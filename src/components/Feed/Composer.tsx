@@ -2,12 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItemType, SlagAttachment } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
+import { VideoRecorder } from '../UI/VideoRecorder';
 import { generateSmartTags } from '../../lib/geminiService';
 import {
   Send,
   Trash2,
   Paperclip,
   Mic,
+  Video,
   Sparkles,
   Bold,
   Heading2,
@@ -19,7 +21,8 @@ import {
   Smile,
   X,
   Loader2,
-  ChevronDown
+  ChevronDown,
+  Maximize2
 } from 'lucide-react';
 
 export const Composer: React.FC = () => {
@@ -27,6 +30,8 @@ export const Composer: React.FC = () => {
     saveItem,
     currentFolder,
     aiSettings,
+    setSelectedItem,
+    setIsFullscreenEditorOpen,
     addToast
   } = useApp();
 
@@ -37,6 +42,7 @@ export const Composer: React.FC = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<SlagAttachment[]>([]);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
@@ -49,7 +55,7 @@ export const Composer: React.FC = () => {
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 240)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 220)}px`;
     }
   }, [content]);
 
@@ -95,7 +101,7 @@ export const Composer: React.FC = () => {
 
   const handleSmartAiTags = async () => {
     if (!content.trim() && attachments.length === 0) {
-      addToast('Введите текст заметки для ИИ-анализа', 'info');
+      addToast('Введите текст заметки для ИИ', 'info');
       return;
     }
 
@@ -103,15 +109,14 @@ export const Composer: React.FC = () => {
     try {
       const suggestedTags = await generateSmartTags(content, aiSettings);
       if (suggestedTags.length > 0) {
-        // Merge with existing unique tags
         const merged = Array.from(new Set([...tags, ...suggestedTags]));
         setTags(merged);
-        addToast(`ИИ подобрал теги: ${suggestedTags.map(t => '#' + t).join(' ')}`, 'success');
+        addToast(`Теги: ${suggestedTags.map(t => '#' + t).join(' ')}`, 'success');
       } else {
-        addToast('ИИ не нашел подходящих тегов или ключ не указан', 'info');
+        addToast('ИИ не нашел подходящих тегов', 'info');
       }
     } catch {
-      addToast('Ошибка запроса к Gemini API', 'error');
+      addToast('Ошибка запроса к Gemini', 'error');
     } finally {
       setIsGeneratingAiTags(false);
     }
@@ -128,7 +133,6 @@ export const Composer: React.FC = () => {
   const handleSend = () => {
     if (!content.trim() && attachments.length === 0) return;
 
-    // Determine title from content
     let title = '';
     const lines = content.trim().split('\n');
     const firstLine = lines[0].replace(/^#+\s*/, '').trim();
@@ -141,11 +145,9 @@ export const Composer: React.FC = () => {
       title = firstLine.slice(0, 50) || 'Заметка';
     }
 
-    // Auto extract #hashtags from text if user typed them inline
     const inlineTags = Array.from(content.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g)).map(m => m[1]);
     const finalTags = Array.from(new Set([...tags, ...inlineTags]));
 
-    // Parse subtasks if task
     let subtasks: Array<{ id: string; title: string; completed: boolean }> = [];
     if (itemType === 'task') {
       const checkboxLines = lines.filter(l => /^\s*-\s*\[([ xX])\]\s+(.+)$/.test(l));
@@ -173,7 +175,6 @@ export const Composer: React.FC = () => {
       subtasks: subtasks.length > 0 ? subtasks : undefined,
     });
 
-    // Reset composer state
     setContent('');
     setTags([]);
     setAttachments([]);
@@ -184,8 +185,29 @@ export const Composer: React.FC = () => {
     }
   };
 
+  // Expand into Fullscreen Focus Mode directly from composer
+  const handleExpandToFullscreen = () => {
+    const lines = content.trim().split('\n');
+    const firstLine = lines[0]?.replace(/^#+\s*/, '').trim() || (itemType === 'article' ? 'Новая статья' : 'Черновик');
+    const tempItem = saveItem({
+      type: itemType,
+      title: firstLine,
+      content: content.trim(),
+      folder: currentFolder,
+      tags,
+      attachments,
+      priority: itemType === 'task' ? priority : undefined,
+      dueDate: itemType === 'task' && dueDate ? dueDate : undefined,
+    });
+
+    setContent('');
+    setAttachments([]);
+    setTags([]);
+    setSelectedItem(tempItem);
+    setIsFullscreenEditorOpen(true);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Send on Enter (Shift+Enter for newline)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -196,54 +218,54 @@ export const Composer: React.FC = () => {
 
   return (
     <div className="p-3 bg-[#0c0c0e] border-t border-white/[0.06] flex flex-col gap-2 select-none shrink-0 max-w-3xl w-full mx-auto">
-      {/* Top Telegram-style Formatting Bar (Aa, B, :=, Table, Link, Image, Formula, Emoji) */}
+      {/* Top Telegram-style Formatting Bar */}
       <div className="flex items-center gap-1 text-zinc-400 border-b border-white/[0.04] pb-1.5 px-1">
         <button
           onClick={() => insertFormatting('## ', '')}
-          className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-          title="Заголовок (Aa)"
+          className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+          title="Заголовок"
         >
           <Heading2 className="w-4 h-4" />
         </button>
         <button
           onClick={() => insertFormatting('**', '**')}
-          className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-          title="Жирный текст (B)"
+          className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+          title="Жирный"
         >
           <Bold className="w-4 h-4" />
         </button>
         <button
           onClick={() => insertFormatting('- [ ] ', '')}
-          className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-          title="Список задач (:=)"
+          className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+          title="Чеклист"
         >
           <CheckSquare className="w-4 h-4" />
         </button>
         <button
-          onClick={() => insertFormatting('\n| Заголовок 1 | Заголовок 2 |\n|---|---|\n| Значение 1 | Значение 2 |\n')}
-          className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-          title="Таблица (田)"
+          onClick={() => insertFormatting('\n| Колонки 1 | Колонки 2 |\n|---|---|\n| Текст 1 | Текст 2 |\n')}
+          className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+          title="Таблица"
         >
           <Table className="w-4 h-4" />
         </button>
         <button
           onClick={() => insertFormatting('[', '](https://)')}
-          className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-          title="Ссылка (🔗)"
+          className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+          title="Ссылка"
         >
           <Link2 className="w-4 h-4" />
         </button>
         <button
           onClick={() => imageInputRef.current?.click()}
-          className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-          title="Вставить изображение (🖼)"
+          className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+          title="Изображение"
         >
           <ImageIcon className="w-4 h-4" />
         </button>
         <button
           onClick={() => insertFormatting('```\n', '\n```')}
-          className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-          title="Формула / Код (∑)"
+          className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+          title="Блок кода"
         >
           <Code2 className="w-4 h-4" />
         </button>
@@ -252,14 +274,14 @@ export const Composer: React.FC = () => {
         <div className="relative">
           <button
             onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-            className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
-            title="Эмодзи (☺)"
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors"
+            title="Эмодзи"
           >
             <Smile className="w-4 h-4" />
           </button>
 
           {isEmojiPickerOpen && (
-            <div className="absolute left-0 bottom-full mb-1 flex items-center gap-1.5 p-1.5 rounded-lg bg-[#18181b] border border-white/[0.08] shadow-2xl z-30 animate-in fade-in">
+            <div className="absolute left-0 bottom-full mb-1 flex items-center gap-1.5 p-1.5 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl z-30 animate-in fade-in">
               {quickEmojis.map(emo => (
                 <button
                   key={emo}
@@ -267,7 +289,7 @@ export const Composer: React.FC = () => {
                     setContent(prev => prev + emo);
                     setIsEmojiPickerOpen(false);
                   }}
-                  className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 text-sm transition-colors"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-sm transition-colors"
                 >
                   {emo}
                 </button>
@@ -283,10 +305,13 @@ export const Composer: React.FC = () => {
           {attachments.map(att => (
             <div
               key={att.id}
-              className="flex items-center gap-2 p-1.5 rounded bg-white/[0.04] border border-white/[0.08] text-xs text-zinc-300 relative group"
+              className="flex items-center gap-2 p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 relative group"
             >
               {att.type === 'image' && (
-                <img src={att.dataUrl} alt={att.name} className="w-8 h-8 object-cover rounded" />
+                <img src={att.dataUrl} alt={att.name} className="w-8 h-8 object-cover rounded-md" />
+              )}
+              {att.type === 'video' && (
+                <span className="text-[10px] font-mono text-zinc-400">⏹ Видео-квадратик</span>
               )}
               {att.type === 'audio' && (
                 <span className="text-[10px] font-mono text-zinc-400">🎙 Войс</span>
@@ -311,7 +336,7 @@ export const Composer: React.FC = () => {
           {tags.map(tag => (
             <span
               key={tag}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 text-[10px] font-mono"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] text-zinc-300 text-[10px] font-mono"
             >
               #{tag}
               <button
@@ -325,7 +350,7 @@ export const Composer: React.FC = () => {
         </div>
       )}
 
-      {/* Voice Recorder Active Banner */}
+      {/* Media Recorders Active Banners */}
       {isRecordingAudio && (
         <AudioRecorder
           onRecorded={(att) => {
@@ -333,6 +358,16 @@ export const Composer: React.FC = () => {
             setIsRecordingAudio(false);
           }}
           onCancel={() => setIsRecordingAudio(false)}
+        />
+      )}
+
+      {isRecordingVideo && (
+        <VideoRecorder
+          onRecorded={(att) => {
+            setAttachments(prev => [...prev, att]);
+            setIsRecordingVideo(false);
+          }}
+          onCancel={() => setIsRecordingVideo(false)}
         />
       )}
 
@@ -363,10 +398,10 @@ export const Composer: React.FC = () => {
           rows={2}
           placeholder={
             itemType === 'task'
-              ? 'Название и описание задачи... (- [ ] для подзадач)'
+              ? 'Задача... (- [ ] для подзадач)'
               : itemType === 'article'
               ? 'Черновик статьи... (Shift+Enter для новой строки)'
-              : 'Напишите заметку, мысль или сниппет... (Enter для отправки)'
+              : 'Мысль, заметка или код... (Enter для отправки)'
           }
           className="w-full bg-transparent text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-relaxed py-1 px-1"
         />
@@ -403,19 +438,19 @@ export const Composer: React.FC = () => {
 
       {/* Bottom Control Bar */}
       <div className="flex items-center justify-between pt-1">
-        {/* Left Side: +Ai Button, Type Selector, Voice Mic, Attach */}
+        {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
         <div className="flex items-center gap-2">
-          {/* +Ai Smart Tagging Button (matching Image 1) */}
+          {/* +Ai Smart Tagging Button */}
           <button
             onClick={handleSmartAiTags}
             disabled={isGeneratingAiTags}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 text-xs font-medium transition-colors border border-white/[0.06]"
-            title="ИИ тегирование через Gemini (с учетом уже существующих тегов)"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition-colors border border-white/[0.05]"
+            title="ИИ тегирование"
           >
             {isGeneratingAiTags ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
             ) : (
-              <Sparkles className="w-3.5 h-3.5 text-zinc-200" />
+              <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
             )}
             <span>+Ai</span>
           </button>
@@ -424,7 +459,7 @@ export const Composer: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 transition-colors"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 transition-colors"
             >
               <span>
                 {itemType === 'note' ? 'Заметка' : itemType === 'task' ? 'Таска' : 'Статья'}
@@ -433,13 +468,13 @@ export const Composer: React.FC = () => {
             </button>
 
             {isTypeDropdownOpen && (
-              <div className="absolute left-0 bottom-full mb-1 w-32 rounded-lg bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 text-xs flex flex-col gap-0.5 animate-in fade-in">
+              <div className="absolute left-0 bottom-full mb-1 w-32 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 text-xs flex flex-col gap-0.5 animate-in fade-in">
                 <button
                   onClick={() => {
                     setItemType('note');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded transition-colors ${
+                  className={`text-left px-2 py-1.5 rounded-md transition-colors ${
                     itemType === 'note' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
@@ -450,7 +485,7 @@ export const Composer: React.FC = () => {
                     setItemType('task');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded transition-colors ${
+                  className={`text-left px-2 py-1.5 rounded-md transition-colors ${
                     itemType === 'task' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
@@ -461,7 +496,7 @@ export const Composer: React.FC = () => {
                     setItemType('article');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded transition-colors ${
+                  className={`text-left px-2 py-1.5 rounded-md transition-colors ${
                     itemType === 'article' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
@@ -473,10 +508,13 @@ export const Composer: React.FC = () => {
 
           {/* Voice Mic Button */}
           <button
-            onClick={() => setIsRecordingAudio(!isRecordingAudio)}
-            className={`p-1.5 rounded transition-colors ${
+            onClick={() => {
+              setIsRecordingVideo(false);
+              setIsRecordingAudio(!isRecordingAudio);
+            }}
+            className={`p-1.5 rounded-md transition-colors ${
               isRecordingAudio
-                ? 'bg-red-500/20 text-red-400'
+                ? 'bg-rose-500/20 text-rose-400'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
             }`}
             title="Записать голосовую заметку (войс)"
@@ -484,18 +522,34 @@ export const Composer: React.FC = () => {
             <Mic className="w-4 h-4" />
           </button>
 
+          {/* Video Square Camera Button */}
+          <button
+            onClick={() => {
+              setIsRecordingAudio(false);
+              setIsRecordingVideo(!isRecordingVideo);
+            }}
+            className={`p-1.5 rounded-md transition-colors ${
+              isRecordingVideo
+                ? 'bg-rose-500/20 text-rose-400'
+                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+            }`}
+            title="Записать видео-квадратик"
+          >
+            <Video className="w-4 h-4" />
+          </button>
+
           {/* File Attach Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
             title="Прикрепить файл"
           >
             <Paperclip className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Right Side: Clear draft & Send Button */}
-        <div className="flex items-center gap-2">
+        {/* Right Side: Clear draft, Fullscreen Expand Icon, and Send Button */}
+        <div className="flex items-center gap-1.5">
           {(content.trim() || attachments.length > 0) && (
             <button
               onClick={() => {
@@ -503,14 +557,23 @@ export const Composer: React.FC = () => {
                 setAttachments([]);
                 setTags([]);
               }}
-              className="p-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors"
+              className="p-1.5 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors"
               title="Очистить"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
 
-          {/* Telegram-style Circular Send Button (Image 1 style) */}
+          {/* Expand to Fullscreen Editor Icon Button */}
+          <button
+            onClick={handleExpandToFullscreen}
+            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            title="Раскрыть в полноэкранный редактор"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+
+          {/* Telegram-style Circular Send Button */}
           <button
             onClick={handleSend}
             disabled={!content.trim() && attachments.length === 0}

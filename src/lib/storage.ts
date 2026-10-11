@@ -25,26 +25,26 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
   {
     path: 'Проекты/SLAG v2',
     name: 'SLAG v2',
-    description: 'Разработка ультра-минималистичного приложения для заметок на Tauri + React в стиле Linear.',
-    icon: 'Folder',
+    description: 'Разработка приложения заметок в стиле Linear.',
+    icon: 'Code2',
   },
   {
     path: 'Проекты/Дизайн',
     name: 'Дизайн',
-    description: 'UI/UX концепты, правила темной темы, типографика Inter, референсы Linear и Vercel.',
-    icon: 'Folder',
+    description: 'Интерфейсы, типографика Inter, референсы Linear и Vercel.',
+    icon: 'Layers',
   },
   {
     path: 'Личное',
     name: 'Личное',
-    description: 'Личные мысли, книги, идеи, здоровье и бытовые вопросы.',
-    icon: 'Folder',
+    description: 'Мысли, книги, бытовые вопросы.',
+    icon: 'Bookmark',
   },
   {
     path: 'Личное/Финансы',
     name: 'Финансы',
-    description: 'Счета, подписки, инвестиции, планирование покупок и расходов.',
-    icon: 'Folder',
+    description: 'Счета, подписки, расходы.',
+    icon: 'Briefcase',
   },
 ];
 

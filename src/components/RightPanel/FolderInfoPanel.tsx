@@ -22,6 +22,7 @@ export const FolderInfoPanel: React.FC = () => {
     filteredItems,
     isRightPanelOpen,
     setIsRightPanelOpen,
+    rightPanelWidth,
     saveFolder,
     setActiveTagFilter,
     addToast
@@ -84,7 +85,10 @@ export const FolderInfoPanel: React.FC = () => {
   };
 
   return (
-    <aside className="w-72 h-screen flex flex-col bg-[#0c0c0e] border-l border-white/[0.06] select-none text-[#a1a1aa] shrink-0">
+    <aside
+      style={{ width: `${rightPanelWidth}px` }}
+      className="h-screen flex flex-col bg-[#0c0c0e] border-l border-white/[0.06] select-none text-[#a1a1aa] shrink-0"
+    >
       {/* Top Header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-white/[0.04]">
         <div className="flex items-center gap-2 truncate">

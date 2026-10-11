@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
+import { VideoSquarePlayer } from '../UI/VideoSquarePlayer';
 import {
   CheckCircle2,
   Circle,
@@ -27,7 +28,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     setIsFullscreenEditorOpen,
     setActiveTagFilter,
     folders,
-    moveItem
+    moveItem,
+    openContextMenu
   } = useApp();
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
@@ -43,6 +45,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const isArticle = item.type === 'article';
 
   const audioAttachments = item.attachments.filter(a => a.type === 'audio');
+  const videoAttachments = item.attachments.filter(a => a.type === 'video');
   const imageAttachments = item.attachments.filter(a => a.type === 'image');
   const fileAttachments = item.attachments.filter(a => a.type === 'file');
 
@@ -54,26 +57,47 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     setIsFullscreenEditorOpen(true);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      type: 'item',
+      item,
+    });
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('text/plain', item.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
-    <div className="group relative flex flex-col gap-1.5 max-w-2xl w-full mx-auto p-3.5 rounded-xl bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05] transition-all">
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onContextMenu={handleContextMenu}
+      className="group relative flex flex-col gap-2 max-w-2xl w-full mx-auto p-3.5 rounded-xl bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05] transition-all cursor-default"
+    >
       {/* Top Header / Metadata Bar */}
       <div className="flex items-center justify-between text-xs text-zinc-500">
         <div className="flex items-center gap-2">
-          {/* Item Type Badge */}
+          {/* Item Type: Plain text, no nested chips */}
           {isTask && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300">
+            <span className="text-[11px] font-mono text-amber-400/90 font-medium">
               Таска
             </span>
           )}
           {isArticle && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-300">
+            <span className="text-[11px] font-mono text-blue-400/90 font-medium">
               Статья {item.readingTimeMinutes ? `• ${item.readingTimeMinutes} мин` : ''}
             </span>
           )}
 
-          {/* Folder pill if not in inbox */}
+          {/* Folder name if not in inbox */}
           {item.folder !== 'Входящие' && (
-            <span className="text-[11px] text-zinc-400 font-mono">
+            <span className="text-[11px] text-zinc-500 font-mono">
               {item.folder}
             </span>
           )}
@@ -81,12 +105,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           {/* Task Priority */}
           {isTask && item.priority && item.priority !== 'none' && (
             <span
-              className={`text-[10px] uppercase font-mono px-1 rounded ${
+              className={`text-[10px] uppercase font-mono font-medium ${
                 item.priority === 'high'
-                  ? 'text-rose-400 bg-rose-500/10'
+                  ? 'text-rose-400'
                   : item.priority === 'medium'
-                  ? 'text-amber-400 bg-amber-500/10'
-                  : 'text-zinc-400 bg-zinc-800'
+                  ? 'text-amber-400'
+                  : 'text-zinc-500'
               }`}
             >
               {item.priority}
@@ -95,8 +119,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
           {/* Task Due Date */}
           {isTask && item.dueDate && (
-            <span className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
-              <Calendar className="w-3 h-3" />
+            <span className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
+              <Calendar className="w-3 h-3 text-zinc-600" />
               {item.dueDate}
             </span>
           )}
@@ -212,7 +236,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             </div>
           </div>
 
-          {/* Subtasks Section if exists */}
+          {/* Subtasks Section */}
           {item.subtasks && item.subtasks.length > 0 && (
             <div className="mt-1 pl-6 flex flex-col gap-1 border-l border-white/[0.06]">
               <div
@@ -278,7 +302,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       ) : (
         /* Note Variant */
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {item.title && item.title !== item.content.slice(0, 40) && (
             <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
               {item.title}
@@ -293,7 +317,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Audio Notes Player (if any) */}
+      {/* Video Square Notes (instead of round video circles) */}
+      {videoAttachments.map(att => (
+        <div key={att.id} className="pt-1 flex">
+          <VideoSquarePlayer src={att.dataUrl || ''} />
+        </div>
+      ))}
+
+      {/* Audio Notes Player */}
       {audioAttachments.map(att => (
         <div key={att.id} className="pt-1">
           <AudioPlayer src={att.dataUrl || ''} />
@@ -318,7 +349,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* File Attachments Pills */}
+      {/* File Attachments */}
       {fileAttachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">
           {fileAttachments.map(file => (
@@ -326,7 +357,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               key={file.id}
               href={file.dataUrl}
               download={file.name}
-              className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 border border-white/[0.06] transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 border border-white/[0.05] transition-colors"
             >
               <Paperclip className="w-3 h-3 text-zinc-400" />
               <span className="truncate max-w-[150px]">{file.name}</span>
@@ -340,7 +371,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
       {/* Tags List */}
       {item.tags && item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 pt-1 items-center">
+        <div className="flex flex-wrap gap-1.5 pt-0.5 items-center">
           {item.tags.map(tag => (
             <button
               key={tag}

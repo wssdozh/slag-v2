@@ -8,6 +8,14 @@ interface ToastMessage {
   text: string;
 }
 
+export interface ContextMenuTarget {
+  x: number;
+  y: number;
+  type: 'item' | 'folder' | 'feed';
+  item?: SlagItem;
+  folder?: FolderMeta;
+}
+
 interface AppContextType {
   vault: VaultMeta;
   vaults: VaultMeta[];
@@ -27,6 +35,17 @@ interface AppContextType {
   isTriageModalOpen: boolean;
   aiSettings: AiSettings;
   toasts: ToastMessage[];
+
+  // Layout & Resizing
+  sidebarWidth: number;
+  rightPanelWidth: number;
+  setSidebarWidth: (w: number) => void;
+  setRightPanelWidth: (w: number) => void;
+
+  // Context Menu
+  contextMenu: ContextMenuTarget | null;
+  openContextMenu: (target: ContextMenuTarget) => void;
+  closeContextMenu: () => void;
 
   // Actions
   setCurrentFolder: (folder: string) => void;
@@ -59,6 +78,8 @@ interface AppContextType {
 }
 
 const AI_SETTINGS_KEY = 'slag_ai_settings_v2';
+const SIDEBAR_WIDTH_KEY = 'slag_sidebar_width_v2';
+const RIGHT_PANEL_WIDTH_KEY = 'slag_right_panel_width_v2';
 
 const DEFAULT_AI_SETTINGS: AiSettings = {
   geminiApiKey: '',
@@ -86,6 +107,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [editingFolder, setEditingFolder] = useState<FolderMeta | null>(null);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState<boolean>(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
+
+  // Resizable panel widths
+  const [sidebarWidth, setSidebarWidthState] = useState<number>(() => {
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    return saved ? Number(saved) : 256;
+  });
+
+  const [rightPanelWidth, setRightPanelWidthState] = useState<number>(() => {
+    const saved = localStorage.getItem(RIGHT_PANEL_WIDTH_KEY);
+    return saved ? Number(saved) : 288;
+  });
+
+  const setSidebarWidth = (w: number) => {
+    const clamped = Math.max(180, Math.min(480, w));
+    setSidebarWidthState(clamped);
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clamped));
+  };
+
+  const setRightPanelWidth = (w: number) => {
+    const clamped = Math.max(220, Math.min(520, w));
+    setRightPanelWidthState(clamped);
+    localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(clamped));
+  };
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -103,7 +148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts(prev => [...prev, { id, text, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3200);
+    }, 2800);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -121,30 +166,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
   }, [refreshData]);
 
-  // Keyboard shortcut listener: Cmd+K / Ctrl+K for search, Escape to close modals
+  const openContextMenu = useCallback((target: ContextMenuTarget) => {
+    setContextMenu(target);
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Strict Layered Dismiss Stack for Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(prev => !prev);
+        return;
       }
+
       if (e.key === 'Escape') {
-        if (isFullscreenEditorOpen) setIsFullscreenEditorOpen(false);
-        else if (isSearchOpen) setIsSearchOpen(false);
-        else if (isSettingsOpen) setIsSettingsOpen(false);
-        else if (isFolderModalOpen) setIsFolderModalOpen(false);
-        else if (isTriageModalOpen) setIsTriageModalOpen(false);
+        // Hierarchy of layered closing: ContextMenu -> FolderModal/TriageModal/SettingsModal -> SearchModal -> FullscreenEditor
+        if (contextMenu) {
+          e.preventDefault();
+          closeContextMenu();
+        } else if (isFolderModalOpen) {
+          e.preventDefault();
+          setIsFolderModalOpen(false);
+          setEditingFolder(null);
+        } else if (isTriageModalOpen) {
+          e.preventDefault();
+          setIsTriageModalOpen(false);
+        } else if (isSettingsOpen) {
+          e.preventDefault();
+          setIsSettingsOpen(false);
+        } else if (isSearchOpen) {
+          e.preventDefault();
+          setIsSearchOpen(false);
+        } else if (isFullscreenEditorOpen) {
+          e.preventDefault();
+          setIsFullscreenEditorOpen(false);
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreenEditorOpen, isSearchOpen, isSettingsOpen, isFolderModalOpen, isTriageModalOpen]);
+  }, [
+    contextMenu,
+    isFolderModalOpen,
+    isTriageModalOpen,
+    isSettingsOpen,
+    isSearchOpen,
+    isFullscreenEditorOpen,
+    closeContextMenu
+  ]);
+
+  // Global click outside for Context Menu
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClick = () => closeContextMenu();
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [contextMenu, closeContextMenu]);
 
   const saveAiSettings = (newSettings: Partial<AiSettings>) => {
     const updated = { ...aiSettings, ...newSettings };
     setAiSettings(updated);
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
-    addToast('Настройки ИИ сохранены', 'success');
+    addToast('Настройки сохранены', 'success');
   };
 
   const saveItem = (itemData: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }): SlagItem => {
@@ -199,7 +287,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedSubtasks = item.subtasks.map(st => 
         st.id === subtaskId ? { ...st, completed: !st.completed } : st
       );
-      // Auto complete parent if all subtasks completed
       const allDone = updatedSubtasks.every(st => st.completed);
       updateItem({
         ...item,
@@ -208,7 +295,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } else {
       const newStatus = item.status === 'done' ? 'todo' : 'done';
-      // If completing main task, toggle all subtasks
       const updatedSubtasks = item.subtasks?.map(st => ({
         ...st,
         completed: newStatus === 'done',
@@ -245,7 +331,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentFolder('Входящие');
     }
     refreshData();
-    addToast('Папка удалена, заметки перенесены во Входящие', 'info');
+    addToast('Папка удалена, заметки перемещены во Входящие', 'info');
   };
 
   const switchVault = (vaultId: string) => {
@@ -265,7 +351,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const openCreateFolderModal = (parentPath?: string) => {
-    setEditingFolder(parentPath ? { path: `${parentPath}/`, name: '', description: '' } : null);
+    setEditingFolder(parentPath ? { path: `${parentPath}/`, name: '', description: '', icon: 'Folder' } : null);
     setIsFolderModalOpen(true);
   };
 
@@ -281,8 +367,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Filter items by current folder, type filter, and tag filter
   const filteredItems = items.filter(item => {
-    // Folder match: if currentFolder is "Входящие", show items where folder is "Входящие"
-    // If it's a parent folder, show items in this folder or subfolders
     const matchesFolder = item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
     if (!matchesFolder) return false;
 
@@ -295,7 +379,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return true;
-  }).sort((a, b) => a.createdAt - b.createdAt); // Chronological stream for Telegram feel
+  }).sort((a, b) => a.createdAt - b.createdAt);
 
   return (
     <AppContext.Provider
@@ -318,6 +402,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isTriageModalOpen,
         aiSettings,
         toasts,
+        sidebarWidth,
+        rightPanelWidth,
+        setSidebarWidth,
+        setRightPanelWidth,
+        contextMenu,
+        openContextMenu,
+        closeContextMenu,
         setCurrentFolder,
         setActiveTypeFilter,
         setActiveTagFilter,

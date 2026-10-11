@@ -3,7 +3,7 @@ export type SlagItemType = 'note' | 'article' | 'task';
 export interface SlagAttachment {
   id: string;
   name: string;
-  type: 'image' | 'audio' | 'file';
+  type: 'image' | 'audio' | 'video' | 'file';
   mimeType: string;
   size: number;
   relativePath: string;

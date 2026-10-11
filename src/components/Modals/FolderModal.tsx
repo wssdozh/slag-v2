@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
-import { Folder, X, Sparkles, Trash2 } from 'lucide-react';
+import { FOLDER_ICONS } from '../Sidebar/FolderTree';
+import { Folder, X, Trash2 } from 'lucide-react';
 
 export const FolderModal: React.FC = () => {
   const {
@@ -16,6 +17,7 @@ export const FolderModal: React.FC = () => {
   const [name, setName] = useState('');
   const [parentFolder, setParentFolder] = useState<string>('');
   const [description, setDescription] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState<string>('Folder');
 
   const isEditing = Boolean(editingFolder && editingFolder.name);
 
@@ -23,6 +25,7 @@ export const FolderModal: React.FC = () => {
     if (editingFolder) {
       setName(editingFolder.name || '');
       setDescription(editingFolder.description || '');
+      setSelectedIcon(editingFolder.icon || 'Folder');
       const parts = editingFolder.path.split('/');
       if (parts.length > 1) {
         setParentFolder(parts.slice(0, -1).join('/'));
@@ -32,6 +35,7 @@ export const FolderModal: React.FC = () => {
     } else {
       setName('');
       setDescription('');
+      setSelectedIcon('Folder');
       setParentFolder('');
     }
   }, [editingFolder, isFolderModalOpen]);
@@ -49,13 +53,15 @@ export const FolderModal: React.FC = () => {
       path: finalPath,
       name: cleanName,
       description: description.trim(),
-      icon: 'Folder',
+      icon: selectedIcon,
     };
 
     saveFolder(folderMeta);
   };
 
   const eligibleParentFolders = folders.filter(f => f.path !== 'Входящие' && f.path !== editingFolder?.path);
+
+  const CurrentIconComp = FOLDER_ICONS[selectedIcon] || Folder;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
@@ -64,7 +70,7 @@ export const FolderModal: React.FC = () => {
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white">
-              <Folder className="w-4 h-4" />
+              <CurrentIconComp className="w-4 h-4" />
             </div>
             <h3 className="text-sm font-semibold text-white">
               {isEditing ? 'Настройки папки' : 'Создать новую папку'}
@@ -92,6 +98,28 @@ export const FolderModal: React.FC = () => {
             />
           </div>
 
+          {/* Folder Icon Selector Grid */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-400">Иконка папки</label>
+            <div className="grid grid-cols-8 gap-1.5 p-2 rounded-lg bg-black/30 border border-white/[0.06]">
+              {Object.entries(FOLDER_ICONS).map(([key, IconComponent]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedIcon(key)}
+                  className={`p-1.5 rounded-md flex items-center justify-center transition-all ${
+                    selectedIcon === key
+                      ? 'bg-white text-black font-medium'
+                      : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                  }`}
+                  title={key}
+                >
+                  <IconComponent className="w-4 h-4" />
+                </button>
+              ))}
+            </div>
+          </div>
+
           {!isEditing && (
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-400">Родительская папка (опционально)</label>
@@ -111,22 +139,16 @@ export const FolderModal: React.FC = () => {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-zinc-400 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-zinc-400" />
-                Описание для ИИ-сортировки
-              </label>
-            </div>
+            <label className="text-xs font-medium text-zinc-400">
+              Описание для ИИ-сортировки
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Опишите темы и содержание папки, чтобы Gemini Flash мог безошибочно сортировать сюда входящие заметки..."
-              rows={3}
-              className="w-full bg-black/40 border border-white/[0.08] rounded-lg p-3 text-xs text-white placeholder-zinc-600 resize-none leading-relaxed"
+              placeholder="Опишите темы и содержание папки, чтобы ИИ сортировал сюда входящие заметки..."
+              rows={2}
+              className="w-full bg-black/40 border border-white/[0.08] rounded-lg p-2.5 text-xs text-white placeholder-zinc-600 resize-none leading-relaxed"
             />
-            <span className="text-[11px] text-zinc-500">
-              ИИ читает это описание при нажатии кнопки «AI Triage» во «Входящих».
-            </span>
           </div>
 
           {/* Footer Controls */}

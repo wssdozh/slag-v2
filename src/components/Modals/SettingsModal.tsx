@@ -9,7 +9,11 @@ import {
   Upload,
   Eye,
   EyeOff,
-  ExternalLink
+  ExternalLink,
+  Database,
+  Sliders,
+  Keyboard,
+  RotateCcw
 } from 'lucide-react';
 
 export const SettingsModal: React.FC = () => {
@@ -18,10 +22,13 @@ export const SettingsModal: React.FC = () => {
     setIsSettingsOpen,
     aiSettings,
     saveAiSettings,
+    setSidebarWidth,
+    setRightPanelWidth,
     refreshData,
     addToast
   } = useApp();
 
+  const [activeTab, setActiveTab] = useState<'ai' | 'vault' | 'ui' | 'shortcuts'>('ai');
   const [apiKey, setApiKey] = useState(aiSettings.geminiApiKey || '');
   const [model, setModel] = useState(aiSettings.model || 'gemini-2.0-flash');
   const [showKey, setShowKey] = useState(false);
@@ -46,12 +53,11 @@ export const SettingsModal: React.FC = () => {
     a.download = `slag_vault_backup_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    addToast('Резервная копия Vault экспортирована', 'success');
+    addToast('Резервная копия экспортирована', 'success');
   };
 
   const handleExportMarkdownFiles = () => {
     const files = storage.exportObsidianBundle();
-    // Export each or generate multi-file download
     files.forEach((f, idx) => {
       setTimeout(() => {
         const blob = new Blob([f.content], { type: 'text/markdown;charset=utf-8' });
@@ -62,9 +68,9 @@ export const SettingsModal: React.FC = () => {
         a.download = cleanName;
         a.click();
         URL.revokeObjectURL(url);
-      }, idx * 100);
+      }, idx * 80);
     });
-    addToast(`Экспортировано ${files.length} Markdown-файлов для Obsidian`, 'success');
+    addToast(`Экспортировано ${files.length} .md файлов`, 'success');
   };
 
   const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,25 +83,31 @@ export const SettingsModal: React.FC = () => {
       const success = storage.importVaultFromJson(content);
       if (success) {
         refreshData();
-        addToast('Хранилище успешно восстановлено из бэкапа', 'success');
+        addToast('Хранилище восстановлено', 'success');
       } else {
-        addToast('Ошибка формата файла бэкапа', 'error');
+        addToast('Ошибка формата файла', 'error');
       }
     };
     reader.readAsText(file);
     e.target.value = '';
   };
 
+  const resetPanelSizes = () => {
+    setSidebarWidth(256);
+    setRightPanelWidth(288);
+    addToast('Размеры панелей сброшены', 'info');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="w-full max-w-lg rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="w-full max-w-2xl rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden h-[540px]">
+        {/* Top Header */}
+        <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white">
-              <Settings className="w-4 h-4" />
+            <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white">
+              <Settings className="w-3.5 h-3.5" />
             </div>
-            <h3 className="text-sm font-semibold text-white">Настройки SLAG v2</h3>
+            <h3 className="text-sm font-semibold text-white">Настройки</h3>
           </div>
           <button
             onClick={() => setIsSettingsOpen(false)}
@@ -105,132 +117,249 @@ export const SettingsModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Content */}
-        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 flex flex-col gap-6">
-          {/* Gemini AI Settings */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
-                Интеграция с Google Gemini
-              </span>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
-              >
-                <span>Получить бесплатный ключ</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
+        {/* 2-Column Body: Tabs Navigation on Left, Tab Content on Right */}
+        <div className="flex-1 flex min-h-0">
+          {/* Left Tabs Nav */}
+          <div className="w-48 border-r border-white/[0.06] bg-[#0c0c0e] p-2 flex flex-col gap-1 select-none shrink-0">
+            <button
+              onClick={() => setActiveTab('ai')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+                activeTab === 'ai'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span>ИИ & Gemini</span>
+            </button>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-400">Gemini API Key</label>
-              <div className="relative">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="AIzaSy..."
-                  className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
-                >
-                  {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
+            <button
+              onClick={() => setActiveTab('vault')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+                activeTab === 'vault'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span>Хранилище & Бэкап</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ui')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+                activeTab === 'ui'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span>Интерфейс & Панели</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('shortcuts')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+                activeTab === 'shortcuts'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <Keyboard className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span>Горячие клавиши</span>
+            </button>
+          </div>
+
+          {/* Right Tab Content */}
+          <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 flex flex-col justify-between">
+            {activeTab === 'ai' && (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-200">
+                    Google Gemini Flash
+                  </span>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
+                  >
+                    <span>Бесплатный API ключ</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-zinc-400">Gemini API Key</label>
+                  <div className="relative">
+                    <input
+                      type={showKey ? 'text' : 'password'}
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
+                    >
+                      {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-zinc-500">
+                    Используется для быстрого подбора тегов и функции AI Triage. Без ключа работает встроенная эвристика.
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-zinc-400">Модель</label>
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200"
+                  >
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Рекомендуется)</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                  </select>
+                </div>
               </div>
-              <span className="text-[11px] text-zinc-500">
-                Используется для молниеносного подбора тегов и умного распределения заметок из Входящих. Если ключ не указан, работает локальный эвристический алгоритм.
-              </span>
-            </div>
+            )}
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-zinc-400">Модель</label>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200"
-              >
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Самая быстрая, рекомендуется)</option>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Стабильная)</option>
-              </select>
-            </div>
-          </div>
+            {activeTab === 'vault' && (
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-semibold text-zinc-200">
+                  Резервное копирование и Obsidian
+                </span>
 
-          {/* Obsidian Vault & Data Storage */}
-          <div className="flex flex-col gap-3 pt-2 border-t border-white/[0.06]">
-            <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
-              Совместимость с Obsidian и Резервные копии
-            </span>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExportMarkdownFiles}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Download className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Экспорт в .md (Obsidian Vault)</div>
+                        <div className="text-[10px] text-zinc-500">Заметки в чистом Markdown с YAML Frontmatter</div>
+                      </div>
+                    </div>
+                  </button>
 
-            <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Download className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Полный бэкап в JSON</div>
+                        <div className="text-[10px] text-zinc-500">Экспорт структуры, заметок и настроек</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <label className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Восстановить из JSON</div>
+                        <div className="text-[10px] text-zinc-500">Загрузить ранее сохраненный бэкап</div>
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleImportJson}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'ui' && (
+              <div className="flex flex-col gap-4">
+                <span className="text-xs font-semibold text-zinc-200">
+                  Внешний вид и панели
+                </span>
+
+                <div className="flex flex-col gap-2 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-300">Размеры панелей:</span>
+                    <button
+                      type="button"
+                      onClick={resetPanelSizes}
+                      className="flex items-center gap-1 px-2 py-1 rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-[11px] transition-colors"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Сбросить размеры</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-zinc-500">
+                    Панели можно перетаскивать за разделители левой и правой границы.
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 text-[11px] text-zinc-500">
+                  <div>• Цветовая схема: Linear Dark Monochrome (#09090b)</div>
+                  <div>• Скругления: согласованная сетка (6px кнопки, 10px карточки, 14px модалки)</div>
+                  <div>• Рамки фокуса: полностью отключены</div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'shortcuts' && (
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-semibold text-zinc-200">
+                  Клавиатурные комбинации
+                </span>
+
+                <div className="flex flex-col gap-1 text-xs">
+                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                    <span className="text-zinc-400">Быстрый поиск</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Cmd / Ctrl + K</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                    <span className="text-zinc-400">Отправить запись</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Enter</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                    <span className="text-zinc-400">Перенос строки</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Shift + Enter</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                    <span className="text-zinc-400">Закрыть окно / Полноэкранный режим</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Esc</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                    <span className="text-zinc-400">Контекстное меню</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">ПКМ (Правый клик)</kbd>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Form Actions */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.06] mt-4">
               <button
                 type="button"
-                onClick={handleExportMarkdownFiles}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                onClick={() => setIsSettingsOpen(false)}
+                className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Download className="w-4 h-4 text-zinc-400" />
-                  <div className="text-left">
-                    <div className="font-medium">Экспорт в .md (Obsidian Vault)</div>
-                    <div className="text-[10px] text-zinc-500">Все заметки в чистом Markdown с YAML Frontmatter</div>
-                  </div>
-                </div>
+                Закрыть
               </button>
-
               <button
-                type="button"
-                onClick={handleExportJson}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                type="submit"
+                className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <Download className="w-4 h-4 text-zinc-400" />
-                  <div className="text-left">
-                    <div className="font-medium">Полный бэкап в JSON</div>
-                    <div className="text-[10px] text-zinc-500">Экспорт структуры хранилища, заметок и настроек</div>
-                  </div>
-                </div>
+                Сохранить
               </button>
-
-              <label className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer">
-                <div className="flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-zinc-400" />
-                  <div className="text-left">
-                    <div className="font-medium">Восстановить из бэкапа JSON</div>
-                    <div className="text-[10px] text-zinc-500">Загрузить ранее сохраненный файл</div>
-                  </div>
-                </div>
-                <input
-                  type="file"
-                  accept=".json"
-                  className="hidden"
-                  onChange={handleImportJson}
-                />
-              </label>
             </div>
-          </div>
-
-          {/* Footer Controls */}
-          <div className="flex justify-end gap-2 pt-2 border-t border-white/[0.06]">
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors"
-            >
-              Сохранить настройки
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

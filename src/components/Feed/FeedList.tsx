@@ -5,8 +5,19 @@ import type { SlagItem } from '../../types';
 import { Inbox } from 'lucide-react';
 
 export const FeedList: React.FC = () => {
-  const { filteredItems } = useApp();
+  const { filteredItems, openContextMenu } = useApp();
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  const handleFeedContextMenu = (e: React.MouseEvent) => {
+    // Only open if clicking on empty feed space
+    if ((e.target as HTMLElement).closest('.group')) return;
+    e.preventDefault();
+    openContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      type: 'feed',
+    });
+  };
 
   // Group items by calendar date
   const groupItemsByDate = (items: SlagItem[]) => {
@@ -55,7 +66,10 @@ export const FeedList: React.FC = () => {
   }, [filteredItems.length]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-6">
+    <div
+      onContextMenu={handleFeedContextMenu}
+      className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-6"
+    >
       {filteredItems.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-zinc-500 select-none">
           <div className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center mb-3 text-zinc-600">
