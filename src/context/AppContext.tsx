@@ -47,6 +47,12 @@ interface AppContextType {
   openContextMenu: (target: ContextMenuTarget) => void;
   closeContextMenu: () => void;
 
+  // Replies & Linking
+  replyTarget: SlagItem | null;
+  setReplyTarget: (item: SlagItem | null) => void;
+  highlightedItemId: string | null;
+  scrollToItem: (idOrTitle: string) => void;
+
   // Actions
   setCurrentFolder: (folder: string) => void;
   setActiveTypeFilter: (type: SlagItemType | 'all') => void;
@@ -108,6 +114,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [editingFolder, setEditingFolder] = useState<FolderMeta | null>(null);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState<boolean>(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
+  const [replyTarget, setReplyTarget] = useState<SlagItem | null>(null);
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
 
   // Resizable panel widths
   const [sidebarWidth, setSidebarWidthState] = useState<number>(() => {
@@ -201,6 +209,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else if (isSearchOpen) {
           e.preventDefault();
           setIsSearchOpen(false);
+        } else if (replyTarget) {
+          e.preventDefault();
+          setReplyTarget(null);
         } else if (isFullscreenEditorOpen) {
           e.preventDefault();
           setIsFullscreenEditorOpen(false);
@@ -216,9 +227,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isTriageModalOpen,
     isSettingsOpen,
     isSearchOpen,
+    replyTarget,
     isFullscreenEditorOpen,
     closeContextMenu
   ]);
+
+  const scrollToItem = useCallback((idOrTitle: string) => {
+    const cleanQuery = idOrTitle.trim().replace(/^\[\[/, '').replace(/\]\]$/, '');
+    const found = items.find(i => 
+      i.id === cleanQuery || 
+      i.title.toLowerCase() === cleanQuery.toLowerCase() ||
+      i.title.toLowerCase().startsWith(cleanQuery.toLowerCase())
+    );
+
+    if (!found) {
+      addToast(`Запись «${cleanQuery}» не найдена`, 'info');
+      return;
+    }
+
+    if (currentFolder !== found.folder && !found.folder.startsWith(currentFolder + '/')) {
+      setCurrentFolder(found.folder);
+    }
+
+    setHighlightedItemId(found.id);
+
+    setTimeout(() => {
+      const el = document.getElementById(`item-${found.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
+
+    setTimeout(() => {
+      setHighlightedItemId(prev => (prev === found.id ? null : prev));
+    }, 2400);
+  }, [items, currentFolder, addToast]);
 
   // Global click outside for Context Menu
   useEffect(() => {
@@ -255,6 +298,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subtasks: itemData.subtasks || [],
       readingTimeMinutes: itemData.readingTimeMinutes || (itemData.type === 'article' ? Math.max(1, Math.round(itemData.content.split(/\s+/).length / 200)) : undefined),
       summary: itemData.summary,
+      replyToId: itemData.replyToId,
+      linkedItemIds: itemData.linkedItemIds,
     };
 
     const saved = storage.saveItem(newItem);
@@ -409,6 +454,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contextMenu,
         openContextMenu,
         closeContextMenu,
+        replyTarget,
+        setReplyTarget,
+        highlightedItemId,
+        scrollToItem,
         setCurrentFolder,
         setActiveTypeFilter,
         setActiveTagFilter,

@@ -10,7 +10,9 @@ import {
   Search,
   CheckSquare,
   FileText,
-  StickyNote
+  StickyNote,
+  CornerUpLeft,
+  Link2
 } from 'lucide-react';
 
 export const ContextMenu: React.FC = () => {
@@ -28,6 +30,7 @@ export const ContextMenu: React.FC = () => {
     currentFolder,
     folders,
     moveItem,
+    setReplyTarget,
     addToast
   } = useApp();
 
@@ -73,11 +76,35 @@ export const ContextMenu: React.FC = () => {
       {type === 'item' && item && (
         <>
           <button
+            onClick={() => {
+              setReplyTarget(item);
+              closeContextMenu();
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left"
+          >
+            <CornerUpLeft className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Ответить</span>
+          </button>
+
+          <button
             onClick={handleOpenFocus}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left"
           >
             <Maximize2 className="w-3.5 h-3.5 text-zinc-400" />
             <span>Фокус-редактор</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const linkText = `[[${item.title || item.id}]]`;
+              navigator.clipboard.writeText(linkText);
+              addToast(`Скопирован: ${linkText}`, 'success');
+              closeContextMenu();
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left"
+          >
+            <Link2 className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Копировать [[линк]]</span>
           </button>
 
           <button

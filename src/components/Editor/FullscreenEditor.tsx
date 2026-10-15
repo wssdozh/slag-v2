@@ -16,7 +16,8 @@ import {
   List,
   CheckSquare,
   Code,
-  Quote
+  Quote,
+  Link2
 } from 'lucide-react';
 
 export const FullscreenEditor: React.FC = () => {
@@ -270,6 +271,13 @@ export const FullscreenEditor: React.FC = () => {
               title="Блок кода"
             >
               <Code className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => insertMarkdown('[[', ']]')}
+              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors"
+              title="Ссылка [[заметка]]"
+            >
+              <Link2 className="w-4 h-4" />
             </button>
           </div>
 

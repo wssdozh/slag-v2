@@ -102,6 +102,18 @@ export const DEFAULT_ITEMS: SlagItem[] = [
     attachments: [],
   },
   {
+    id: 'demo_reply_1',
+    type: 'note',
+    title: 'Ответ по архитектуре ИИ',
+    content: 'Сверил требования со статьёй [[Манифест ультра-минимализма: почему интерфейс не должен орать]].\n\nТеги должны подбираться тихо и без навязчивых баннеров.',
+    folder: 'Проекты/SLAG v2',
+    tags: ['ai', 'дизайн'],
+    replyToId: 'demo_task_1',
+    createdAt: Date.now() - 1200000,
+    updatedAt: Date.now() - 1200000,
+    attachments: [],
+  },
+  {
     id: 'demo_task_2',
     type: 'task',
     title: 'Купить хороший зеленый чай',

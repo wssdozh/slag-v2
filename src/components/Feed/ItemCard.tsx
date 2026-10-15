@@ -13,7 +13,9 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  FileText
+  FileText,
+  CornerUpLeft,
+  Link2
 } from 'lucide-react';
 
 interface ItemCardProps {
@@ -22,6 +24,7 @@ interface ItemCardProps {
 
 export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const {
+    items,
     toggleTaskComplete,
     deleteItem,
     setSelectedItem,
@@ -29,7 +32,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     setActiveTagFilter,
     folders,
     moveItem,
-    openContextMenu
+    openContextMenu,
+    setReplyTarget,
+    highlightedItemId,
+    scrollToItem
   } = useApp();
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
@@ -52,6 +58,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const completedSubtasksCount = item.subtasks?.filter(s => s.completed).length || 0;
   const totalSubtasksCount = item.subtasks?.length || 0;
 
+  // Replied parent item
+  const replyParent = item.replyToId ? items.find(i => i.id === item.replyToId) : null;
+  const repliesCount = items.filter(i => i.replyToId === item.id).length;
+
   const handleOpenArticle = () => {
     setSelectedItem(item);
     setIsFullscreenEditorOpen(true);
@@ -73,12 +83,45 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const renderContentWithWikiLinks = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(\[\[[^\]]+\]\])/g);
+    return parts.map((part, idx) => {
+      const match = part.match(/^\[\[([^\]]+)\]\]$/);
+      if (match) {
+        const linkTarget = match[1];
+        return (
+          <span
+            key={idx}
+            onClick={(e) => {
+              e.stopPropagation();
+              scrollToItem(linkTarget);
+            }}
+            className="inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white font-mono text-[11px] cursor-pointer transition-colors border border-white/[0.06]"
+            title={`Перейти к «${linkTarget}»`}
+          >
+            <Link2 className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+            <span className="underline decoration-white/20 underline-offset-2">{linkTarget}</span>
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
+  const isHighlighted = highlightedItemId === item.id;
+
   return (
     <div
+      id={`item-${item.id}`}
       draggable
       onDragStart={handleDragStart}
       onContextMenu={handleContextMenu}
-      className="group relative flex flex-col gap-2 max-w-2xl w-full mx-auto p-3.5 rounded-xl bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05] transition-all cursor-default"
+      className={`group relative flex flex-col gap-2 max-w-2xl w-full mx-auto p-3.5 rounded-xl transition-all cursor-default ${
+        isHighlighted
+          ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
+          : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
+      }`}
     >
       {/* Top Header / Metadata Bar */}
       <div className="flex items-center justify-between text-xs text-zinc-500">
@@ -127,8 +170,17 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
 
         {/* Message Actions & Timestamp */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-mono text-zinc-500">{formattedTime}</span>
+
+          {/* Quick Reply Button */}
+          <button
+            onClick={() => setReplyTarget(item)}
+            className="p-1 rounded opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-all"
+            title="Ответить"
+          >
+            <CornerUpLeft className="w-3.5 h-3.5" />
+          </button>
 
           {/* Context Menu Trigger */}
           <div className="relative">
@@ -201,6 +253,28 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       </div>
 
+      {/* Reply Parent Quote Banner */}
+      {item.replyToId && (
+        <div
+          onClick={() => replyParent && scrollToItem(replyParent.id)}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border-l-2 border-white/20 hover:border-blue-400 cursor-pointer transition-colors text-xs text-zinc-400 select-none group/quote"
+        >
+          <CornerUpLeft className="w-3 h-3 text-zinc-500 group-hover/quote:text-blue-400 shrink-0" />
+          {replyParent ? (
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="font-mono text-[10px] text-zinc-500 shrink-0">
+                {replyParent.type === 'task' ? 'Таска' : replyParent.type === 'article' ? 'Статья' : 'Заметка'}:
+              </span>
+              <span className="text-zinc-300 truncate font-medium text-xs">
+                {replyParent.title || replyParent.content.slice(0, 45)}
+              </span>
+            </div>
+          ) : (
+            <span className="text-[11px] text-zinc-600 italic">Исходная запись удалена</span>
+          )}
+        </div>
+      )}
+
       {/* Main Content Area */}
       {isTask ? (
         /* Task Variant */
@@ -229,9 +303,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               </h3>
 
               {item.content && (
-                <p className="mt-1 text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-normal">
-                  {item.content}
-                </p>
+                <div className="mt-1 text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-normal">
+                  {renderContentWithWikiLinks(item.content)}
+                </div>
               )}
             </div>
           </div>
@@ -311,7 +385,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
           {item.content && (
             <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap font-normal">
-              {item.content}
+              {renderContentWithWikiLinks(item.content)}
             </div>
           )}
         </div>
@@ -382,6 +456,20 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Replies Count Link */}
+      {repliesCount > 0 && (
+        <button
+          onClick={() => {
+            const firstReply = items.find(i => i.replyToId === item.id);
+            if (firstReply) scrollToItem(firstReply.id);
+          }}
+          className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 hover:text-blue-400 transition-colors pt-1 select-none w-fit"
+        >
+          <CornerUpLeft className="w-3 h-3 rotate-180 text-zinc-500" />
+          <span>{repliesCount} {repliesCount === 1 ? 'ответ' : repliesCount < 5 ? 'ответа' : 'ответов'}</span>
+        </button>
       )}
     </div>
   );

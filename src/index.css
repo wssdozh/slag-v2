@@ -98,3 +98,19 @@
 .tiptap ul[data-type="taskList"] li > div {
   flex: 1 1 auto;
 }
+
+@keyframes itemHighlightPulse {
+  0% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0);
+  }
+}
+
+.item-highlight-pulse {
+  animation: itemHighlightPulse 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}

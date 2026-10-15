@@ -22,7 +22,10 @@ import {
   X,
   Loader2,
   ChevronDown,
-  Maximize2
+  Maximize2,
+  CornerUpLeft,
+  FileText,
+  StickyNote
 } from 'lucide-react';
 
 export const Composer: React.FC = () => {
@@ -32,6 +35,9 @@ export const Composer: React.FC = () => {
     aiSettings,
     setSelectedItem,
     setIsFullscreenEditorOpen,
+    replyTarget,
+    setReplyTarget,
+    items,
     addToast
   } = useApp();
 
@@ -47,9 +53,20 @@ export const Composer: React.FC = () => {
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
+  // WikiLink [[ autocomplete state
+  const [wikiQuery, setWikiQuery] = useState<string | null>(null);
+  const [wikiSelectedIndex, setWikiSelectedIndex] = useState(0);
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Focus textarea when replying
+  useEffect(() => {
+    if (replyTarget && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [replyTarget]);
 
   // Auto-resize textarea as user types
   useEffect(() => {
@@ -58,6 +75,49 @@ export const Composer: React.FC = () => {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 220)}px`;
     }
   }, [content]);
+
+  // WikiLink items matching current query
+  const matchingWikiItems = wikiQuery !== null
+    ? items
+        .filter(i => (i.title || '').toLowerCase().includes(wikiQuery.toLowerCase()))
+        .slice(0, 5)
+    : [];
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    setContent(text);
+
+    const cursorPos = e.target.selectionStart || text.length;
+    const textBefore = text.slice(0, cursorPos);
+    const match = textBefore.match(/\[\[([^\]\n]*)$/);
+    if (match) {
+      setWikiQuery(match[1]);
+      setWikiSelectedIndex(0);
+    } else {
+      setWikiQuery(null);
+    }
+  };
+
+  const insertWikiLink = (targetItem: (typeof items)[0]) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const cursorPos = el.selectionStart || content.length;
+    const textBefore = content.slice(0, cursorPos);
+    const textAfter = content.slice(cursorPos);
+    const match = textBefore.match(/\[\[([^\]\n]*)$/);
+    if (match && match.index !== undefined) {
+      const startIdx = match.index;
+      const cleanTitle = targetItem.title || targetItem.id;
+      const newText = textBefore.slice(0, startIdx) + `[[${cleanTitle}]] ` + textAfter;
+      setContent(newText);
+      setWikiQuery(null);
+      setTimeout(() => {
+        el.focus();
+        const newCursor = startIdx + cleanTitle.length + 5;
+        el.setSelectionRange(newCursor, newCursor);
+      }, 10);
+    }
+  };
 
   // Insert markdown helpers
   const insertFormatting = (prefix: string, suffix: string = '') => {
@@ -170,6 +230,7 @@ export const Composer: React.FC = () => {
       folder: currentFolder,
       tags: finalTags,
       attachments,
+      replyToId: replyTarget?.id,
       priority: itemType === 'task' ? priority : undefined,
       dueDate: itemType === 'task' && dueDate ? dueDate : undefined,
       subtasks: subtasks.length > 0 ? subtasks : undefined,
@@ -180,6 +241,8 @@ export const Composer: React.FC = () => {
     setAttachments([]);
     setPriority('none');
     setDueDate('');
+    setReplyTarget(null);
+    setWikiQuery(null);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -196,6 +259,7 @@ export const Composer: React.FC = () => {
       folder: currentFolder,
       tags,
       attachments,
+      replyToId: replyTarget?.id,
       priority: itemType === 'task' ? priority : undefined,
       dueDate: itemType === 'task' && dueDate ? dueDate : undefined,
     });
@@ -203,11 +267,37 @@ export const Composer: React.FC = () => {
     setContent('');
     setAttachments([]);
     setTags([]);
+    setReplyTarget(null);
+    setWikiQuery(null);
     setSelectedItem(tempItem);
     setIsFullscreenEditorOpen(true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Wiki autocomplete keyboard controls
+    if (wikiQuery !== null && matchingWikiItems.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setWikiSelectedIndex(prev => (prev < matchingWikiItems.length - 1 ? prev + 1 : prev));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setWikiSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertWikiLink(matchingWikiItems[wikiSelectedIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setWikiQuery(null);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -299,6 +389,28 @@ export const Composer: React.FC = () => {
         </div>
       </div>
 
+      {/* Reply Banner */}
+      {replyTarget && (
+        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.04] border-l-2 border-blue-400 text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
+          <div className="flex items-center gap-2 truncate min-w-0">
+            <CornerUpLeft className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <span className="text-[11px] font-mono text-blue-400/90 shrink-0">
+              {replyTarget.type === 'task' ? 'Ответ на таску:' : replyTarget.type === 'article' ? 'Ответ на статью:' : 'Ответ:'}
+            </span>
+            <span className="truncate text-zinc-200 font-medium text-xs">
+              {replyTarget.title || replyTarget.content.slice(0, 45)}
+            </span>
+          </div>
+          <button
+            onClick={() => setReplyTarget(null)}
+            className="p-1 rounded text-zinc-500 hover:text-zinc-200 transition-colors shrink-0"
+            title="Отменить ответ"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Attachments Preview Strip */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1 py-1">
@@ -388,20 +500,46 @@ export const Composer: React.FC = () => {
         onChange={(e) => handleFileUpload(e, 'image')}
       />
 
-      {/* Textarea Input */}
+      {/* Textarea Input Container with WikiLink popover */}
       <div className="relative">
+        {wikiQuery !== null && matchingWikiItems.length > 0 && (
+          <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
+            <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
+              Связать заметку [[...]]
+            </div>
+            {matchingWikiItems.map((wikiItem, idx) => {
+              const isSelected = idx === wikiSelectedIndex;
+              return (
+                <button
+                  key={wikiItem.id}
+                  type="button"
+                  onClick={() => insertWikiLink(wikiItem)}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate ${
+                    isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
+                  }`}
+                >
+                  {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                  {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                  {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+                  <span className="truncate">{wikiItem.title || wikiItem.id}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={handleContentChange}
           onKeyDown={handleKeyDown}
           rows={2}
           placeholder={
             itemType === 'task'
-              ? 'Задача... (- [ ] для подзадач)'
+              ? 'Задача... (- [ ] для подзадач, [[ для ссылки)'
               : itemType === 'article'
-              ? 'Черновик статьи... (Shift+Enter для новой строки)'
-              : 'Мысль, заметка или код... (Enter для отправки)'
+              ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
+              : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
           }
           className="w-full bg-transparent text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-relaxed py-1 px-1"
         />

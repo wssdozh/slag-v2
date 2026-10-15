@@ -39,6 +39,10 @@ export interface SlagItem {
   // Article-specific fields
   readingTimeMinutes?: number;
   summary?: string;
+
+  // Link & Reply fields
+  replyToId?: string; // ID of the note/task this is replying to
+  linkedItemIds?: string[]; // IDs of explicitly linked tasks/notes
 }
 
 export interface FolderMeta {

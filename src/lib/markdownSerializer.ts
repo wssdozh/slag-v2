@@ -31,6 +31,14 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     if (item.summary) frontmatterData.summary = item.summary;
   }
 
+  if (item.replyToId) {
+    frontmatterData.replyTo = item.replyToId;
+  }
+
+  if (item.linkedItemIds && item.linkedItemIds.length > 0) {
+    frontmatterData.linked = item.linkedItemIds;
+  }
+
   if (item.attachments && item.attachments.length > 0) {
     frontmatterData.attachments = item.attachments.map(att => ({
       id: att.id,
@@ -105,6 +113,8 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
     updatedAt: Number(frontmatter.updated) || Date.now(),
     isPinned: Boolean(frontmatter.pinned),
     isArchived: Boolean(frontmatter.archived),
+    replyToId: frontmatter.replyTo || undefined,
+    linkedItemIds: Array.isArray(frontmatter.linked) ? frontmatter.linked : undefined,
   };
 
   if (type === 'task') {
