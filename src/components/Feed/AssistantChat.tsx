@@ -38,8 +38,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     saveAiSettings,
     scrollToItem,
     applyAiFilter,
-    setIsSettingsOpen,
-    setIsLogViewerOpen
+    setIsSettingsOpen
   } = useApp();
 
   const [input, setInput] = useState('');
@@ -339,54 +338,16 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           </span>
         </div>
 
-        {/* Right Header Status & Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Provider badge */}
-          {isConnected ? (
-            <span
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                aiSettings.provider === 'groq'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : aiSettings.provider === 'kie'
-                  ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                  : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-              }`}
-              title={`Активен провайдер ${aiSettings.provider}: ${aiSettings.model}`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
-            </span>
-          ) : (
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.06] text-[10px] font-mono transition-colors cursor-pointer"
-              title="Нажмите для настройки API-ключа (⌘,)"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
-              <span>Локальный</span>
-            </button>
-          )}
-
-          {/* Dev HUD logs button */}
+        {chatMessages.length > 0 && (
           <button
-            onClick={() => setIsLogViewerOpen(true)}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] transition-colors"
-            title="Журнал диагностики (Ctrl + ~)"
+            onClick={clearChatMessages}
+            className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.04] shrink-0"
+            title="Очистить диалог"
           >
-            <Terminal className="w-3 h-3" />
+            <Trash2 className="w-3 h-3" />
+            <span className={isSidebar ? 'hidden sm:inline' : ''}>Очистить</span>
           </button>
-
-          {chatMessages.length > 0 && (
-            <button
-              onClick={clearChatMessages}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.04] shrink-0"
-              title="Очистить диалог"
-            >
-              <Trash2 className="w-3 h-3" />
-              <span className={isSidebar ? 'hidden sm:inline' : ''}>Очистить</span>
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Messages Stream */}
@@ -689,9 +650,38 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             className="w-full min-h-[28px] bg-transparent text-xs text-white placeholder-zinc-500 resize-none outline-none border-none leading-relaxed"
           />
 
-          {/* Controls Bar: Reasoning selector + Web Search toggle + Send */}
+          {/* Controls Bar: Provider status badge + Reasoning selector + Web Search toggle + Send */}
           <div className="flex items-center justify-between pt-1 border-t border-white/[0.04]">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
+              {/* Provider badge moved here (click to open settings) */}
+              {isConnected ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                    aiSettings.provider === 'groq'
+                      ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
+                      : aiSettings.provider === 'kie'
+                      ? 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20'
+                      : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20'
+                  }`}
+                  title={`Провайдер ${aiSettings.provider}: ${aiSettings.model} (нажмите для настроек)`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.06] text-[10px] font-mono transition-colors cursor-pointer"
+                  title="Нажмите для настройки API-ключа (⌘,)"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                  <span>Локальный</span>
+                </button>
+              )}
+
               {/* Reasoning Selector */}
               <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-500">
                 <span>R:</span>
