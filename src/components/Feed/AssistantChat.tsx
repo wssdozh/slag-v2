@@ -37,7 +37,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     aiSettings,
     saveAiSettings,
     scrollToItem,
-    applyAiFilter
+    applyAiFilter,
+    setIsSettingsOpen,
+    setIsLogViewerOpen
   } = useApp();
 
   const [input, setInput] = useState('');
@@ -94,13 +96,17 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     sendChatMessage(prompt);
   };
 
-  // Render rich text with WikiLinks, bold, code, tags, and structured lists
+  // Render rich text with WikiLinks, markdown headers, dividers, code blocks, bold, italic, code, tags, and structured lists
   const renderRichContent = (content: string) => {
-    const lines = content.split('\n');
+    const rawLines = content.split('\n');
+    const elements: React.ReactNode[] = [];
+    let inCodeBlock = false;
+    let codeBlockLang = '';
+    let codeBlockLines: string[] = [];
 
     const parseInline = (text: string, lineKey: string | number) => {
-      // Split text by [[WikiLinks]], `code`, **bold**, and #tags
-      const tokenRegex = /(\[\[[^\]]+\]\]|`[^`]+`|\*\*[^*]+\*\*|#[\wа-яА-ЯёЁ_-]+)/g;
+      // Split text by [[WikiLinks]], [Markdown Links](url), `code`, **bold**, *italic*, ~~strikethrough~~, and #tags
+      const tokenRegex = /(\[\[[^\]]+\]\]|\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|#[\wа-яА-ЯёЁ_-]+)/g;
       const parts = text.split(tokenRegex);
 
       return parts.map((part, index) => {
@@ -125,12 +131,46 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           );
         }
 
+        // [Markdown Link](url)
+        const mdLinkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (mdLinkMatch) {
+          return (
+            <a
+              key={key}
+              href={mdLinkMatch[2]}
+              target="_blank"
+              rel="noreferrer"
+              className="inline text-blue-400 hover:text-blue-300 underline underline-offset-2"
+            >
+              {mdLinkMatch[1]}
+            </a>
+          );
+        }
+
         // **Bold**
         if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
           return (
             <strong key={key} className="font-semibold text-zinc-100">
               {part.slice(2, -2)}
             </strong>
+          );
+        }
+
+        // *Italic*
+        if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+          return (
+            <em key={key} className="italic text-zinc-200">
+              {part.slice(1, -1)}
+            </em>
+          );
+        }
+
+        // ~~Strikethrough~~
+        if (part.startsWith('~~') && part.endsWith('~~') && part.length >= 4) {
+          return (
+            <del key={key} className="line-through text-zinc-500">
+              {part.slice(2, -2)}
+            </del>
           );
         }
 
@@ -156,62 +196,136 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       });
     };
 
-    return lines.map((line, lineIndex) => {
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
       const trimmed = line.trim();
+
+      // Multi-line Code blocks start/end
+      if (trimmed.startsWith('```')) {
+        if (!inCodeBlock) {
+          inCodeBlock = true;
+          codeBlockLang = trimmed.slice(3).trim();
+          codeBlockLines = [];
+        } else {
+          inCodeBlock = false;
+          elements.push(
+            <div key={`cb-${i}`} className="my-2 rounded-lg bg-black/60 border border-white/[0.06] overflow-hidden">
+              {codeBlockLang && (
+                <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 bg-white/[0.02] border-b border-white/[0.04]">
+                  {codeBlockLang}
+                </div>
+              )}
+              <pre className="p-2.5 overflow-x-auto text-[11px] font-mono text-zinc-300 leading-normal">
+                <code>{codeBlockLines.join('\n')}</code>
+              </pre>
+            </div>
+          );
+        }
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeBlockLines.push(line);
+        continue;
+      }
 
       // Empty line -> small vertical spacer
       if (!trimmed) {
-        return <div key={lineIndex} className="h-1.5" />;
+        elements.push(<div key={`sp-${i}`} className="h-1.5" />);
+        continue;
       }
 
-      // Heading: ### or ## or #
-      if (/^#{1,4}\s+/.test(trimmed)) {
-        const headingText = trimmed.replace(/^#{1,4}\s+/, '');
-        return (
-          <div key={lineIndex} className="font-semibold text-zinc-100 text-xs mt-1.5 mb-0.5">
-            {parseInline(headingText, lineIndex)}
+      // Horizontal Divider: ---, ***, ___
+      if (/^([-*_]){3,}$/.test(trimmed)) {
+        elements.push(<hr key={`hr-${i}`} className="my-2.5 border-t border-white/[0.08]" />);
+        continue;
+      }
+
+      // Blockquote: > text
+      if (/^>\s+/.test(trimmed)) {
+        elements.push(
+          <div key={`quote-${i}`} className="border-l-2 border-zinc-600 pl-2.5 py-0.5 my-1 text-zinc-400 italic">
+            {parseInline(trimmed.replace(/^>\s+/, ''), i)}
           </div>
         );
+        continue;
+      }
+
+      // Heading: #, ##, ###
+      if (/^#{1,4}\s+/.test(trimmed)) {
+        const headingMatch = trimmed.match(/^(#{1,4})\s+(.*)$/);
+        if (headingMatch) {
+          const level = headingMatch[1].length;
+          const text = headingMatch[2];
+          elements.push(
+            <div
+              key={`h-${i}`}
+              className={`font-semibold ${
+                level === 1 ? 'text-xs font-bold mt-2 mb-1 text-zinc-100' : 'text-xs mt-1.5 mb-0.5 text-zinc-200'
+              }`}
+            >
+              {parseInline(text, i)}
+            </div>
+          );
+          continue;
+        }
       }
 
       // List item: - or *
       if (/^[-*]\s+/.test(trimmed)) {
         const itemText = trimmed.replace(/^[-*]\s+/, '');
-        return (
-          <div key={lineIndex} className="flex items-start gap-2 pl-0.5 my-0.5 leading-relaxed">
+        elements.push(
+          <div key={`li-${i}`} className="flex items-start gap-2 pl-0.5 my-0.5 leading-relaxed">
             <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0 mt-1.5 select-none" />
-            <span className="flex-1 min-w-0">{parseInline(itemText, lineIndex)}</span>
+            <span className="flex-1 min-w-0">{parseInline(itemText, i)}</span>
           </div>
         );
+        continue;
       }
 
       // Numbered list item: 1. or 2.
       if (/^\d+\.\s+/.test(trimmed)) {
         const match = trimmed.match(/^(\d+\.)\s+(.*)$/);
         if (match) {
-          return (
-            <div key={lineIndex} className="flex items-start gap-1.5 pl-0.5 my-0.5 leading-relaxed">
+          elements.push(
+            <div key={`ol-${i}`} className="flex items-start gap-1.5 pl-0.5 my-0.5 leading-relaxed">
               <span className="text-[10px] font-mono text-zinc-500 shrink-0 mt-0.5 select-none">{match[1]}</span>
-              <span className="flex-1 min-w-0">{parseInline(match[2], lineIndex)}</span>
+              <span className="flex-1 min-w-0">{parseInline(match[2], i)}</span>
             </div>
           );
+          continue;
         }
       }
 
       // Normal paragraph line
-      return (
-        <div key={lineIndex} className="leading-relaxed">
-          {parseInline(line, lineIndex)}
+      elements.push(
+        <div key={`p-${i}`} className="leading-relaxed">
+          {parseInline(line, i)}
         </div>
       );
-    });
+    }
+
+    if (inCodeBlock && codeBlockLines.length > 0) {
+      elements.push(
+        <div key="cb-unclosed" className="my-2 rounded-lg bg-black/60 border border-white/[0.06] p-2.5 overflow-x-auto text-[11px] font-mono text-zinc-300">
+          <code>{codeBlockLines.join('\n')}</code>
+        </div>
+      );
+    }
+
+    return elements;
   };
+
+  const isConnected =
+    (aiSettings.provider === 'groq' && Boolean(aiSettings.groqApiKey)) ||
+    (aiSettings.provider === 'kie' && Boolean(aiSettings.kieApiKey)) ||
+    (aiSettings.provider === 'gemini' && Boolean(aiSettings.geminiApiKey));
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 bg-[#09090b] relative select-text overflow-hidden">
       {/* Scope Context Header Banner */}
       <div className={`px-3 py-2 border-b border-white/[0.04] bg-white/[0.01] flex items-center justify-between text-xs text-zinc-400 shrink-0 ${isSidebar ? 'gap-1' : ''}`}>
-        <div className="flex items-center gap-1.5 truncate">
+        <div className="flex items-center gap-2 truncate min-w-0">
           <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
           <span className="truncate">
             {isInbox ? (
@@ -225,16 +339,54 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           </span>
         </div>
 
-        {chatMessages.length > 0 && (
+        {/* Right Header Status & Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Provider badge */}
+          {isConnected ? (
+            <span
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                aiSettings.provider === 'groq'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : aiSettings.provider === 'kie'
+                  ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                  : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+              }`}
+              title={`Активен провайдер ${aiSettings.provider}: ${aiSettings.model}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
+            </span>
+          ) : (
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.06] text-[10px] font-mono transition-colors cursor-pointer"
+              title="Нажмите для настройки API-ключа (⌘,)"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+              <span>Локальный</span>
+            </button>
+          )}
+
+          {/* Dev HUD logs button */}
           <button
-            onClick={clearChatMessages}
-            className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.04] shrink-0"
-            title="Очистить диалог"
+            onClick={() => setIsLogViewerOpen(true)}
+            className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] transition-colors"
+            title="Журнал диагностики (Ctrl + ~)"
           >
-            <Trash2 className="w-3 h-3" />
-            <span className={isSidebar ? 'hidden sm:inline' : ''}>Очистить</span>
+            <Terminal className="w-3 h-3" />
           </button>
-        )}
+
+          {chatMessages.length > 0 && (
+            <button
+              onClick={clearChatMessages}
+              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.04] shrink-0"
+              title="Очистить диалог"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span className={isSidebar ? 'hidden sm:inline' : ''}>Очистить</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages Stream */}

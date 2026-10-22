@@ -223,11 +223,11 @@ export const SettingsModal: React.FC = () => {
                 {/* Provider Selector */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs text-zinc-400">Провайдер ИИ</label>
-                  <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-xl border border-white/[0.06]">
+                  <div className="grid grid-cols-3 gap-2 bg-black/40 p-1 rounded-xl border border-white/[0.06]">
                     <button
                       type="button"
                       onClick={() => handleProviderChange('groq')}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${
+                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
                         provider === 'groq'
                           ? 'bg-white/10 text-white shadow-sm'
                           : 'text-zinc-400 hover:text-zinc-200'
@@ -237,14 +237,25 @@ export const SettingsModal: React.FC = () => {
                     </button>
                     <button
                       type="button"
+                      onClick={() => handleProviderChange('kie')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
+                        provider === 'kie'
+                          ? 'bg-white/10 text-white shadow-sm'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      🧠 KIE.AI
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleProviderChange('gemini')}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${
+                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
                         provider === 'gemini'
                           ? 'bg-white/10 text-white shadow-sm'
                           : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
-                      ✨ Google Gemini
+                      ✨ Gemini
                     </button>
                   </div>
                 </div>
@@ -298,9 +309,79 @@ export const SettingsModal: React.FC = () => {
                         className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200"
                       >
                         <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)</option>
-                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B (280 t/s, универсальная)</option>
-                        <option value="deepseek-r1-distill-llama-70b">DeepSeek R1 Distill 70B (Рассуждения)</option>
+                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (280 t/s, 128K)</option>
+                        <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (560 t/s, 128K)</option>
+                        <option value="llama-3.3-70b-specdec">Llama 3.3 70B SpecDec</option>
                       </select>
+                    </div>
+                  </>
+                )}
+
+                {/* KIE.AI Settings */}
+                {provider === 'kie' && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-zinc-200">
+                        KIE.AI Unified API
+                      </span>
+                      <a
+                        href="https://kie.ai/api-key"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
+                      >
+                        <span>Получить API ключ</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs text-zinc-400">KIE.AI API Key / Token</label>
+                      <div className="relative">
+                        <input
+                          type={showKey ? 'text' : 'password'}
+                          value={kieApiKey}
+                          onChange={(e) => setKieApiKey(e.target.value)}
+                          placeholder="sk-kie-... или Bearer токен"
+                          className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKey(!showKey)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
+                        >
+                          {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <span className="text-[11px] text-zinc-500">
+                        Единый доступ к передовым LLM по оптимизированным тарифам KIE.
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs text-zinc-400">Модель</label>
+                      <select
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200"
+                      >
+                        <option value="gpt-5-2">GPT 5.2</option>
+                        <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+                        <option value="deepseek-v4-1-flash">DeepSeek V4.1 Flash</option>
+                        <option value="grok-4-5">Grok 4.5</option>
+                        <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs text-zinc-400">Base URL эндпоинта</label>
+                      <input
+                        type="text"
+                        value={kieBaseUrl}
+                        onChange={(e) => setKieBaseUrl(e.target.value)}
+                        placeholder="https://api.kie.ai"
+                        className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-600 font-mono"
+                      />
                     </div>
                   </>
                 )}

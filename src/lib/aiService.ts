@@ -119,7 +119,50 @@ ${settings.customTagRules ? `Пользовательские правила: ${
     }
   }
 
-  // 2. Google Gemini Provider
+  // 2. KIE.AI Provider
+  if (settings.provider === 'kie' && settings.kieApiKey) {
+    try {
+      const model = settings.model || 'gpt-5-2';
+      const baseUrl = settings.kieBaseUrl?.replace(/\/+$/, '') || 'https://api.kie.ai';
+      const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.kieApiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: baseInstructions },
+            { role: 'user', content: content.slice(0, 2000) },
+          ],
+          temperature: 0.2,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawContent = data.choices?.[0]?.message?.content;
+        if (rawContent) {
+          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawContent);
+          if (parsed.reasoning) {
+            aiLog.debug('KIE SmartTags reasoning:', parsed.reasoning);
+          }
+          const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
+          const formatted = rawTags
+            .map(t => formatTag(String(t), style))
+            .filter(Boolean);
+          const combined = Array.from(new Set([...explicitHashtags, ...formatted])).slice(0, maxTags);
+          if (combined.length > 0) return combined;
+        }
+      }
+    } catch (err) {
+      aiLog.warn('KIE Tagging API call failed, falling back to local heuristic', err);
+    }
+  }
+
+  // 3. Google Gemini Provider
   if (settings.provider === 'gemini' && settings.geminiApiKey) {
     try {
       const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
@@ -283,7 +326,49 @@ ${JSON.stringify(itemsContext, null, 2)}
     }
   }
 
-  // 2. Gemini Provider
+  // 2. KIE.AI Provider
+  if (settings.provider === 'kie' && settings.kieApiKey) {
+    try {
+      const model = settings.model || 'gpt-5-2';
+      const baseUrl = settings.kieBaseUrl?.replace(/\/+$/, '') || 'https://api.kie.ai';
+      const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.kieApiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: 'Ты — автономный ассистент каталогизации базы знаний SLAG. Отвечай строго валидным JSON массивом объектов.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.1,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const raw = data.choices?.[0]?.message?.content;
+        if (raw) {
+          const jsonMatch = raw.match(/\[[\s\S]*\]/);
+          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+          const list: TriageSuggestion[] = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.items || []);
+          return list.map(s => {
+            const item = inboxItems.find(i => i.id === s.itemId);
+            return {
+              ...s,
+              itemTitle: item?.title || 'Без названия',
+            };
+          });
+        }
+      }
+    } catch (err) {
+      aiLog.warn('KIE Triage API failed, falling back to local matching', err);
+    }
+  }
+
+  // 3. Gemini Provider
   if (settings.provider === 'gemini' && settings.geminiApiKey) {
     try {
       const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
@@ -631,9 +716,19 @@ ${isInbox
 }
 
 ПРАВИЛА ОТВЕТА:
-1. При отсылке к конкретным заметкам ОБЯЗАТЕЛЬНО используй синтаксис вики-ссылок: [[Название заметки]].
-2. Если для ответа нужны факты из заметок, ВСЕГДА вызывай search_notes или read_note. Для повестки дня и задач используй get_calendar_agenda. Не выдумывай факты.
-3. ПРАВИЛО READ-ONLY SAFETY: любые действия (создание, перенос, статус, подзадачи) оформляй ТОЛЬКО блоком действия action:
+1. КОНТЕКСТНЫЕ ССЫЛКИ И АНАФОРА (ПЕРВЫЙ ПРИОРИТЕТ):
+   - Если пользователь просит ссылку на заметку или задачу, которая УЖЕ упоминалась в предыдущих сообщениях (например, в повестке календаря, результатах поиска или ответах): «дай мне линк на эту заметку», «дай ссылку на задачу», «ссылку на просроченную» — СТРОГО бери точное название из контекста диалога и отвечай вики-ссылкой: [[Точное название заметки]].
+   - В ЭТОМ СЛУЧАЕ КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО вызывать search_notes! Не выдумывай случайные или искаженные слова для поиска (например, «гидрецифаллизм» и т.п.).
+
+2. ДИСЦИПЛИНА ИСПОЛЬЗОВАНИЯ ИНСТРУМЕНТОВ (ZERO-SLOP GROUNDING):
+   - search_notes: вызывай ТОЛЬКО когда пользователь ищет конкретную информацию или заметку, которой НЕТ в истории сообщений. Поисковый запрос должен состоять ТОЛЬКО из реальных ключевых слов из запроса пользователя. Запрещено передавать в search_notes общие междометия («что», «почему», «а», «как») или случайные выдуманные слова.
+   - get_calendar_agenda: используй для повестки дня, расписания, задач на сегодня/завтра/дату (date: 'YYYY-MM-DD').
+   - read_note: вызывай только если сниппета из поиска недостаточно и нужно полное содержание.
+   - При вопросах общего характера («что?», «почему?», «не хочу», «поговори со мной», «кто ты?») — отвечай прямо текстом без бессмысленного вызова инструментов.
+
+3. ПРАВИЛО READ-ONLY SAFETY И ДЕЙСТВИЯ:
+   - Прямое удаление заметок запрещено политикой безопасности. Если пользователь просит удалить заметку («удали эту заметку»), прямо поясни, что удаление через чат недоступно, но можно предложить перенести её в архив/корзину через блок action:move_note или сменить статус.
+   - Любые другие мутации (создание, перенос, декомпозиция, расписание) оформляй ТОЛЬКО через блок action:
 - Создание заметки/задачи:
 \`\`\`action:create_note
 { "action": "create_note", "title": "Название", "folder": "${currentFolder}", "content": "Текст...", "tags": ["тег"], "itemType": "note" }
@@ -656,23 +751,37 @@ ${isInbox
 \`\`\`
 Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.`;
 
-  // 1. Groq Provider with Tool Calling & Reasoning
-  if (settings.provider === 'groq' && settings.groqApiKey) {
-    try {
-      const model = settings.model || 'openai/gpt-oss-120b';
-      const executedToolCalls: ChatToolCall[] = [];
+  // 1. External LLM Provider with Tool Calling (Groq / KIE.AI / Gemini)
+  const isGroq = settings.provider === 'groq' && Boolean(settings.groqApiKey);
+  const isKie = settings.provider === 'kie' && Boolean(settings.kieApiKey);
+  const isGemini = settings.provider === 'gemini' && Boolean(settings.geminiApiKey);
 
+  if (isGroq || isKie || isGemini) {
+    const providerName = isGroq ? 'Groq' : isKie ? 'KIE.AI' : 'Gemini';
+    const apiKey = isGroq ? settings.groqApiKey : isKie ? settings.kieApiKey : settings.geminiApiKey;
+    const defaultModel = isGroq ? 'openai/gpt-oss-120b' : isKie ? 'gpt-5-2' : 'gemini-2.0-flash';
+    const model = settings.model || defaultModel;
+    const baseUrl = isGroq
+      ? 'https://api.groq.com/openai/v1'
+      : isKie
+      ? (settings.kieBaseUrl?.replace(/\/+$/, '') || 'https://api.kie.ai') + '/v1'
+      : 'https://generativelanguage.googleapis.com/v1beta/openai';
+
+    try {
+      const executedToolCalls: ChatToolCall[] = [];
       const requestMessages: any[] = [
         { role: 'system', content: systemPrompt },
         ...messages.map(m => ({ role: m.role, content: m.content })),
       ];
 
-      // Initial call to Groq
-      const res1 = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      aiLog.info(`Dispatching ${providerName} assistant chat`, { model, messageCount: requestMessages.length });
+
+      // Initial call
+      const res1 = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.groqApiKey}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model,
@@ -683,105 +792,148 @@ ${isInbox
         }),
       });
 
-      if (res1.ok) {
-        const data1 = await res1.json();
-        const choice = data1.choices?.[0];
-        const msg = choice?.message;
+      if (!res1.ok) {
+        const errorBody = await res1.text().catch(() => '');
+        aiLog.warn(`${providerName} Assistant API HTTP ${res1.status} (${res1.statusText}):`, errorBody);
+        throw new Error(`${providerName} HTTP ${res1.status}: ${errorBody.slice(0, 200)}`);
+      }
 
-        let reasoning = msg?.reasoning_content || '';
-        let initialContent = msg?.content || '';
+      const data1 = await res1.json();
+      const choice = data1.choices?.[0];
+      const msg = choice?.message;
 
-        // Extract <think> if present in message content
-        if (initialContent.includes('<think>')) {
-          const match = initialContent.match(/<think>([\s\S]*?)<\/think>/);
-          if (match) {
-            reasoning = match[1].trim();
-            initialContent = initialContent.replace(/<think>[\s\S]*?<\/think>/, '').trim();
-          }
+      let reasoning = msg?.reasoning_content || '';
+      let initialContent = msg?.content || '';
+
+      // Extract <think> if present in message content
+      if (initialContent.includes('<think>')) {
+        const match = initialContent.match(/<think>([\s\S]*?)<\/think>/);
+        if (match) {
+          reasoning = match[1].trim();
+          initialContent = initialContent.replace(/<think>[\s\S]*?<\/think>/, '').trim();
         }
+      }
 
-        // If model generated tool calls
-        if (msg?.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
-          requestMessages.push(msg);
+      // If model generated tool calls
+      if (msg?.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+        requestMessages.push(msg);
 
-          for (const tc of msg.tool_calls) {
-            const toolName = tc.function?.name;
-            let toolArgs = {};
-            try {
-              toolArgs = JSON.parse(tc.function?.arguments || '{}');
-            } catch {
-              // ignore
-            }
-
-            const toolResult = await executeLocalTool(toolName, toolArgs);
-            executedToolCalls.push({
-              name: toolName,
-              args: toolArgs,
-              result: toolResult,
-            });
-
-            requestMessages.push({
-              role: 'tool',
-              tool_call_id: tc.id,
-              content: JSON.stringify(toolResult),
-            });
+        for (const tc of msg.tool_calls) {
+          const toolName = tc.function?.name;
+          let toolArgs = {};
+          try {
+            toolArgs = JSON.parse(tc.function?.arguments || '{}');
+          } catch {
+            // ignore
           }
 
-          // Second round: send tool outputs to model for final text
-          const res2 = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${settings.groqApiKey}`,
-            },
-            body: JSON.stringify({
-              model,
-              messages: requestMessages,
-              temperature: 0.2,
-            }),
+          const toolStart = performance.now();
+          const toolResult = await executeLocalTool(toolName, toolArgs);
+          const toolDuration = Math.round(performance.now() - toolStart);
+
+          aiLog.info(`Tool executed: ${toolName}`, { args: toolArgs, durationMs: toolDuration });
+
+          executedToolCalls.push({
+            name: toolName,
+            args: toolArgs,
+            result: toolResult,
           });
 
-          if (res2.ok) {
-            const data2 = await res2.json();
-            const choice2 = data2.choices?.[0];
-            let finalContent = choice2?.message?.content || '';
-            if (choice2?.message?.reasoning_content) {
-              reasoning = reasoning ? `${reasoning}\n${choice2.message.reasoning_content}` : choice2.message.reasoning_content;
-            }
-
-            const { cleanText, suggestedAction } = extractActionBlock(finalContent);
-            return {
-              content: cleanText,
-              reasoning: reasoning || undefined,
-              reasoningTimeMs: Date.now() - startTime,
-              toolCalls: executedToolCalls,
-              suggestedAction,
-            };
-          }
+          requestMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify(toolResult),
+          });
         }
 
-        // If no tool calls needed
-        const { cleanText, suggestedAction } = extractActionBlock(initialContent);
-        return {
-          content: cleanText,
-          reasoning: reasoning || undefined,
-          reasoningTimeMs: Date.now() - startTime,
-          toolCalls: executedToolCalls.length > 0 ? executedToolCalls : undefined,
-          suggestedAction,
-        };
+        // Second round: send tool outputs to model for final text
+        const res2 = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: requestMessages,
+            temperature: 0.2,
+          }),
+        });
+
+        if (res2.ok) {
+          const data2 = await res2.json();
+          const choice2 = data2.choices?.[0];
+          let finalContent = choice2?.message?.content || '';
+          if (choice2?.message?.reasoning_content) {
+            reasoning = reasoning ? `${reasoning}\n${choice2.message.reasoning_content}` : choice2.message.reasoning_content;
+          }
+
+          const { cleanText, suggestedAction } = extractActionBlock(finalContent);
+          return {
+            content: cleanText,
+            reasoning: reasoning || undefined,
+            reasoningTimeMs: Date.now() - startTime,
+            toolCalls: executedToolCalls,
+            suggestedAction,
+          };
+        } else {
+          const errText2 = await res2.text().catch(() => '');
+          aiLog.warn(`${providerName} Round 2 failed with ${res2.status}:`, errText2);
+        }
       }
+
+      // If no tool calls needed
+      const { cleanText, suggestedAction } = extractActionBlock(initialContent);
+      return {
+        content: cleanText,
+        reasoning: reasoning || undefined,
+        reasoningTimeMs: Date.now() - startTime,
+        toolCalls: executedToolCalls.length > 0 ? executedToolCalls : undefined,
+        suggestedAction,
+      };
     } catch (err) {
-      aiLog.warn('Groq Assistant API call failed, falling back to local agent', err);
+      aiLog.warn(`${providerName} Assistant API call failed, falling back to local agent`, err);
     }
   }
 
   // 2. Offline / Local Heuristic Agent (guarantees tests and offline mode work seamlessly)
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
-  const lowerMsg = lastUserMsg.toLowerCase();
+  const lowerMsg = lastUserMsg.toLowerCase().trim();
   const executedToolCalls: ChatToolCall[] = [];
 
-  // Check if asking for stats / count
-  if (lowerMsg.includes('сколько') || lowerMsg.includes('статистик') || lowerMsg.includes('всего')) {
+  // Check 1: Contextual link / Anaphora resolution from recent chat history
+  if (
+    lowerMsg.includes('линк на') ||
+    lowerMsg.includes('дай мне линк') ||
+    lowerMsg.includes('дай ссылку') ||
+    lowerMsg.includes('ссылк')
+  ) {
+    let foundTitle: string | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const text = messages[i].content;
+      const wikiMatch = text.match(/\[\[([^\]]+)\]\]/);
+      if (wikiMatch) {
+        foundTitle = wikiMatch[1];
+        break;
+      }
+      const quoteMatch = text.match(/[«"]([^»"]+)[»"]/);
+      if (quoteMatch) {
+        foundTitle = quoteMatch[1];
+        break;
+      }
+    }
+
+    if (foundTitle) {
+      return {
+        content: `Вот ссылка на запись из контекста: [[${foundTitle}]]`,
+        reasoning: `Извлечена ссылка из контекста предыдущих сообщений диалога: [[${foundTitle}]]`,
+        reasoningTimeMs: Date.now() - startTime,
+      };
+    }
+  }
+
+  // Check 2: Vault stats / count (priority over generic task mentions)
+  if (lowerMsg.includes('сколько') || lowerMsg.includes('статистик') || lowerMsg.includes('всего') || lowerMsg.includes('сводка')) {
     const stats = await executeLocalTool('get_vault_stats', { target: 'all' });
     executedToolCalls.push({ name: 'get_vault_stats', args: { target: 'all' }, result: stats });
 
@@ -800,17 +952,47 @@ ${isInbox
     };
   }
 
-  // Check if asking for agenda / plan / calendar
-  if (lowerMsg.includes('повестк') || lowerMsg.includes('план на сегодня') || lowerMsg.includes('расписани') || lowerMsg.includes('что сегодня') || lowerMsg.includes('дела на сегодня') || lowerMsg.includes('календар')) {
-    const agenda = await executeLocalTool('get_calendar_agenda', {});
+  // Check 3: Calendar / Agenda / Relative Dates
+  const isCalendarQuery =
+    (lowerMsg.includes('повестк') ||
+    lowerMsg.includes('план') ||
+    lowerMsg.includes('расписани') ||
+    lowerMsg.includes('календар') ||
+    lowerMsg.includes('просроченн') ||
+    lowerMsg.includes('сегодня') ||
+    lowerMsg.includes('завтра') ||
+    lowerMsg.includes('послезавтра') ||
+    lowerMsg.includes('вчера') ||
+    lowerMsg === 'а на завтра чо' ||
+    lowerMsg.includes('на завтра') ||
+    (lowerMsg.includes('дела') && (lowerMsg.includes('день') || lowerMsg.includes('сегодня') || lowerMsg.includes('завтра'))) ||
+    (lowerMsg.includes('задач') && (lowerMsg.includes('день') || lowerMsg.includes('сегодня') || lowerMsg.includes('завтра') || lowerMsg.includes('просроч')))) &&
+    !lowerMsg.includes('сколько') &&
+    !lowerMsg.includes('статистик');
+
+  if (isCalendarQuery && !lowerMsg.includes('создай') && !lowerMsg.includes('добавь') && !lowerMsg.includes('разбей')) {
+    let targetDate = new Date().toISOString().slice(0, 10);
+    let dateLabel = 'сегодня';
+    if (lowerMsg.includes('послезавтра')) {
+      targetDate = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
+      dateLabel = 'послезавтра';
+    } else if (lowerMsg.includes('завтра')) {
+      targetDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      dateLabel = 'завтра';
+    } else if (lowerMsg.includes('вчера')) {
+      targetDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      dateLabel = 'вчера';
+    }
+
+    const agenda = await executeLocalTool('get_calendar_agenda', { date: targetDate });
     executedToolCalls.push({ name: 'get_calendar_agenda', args: { date: agenda.targetDate }, result: agenda });
 
-    let content = `Повестка на ${agenda.targetDate}:\n`;
+    let content = `Повестка на ${agenda.targetDate} (${dateLabel}):\n`;
     if (agenda.scheduledCount === 0 && agenda.overdueCount === 0) {
-      content += '- Запланированных задач на сегодня нет. День свободен для глубокой работы.';
+      content += '- Запланированных задач нет. День свободен для глубокой работы.';
     } else {
       if (agenda.scheduledCount > 0) {
-        content += `\n**Запланировано на сегодня (${agenda.scheduledCount}):**\n`;
+        content += `\n**Запланировано (${agenda.scheduledCount}):**\n`;
         agenda.scheduledTasks.forEach((t: any) => {
           content += `- [[${t.title}]] (${t.status || 'todo'}, приоритет: ${t.priority || 'обычный'})\n`;
         });
@@ -825,18 +1007,17 @@ ${isInbox
 
     return {
       content,
-      reasoning: 'Сформирована сводка календаря через get_calendar_agenda()',
+      reasoning: `Сформирована сводка календаря через get_calendar_agenda(${agenda.targetDate})`,
       reasoningTimeMs: Date.now() - startTime,
       toolCalls: executedToolCalls,
     };
   }
 
-  // Check if asking to decompose a task
+  // Check 4: Decompose task into checklist
   if (lowerMsg.includes('разбей') || lowerMsg.includes('декомпози') || lowerMsg.includes('подзадач') || lowerMsg.includes('шаги')) {
     const targetTask = allItems.find(i => {
       if (i.type !== 'task') return false;
       const lowerTitle = i.title.toLowerCase();
-      // Match by exact title, or tokens in query
       if (lowerMsg.includes(lowerTitle)) return true;
       const titleTokens = lowerTitle.split(/\s+/).filter(w => w.length > 3);
       return titleTokens.some(tok => lowerMsg.includes(tok));
@@ -868,7 +1049,7 @@ ${isInbox
     };
   }
 
-  // Check if asking to create a note or task
+  // Check 5: Create note or task
   if (lowerMsg.includes('создай') || lowerMsg.includes('добавь') || lowerMsg.includes('новая заметка') || lowerMsg.includes('новую задачу')) {
     const isTask = lowerMsg.includes('задач') || lowerMsg.includes('таск');
     const titleMatch = lastUserMsg.match(/["«]([^"»]+)["»]/) || lastUserMsg.split('\n')[0].replace(/(создай|добавь|новая заметка|новую задачу)\s*/i, '');
@@ -891,7 +1072,68 @@ ${isInbox
     };
   }
 
-  // General search query
+  // Check 6: Delete request
+  if (lowerMsg.includes('удали') || lowerMsg.includes('стереть') || lowerMsg.includes('delete')) {
+    return {
+      content: 'Удаление заметок не поддерживается напрямую из диалога ради безопасности данных. Возможны только создание, перемещение в архив/корзину, изменение статуса и планирование задач.',
+      reasoning: 'Сработало правило Read-Only Safety (удаление заблокировано)',
+      reasoningTimeMs: Date.now() - startTime,
+    };
+  }
+
+  // Check 7: Conversational meta-intents, emotional feedback, or questions
+  if (
+    lowerMsg === 'не хочу' ||
+    lowerMsg === 'не надо' ||
+    lowerMsg === 'что' ||
+    lowerMsg === 'что?' ||
+    lowerMsg === 'чо' ||
+    lowerMsg.includes('почему ты') ||
+    lowerMsg.includes('почему не') ||
+    lowerMsg.includes('молч') ||
+    lowerMsg.includes('не общ') ||
+    lowerMsg.includes('даун') ||
+    lowerMsg.includes('дурак') ||
+    lowerMsg.includes('туп') ||
+    lowerMsg.includes('глуп') ||
+    lowerMsg.includes('поговори')
+  ) {
+    return {
+      content: `Я работаю в локальном автономном режиме без активного API-ключа.\n\nВ этом режиме доступны базовые функции: календарная повестка («план на сегодня/завтра»), статистика хранилища, поиск заметок и создание задач.\n\nДля свободного диалога и рассуждений подключите API-ключ Groq или KIE.AI в Настройках (⌘,).`,
+      reasoning: 'Локальный диалоговый ответ (автономный режим без LLM API)',
+      reasoningTimeMs: Date.now() - startTime,
+    };
+  }
+
+  // Check 8: Greetings & Help
+  if (
+    lowerMsg === 'привет' ||
+    lowerMsg === 'здравствуй' ||
+    lowerMsg === 'здравствуйте' ||
+    lowerMsg === 'хай' ||
+    lowerMsg === 'hello' ||
+    lowerMsg.includes('кто ты') ||
+    lowerMsg.includes('что ты умеешь') ||
+    lowerMsg.includes('помощь') ||
+    lowerMsg === 'help'
+  ) {
+    return {
+      content: `Ассистент базы знаний SLAG v2 (локальный режим):\n\n- 📅 **Повестка дня**: «план на сегодня», «что на завтра»\n- 🔍 **Поиск заметок**: введите тему или ключевое слово\n- 📊 **Статистика**: «сколько заметок в базе?»\n- ✏️ **Создание**: «создай задачу: ...»\n\nДля подключения полной языковой модели укажите ключ Groq или KIE.AI в Настройках (⌘,).`,
+      reasoning: 'Справочный ответ локального агента',
+      reasoningTimeMs: Date.now() - startTime,
+    };
+  }
+
+  // Check 9: Short noise guard
+  if (lowerMsg.length < 2) {
+    return {
+      content: 'Пожалуйста, введите запрос для поиска или команду для ассистента.',
+      reasoning: 'Слишком короткий запрос',
+      reasoningTimeMs: Date.now() - startTime,
+    };
+  }
+
+  // 10. General search query via Orama
   const searchResults = await executeLocalTool('search_notes', { query: lastUserMsg });
   executedToolCalls.push({ name: 'search_notes', args: { query: lastUserMsg }, result: searchResults });
 
@@ -906,7 +1148,7 @@ ${isInbox
   }
 
   return {
-    content: `В контексте "${isInbox ? 'Все хранилище' : currentFolder}" по вашему запросу не найдено подходящих заметок. Попробуйте уточнить ключевые слова или спросите статистику («сколько заметок?»).`,
+    content: `В контексте "${isInbox ? 'Все хранилище' : currentFolder}" по запросу "${lastUserMsg}" записей не найдено.\n\n💡 Попробуйте другие ключевые слова или тег. Для свободного общения подключите ключ Groq или KIE.AI в Настройках (⌘,).`,
     reasoning: 'Поиск Orama завершен с 0 результатов',
     reasoningTimeMs: Date.now() - startTime,
     toolCalls: executedToolCalls,

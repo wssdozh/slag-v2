@@ -391,6 +391,13 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(100);
     await groqProviderBtn.click();
 
+    // Verify KIE.AI provider is also available
+    const kieProviderBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
+    await expect(kieProviderBtn).toBeVisible();
+    await kieProviderBtn.click();
+    await expect(settingsModal.locator('input[placeholder*="sk-kie"]')).toBeVisible();
+    await groqProviderBtn.click();
+
     // Verify gpt-oss-120b model option exists
     const modelSelect = settingsModal.locator('select', { hasText: /OpenAI GPT-OSS 120B/ });
     await expect(modelSelect).toBeVisible();
@@ -769,5 +776,49 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     await page.keyboard.press('Escape');
     await expect(settingsModal).not.toBeVisible();
+  });
+
+  test('22. Assistant Relative Calendar Dates, Contextual Links, and Offline Intent Classifier', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    // Verify "Локальный" mode badge is visible in header
+    await expect(page.locator('text=Локальный').first()).toBeVisible();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Ask today agenda via quick prompt
+    await page.locator('button', { hasText: 'План на сегодня' }).first().click();
+    await expect(page.locator('text=Повестка на').first()).toBeVisible({ timeout: 5000 });
+
+    // 3. Ask relative date query "а на завтра чо"
+    await textarea.fill('а на завтра чо');
+    await textarea.press('Enter');
+
+    // Verify it answers with tomorrow's agenda and NOT "не найдено подходящих заметок"
+    await expect(page.locator('text=завтра').last()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=не найдено подходящих заметок')).not.toBeVisible();
+
+    // 4. Ask contextual link query "дай мне линк на эту задачу"
+    await textarea.fill('дай мне линк на эту задачу');
+    await textarea.press('Enter');
+
+    // Verify it resolves the link from previous context
+    await expect(page.locator('text=Вот ссылка на запись из контекста:').first()).toBeVisible({ timeout: 5000 });
+
+    // 5. Ask conversational complaint "не хочу"
+    await textarea.fill('не хочу');
+    await textarea.press('Enter');
+
+    // Verify it answers with the polite offline mode explanation
+    await expect(page.locator('text=локальном автономном режиме').first()).toBeVisible({ timeout: 5000 });
+
+    // Take screenshot for visual audit
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-smart-dialogue.png',
+      fullPage: false,
+    });
   });
 });
