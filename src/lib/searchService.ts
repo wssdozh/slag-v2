@@ -7,15 +7,18 @@ let dbInstance: Orama<any> | null = null;
 
 // Stop words for Russian and English to clean noisy conversational queries
 const STOP_WORDS = new Set([
-  // Russian prepositions, particles, conversational noise
+  // Russian prepositions, particles, conversational noise, query verbs & entity mentions
   'по', 'как', 'жить', 'вообще', 'что', 'это', 'для', 'при', 'от', 'до', 'из', 'со',
   'ко', 'не', 'же', 'да', 'ну', 'бы', 'то', 'быть', 'все', 'всё', 'поищи', 'найди',
   'ищи', 'где', 'есть', 'мне', 'нам', 'ты', 'вы', 'он', 'она', 'они', 'их', 'его',
   'ее', 'её', 'ли', 'так', 'уже', 'еще', 'ещё', 'за', 'под', 'над', 'про', 'без',
   'о', 'об', 'обо', 'чем', 'тем', 'или', 'но', 'а', 'и', 'в', 'во', 'на', 'с', 'к',
+  'там', 'тут', 'здесь', 'заметку', 'заметки', 'заметка', 'заметкам', 'таску', 'таски',
+  'статью', 'статьи', 'статья', 'запись', 'записи', 'итд', 'тд', 'др', 'прочее',
   // English common stop words
   'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'about',
-  'how', 'what', 'why', 'where', 'is', 'are', 'was', 'were', 'find', 'search',
+  'how', 'what', 'why', 'where', 'is', 'are', 'was', 'were', 'find', 'search', 'note',
+  'notes', 'task', 'tasks', 'article', 'articles', 'there', 'here',
 ]);
 
 /**
@@ -70,7 +73,9 @@ export function tokenMatches(queryToken: string, targetToken: string): boolean {
   const tStem = getStem(t);
   if (qStem && tStem) {
     if (qStem === tStem || tStem.startsWith(qStem) || qStem.startsWith(tStem)) return true;
-    if (qStem.length >= 4 && tStem.length >= 4) {
+    if (qStem.length >= 5 && tStem.length >= 5) {
+      if (levenshtein(qStem, tStem) <= 2) return true;
+    } else if (qStem.length >= 4 && tStem.length >= 4) {
       if (levenshtein(qStem, tStem) <= 1) return true;
     }
   }

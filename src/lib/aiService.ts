@@ -869,8 +869,21 @@ ${isInbox
           break;
         }
 
-        // Push assistant's message with tool_calls into history
-        requestMessages.push(msg);
+        // Push sanitized assistant message with tool_calls into history (stripping vendor metadata like reasoning_content)
+        requestMessages.push({
+          role: 'assistant',
+          content: msg.content || '',
+          tool_calls: msg.tool_calls.map((tc: any) => ({
+            id: tc.id,
+            type: tc.type || 'function',
+            function: {
+              name: tc.function?.name,
+              arguments: typeof tc.function?.arguments === 'string'
+                ? tc.function.arguments
+                : JSON.stringify(tc.function?.arguments || {}),
+            },
+          })),
+        });
 
         // Execute all tool calls in this round
         let hasNewTools = false;
@@ -928,6 +941,27 @@ ${isInbox
         if (!hasNewTools) {
           finalContent = stepContent;
           break;
+        }
+      }
+
+      // Safeguard: If finalContent is empty but tools were executed, synthesize a friendly response from tool results
+      if (!finalContent.trim() && executedToolCalls.length > 0) {
+        const foundNotesSearch = executedToolCalls.find(
+          tc => tc.name === 'search_notes' && Array.isArray(tc.result) && tc.result.length > 0
+        );
+        if (foundNotesSearch && Array.isArray(foundNotesSearch.result)) {
+          const list = foundNotesSearch.result
+            .map((r: any) => `- [[${r.title}]] (${r.folder}): ${r.snippet || ''}`)
+            .join('\n');
+          finalContent = `По вашему запросу найдены следующие записи:\n\n${list}`;
+        } else {
+          const agendaCall = executedToolCalls.find(tc => tc.name === 'get_calendar_agenda' && tc.result);
+          if (agendaCall && agendaCall.result) {
+            const a = agendaCall.result;
+            finalContent = `Повестка на ${a.targetDate}: запланировано ${a.scheduledCount || 0} задач, просрочено ${a.overdueCount || 0}.`;
+          } else {
+            finalContent = `В базе знаний не найдено подходящих записей по вашему запросу. Попробуйте уточнить ключевые слова.`;
+          }
         }
       }
 

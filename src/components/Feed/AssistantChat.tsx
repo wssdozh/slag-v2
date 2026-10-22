@@ -18,7 +18,8 @@ import {
   Calendar,
   ListTodo,
   Check,
-  FolderOpen
+  FolderOpen,
+  Link2
 } from 'lucide-react';
 
 interface AssistantChatProps {
@@ -104,31 +105,12 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     let codeBlockLines: string[] = [];
 
     const parseInline = (text: string, lineKey: string | number) => {
-      // Split text by [[WikiLinks]], [Markdown Links](url), `code`, **bold**, *italic*, ~~strikethrough~~, and #tags
-      const tokenRegex = /(\[\[[^\]]+\]\]|\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|#[\wа-яА-ЯёЁ_-]+)/g;
+      // Split text by [Markdown Links](url), [[WikiLinks]] (with tolerance for [[[brackets]]]), `code`, **bold**, *italic*, ~~strikethrough~~, and #tags
+      const tokenRegex = /(\[[^\]]+\]\([^)]+\)|\[{2,}[^\]]+\]+|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|#[\wа-яА-ЯёЁ_-]+)/g;
       const parts = text.split(tokenRegex);
 
       return parts.map((part, index) => {
         const key = `${lineKey}-${index}`;
-
-        // [[WikiLink]]
-        if (part.startsWith('[[') && part.endsWith(']]')) {
-          const title = part.slice(2, -2);
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => scrollToItem(title)}
-              className="inline text-left text-blue-400 hover:text-blue-300 font-medium cursor-pointer transition-colors hover:underline select-text text-xs"
-              title={`Перейти к «${title}»`}
-            >
-              <span className="text-zinc-500 font-mono text-[11px] select-none">[[</span>
-              <span className="underline decoration-blue-500/40 underline-offset-2">{title}</span>
-              <span className="text-zinc-500 font-mono text-[11px] select-none">]]</span>
-              <ArrowUpRight className="w-2.5 h-2.5 text-blue-400/70 inline-block align-baseline ml-0.5 select-none" />
-            </button>
-          );
-        }
 
         // [Markdown Link](url)
         const mdLinkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
@@ -143,6 +125,23 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             >
               {mdLinkMatch[1]}
             </a>
+          );
+        }
+
+        // [[WikiLink]] - Clean badge rendering without raw brackets or detached arrow
+        if (part.startsWith('[[') && part.endsWith(']')) {
+          const title = part.replace(/^\[+|\]+$/g, '').trim();
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => scrollToItem(title)}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 hover:text-blue-200 font-medium cursor-pointer transition-colors border border-blue-500/20 align-baseline text-[11px]"
+              title={`Перейти к «${title}»`}
+            >
+              <Link2 className="w-2.5 h-2.5 text-blue-400 shrink-0 select-none" />
+              <span className="underline decoration-blue-400/30 underline-offset-2">{title}</span>
+            </button>
           );
         }
 
@@ -452,14 +451,19 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   </div>
                 )}
 
-                {/* Message Bubble */}
-                <div
-                  className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-white/10 text-zinc-100 border border-white/[0.08]'
-                      : 'bg-[#141416] text-zinc-200 border border-white/[0.06] shadow-sm'
-                  }`}
-                >
+                {/* Message Bubble - only rendered if has body text, reasoning or action */}
+                {Boolean(
+                  (msg.content && !msg.content.startsWith('[Подготовлен черновик')) ||
+                    msg.reasoning ||
+                    msg.suggestedAction
+                ) && (
+                  <div
+                    className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-white/10 text-zinc-100 border border-white/[0.08]'
+                        : 'bg-[#141416] text-zinc-200 border border-white/[0.06] shadow-sm'
+                    }`}
+                  >
                   {/* Reasoning Accordion */}
                   {msg.reasoning && (
                     <div className="mb-2 pb-1.5 border-b border-white/[0.06]">
@@ -607,6 +611,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     </div>
                   )}
                 </div>
+              )}
 
                 {/* Telegram-style Inline Action Button below the message bubble */}
                 {filterItemIds.length > 0 && (
