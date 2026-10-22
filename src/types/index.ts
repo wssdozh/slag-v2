@@ -142,3 +142,16 @@ export interface ChatMessage {
   suggestedAction?: SuggestedAction;
 }
 
+export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
+export type LogScope = 'AI' | 'FS' | 'SEARCH' | 'UI' | 'APP' | 'SYNC';
+
+export interface LogEntry {
+  id: string;
+  timestamp: number;
+  level: LogLevel;
+  scope: LogScope;
+  message: string;
+  data?: unknown;
+  durationMs?: number;
+}
+
