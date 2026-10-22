@@ -86,7 +86,8 @@ export const Composer: React.FC = () => {
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 220)}px`;
+      const targetHeight = content.trim() ? Math.min(textareaRef.current.scrollHeight, 220) : 22;
+      textareaRef.current.style.height = `${targetHeight}px`;
     }
   }, [content]);
 
@@ -405,8 +406,8 @@ export const Composer: React.FC = () => {
   };
 
   return (
-    <div className="p-3 pb-3 select-none shrink-0 max-w-2xl w-full mx-auto">
-      <div className="rounded-2xl bg-[#0c0c0e] border border-white/[0.06] p-3 flex flex-col gap-2">
+    <div className="w-full select-none">
+      <div className="rounded-2xl bg-[#0c0c0e]/95 backdrop-blur-md border border-white/[0.08] p-2.5 flex flex-col gap-1.5 shadow-2xl">
         {/* Reply Banner */}
         {replyTarget && (
         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
@@ -630,7 +631,7 @@ export const Composer: React.FC = () => {
           value={content}
           onChange={handleContentChange}
           onKeyDown={handleKeyDown}
-          rows={2}
+          rows={1}
           placeholder={
             itemType === 'task'
               ? 'Задача... (- [ ] для подзадач, [[ для ссылки)'
@@ -638,7 +639,8 @@ export const Composer: React.FC = () => {
               ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
               : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
           }
-          className="w-full bg-transparent text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-relaxed py-1 px-1 outline-none border-none"
+          className="w-full bg-transparent text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal py-0 px-1 outline-none border-none"
+          style={{ minHeight: '22px', maxHeight: '220px' }}
         />
       </div>
 
@@ -672,7 +674,7 @@ export const Composer: React.FC = () => {
       )}
 
       {/* Bottom Control Bar */}
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex items-center justify-between pt-0.5">
         {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
         <div className="flex items-center gap-2">
           {/* +Ai Smart Tagging Button */}
