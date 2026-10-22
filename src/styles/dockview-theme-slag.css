@@ -1,0 +1,54 @@
+@import "dockview-react/dist/styles/dockview.css";
+
+/*
+ * SLAG v2 Linear Minimal Dark Dockview Theme (95% Contract)
+ * Colors: Deep monochrome #09090b, #0c0c0e, #141416, 1px subtle borders #27272a
+ */
+.dockview-theme-slag {
+  --dv-group-view-background-color: #09090b;
+  --dv-tabs-and-actions-container-background-color: #0c0c0e;
+  --dv-activegroup-visiblepanel-tab-background-color: #141416;
+  --dv-activegroup-hiddenpanel-tab-background-color: #0c0c0e;
+  --dv-inactivegroup-visiblepanel-tab-background-color: #141416;
+  --dv-inactivegroup-hiddenpanel-tab-background-color: #0c0c0e;
+
+  --dv-activegroup-visiblepanel-tab-color: #f4f4f5;
+  --dv-activegroup-hiddenpanel-tab-color: #71717a;
+  --dv-inactivegroup-visiblepanel-tab-color: #a1a1aa;
+  --dv-inactivegroup-hiddenpanel-tab-color: #52525b;
+
+  --dv-separator-border: 1px solid rgba(255, 255, 255, 0.06);
+  --dv-sash-color: rgba(255, 255, 255, 0.06);
+  --dv-active-sash-color: rgba(59, 130, 246, 0.6);
+  --dv-tab-divider-color: rgba(255, 255, 255, 0.04);
+  --dv-tabs-and-actions-container-height: 34px;
+  --dv-tabs-and-actions-container-font-size: 11px;
+
+  --dv-drag-over-background-color: rgba(59, 130, 246, 0.15);
+  --dv-drag-over-border-color: rgba(59, 130, 246, 0.5);
+  --dv-edge-dock-indicator-color: rgba(59, 130, 246, 0.8);
+
+  --dv-floating-border: 1px solid rgba(255, 255, 255, 0.1);
+  --dv-floating-titlebar-background-color: #0c0c0e;
+  --dv-border-radius: 0px;
+  --dv-tab-border-radius: 0px;
+  --dv-sash-border-radius: 0px;
+  --dv-tab-margin: 0px;
+  --dv-icon-hover-background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dockview-theme-slag .dockview-tab {
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  border-top: 2px solid transparent;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.dockview-theme-slag .dockview-tab.active {
+  border-top: 2px solid #52525b;
+}
+
+.dockview-theme-slag .dockview-tab:hover {
+  color: #f4f4f5;
+}

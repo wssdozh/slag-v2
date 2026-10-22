@@ -386,6 +386,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isPinned: itemData.isPinned || false,
       isArchived: itemData.isArchived || false,
       status: itemData.status || (itemData.type === 'task' ? 'todo' : undefined),
+      kanbanColumn: itemData.kanbanColumn,
       priority: itemData.priority || (itemData.type === 'task' ? 'none' : undefined),
       dueDate: itemData.dueDate,
       reminder: itemData.reminder,

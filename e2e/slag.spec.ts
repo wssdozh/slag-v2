@@ -406,4 +406,319 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('16. Assistant Dialogue Display Modes (bubbles, document, terminal) switching, styling, and persistence', async ({ page }) => {
+    // 1. Open Center Assistant view
+    await page.locator('header button', { hasText: 'Ассистент' }).click();
+    await expect(page.locator('text=Все хранилище').first()).toBeVisible();
+
+    // 2. Locate segmented control buttons
+    const bubblesBtn = page.locator('button', { hasText: 'Чат' }).first();
+    const docBtn = page.locator('button', { hasText: 'Документ' }).first();
+    const terminalBtn = page.locator('button', { hasText: 'Терминал' }).first();
+
+    await expect(bubblesBtn).toBeVisible();
+    await expect(docBtn).toBeVisible();
+    await expect(terminalBtn).toBeVisible();
+
+    // Verify initial mode is bubbles
+    await expect(bubblesBtn).toHaveClass(/bg-white\/10/);
+
+    // 3. Send a message via quick prompt
+    await page.locator('button', { hasText: 'Сводка хранилища' }).click();
+    // Wait for assistant response to appear
+    await expect(page.locator('text=SLAG').first()).toBeVisible({ timeout: 5000 });
+
+    // Capture bubbles screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-mode-bubbles.png',
+      fullPage: false,
+    });
+
+    // 4. Switch to Document mode
+    await docBtn.click();
+    await expect(docBtn).toHaveClass(/bg-white\/10/);
+    await expect(bubblesBtn).not.toHaveClass(/bg-white\/10/);
+
+    // Verify document mode elements
+    await expect(page.locator('text=### Вопрос')).toBeVisible();
+    await expect(page.locator('text=> ❯')).toBeVisible();
+
+    // Verify localStorage persistence
+    const savedDocMode = await page.evaluate(() => localStorage.getItem('slag_chat_display_mode'));
+    expect(savedDocMode).toBe('document');
+
+    // Capture document screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-mode-document.png',
+      fullPage: false,
+    });
+
+    // 5. Switch to Terminal mode
+    await terminalBtn.click();
+    await expect(terminalBtn).toHaveClass(/bg-white\/10/);
+    await expect(docBtn).not.toHaveClass(/bg-white\/10/);
+
+    // Verify terminal mode elements
+    await expect(page.locator('text=❯ USER:')).toBeVisible();
+    await expect(page.locator('text=✔ [OUTPUT]:')).toBeVisible();
+
+    // Verify localStorage persistence
+    const savedTermMode = await page.evaluate(() => localStorage.getItem('slag_chat_display_mode'));
+    expect(savedTermMode).toBe('terminal');
+
+    // Send a prompt that generates suggestedAction (Draft task)
+    const textarea = page.locator('main textarea');
+    await textarea.fill('Создай новую задачу: Проверить синхронизацию заметок');
+    await textarea.press('Enter');
+    await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible({ timeout: 5000 });
+
+    // Verify ASCII border in terminal mode
+    await expect(page.locator('text=DRAFT TASK')).toBeVisible();
+
+    // Capture terminal screenshot with suggestedAction
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-mode-terminal.png',
+      fullPage: false,
+    });
+
+    // 6. Switch back to Document mode and verify suggestedAction inline block
+    await docBtn.click();
+    await expect(docBtn).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-mode-document.png',
+      fullPage: false,
+    });
+
+    // 7. Switch back to Bubbles mode
+    await bubblesBtn.click();
+    await expect(bubblesBtn).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-mode-bubbles.png',
+      fullPage: false,
+    });
+
+    const savedBubblesMode = await page.evaluate(() => localStorage.getItem('slag_chat_display_mode'));
+    expect(savedBubblesMode).toBe('bubbles');
+  });
+
+  test('17. Linear-style Kanban Board with TRIZ Dock and Signal Bars', async ({ page }) => {
+    // 1. Switch to Kanban view in header
+    const kanbanBtn = page.locator('header button', { hasText: 'Канбан' });
+    await expect(kanbanBtn).toBeVisible();
+    await kanbanBtn.click();
+
+    // 2. Verify TRIZ Materials Dock exists and shows materials
+    const materialsHeader = page.locator('text=Материалы папки');
+    await expect(materialsHeader).toBeVisible();
+
+    // 3. Verify 4 columns exist (Бэклог, К выполнению, В работе, Выполнено)
+    await expect(page.locator('h3', { hasText: 'Бэклог' })).toBeVisible();
+    await expect(page.locator('h3', { hasText: 'К выполнению' })).toBeVisible();
+    await expect(page.locator('h3', { hasText: 'В работе' })).toBeVisible();
+    await expect(page.locator('h3', { hasText: 'Выполнено' })).toBeVisible();
+
+    // 4. Create a task inline in "К выполнению" column
+    const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]');
+    await addBtn.click();
+
+    const input = page.locator('input[placeholder*="Название задачи"]');
+    await expect(input).toBeVisible();
+    const taskName = 'Линейный Канбан Тест ' + Date.now();
+    await input.fill(taskName);
+    await input.press('Enter');
+
+    // Verify task card appeared in Kanban
+    const taskCard = page.locator('[data-testid="kanban-card"]', { hasText: taskName });
+    await expect(taskCard).toBeVisible();
+
+    // Verify Linear Task key (e.g. TSK-...)
+    await expect(taskCard.locator('text=TSK-')).toBeVisible();
+
+    // 5. Screenshot Kanban layout for visual inspection
+    await page.screenshot({
+      path: 'test-results/screenshots/kanban-board-layout.png',
+      fullPage: false,
+    });
+  });
+
+  test('18. Todoist Upcoming Calendar with Week/Month Views and Overdue Drawer', async ({ page }) => {
+    // 1. Switch to Calendar view in header
+    const calendarBtn = page.locator('header button', { hasText: 'Календарь' });
+    await expect(calendarBtn).toBeVisible();
+    await calendarBtn.click();
+
+    // 2. Verify Week view by default
+    await expect(page.locator('text=Неделя')).toBeVisible();
+    await expect(page.locator('text=Месяц')).toBeVisible();
+    await expect(page.locator('text=Сегодня')).toBeVisible();
+
+    // 3. Verify Today date indicator in week header
+    const redTodayBadge = page.locator('.bg-\\[\\#e44332\\]');
+    await expect(redTodayBadge.first()).toBeVisible();
+
+    // 4. Verify Hourly Time Grid (e.g. 08:00, 12:00, 18:00)
+    await expect(page.locator('text=08:00').first()).toBeVisible();
+    await expect(page.locator('text=12:00').first()).toBeVisible();
+
+    // 5. Capture Week View screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-week-layout.png',
+      fullPage: false,
+    });
+
+    // 6. Switch to Month View
+    await page.locator('button', { hasText: 'Месяц' }).click();
+    await expect(page.locator('button', { hasText: 'Месяц' })).toHaveClass(/bg-white\/10/);
+
+    // Capture Month View screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-month-layout.png',
+      fullPage: false,
+    });
+
+    // 7. Open Overdue & Unscheduled Drawer
+    const drawerBtn = page.locator('button[title*="просроченных"]').first();
+    await drawerBtn.click();
+    await expect(page.locator('text=Просроченные')).toBeVisible();
+    await expect(page.locator('text=Без срока')).toBeVisible();
+
+    // Capture Drawer screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-drawer-layout.png',
+      fullPage: false,
+    });
+  });
+
+  test('19. Todoist task parser and interactive Ghost chips', async ({ page }) => {
+    const composerTextarea = page.locator('main textarea');
+    await expect(composerTextarea).toBeVisible();
+
+    // 1. Type a task with date, priority, and tags in Todoist syntax
+    await composerTextarea.fill('Купить фермерское молоко завтра в 18:00 p1 #groceries');
+
+    // 2. Wait for 150ms debounce
+    await page.waitForTimeout(250);
+
+    // 3. Verify Ghost chips are visible right above textarea
+    const dateChip = page.locator('span.font-mono', { hasText: '📅' }).first();
+    const priorityChip = page.locator('span.font-mono', { hasText: 'p1 (High)' });
+    const tagChip = page.locator('span.font-mono', { hasText: '#groceries' });
+
+    await expect(dateChip).toBeVisible();
+    await expect(priorityChip).toBeVisible();
+    await expect(tagChip).toBeVisible();
+
+    // 4. Take screenshot of Ghost chips
+    await page.screenshot({
+      path: 'test-results/screenshots/todoist-ghost-chips.png',
+      fullPage: false,
+    });
+
+    // 5. Test Escape key dismisses all ghost chips
+    await composerTextarea.press('Escape');
+    await expect(dateChip).not.toBeVisible();
+    await expect(priorityChip).not.toBeVisible();
+    await expect(tagChip).not.toBeVisible();
+
+    // 6. Retype to bring chips back and test individual dismiss
+    await composerTextarea.fill('');
+    await page.waitForTimeout(100);
+    await composerTextarea.fill('Заказать билеты в театр завтра p2 #culture');
+    await page.waitForTimeout(250);
+
+    const newPriorityChip = page.locator('span.font-mono', { hasText: 'p2 (Medium)' });
+    await expect(newPriorityChip).toBeVisible();
+
+    // Dismiss priority chip via its X button
+    const prioX = newPriorityChip.locator('button');
+    await prioX.click();
+    await expect(newPriorityChip).not.toBeVisible();
+
+    // 7. Send task via Enter
+    await composerTextarea.press('Enter');
+
+    // 8. Verify created task card in feed has clean title
+    const createdCard = page.locator('.group', { hasText: 'Заказать билеты в театр' }).first();
+    await expect(createdCard).toBeVisible();
+
+    // Verify tag is present
+    await expect(createdCard.getByRole('button', { name: '#culture' })).toBeVisible();
+
+    // Verify task type badge is present
+    await expect(createdCard.locator('span', { hasText: 'Таска' })).toBeVisible();
+
+    // Verify title does NOT contain raw syntax (p2, #culture, tomorrow)
+    const cardText = await createdCard.innerText();
+    expect(cardText).not.toContain('#culture завтра');
+  });
+
+  test('20. Composite Workspace (Dockview), Presets Switching, and Layout Engine Toggle', async ({ page }) => {
+    // 1. Locate the Layout Engine toggle button in FeedHeader
+    const toggleLayoutBtn = page.locator('header button[title*="Композитная IDE-сетка"]');
+    await expect(toggleLayoutBtn).toBeVisible();
+
+    // 2. Click to toggle to Dockview Grid
+    await toggleLayoutBtn.click();
+
+    // 3. Verify Dockview container and Presets controls are visible
+    const dockviewContainer = page.locator('.dockview-theme-slag');
+    await expect(dockviewContainer).toBeVisible();
+    await expect(page.locator('text=Сетка:')).toBeVisible();
+
+    // 4. Verify Preset buttons exist
+    const defaultPresetBtn = page.locator('button', { hasText: 'Стандарт' }).first();
+    const aiLabPresetBtn = page.locator('button', { hasText: 'AI Lab' }).first();
+    const focusPresetBtn = page.locator('button', { hasText: 'Фокус' }).first();
+    const dualPresetBtn = page.locator('button', { hasText: '2 Экрана' }).first();
+
+    await expect(defaultPresetBtn).toBeVisible();
+    await expect(aiLabPresetBtn).toBeVisible();
+    await expect(focusPresetBtn).toBeVisible();
+    await expect(dualPresetBtn).toBeVisible();
+
+    // Capture Default Preset screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-default-preset.png',
+      fullPage: false,
+    });
+
+    // 5. Switch to AI Lab Preset
+    await aiLabPresetBtn.click();
+    await expect(aiLabPresetBtn).toHaveClass(/bg-white\/10/);
+    await page.waitForTimeout(200);
+
+    // Capture AI Lab Preset screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-ai-lab-preset.png',
+      fullPage: false,
+    });
+
+    // 6. Switch to Deep Focus Preset
+    await focusPresetBtn.click();
+    await expect(focusPresetBtn).toHaveClass(/bg-white\/10/);
+    await page.waitForTimeout(200);
+
+    // Capture Deep Focus Preset screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-focus-preset.png',
+      fullPage: false,
+    });
+
+    // 7. Switch to Dual Screen Preset
+    await dualPresetBtn.click();
+    await expect(dualPresetBtn).toHaveClass(/bg-white\/10/);
+    await page.waitForTimeout(200);
+
+    // 8. Switch back to Classic Layout via "Классика" button
+    const classicBtn = page.locator('button', { hasText: 'Классика' });
+    await expect(classicBtn).toBeVisible();
+    await classicBtn.click();
+
+    // Verify returning to classic layout
+    await expect(dockviewContainer).not.toBeVisible();
+    await expect(page.locator('header button', { hasText: 'Лента' })).toBeVisible();
+  });
 });

@@ -1,4 +1,5 @@
 export type SlagItemType = 'note' | 'article' | 'task';
+export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'done';
 
 export interface SlagAttachment {
   id: string;
@@ -30,11 +31,12 @@ export interface SlagItem {
   isArchived?: boolean;
 
   // Task-specific fields
-  status?: 'todo' | 'in_progress' | 'done';
+  status?: 'backlog' | 'todo' | 'in_progress' | 'done';
   priority?: 'none' | 'low' | 'medium' | 'high';
   dueDate?: string; // YYYY-MM-DD
   reminder?: string; // ISO DateTime
   subtasks?: SlagSubtask[];
+  kanbanColumn?: string;
 
   // Article-specific fields
   readingTimeMinutes?: number;
@@ -45,12 +47,20 @@ export interface SlagItem {
   linkedItemIds?: string[]; // IDs of explicitly linked tasks/notes
 }
 
+export interface KanbanColumn {
+  id: string;
+  title: string;
+  statusMapping?: 'backlog' | 'todo' | 'in_progress' | 'done';
+}
+
 export interface FolderMeta {
   path: string; // Relative path, e.g. "Входящие", "Проекты/SLAG"
   name: string; // Display name
   description: string; // Detailed description used by AI triage
   icon?: string;
   isSystem?: boolean; // E.g., true for "Входящие"
+  kanbanColumns?: KanbanColumn[];
+  showReferenceColumn?: boolean;
 }
 
 export interface VaultMeta {
@@ -81,6 +91,7 @@ export interface AiSettings {
 export type InboxMode = 'unsorted' | 'all' | 'sorted';
 export type FeedViewMode = 'feed' | 'kanban' | 'calendar' | 'assistant';
 export type RightPanelMode = 'info' | 'assistant';
+export type ChatDisplayMode = 'bubbles' | 'document' | 'terminal';
 
 export interface AiItemFilter {
   itemIds: string[];

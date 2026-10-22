@@ -3,7 +3,8 @@ import { useApp } from '../../context/AppContext';
 import type { SlagItemType, SlagAttachment } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
-import { generateSmartTags } from '../../lib/geminiService';
+import { generateSmartTags } from '../../lib/aiService';
+import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import {
   Send,
   Trash2,
@@ -57,6 +58,27 @@ export const Composer: React.FC = () => {
   const [wikiQuery, setWikiQuery] = useState<string | null>(null);
   const [wikiSelectedIndex, setWikiSelectedIndex] = useState(0);
 
+  // Todoist parser & Ghost-chips state
+  const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
+  const [isDateDismissed, setIsDateDismissed] = useState(false);
+  const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
+  const [dismissedTags, setDismissedTags] = useState<Set<string>>(new Set());
+
+  // 150ms debounced Todoist parsing when content changes
+  useEffect(() => {
+    if (!content.trim()) return;
+
+    const timer = setTimeout(() => {
+      const parsed = parseTodoistInput(content);
+      setParsedTask(parsed);
+      if (itemType === 'note' && (parsed.dueDate || (parsed.priority && parsed.priority !== 'none'))) {
+        setItemType('task');
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [content, itemType]);
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -86,6 +108,13 @@ export const Composer: React.FC = () => {
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setContent(text);
+
+    if (!text.trim()) {
+      setParsedTask(null);
+      setIsDateDismissed(false);
+      setIsPriorityDismissed(false);
+      setDismissedTags(new Set());
+    }
 
     // Smart type inference: typing checklist switches note to task
     if (itemType === 'note') {
@@ -197,8 +226,27 @@ export const Composer: React.FC = () => {
     setAttachments(attachments.filter(a => a.id !== id));
   };
 
+  const hasDetectedDateOrPriority = Boolean(
+    parsedTask && (parsedTask.dueDate || (parsedTask.priority && parsedTask.priority !== 'none'))
+  );
+  const isGhostActive = itemType === 'task' || hasDetectedDateOrPriority;
+
+  const hasActiveDateChip = Boolean(isGhostActive && parsedTask?.dueDate && !isDateDismissed);
+  const hasActivePriorityChip = Boolean(
+    isGhostActive && parsedTask?.priority && !isPriorityDismissed
+  );
+  const activeGhostTags = isGhostActive && parsedTask?.tags
+    ? parsedTask.tags.filter(t => !dismissedTags.has(t))
+    : [];
+  const hasActiveTagChips = activeGhostTags.length > 0;
+
+  const hasAnyActiveGhostChips = hasActiveDateChip || hasActivePriorityChip || hasActiveTagChips;
+
   const handleSend = () => {
     if (!content.trim() && attachments.length === 0) return;
+
+    // Parse Todoist input synchronously for immediate state accuracy
+    const currentParsed = parseTodoistInput(content);
 
     let title = '';
     const lines = content.trim().split('\n');
@@ -207,13 +255,16 @@ export const Composer: React.FC = () => {
     if (itemType === 'article') {
       title = firstLine || 'Новая статья';
     } else if (itemType === 'task') {
-      title = firstLine || 'Новая задача';
+      title = currentParsed.cleanTitle || 'Новая задача';
     } else {
       title = firstLine.slice(0, 50) || 'Заметка';
     }
 
-    const inlineTags = Array.from(content.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g)).map(m => m[1]);
-    const finalTags = Array.from(new Set([...tags, ...inlineTags]));
+    const rawGhostTags = currentParsed.tags.filter(t => !dismissedTags.has(t));
+    const inlineTags = Array.from(content.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g))
+      .map(m => m[1])
+      .filter(t => !dismissedTags.has(t));
+    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...inlineTags]));
 
     let subtasks: Array<{ id: string; title: string; completed: boolean }> = [];
     if (itemType === 'task') {
@@ -230,6 +281,24 @@ export const Composer: React.FC = () => {
       }
     }
 
+    const taskPriority = itemType === 'task'
+      ? (!isPriorityDismissed && currentParsed.priority
+          ? currentParsed.priority
+          : priority)
+      : undefined;
+
+    const taskDueDate = itemType === 'task'
+      ? (!isDateDismissed && currentParsed.dueDate
+          ? currentParsed.dueDate
+          : (dueDate || undefined))
+      : undefined;
+
+    const taskReminder = itemType === 'task'
+      ? (!isDateDismissed && currentParsed.reminder
+          ? currentParsed.reminder
+          : undefined)
+      : undefined;
+
     saveItem({
       type: itemType,
       title,
@@ -238,8 +307,9 @@ export const Composer: React.FC = () => {
       tags: finalTags,
       attachments,
       replyToId: replyTarget?.id,
-      priority: itemType === 'task' ? priority : undefined,
-      dueDate: itemType === 'task' && dueDate ? dueDate : undefined,
+      priority: taskPriority,
+      dueDate: taskDueDate,
+      reminder: taskReminder,
       subtasks: subtasks.length > 0 ? subtasks : undefined,
     });
 
@@ -250,6 +320,10 @@ export const Composer: React.FC = () => {
     setDueDate('');
     setReplyTarget(null);
     setWikiQuery(null);
+    setParsedTask(null);
+    setIsDateDismissed(false);
+    setIsPriorityDismissed(false);
+    setDismissedTags(new Set());
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -259,16 +333,47 @@ export const Composer: React.FC = () => {
   const handleExpandToFullscreen = () => {
     const lines = content.trim().split('\n');
     const firstLine = lines[0]?.replace(/^#+\s*/, '').trim() || (itemType === 'article' ? 'Новая статья' : 'Черновик');
+    const currentParsed = parseTodoistInput(content);
+
+    const taskTitle = itemType === 'task'
+      ? (currentParsed.cleanTitle || 'Новая задача')
+      : firstLine;
+
+    const rawGhostTags = currentParsed.tags.filter(t => !dismissedTags.has(t));
+    const inlineTags = Array.from(content.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g))
+      .map(m => m[1])
+      .filter(t => !dismissedTags.has(t));
+    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...inlineTags]));
+
+    const taskPriority = itemType === 'task'
+      ? (!isPriorityDismissed && currentParsed.priority
+          ? currentParsed.priority
+          : priority)
+      : undefined;
+
+    const taskDueDate = itemType === 'task'
+      ? (!isDateDismissed && currentParsed.dueDate
+          ? currentParsed.dueDate
+          : (dueDate || undefined))
+      : undefined;
+
+    const taskReminder = itemType === 'task'
+      ? (!isDateDismissed && currentParsed.reminder
+          ? currentParsed.reminder
+          : undefined)
+      : undefined;
+
     const tempItem = saveItem({
       type: itemType,
-      title: firstLine,
+      title: taskTitle,
       content: content.trim(),
       folder: currentFolder,
-      tags,
+      tags: finalTags,
       attachments,
       replyToId: replyTarget?.id,
-      priority: itemType === 'task' ? priority : undefined,
-      dueDate: itemType === 'task' && dueDate ? dueDate : undefined,
+      priority: taskPriority,
+      dueDate: taskDueDate,
+      reminder: taskReminder,
     });
 
     setContent('');
@@ -276,11 +381,28 @@ export const Composer: React.FC = () => {
     setTags([]);
     setReplyTarget(null);
     setWikiQuery(null);
+    setParsedTask(null);
+    setIsDateDismissed(false);
+    setIsPriorityDismissed(false);
+    setDismissedTags(new Set());
     setSelectedItem(tempItem);
     setIsFullscreenEditorOpen(true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Dismiss active ghost chips first on Escape
+    if (e.key === 'Escape') {
+      if (hasAnyActiveGhostChips) {
+        e.preventDefault();
+        setIsDateDismissed(true);
+        setIsPriorityDismissed(true);
+        if (parsedTask?.tags) {
+          setDismissedTags(new Set(parsedTask.tags));
+        }
+        return;
+      }
+    }
+
     // Wiki autocomplete keyboard controls
     if (wikiQuery !== null && matchingWikiItems.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -507,6 +629,85 @@ export const Composer: React.FC = () => {
         onChange={(e) => handleFileUpload(e, 'image')}
       />
 
+      {/* Interactive Ghost-chips right above the textarea */}
+      {hasAnyActiveGhostChips && (
+        <div className="flex flex-wrap items-center gap-1.5 px-1 py-1 text-xs animate-in fade-in duration-150">
+          {hasActiveDateChip && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
+              <span>📅</span>
+              <span>{parsedTask?.rawMatchedDateText || parsedTask?.dueDate}</span>
+              <button
+                type="button"
+                onClick={() => setIsDateDismissed(true)}
+                className="ml-0.5 p-0.5 rounded text-blue-400/80 hover:text-white hover:bg-white/10 transition-colors"
+                title="Отменить дату для этого черновика"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
+
+          {hasActivePriorityChip && (
+            <span
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono border ${
+                parsedTask?.priority === 'high'
+                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                  : parsedTask?.priority === 'medium'
+                  ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                  : parsedTask?.priority === 'low'
+                  ? 'bg-sky-500/10 border-sky-500/20 text-sky-300'
+                  : 'bg-zinc-500/10 border-zinc-500/20 text-zinc-300'
+              }`}
+            >
+              <span>
+                {parsedTask?.priority === 'high'
+                  ? '🔴'
+                  : parsedTask?.priority === 'medium'
+                  ? '🟠'
+                  : parsedTask?.priority === 'low'
+                  ? '🔵'
+                  : '⚪'}
+              </span>
+              <span>
+                {parsedTask?.priority === 'high'
+                  ? 'p1 (High)'
+                  : parsedTask?.priority === 'medium'
+                  ? 'p2 (Medium)'
+                  : parsedTask?.priority === 'low'
+                  ? 'p3 (Low)'
+                  : 'p4 (None)'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsPriorityDismissed(true)}
+                className="ml-0.5 p-0.5 rounded hover:text-white hover:bg-white/10 transition-colors"
+                title="Отменить приоритет"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
+
+          {activeGhostTags.map(tag => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/[0.08] text-zinc-300 text-[11px] font-mono"
+            >
+              <span>🏷</span>
+              <span>#{tag}</span>
+              <button
+                type="button"
+                onClick={() => setDismissedTags(prev => new Set(prev).add(tag))}
+                className="ml-0.5 p-0.5 rounded text-zinc-400 hover:text-rose-400 hover:bg-white/10 transition-colors"
+                title="Отменить тег"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Textarea Input Container with WikiLink popover */}
       <div className="relative">
         {wikiQuery !== null && matchingWikiItems.length > 0 && (
@@ -701,6 +902,12 @@ export const Composer: React.FC = () => {
                 setContent('');
                 setAttachments([]);
                 setTags([]);
+                setPriority('none');
+                setDueDate('');
+                setParsedTask(null);
+                setIsDateDismissed(false);
+                setIsPriorityDismissed(false);
+                setDismissedTags(new Set());
               }}
               className="p-1.5 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors"
               title="Очистить"

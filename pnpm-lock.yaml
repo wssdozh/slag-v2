@@ -41,9 +41,15 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.31.4
         version: 3.31.4
+      chrono-node:
+        specifier: ^2.10.3
+        version: 2.10.3
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dockview-react:
+        specifier: ^8.6.1
+        version: 8.6.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       lucide-react:
         specifier: ^1.55.0
         version: 1.55.0(@types/react@19.3.0)(react@19.3.0)
@@ -752,6 +758,10 @@ packages:
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
+  chrono-node@2.10.3:
+    resolution: {integrity: sha512-MOfrzXgSMZTH4SZ5gyRKQCVwiCrCKY+uYkSJiWoRLXS88DA6WGJm8UjgS+VVEuUQeew/UUXaxrO+SeDn/WCisg==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
@@ -762,6 +772,18 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  dockview-core@8.6.1:
+    resolution: {integrity: sha512-DayOT2iM66kwlhxUYgP490UE1moxL8yZD6DVIXcX+LPowE7x537S6gwF/K8iWog+XR+aRvgwI3FJhLn90FJHTQ==}
+
+  dockview-react@8.6.1:
+    resolution: {integrity: sha512-F67LqtPsgKjQ6bvzkTnI8soXmMTu3XEFGVtKEu1UHS0sqpkaRMyQbNAP/+DF/VOGhkn0h/PwHLdehJdrF5yJrg==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  dockview@8.6.1:
+    resolution: {integrity: sha512-2WZyTw+Wln7ZX7er4XhH6S9i3InfdbdQZZo/tK26GdQudKn913ctbRN2tkZgXCN9mToGSd5aj8ANp1Lid/MMEQ==}
 
   enhanced-resolve@5.26.0:
     resolution: {integrity: sha512-9vhedylFonb2YGogzUKX6+Ja72gOJbN1QHAqdrvqLwhdl/QWbKopzoUC9EbQNVsAns/bx/4uyqalrQAoy1IByw==}
@@ -1666,11 +1688,25 @@ snapshots:
 
   argparse@2.0.1: {}
 
+  chrono-node@2.10.3: {}
+
   clsx@2.1.1: {}
 
   csstype@3.2.3: {}
 
   detect-libc@2.1.2: {}
+
+  dockview-core@8.6.1: {}
+
+  dockview-react@8.6.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      dockview: 8.6.1
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+
+  dockview@8.6.1:
+    dependencies:
+      dockview-core: 8.6.1
 
   enhanced-resolve@5.26.0:
     dependencies:

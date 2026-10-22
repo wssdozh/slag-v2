@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { triageInboxItems } from '../../lib/geminiService';
-import type { TriageSuggestion } from '../../lib/geminiService';
+import { triageInboxItems } from '../../lib/aiService';
+import type { TriageSuggestion } from '../../lib/aiService';
 import {
   Sparkles,
   X,

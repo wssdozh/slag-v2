@@ -20,6 +20,7 @@ export function serializeItemToMarkdown(item: SlagItem): string {
 
   if (item.type === 'task') {
     if (item.status) frontmatterData.status = item.status;
+    if (item.kanbanColumn) frontmatterData.kanbanColumn = item.kanbanColumn;
     if (item.priority && item.priority !== 'none') frontmatterData.priority = item.priority;
     if (item.dueDate) frontmatterData.dueDate = item.dueDate;
     if (item.reminder) frontmatterData.reminder = item.reminder;
@@ -119,6 +120,7 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
 
   if (type === 'task') {
     item.status = frontmatter.status || 'todo';
+    item.kanbanColumn = frontmatter.kanbanColumn;
     item.priority = frontmatter.priority || 'none';
     item.dueDate = frontmatter.dueDate;
     item.reminder = frontmatter.reminder;
