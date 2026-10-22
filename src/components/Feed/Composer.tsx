@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItemType, SlagAttachment } from '../../types';
+import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
 import { generateSmartTags } from '../../lib/aiService';
@@ -12,14 +12,7 @@ import {
   Mic,
   Video,
   Sparkles,
-  Bold,
-  Heading2,
   CheckSquare,
-  Table,
-  Link2,
-  Image as ImageIcon,
-  Code2,
-  Smile,
   X,
   Loader2,
   ChevronDown,
@@ -51,7 +44,6 @@ export const Composer: React.FC = () => {
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
   // WikiLink [[ autocomplete state
@@ -153,22 +145,6 @@ export const Composer: React.FC = () => {
         el.setSelectionRange(newCursor, newCursor);
       }, 10);
     }
-  };
-
-  // Insert markdown helpers
-  const insertFormatting = (prefix: string, suffix: string = '') => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = content.slice(start, end);
-    const replacement = `${prefix}${selected || 'текст'}${suffix}`;
-    const newContent = content.slice(0, start) + replacement + content.slice(end);
-    setContent(newContent);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + prefix.length, start + prefix.length + (selected ? selected.length : 5));
-    }, 10);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
@@ -363,7 +339,9 @@ export const Composer: React.FC = () => {
           : undefined)
       : undefined;
 
-    const tempItem = saveItem({
+    // Create a temporary draft object in memory WITHOUT saving to vault storage yet
+    const draftItem: SlagItem = {
+      id: 'draft_' + Date.now(),
       type: itemType,
       title: taskTitle,
       content: content.trim(),
@@ -374,18 +352,11 @@ export const Composer: React.FC = () => {
       priority: taskPriority,
       dueDate: taskDueDate,
       reminder: taskReminder,
-    });
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
 
-    setContent('');
-    setAttachments([]);
-    setTags([]);
-    setReplyTarget(null);
-    setWikiQuery(null);
-    setParsedTask(null);
-    setIsDateDismissed(false);
-    setIsPriorityDismissed(false);
-    setDismissedTags(new Set());
-    setSelectedItem(tempItem);
+    setSelectedItem(draftItem);
     setIsFullscreenEditorOpen(true);
   };
 
@@ -433,94 +404,11 @@ export const Composer: React.FC = () => {
     }
   };
 
-  const quickEmojis = ['💡', '🔥', '📌', '⚡', '✅', '🚀', '🧠', '☕'];
-
   return (
     <div className="p-3 pb-3 select-none shrink-0 max-w-2xl w-full mx-auto">
       <div className="rounded-2xl bg-[#0c0c0e] border border-white/[0.06] p-3 flex flex-col gap-2">
-        {/* Top Telegram-style Formatting Bar */}
-        <div className="flex items-center gap-1 text-zinc-400 border-b border-white/[0.04] pb-1.5 px-1">
-          <button
-            onClick={() => insertFormatting('## ', '')}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Заголовок"
-          >
-            <Heading2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => insertFormatting('**', '**')}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Жирный"
-          >
-            <Bold className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => insertFormatting('- [ ] ', '')}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Чеклист"
-          >
-            <CheckSquare className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => insertFormatting('\n| Колонки 1 | Колонки 2 |\n|---|---|\n| Текст 1 | Текст 2 |\n')}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Таблица"
-          >
-            <Table className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => insertFormatting('[', '](https://)')}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Ссылка"
-          >
-            <Link2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => imageInputRef.current?.click()}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Изображение"
-          >
-            <ImageIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => insertFormatting('```\n', '\n```')}
-            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Блок кода"
-          >
-            <Code2 className="w-4 h-4" />
-          </button>
-
-          {/* Emoji popover */}
-          <div className="relative">
-            <button
-              onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-              className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Эмодзи"
-            >
-              <Smile className="w-4 h-4" />
-            </button>
-
-            {isEmojiPickerOpen && (
-              <div className="absolute left-0 bottom-full mb-1 flex items-center gap-1.5 p-1.5 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl z-30 animate-in fade-in">
-                {quickEmojis.map(emo => (
-                  <button
-                    key={emo}
-                    onClick={() => {
-                      setContent(prev => prev + emo);
-                      setIsEmojiPickerOpen(false);
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-sm transition-colors cursor-pointer"
-                  >
-                    {emo}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-      {/* Reply Banner */}
-      {replyTarget && (
+        {/* Reply Banner */}
+        {replyTarget && (
         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
           <div className="flex items-center gap-2 truncate min-w-0">
             <CornerUpLeft className="w-3.5 h-3.5 text-zinc-400 shrink-0" />

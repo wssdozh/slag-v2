@@ -262,6 +262,20 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await sidebar.screenshot({
       path: 'test-results/screenshots/sidebar.png',
     });
+
+    // 4. Capture Fullscreen Editor layout for visual audit
+    const focusEditorBtn = page.locator('button', { hasText: 'Фокус-редактор' }).first();
+    if (await focusEditorBtn.isVisible()) {
+      await focusEditorBtn.click();
+      await expect(page.locator('#fullscreen-textarea')).toBeVisible();
+      await page.screenshot({
+        path: 'test-results/screenshots/fullscreen-editor-layout.png',
+        fullPage: false,
+      });
+      // Click "Назад" to return
+      await page.locator('button', { hasText: 'Назад' }).click();
+      await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();
+    }
   });
 
   test('10. Toggle Assistant Mode via Dockview Tab and Panel Navigation', async ({ page }) => {
