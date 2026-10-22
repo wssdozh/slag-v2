@@ -1,5 +1,8 @@
 import type { SlagItem, FolderMeta, VaultMeta, SlagAttachment } from '../types';
 import { serializeItemToMarkdown } from './markdownSerializer';
+import { logger } from './logger';
+
+const fsLog = logger.scope('FS');
 
 const VAULTS_KEY = 'slag_vaults_v2';
 const CURRENT_VAULT_KEY = 'slag_current_vault_v2';
@@ -228,6 +231,7 @@ export class StorageService {
       this.currentVault = { ...target, isCurrent: true };
       localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(this.currentVault));
       this.initDefaultsIfNeeded();
+      fsLog.info(`Switched vault to "${this.currentVault.name}" (${this.currentVault.id})`);
       return this.currentVault;
     }
     return this.currentVault;
@@ -241,6 +245,7 @@ export class StorageService {
       isCurrent: true,
     };
     this.saveVaultMeta(newVault);
+    fsLog.info(`Created new vault "${name}" [${mode}]`);
     return this.switchVault(newVault.id);
   }
 
@@ -284,6 +289,7 @@ export class StorageService {
     const folders = this.getFolders().filter(f => f.path !== folder.path);
     folders.push(folder);
     localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
+    fsLog.info(`Saved folder "${folder.name}" (${folder.path})`);
   }
 
   public updateFolderDescription(path: string, description: string): void {
@@ -294,6 +300,7 @@ export class StorageService {
       return f;
     });
     localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
+    fsLog.debug(`Updated description for folder "${path}"`);
   }
 
   public deleteFolder(path: string): void {
@@ -310,6 +317,7 @@ export class StorageService {
       return it;
     });
     localStorage.setItem(this.getItemsKey(), JSON.stringify(updatedItems));
+    fsLog.info(`Deleted folder "${path}", items re-routed to Inbox`);
   }
 
   // Items API
@@ -343,8 +351,10 @@ export class StorageService {
 
     if (existingIndex >= 0) {
       items[existingIndex] = updatedItem;
+      fsLog.info(`Updated [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     } else {
       items.unshift(updatedItem);
+      fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     }
 
     localStorage.setItem(this.getItemsKey(), JSON.stringify(items));
@@ -378,6 +388,7 @@ export class StorageService {
     const trash = this.getTrashItems();
     trash.unshift({ ...item, updatedAt: Date.now() });
     localStorage.setItem(this.getTrashKey(), JSON.stringify(trash));
+    fsLog.info(`Moved "${item.title || item.id}" to .trash`);
   }
 
   public restoreFromTrash(id: string): SlagItem | null {
@@ -391,11 +402,13 @@ export class StorageService {
 
     // Restore to active items
     this.saveItem(item);
+    fsLog.info(`Restored "${item.title || item.id}" from .trash to "${item.folder}"`);
     return item;
   }
 
   public emptyTrash(): void {
     localStorage.removeItem(this.getTrashKey());
+    fsLog.info('Emptied .trash folder');
   }
 
   public deleteItem(id: string): void {
@@ -504,8 +517,10 @@ export class StorageService {
       if (Array.isArray(data.items)) {
         localStorage.setItem(this.getItemsKey(), JSON.stringify(data.items));
       }
+      fsLog.info(`Imported vault backup: ${data.items?.length || 0} items, ${data.folders?.length || 0} folders`);
       return true;
-    } catch {
+    } catch (err) {
+      fsLog.error('Failed to import vault JSON backup:', err);
       return false;
     }
   }

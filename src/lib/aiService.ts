@@ -2,6 +2,9 @@ import type { SlagItem, FolderMeta, AiSettings, SuggestedAction, ChatToolCall } 
 import { storage } from './storage';
 import { querySearch } from './searchService';
 import { serializeItemToMarkdown } from './markdownSerializer';
+import { logger } from './logger';
+
+const aiLog = logger.scope('AI');
 
 export interface TriageSuggestion {
   itemId: string;
@@ -101,7 +104,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
         if (rawContent) {
           const parsed = JSON.parse(rawContent);
           if (parsed.reasoning) {
-            console.info('[AI SmartTags reasoning]:', parsed.reasoning);
+            aiLog.debug('SmartTags reasoning:', parsed.reasoning);
           }
           const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
           const formatted = rawTags
@@ -112,7 +115,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
         }
       }
     } catch (err) {
-      console.warn('Groq Tagging API call failed, falling back to local heuristic:', err);
+      aiLog.warn('Groq Tagging API call failed, falling back to local heuristic', err);
     }
   }
 
@@ -140,7 +143,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
         if (text) {
           const parsed = JSON.parse(text);
           if (parsed.reasoning) {
-            console.info('[AI SmartTags reasoning]:', parsed.reasoning);
+            aiLog.debug('SmartTags reasoning:', parsed.reasoning);
           }
           const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
           const formatted = rawTags
@@ -151,7 +154,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
         }
       }
     } catch (err) {
-      console.warn('Gemini Tagging API call failed, using heuristic tagger:', err);
+      aiLog.warn('Gemini Tagging API call failed, using heuristic tagger', err);
     }
   }
 
@@ -276,7 +279,7 @@ ${JSON.stringify(itemsContext, null, 2)}
         }
       }
     } catch (err) {
-      console.warn('Groq Triage API failed, falling back to local matching:', err);
+      aiLog.warn('Groq Triage API failed, falling back to local matching', err);
     }
   }
 
@@ -313,7 +316,7 @@ ${JSON.stringify(itemsContext, null, 2)}
         }
       }
     } catch (err) {
-      console.warn('Gemini Triage API failed, fallback to local matching:', err);
+      aiLog.warn('Gemini Triage API failed, fallback to local matching', err);
     }
   }
 
@@ -768,7 +771,7 @@ ${isInbox
         };
       }
     } catch (err) {
-      console.warn('Groq Assistant API call failed, falling back to local agent:', err);
+      aiLog.warn('Groq Assistant API call failed, falling back to local agent', err);
     }
   }
 
