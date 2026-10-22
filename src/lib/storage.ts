@@ -6,6 +6,7 @@ const CURRENT_VAULT_KEY = 'slag_current_vault_v2';
 const ITEMS_STORAGE_PREFIX = 'slag_items_';
 const FOLDERS_STORAGE_PREFIX = 'slag_folders_';
 const ATTACHMENTS_STORAGE_PREFIX = 'slag_attachments_';
+const TRASH_STORAGE_PREFIX = 'slag_trash_';
 
 // Initial default folders
 export const DEFAULT_FOLDERS: FolderMeta[] = [
@@ -154,6 +155,7 @@ export class StorageService {
       mode: 'indexeddb',
       isCurrent: true,
     };
+    this.currentVault = defaultVault;
     localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(defaultVault));
     this.saveVaultMeta(defaultVault);
     return defaultVault;
@@ -165,16 +167,21 @@ export class StorageService {
 
   public getVaults(): VaultMeta[] {
     const raw = localStorage.getItem(VAULTS_KEY);
-    if (!raw) return [this.currentVault];
+    if (!raw) return this.currentVault ? [this.currentVault] : [];
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(v => v && typeof v === 'object' && v.id);
+      }
+      return this.currentVault ? [this.currentVault] : [];
     } catch {
-      return [this.currentVault];
+      return this.currentVault ? [this.currentVault] : [];
     }
   }
 
   public saveVaultMeta(vault: VaultMeta): void {
-    const list = this.getVaults().filter(v => v.id !== vault.id);
+    if (!vault || !vault.id) return;
+    const list = this.getVaults().filter(v => v && v.id !== vault.id);
     list.push(vault);
     localStorage.setItem(VAULTS_KEY, JSON.stringify(list));
   }
@@ -309,9 +316,55 @@ export class StorageService {
     return updatedItem;
   }
 
+  private getTrashKey(): string {
+    return `${TRASH_STORAGE_PREFIX}${this.currentVault.id}`;
+  }
+
+  public getTrashItems(): SlagItem[] {
+    const raw = localStorage.getItem(this.getTrashKey());
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+
+  public moveToTrash(id: string): void {
+    const items = this.getItems();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    // Remove from active items
+    const remaining = items.filter(i => i.id !== id);
+    localStorage.setItem(this.getItemsKey(), JSON.stringify(remaining));
+
+    // Save to .trash
+    const trash = this.getTrashItems();
+    trash.unshift({ ...item, updatedAt: Date.now() });
+    localStorage.setItem(this.getTrashKey(), JSON.stringify(trash));
+  }
+
+  public restoreFromTrash(id: string): SlagItem | null {
+    const trash = this.getTrashItems();
+    const item = trash.find(i => i.id === id);
+    if (!item) return null;
+
+    // Remove from trash
+    const remainingTrash = trash.filter(i => i.id !== id);
+    localStorage.setItem(this.getTrashKey(), JSON.stringify(remainingTrash));
+
+    // Restore to active items
+    this.saveItem(item);
+    return item;
+  }
+
+  public emptyTrash(): void {
+    localStorage.removeItem(this.getTrashKey());
+  }
+
   public deleteItem(id: string): void {
-    const items = this.getItems().filter(i => i.id !== id);
-    localStorage.setItem(this.getItemsKey(), JSON.stringify(items));
+    this.moveToTrash(id);
   }
 
   public moveItem(id: string, targetFolder: string): SlagItem | null {
@@ -349,6 +402,52 @@ export class StorageService {
       (it.tags || []).forEach(t => tagSet.add(t.toLowerCase().trim()));
     });
     return Array.from(tagSet).sort();
+  }
+
+  // Vault & Folder Statistics for AI RAG & Inspector
+  public getVaultStats(folderScope?: string): {
+    totalItems: number;
+    notesCount: number;
+    tasksCount: number;
+    articlesCount: number;
+    tags: Record<string, number>;
+    folders: Record<string, number>;
+    scope: string;
+  } {
+    const allItems = this.getItems();
+    const scopedItems = folderScope && folderScope !== 'Входящие'
+      ? allItems.filter(i => i.folder === folderScope)
+      : allItems;
+
+    const tags: Record<string, number> = {};
+    const folders: Record<string, number> = {};
+    let notesCount = 0;
+    let tasksCount = 0;
+    let articlesCount = 0;
+
+    scopedItems.forEach(it => {
+      if (it.type === 'note') notesCount++;
+      else if (it.type === 'task') tasksCount++;
+      else if (it.type === 'article') articlesCount++;
+
+      const folderName = it.folder || 'Входящие';
+      folders[folderName] = (folders[folderName] || 0) + 1;
+
+      (it.tags || []).forEach(t => {
+        const clean = t.toLowerCase().trim();
+        if (clean) tags[clean] = (tags[clean] || 0) + 1;
+      });
+    });
+
+    return {
+      totalItems: scopedItems.length,
+      notesCount,
+      tasksCount,
+      articlesCount,
+      tags,
+      folders,
+      scope: folderScope || 'Все хранилище',
+    };
   }
 
   // Export current vault as Markdown files (ZIP or downloadable Blob)

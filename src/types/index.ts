@@ -61,9 +61,61 @@ export interface VaultMeta {
   isCurrent?: boolean;
 }
 
+export type AiProvider = 'groq' | 'gemini';
+
 export interface AiSettings {
+  provider: AiProvider;
+  groqApiKey: string;
   geminiApiKey: string;
-  model: string; // e.g. 'gemini-2.0-flash' or 'gemini-1.5-flash'
+  model: string; // e.g. 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'gemini-2.0-flash'
+  reasoningEffort: 'none' | 'low' | 'medium' | 'high';
   autoTagging: boolean;
   autoTriage: boolean;
+  webSearchEnabled: boolean;
+  maxTagsPerNote: number;
+  allowNewTags: boolean;
+  tagCaseStyle: 'lowercase' | 'kebab-case';
+  customTagRules?: string;
 }
+
+export type InboxMode = 'unsorted' | 'all' | 'sorted';
+export type FeedViewMode = 'feed' | 'kanban' | 'calendar' | 'assistant';
+export type RightPanelMode = 'info' | 'assistant';
+
+export interface AiItemFilter {
+  itemIds: string[];
+  queryLabel: string;
+}
+
+export interface LightboxImage {
+  id?: string;
+  name: string;
+  url: string;
+}
+
+export interface SuggestedAction {
+  type: 'create_note';
+  title: string;
+  folder: string;
+  content: string;
+  tags: string[];
+  itemType: SlagItemType;
+}
+
+export interface ChatToolCall {
+  name: string;
+  args: Record<string, any>;
+  result?: any;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  createdAt: number;
+  reasoning?: string;
+  reasoningTimeMs?: number;
+  toolCalls?: ChatToolCall[];
+  suggestedAction?: SuggestedAction;
+}
+
