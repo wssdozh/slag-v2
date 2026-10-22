@@ -14,7 +14,11 @@ import {
   BarChart3,
   Search,
   CheckSquare,
-  ArrowUpRight
+  ArrowUpRight,
+  Calendar,
+  ListTodo,
+  Check,
+  FolderOpen
 } from 'lucide-react';
 
 interface AssistantChatProps {
@@ -249,14 +253,14 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
             <div className="flex flex-col gap-1.5 w-full">
               <button
-                onClick={() => handleQuickPrompt('Сколько заметок и задач в хранилище?')}
+                onClick={() => handleQuickPrompt('Покажи план на сегодня и календарную повестку')}
                 className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  <BarChart3 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  <span>Сводка хранилища</span>
+                  <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span>План на сегодня</span>
                 </span>
-                <span className="text-[10px] text-zinc-600 font-mono">stats</span>
+                <span className="text-[10px] text-zinc-600 font-mono">agenda</span>
               </button>
               <button
                 onClick={() => handleQuickPrompt('Найди ключевые заметки')}
@@ -277,6 +281,16 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   <span>Создать задачу</span>
                 </span>
                 <span className="text-[10px] text-zinc-600 font-mono">task</span>
+              </button>
+              <button
+                onClick={() => handleQuickPrompt('Сколько заметок и задач в хранилище?')}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span>Сводка хранилища</span>
+                </span>
+                <span className="text-[10px] text-zinc-600 font-mono">stats</span>
               </button>
             </div>
           </div>
@@ -363,19 +377,60 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
                   {/* Interactive Action Card (Read-Only Safety) */}
                   {msg.suggestedAction && (
-                    <div className="mt-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] flex flex-col gap-1.5">
+                    <div className="mt-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300">
-                          Черновик {msg.suggestedAction.itemType === 'task' ? 'задачи' : 'заметки'}
+                          {msg.suggestedAction.type === 'schedule_task' && '📅 Планирование в календарь'}
+                          {msg.suggestedAction.type === 'decompose_task' && '☑️ Декомпозиция задачи'}
+                          {msg.suggestedAction.type === 'update_task_status' && '📊 Смена статуса канбан'}
+                          {msg.suggestedAction.type === 'reschedule_task' && '⏱ Перенос срока'}
+                          {msg.suggestedAction.type === 'move_note' && '📁 Перемещение по папкам'}
+                          {msg.suggestedAction.type === 'create_note' && (msg.suggestedAction.itemType === 'task' ? 'Черновик задачи' : 'Черновик заметки')}
                         </span>
-                        <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[100px]">
+                        <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[120px]">
                           {msg.suggestedAction.folder}
                         </span>
                       </div>
 
-                      <div className="text-xs font-semibold text-zinc-100">
-                        {msg.suggestedAction.title}
+                      <div className="text-xs font-semibold text-zinc-100 flex items-center justify-between gap-2">
+                        <span>{msg.suggestedAction.title}</span>
+                        {msg.suggestedAction.priority && (
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                            msg.suggestedAction.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
+                            msg.suggestedAction.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
+                            'bg-blue-500/15 text-blue-300'
+                          }`}>
+                            {msg.suggestedAction.priority.toUpperCase()}
+                          </span>
+                        )}
                       </div>
+
+                      {/* Schedule info if available */}
+                      {msg.suggestedAction.dueDate && (
+                        <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-400">
+                          <Calendar className="w-3 h-3 text-zinc-500" />
+                          <span>Срок: {msg.suggestedAction.dueDate}</span>
+                          {msg.suggestedAction.reminder && (
+                            <span className="text-zinc-500">
+                              ({new Date(msg.suggestedAction.reminder).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Subtasks checklist if decompose_task */}
+                      {msg.suggestedAction.subtasks && msg.suggestedAction.subtasks.length > 0 && (
+                        <div className="space-y-1 py-1">
+                          {msg.suggestedAction.subtasks.map((st, sIdx) => (
+                            <div key={sIdx} className="flex items-center gap-1.5 text-[11px] text-zinc-300">
+                              <span className="w-3.5 h-3.5 rounded border border-zinc-600 flex items-center justify-center shrink-0">
+                                {st.completed && <Check className="w-2 h-2 text-white" />}
+                              </span>
+                              <span className="truncate">{st.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       {msg.suggestedAction.content && (
                         <p className="text-[11px] text-zinc-400 line-clamp-2">
@@ -397,8 +452,36 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                         onClick={() => createNoteFromAction(msg.suggestedAction!)}
                         className="mt-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors shadow-sm cursor-pointer"
                       >
-                        <Plus className="w-3 h-3" />
-                        <span>Сохранить в хранилище</span>
+                        {msg.suggestedAction.type === 'decompose_task' && (
+                          <>
+                            <ListTodo className="w-3.5 h-3.5" />
+                            <span>Применить {msg.suggestedAction.subtasks?.length} подзадач</span>
+                          </>
+                        )}
+                        {msg.suggestedAction.type === 'schedule_task' && (
+                          <>
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>Запланировать на {msg.suggestedAction.dueDate}</span>
+                          </>
+                        )}
+                        {msg.suggestedAction.type === 'update_task_status' && (
+                          <>
+                            <CheckSquare className="w-3.5 h-3.5" />
+                            <span>Сменить статус на «{msg.suggestedAction.status}»</span>
+                          </>
+                        )}
+                        {msg.suggestedAction.type === 'move_note' && (
+                          <>
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            <span>Переместить в «{msg.suggestedAction.folder}»</span>
+                          </>
+                        )}
+                        {(!msg.suggestedAction.type || msg.suggestedAction.type === 'create_note') && (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Сохранить в хранилище</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   )}

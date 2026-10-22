@@ -90,7 +90,6 @@ export interface AiSettings {
 
 export type InboxMode = 'unsorted' | 'all' | 'sorted';
 export type FeedViewMode = 'feed' | 'kanban' | 'calendar';
-export type RightPanelMode = 'info' | 'assistant';
 
 export interface AiItemFilter {
   itemIds: string[];
@@ -103,13 +102,27 @@ export interface LightboxImage {
   url: string;
 }
 
+export type SuggestedActionType =
+  | 'create_note'
+  | 'schedule_task'
+  | 'reschedule_task'
+  | 'update_task_status'
+  | 'decompose_task'
+  | 'move_note';
+
 export interface SuggestedAction {
-  type: 'create_note';
+  type: SuggestedActionType;
   title: string;
   folder: string;
   content: string;
   tags: string[];
   itemType: SlagItemType;
+  targetItemId?: string;
+  dueDate?: string;
+  reminder?: string;
+  priority?: 'none' | 'low' | 'medium' | 'high';
+  status?: 'backlog' | 'todo' | 'in_progress' | 'done';
+  subtasks?: { id: string; title: string; completed: boolean }[];
 }
 
 export interface ChatToolCall {

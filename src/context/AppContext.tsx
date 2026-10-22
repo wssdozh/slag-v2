@@ -1,5 +1,5 @@
 /* oxlint-disable react/only-export-components */
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type {
   SlagItem,
   FolderMeta,
@@ -9,7 +9,6 @@ import type {
   InboxMode,
   LightboxImage,
   FeedViewMode,
-  RightPanelMode,
   AiItemFilter,
   ChatMessage,
   SuggestedAction
@@ -48,9 +47,6 @@ interface AppContextType {
   aiItemFilter: AiItemFilter | null;
   applyAiFilter: (itemIds: string[], queryLabel: string) => void;
   clearAiFilter: () => void;
-  isRightPanelOpen: boolean;
-  rightPanelMode: RightPanelMode;
-  setRightPanelMode: (mode: RightPanelMode | ((prev: RightPanelMode) => RightPanelMode)) => void;
   isFullscreenEditorOpen: boolean;
   isSearchOpen: boolean;
   isSettingsOpen: boolean;
@@ -65,7 +61,8 @@ interface AppContextType {
   isChatLoading: boolean;
   sendChatMessage: (text: string) => Promise<void>;
   clearChatMessages: () => void;
-  createNoteFromAction: (action: SuggestedAction) => SlagItem;
+  createNoteFromAction: (action: SuggestedAction) => SlagItem | void;
+  executeSuggestedAction: (action: SuggestedAction) => SlagItem | void;
 
   // Lightbox Gallery
   lightboxImages: LightboxImage[];
@@ -96,7 +93,6 @@ interface AppContextType {
   setActiveTypeFilter: (type: SlagItemType | 'all') => void;
   setActiveTagFilter: (tag: string | null) => void;
   setSelectedItem: (item: SlagItem | null) => void;
-  setIsRightPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setIsFullscreenEditorOpen: (open: boolean) => void;
   setIsSearchOpen: (open: boolean) => void;
   setIsSettingsOpen: (open: boolean) => void;
@@ -183,8 +179,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveLightboxIndex(newIndex);
   }, []);
   
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(true);
-  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>('info');
   const [isFullscreenEditorOpen, setIsFullscreenEditorOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -269,14 +263,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(prev => !prev);
-        return;
-      }
-
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
-        e.preventDefault();
-        // Toggle right panel assistant mode and ensure panel is open
-        setIsRightPanelOpen(true);
-        setRightPanelMode(prev => prev === 'assistant' ? 'info' : 'assistant');
         return;
       }
 
@@ -402,17 +388,138 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved;
   }, [currentFolder, refreshData]);
 
-  const createNoteFromAction = useCallback((action: SuggestedAction): SlagItem => {
-    const saved = saveItem({
-      type: action.itemType || 'note',
-      title: action.title,
-      content: action.content,
-      folder: action.folder || currentFolder,
-      tags: action.tags,
-    });
-    addToast(`Запись «${saved.title}» сохранена`, 'success');
-    return saved;
-  }, [currentFolder, saveItem, addToast]);
+  const updateItem = useCallback((item: SlagItem) => {
+    storage.saveItem(item);
+    if (selectedItem?.id === item.id) {
+      setSelectedItem(item);
+    }
+    refreshData();
+  }, [selectedItem, refreshData]);
+
+  const deleteItem = useCallback((id: string) => {
+    storage.deleteItem(id);
+    if (selectedItem?.id === id) {
+      setSelectedItem(null);
+    }
+    refreshData();
+    addToast('Запись перемещена в корзину .trash', 'info');
+  }, [selectedItem, refreshData, addToast]);
+
+  const restoreFromTrash = useCallback((id: string) => {
+    const restored = storage.restoreFromTrash(id);
+    if (restored) {
+      refreshData();
+      addToast(`Запись «${restored.title}» восстановлена`, 'success');
+    }
+  }, [refreshData, addToast]);
+
+  const moveItem = useCallback((itemId: string, targetFolder: string) => {
+    storage.moveItem(itemId, targetFolder);
+    refreshData();
+    addToast(`Перемещено в «${targetFolder}»`, 'success');
+  }, [refreshData, addToast]);
+
+  const toggleTaskComplete = useCallback((itemId: string, subtaskId?: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (subtaskId && item.subtasks) {
+      const updatedSubtasks = item.subtasks.map(st => 
+        st.id === subtaskId ? { ...st, completed: !st.completed } : st
+      );
+      const allDone = updatedSubtasks.every(st => st.completed);
+      updateItem({
+        ...item,
+        subtasks: updatedSubtasks,
+        status: allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status,
+      });
+    } else {
+      const newStatus = item.status === 'done' ? 'todo' : 'done';
+      const updatedSubtasks = item.subtasks?.map(st => ({
+        ...st,
+        completed: newStatus === 'done',
+      }));
+      updateItem({
+        ...item,
+        status: newStatus,
+        subtasks: updatedSubtasks,
+      });
+      addToast(newStatus === 'done' ? 'Задача выполнена' : 'Задача возобновлена', 'success');
+    }
+  }, [items, updateItem, addToast]);
+
+  const executeSuggestedAction = useCallback((action: SuggestedAction): SlagItem | void => {
+    // 1. Create Note / Task
+    if (action.type === 'create_note' || action.type === 'schedule_task') {
+      const saved = saveItem({
+        type: action.itemType || (action.type === 'schedule_task' ? 'task' : 'note'),
+        title: action.title,
+        content: action.content || '',
+        folder: action.folder || currentFolder,
+        tags: action.tags || [],
+        dueDate: action.dueDate,
+        reminder: action.reminder,
+        priority: action.priority,
+      });
+      addToast(`Запись «${saved.title}» сохранена`, 'success');
+      return saved;
+    }
+
+    // 2. Decompose Task (add subtasks to target task)
+    if (action.type === 'decompose_task') {
+      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
+      if (target) {
+        const existingSubtasks = target.subtasks || [];
+        const newSubtasks = action.subtasks || [];
+        const merged = [...existingSubtasks, ...newSubtasks];
+        const updated = { ...target, subtasks: merged };
+        updateItem(updated);
+        addToast(`К задаче «${target.title}» добавлено ${newSubtasks.length} подзадач`, 'success');
+        return updated;
+      }
+      addToast(`Задача «${action.title}» не найдена`, 'error');
+      return;
+    }
+
+    // 3. Update Task Status
+    if (action.type === 'update_task_status') {
+      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
+      if (target && action.status) {
+        const updated = { ...target, status: action.status };
+        updateItem(updated);
+        addToast(`Статус задачи изменен на «${action.status}»`, 'success');
+        return updated;
+      }
+      return;
+    }
+
+    // 4. Reschedule Task
+    if (action.type === 'reschedule_task') {
+      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
+      if (target && action.dueDate) {
+        const updated = { ...target, dueDate: action.dueDate, reminder: action.reminder };
+        updateItem(updated);
+        addToast(`Задача перенесена на ${action.dueDate}`, 'success');
+        return updated;
+      }
+      return;
+    }
+
+    // 5. Move Note to Folder
+    if (action.type === 'move_note') {
+      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
+      if (target && action.folder) {
+        moveItem(target.id, action.folder);
+        addToast(`Запись перенесена в «${action.folder}»`, 'success');
+        return;
+      }
+      return;
+    }
+  }, [currentFolder, saveItem, updateItem, moveItem, items, addToast]);
+
+  const createNoteFromAction = useCallback((action: SuggestedAction): SlagItem | void => {
+    return executeSuggestedAction(action);
+  }, [executeSuggestedAction]);
 
   const sendChatMessage = useCallback(async (userText: string) => {
     if (!userText.trim()) return;
@@ -465,66 +572,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearChatMessages = useCallback(() => {
     setChatMessages([]);
   }, []);
-
-  const updateItem = (item: SlagItem) => {
-    storage.saveItem(item);
-    if (selectedItem?.id === item.id) {
-      setSelectedItem(item);
-    }
-    refreshData();
-  };
-
-  const deleteItem = (id: string) => {
-    storage.deleteItem(id);
-    if (selectedItem?.id === id) {
-      setSelectedItem(null);
-    }
-    refreshData();
-    addToast('Запись перемещена в корзину .trash', 'info');
-  };
-
-  const restoreFromTrash = (id: string) => {
-    const restored = storage.restoreFromTrash(id);
-    if (restored) {
-      refreshData();
-      addToast(`Запись «${restored.title}» восстановлена`, 'success');
-    }
-  };
-
-  const toggleTaskComplete = (itemId: string, subtaskId?: string) => {
-    const item = items.find(i => i.id === itemId);
-    if (!item) return;
-
-    if (subtaskId && item.subtasks) {
-      const updatedSubtasks = item.subtasks.map(st => 
-        st.id === subtaskId ? { ...st, completed: !st.completed } : st
-      );
-      const allDone = updatedSubtasks.every(st => st.completed);
-      updateItem({
-        ...item,
-        subtasks: updatedSubtasks,
-        status: allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status,
-      });
-    } else {
-      const newStatus = item.status === 'done' ? 'todo' : 'done';
-      const updatedSubtasks = item.subtasks?.map(st => ({
-        ...st,
-        completed: newStatus === 'done',
-      }));
-      updateItem({
-        ...item,
-        status: newStatus,
-        subtasks: updatedSubtasks,
-      });
-      addToast(newStatus === 'done' ? 'Задача выполнена' : 'Задача возобновлена', 'success');
-    }
-  };
-
-  const moveItem = (itemId: string, targetFolder: string) => {
-    storage.moveItem(itemId, targetFolder);
-    refreshData();
-    addToast(`Перемещено в «${targetFolder}»`, 'success');
-  };
 
   const saveFolder = (folder: FolderMeta) => {
     storage.saveFolder(folder);
@@ -635,9 +682,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         aiItemFilter,
         applyAiFilter,
         clearAiFilter,
-        isRightPanelOpen,
-        rightPanelMode,
-        setRightPanelMode,
         isFullscreenEditorOpen,
         isSearchOpen,
         isSettingsOpen,
@@ -651,6 +695,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sendChatMessage,
         clearChatMessages,
         createNoteFromAction,
+        executeSuggestedAction,
         lightboxImages,
         activeLightboxIndex,
         openLightbox,
@@ -671,7 +716,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveTypeFilter,
         setActiveTagFilter,
         setSelectedItem,
-        setIsRightPanelOpen,
         setIsFullscreenEditorOpen,
         setIsSearchOpen,
         setIsSettingsOpen,
@@ -700,4 +744,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
-export { useApp } from './useApp';
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};

@@ -347,26 +347,100 @@ ${JSON.stringify(itemsContext, null, 2)}
 }
 
 /**
- * Parses embedded action block from assistant response (e.g. action: create_note)
+ * Parses embedded action block from assistant response (create_note, schedule_task, reschedule_task, update_task_status, decompose_task, move_note)
  */
 function extractActionBlock(text: string): { cleanText: string; suggestedAction?: SuggestedAction } {
-  const actionRegex = /```(?:action:create_note|json:create_note)?\s*\n?(\{\s*"action"\s*:\s*"create_note"[\s\S]*?\})\s*```/i;
+  const actionRegex = /```(?:action:[\w_]+|json:[\w_]+)?\s*\n?(\{\s*"action"\s*:\s*"[\w_]+"[\s\S]*?\})\s*```/i;
   const match = text.match(actionRegex);
 
   if (match) {
     try {
       const parsed = JSON.parse(match[1]);
-      if (parsed.action === 'create_note') {
-        const cleanText = text.replace(match[0], '').trim();
+      const cleanText = text.replace(match[0], '').trim();
+
+      if (parsed.action === 'create_note' || parsed.action === 'schedule_task') {
         return {
           cleanText,
           suggestedAction: {
-            type: 'create_note',
-            title: parsed.title || 'Новая заметка',
+            type: parsed.action === 'schedule_task' ? 'schedule_task' : 'create_note',
+            title: parsed.title || 'Новая запись',
             folder: parsed.folder || 'Входящие',
             content: parsed.content || '',
             tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-            itemType: ['note', 'task', 'article'].includes(parsed.itemType) ? parsed.itemType : 'note',
+            itemType: ['note', 'task', 'article'].includes(parsed.itemType) ? parsed.itemType : (parsed.action === 'schedule_task' ? 'task' : 'note'),
+            dueDate: parsed.dueDate,
+            reminder: parsed.reminder,
+            priority: ['none', 'low', 'medium', 'high'].includes(parsed.priority) ? parsed.priority : undefined,
+          },
+        };
+      }
+
+      if (parsed.action === 'reschedule_task') {
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'reschedule_task',
+            targetItemId: parsed.targetItemId,
+            title: parsed.title || 'Перенос задачи',
+            folder: parsed.folder || 'Входящие',
+            content: '',
+            tags: [],
+            itemType: 'task',
+            dueDate: parsed.dueDate,
+            reminder: parsed.reminder,
+          },
+        };
+      }
+
+      if (parsed.action === 'update_task_status') {
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'update_task_status',
+            targetItemId: parsed.targetItemId,
+            title: parsed.title || 'Смена статуса задачи',
+            folder: parsed.folder || 'Входящие',
+            content: '',
+            tags: [],
+            itemType: 'task',
+            status: ['backlog', 'todo', 'in_progress', 'done'].includes(parsed.status) ? parsed.status : 'todo',
+          },
+        };
+      }
+
+      if (parsed.action === 'decompose_task') {
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'decompose_task',
+            targetItemId: parsed.targetItemId,
+            title: parsed.title || 'Декомпозиция задачи',
+            folder: parsed.folder || 'Входящие',
+            content: '',
+            tags: [],
+            itemType: 'task',
+            subtasks: Array.isArray(parsed.subtasks)
+              ? parsed.subtasks.map((st: any, i: number) => ({
+                  id: st.id || `st_${Date.now()}_${i}`,
+                  title: typeof st === 'string' ? st : (st.title || 'Подзадача'),
+                  completed: !!st.completed,
+                }))
+              : [],
+          },
+        };
+      }
+
+      if (parsed.action === 'move_note') {
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'move_note',
+            targetItemId: parsed.targetItemId,
+            title: parsed.title || 'Перемещение заметки',
+            folder: parsed.folder || 'Входящие',
+            content: '',
+            tags: [],
+            itemType: 'note',
           },
         };
       }
@@ -422,6 +496,36 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
 
     if (name === 'get_vault_stats') {
       return storage.getVaultStats(isInbox ? undefined : currentFolder);
+    }
+
+    if (name === 'get_calendar_agenda') {
+      const today = new Date().toISOString().slice(0, 10);
+      const targetDate = args.date || today;
+      const tasks = allItems.filter(i => {
+        if (i.type !== 'task') return false;
+        if (!isInbox && i.folder !== currentFolder && !i.folder.startsWith(currentFolder + '/')) return false;
+        return true;
+      });
+
+      const overdue = tasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < today);
+      const scheduledOnDate = tasks.filter(t => t.dueDate === targetDate);
+      const unscheduled = tasks.filter(t => t.status !== 'done' && !t.dueDate);
+
+      return {
+        targetDate,
+        overdueCount: overdue.length,
+        overdueTasks: overdue.slice(0, 5).map(t => ({ id: t.id, title: t.title, dueDate: t.dueDate, priority: t.priority })),
+        scheduledCount: scheduledOnDate.length,
+        scheduledTasks: scheduledOnDate.map(t => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          reminder: t.reminder,
+          subtasksCount: t.subtasks?.length || 0,
+        })),
+        unscheduledCount: unscheduled.length,
+      };
     }
 
     if (name === 'web_search') {
@@ -480,6 +584,19 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
         },
       },
     },
+    {
+      type: 'function',
+      function: {
+        name: 'get_calendar_agenda',
+        description: 'Получить календарную повестку, список задач на день/дату, просроченные и незапланированные задачи.',
+        parameters: {
+          type: 'object',
+          properties: {
+            date: { type: 'string', description: 'Дата в формате YYYY-MM-DD (по умолчанию сегодня)' },
+          },
+        },
+      },
+    },
   ];
 
   if (settings.webSearchEnabled) {
@@ -512,19 +629,29 @@ ${isInbox
 
 ПРАВИЛА ОТВЕТА:
 1. При отсылке к конкретным заметкам ОБЯЗАТЕЛЬНО используй синтаксис вики-ссылок: [[Название заметки]].
-2. Если для ответа нужны факты из заметок, ВСЕГДА вызывай search_notes или read_note. Не выдумывай факты.
-3. Если пользователь просит создать новую заметку или задачу, ответь кратким подтверждением и приложи блок действия:
+2. Если для ответа нужны факты из заметок, ВСЕГДА вызывай search_notes или read_note. Для повестки дня и задач используй get_calendar_agenda. Не выдумывай факты.
+3. ПРАВИЛО READ-ONLY SAFETY: любые действия (создание, перенос, статус, подзадачи) оформляй ТОЛЬКО блоком действия action:
+- Создание заметки/задачи:
 \`\`\`action:create_note
-{
-  "action": "create_note",
-  "title": "Название записи",
-  "folder": "${currentFolder}",
-  "content": "Текст заметки...",
-  "tags": ["тег1"],
-  "itemType": "note"
-}
+{ "action": "create_note", "title": "Название", "folder": "${currentFolder}", "content": "Текст...", "tags": ["тег"], "itemType": "note" }
 \`\`\`
-Пользователь увидит интерактивную кнопку сохранения. Никаких самовольных записей на диск.`;
+- Планирование задачи в календаре:
+\`\`\`action:schedule_task
+{ "action": "schedule_task", "title": "Название задачи", "folder": "${currentFolder}", "dueDate": "YYYY-MM-DD", "reminder": "ISO-время", "priority": "high", "itemType": "task" }
+\`\`\`
+- Декомпозиция задачи на чеклист:
+\`\`\`action:decompose_task
+{ "action": "decompose_task", "targetItemId": "id_задачи", "title": "Название задачи", "folder": "${currentFolder}", "subtasks": [{ "title": "Шаг 1", "completed": false }] }
+\`\`\`
+- Смена статуса канбан:
+\`\`\`action:update_task_status
+{ "action": "update_task_status", "targetItemId": "id_задачи", "title": "Название задачи", "status": "in_progress" }
+\`\`\`
+- Перемещение в папку:
+\`\`\`action:move_note
+{ "action": "move_note", "targetItemId": "id_записи", "title": "Название", "folder": "Целевая/Папка" }
+\`\`\`
+Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.`;
 
   // 1. Groq Provider with Tool Calling & Reasoning
   if (settings.provider === 'groq' && settings.groqApiKey) {
@@ -667,6 +794,74 @@ ${isInbox
       reasoning: 'Проанализирован локальный индекс хранилища через storage.getVaultStats()',
       reasoningTimeMs: Date.now() - startTime,
       toolCalls: executedToolCalls,
+    };
+  }
+
+  // Check if asking for agenda / plan / calendar
+  if (lowerMsg.includes('повестк') || lowerMsg.includes('план на сегодня') || lowerMsg.includes('расписани') || lowerMsg.includes('что сегодня') || lowerMsg.includes('дела на сегодня') || lowerMsg.includes('календар')) {
+    const agenda = await executeLocalTool('get_calendar_agenda', {});
+    executedToolCalls.push({ name: 'get_calendar_agenda', args: { date: agenda.targetDate }, result: agenda });
+
+    let content = `Повестка на ${agenda.targetDate}:\n`;
+    if (agenda.scheduledCount === 0 && agenda.overdueCount === 0) {
+      content += '- Запланированных задач на сегодня нет. День свободен для глубокой работы.';
+    } else {
+      if (agenda.scheduledCount > 0) {
+        content += `\n**Запланировано на сегодня (${agenda.scheduledCount}):**\n`;
+        agenda.scheduledTasks.forEach((t: any) => {
+          content += `- [[${t.title}]] (${t.status || 'todo'}, приоритет: ${t.priority || 'обычный'})\n`;
+        });
+      }
+      if (agenda.overdueCount > 0) {
+        content += `\n**Просроченные задачи (${agenda.overdueCount}):**\n`;
+        agenda.overdueTasks.forEach((t: any) => {
+          content += `- [[${t.title}]] (срок: ${t.dueDate})\n`;
+        });
+      }
+    }
+
+    return {
+      content,
+      reasoning: 'Сформирована сводка календаря через get_calendar_agenda()',
+      reasoningTimeMs: Date.now() - startTime,
+      toolCalls: executedToolCalls,
+    };
+  }
+
+  // Check if asking to decompose a task
+  if (lowerMsg.includes('разбей') || lowerMsg.includes('декомпози') || lowerMsg.includes('подзадач') || lowerMsg.includes('шаги')) {
+    const targetTask = allItems.find(i => {
+      if (i.type !== 'task') return false;
+      const lowerTitle = i.title.toLowerCase();
+      // Match by exact title, or tokens in query
+      if (lowerMsg.includes(lowerTitle)) return true;
+      const titleTokens = lowerTitle.split(/\s+/).filter(w => w.length > 3);
+      return titleTokens.some(tok => lowerMsg.includes(tok));
+    });
+    const taskTitle = targetTask ? targetTask.title : 'Реализовать ИИ-тегирование заметок';
+    const taskId = targetTask?.id || allItems.find(i => i.type === 'task')?.id;
+
+    const suggestedAction: SuggestedAction = {
+      type: 'decompose_task',
+      targetItemId: taskId,
+      title: taskTitle,
+      folder: targetTask?.folder || currentFolder,
+      content: '',
+      tags: [],
+      itemType: 'task',
+      subtasks: [
+        { id: `st_${Date.now()}_1`, title: 'Собрать требования и составить список спецификаций', completed: false },
+        { id: `st_${Date.now()}_2`, title: 'Разработать архитектурный прототип', completed: false },
+        { id: `st_${Date.now()}_3`, title: 'Написать E2E-тесты и провести визуальную верификацию', completed: false },
+        { id: `st_${Date.now()}_4`, title: 'Зафиксировать изменения коммитом и обновить документацию', completed: false },
+      ],
+    };
+
+    return {
+      content: `Я составил план декомпозиции для задачи «${taskTitle}». Нажмите кнопку ниже, чтобы применить шаги:`,
+      reasoning: 'Сформирован чеклист декомпозиции (action:decompose_task)',
+      reasoningTimeMs: Date.now() - startTime,
+      suggestedAction,
     };
   }
 

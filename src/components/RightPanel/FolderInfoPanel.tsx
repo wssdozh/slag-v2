@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
-  X,
   Image as ImageIcon,
   Mic,
   File,
@@ -21,7 +20,6 @@ export const FolderInfoPanel: React.FC = () => {
     folders,
     filteredItems,
     items,
-    setIsRightPanelOpen,
     saveFolder,
     setActiveTagFilter,
     addToast,
@@ -97,14 +95,6 @@ export const FolderInfoPanel: React.FC = () => {
             {currentFolderMeta?.name || currentFolder}
           </span>
         </div>
-
-        <button
-          onClick={() => setIsRightPanelOpen(false)}
-          className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
-          title="Скрыть панель"
-        >
-          <X className="w-4 h-4" />
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">

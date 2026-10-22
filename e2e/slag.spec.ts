@@ -428,8 +428,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await assistantTab.click();
     await expect(page.locator('text=Все хранилище').first()).toBeVisible();
 
-    // 2. Send a message via quick prompt
-    await page.locator('button', { hasText: 'Сводка хранилища' }).first().click();
+    // 2. Send a message via quick prompt (Agenda / Today Plan)
+    await page.locator('button', { hasText: 'План на сегодня' }).first().click();
     // Wait for assistant response to appear
     await expect(page.locator('text=SLAG').first()).toBeVisible({ timeout: 5000 });
 
@@ -448,6 +448,18 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 4. Click Save to Vault
     await page.locator('button', { hasText: 'Сохранить в хранилище' }).first().click();
     await expect(page.locator('text=сохранена').or(page.locator('text=Запись'))).toBeVisible();
+
+    // 5. Test Subtask Decomposition action
+    await textarea.fill('Разбей задачу Реализовать ИИ-тегирование на подзадачи');
+    await textarea.press('Enter');
+    const decomposeBtn = page.locator('button', { hasText: /Применить \d+ подзадач/ }).first();
+    await expect(decomposeBtn).toBeVisible({ timeout: 5000 });
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-decompose-action.png',
+      fullPage: false,
+    });
+    await decomposeBtn.click();
+    await expect(page.locator('text=добавлено 4 подзадач').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('17. Linear-style Kanban Board with Inline Task Button and Orama Materials Search', async ({ page }) => {
