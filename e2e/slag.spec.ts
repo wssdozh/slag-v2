@@ -388,6 +388,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Verify Groq provider is selectable and default recommended
     const groqProviderBtn = settingsModal.locator('button', { hasText: 'Groq (Рекомендуется)' });
     await expect(groqProviderBtn).toBeVisible();
+    await page.waitForTimeout(100);
     await groqProviderBtn.click();
 
     // Verify gpt-oss-120b model option exists
@@ -678,5 +679,33 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 6. Close menu via Escape
     await page.keyboard.press('Escape');
     await expect(menu).not.toBeVisible();
+  });
+
+  test('21. Tab Insertion Beam and Singular Dropzone Guardian Verification', async ({ page }) => {
+    const dockviewContainer = page.locator('.dockview-theme-slag');
+    await expect(dockviewContainer).toBeVisible();
+
+    // 1. Locate Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await expect(assistantTab).toBeVisible();
+
+    // 2. Drag tab slightly to initiate DnD and verify no residual ghost dropzones
+    const tabBox = await assistantTab.boundingBox();
+    if (tabBox) {
+      await page.mouse.move(tabBox.x + tabBox.width / 2, tabBox.y + tabBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(tabBox.x + tabBox.width / 2 + 30, tabBox.y + tabBox.height / 2, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    // 3. Verify that all stale dropzones are cleanly purged after pointer up
+    const residualDropzones = await page.locator('.dv-drop-target-dropzone, .dv-drop-target-anchor').count();
+    expect(residualDropzones).toBe(0);
+
+    // 4. Capture screenshot of workspace with clean tab bar
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-insertion-beam-clean.png',
+      fullPage: false,
+    });
   });
 });

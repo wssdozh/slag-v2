@@ -14,6 +14,7 @@ import { AssistantChat } from '../Feed/AssistantChat';
 import { KanbanBoard } from '../Views/KanbanBoard';
 import { CalendarView } from '../Views/CalendarView';
 import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
+import { LogViewer } from '../Logs/LogViewer';
 import {
   Plus,
   Layers,
@@ -21,7 +22,8 @@ import {
   Calendar,
   Sparkles,
   Folder,
-  Info
+  Info,
+  Terminal
 } from 'lucide-react';
 
 const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
@@ -81,6 +83,11 @@ const components: Record<string, React.FC<IDockviewPanelProps>> = {
       <FolderInfoPanel />
     </aside>
   ),
+  logs: () => (
+    <div className="w-full h-full bg-[#08090a] flex flex-col overflow-hidden min-w-0">
+      <LogViewer variant="dock" />
+    </div>
+  ),
 };
 
 const PANELS_TO_ADD = [
@@ -90,6 +97,7 @@ const PANELS_TO_ADD = [
   { id: 'assistant', title: 'Ассистент', icon: Sparkles },
   { id: 'sidebar', title: 'Навигация', icon: Folder },
   { id: 'folder-info', title: 'Инфо папки', icon: Info },
+  { id: 'logs', title: 'Логи & HUD', icon: Terminal },
 ];
 
 // Header action [+] button with floating context menu on each tab group
@@ -191,7 +199,7 @@ export const WorkspaceShell: React.FC = () => {
     }
   }, [currentFolder]);
 
-  // Safety cleaner for stale Dockview drag-and-drop ghost overlays
+  // Safety cleaner and singular guardian for Dockview drag-and-drop overlays
   useEffect(() => {
     const purgeStaleOverlays = () => {
       const dropzones = document.querySelectorAll(
@@ -205,24 +213,68 @@ export const WorkspaceShell: React.FC = () => {
       });
     };
 
+    // Guarantee that strictly one dropzone exists at any given moment
+    const enforceSingularDropzone = (clientX?: number, clientY?: number) => {
+      const dropzones = Array.from(
+        document.querySelectorAll<HTMLElement>('.dv-drop-target-dropzone, .dv-drop-target-anchor')
+      );
+      if (dropzones.length <= 1) return;
+
+      let targetDropzone = dropzones[dropzones.length - 1];
+      if (clientX !== undefined && clientY !== undefined) {
+        const elUnder = document.elementFromPoint(clientX, clientY);
+        const activeContainer = elUnder?.closest(
+          '.dv-groupview, .dv-content-container, .dv-tabs-and-actions-container'
+        );
+        if (activeContainer) {
+          const matching = dropzones.find(dz => activeContainer.contains(dz));
+          if (matching) {
+            targetDropzone = matching;
+          }
+        }
+      }
+
+      dropzones.forEach(dz => {
+        if (dz !== targetDropzone) {
+          const parent = dz.closest('.dv-drop-target');
+          dz.remove();
+          if (parent && !parent.querySelector('.dv-drop-target-dropzone, .dv-drop-target-anchor')) {
+            parent.classList.remove('dv-drop-target');
+          }
+        }
+      });
+    };
+
     const handlePointerOrDragEnd = (e: MouseEvent | DragEvent) => {
-      if (e.buttons === 0 || e.type === 'dragend' || e.type === 'drop' || e.type === 'mouseup') {
+      if (e.buttons === 0 || e.type === 'dragend' || e.type === 'drop' || e.type === 'mouseup' || e.type === 'pointerup') {
         purgeStaleOverlays();
+      } else {
+        enforceSingularDropzone(e.clientX, e.clientY);
       }
     };
+
+    const observer = new MutationObserver(() => {
+      enforceSingularDropzone();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
     window.addEventListener('dragend', handlePointerOrDragEnd);
     window.addEventListener('drop', handlePointerOrDragEnd);
     window.addEventListener('mouseup', handlePointerOrDragEnd);
     window.addEventListener('pointerup', handlePointerOrDragEnd);
     window.addEventListener('mousemove', handlePointerOrDragEnd);
+    window.addEventListener('dragover', handlePointerOrDragEnd);
+    window.addEventListener('blur', purgeStaleOverlays);
 
     return () => {
+      observer.disconnect();
       window.removeEventListener('dragend', handlePointerOrDragEnd);
       window.removeEventListener('drop', handlePointerOrDragEnd);
       window.removeEventListener('mouseup', handlePointerOrDragEnd);
       window.removeEventListener('pointerup', handlePointerOrDragEnd);
       window.removeEventListener('mousemove', handlePointerOrDragEnd);
+      window.removeEventListener('dragover', handlePointerOrDragEnd);
+      window.removeEventListener('blur', purgeStaleOverlays);
     };
   }, []);
 
