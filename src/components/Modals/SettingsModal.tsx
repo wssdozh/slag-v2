@@ -36,7 +36,7 @@ export const SettingsModal: React.FC = () => {
   const [groqApiKey, setGroqApiKey] = useState(aiSettings.groqApiKey || '');
   const [kieApiKey, setKieApiKey] = useState(aiSettings.kieApiKey || '');
   const [kieBaseUrl, setKieBaseUrl] = useState(aiSettings.kieBaseUrl || 'https://api.kie.ai');
-  const [geminiApiKey, setGeminiApiKey] = useState(aiSettings.geminiApiKey || '');
+  const geminiApiKey = aiSettings.geminiApiKey || '';
   const [model, setModel] = useState(aiSettings.model || 'openai/gpt-oss-120b');
   const [maxTags, setMaxTags] = useState(aiSettings.maxTagsPerNote ?? 3);
   const [allowNewTags, setAllowNewTags] = useState(aiSettings.allowNewTags ?? true);
@@ -51,9 +51,7 @@ export const SettingsModal: React.FC = () => {
     if (newProvider === 'groq') {
       setModel('openai/gpt-oss-120b');
     } else if (newProvider === 'kie') {
-      setModel('gpt-5-2');
-    } else {
-      setModel('gemini-2.0-flash');
+      setModel('gemini-4-argon-openai');
     }
   };
 
@@ -219,283 +217,243 @@ export const SettingsModal: React.FC = () => {
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-[#141416]">
             <div className="flex-1 overflow-y-auto p-5">
               {activeTab === 'ai' && (
-              <div className="flex flex-col gap-4">
-                {/* Provider Selector */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-zinc-400">Провайдер ИИ</label>
-                  <div className="grid grid-cols-3 gap-2 bg-black/40 p-1 rounded-xl border border-white/[0.06]">
-                    <button
-                      type="button"
-                      onClick={() => handleProviderChange('groq')}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
-                        provider === 'groq'
-                          ? 'bg-white/10 text-white shadow-sm'
-                          : 'text-zinc-400 hover:text-zinc-200'
-                      }`}
-                    >
-                      ⚡ Groq (Рекомендуется)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleProviderChange('kie')}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
-                        provider === 'kie'
-                          ? 'bg-white/10 text-white shadow-sm'
-                          : 'text-zinc-400 hover:text-zinc-200'
-                      }`}
-                    >
-                      🧠 KIE.AI
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleProviderChange('gemini')}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${
-                        provider === 'gemini'
-                          ? 'bg-white/10 text-white shadow-sm'
-                          : 'text-zinc-400 hover:text-zinc-200'
-                      }`}
-                    >
-                      ✨ Gemini
-                    </button>
+                <div className="flex flex-col gap-4">
+                  {/* Section 1: Выбор провайдера ИИ (Groq & KIE.AI) */}
+                  <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
+                        Провайдер ИИ
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {provider === 'groq'
+                          ? (groqApiKey ? '● Подключен к LPU' : '○ Ключ не указан')
+                          : (kieApiKey ? '● Подключен к KIE' : '○ Ключ не указан')}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-lg border border-white/[0.04]">
+                      <button
+                        type="button"
+                        onClick={() => handleProviderChange('groq')}
+                        className={`py-2 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          provider === 'groq'
+                            ? 'bg-white/10 text-white shadow-sm font-semibold'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        <span>⚡ Groq (Рекомендуется)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleProviderChange('kie')}
+                        className={`py-2 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          provider === 'kie'
+                            ? 'bg-white/10 text-white shadow-sm font-semibold'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        <span>🧠 KIE.AI</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Groq Settings */}
-                {provider === 'groq' && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-zinc-200">
-                        Groq Cloud API
-                      </span>
-                      <a
-                        href="https://console.groq.com/keys"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
-                      >
-                        <span>Получить API ключ</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-zinc-400">Groq API Key</label>
-                      <div className="relative">
-                        <input
-                          type={showKey ? 'text' : 'password'}
-                          value={groqApiKey}
-                          onChange={(e) => setGroqApiKey(e.target.value)}
-                          placeholder="gsk_..."
-                          className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowKey(!showKey)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
+                  {/* Section 2: Настройки Groq */}
+                  {provider === 'groq' && (
+                    <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
+                      <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-zinc-100">Groq Cloud API</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                            500+ t/s LPU
+                          </span>
+                        </div>
+                        <a
+                          href="https://console.groq.com/keys"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
                         >
-                          {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                          <span>Получить API ключ</span>
+                          <ExternalLink className="w-3 h-3 text-zinc-500" />
+                        </a>
                       </div>
-                      <span className="text-[11px] text-zinc-500">
-                        Аппаратное ускорение LPU: 500+ токенов/сек, вызов инструментов и рассуждения.
-                      </span>
-                    </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-zinc-400">Модель</label>
-                      <select
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200"
-                      >
-                        <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)</option>
-                        <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (280 t/s, 128K)</option>
-                        <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (560 t/s, 128K)</option>
-                        <option value="llama-3.3-70b-specdec">Llama 3.3 70B SpecDec</option>
-                      </select>
-                    </div>
-                  </>
-                )}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-medium text-zinc-300">Groq API Key</label>
+                        <div className="relative">
+                          <input
+                            type={showKey ? 'text' : 'password'}
+                            value={groqApiKey}
+                            onChange={(e) => setGroqApiKey(e.target.value)}
+                            placeholder="gsk_..."
+                            className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowKey(!showKey)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                          >
+                            {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
 
-                {/* KIE.AI Settings */}
-                {provider === 'kie' && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-zinc-200">
-                        KIE.AI Unified API
-                      </span>
-                      <a
-                        href="https://kie.ai/api-key"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
-                      >
-                        <span>Получить API ключ</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-zinc-400">KIE.AI API Key / Token</label>
-                      <div className="relative">
-                        <input
-                          type={showKey ? 'text' : 'password'}
-                          value={kieApiKey}
-                          onChange={(e) => setKieApiKey(e.target.value)}
-                          placeholder="sk-kie-... или Bearer токен"
-                          className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowKey(!showKey)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-medium text-zinc-300">Модель</label>
+                        <select
+                          value={model}
+                          onChange={(e) => setModel(e.target.value)}
+                          className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
                         >
-                          {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                          <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)</option>
+                          <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (280 t/s, 128K)</option>
+                          <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (560 t/s, 128K)</option>
+                          <option value="llama-3.3-70b-specdec">Llama 3.3 70B SpecDec</option>
+                        </select>
+                        <span className="text-[11px] text-zinc-500 leading-relaxed">
+                          Аппаратное LPU ускорение с поддержкой многошагового вызова инструментов и рассуждений.
+                        </span>
                       </div>
-                      <span className="text-[11px] text-zinc-500">
-                        Единый доступ к передовым LLM по оптимизированным тарифам KIE.
+                    </div>
+                  )}
+
+                  {/* Section 2: Настройки KIE.AI (с Gemini 4 Argon) */}
+                  {provider === 'kie' && (
+                    <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
+                      <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-zinc-100">KIE.AI Unified Gateway</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                            Gemini 4 Argon
+                          </span>
+                        </div>
+                        <a
+                          href="https://kie.ai/api-key"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
+                        >
+                          <span>Получить API ключ</span>
+                          <ExternalLink className="w-3 h-3 text-zinc-500" />
+                        </a>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-medium text-zinc-300">KIE.AI API Key / Token</label>
+                        <div className="relative">
+                          <input
+                            type={showKey ? 'text' : 'password'}
+                            value={kieApiKey}
+                            onChange={(e) => setKieApiKey(e.target.value)}
+                            placeholder="sk-kie-... или Bearer токен"
+                            className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowKey(!showKey)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                          >
+                            {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-medium text-zinc-300">Модель</label>
+                          <select
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
+                          >
+                            <option value="gemini-4-argon-openai">Gemini 4 Argon (OpenAI, Рекомендуется)</option>
+                            <option value="gpt-5-2">GPT 5.2</option>
+                            <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+                            <option value="deepseek-v4-1-flash">DeepSeek V4.1 Flash</option>
+                            <option value="grok-4-5">Grok 4.5</option>
+                            <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-medium text-zinc-300">Base URL эндпоинта</label>
+                          <input
+                            type="text"
+                            value={kieBaseUrl}
+                            onChange={(e) => setKieBaseUrl(e.target.value)}
+                            placeholder="https://api.kie.ai"
+                            className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      <span className="text-[11px] text-zinc-500 leading-relaxed">
+                        Маршрут Gemini 4 Argon: /gemini-4-argon-openai/v1/chat/completions с поддержкой Google Search и цепочек мыслей.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Section 3: Норма таксономии и правила тегирования */}
+                  <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                      <span className="text-xs font-semibold text-zinc-100">
+                        Норма таксономии и правила тегирования
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Zero-Slop Taxonomy
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-zinc-400">Модель</label>
-                      <select
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200"
-                      >
-                        <option value="gpt-5-2">GPT 5.2</option>
-                        <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-                        <option value="deepseek-v4-1-flash">DeepSeek V4.1 Flash</option>
-                        <option value="grok-4-5">Grok 4.5</option>
-                        <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-medium text-zinc-300">Максимум тегов на запись</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={8}
+                          value={maxTags}
+                          onChange={(e) => setMaxTags(Number(e.target.value))}
+                          className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-1.5 text-xs text-white transition-colors"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-medium text-zinc-300">Стиль регистра тегов</label>
+                        <select
+                          value={tagCaseStyle}
+                          onChange={(e) => setTagCaseStyle(e.target.value as any)}
+                          className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-1.5 text-xs text-zinc-200 transition-colors"
+                        >
+                          <option value="lowercase">lowercase (#дизайн)</option>
+                          <option value="kebab-case">kebab-case (#ui-ux)</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-zinc-400">Base URL эндпоинта</label>
+                    <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer pt-1">
                       <input
-                        type="text"
-                        value={kieBaseUrl}
-                        onChange={(e) => setKieBaseUrl(e.target.value)}
-                        placeholder="https://api.kie.ai"
-                        className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-600 font-mono"
+                        type="checkbox"
+                        checked={allowNewTags}
+                        onChange={(e) => setAllowNewTags(e.target.checked)}
+                        className="rounded border-white/20 bg-black/40 text-blue-500"
+                      />
+                      <span>Разрешить ИИ создавать новые теги (если выкл — строгий выбор из имеющихся)</span>
+                    </label>
+
+                    <div className="flex flex-col gap-1.5 pt-1">
+                      <label className="text-[11px] font-medium text-zinc-300">Пользовательские правила промпта</label>
+                      <textarea
+                        rows={2}
+                        value={customTagRules}
+                        onChange={(e) => setCustomTagRules(e.target.value)}
+                        placeholder="Например: Не использовать тег #general. Для задач по коду предпочитать #frontend или #backend."
+                        className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg p-2.5 text-xs text-white placeholder-zinc-600 resize-none transition-colors"
                       />
                     </div>
-                  </>
-                )}
-
-                {/* Gemini Settings */}
-                {provider === 'gemini' && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-zinc-200">
-                        Google Gemini Flash
-                      </span>
-                      <a
-                        href="https://aistudio.google.com/app/apikey"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
-                      >
-                        <span>Бесплатный API ключ</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-zinc-400">Gemini API Key</label>
-                      <div className="relative">
-                        <input
-                          type={showKey ? 'text' : 'password'}
-                          value={geminiApiKey}
-                          onChange={(e) => setGeminiApiKey(e.target.value)}
-                          placeholder="AIzaSy..."
-                          className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowKey(!showKey)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
-                        >
-                          {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      <span className="text-[11px] text-zinc-500">
-                        Используется для быстрого подбора тегов и функции AI Triage.
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-zinc-400">Модель</label>
-                      <select
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200"
-                      >
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Рекомендуется)</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {/* Tag Taxonomy Norm Section */}
-                <div className="pt-3 border-t border-white/[0.06] flex flex-col gap-3">
-                  <span className="text-xs font-semibold text-zinc-200">
-                    Норма таксономии и правила тегирования
-                  </span>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] text-zinc-400">Максимум тегов на запись</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        value={maxTags}
-                        onChange={(e) => setMaxTags(Number(e.target.value))}
-                        className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] text-zinc-400">Стиль регистра тегов</label>
-                      <select
-                        value={tagCaseStyle}
-                        onChange={(e) => setTagCaseStyle(e.target.value as any)}
-                        className="bg-black/40 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-zinc-200"
-                      >
-                        <option value="lowercase">lowercase (#дизайн)</option>
-                        <option value="kebab-case">kebab-case (#ui-ux)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={allowNewTags}
-                      onChange={(e) => setAllowNewTags(e.target.checked)}
-                      className="rounded border-white/20 bg-black/40 text-blue-500"
-                    />
-                    <span>Разрешить ИИ создавать новые теги (если выкл — строгий выбор из имеющихся)</span>
-                  </label>
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[11px] text-zinc-400">Пользовательские правила промпта</label>
-                    <textarea
-                      rows={2}
-                      value={customTagRules}
-                      onChange={(e) => setCustomTagRules(e.target.value)}
-                      placeholder="Например: Не использовать тег #general. Для задач по коду предпочитать #frontend или #backend."
-                      className="bg-black/40 border border-white/[0.08] rounded-lg p-2 text-xs text-white placeholder-zinc-600 resize-none"
-                    />
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {activeTab === 'vault' && (
               <div className="flex flex-col gap-3">

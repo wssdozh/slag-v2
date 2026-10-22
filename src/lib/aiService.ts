@@ -38,6 +38,25 @@ function formatTag(tag: string, style: 'lowercase' | 'kebab-case'): string {
 }
 
 /**
+ * Resolves full chat completions endpoint for KIE.AI.
+ * For Gemini 4 Argon, routes to dedicated /gemini-4-argon-openai/v1/chat/completions.
+ */
+export function resolveKieEndpoint(baseUrl?: string, model?: string): string {
+  const clean = (baseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
+  if (clean.endsWith('/chat/completions')) return clean;
+
+  const m = (model || '').toLowerCase();
+  if (m.includes('gemini-4-argon') || m === 'gemini-4-argon-openai') {
+    if (clean.includes('gemini-4-argon-openai')) {
+      return clean.endsWith('/v1') ? `${clean}/chat/completions` : `${clean}/v1/chat/completions`;
+    }
+    return `${clean}/gemini-4-argon-openai/v1/chat/completions`;
+  }
+
+  return clean.endsWith('/v1') ? `${clean}/chat/completions` : `${clean}/v1/chat/completions`;
+}
+
+/**
  * Intelligent AI tagging service with Groq & Gemini providers and tag taxonomy indexing.
  */
 export async function generateSmartTags(content: string, settings: AiSettings): Promise<string[]> {
@@ -122,9 +141,9 @@ ${settings.customTagRules ? `Пользовательские правила: ${
   // 2. KIE.AI Provider
   if (settings.provider === 'kie' && settings.kieApiKey) {
     try {
-      const model = settings.model || 'gpt-5-2';
-      const baseUrl = settings.kieBaseUrl?.replace(/\/+$/, '') || 'https://api.kie.ai';
-      const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      const model = settings.model || 'gemini-4-argon-openai';
+      const endpoint = resolveKieEndpoint(settings.kieBaseUrl, model);
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,6 +161,9 @@ ${settings.customTagRules ? `Пользовательские правила: ${
 
       if (res.ok) {
         const data = await res.json();
+        if (data.code && data.code !== 200) {
+          throw new Error(data.msg || `KIE.AI Tagging error code ${data.code}`);
+        }
         const rawContent = data.choices?.[0]?.message?.content;
         if (rawContent) {
           const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
@@ -329,9 +351,9 @@ ${JSON.stringify(itemsContext, null, 2)}
   // 2. KIE.AI Provider
   if (settings.provider === 'kie' && settings.kieApiKey) {
     try {
-      const model = settings.model || 'gpt-5-2';
-      const baseUrl = settings.kieBaseUrl?.replace(/\/+$/, '') || 'https://api.kie.ai';
-      const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      const model = settings.model || 'gemini-4-argon-openai';
+      const endpoint = resolveKieEndpoint(settings.kieBaseUrl, model);
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -349,6 +371,9 @@ ${JSON.stringify(itemsContext, null, 2)}
 
       if (res.ok) {
         const data = await res.json();
+        if (data.code && data.code !== 200) {
+          throw new Error(data.msg || `KIE.AI Triage error code ${data.code}`);
+        }
         const raw = data.choices?.[0]?.message?.content;
         if (raw) {
           const jsonMatch = raw.match(/\[[\s\S]*\]/);
@@ -947,13 +972,13 @@ ${isInbox
   if (isGroq || isKie || isGemini) {
     const providerName = isGroq ? 'Groq' : isKie ? 'KIE.AI' : 'Gemini';
     const apiKey = isGroq ? settings.groqApiKey : isKie ? settings.kieApiKey : settings.geminiApiKey;
-    const defaultModel = isGroq ? 'openai/gpt-oss-120b' : isKie ? 'gpt-5-2' : 'gemini-2.0-flash';
+    const defaultModel = isGroq ? 'openai/gpt-oss-120b' : isKie ? 'gemini-4-argon-openai' : 'gemini-2.0-flash';
     const model = settings.model || defaultModel;
-    const baseUrl = isGroq
-      ? 'https://api.groq.com/openai/v1'
+    const endpointUrl = isGroq
+      ? 'https://api.groq.com/openai/v1/chat/completions'
       : isKie
-      ? (settings.kieBaseUrl?.replace(/\/+$/, '') || 'https://api.kie.ai') + '/v1'
-      : 'https://generativelanguage.googleapis.com/v1beta/openai';
+      ? resolveKieEndpoint(settings.kieBaseUrl, model)
+      : 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
     try {
       const executedToolCalls: ChatToolCall[] = [];
@@ -981,6 +1006,7 @@ ${isInbox
         aiLog.info(`Agent round ${round}/${MAX_TOOL_ROUNDS} [${providerName}]`, {
           model,
           messageCount: requestMessages.length,
+          endpoint: endpointUrl,
         });
 
         const payload: Record<string, any> = {
@@ -989,12 +1015,17 @@ ${isInbox
           temperature: 0.2,
         };
 
+        if (isKie && (model.includes('gemini-4-argon') || model === 'gemini-4-argon-openai')) {
+          payload.include_thoughts = true;
+          payload.reasoning_effort = settings.reasoningEffort === 'high' ? 'high' : 'low';
+        }
+
         if (!isLastAllowedRound) {
           payload.tools = groqTools;
           payload.tool_choice = 'auto';
         }
 
-        const res = await fetch(`${baseUrl}/chat/completions`, {
+        const res = await fetch(endpointUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1013,6 +1044,9 @@ ${isInbox
         }
 
         const data = await res.json();
+        if (data.code && data.code !== 200) {
+          throw new Error(data.msg || `KIE.AI Error ${data.code}`);
+        }
         const choice = data.choices?.[0];
         const msg = choice?.message;
 

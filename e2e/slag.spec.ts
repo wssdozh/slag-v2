@@ -391,11 +391,24 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(100);
     await groqProviderBtn.click();
 
-    // Verify KIE.AI provider is also available
+    // Verify Gemini provider tab is cut out / removed from top tabs
+    await expect(settingsModal.locator('button', { hasText: '✨ Gemini' })).not.toBeVisible();
+
+    // Verify KIE.AI provider is available and defaults to Gemini 4 Argon
     const kieProviderBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
     await expect(kieProviderBtn).toBeVisible();
     await kieProviderBtn.click();
     await expect(settingsModal.locator('input[placeholder*="sk-kie"]')).toBeVisible();
+
+    // Verify Gemini 4 Argon model option is visible in KIE.AI
+    const kieModelSelect = settingsModal.locator('select', { hasText: /Gemini 4 Argon/ });
+    await expect(kieModelSelect).toBeVisible();
+
+    // Take screenshot of KIE.AI settings with Argon for visual audit
+    await page.screenshot({
+      path: 'test-results/screenshots/settings-modal-kie-argon.png',
+    });
+
     await groqProviderBtn.click();
 
     // Verify gpt-oss-120b model option exists
@@ -910,5 +923,43 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const updateConfirmBtn = page.locator('button', { hasText: /Запланировать на|Сохранить в хранилище/ }).last();
     await updateConfirmBtn.click();
     await expect(page.locator('text=обновлена').or(page.locator('text=сохранена')).first()).toBeVisible();
+  });
+
+  test('26. KIE.AI Provider with Gemini 4 Argon Endpoint and Structured Settings', async ({ page }) => {
+    // 1. Open Settings
+    await page.locator('button[title*="Настройки"]').first().click();
+    const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
+    await expect(settingsModal).toBeVisible();
+
+    // 2. Select KIE.AI
+    const kieBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
+    await kieBtn.click();
+
+    // 3. Verify Gemini 4 Argon is selected and visible
+    const select = settingsModal.locator('select').first();
+    await expect(select).toHaveValue('gemini-4-argon-openai');
+
+    // 4. Fill in token and save
+    const keyInput = settingsModal.locator('input[placeholder*="sk-kie"]');
+    await keyInput.fill('sk-kie-test-argon-token');
+    await settingsModal.locator('button', { hasText: 'Сохранить' }).click();
+    await expect(settingsModal).not.toBeVisible();
+
+    // 5. Verify Assistant Chat shows KIE provider badge in bottom composer
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+    await expect(page.locator('button', { hasText: 'KIE' }).or(page.locator('text=KIE')).first()).toBeVisible();
+
+    // 6. Verify client endpoint resolver behavior in browser context
+    const endpoints = await page.evaluate(async () => {
+      const module = await import('/src/lib/aiService.ts');
+      return {
+        argonUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gemini-4-argon-openai'),
+        gptUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gpt-5-2'),
+      };
+    });
+
+    expect(endpoints.argonUrl).toBe('https://api.kie.ai/gemini-4-argon-openai/v1/chat/completions');
+    expect(endpoints.gptUrl).toBe('https://api.kie.ai/v1/chat/completions');
   });
 });
