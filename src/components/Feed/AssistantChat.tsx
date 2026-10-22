@@ -500,7 +500,13 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                           {msg.suggestedAction.type === 'update_task_status' && '📊 Смена статуса канбан'}
                           {msg.suggestedAction.type === 'reschedule_task' && '⏱ Перенос срока'}
                           {msg.suggestedAction.type === 'move_note' && '📁 Перемещение по папкам'}
-                          {msg.suggestedAction.type === 'create_note' && (msg.suggestedAction.itemType === 'task' ? 'Черновик задачи' : 'Черновик заметки')}
+                          {msg.suggestedAction.type === 'create_note' && (
+                            msg.suggestedAction.itemType === 'task'
+                              ? 'Черновик задачи'
+                              : msg.suggestedAction.itemType === 'article'
+                              ? 'Черновик статьи'
+                              : 'Черновик заметки'
+                          )}
                         </span>
                         <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[120px]">
                           {msg.suggestedAction.folder}

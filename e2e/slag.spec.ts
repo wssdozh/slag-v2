@@ -778,7 +778,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(settingsModal).not.toBeVisible();
   });
 
-  test('22. Assistant Relative Calendar Dates, Contextual Links, and Offline Intent Classifier', async ({ page }) => {
+  test('23. Assistant Relative Calendar Dates, Contextual Links, and Offline Intent Classifier', async ({ page }) => {
     // 1. Switch to Assistant tab
     const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
     await assistantTab.click();
@@ -818,6 +818,40 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Take screenshot for visual audit
     await page.screenshot({
       path: 'test-results/screenshots/assistant-smart-dialogue.png',
+      fullPage: false,
+    });
+  });
+
+  test('24. Typo-Tolerant Note Search and Multi-step Agentic Tool Calling Verification', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Query with conversational filler and typo: "поищи по заметкам по прафилам как жить вообще"
+    await textarea.fill('поищи по заметкам по прафилам как жить вообще');
+    await textarea.press('Enter');
+
+    // 3. Verify that typo "прафилам" matches "12 правил эффективности"
+    const matchedLink = page.locator('button', { hasText: '12 правил эффективности' }).first();
+    await expect(matchedLink).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=записей не найдено')).not.toBeVisible();
+
+    // 4. Test clicking the wikilink inside the chat message
+    await matchedLink.click();
+
+    // 5. Test another conversational query with transformation intent
+    await textarea.fill('сделай статью на этот счет');
+    await textarea.press('Enter');
+
+    // Verify draft action card for article is formed
+    await expect(page.locator('text=Черновик статьи').first()).toBeVisible({ timeout: 5000 });
+
+    // Capture visual screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-typo-search-success.png',
       fullPage: false,
     });
   });
