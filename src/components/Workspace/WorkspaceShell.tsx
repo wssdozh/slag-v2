@@ -39,13 +39,10 @@ const DynamicFeedPanel: React.FC = () => {
       ) : (
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           <FeedList />
-          {/* Floating Composer Container with soft gradient dissolution */}
-          <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 flex flex-col items-center">
-            <div className="w-full h-8 bg-gradient-to-t from-[#09090b] to-transparent pointer-events-none" />
-            <div className="w-full pb-3 px-3 flex justify-center bg-transparent pointer-events-none">
-              <div className="pointer-events-auto max-w-2xl w-full">
-                <Composer />
-              </div>
+          {/* Floating Composer Island */}
+          <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 px-3 flex justify-center">
+            <div className="pointer-events-auto max-w-2xl w-full">
+              <Composer />
             </div>
           </div>
         </div>

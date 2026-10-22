@@ -407,7 +407,7 @@ export const Composer: React.FC = () => {
 
   return (
     <div className="w-full select-none">
-      <div className="rounded-2xl bg-[#0c0c0e]/95 backdrop-blur-md border border-white/[0.08] p-2.5 flex flex-col gap-1.5 shadow-2xl">
+      <div className="rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50">
         {/* Reply Banner */}
         {replyTarget && (
         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">

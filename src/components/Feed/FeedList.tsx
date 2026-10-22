@@ -164,6 +164,8 @@ export const FeedList: React.FC = () => {
           </div>
         ))
       )}
+      {/* Generous bottom spacer so the last card can always scroll fully clear of the floating composer */}
+      <div className="h-44 shrink-0 pointer-events-none" aria-hidden="true" />
       <div ref={bottomAnchorRef} />
     </div>
   );
