@@ -112,6 +112,8 @@ export type SuggestedActionType =
   | 'decompose_task'
   | 'move_note';
 
+export type ActionState = 'suggested' | 'executing' | 'applied' | 'rejected';
+
 export interface SuggestedAction {
   type: SuggestedActionType;
   title: string;
@@ -125,6 +127,9 @@ export interface SuggestedAction {
   priority?: 'none' | 'low' | 'medium' | 'high';
   status?: 'backlog' | 'todo' | 'in_progress' | 'done';
   subtasks?: { id: string; title: string; completed: boolean }[];
+  actionState?: ActionState;
+  appliedItemId?: string;
+  error?: string;
 }
 
 export interface ChatToolCall {

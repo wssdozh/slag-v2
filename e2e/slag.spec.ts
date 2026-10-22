@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test.describe('SLAG v2 Specification E2E Verification', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Wait for the app main feed to be visible
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('1. Note creation with Enter shortcut without empty headers', async ({ page }) => {
@@ -854,5 +854,61 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/assistant-typo-search-success.png',
       fullPage: false,
     });
+  });
+
+  test('25. Assistant Action Lifecycle (suggested, applied, rejection, and task refinement)', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Ask to create a task with relative date
+    await textarea.fill('можешь на завтра таску сделать почистить яйца');
+    await textarea.press('Enter');
+
+    // 3. Verify action card appears with title and buttons
+    await expect(page.locator('text=почистить яйца').first()).toBeVisible({ timeout: 5000 });
+    const planBtn = page.locator('button', { hasText: /Запланировать на|Сохранить в хранилище/ }).first();
+    await expect(planBtn).toBeVisible();
+    const rejectBtn = page.locator('button', { hasText: 'Отклонить' }).first();
+    await expect(rejectBtn).toBeVisible();
+
+    // 4. Test Rejection with a disposable note request
+    await textarea.fill('создай черновик: временная мысль для отмены');
+    await textarea.press('Enter');
+    await expect(page.locator('text=временная мысль для отмены').first()).toBeVisible({ timeout: 5000 });
+    const secondRejectBtn = page.locator('button', { hasText: 'Отклонить' }).last();
+    await secondRejectBtn.click();
+    await expect(page.locator('text=Действие отклонено').first()).toBeVisible();
+
+    // 5. Test Confirmation & Transition to Applied
+    await planBtn.click();
+    await expect(page.locator('text=сохранена').first()).toBeVisible();
+
+    // Verify card now shows applied state with "Перейти к записи"
+    const jumpBtn = page.locator('button', { hasText: 'Перейти к записи' }).first();
+    await expect(jumpBtn).toBeVisible();
+    await jumpBtn.click();
+
+    // 6. Test Context Refinement ("требуемые инструменты бритва")
+    await textarea.fill('можешь добавить этой таске подробности: требуемые инструменты бритва');
+    await textarea.press('Enter');
+
+    // Verify assistant does NOT produce empty search error and instead updates the draft
+    await expect(page.locator('text=записей не найдено')).not.toBeVisible();
+    await expect(page.locator('text=требуемые инструменты бритва').first()).toBeVisible({ timeout: 5000 });
+
+    // Capture visual screenshot of the action card states
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-action-lifecycle.png',
+      fullPage: false,
+    });
+
+    // 7. Click confirm on the updated action
+    const updateConfirmBtn = page.locator('button', { hasText: /Запланировать на|Сохранить в хранилище/ }).last();
+    await updateConfirmBtn.click();
+    await expect(page.locator('text=обновлена').or(page.locator('text=сохранена')).first()).toBeVisible();
   });
 });

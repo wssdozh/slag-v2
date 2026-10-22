@@ -63,8 +63,9 @@ interface AppContextType {
   isChatLoading: boolean;
   sendChatMessage: (text: string) => Promise<void>;
   clearChatMessages: () => void;
-  createNoteFromAction: (action: SuggestedAction) => SlagItem | void;
-  executeSuggestedAction: (action: SuggestedAction) => SlagItem | void;
+  createNoteFromAction: (action: SuggestedAction, messageId?: string) => SlagItem | void;
+  executeSuggestedAction: (action: SuggestedAction, messageId?: string) => SlagItem | void;
+  rejectAction: (messageId: string) => void;
 
   // Lightbox Gallery
   lightboxImages: LightboxImage[];
@@ -480,77 +481,149 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [items, updateItem, addToast]);
 
-  const executeSuggestedAction = useCallback((action: SuggestedAction): SlagItem | void => {
-    // 1. Create Note / Task
+  const executeSuggestedAction = useCallback((action: SuggestedAction, messageId?: string): SlagItem | void => {
+    if (action.actionState === 'executing' || action.actionState === 'applied') {
+      return;
+    }
+
+    if (messageId) {
+      setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
+        ? { ...m, suggestedAction: { ...m.suggestedAction, actionState: 'executing' } }
+        : m
+      ));
+    }
+
+    let savedItem: SlagItem | void = undefined;
+
+    // 1. Create Note / Task / Schedule Task
     if (action.type === 'create_note' || action.type === 'schedule_task') {
-      const saved = saveItem({
-        type: action.itemType || (action.type === 'schedule_task' ? 'task' : 'note'),
-        title: action.title,
-        content: action.content || '',
-        folder: action.folder || currentFolder,
-        tags: action.tags || [],
-        dueDate: action.dueDate,
-        reminder: action.reminder,
-        priority: action.priority,
-      });
-      addToast(`Запись «${saved.title}» сохранена`, 'success');
-      return saved;
+      const targetFolder = action.folder || currentFolder;
+      const targetType = action.itemType || (action.type === 'schedule_task' ? 'task' : 'note');
+
+      // Prevent duplicate creation if matching item already exists (by targetItemId, appliedItemId, or exact title + folder + type)
+      const existing = items.find(i =>
+        (action.appliedItemId && i.id === action.appliedItemId) ||
+        (action.targetItemId && i.id === action.targetItemId) ||
+        (i.title.trim().toLowerCase() === action.title.trim().toLowerCase() && i.folder === targetFolder && i.type === targetType)
+      );
+
+      if (existing) {
+        const updated: SlagItem = {
+          ...existing,
+          title: action.title.trim() || existing.title,
+          content: action.content !== undefined && action.content !== '' ? action.content : existing.content,
+          tags: action.tags && action.tags.length > 0 ? Array.from(new Set([...existing.tags, ...action.tags])) : existing.tags,
+          dueDate: action.dueDate !== undefined ? action.dueDate : existing.dueDate,
+          reminder: action.reminder !== undefined ? action.reminder : existing.reminder,
+          priority: action.priority !== undefined ? action.priority : existing.priority,
+          status: action.status !== undefined ? action.status : existing.status,
+          subtasks: action.subtasks && action.subtasks.length > 0 ? [...(existing.subtasks || []), ...action.subtasks] : existing.subtasks,
+          updatedAt: Date.now(),
+        };
+        updateItem(updated);
+        savedItem = updated;
+        addToast(`Запись «${updated.title}» обновлена`, 'success');
+      } else {
+        const saved = saveItem({
+          type: targetType,
+          title: action.title.trim(),
+          content: action.content || '',
+          folder: targetFolder,
+          tags: action.tags || [],
+          dueDate: action.dueDate,
+          reminder: action.reminder,
+          priority: action.priority,
+          status: action.status,
+          subtasks: action.subtasks,
+        });
+        savedItem = saved;
+        addToast(`Запись «${saved.title}» сохранена`, 'success');
+      }
     }
 
     // 2. Decompose Task (add subtasks to target task)
-    if (action.type === 'decompose_task') {
+    else if (action.type === 'decompose_task') {
       const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
       if (target) {
         const existingSubtasks = target.subtasks || [];
         const newSubtasks = action.subtasks || [];
         const merged = [...existingSubtasks, ...newSubtasks];
-        const updated = { ...target, subtasks: merged };
+        const updated = { ...target, subtasks: merged, updatedAt: Date.now() };
         updateItem(updated);
+        savedItem = updated;
         addToast(`К задаче «${target.title}» добавлено ${newSubtasks.length} подзадач`, 'success');
-        return updated;
+      } else {
+        addToast(`Задача «${action.title}» не найдена`, 'error');
+        if (messageId) {
+          setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
+            ? { ...m, suggestedAction: { ...m.suggestedAction, actionState: 'suggested', error: 'Задача не найдена' } }
+            : m
+          ));
+        }
+        return;
       }
-      addToast(`Задача «${action.title}» не найдена`, 'error');
-      return;
     }
 
     // 3. Update Task Status
-    if (action.type === 'update_task_status') {
+    else if (action.type === 'update_task_status') {
       const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
       if (target && action.status) {
-        const updated = { ...target, status: action.status };
+        const updated = { ...target, status: action.status, updatedAt: Date.now() };
         updateItem(updated);
+        savedItem = updated;
         addToast(`Статус задачи изменен на «${action.status}»`, 'success');
-        return updated;
       }
-      return;
     }
 
     // 4. Reschedule Task
-    if (action.type === 'reschedule_task') {
+    else if (action.type === 'reschedule_task') {
       const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
       if (target && action.dueDate) {
-        const updated = { ...target, dueDate: action.dueDate, reminder: action.reminder };
+        const updated = { ...target, dueDate: action.dueDate, reminder: action.reminder, updatedAt: Date.now() };
         updateItem(updated);
+        savedItem = updated;
         addToast(`Задача перенесена на ${action.dueDate}`, 'success');
-        return updated;
       }
-      return;
     }
 
     // 5. Move Note to Folder
-    if (action.type === 'move_note') {
+    else if (action.type === 'move_note') {
       const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
       if (target && action.folder) {
         moveItem(target.id, action.folder);
+        savedItem = { ...target, folder: action.folder, updatedAt: Date.now() };
         addToast(`Запись перенесена в «${action.folder}»`, 'success');
-        return;
       }
-      return;
     }
+
+    if (messageId && savedItem) {
+      const finalSavedId = savedItem.id;
+      setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
+        ? {
+            ...m,
+            suggestedAction: {
+              ...m.suggestedAction,
+              actionState: 'applied',
+              appliedItemId: finalSavedId,
+            },
+          }
+        : m
+      ));
+    }
+
+    return savedItem;
   }, [currentFolder, saveItem, updateItem, moveItem, items, addToast]);
 
-  const createNoteFromAction = useCallback((action: SuggestedAction): SlagItem | void => {
-    return executeSuggestedAction(action);
+  const rejectAction = useCallback((messageId: string) => {
+    setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
+      ? { ...m, suggestedAction: { ...m.suggestedAction, actionState: 'rejected' } }
+      : m
+    ));
+    addToast('Действие отклонено', 'info');
+  }, [addToast]);
+
+  const createNoteFromAction = useCallback((action: SuggestedAction, messageId?: string): SlagItem | void => {
+    return executeSuggestedAction(action, messageId);
   }, [executeSuggestedAction]);
 
   const sendChatMessage = useCallback(async (userText: string) => {
@@ -570,9 +643,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const response = await sendAssistantChat({
         messages: newHistory.map(m => {
-          let content = m.content;
-          if (!content.trim() && m.suggestedAction) {
-            content = `[Подготовлен черновик ${m.suggestedAction.itemType || 'note'}: «${m.suggestedAction.title}»:\n${m.suggestedAction.content || ''}]`;
+          let content = m.content || '';
+          if (m.suggestedAction) {
+            const sa = m.suggestedAction;
+            const actionDesc = `[Действие ассистента: ${sa.type} | Статус: ${sa.actionState || 'suggested'} | Заголовок: «${sa.title}» | Тип: ${sa.itemType || 'note'} | Папка: «${sa.folder}»${sa.dueDate ? ` | Срок: ${sa.dueDate}` : ''}${sa.content ? ` | Содержимое: ${sa.content}` : ''}${sa.appliedItemId ? ` | ID в базе: ${sa.appliedItemId}` : ''}]`;
+            if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
+              content = actionDesc;
+            } else {
+              content = `${content.trim()}\n${actionDesc}`;
+            }
           }
           return { role: m.role, content: content.trim() || '[Действие]' };
         }),
@@ -739,6 +818,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearChatMessages,
         createNoteFromAction,
         executeSuggestedAction,
+        rejectAction,
         lightboxImages,
         activeLightboxIndex,
         openLightbox,

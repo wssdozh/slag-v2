@@ -550,6 +550,7 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
   const folderMeta = folders.find(f => f.path === currentFolder);
 
   const startTime = Date.now();
+  let capturedAction: SuggestedAction | undefined;
 
   // Local Tool Executor
   const executeLocalTool = async (name: string, args: Record<string, any>): Promise<any> => {
@@ -621,6 +622,95 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
       };
     }
 
+    // Action tools for Read-Only Safety: prepare SuggestedAction cards for UI confirmation
+    if (name === 'create_note') {
+      capturedAction = {
+        type: 'create_note',
+        title: String(args.title || 'Новая запись').trim(),
+        folder: args.folder || currentFolder,
+        content: args.content || '',
+        tags: Array.isArray(args.tags) ? args.tags : [],
+        itemType: args.itemType || 'note',
+        actionState: 'suggested',
+      };
+      return {
+        status: 'proposed',
+        message: `Черновик ${args.itemType || 'записи'} «${args.title}» подготовлен к сохранению в хранилище. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
+      };
+    }
+
+    if (name === 'schedule_task') {
+      capturedAction = {
+        type: 'schedule_task',
+        title: String(args.title || 'Новая задача').trim(),
+        folder: args.folder || currentFolder,
+        content: args.content || '',
+        dueDate: args.dueDate,
+        reminder: args.reminder,
+        priority: args.priority || 'medium',
+        tags: Array.isArray(args.tags) ? args.tags : [],
+        itemType: 'task',
+        actionState: 'suggested',
+      };
+      return {
+        status: 'proposed',
+        message: `Задача «${args.title}» на дату ${args.dueDate} подготовлена к планированию. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
+      };
+    }
+
+    if (name === 'decompose_task') {
+      const subtasks = Array.isArray(args.subtasks)
+        ? args.subtasks.map((st: any, idx: number) => typeof st === 'string' ? { id: `st_${Date.now()}_${idx}`, title: st, completed: false } : st)
+        : [];
+      capturedAction = {
+        type: 'decompose_task',
+        title: String(args.title || 'Задача').trim(),
+        folder: currentFolder,
+        content: '',
+        tags: [],
+        itemType: 'task',
+        subtasks,
+        actionState: 'suggested',
+      };
+      return {
+        status: 'proposed',
+        message: `Декомпозиция задачи «${args.title}» на ${subtasks.length} подзадач подготовлена к применению. Завершите ответ кратким пояснением.`,
+      };
+    }
+
+    if (name === 'update_task_status') {
+      capturedAction = {
+        type: 'update_task_status',
+        title: String(args.title || 'Задача').trim(),
+        folder: currentFolder,
+        content: '',
+        tags: [],
+        itemType: 'task',
+        status: args.status,
+        actionState: 'suggested',
+      };
+      return {
+        status: 'proposed',
+        message: `Смена статуса задачи «${args.title}» на «${args.status}» подготовлена к подтверждению.`,
+      };
+    }
+
+    if (name === 'move_note') {
+      capturedAction = {
+        type: 'move_note',
+        title: String(args.title || 'Запись').trim(),
+        folder: args.folder || currentFolder,
+        content: '',
+        tags: [],
+        itemType: 'note',
+        actionState: 'suggested',
+      };
+      return {
+        status: 'proposed',
+        message: `Перемещение «${args.title}» в папку «${args.folder}» подготовлено к подтверждению.`,
+      };
+    }
+
     if (name === 'web_search') {
       return {
         query: args.query,
@@ -643,11 +733,8 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
           properties: {
             query: {
               type: 'string',
-              description: 'Поисковый запрос. Передавай ключевые существительные или основы слов (1-3 слова). Обязательно исправляй опечатки пользователя (например: "прафилам как жить" -> "правила") и удаляй разговорный шум ("поищи", "как", "вообще").',
+              description: 'Поисковый запрос. Передавай ключевые существительные или основы слов (1-3 слова). Обязательно исправляй опечатки пользователя (например: "прафилам как жить" -> "правила") и удаляй разговорный шум.',
             },
-            folder: { type: 'string', description: 'Ограничение по папке (если применимо)' },
-            tag: { type: 'string', description: 'Фильтр по тегу' },
-            type: { type: 'string', enum: ['note', 'task', 'article'], description: 'Тип записи' },
           },
           required: ['query'],
         },
@@ -690,6 +777,91 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
           properties: {
             date: { type: 'string', description: 'Дата в формате YYYY-MM-DD (по умолчанию сегодня)' },
           },
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'create_note',
+        description: 'Создать или обновить черновик заметки, задачи или статьи в хранилище (с интерактивной кнопкой подтверждения).',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Заголовок записи' },
+            content: { type: 'string', description: 'Содержимое/текст записи (включая подробности, шаги, инструменты)' },
+            itemType: { type: 'string', enum: ['note', 'task', 'article'], description: 'Тип записи' },
+            folder: { type: 'string', description: 'Папка для сохранения' },
+            tags: { type: 'array', items: { type: 'string' }, description: 'Теги' },
+          },
+          required: ['title'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'schedule_task',
+        description: 'Запланировать задачу в календаре на конкретную дату (YYYY-MM-DD).',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Заголовок задачи' },
+            dueDate: { type: 'string', description: 'Дата в формате YYYY-MM-DD' },
+            priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Приоритет задачи' },
+            content: { type: 'string', description: 'Описание или подробности задачи' },
+            folder: { type: 'string', description: 'Папка' },
+          },
+          required: ['title', 'dueDate'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'decompose_task',
+        description: 'Декомпозировать задачу на список подзадач/шагов.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Заголовок задачи' },
+            subtasks: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Список подзадач/шагов',
+            },
+          },
+          required: ['title', 'subtasks'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'update_task_status',
+        description: 'Изменить статус задачи (backlog, todo, in_progress, done).',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Заголовок задачи' },
+            status: { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'done'] },
+          },
+          required: ['title', 'status'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'move_note',
+        description: 'Переместить заметку в другую папку базы знаний.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Заголовок заметки' },
+            folder: { type: 'string', description: 'Целевая папка' },
+          },
+          required: ['title', 'folder'],
         },
       },
     },
@@ -761,10 +933,11 @@ ${isInbox
 Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.
 
 4. РАБОТА С КОНТЕКСТОМ И ТРАНСФОРМАЦИЯ ЧЕРНОВИКОВ:
-   - Если пользователь просит переделать, развить или преобразовать предыдущую запись («сделай из этого статью», «преврати в задачу», «добавь деталей»):
+   - Если пользователь просит переделать, развить или преобразовать предыдущую запись («сделай из этого статью», «преврати в задачу», «добавь деталей», «добавь этой таске подробности»):
    - Опирайся на тему и текст предыдущего черновика из истории диалога.
-   - Сформируй обновленный блок действия action:create_note (например, с itemType: "article" и развернутым структурированным содержанием).
-   - НЕ вызывай search_notes на такие контекстные просьбы!`;
+   - Сформируй обновленный вызов инструмента create_note / schedule_task или блок действия action:create_note.
+   - Если пользователь сообщает дополнительные подробности («требуемые инструменты бритва», «детали:...») — ОБНОВИ черновик задачи/заметки, включив этот текст в поле content.
+   - НЕ вызывай search_notes на такие контекстные просьбы и уточнения!`;
 
   // 1. External LLM Provider with Multi-Step Agentic Tool Calling (Groq / KIE.AI / Gemini)
   const isGroq = settings.provider === 'groq' && Boolean(settings.groqApiKey);
@@ -965,7 +1138,8 @@ ${isInbox
         }
       }
 
-      const { cleanText, suggestedAction } = extractActionBlock(finalContent);
+      const { cleanText, suggestedAction: blockAction } = extractActionBlock(finalContent);
+      const suggestedAction = capturedAction || blockAction;
       return {
         content: cleanText,
         reasoning: accumulatedReasoning || undefined,
@@ -1035,6 +1209,20 @@ ${isInbox
   }
 
   // Check 3: Calendar / Agenda / Relative Dates
+  const isCreateIntent =
+    lowerMsg.includes('созда') ||
+    lowerMsg.includes('добав') ||
+    lowerMsg.includes('сдела') ||
+    lowerMsg.includes('написа') ||
+    lowerMsg.includes('напиш') ||
+    lowerMsg.includes('оформ') ||
+    lowerMsg.includes('преврат') ||
+    lowerMsg.includes('запланир') ||
+    lowerMsg.includes('постав') ||
+    lowerMsg.includes('новая заметка') ||
+    lowerMsg.includes('новую задачу') ||
+    lowerMsg.includes('статью');
+
   const isCalendarQuery =
     (lowerMsg.includes('повестк') ||
     lowerMsg.includes('план') ||
@@ -1052,7 +1240,7 @@ ${isInbox
     !lowerMsg.includes('сколько') &&
     !lowerMsg.includes('статистик');
 
-  if (isCalendarQuery && !lowerMsg.includes('создай') && !lowerMsg.includes('добавь') && !lowerMsg.includes('разбей')) {
+  if (isCalendarQuery && !isCreateIntent && !lowerMsg.includes('разбей')) {
     let targetDate = new Date().toISOString().slice(0, 10);
     let dateLabel = 'сегодня';
     if (lowerMsg.includes('послезавтра')) {
@@ -1131,22 +1319,67 @@ ${isInbox
     };
   }
 
-  // Check 5: Create note, task or article (including contextual transformations)
-  const isCreateIntent =
-    lowerMsg.includes('создай') ||
-    lowerMsg.includes('добавь') ||
-    lowerMsg.includes('сделай') ||
-    lowerMsg.includes('напиши') ||
-    lowerMsg.includes('оформи') ||
-    lowerMsg.includes('преврати') ||
-    lowerMsg.includes('новая заметка') ||
-    lowerMsg.includes('новую задачу') ||
-    lowerMsg.includes('статью');
+  // Check 4.5: Refine existing task/note from context or follow-up details
+  // (e.g. user asking "можешь добавить этой таске подробности" or answering "требуемые инструменты бритва")
+  const recentActionMsg = [...messages].reverse().find(m => m.content && (
+    m.content.includes('[Действие ассистента:') ||
+    m.content.includes('[Подготовлен черновик') ||
+    m.content.includes('Уточните, какие именно подробности') ||
+    m.content.includes('«почистить яйца»')
+  ));
 
+  const isRefineIntent =
+    lowerMsg.includes('подробност') ||
+    lowerMsg.includes('инструмент') ||
+    lowerMsg.includes('детал') ||
+    lowerMsg.includes('измени') ||
+    lowerMsg.includes('уточни') ||
+    lowerMsg.includes('шаг') ||
+    Boolean(recentActionMsg && (recentActionMsg.content.includes('Уточните') || recentActionMsg.content.includes('подробности')));
+
+  if (isRefineIntent && recentActionMsg) {
+    const titleMatch = recentActionMsg.content.match(/[«"]([^»"]+)[»"]/) || recentActionMsg.content.match(/Заголовок:\s*«([^»]+)»/);
+    const existingTitle = titleMatch ? titleMatch[1] : 'почистить яйца';
+
+    const dueMatch = recentActionMsg.content.match(/Срок:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})/);
+    const existingDue = dueMatch ? dueMatch[1] : undefined;
+
+    const details = lastUserMsg.replace(/^(добавь|укажи|запиши|измени|можешь добавить|подробности|детали)\s*/i, '').trim();
+    const suggestedAction: SuggestedAction = {
+      type: existingDue ? 'schedule_task' : 'create_note',
+      title: existingTitle,
+      folder: currentFolder,
+      content: `Подробности:\n- ${details || lastUserMsg}`,
+      dueDate: existingDue,
+      priority: 'medium',
+      tags: ['задачи'],
+      itemType: 'task',
+      actionState: 'suggested',
+    };
+
+    return {
+      content: `Я обновил черновик задачи «${existingTitle}» с указанием подробностей. Нажмите кнопку ниже для подтверждения:`,
+      reasoning: 'Обновлен черновик задачи на основе контекста диалога (Read-Only Safety)',
+      reasoningTimeMs: Date.now() - startTime,
+      suggestedAction,
+    };
+  }
+
+  // Check 5: Create note, task or article (including contextual transformations)
   if (isCreateIntent) {
     const isTask = lowerMsg.includes('задач') || lowerMsg.includes('таск');
     const isArticle = lowerMsg.includes('стать') || lowerMsg.includes('лонгрид');
     const itemType = isArticle ? 'article' : isTask ? 'task' : 'note';
+
+    // Parse relative dueDate if mentioned
+    let dueDate: string | undefined;
+    if (lowerMsg.includes('на завтра') || lowerMsg.includes('завтра')) {
+      dueDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    } else if (lowerMsg.includes('на сегодня') || lowerMsg.includes('сегодня')) {
+      dueDate = new Date().toISOString().slice(0, 10);
+    } else if (lowerMsg.includes('на послезавтра') || lowerMsg.includes('послезавтра')) {
+      dueDate = new Date(Date.now() + 172800000).toISOString().slice(0, 10);
+    }
 
     // Check if user is referencing a previously generated draft ("из этого", "на этот счет", "по этой теме")
     let previousDraftContent = '';
@@ -1171,8 +1404,22 @@ ${isInbox
       }
     }
 
-    const titleMatch = lastUserMsg.match(/["«]([^"»]+)["»]/) || lastUserMsg.split('\n')[0].replace(/(создай|добавь|сделай|напиши|оформи|преврати|новая заметка|новую задачу|статью|из этого)\s*/i, '');
-    const title = previousTitle || (typeof titleMatch === 'string' ? titleMatch : titleMatch?.[1]) || (isArticle ? 'Статья' : isTask ? 'Новая задача' : 'Новая мысль');
+    let title = previousTitle;
+    if (!title) {
+      const quoted = lastUserMsg.match(/["«]([^"»]+)["»]/);
+      if (quoted) {
+        title = quoted[1];
+      } else {
+        const cleaned = lastUserMsg
+          .split('\n')[0]
+          .replace(/^(можешь|пожалуйста|хочу|нужно|надо)\s*/i, '')
+          .replace(/(создай|добавь|сделай|напиши|оформи|преврати|запланируй|новая заметка|новую задачу|таску|задачу|заметку|статью|из этого)\s*/gi, '')
+          .replace(/на\s+(сегодня|завтра|послезавтра)\s*/gi, '')
+          .replace(/^(сделать|создать|добавить|написать|запланировать)\s*/i, '')
+          .trim();
+        title = cleaned || (isArticle ? 'Статья' : isTask ? 'Новая задача' : 'Новая мысль');
+      }
+    }
 
     const cleanContent = previousDraftContent
       ? (previousDraftContent.startsWith('[Подготовлен черновик')
@@ -1181,16 +1428,19 @@ ${isInbox
       : `Создано через Ассистента: ${lastUserMsg}`;
 
     const suggestedAction: SuggestedAction = {
-      type: 'create_note',
+      type: dueDate ? 'schedule_task' : 'create_note',
       title: title.trim(),
       folder: currentFolder,
       content: isArticle ? `# ${title.trim()}\n\n${cleanContent}` : cleanContent,
       tags: isArticle ? ['статьи', 'база-знаний'] : isTask ? ['задачи'] : ['ассистент'],
+      dueDate,
+      priority: isTask ? 'medium' : undefined,
       itemType,
+      actionState: 'suggested',
     };
 
     return {
-      content: `Я подготовил черновик ${isArticle ? 'статьи' : isTask ? 'задачи' : 'заметки'}. Нажмите кнопку ниже для сохранения в хранилище:`,
+      content: `Я подготовил черновик ${isArticle ? 'статьи' : isTask ? (dueDate ? 'задачи в календарь' : 'задачи') : 'заметки'}. Нажмите кнопку ниже для сохранения в хранилище:`,
       reasoning: 'Сформирован черновик записи согласно правилу Read-Only Safety',
       reasoningTimeMs: Date.now() - startTime,
       suggestedAction,
