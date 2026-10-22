@@ -16,7 +16,6 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  ArrowRight,
   BookOpen,
   Search,
   X,
@@ -86,27 +85,6 @@ const InProgressIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h
   </svg>
 );
 
-// Consistent tag dot colors
-const TAG_COLORS = [
-  '#38bdf8', // sky
-  '#818cf8', // indigo
-  '#a855f7', // purple
-  '#f472b6', // pink
-  '#34d399', // emerald
-  '#fbbf24', // amber
-  '#fb7185', // rose
-  '#2dd4bf', // teal
-];
-
-function getTagDotColor(tag: string): string {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) {
-    hash = (hash << 5) - hash + tag.charCodeAt(i);
-    hash |= 0;
-  }
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
-}
-
 function getTaskKey(item: SlagItem): string {
   const digits = item.id.replace(/\D/g, '');
   if (digits.length >= 2) {
@@ -138,7 +116,9 @@ export const KanbanBoard: React.FC = () => {
     setSelectedItem,
     setIsFullscreenEditorOpen,
     openContextMenu,
-    addToast
+    addToast,
+    setActiveTagFilter,
+    activeTagFilter,
   } = useApp();
 
   // Collapsible TRIZ materials dock
@@ -224,21 +204,6 @@ export const KanbanBoard: React.FC = () => {
       status: targetStatus,
     });
     addToast(`«${material.title || 'Заметка'}» преобразована в задачу`, 'success');
-  };
-
-  // Quick Action: Create Linked Task from Material
-  const handleCreateLinkedTask = (material: SlagItem) => {
-    const newTask = saveItem({
-      type: 'task',
-      title: `Задача: ${material.title || 'по материалу'}`,
-      content: `Связано с: [[${material.title || material.id}]]`,
-      folder: currentFolder,
-      status: 'todo',
-      priority: 'medium',
-      linkedItemIds: [material.id],
-      tags: material.tags || [],
-    });
-    addToast(`Создана задача «${newTask.title}»`, 'success');
   };
 
   // Drag and Drop handlers
@@ -435,46 +400,21 @@ export const KanbanBoard: React.FC = () => {
 
                   {/* Tags */}
                   {mat.tags && mat.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 pt-0.5">
-                      {mat.tags.slice(0, 3).map(tag => (
-                        <span
+                    <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
+                      {mat.tags.map(tag => (
+                        <button
                           key={tag}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-mono bg-white/[0.04] text-zinc-400 border border-white/[0.05]"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setActiveTagFilter(activeTagFilter === tag ? null : tag);
+                          }}
+                          className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
                         >
-                          <span
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: getTagDotColor(tag) }}
-                          />
-                          {tag}
-                        </span>
+                          #{tag}
+                        </button>
                       ))}
                     </div>
                   )}
-
-                  {/* Actions footer */}
-                  <div className="pt-1 flex items-center justify-between border-t border-white/[0.04] text-[10px]">
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleConvertToTask(mat, 'todo');
-                      }}
-                      className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 font-medium transition-colors"
-                      title="Трансформировать заметку в задачу"
-                    >
-                      <span>Превратить в задачу</span>
-                      <ArrowRight className="w-2.5 h-2.5" />
-                    </button>
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleCreateLinkedTask(mat);
-                      }}
-                      className="text-zinc-500 hover:text-zinc-300 transition-colors"
-                      title="Создать связанную задачу"
-                    >
-                      + Связать
-                    </button>
-                  </div>
                 </div>
               ))
             )}
@@ -641,20 +581,20 @@ export const KanbanBoard: React.FC = () => {
                           {task.title || 'Безымянная задача'}
                         </div>
 
-                        {/* Tag pills with colored dots */}
+                        {/* Tags */}
                         {task.tags && task.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pt-0.5">
+                          <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
                             {task.tags.map(tag => (
-                              <span
+                              <button
                                 key={tag}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-white/[0.04] border border-white/[0.06] text-zinc-300"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setActiveTagFilter(activeTagFilter === tag ? null : tag);
+                                }}
+                                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
                               >
-                                <span
-                                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                                  style={{ backgroundColor: getTagDotColor(tag) }}
-                                />
-                                <span>{tag}</span>
-                              </span>
+                                #{tag}
+                              </button>
                             ))}
                           </div>
                         )}

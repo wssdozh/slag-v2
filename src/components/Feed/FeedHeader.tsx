@@ -142,8 +142,8 @@ export const FeedHeader: React.FC = () => {
           </div>
         )}
 
-        {/* Tag filter chip if active (feed mode only) */}
-        {activeTagFilter && feedViewMode === 'feed' && (
+        {/* Tag filter chip if active */}
+        {activeTagFilter && (
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 text-white text-[10px] font-mono shrink-0">
             <span>#{activeTagFilter}</span>
             <button
