@@ -1,28 +1,29 @@
 @import "dockview-react/dist/styles/dockview.css";
 
 /*
- * SLAG v2 Linear / Arc Minimal Dark Dockview Theme (95% Contract)
- * Compact 28px height, rounded-t sleek tabs, deep monochrome #09090b, #0c0c0e, #141416
+ * SLAG v2 Linear Minimal Dark Dockview Theme (95% Contract)
+ * Borderless rounded tabs, inline '+' button after tabs, concise close action
  */
 .dockview-theme-slag {
-  --dv-group-view-background-color: #09090b;
+  --dv-group-view-background-color: #08090a;
   --dv-tabs-and-actions-container-background-color: #0c0c0e;
-  --dv-activegroup-visiblepanel-tab-background-color: #141416;
-  --dv-activegroup-hiddenpanel-tab-background-color: #0c0c0e;
-  --dv-inactivegroup-visiblepanel-tab-background-color: #141416;
-  --dv-inactivegroup-hiddenpanel-tab-background-color: #0c0c0e;
+  --dv-activegroup-visiblepanel-tab-background-color: rgba(255, 255, 255, 0.08);
+  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-inactivegroup-visiblepanel-tab-background-color: rgba(255, 255, 255, 0.05);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
 
-  --dv-activegroup-visiblepanel-tab-color: #f4f4f5;
+  --dv-activegroup-visiblepanel-tab-color: #ffffff;
   --dv-activegroup-hiddenpanel-tab-color: #71717a;
-  --dv-inactivegroup-visiblepanel-tab-color: #a1a1aa;
+  --dv-inactivegroup-visiblepanel-tab-color: #e4e4e7;
   --dv-inactivegroup-hiddenpanel-tab-color: #52525b;
 
   --dv-separator-border: 1px solid rgba(255, 255, 255, 0.06);
   --dv-sash-color: rgba(255, 255, 255, 0.06);
   --dv-active-sash-color: rgba(59, 130, 246, 0.6);
   --dv-tab-divider-color: transparent;
-  --dv-tabs-and-actions-container-height: 28px;
+  --dv-tabs-and-actions-container-height: 34px;
   --dv-tabs-and-actions-container-font-size: 11px;
+  --dv-tab-border-radius: 6px;
 
   --dv-drag-over-background-color: rgba(59, 130, 246, 0.15);
   --dv-drag-over-border-color: rgba(59, 130, 246, 0.5);
@@ -30,53 +31,153 @@
 
   --dv-floating-border: 1px solid rgba(255, 255, 255, 0.1);
   --dv-floating-titlebar-background-color: #0c0c0e;
-  --dv-border-radius: 6px;
-  --dv-tab-border-radius: 6px;
-  --dv-sash-border-radius: 0px;
-  --dv-tab-margin: 0px;
+  --dv-border-radius: 8px;
   --dv-icon-hover-background-color: rgba(255, 255, 255, 0.08);
 }
 
+/* Tabs & Actions Bar Header */
+.dockview-theme-slag .dv-tabs-and-actions-container,
 .dockview-theme-slag .dockview-tabs-and-actions-container {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 0 4px;
+  padding: 0 6px;
+  display: flex !important;
+  align-items: center !important;
+  background-color: #0c0c0e;
+  height: 34px !important;
+  box-sizing: border-box;
 }
 
+/* Position '+' button immediately after the last tab */
+.dockview-theme-slag .dv-tabs-and-actions-container .dv-scrollable,
+.dockview-theme-slag .dockview-tabs-and-actions-container .dv-scrollable {
+  order: 1 !important;
+  flex-shrink: 0 !important;
+}
+
+.dockview-theme-slag .dv-tabs-and-actions-container .dv-right-actions-container,
+.dockview-theme-slag .dockview-tabs-and-actions-container .dv-right-actions-container {
+  order: 2 !important;
+  display: flex !important;
+  align-items: center !important;
+  margin-left: 2px !important;
+}
+
+.dockview-theme-slag .dv-tabs-and-actions-container .dv-void-container,
+.dockview-theme-slag .dockview-tabs-and-actions-container .dv-void-container {
+  order: 3 !important;
+  flex-grow: 1 !important;
+}
+
+/* Tabs Row: gaps and clean alignment */
+.dockview-theme-slag .dv-tabs-container,
+.dockview-theme-slag .dockview-tabs-container {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  padding: 0 2px !important;
+  height: 100% !important;
+}
+
+/* Borderless Rounded Tabs */
+.dockview-theme-slag .dv-tab,
 .dockview-theme-slag .dockview-tab {
   font-family: inherit;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em;
+  height: 25px !important;
+  line-height: 25px !important;
+  padding: 0 9px !important;
+  margin: 0 !important;
+  border-radius: 6px !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  color: #71717a !important;
+  transition: all 120ms ease !important;
+  user-select: none;
+  cursor: pointer;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box;
+}
+
+/* Active Tab: Pure surface without borders */
+.dockview-theme-slag .dv-tab.dv-active-tab,
+.dockview-theme-slag .dockview-tab.active,
+.dockview-theme-slag .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Inactive Tab Hover */
+.dockview-theme-slag .dv-tab.dv-inactive-tab:hover,
+.dockview-theme-slag .dockview-tab:hover:not(.active):not(.dv-active-tab) {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  color: #d4d4d8 !important;
+  border: none !important;
+}
+
+/* Tab Content Typography */
+.dockview-theme-slag .dv-tab .dv-default-tab,
+.dockview-theme-slag .dockview-tab .dv-default-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+}
+
+.dockview-theme-slag .dv-tab .dv-default-tab-content,
+.dockview-theme-slag .dockview-tab .dv-default-tab-content {
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: -0.01em;
-  padding: 0 10px;
-  margin: 2px 2px 0 2px;
-  border-radius: 6px 6px 0 0;
-  border: 1px solid transparent;
-  border-bottom: none;
-  color: #71717a;
-  background-color: transparent;
-  transition: all 120ms ease;
-  user-select: none;
+  line-height: 1;
 }
 
-.dockview-theme-slag .dockview-tab.active {
-  background-color: #18181b;
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.dockview-theme-slag .dockview-tab:hover:not(.active) {
-  color: #a1a1aa;
-  background-color: rgba(255, 255, 255, 0.03);
-}
-
+/* Concise & Sleek Close Button */
+.dockview-theme-slag .dv-tab .dv-default-tab-action,
 .dockview-theme-slag .dockview-tab .dockview-tab-close-action {
-  opacity: 0.5;
-  transition: opacity 120ms ease;
-  border-radius: 4px;
-  padding: 1px;
-  margin-left: 4px;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  border-radius: 3px !important;
+  padding: 0 !important;
+  margin-left: 2px !important;
+  opacity: 0.35 !important;
+  transition: all 120ms ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
 }
 
+.dockview-theme-slag .dv-tab .dv-default-tab-action svg,
+.dockview-theme-slag .dockview-tab .dockview-tab-close-action svg,
+.dockview-theme-slag .dv-tab .dv-svg {
+  width: 9px !important;
+  height: 9px !important;
+}
+
+.dockview-theme-slag .dv-tab:hover .dv-default-tab-action,
 .dockview-theme-slag .dockview-tab:hover .dockview-tab-close-action {
-  opacity: 0.9;
+  opacity: 0.65 !important;
+}
+
+.dockview-theme-slag .dv-tab .dv-default-tab-action:hover,
+.dockview-theme-slag .dockview-tab .dockview-tab-close-action:hover {
+  opacity: 1 !important;
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Remove default vertical dividers */
+.dockview-theme-slag .dv-tabs-container.dv-horizontal .dv-tab:not(:first-child)::before,
+.dockview-theme-slag .dv-tabs-container.dv-vertical .dv-tab:not(:first-child)::before {
+  display: none !important;
 }

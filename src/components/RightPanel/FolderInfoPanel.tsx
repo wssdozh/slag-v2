@@ -11,11 +11,9 @@ import {
   StickyNote,
   Sparkles,
   ExternalLink,
-  Bot,
-  Info
+  Folder
 } from 'lucide-react';
 import { AudioPlayer } from '../UI/AudioPlayer';
-import { AssistantChat } from '../Feed/AssistantChat';
 
 export const FolderInfoPanel: React.FC = () => {
   const {
@@ -24,8 +22,6 @@ export const FolderInfoPanel: React.FC = () => {
     filteredItems,
     items,
     setIsRightPanelOpen,
-    rightPanelMode,
-    setRightPanelMode,
     saveFolder,
     setActiveTagFilter,
     addToast,
@@ -93,69 +89,42 @@ export const FolderInfoPanel: React.FC = () => {
     <aside
       className="w-full h-full flex flex-col bg-[#0c0c0e] select-none text-[#a1a1aa] overflow-hidden"
     >
-      {/* Top Header with [ Инфо | Ассистент ] Toggle */}
+      {/* Top Header: Folder info & close button */}
       <div className="h-12 px-3 flex items-center justify-between border-b border-white/[0.04] gap-2">
-        <div className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner w-fit">
-          <button
-            onClick={() => setRightPanelMode('info')}
-            className={`flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
-              rightPanelMode === 'info'
-                ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-            }`}
-            title="Информация и статистика папки"
-          >
-            <Info className="w-3.5 h-3.5 shrink-0" />
-            <span>Инфо</span>
-          </button>
-          <button
-            onClick={() => setRightPanelMode('assistant')}
-            className={`flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
-              rightPanelMode === 'assistant'
-                ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-            }`}
-            title="ИИ-Копилот и Ассистент (⌘J / Ctrl+J)"
-          >
-            <Bot className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-            <span>Ассистент</span>
-          </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span className="text-xs font-semibold text-zinc-200 truncate">
+            {currentFolderMeta?.name || currentFolder}
+          </span>
         </div>
 
         <button
           onClick={() => setIsRightPanelOpen(false)}
-          className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0"
+          className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
           title="Скрыть панель"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      {rightPanelMode === 'assistant' ? (
-        <AssistantChat variant="sidebar" />
-      ) : (
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-          {/* Natural AI Triage button for Inbox in sidebar */}
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+          {/* Compact AI Triage card for Inbox */}
           {isInbox && inboxUnsortedCount > 0 && (
-            <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.08] flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-zinc-100 flex items-center gap-1.5">
+            <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-between gap-2 shadow-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-amber-400/10 flex items-center justify-center shrink-0">
                   <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>ИИ-Сортировка</span>
-                </span>
-                <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-zinc-300">
-                  {inboxUnsortedCount} неразобранных
+                </div>
+                <span className="font-semibold text-xs text-zinc-100 truncate">ИИ-Сортировка</span>
+                <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-zinc-300 shrink-0">
+                  {inboxUnsortedCount}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Автоматически распределить заметки по смыслу в подходящие папки хранилища.
-              </p>
               <button
                 onClick={() => setIsTriageModalOpen(true)}
-                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors shadow-sm"
+                className="px-2.5 py-1 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors shadow-sm shrink-0 cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Запустить AI Triage</span>
+                Запустить
               </button>
             </div>
           )}
@@ -391,8 +360,7 @@ export const FolderInfoPanel: React.FC = () => {
             )}
           </div>
         </div>
-        </div>
-      )}
+      </div>
     </aside>
   );
 };

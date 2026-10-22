@@ -3,8 +3,6 @@ import { useApp } from '../../context/AppContext';
 import {
   Folder,
   Inbox,
-  Sparkles,
-  PanelRight,
   CheckSquare,
   FileText,
   StickyNote,
@@ -29,9 +27,7 @@ export const FeedHeader: React.FC = () => {
     activeTagFilter,
     setActiveTagFilter,
     aiItemFilter,
-    clearAiFilter,
-    isRightPanelOpen,
-    setIsRightPanelOpen
+    clearAiFilter
   } = useApp();
 
   const folderMeta = folders.find(f => f.path === currentFolder);
@@ -88,6 +84,56 @@ export const FeedHeader: React.FC = () => {
               title="Только распределенные по папкам"
             >
               Разобранные
+            </button>
+          </div>
+        )}
+
+        {/* Type filters (feed mode only) - placed next to Inbox filter */}
+        {feedViewMode === 'feed' && (
+          <div aria-label="Фильтр по типу" className="flex items-center h-7.5 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] ml-1 shrink-0">
+            <button
+              onClick={() => setActiveTypeFilter('all')}
+              className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                activeTypeFilter === 'all'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+              }`}
+              title="Все типы записей"
+            >
+              Все
+            </button>
+            <button
+              onClick={() => setActiveTypeFilter('note')}
+              className={`h-6.5 px-1.5 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
+                activeTypeFilter === 'note'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+              }`}
+              title="Только заметки"
+            >
+              <StickyNote className="w-3.5 h-3.5 text-zinc-300" />
+            </button>
+            <button
+              onClick={() => setActiveTypeFilter('task')}
+              className={`h-6.5 px-1.5 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
+                activeTypeFilter === 'task'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+              }`}
+              title="Только таски"
+            >
+              <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+            <button
+              onClick={() => setActiveTypeFilter('article')}
+              className={`h-6.5 px-1.5 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
+                activeTypeFilter === 'article'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+              }`}
+              title="Только статьи"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
             </button>
           </div>
         )}
@@ -158,87 +204,7 @@ export const FeedHeader: React.FC = () => {
           >
             <Calendar className="w-3.5 h-3.5 shrink-0" />
           </button>
-          <button
-            onClick={() => setFeedViewMode('assistant')}
-            className={`h-7 px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
-              feedViewMode === 'assistant'
-                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-            }`}
-            title="Ассистент"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-          </button>
         </nav>
-
-        {/* Type filters (feed mode only) */}
-        {feedViewMode === 'feed' && (
-          <div aria-label="Фильтр по типу" className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
-            <button
-              onClick={() => setActiveTypeFilter('all')}
-              className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                activeTypeFilter === 'all'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-              }`}
-              title="Все типы записей"
-            >
-              Все
-            </button>
-            <button
-              onClick={() => setActiveTypeFilter('note')}
-              className={`h-7 px-2 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
-                activeTypeFilter === 'note'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-              }`}
-              title="Только заметки"
-            >
-              <StickyNote className="w-3.5 h-3.5 text-zinc-300" />
-            </button>
-            <button
-              onClick={() => setActiveTypeFilter('task')}
-              className={`h-7 px-2 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
-                activeTypeFilter === 'task'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-              }`}
-              title="Только таски"
-            >
-              <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
-            </button>
-            <button
-              onClick={() => setActiveTypeFilter('article')}
-              className={`h-7 px-2 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
-                activeTypeFilter === 'article'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-              }`}
-              title="Только статьи"
-            >
-              <FileText className="w-3.5 h-3.5 text-blue-400" />
-            </button>
-          </div>
-        )}
-
-        {/* Toggle Right Panel (opens assistant or info) */}
-        <button
-          onClick={() => {
-            if (!isRightPanelOpen) {
-              setIsRightPanelOpen(true);
-            } else {
-              setIsRightPanelOpen(false);
-            }
-          }}
-          className={`p-1.5 rounded transition-colors shrink-0 ${
-            isRightPanelOpen
-              ? 'text-white bg-white/10'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-          }`}
-          title="Боковая панель (⌘J / Ctrl+J)"
-        >
-          <PanelRight className="w-4 h-4" />
-        </button>
       </div>
     </header>
   );

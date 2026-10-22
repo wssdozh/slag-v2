@@ -264,31 +264,32 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
   });
 
-  test('10. Toggle Assistant Mode via Header Button and Shortcut (Ctrl+J)', async ({ page }) => {
-    // 1. Click on Assistant icon button in center header
-    const assistantBtn = page.locator('header button[title*="Ассистент"]');
-    await expect(assistantBtn).toBeVisible();
-    await assistantBtn.click();
+  test('10. Toggle Assistant Mode via Dockview Tab and Panel Navigation', async ({ page }) => {
+    // 1. Click on Assistant tab in right group
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await expect(assistantTab).toBeVisible();
+    await assistantTab.click();
 
     // Verify Assistant view is active
-    await expect(page.locator('text=Все хранилище').first()).toBeVisible();
+    await expect(page.locator('textarea[placeholder*="Спросите"]').first()).toBeVisible();
 
-    // 2. Toggle to Feed via icon button
-    await page.locator('header button[title*="Лента"]').click();
-    await expect(page.locator('main textarea[placeholder*="Мысль, заметка или код"]')).toBeVisible();
+    // 2. Switch to Info tab in same group
+    const infoTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Инфо' }).first();
+    await expect(infoTab).toBeVisible();
+    await infoTab.click();
 
-    // 3. Toggle Right Panel Assistant via shortcut Ctrl+J
-    await page.keyboard.press('Control+j');
-    const rightPanel = page.locator('aside').last();
-    await expect(rightPanel.locator('text=Ассистент').first()).toBeVisible();
+    // 3. Switch back to Assistant tab
+    await assistantTab.click();
+    await expect(page.locator('textarea[placeholder*="Спросите"]').first()).toBeVisible();
   });
 
   test('11. Assistant Tool Calling (get_vault_stats) and Reasoning Accordion', async ({ page }) => {
-    // Switch to Assistant in center
-    await page.locator('header button[title*="Ассистент"]').click();
+    // Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
 
     // Click quick prompt for vault stats
-    const statsPromptBtn = page.locator('button', { hasText: 'Сводка хранилища' });
+    const statsPromptBtn = page.locator('button', { hasText: 'Сводка хранилища' }).first();
     await expect(statsPromptBtn).toBeVisible();
     await statsPromptBtn.click();
 
@@ -307,11 +308,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('12. Assistant Draft Note Generation and Creation', async ({ page }) => {
-    // Switch to Assistant in center
-    await page.locator('header button[title*="Ассистент"]').click();
+    // Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
 
     // Ask to create a task
-    const textarea = page.locator('main textarea[placeholder*="Спросите"]');
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
     await textarea.fill('Создай новую задачу "Проверить Groq API"');
     await textarea.press('Enter');
 
@@ -327,26 +329,25 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Verify toast notification
     await expect(page.locator('text=Запись «Проверить Groq API» сохранена')).toBeVisible();
 
-    // Switch back to Feed and verify the task exists in the feed!
-    await page.locator('header button[title*="Лента"]').click();
+    // Verify the task exists in the feed!
     await expect(page.locator('.group', { hasText: 'Проверить Groq API' })).toBeVisible();
   });
 
-  test('13. Right Sidebar Assistant & Feed Filtering', async ({ page }) => {
-    // Open Assistant mode in right sidebar
-    const assistantTab = page.locator('button[title*="Ассистент"]').last();
+  test('13. Assistant Feed Filtering with AI Chip', async ({ page }) => {
+    // Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
     await assistantTab.click();
 
-    // Verify sidebar assistant is visible
-    const sidebarTextarea = page.locator('aside textarea[placeholder*="Спросите"]');
-    await expect(sidebarTextarea).toBeVisible();
+    // Verify assistant is visible
+    const assistantTextarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(assistantTextarea).toBeVisible();
 
     // Ask to search design notes
-    await sidebarTextarea.fill('дизайн');
-    await sidebarTextarea.press('Enter');
+    await assistantTextarea.fill('дизайн');
+    await assistantTextarea.press('Enter');
 
     // Wait for search result with "Показать в ленте" button
-    const filterBtn = page.locator('aside button', { hasText: /Показать \d+ в ленте/ });
+    const filterBtn = page.locator('button', { hasText: /Показать \d+ в ленте/ }).first();
     await expect(filterBtn).toBeVisible();
     await filterBtn.click();
 
@@ -394,31 +395,25 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('15. Visual Layout Screenshots of Assistant Views for Agent Audit', async ({ page }) => {
-    // 1. Right sidebar assistant screenshot
-    const assistantTab = page.locator('aside button[title*="Ассистент"]').last();
+    // 1. Right Assistant panel screenshot
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
     await assistantTab.click();
+    await expect(page.locator('textarea[placeholder*="Спросите"]').first()).toBeVisible();
+
     await page.screenshot({
       path: 'test-results/screenshots/assistant-sidebar-layout.png',
-      fullPage: false,
-    });
-
-    // 2. Center full-screen assistant screenshot
-    await page.locator('header button[title*="Ассистент"]').click();
-    await expect(page.locator('text=Все хранилище').first()).toBeVisible();
-
-    await page.screenshot({
-      path: 'test-results/screenshots/assistant-chat-view.png',
       fullPage: false,
     });
   });
 
   test('16. Assistant Pure Chat Dialogue, Quick Prompts, and Interactive Draft Generation', async ({ page }) => {
-    // 1. Open Center Assistant view
-    await page.locator('header button[title*="Ассистент"]').click();
+    // 1. Open Assistant view
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
     await expect(page.locator('text=Все хранилище').first()).toBeVisible();
 
     // 2. Send a message via quick prompt
-    await page.locator('button', { hasText: 'Сводка хранилища' }).click();
+    await page.locator('button', { hasText: 'Сводка хранилища' }).first().click();
     // Wait for assistant response to appear
     await expect(page.locator('text=SLAG').first()).toBeVisible({ timeout: 5000 });
 
@@ -429,7 +424,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
 
     // 3. Send a prompt that generates suggestedAction (Draft task)
-    const textarea = page.locator('main textarea');
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
     await textarea.fill('Создай новую задачу: Проверить синхронизацию заметок');
     await textarea.press('Enter');
     await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible({ timeout: 5000 });

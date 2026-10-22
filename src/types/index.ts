@@ -89,7 +89,7 @@ export interface AiSettings {
 }
 
 export type InboxMode = 'unsorted' | 'all' | 'sorted';
-export type FeedViewMode = 'feed' | 'kanban' | 'calendar' | 'assistant';
+export type FeedViewMode = 'feed' | 'kanban' | 'calendar';
 export type RightPanelMode = 'info' | 'assistant';
 
 export interface AiItemFilter {

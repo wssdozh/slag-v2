@@ -36,8 +36,6 @@ const DynamicFeedPanel: React.FC = () => {
         <KanbanBoard />
       ) : feedViewMode === 'calendar' ? (
         <CalendarView />
-      ) : feedViewMode === 'assistant' ? (
-        <AssistantChat variant="center" />
       ) : (
         <>
           <FeedList />
@@ -138,10 +136,10 @@ const GroupHeaderActions: React.FC<any> = (props) => {
   };
 
   return (
-    <div className="relative flex items-center h-full px-1">
+    <div className="relative flex items-center h-full px-0.5">
       <button
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-5 h-5 rounded hover:bg-white/[0.1] text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+        className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
         title="Добавить вкладку в эту группу"
       >
         <Plus className="w-3.5 h-3.5" />
@@ -150,7 +148,7 @@ const GroupHeaderActions: React.FC<any> = (props) => {
       {isOpen && (
         <div
           ref={menuRef}
-          className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-2xl py-1 z-50 animate-in fade-in duration-100"
+          className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-2xl py-1 z-50 animate-in fade-in duration-100"
         >
           <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04]">
             Добавить вкладку
@@ -180,7 +178,7 @@ export const WorkspaceShell: React.FC = () => {
   const applyDefaultLayout = useCallback((api: DockviewApi) => {
     api.clear();
 
-    // 1. Center workspace panel (DynamicFeedPanel: Feed / Kanban / Calendar / Assistant)
+    // 1. Center workspace panel (DynamicFeedPanel: Feed / Kanban / Calendar)
     const centerPanel = api.addPanel({
       id: 'panel_feed',
       component: 'feed',

@@ -50,7 +50,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, isSidebar ? 120 : 160)}px`;
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const targetHeight = Math.max(28, Math.min(scrollHeight || 28, isSidebar ? 120 : 160));
+      textareaRef.current.style.height = `${targetHeight}px`;
     }
   }, [input, isSidebar]);
 
@@ -135,9 +137,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       </div>
 
       {/* Messages Stream */}
-      <div className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3.5 ${isSidebar ? 'text-[11px]' : 'p-4 gap-4'}`}>
+      <div className={`flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3.5 ${isSidebar ? 'text-[11px]' : 'p-4 gap-4'}`}>
         {chatMessages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
             <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-300 mb-2.5">
               <Sparkles className="w-4 h-4 text-amber-300" />
             </div>
@@ -338,7 +340,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 : `Спросите о заметках папки «${folderMeta?.name || currentFolder}»... (Enter для отправки)`
             }
             rows={1}
-            className="w-full bg-transparent text-xs text-white placeholder-zinc-500 resize-none outline-none border-none leading-relaxed"
+            className="w-full min-h-[28px] bg-transparent text-xs text-white placeholder-zinc-500 resize-none outline-none border-none leading-relaxed"
           />
 
           {/* Controls Bar: Reasoning selector + Web Search toggle + Send */}

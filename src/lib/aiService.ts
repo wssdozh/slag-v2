@@ -39,28 +39,45 @@ function formatTag(tag: string, style: 'lowercase' | 'kebab-case'): string {
  */
 export async function generateSmartTags(content: string, settings: AiSettings): Promise<string[]> {
   const existingTags = storage.getAllExistingTags();
-  const maxTags = settings.maxTagsPerNote || 3;
+  const maxTags = settings.maxTagsPerNote || 4;
   const style = settings.tagCaseStyle || 'lowercase';
+
+  // Extract explicit inline #hashtags from content first
+  const inlineHashtagRegex = /#([\p{L}\p{N}_-]+)/gu;
+  const explicitHashtags: string[] = [];
+  let hashtagMatch: RegExpExecArray | null;
+  while ((hashtagMatch = inlineHashtagRegex.exec(content)) !== null) {
+    const clean = formatTag(hashtagMatch[1], style);
+    if (clean && !explicitHashtags.includes(clean)) {
+      explicitHashtags.push(clean);
+    }
+  }
+
+  const baseInstructions = `Ты — экспертный таксономист персональной базы знаний.
+Твоя задача — подобрать от 1 до ${maxTags} наиболее точных и содержательных тегов для заметки.
+
+СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
+[${existingTags.join(', ')}]
+${explicitHashtags.length > 0 ? `ХЕШТЕГИ В ТЕКСТЕ: [${explicitHashtags.join(', ')}]` : ''}
+
+ИНСТРУКЦИЯ И ШАГИ РАССУЖДЕНИЯ (REASONING):
+1. ОПРЕДЕЛЕНИЕ СУТИ: Выдели ключевые темы, стек, сущности или предметную область (например: геймдев, unity, c#, frontend, финансы, здоровье, менеджмент).
+2. ПРИОРИТЕТ СУЩЕСТВУЮЩИХ: Если в словаре есть тег, который ТОЧНО и ПРЯМО соответствует теме (например, 'идея', 'дизайн'), используй его. Не создавай грамматических дубликатов (если есть 'дизайн', не создавай 'дизайны').
+3. СМЕЛОЕ СОЗДАНИЕ НОВЫХ ТЕГОВ: НЕ БОЙСЯ создавать новые теги! Если в словаре нет тегов для специфичной технологии, проекта или инструмента (например, 'юнити', 'unity', 'csharp', 'шарп', 'игры', 'blender', 'react', 'инвестиции') — ОБЯЗАТЕЛЬНО создавай новый тег. Не притягивай за уши неподходящие общие теги из словаря (например, не ставь 'дизайн' на технический код, если это не UI).
+4. ХЕШТЕГИ АВТОРА: Если в тексте есть хештеги (#тег), они отражают прямое намерение пользователя — включи их в приоритетном порядке.
+5. ФОРМАТ: ${style === 'kebab-case' ? 'kebab-case без пробелов' : 'строчные буквы без символа #'}. От 1 до ${maxTags} лучших тегов.
+${settings.customTagRules ? `Пользовательские правила: ${settings.customTagRules}` : ''}
+
+Ответь СТРОГО в формате JSON:
+{
+  "reasoning": "Кратко: о чем заметка, какие теги из словаря реально подходят и почему созданы новые теги",
+  "tags": ["тег1", "тег2"]
+}`;
 
   // 1. Groq Provider (e.g. openai/gpt-oss-120b, llama-3.3-70b-versatile)
   if (settings.provider === 'groq' && settings.groqApiKey) {
     try {
       const model = settings.model || 'openai/gpt-oss-120b';
-      const prompt = `Ты — строгий классификатор метаданных без права на разговорную речь.
-Твоя задача — подобрать от 1 до ${maxTags} точных тегов для заметки.
-
-СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
-[${existingTags.join(', ')}]
-
-ПРАВИЛА ТАКСОНОМИИ:
-1. В ПЕРВУЮ ОЧЕРЕДЬ выбери подходящие теги из существующего списка выше.
-2. Не создавай синонимы уже имеющихся тегов.
-${settings.allowNewTags ? '3. Новый тег создавай ТОЛЬКО если тема принципиально отсутствует в словаре (не более 1 нового тега).' : '3. Создание новых тегов СТРОГО ЗАПРЕЩЕНО. Выбирай исключительно из словаря.'}
-4. Формат тегов: ${style === 'kebab-case' ? 'kebab-case без пробелов' : 'строчные буквы без символа #'}.
-${settings.customTagRules ? `Пользовательские правила: ${settings.customTagRules}` : ''}
-
-Ответь ТОЛЬКО валидным JSON объектом вида: { "tags": ["тег1", "тег2"] }`;
-
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -70,10 +87,10 @@ ${settings.customTagRules ? `Пользовательские правила: ${
         body: JSON.stringify({
           model,
           messages: [
-            { role: 'system', content: prompt },
-            { role: 'user', content: content.slice(0, 1500) },
+            { role: 'system', content: baseInstructions },
+            { role: 'user', content: content.slice(0, 2000) },
           ],
-          temperature: 0.1,
+          temperature: 0.2,
           response_format: { type: 'json_object' },
         }),
       });
@@ -83,12 +100,15 @@ ${settings.customTagRules ? `Пользовательские правила: ${
         const rawContent = data.choices?.[0]?.message?.content;
         if (rawContent) {
           const parsed = JSON.parse(rawContent);
-          const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || []);
+          if (parsed.reasoning) {
+            console.info('[AI SmartTags reasoning]:', parsed.reasoning);
+          }
+          const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
           const formatted = rawTags
             .map(t => formatTag(String(t), style))
-            .filter(Boolean)
-            .slice(0, maxTags);
-          if (formatted.length > 0) return formatted;
+            .filter(Boolean);
+          const combined = Array.from(new Set([...explicitHashtags, ...formatted])).slice(0, maxTags);
+          if (combined.length > 0) return combined;
         }
       }
     } catch (err) {
@@ -102,24 +122,11 @@ ${settings.customTagRules ? `Пользовательские правила: ${
       const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.geminiApiKey}`;
 
-      const prompt = `Ты — строгий классификатор метаданных без права на разговорную речь.
-Подобрать от 1 до ${maxTags} точных тегов для заметки.
-
-Словарь существующих тегов: [${existingTags.join(', ')}]
-Правила:
-1. В ПЕРВУЮ ОЧЕРЕДЬ используй подходящие теги из существующего списка. Не плоди синонимы.
-${settings.allowNewTags ? '2. Новый тег создавай ТОЛЬКО если тема принципиально новая.' : '2. Новый тег создавать ЗАПРЕЩЕНО. Бери строго из словаря.'}
-3. Ответь ТОЛЬКО валидным JSON-массивом строк в нижнем регистре без символа '#'. Пример: ["дизайн", "react"]
-${settings.customTagRules ? `Пользовательские правила: ${settings.customTagRules}` : ''}
-
-Текст заметки:
-${content.slice(0, 1500)}`;
-
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts: [{ text: `${baseInstructions}\n\nТекст заметки:\n${content.slice(0, 2000)}` }] }],
           generationConfig: {
             temperature: 0.2,
             responseMimeType: 'application/json',
@@ -132,13 +139,15 @@ ${content.slice(0, 1500)}`;
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           const parsed = JSON.parse(text);
-          if (Array.isArray(parsed)) {
-            const formatted = parsed
-              .map(t => formatTag(String(t), style))
-              .filter(Boolean)
-              .slice(0, maxTags);
-            if (formatted.length > 0) return formatted;
+          if (parsed.reasoning) {
+            console.info('[AI SmartTags reasoning]:', parsed.reasoning);
           }
+          const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
+          const formatted = rawTags
+            .map(t => formatTag(String(t), style))
+            .filter(Boolean);
+          const combined = Array.from(new Set([...explicitHashtags, ...formatted])).slice(0, maxTags);
+          if (combined.length > 0) return combined;
         }
       }
     } catch (err) {
@@ -148,34 +157,45 @@ ${content.slice(0, 1500)}`;
 
   // 3. Fallback Local Heuristic Tagger
   const lowerContent = content.toLowerCase();
-  const matchedExisting = existingTags.filter(t => {
-    return lowerContent.includes(t.toLowerCase());
-  });
+  const candidateTags: string[] = [...explicitHashtags];
 
-  if (matchedExisting.length > 0) {
-    return matchedExisting.map(t => formatTag(t, style)).slice(0, maxTags);
+  // Matched existing tags (if specifically mentioned in content as whole word)
+  for (const t of existingTags) {
+    const cleanT = t.toLowerCase();
+    const wordRegex = new RegExp(`(^|[\\s#.,!?()\\[\\]])${cleanT}([\\s#.,!?()\\[\\]]|$)`, 'i');
+    if (wordRegex.test(lowerContent) && !candidateTags.includes(cleanT)) {
+      candidateTags.push(cleanT);
+    }
   }
 
-  // Common keywords heuristics
-  const heuristicTags: string[] = [];
+  // Domain keywords heuristics for new tags
+  if (lowerContent.includes('юнити') || lowerContent.includes('unity')) {
+    candidateTags.push('юнити');
+  }
+  if (lowerContent.includes('игра') || lowerContent.includes('игр') || lowerContent.includes('game')) {
+    candidateTags.push('игры');
+  }
+  if (lowerContent.includes('шарп') || lowerContent.includes('c#') || lowerContent.includes('csharp')) {
+    candidateTags.push('csharp');
+  }
   if (lowerContent.includes('купить') || lowerContent.includes('магазин') || lowerContent.includes('руб')) {
-    heuristicTags.push('покупки');
+    candidateTags.push('покупки');
   }
   if (lowerContent.includes('код') || lowerContent.includes('api') || lowerContent.includes('react') || lowerContent.includes('bug')) {
-    heuristicTags.push('разработка');
+    candidateTags.push('разработка');
   }
   if (lowerContent.includes('идея') || lowerContent.includes('стартап') || lowerContent.includes('фича')) {
-    heuristicTags.push('идеи');
+    candidateTags.push('идея');
   }
   if (lowerContent.includes('сделать') || lowerContent.includes('задача') || lowerContent.includes('дедлайн')) {
-    heuristicTags.push('задачи');
+    candidateTags.push('задачи');
   }
   if (lowerContent.includes('дизайн') || lowerContent.includes('ui') || lowerContent.includes('ux')) {
-    heuristicTags.push('дизайн');
+    candidateTags.push('дизайн');
   }
 
-  const result = heuristicTags.length > 0 ? heuristicTags : ['заметка'];
-  return result.map(t => formatTag(t, style)).slice(0, maxTags);
+  const result = candidateTags.length > 0 ? candidateTags : ['заметка'];
+  return Array.from(new Set(result.map(t => formatTag(t, style)).filter(Boolean))).slice(0, maxTags);
 }
 
 /**
