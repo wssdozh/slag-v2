@@ -9,6 +9,7 @@ import { TriageModal } from './components/Modals/TriageModal';
 import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
+import { LogModal } from './components/Logs/LogModal';
 
 const AppContent: React.FC = () => {
   const {
@@ -31,6 +32,7 @@ const AppContent: React.FC = () => {
       <SettingsModal />
       <FolderModal />
       <TriageModal />
+      <LogModal />
       <ToastContainer />
       <ImageLightbox
         images={lightboxImages}

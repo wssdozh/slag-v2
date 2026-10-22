@@ -494,6 +494,10 @@ export const SettingsModal: React.FC = () => {
                     <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Cmd / Ctrl + J</kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                    <span className="text-zinc-400">Системные логи & HUD</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Cmd / Ctrl + `</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
                     <span className="text-zinc-400">Отправить запись</span>
                     <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Enter</kbd>
                   </div>

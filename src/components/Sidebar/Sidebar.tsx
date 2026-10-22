@@ -10,7 +10,8 @@ import {
   ChevronDown,
   Check,
   PlusCircle,
-  FolderSync
+  FolderSync,
+  Terminal
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -22,6 +23,7 @@ export const Sidebar: React.FC = () => {
     items,
     setIsSearchOpen,
     setIsSettingsOpen,
+    setIsLogViewerOpen,
     openCreateFolderModal,
     switchVault,
     createVault,
@@ -208,6 +210,16 @@ export const Sidebar: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Logs HUD button */}
+        <button
+          onClick={() => setIsLogViewerOpen(true)}
+          className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors shrink-0"
+          title="Системные логи & HUD (Ctrl + `)"
+          data-testid="sidebar-logs-btn"
+        >
+          <Terminal className="w-4 h-4" />
+        </button>
 
         {/* Settings button */}
         <button

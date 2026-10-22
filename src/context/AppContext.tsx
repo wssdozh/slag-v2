@@ -1,5 +1,5 @@
 /* oxlint-disable react/only-export-components */
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type {
   SlagItem,
   FolderMeta,
@@ -15,6 +15,7 @@ import type {
 } from '../types';
 import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
+import { logger } from '../lib/logger';
 
 interface ToastMessage {
   id: string;
@@ -50,6 +51,7 @@ interface AppContextType {
   isFullscreenEditorOpen: boolean;
   isSearchOpen: boolean;
   isSettingsOpen: boolean;
+  isLogViewerOpen: boolean;
   isFolderModalOpen: boolean;
   editingFolder: FolderMeta | null;
   isTriageModalOpen: boolean;
@@ -96,6 +98,7 @@ interface AppContextType {
   setIsFullscreenEditorOpen: (open: boolean) => void;
   setIsSearchOpen: (open: boolean) => void;
   setIsSettingsOpen: (open: boolean) => void;
+  setIsLogViewerOpen: (open: boolean) => void;
   openCreateFolderModal: (parentPath?: string) => void;
   openEditFolderModal: (folder: FolderMeta) => void;
   closeFolderModal: () => void;
@@ -182,6 +185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isFullscreenEditorOpen, setIsFullscreenEditorOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isLogViewerOpen, setIsLogViewerOpen] = useState<boolean>(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [editingFolder, setEditingFolder] = useState<FolderMeta | null>(null);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState<boolean>(false);
@@ -226,6 +230,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addToast = useCallback((text: string, type: 'info' | 'success' | 'error' = 'info') => {
     const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
     setToasts(prev => [...prev, { id, text, type }]);
+    logger.log(type === 'error' ? 'error' : 'info', 'UI', `Toast: ${text}`);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 2800);
@@ -240,6 +245,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVaults(storage.getVaults());
     setFolders(storage.getFolders());
     setItems(storage.getItems());
+  }, []);
+
+  // Application Startup Log (guarded against React StrictMode double invocation)
+  const hasLoggedInitRef = useRef(false);
+  useEffect(() => {
+    if (hasLoggedInitRef.current) return;
+    hasLoggedInitRef.current = true;
+    const currentVault = storage.getCurrentVault();
+    const currentItems = storage.getItems();
+    const currentFolders = storage.getFolders();
+    logger.info('APP', 'SLAG v2 application initialized', {
+      vault: currentVault.name,
+      itemsCount: currentItems.length,
+      foldersCount: currentFolders.length,
+    });
   }, []);
 
   // Listen to window storage events if multi-window sync is used
@@ -257,7 +277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setContextMenu(null);
   }, []);
 
-  // Strict Layered Dismiss Stack for Escape key
+  // Strict Layered Dismiss Stack for Escape key & Global Hotkeys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -266,14 +286,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
+      if ((e.metaKey || e.ctrlKey) && (e.key === '`' || e.key === '~' || e.key === 'ё' || e.key === 'Ё')) {
+        e.preventDefault();
+        setIsLogViewerOpen(prev => !prev);
+        return;
+      }
+
       if (e.key === 'Escape') {
-        // Hierarchy of layered closing: Lightbox -> ContextMenu -> FolderModal/TriageModal/SettingsModal -> SearchModal -> FullscreenEditor
+        // Hierarchy of layered closing: Lightbox -> ContextMenu -> LogViewer -> FolderModal/TriageModal/SettingsModal -> SearchModal -> FullscreenEditor
         if (activeLightboxIndex !== null) {
           e.preventDefault();
           closeLightbox();
         } else if (contextMenu) {
           e.preventDefault();
           closeContextMenu();
+        } else if (isLogViewerOpen) {
+          e.preventDefault();
+          setIsLogViewerOpen(false);
         } else if (isFolderModalOpen) {
           e.preventDefault();
           setIsFolderModalOpen(false);
@@ -303,6 +332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activeLightboxIndex,
     closeLightbox,
     contextMenu,
+    isLogViewerOpen,
     isFolderModalOpen,
     isTriageModalOpen,
     isSettingsOpen,
@@ -719,6 +749,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsFullscreenEditorOpen,
         setIsSearchOpen,
         setIsSettingsOpen,
+        isLogViewerOpen,
+        setIsLogViewerOpen,
         openCreateFolderModal,
         openEditFolderModal,
         closeFolderModal,
