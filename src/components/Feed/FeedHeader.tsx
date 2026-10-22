@@ -35,24 +35,12 @@ export const FeedHeader: React.FC = () => {
   const isInbox = currentFolder === 'Входящие';
 
   return (
-    <header className="h-12 px-4 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-3 select-none shrink-0">
-      {/* Folder Breadcrumb & Title */}
-      <div className="flex items-center gap-2 min-w-0 shrink-0">
-        {isInbox ? (
-          <Inbox className="w-4 h-4 text-zinc-300 shrink-0" />
-        ) : (
-          <Folder className="w-4 h-4 text-zinc-400 shrink-0" />
-        )}
-        <h2 className="text-xs font-semibold text-zinc-100 tracking-tight shrink-0">
-          {folderMeta?.name || currentFolder}
-        </h2>
-        <span className="text-[11px] font-mono text-zinc-500 shrink-0">
-          ({filteredItems.length})
-        </span>
-
+    <header className="h-12 px-4 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-3 select-none shrink-0 relative">
+      {/* Left: Filter Controls & Chips */}
+      <div className="flex items-center gap-2 shrink-0 z-10 min-w-0">
         {/* Inbox Sub-mode Filter (SPEC §8.2) - only in feed mode */}
         {isInbox && feedViewMode === 'feed' && (
-          <div aria-label="Фильтр входящих" className="flex items-center h-7.5 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] ml-2 shrink-0">
+          <div aria-label="Фильтр входящих" className="flex items-center h-7.5 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
             <button
               onClick={() => setInboxMode('all')}
               className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
@@ -89,9 +77,9 @@ export const FeedHeader: React.FC = () => {
           </div>
         )}
 
-        {/* Type filters (feed mode only) - placed next to Inbox filter */}
+        {/* Type filters (feed mode only) */}
         {feedViewMode === 'feed' && (
-          <div aria-label="Фильтр по типу" className="flex items-center h-7.5 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] ml-1 shrink-0">
+          <div aria-label="Фильтр по типу" className="flex items-center h-7.5 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
             <button
               onClick={() => setActiveTypeFilter('all')}
               className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
@@ -168,8 +156,25 @@ export const FeedHeader: React.FC = () => {
         )}
       </div>
 
+      {/* Center: Large prominent folder title in the center of the bar */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-auto px-2">
+          {isInbox ? (
+            <Inbox className="w-4.5 h-4.5 text-zinc-300 shrink-0" />
+          ) : (
+            <Folder className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
+          )}
+          <h2 className="text-sm font-bold text-zinc-100 tracking-tight">
+            {folderMeta?.name || currentFolder}
+          </h2>
+          <span className="text-xs font-mono text-zinc-500">
+            ({filteredItems.length})
+          </span>
+        </div>
+      </div>
+
       {/* Center / Right Controls */}
-      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+      <div className="flex items-center gap-1.5 shrink-0 ml-auto z-10">
         {/* Unified View Mode Switcher: Icon-only Linear-grade segmented control */}
         <nav aria-label="Режимы представления" className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
           <button

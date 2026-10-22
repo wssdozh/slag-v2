@@ -178,7 +178,18 @@ const GroupHeaderActions: React.FC<any> = (props) => {
 };
 
 export const WorkspaceShell: React.FC = () => {
+  const { currentFolder } = useApp();
   const apiRef = useRef<DockviewApi | null>(null);
+
+  // Dynamically update feed panel tab title to match currentFolder
+  useEffect(() => {
+    if (apiRef.current) {
+      const feedPanels = apiRef.current.panels.filter(
+        p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_')
+      );
+      feedPanels.forEach(p => p.api.setTitle(currentFolder || 'Входящие'));
+    }
+  }, [currentFolder]);
 
   // Safety cleaner for stale Dockview drag-and-drop ghost overlays
   useEffect(() => {
@@ -222,7 +233,7 @@ export const WorkspaceShell: React.FC = () => {
     const centerPanel = api.addPanel({
       id: 'panel_feed',
       component: 'feed',
-      title: 'Лента',
+      title: currentFolder || 'Входящие',
     });
 
     // 2. Left navigation sidebar
@@ -249,7 +260,7 @@ export const WorkspaceShell: React.FC = () => {
       title: 'Инфо',
       position: { referencePanel: assistantPanel },
     });
-  }, []);
+  }, [currentFolder]);
 
   const onReady = (event: DockviewReadyEvent) => {
     apiRef.current = event.api;
@@ -289,6 +300,12 @@ export const WorkspaceShell: React.FC = () => {
     if (!restored) {
       applyDefaultLayout(event.api);
     }
+
+    // Ensure feed panel tab reflects current folder
+    const feedPanels = event.api.panels.filter(
+      p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_')
+    );
+    feedPanels.forEach(p => p.api.setTitle(currentFolder || 'Входящие'));
   };
 
   return (
