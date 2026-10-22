@@ -125,7 +125,7 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
         border: 'border-white/[0.08]',
         text: 'text-zinc-200',
         dot: 'bg-zinc-500',
-        checkboxHover: 'hover:border-[#e44332] hover:bg-[#e44332]/20 text-[#e44332]',
+        checkboxHover: 'hover:border-zinc-300 hover:bg-white/[0.08] text-zinc-300',
       };
   }
 }
@@ -469,7 +469,7 @@ export const CalendarView: React.FC = () => {
           }}
           className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
             isDone
-              ? 'border border-[#e44332] bg-[#e44332] text-white'
+              ? 'border border-blue-500 bg-blue-500 text-white'
               : `border border-zinc-500 ${styling.checkboxHover}`
           }`}
           title={isDone ? 'Возобновить' : 'Выполнить'}
@@ -533,7 +533,7 @@ export const CalendarView: React.FC = () => {
             }}
             className={`mt-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
               isDone
-                ? 'border border-[#e44332] bg-[#e44332] text-white'
+                ? 'border border-blue-500 bg-blue-500 text-white'
                 : `border border-zinc-500 ${styling.checkboxHover}`
             }`}
             title={isDone ? 'Возобновить' : 'Выполнить'}
@@ -572,7 +572,7 @@ export const CalendarView: React.FC = () => {
         {/* Left: Upcoming Title + Month/Year */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <CalendarIcon className="w-4 h-4 text-[#e44332]" />
+            <CalendarIcon className="w-4 h-4 text-zinc-300" />
             <h2 className="text-xs font-semibold text-zinc-100 tracking-tight">
               {headerTitle}
             </h2>
@@ -641,7 +641,7 @@ export const CalendarView: React.FC = () => {
             title="Открыть список просроченных и незапланированных задач"
           >
             {overdueTasks.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-[#e44332] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
             )}
             <Clock className="w-3.5 h-3.5 text-zinc-400" />
             <span className="hidden sm:inline">Сроки</span>
@@ -683,7 +683,7 @@ export const CalendarView: React.FC = () => {
                           {weekdayName}
                         </span>
                         {isToday ? (
-                          <span className="w-6 h-6 rounded-full bg-[#e44332] text-white text-xs font-bold flex items-center justify-center shadow-sm">
+                          <span className="w-6 h-6 rounded-full bg-white text-[#09090b] text-xs font-bold flex items-center justify-center shadow-sm">
                             {dayNum}
                           </span>
                         ) : (
@@ -824,7 +824,7 @@ export const CalendarView: React.FC = () => {
                               {isSlotAdding && (
                                 <div
                                   onClick={e => e.stopPropagation()}
-                                  className="absolute inset-x-1 top-1 z-30 p-2 rounded-lg bg-[#18181c] border border-blue-500/50 shadow-xl"
+                                  className="absolute inset-x-1 top-1 z-30 p-2 rounded-lg bg-[#18181c] border border-white/[0.15] shadow-xl"
                                 >
                                   <input
                                     autoFocus
@@ -842,23 +842,19 @@ export const CalendarView: React.FC = () => {
                                     }}
                                     className="w-full bg-transparent text-xs text-zinc-100 outline-none"
                                   />
-                                  <div className="flex items-center justify-between mt-1 text-[10px] text-zinc-500 font-mono">
-                                    <span>Enter — сохранить</span>
-                                    <span>Esc — отмена</span>
-                                  </div>
                                 </div>
                               )}
                             </div>
                           );
                         })}
 
-                        {/* Red Time Ribbon for Today */}
+                        {/* Blue Time Ribbon for Today */}
                         {showRedRibbon && (
                           <div
                             style={{ top: `${redRibbonTopPx}px` }}
-                            className="absolute inset-x-0 h-[2px] bg-[#e44332] z-20 pointer-events-none"
+                            className="absolute inset-x-0 h-[2px] bg-blue-500 z-20 pointer-events-none"
                           >
-                            <div className="w-2.5 h-2.5 rounded-full bg-[#e44332] -mt-1 -ml-1 shadow-sm shadow-red-500/80" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-blue-500 -mt-1 -ml-1 shadow-sm shadow-blue-500/80" />
                           </div>
                         )}
 
@@ -913,7 +909,7 @@ export const CalendarView: React.FC = () => {
                         <span
                           className={`text-xs font-mono ${
                             isToday
-                              ? 'w-5 h-5 rounded-full bg-[#e44332] text-white font-bold flex items-center justify-center'
+                              ? 'w-5 h-5 rounded-full bg-white text-[#09090b] font-bold text-xs flex items-center justify-center shadow-sm'
                               : cell.isCurrentMonth
                               ? 'text-zinc-300 font-medium'
                               : 'text-zinc-600'
@@ -1076,9 +1072,9 @@ export const CalendarView: React.FC = () => {
                             e.stopPropagation();
                             toggleTaskComplete(task.id);
                           }}
-                          className="mt-0.5 w-3.5 h-3.5 rounded-full border border-zinc-600 hover:border-[#e44332] flex items-center justify-center shrink-0 cursor-pointer"
+                          className="mt-0.5 w-3.5 h-3.5 rounded-full border border-zinc-600 hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
                         >
-                          <Check className="w-2 h-2 text-[#e44332] opacity-0 hover:opacity-100" />
+                          <Check className="w-2 h-2 text-blue-400 opacity-0 hover:opacity-100" />
                         </button>
                         <span className="text-xs font-medium text-zinc-200 leading-snug line-clamp-2">
                           {task.title || 'Безымянная задача'}
@@ -1140,9 +1136,9 @@ export const CalendarView: React.FC = () => {
                           e.stopPropagation();
                           toggleTaskComplete(task.id);
                         }}
-                        className="mt-0.5 w-3.5 h-3.5 rounded-full border border-zinc-600 hover:border-[#e44332] flex items-center justify-center shrink-0 cursor-pointer"
+                        className="mt-0.5 w-3.5 h-3.5 rounded-full border border-zinc-600 hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
                       >
-                        <Check className="w-2 h-2 text-[#e44332] opacity-0 hover:opacity-100" />
+                        <Check className="w-2 h-2 text-blue-400 opacity-0 hover:opacity-100" />
                       </button>
                       <span className="text-xs font-medium text-zinc-200 leading-snug line-clamp-2">
                         {task.title || 'Безымянная задача'}
@@ -1202,7 +1198,7 @@ export const CalendarView: React.FC = () => {
             {/* Header */}
             <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-[#18181c]">
               <div className="flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4 text-[#e44332]" />
+                <CalendarIcon className="w-4 h-4 text-zinc-300" />
                 <h3 className="text-sm font-semibold text-zinc-100">
                   {expandedDayDateStr}
                 </h3>
@@ -1244,7 +1240,7 @@ export const CalendarView: React.FC = () => {
                           }}
                           className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors shrink-0 ${
                             isDone
-                              ? 'border border-[#e44332] bg-[#e44332] text-white'
+                              ? 'border border-blue-500 bg-blue-500 text-white'
                               : `border border-zinc-500 ${styling.checkboxHover}`
                           }`}
                         >
@@ -1274,7 +1270,7 @@ export const CalendarView: React.FC = () => {
                 <Plus className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                 <input
                   type="text"
-                  placeholder="Добавить задачу... (Enter для сохранения)"
+                  placeholder="Добавить задачу..."
                   value={dayCardInput}
                   onChange={e => setDayCardInput(e.target.value)}
                   onKeyDown={e => {
@@ -1344,8 +1340,8 @@ export const CalendarView: React.FC = () => {
                   }}
                   className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
                     inspectingTask.status === 'done'
-                      ? 'border border-[#e44332] bg-[#e44332] text-white'
-                      : 'border border-zinc-500 hover:border-[#e44332] text-transparent hover:text-[#e44332]'
+                      ? 'border border-blue-500 bg-blue-500 text-white'
+                      : 'border border-zinc-500 hover:border-blue-400 text-transparent hover:text-blue-400'
                   }`}
                 >
                   <Check className="w-2.5 h-2.5 stroke-[3]" />
@@ -1428,7 +1424,7 @@ export const CalendarView: React.FC = () => {
                       <button
                         className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
                           st.completed
-                            ? 'bg-[#e44332] border-[#e44332] text-white'
+                            ? 'bg-blue-500 border-blue-500 text-white'
                             : 'border-zinc-600 hover:border-zinc-400'
                         }`}
                       >

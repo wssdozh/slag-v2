@@ -508,8 +508,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Сегодня')).toBeVisible();
 
     // 3. Verify Today date indicator in week header and All-Day row
-    const redTodayBadge = page.locator('.bg-\\[\\#e44332\\]');
-    await expect(redTodayBadge.first()).toBeVisible();
+    const todayBadge = page.locator('.bg-white.text-\\[\\#09090b\\]');
+    await expect(todayBadge.first()).toBeVisible();
     await expect(page.locator('text=Весь день').first()).toBeVisible();
 
     // 4. Verify Hourly Time Grid (e.g. 08:00, 12:00, 18:00)
@@ -541,9 +541,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('button', { hasText: 'Месяц' })).toHaveClass(/bg-white\/10/);
 
     // Test Expanded Day Card modal by clicking on a month day cell number
-    const todayBadge = page.locator('.grid-cols-7 .bg-\\[\\#e44332\\]').first();
-    if (await todayBadge.isVisible()) {
-      await todayBadge.click();
+    const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
+    if (await monthTodayBadge.isVisible()) {
+      await monthTodayBadge.click();
       await page.waitForTimeout(100);
       await page.screenshot({
         path: 'test-results/screenshots/calendar-month-expanded-day.png',
