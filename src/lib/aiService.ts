@@ -572,13 +572,18 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
     }
 
     if (name === 'read_note') {
-      const note = allItems.find(i => i.id === args.id || i.title.toLowerCase() === String(args.id).toLowerCase());
+      const targetQuery = String(args.id || '').toLowerCase().trim();
+      let note = allItems.find(i => i.id === targetQuery || i.title.toLowerCase() === targetQuery);
+      if (!note) {
+        const cleanTitle = targetQuery.replace(/^\[\[|\]\]$/g, '').trim();
+        note = allItems.find(i => i.title.toLowerCase() === cleanTitle || i.title.toLowerCase().includes(cleanTitle));
+      }
       if (!note) return { error: `Заметка с ID/названием "${args.id}" не найдена` };
       return {
         id: note.id,
         title: note.title,
         folder: note.folder,
-        markdown: serializeItemToMarkdown(note),
+        markdown: serializeItemToMarkdown(note).slice(0, 4000),
       };
     }
 
@@ -626,17 +631,20 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
     return { error: `Неизвестный инструмент: ${name}` };
   };
 
-  // Tool Definitions for OpenAI-compatible APIs (Groq)
+  // Tool Definitions for OpenAI-compatible APIs (Groq / KIE.AI)
   const groqTools: any[] = [
     {
       type: 'function',
       function: {
         name: 'search_notes',
-        description: 'Полнотекстовый нечеткий поиск по заметкам, таскам и статьям базы знаний.',
+        description: 'Полнотекстовый нечеткий поиск по заметкам, таскам и статьям базы знаний с поддержкой опечаток и токенов.',
         parameters: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: 'Поисковый запрос' },
+            query: {
+              type: 'string',
+              description: 'Поисковый запрос. Передавай ключевые существительные или основы слов (1-3 слова). Обязательно исправляй опечатки пользователя (например: "прафилам как жить" -> "правила") и удаляй разговорный шум ("поищи", "как", "вообще").',
+            },
             folder: { type: 'string', description: 'Ограничение по папке (если применимо)' },
             tag: { type: 'string', description: 'Фильтр по тегу' },
             type: { type: 'string', enum: ['note', 'task', 'article'], description: 'Тип записи' },
@@ -649,7 +657,7 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
       type: 'function',
       function: {
         name: 'read_note',
-        description: 'Прочитать полное содержимое заметки по ее ID или названию.',
+        description: 'Прочитать полное содержимое заметки по ее ID или названию (например, после успешного search_notes).',
         parameters: {
           type: 'object',
           properties: {
@@ -720,10 +728,11 @@ ${isInbox
    - Если пользователь просит ссылку на заметку или задачу, которая УЖЕ упоминалась в предыдущих сообщениях (например, в повестке календаря, результатах поиска или ответах): «дай мне линк на эту заметку», «дай ссылку на задачу», «ссылку на просроченную» — СТРОГО бери точное название из контекста диалога и отвечай вики-ссылкой: [[Точное название заметки]].
    - В ЭТОМ СЛУЧАЕ КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО вызывать search_notes! Не выдумывай случайные или искаженные слова для поиска (например, «гидрецифаллизм» и т.п.).
 
-2. ДИСЦИПЛИНА ИСПОЛЬЗОВАНИЯ ИНСТРУМЕНТОВ (ZERO-SLOP GROUNDING):
-   - search_notes: вызывай ТОЛЬКО когда пользователь ищет конкретную информацию или заметку, которой НЕТ в истории сообщений. Поисковый запрос должен состоять ТОЛЬКО из реальных ключевых слов из запроса пользователя. Запрещено передавать в search_notes общие междометия («что», «почему», «а», «как») или случайные выдуманные слова.
+2. МНОГОШАГОВЫЙ АГЕНТНЫЙ ПОИСК (MULTI-STEP AGENTIC WORKFLOW):
+   - Ты поддерживаешь цепочки вызовов инструментов (до 4 раундов в одном диалоговом ходе).
+   - Если для ответа недостаточно сниппета из поиска — сначала вызови search_notes, а получив список заметок, в следующем шаге вызови read_note по названию или id нужной заметки.
+   - НОРМАЛИЗАЦИЯ ЗАПРОСОВ: При вызове search_notes очищай запрос от стоп-слов («поищи», «как», «вообще», «что») и исправляй опечатки пользователя (например, «прафилам как жить вообще» -> search_notes("правила")). Не копируй опечатки и шум буквально.
    - get_calendar_agenda: используй для повестки дня, расписания, задач на сегодня/завтра/дату (date: 'YYYY-MM-DD').
-   - read_note: вызывай только если сниппета из поиска недостаточно и нужно полное содержание.
    - При вопросах общего характера («что?», «почему?», «не хочу», «поговори со мной», «кто ты?») — отвечай прямо текстом без бессмысленного вызова инструментов.
 
 3. ПРАВИЛО READ-ONLY SAFETY И ДЕЙСТВИЯ:
@@ -757,7 +766,7 @@ ${isInbox
    - Сформируй обновленный блок действия action:create_note (например, с itemType: "article" и развернутым структурированным содержанием).
    - НЕ вызывай search_notes на такие контекстные просьбы!`;
 
-  // 1. External LLM Provider with Tool Calling (Groq / KIE.AI / Gemini)
+  // 1. External LLM Provider with Multi-Step Agentic Tool Calling (Groq / KIE.AI / Gemini)
   const isGroq = settings.provider === 'groq' && Boolean(settings.groqApiKey);
   const isKie = settings.provider === 'kie' && Boolean(settings.kieApiKey);
   const isGemini = settings.provider === 'gemini' && Boolean(settings.geminiApiKey);
@@ -786,70 +795,127 @@ ${isInbox
         }),
       ];
 
-      aiLog.info(`Dispatching ${providerName} assistant chat`, { model, messageCount: requestMessages.length });
+      const MAX_TOOL_ROUNDS = 4;
+      let round = 0;
+      let finalContent = '';
+      let accumulatedReasoning = '';
+      const calledSignatures = new Set<string>();
 
-      // Initial call
-      const res1 = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
+      while (round < MAX_TOOL_ROUNDS) {
+        round++;
+        const isLastAllowedRound = round === MAX_TOOL_ROUNDS;
+
+        aiLog.info(`Agent round ${round}/${MAX_TOOL_ROUNDS} [${providerName}]`, {
+          model,
+          messageCount: requestMessages.length,
+        });
+
+        const payload: Record<string, any> = {
           model,
           messages: requestMessages,
-          tools: groqTools,
-          tool_choice: 'auto',
           temperature: 0.2,
-        }),
-      });
+        };
 
-      if (!res1.ok) {
-        const errorBody = await res1.text().catch(() => '');
-        aiLog.warn(`${providerName} Assistant API HTTP ${res1.status} (${res1.statusText}):`, errorBody);
-        throw new Error(`${providerName} HTTP ${res1.status}: ${errorBody.slice(0, 200)}`);
-      }
-
-      const data1 = await res1.json();
-      const choice = data1.choices?.[0];
-      const msg = choice?.message;
-
-      let reasoning = msg?.reasoning_content || '';
-      let initialContent = msg?.content || '';
-
-      // Extract <think> if present in message content
-      if (initialContent.includes('<think>')) {
-        const match = initialContent.match(/<think>([\s\S]*?)<\/think>/);
-        if (match) {
-          reasoning = match[1].trim();
-          initialContent = initialContent.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+        if (!isLastAllowedRound) {
+          payload.tools = groqTools;
+          payload.tool_choice = 'auto';
         }
-      }
 
-      // If model generated tool calls
-      if (msg?.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const errorBody = await res.text().catch(() => '');
+          aiLog.warn(`${providerName} Round ${round} failed HTTP ${res.status}:`, errorBody);
+          if (round === 1) {
+            throw new Error(`${providerName} HTTP ${res.status}: ${errorBody.slice(0, 200)}`);
+          }
+          break;
+        }
+
+        const data = await res.json();
+        const choice = data.choices?.[0];
+        const msg = choice?.message;
+
+        if (!msg) break;
+
+        let stepReasoning = msg.reasoning_content || '';
+        let stepContent = msg.content || '';
+
+        // Extract <think> if present in message content
+        if (stepContent.includes('<think>')) {
+          const match = stepContent.match(/<think>([\s\S]*?)<\/think>/);
+          if (match) {
+            stepReasoning = match[1].trim();
+            stepContent = stepContent.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+          }
+        }
+
+        if (stepReasoning) {
+          accumulatedReasoning = accumulatedReasoning
+            ? `${accumulatedReasoning}\n${stepReasoning}`
+            : stepReasoning;
+        }
+
+        // If no tool calls, this is the final response
+        if (!msg.tool_calls || !Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0) {
+          finalContent = stepContent;
+          break;
+        }
+
+        // Push assistant's message with tool_calls into history
         requestMessages.push(msg);
 
+        // Execute all tool calls in this round
+        let hasNewTools = false;
         for (const tc of msg.tool_calls) {
           const toolName = tc.function?.name;
-          let toolArgs = {};
+          let toolArgs: Record<string, any> = {};
           try {
             toolArgs = JSON.parse(tc.function?.arguments || '{}');
           } catch {
             // ignore
           }
 
-          const toolStart = performance.now();
-          const toolResult = await executeLocalTool(toolName, toolArgs);
-          const toolDuration = Math.round(performance.now() - toolStart);
+          const callSig = `${toolName}:${JSON.stringify(toolArgs)}`;
+          let toolResult: any;
 
-          aiLog.info(`Tool executed: ${toolName}`, { args: toolArgs, durationMs: toolDuration });
+          if (calledSignatures.has(callSig)) {
+            toolResult = {
+              warning: `Этот инструмент уже вызывался с такими параметрами. Сформулируйте финальный ответ на основе имеющихся данных или вызовите другой инструмент.`,
+            };
+          } else {
+            calledSignatures.add(callSig);
+            const toolStart = performance.now();
+            const rawResult = await executeLocalTool(toolName, toolArgs);
+            const toolDuration = Math.round(performance.now() - toolStart);
 
-          executedToolCalls.push({
-            name: toolName,
-            args: toolArgs,
-            result: toolResult,
-          });
+            aiLog.info(`Tool executed: ${toolName}`, { args: toolArgs, durationMs: toolDuration });
+
+            // If search_notes returned 0 results, suggest similar or related active tags
+            if (toolName === 'search_notes' && Array.isArray(rawResult) && rawResult.length === 0) {
+              const allTags = storage.getAllExistingTags().slice(0, 8);
+              toolResult = {
+                results: [],
+                message: `По запросу "${toolArgs.query}" заметок не найдено. Попробуйте поискать по смежным темам или тегам базы: ${allTags.join(', ')}`,
+              };
+            } else {
+              toolResult = rawResult;
+            }
+
+            executedToolCalls.push({
+              name: toolName,
+              args: toolArgs,
+              result: rawResult,
+            });
+            hasNewTools = true;
+          }
 
           requestMessages.push({
             role: 'tool',
@@ -858,47 +924,17 @@ ${isInbox
           });
         }
 
-        // Second round: send tool outputs to model for final text
-        const res2 = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model,
-            messages: requestMessages,
-            temperature: 0.2,
-          }),
-        });
-
-        if (res2.ok) {
-          const data2 = await res2.json();
-          const choice2 = data2.choices?.[0];
-          let finalContent = choice2?.message?.content || '';
-          if (choice2?.message?.reasoning_content) {
-            reasoning = reasoning ? `${reasoning}\n${choice2.message.reasoning_content}` : choice2.message.reasoning_content;
-          }
-
-          const { cleanText, suggestedAction } = extractActionBlock(finalContent);
-          return {
-            content: cleanText,
-            reasoning: reasoning || undefined,
-            reasoningTimeMs: Date.now() - startTime,
-            toolCalls: executedToolCalls,
-            suggestedAction,
-          };
-        } else {
-          const errText2 = await res2.text().catch(() => '');
-          aiLog.warn(`${providerName} Round 2 failed with ${res2.status}:`, errText2);
+        // If all calls were duplicate warnings, break out
+        if (!hasNewTools) {
+          finalContent = stepContent;
+          break;
         }
       }
 
-      // If no tool calls needed
-      const { cleanText, suggestedAction } = extractActionBlock(initialContent);
+      const { cleanText, suggestedAction } = extractActionBlock(finalContent);
       return {
         content: cleanText,
-        reasoning: reasoning || undefined,
+        reasoning: accumulatedReasoning || undefined,
         reasoningTimeMs: Date.now() - startTime,
         toolCalls: executedToolCalls.length > 0 ? executedToolCalls : undefined,
         suggestedAction,
