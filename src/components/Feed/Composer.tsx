@@ -436,92 +436,92 @@ export const Composer: React.FC = () => {
   const quickEmojis = ['💡', '🔥', '📌', '⚡', '✅', '🚀', '🧠', '☕'];
 
   return (
-    <div className="p-3 pt-1 select-none shrink-0 w-full flex justify-center bg-transparent">
-      <div className="max-w-2xl w-full rounded-2xl bg-[#141417]/95 backdrop-blur-md border border-white/[0.08] shadow-2xl p-2.5 pb-3 flex flex-col gap-2">
+    <div className="p-3 pb-3 select-none shrink-0 max-w-2xl w-full mx-auto">
+      <div className="rounded-2xl bg-[#0c0c0e] border border-white/[0.06] p-3 flex flex-col gap-2">
         {/* Top Telegram-style Formatting Bar */}
-        <div className="flex items-center gap-0.5 text-zinc-500 border-b border-white/[0.04] pb-1 px-0.5">
-        <button
-          onClick={() => insertFormatting('## ', '')}
-          className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Заголовок"
-        >
-          <Heading2 className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => insertFormatting('**', '**')}
-          className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Жирный"
-        >
-          <Bold className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => insertFormatting('- [ ] ', '')}
-          className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Чеклист"
-        >
-          <CheckSquare className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => insertFormatting('\n| Колонки 1 | Колонки 2 |\n|---|---|\n| Текст 1 | Текст 2 |\n')}
-          className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Таблица"
-        >
-          <Table className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => insertFormatting('[', '](https://)')}
-          className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Ссылка"
-        >
-          <Link2 className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => imageInputRef.current?.click()}
-          className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Изображение"
-        >
-          <ImageIcon className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => insertFormatting('```\n', '\n```')}
-          className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Блок кода"
-        >
-          <Code2 className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Emoji popover */}
-        <div className="relative">
+        <div className="flex items-center gap-1 text-zinc-400 border-b border-white/[0.04] pb-1.5 px-1">
           <button
-            onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-            className="h-6 w-6 rounded-lg flex items-center justify-center hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Эмодзи"
+            onClick={() => insertFormatting('## ', '')}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Заголовок"
           >
-            <Smile className="w-3.5 h-3.5" />
+            <Heading2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => insertFormatting('**', '**')}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Жирный"
+          >
+            <Bold className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => insertFormatting('- [ ] ', '')}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Чеклист"
+          >
+            <CheckSquare className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => insertFormatting('\n| Колонки 1 | Колонки 2 |\n|---|---|\n| Текст 1 | Текст 2 |\n')}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Таблица"
+          >
+            <Table className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => insertFormatting('[', '](https://)')}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Ссылка"
+          >
+            <Link2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Изображение"
+          >
+            <ImageIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => insertFormatting('```\n', '\n```')}
+            className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Блок кода"
+          >
+            <Code2 className="w-4 h-4" />
           </button>
 
-          {isEmojiPickerOpen && (
-            <div className="absolute left-0 bottom-full mb-1 flex items-center gap-1.5 p-1.5 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl z-30 animate-in fade-in">
-              {quickEmojis.map(emo => (
-                <button
-                  key={emo}
-                  onClick={() => {
-                    setContent(prev => prev + emo);
-                    setIsEmojiPickerOpen(false);
-                  }}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-sm transition-colors cursor-pointer"
-                >
-                  {emo}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Emoji popover */}
+          <div className="relative">
+            <button
+              onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+              className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Эмодзи"
+            >
+              <Smile className="w-4 h-4" />
+            </button>
+
+            {isEmojiPickerOpen && (
+              <div className="absolute left-0 bottom-full mb-1 flex items-center gap-1.5 p-1.5 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl z-30 animate-in fade-in">
+                {quickEmojis.map(emo => (
+                  <button
+                    key={emo}
+                    onClick={() => {
+                      setContent(prev => prev + emo);
+                      setIsEmojiPickerOpen(false);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-sm transition-colors cursor-pointer"
+                  >
+                    {emo}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* Reply Banner */}
       {replyTarget && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
+        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
           <div className="flex items-center gap-2 truncate min-w-0">
             <CornerUpLeft className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span className="text-[11px] font-mono text-zinc-400 shrink-0">
@@ -533,7 +533,7 @@ export const Composer: React.FC = () => {
           </div>
           <button
             onClick={() => setReplyTarget(null)}
-            className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 cursor-pointer"
+            className="p-1 rounded text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 cursor-pointer"
             title="Отменить ответ"
           >
             <X className="w-3.5 h-3.5" />
@@ -547,10 +547,10 @@ export const Composer: React.FC = () => {
           {attachments.map(att => (
             <div
               key={att.id}
-              className="flex items-center gap-2 p-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 relative group"
+              className="flex items-center gap-2 p-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 relative group"
             >
               {att.type === 'image' && (
-                <img src={att.dataUrl} alt={att.name} className="w-8 h-8 object-cover rounded-lg" />
+                <img src={att.dataUrl} alt={att.name} className="w-8 h-8 object-cover rounded-md" />
               )}
               {att.type === 'video' && (
                 <span className="text-[10px] font-mono text-zinc-400">⏹ Видео-квадратик</span>
@@ -578,7 +578,7 @@ export const Composer: React.FC = () => {
           {tags.map(tag => (
             <span
               key={tag}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-xl bg-white/[0.04] text-zinc-300 text-[10px] font-mono"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] text-zinc-300 text-[10px] font-mono"
             >
               #{tag}
               <button
@@ -634,13 +634,13 @@ export const Composer: React.FC = () => {
       {hasAnyActiveGhostChips && (
         <div className="flex flex-wrap items-center gap-1.5 px-1 py-1 text-xs animate-in fade-in duration-150">
           {hasActiveDateChip && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
               <span>📅</span>
               <span>{parsedTask?.rawMatchedDateText || parsedTask?.dueDate}</span>
               <button
                 type="button"
                 onClick={() => setIsDateDismissed(true)}
-                className="ml-0.5 p-0.5 rounded-lg text-blue-400/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="ml-0.5 p-0.5 rounded text-blue-400/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Отменить дату для этого черновика"
               >
                 <X className="w-2.5 h-2.5" />
@@ -650,7 +650,7 @@ export const Composer: React.FC = () => {
 
           {hasActivePriorityChip && (
             <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-[11px] font-mono border ${
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono border ${
                 parsedTask?.priority === 'high'
                   ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
                   : parsedTask?.priority === 'medium'
@@ -681,7 +681,7 @@ export const Composer: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsPriorityDismissed(true)}
-                className="ml-0.5 p-0.5 rounded-lg hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="ml-0.5 p-0.5 rounded hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Отменить приоритет"
               >
                 <X className="w-2.5 h-2.5" />
@@ -692,14 +692,14 @@ export const Composer: React.FC = () => {
           {activeGhostTags.map(tag => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl bg-zinc-800/80 border border-white/[0.08] text-zinc-300 text-[11px] font-mono"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/[0.08] text-zinc-300 text-[11px] font-mono"
             >
               <span>🏷</span>
               <span>#{tag}</span>
               <button
                 type="button"
                 onClick={() => setDismissedTags(prev => new Set(prev).add(tag))}
-                className="ml-0.5 p-0.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-white/10 transition-colors cursor-pointer"
+                className="ml-0.5 p-0.5 rounded text-zinc-400 hover:text-rose-400 hover:bg-white/10 transition-colors cursor-pointer"
                 title="Отменить тег"
               >
                 <X className="w-2.5 h-2.5" />
@@ -709,8 +709,8 @@ export const Composer: React.FC = () => {
         </div>
       )}
 
-      {/* Textarea Input Container with WikiLink popover */}
-      <div className="relative rounded-xl bg-white/[0.02] border border-white/[0.06] p-2.5 focus-within:border-white/15 focus-within:bg-white/[0.04] transition-all">
+      {/* Textarea Input Container with WikiLink popover - Monolithic, direct on card surface */}
+      <div className="relative">
         {wikiQuery !== null && matchingWikiItems.length > 0 && (
           <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
             <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
@@ -750,7 +750,7 @@ export const Composer: React.FC = () => {
               ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
               : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
           }
-          className="w-full bg-transparent text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-relaxed outline-none border-none p-0"
+          className="w-full bg-transparent text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-relaxed py-1 px-1 outline-none border-none"
         />
       </div>
 
@@ -762,7 +762,7 @@ export const Composer: React.FC = () => {
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value as any)}
-              className="bg-black/40 border border-white/[0.08] rounded-xl px-2 py-0.5 text-xs text-zinc-300 focus:outline-none"
+              className="bg-black/40 border border-white/[0.08] rounded px-1.5 py-0.5 text-xs text-zinc-300"
             >
               <option value="none">Обычный</option>
               <option value="low">Низкий</option>
@@ -777,21 +777,21 @@ export const Composer: React.FC = () => {
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="bg-black/40 border border-white/[0.08] rounded-xl px-2 py-0.5 text-xs text-zinc-300 focus:outline-none"
+              className="bg-black/40 border border-white/[0.08] rounded px-1.5 py-0.5 text-xs text-zinc-300"
             />
           </div>
         </div>
       )}
 
       {/* Bottom Control Bar */}
-      <div className="flex items-center justify-between pt-1.5">
+      <div className="flex items-center justify-between pt-1">
         {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
         <div className="flex items-center gap-2">
           {/* +Ai Smart Tagging Button */}
           <button
             onClick={handleSmartAiTags}
             disabled={isGeneratingAiTags}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition-colors border border-white/[0.05] cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition-colors border border-white/[0.05] cursor-pointer"
             title="ИИ тегирование"
           >
             {isGeneratingAiTags ? (
@@ -806,7 +806,7 @@ export const Composer: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 transition-colors border border-white/[0.05] cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 transition-colors cursor-pointer"
             >
               <span>
                 {itemType === 'note' ? 'Заметка' : itemType === 'task' ? 'Таска' : 'Статья'}
@@ -821,7 +821,7 @@ export const Composer: React.FC = () => {
                     setItemType('note');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
                     itemType === 'note' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
@@ -832,7 +832,7 @@ export const Composer: React.FC = () => {
                     setItemType('task');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
                     itemType === 'task' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
@@ -843,7 +843,7 @@ export const Composer: React.FC = () => {
                     setItemType('article');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
                     itemType === 'article' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
@@ -859,7 +859,7 @@ export const Composer: React.FC = () => {
               setIsRecordingVideo(false);
               setIsRecordingAudio(!isRecordingAudio);
             }}
-            className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
               isRecordingAudio
                 ? 'bg-rose-500/20 text-rose-400'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -875,7 +875,7 @@ export const Composer: React.FC = () => {
               setIsRecordingAudio(false);
               setIsRecordingVideo(!isRecordingVideo);
             }}
-            className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
               isRecordingVideo
                 ? 'bg-rose-500/20 text-rose-400'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -888,7 +888,7 @@ export const Composer: React.FC = () => {
           {/* File Attach Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Прикрепить файл"
           >
             <Paperclip className="w-4 h-4" />
@@ -910,7 +910,7 @@ export const Composer: React.FC = () => {
                 setIsPriorityDismissed(false);
                 setDismissedTags(new Set());
               }}
-              className="p-1.5 rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
               title="Очистить"
             >
               <Trash2 className="w-4 h-4" />
@@ -920,7 +920,7 @@ export const Composer: React.FC = () => {
           {/* Expand to Fullscreen Editor Icon Button */}
           <button
             onClick={handleExpandToFullscreen}
-            className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Раскрыть в полноэкранный редактор"
           >
             <Maximize2 className="w-4 h-4" />
