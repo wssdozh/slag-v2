@@ -708,4 +708,48 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('22. Logging HUD & Diagnostics Engine Verification', async ({ page }) => {
+    // 1. Open Log Viewer modal via sidebar Terminal button
+    const logsBtn = page.locator('button[data-testid="sidebar-logs-btn"]');
+    await expect(logsBtn).toBeVisible();
+    await logsBtn.click();
+
+    // 2. Verify Log Viewer modal appeared
+    const logViewer = page.locator('[data-testid="log-viewer"]');
+    await expect(logViewer).toBeVisible();
+
+    // 3. Verify title and chips
+    await expect(logViewer.locator('text=Логи & HUD')).toBeVisible();
+    await expect(logViewer.locator('text=LEVEL:')).toBeVisible();
+    await expect(logViewer.locator('text=SCOPE:')).toBeVisible();
+
+    // 4. Verify system initialization logs are present
+    await expect(logViewer.locator('text=SLAG v2 application initialized').first()).toBeVisible();
+
+    // 5. Test search filter in log viewer
+    const searchInput = logViewer.locator('input[placeholder*="Поиск по логам"]');
+    await searchInput.fill('initialized');
+    await expect(logViewer.locator('text=SLAG v2 application initialized').first()).toBeVisible();
+    await searchInput.clear();
+
+    // 6. Test scope filter
+    const appScopeBtn = logViewer.locator('button', { hasText: 'APP' }).first();
+    await appScopeBtn.click();
+    await expect(logViewer.locator('text=SLAG v2 application initialized').first()).toBeVisible();
+
+    // Reset scope filter
+    const allScopeBtn = logViewer.locator('button', { hasText: 'ALL' }).nth(1);
+    await allScopeBtn.click();
+
+    // 7. Take screenshot of Log Viewer HUD for visual verification
+    await page.screenshot({
+      path: 'test-results/screenshots/log-viewer-hud.png',
+      fullPage: false,
+    });
+
+    // 8. Close Log Viewer via Escape key
+    await page.keyboard.press('Escape');
+    await expect(logViewer).not.toBeVisible();
+  });
 });
