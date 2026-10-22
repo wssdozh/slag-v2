@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { FeedHeader } from './components/Feed/FeedHeader';
 import { FeedList } from './components/Feed/FeedList';
 import { Composer } from './components/Feed/Composer';
+import { AssistantChat } from './components/Feed/AssistantChat';
 import { FolderInfoPanel } from './components/RightPanel/FolderInfoPanel';
 import { FullscreenEditor } from './components/Editor/FullscreenEditor';
 import { SearchModal } from './components/Search/SearchModal';
@@ -12,12 +13,18 @@ import { FolderModal } from './components/Modals/FolderModal';
 import { TriageModal } from './components/Modals/TriageModal';
 import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
+import { ImageLightbox } from './components/UI/ImageLightbox';
 
 const MainLayout: React.FC = () => {
   const {
     setSidebarWidth,
     setRightPanelWidth,
-    isRightPanelOpen
+    isRightPanelOpen,
+    feedViewMode,
+    lightboxImages,
+    activeLightboxIndex,
+    closeLightbox,
+    navigateLightbox
   } = useApp();
 
   const isDraggingSidebar = useRef(false);
@@ -75,11 +82,17 @@ const MainLayout: React.FC = () => {
         title="Перетащите для изменения ширины"
       />
 
-      {/* 2. Center Column: Telegram-Style Stream / Monologue Feed */}
+      {/* 2. Center Column: Telegram-Style Stream / Monologue Feed or AI Assistant */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#09090b] relative">
         <FeedHeader />
-        <FeedList />
-        <Composer />
+        {feedViewMode === 'assistant' ? (
+          <AssistantChat />
+        ) : (
+          <>
+            <FeedList />
+            <Composer />
+          </>
+        )}
       </main>
 
       {/* Right Panel Resizer Splitter */}
@@ -104,6 +117,13 @@ const MainLayout: React.FC = () => {
       <FolderModal />
       <TriageModal />
       <ToastContainer />
+      <ImageLightbox
+        images={lightboxImages}
+        currentIndex={activeLightboxIndex ?? 0}
+        isOpen={activeLightboxIndex !== null}
+        onClose={closeLightbox}
+        onNavigate={navigateLightbox}
+      />
     </div>
   );
 };
