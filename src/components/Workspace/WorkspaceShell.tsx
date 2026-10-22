@@ -175,6 +175,41 @@ const GroupHeaderActions: React.FC<any> = (props) => {
 export const WorkspaceShell: React.FC = () => {
   const apiRef = useRef<DockviewApi | null>(null);
 
+  // Safety cleaner for stale Dockview drag-and-drop ghost overlays
+  useEffect(() => {
+    const purgeStaleOverlays = () => {
+      const dropzones = document.querySelectorAll(
+        '.dv-drop-target-dropzone, .dv-drop-target-anchor, .dv-drop-target-selection'
+      );
+      if (dropzones.length > 0) {
+        dropzones.forEach(el => el.remove());
+      }
+      document.querySelectorAll('.dv-drop-target').forEach(el => {
+        el.classList.remove('dv-drop-target');
+      });
+    };
+
+    const handlePointerOrDragEnd = (e: MouseEvent | DragEvent) => {
+      if (e.buttons === 0 || e.type === 'dragend' || e.type === 'drop' || e.type === 'mouseup') {
+        purgeStaleOverlays();
+      }
+    };
+
+    window.addEventListener('dragend', handlePointerOrDragEnd);
+    window.addEventListener('drop', handlePointerOrDragEnd);
+    window.addEventListener('mouseup', handlePointerOrDragEnd);
+    window.addEventListener('pointerup', handlePointerOrDragEnd);
+    window.addEventListener('mousemove', handlePointerOrDragEnd);
+
+    return () => {
+      window.removeEventListener('dragend', handlePointerOrDragEnd);
+      window.removeEventListener('drop', handlePointerOrDragEnd);
+      window.removeEventListener('mouseup', handlePointerOrDragEnd);
+      window.removeEventListener('pointerup', handlePointerOrDragEnd);
+      window.removeEventListener('mousemove', handlePointerOrDragEnd);
+    };
+  }, []);
+
   const applyDefaultLayout = useCallback((api: DockviewApi) => {
     api.clear();
 
@@ -214,8 +249,18 @@ export const WorkspaceShell: React.FC = () => {
   const onReady = (event: DockviewReadyEvent) => {
     apiRef.current = event.api;
 
-    // Save layout on changes
+    // Save layout on changes and clear lingering drop overlays
     event.api.onDidLayoutChange(() => {
+      const dropzones = document.querySelectorAll(
+        '.dv-drop-target-dropzone, .dv-drop-target-anchor, .dv-drop-target-selection'
+      );
+      if (dropzones.length > 0) {
+        dropzones.forEach(el => el.remove());
+      }
+      document.querySelectorAll('.dv-drop-target').forEach(el => {
+        el.classList.remove('dv-drop-target');
+      });
+
       try {
         const json = event.api.toJSON();
         localStorage.setItem(WORKSPACE_LAYOUT_KEY, JSON.stringify(json));
