@@ -86,7 +86,7 @@
   box-shadow: none !important;
   background-color: transparent !important;
   color: #71717a !important;
-  transition: all 120ms ease !important;
+  transition: background-color 100ms ease, color 100ms ease, opacity 100ms ease !important;
   user-select: none;
   cursor: pointer;
   display: inline-flex !important;
@@ -177,7 +177,7 @@
    1. Sleek Tab DnD: Insertion Beam (No Blocky Rectangles in Header)
    ========================================================================= */
 
-/* Zero out rectangular fills and borders in tab header */
+/* Zero out rectangular fills and eliminate transition jitter in tab header */
 .dockview-theme-slag .dv-tabs-and-actions-container .dv-drop-target-selection,
 .dockview-theme-slag .dv-tabs-and-actions-container .dv-drop-target-anchor,
 .dockview-theme-slag .dv-tabs-and-actions-container .dv-drop-target-dropzone {
@@ -186,28 +186,39 @@
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  transition: none !important;
+  will-change: auto !important;
 }
 
 .dockview-theme-slag .dv-tabs-and-actions-container .dv-drop-target-selection::after {
   display: none !important;
 }
 
-/* Tab Insertion Beam: Sleek rounded vertical stick between tabs */
+/* Prevent double-drawing stick when both drop-target and reorder class exist */
+.dockview-theme-slag .dv-tab.dv-drop-target::after {
+  display: none !important;
+}
+
+/* Tab Insertion Beam: Sleek flat rounded vertical stick between tabs (zero glow, fixed 18px height) */
 .dockview-theme-slag .dv-tab .dv-drop-target-selection.dv-drop-target-left::before,
 .dockview-theme-slag .dv-tab .dv-drop-target-selection.dv-drop-target-right::before,
 .dockview-theme-slag .dv-tabs-container .dv-tab--reorder-before::after,
 .dockview-theme-slag .dv-tabs-container .dv-tab--reorder-after::after {
   content: "" !important;
   position: absolute !important;
-  top: 3px !important;
-  bottom: 3px !important;
-  width: 2.5px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  bottom: auto !important;
+  height: 18px !important;
+  width: 2px !important;
   border-radius: 9999px !important;
   background-color: #3b82f6 !important;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.8), 0 0 2px rgba(255, 255, 255, 0.9) !important;
+  box-shadow: none !important;
   pointer-events: none !important;
   z-index: 100 !important;
   display: block !important;
+  transition: none !important;
+  animation: none !important;
 }
 
 .dockview-theme-slag .dv-tab .dv-drop-target-selection.dv-drop-target-left::before,
@@ -222,20 +233,24 @@
   left: auto !important;
 }
 
-/* Void Container Insertion Beam: Stick placed at start of empty header strip */
+/* Void Container Insertion Beam: Flat stick placed at start of empty header strip (always same 18px height) */
 .dockview-theme-slag .dv-void-container .dv-drop-target-selection::before {
   content: "" !important;
   position: absolute !important;
-  top: 4px !important;
-  bottom: 4px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  bottom: auto !important;
   left: 2px !important;
-  width: 2.5px !important;
+  height: 18px !important;
+  width: 2px !important;
   border-radius: 9999px !important;
   background-color: #3b82f6 !important;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.8), 0 0 2px rgba(255, 255, 255, 0.9) !important;
+  box-shadow: none !important;
   pointer-events: none !important;
   z-index: 100 !important;
   display: block !important;
+  transition: none !important;
+  animation: none !important;
 }
 
 /* =========================================================================
@@ -269,4 +284,144 @@
   pointer-events: none !important;
   transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
+
+/* =========================================================================
+   3. Tabs Overflow Dropdown & Popup Menu (Linear Minimal Dark)
+   ========================================================================= */
+
+/* Trigger button on header when tabs overflow */
+.dockview-theme-slag .dv-tabs-overflow-dropdown-default {
+  height: 25px !important;
+  line-height: 25px !important;
+  padding: 0 6px !important;
+  margin: 0 2px !important;
+  border-radius: 6px !important;
+  background-color: transparent !important;
+  color: #71717a !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  cursor: pointer !important;
+  transition: all 120ms ease !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-dropdown-default:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-dropdown-default > svg {
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.7 !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-dropdown-default > span {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  padding-left: 2px !important;
+}
+
+/* Overflow Menu Popup Container */
+.dockview-theme-slag .dv-tabs-overflow-container,
+.dv-tabs-overflow-container {
+  background-color: #121215 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  padding: 4px !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  min-width: 160px !important;
+  max-width: 280px !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+/* Items inside the overflow menu */
+.dockview-theme-slag .dv-tabs-overflow-container .dv-tab,
+.dv-tabs-overflow-container .dv-tab {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
+  border-radius: 5px !important;
+  border: none !important;
+  border-bottom: none !important;
+  background-color: transparent !important;
+  color: #a1a1aa !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+  transition: background-color 100ms ease, color 100ms ease !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-container .dv-tab:not(:last-child),
+.dv-tabs-overflow-container .dv-tab:not(:last-child) {
+  border-bottom: none !important;
+}
+
+/* Hover on overflow item */
+.dockview-theme-slag .dv-tabs-overflow-container .dv-tab:hover,
+.dv-tabs-overflow-container .dv-tab:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+/* Active tab inside overflow menu */
+.dockview-theme-slag .dv-tabs-overflow-container .dv-tab.dv-active-tab,
+.dv-tabs-overflow-container .dv-tab.dv-active-tab {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+/* Close button inside overflow item */
+.dockview-theme-slag .dv-tabs-overflow-container .dv-tab .dv-default-tab-action,
+.dv-tabs-overflow-container .dv-tab .dv-default-tab-action {
+  width: 14px !important;
+  height: 14px !important;
+  opacity: 0.35 !important;
+  border-radius: 3px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-container .dv-tab:hover .dv-default-tab-action,
+.dv-tabs-overflow-container .dv-tab:hover .dv-default-tab-action {
+  opacity: 0.75 !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-container .dv-tab .dv-default-tab-action:hover,
+.dv-tabs-overflow-container .dv-tab .dv-default-tab-action:hover {
+  opacity: 1 !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+/* Scrollbar inside overflow list */
+.dockview-theme-slag .dv-tabs-overflow-container::-webkit-scrollbar,
+.dv-tabs-overflow-container::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-container::-webkit-scrollbar-track,
+.dv-tabs-overflow-container::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.dockview-theme-slag .dv-tabs-overflow-container::-webkit-scrollbar-thumb,
+.dv-tabs-overflow-container::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 2px !important;
+}
+
 

@@ -710,12 +710,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('22. Logging HUD & Diagnostics Engine Verification', async ({ page }) => {
-    // 1. Open Log Viewer modal via sidebar Terminal button
-    const logsBtn = page.locator('button[data-testid="sidebar-logs-btn"]');
-    await expect(logsBtn).toBeVisible();
-    await logsBtn.click();
+    // 1. Open Log Viewer modal via global shortcut Ctrl+`
+    await page.keyboard.press('Control+Backquote');
 
-    // 2. Verify Log Viewer modal appeared
+    // 2. Verify Log Viewer appeared
     const logViewer = page.locator('[data-testid="log-viewer"]');
     await expect(logViewer).toBeVisible();
 
@@ -751,5 +749,25 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 8. Close Log Viewer via Escape key
     await page.keyboard.press('Escape');
     await expect(logViewer).not.toBeVisible();
+
+    // 9. Also verify Settings modal contains "Логи & Диагностика" tab
+    await page.locator('button[title*="Настройки"]').first().click();
+    const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
+    await expect(settingsModal).toBeVisible();
+
+    const logsTab = settingsModal.locator('button[data-testid="settings-tab-logs"]');
+    await expect(logsTab).toBeVisible();
+    await logsTab.click();
+
+    // Verify embedded log viewer is visible inside settings
+    await expect(settingsModal.locator('[data-testid="log-viewer"]')).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/settings-modal-logs-tab.png',
+      fullPage: false,
+    });
+
+    await page.keyboard.press('Escape');
+    await expect(settingsModal).not.toBeVisible();
   });
 });

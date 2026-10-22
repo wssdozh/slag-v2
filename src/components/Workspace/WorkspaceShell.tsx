@@ -213,33 +213,25 @@ export const WorkspaceShell: React.FC = () => {
       });
     };
 
-    // Guarantee that strictly one dropzone exists at any given moment
-    const enforceSingularDropzone = (clientX?: number, clientY?: number) => {
-      const dropzones = Array.from(
-        document.querySelectorAll<HTMLElement>('.dv-drop-target-dropzone, .dv-drop-target-anchor')
-      );
-      if (dropzones.length <= 1) return;
-
-      let targetDropzone = dropzones[dropzones.length - 1];
-      if (clientX !== undefined && clientY !== undefined) {
-        const elUnder = document.elementFromPoint(clientX, clientY);
-        const activeContainer = elUnder?.closest(
-          '.dv-groupview, .dv-content-container, .dv-tabs-and-actions-container'
+    // Clean up orphaned panel content dropzones (e.g. when drag exits a panel without dragleave)
+    // Runs throttled via requestAnimationFrame so we never interrupt Dockview's active drag loop or tab stick
+    let rafId: number | null = null;
+    const cleanOrphanedContentDropzones = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const contentDropzones = Array.from(
+          document.querySelectorAll<HTMLElement>('.dv-content-container > .dv-drop-target-dropzone')
         );
-        if (activeContainer) {
-          const matching = dropzones.find(dz => activeContainer.contains(dz));
-          if (matching) {
-            targetDropzone = matching;
-          }
-        }
-      }
-
-      dropzones.forEach(dz => {
-        if (dz !== targetDropzone) {
-          const parent = dz.closest('.dv-drop-target');
-          dz.remove();
-          if (parent && !parent.querySelector('.dv-drop-target-dropzone, .dv-drop-target-anchor')) {
-            parent.classList.remove('dv-drop-target');
+        if (contentDropzones.length > 1) {
+          // Keep only the newest content dropzone, remove older orphaned ones
+          for (let i = 0; i < contentDropzones.length - 1; i++) {
+            const stale = contentDropzones[i];
+            const parent = stale.closest('.dv-drop-target');
+            stale.remove();
+            if (parent && !parent.querySelector('.dv-drop-target-dropzone')) {
+              parent.classList.remove('dv-drop-target');
+            }
           }
         }
       });
@@ -248,32 +240,34 @@ export const WorkspaceShell: React.FC = () => {
     const handlePointerOrDragEnd = (e: MouseEvent | DragEvent) => {
       if (e.buttons === 0 || e.type === 'dragend' || e.type === 'drop' || e.type === 'mouseup' || e.type === 'pointerup') {
         purgeStaleOverlays();
-      } else {
-        enforceSingularDropzone(e.clientX, e.clientY);
       }
     };
 
-    const observer = new MutationObserver(() => {
-      enforceSingularDropzone();
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.addedNodes.length > 0) {
+          cleanOrphanedContentDropzones();
+          break;
+        }
+      }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+
+    const dockHost = document.querySelector('.dockview-theme-slag') || document.body;
+    observer.observe(dockHost, { childList: true, subtree: true });
 
     window.addEventListener('dragend', handlePointerOrDragEnd);
     window.addEventListener('drop', handlePointerOrDragEnd);
     window.addEventListener('mouseup', handlePointerOrDragEnd);
     window.addEventListener('pointerup', handlePointerOrDragEnd);
-    window.addEventListener('mousemove', handlePointerOrDragEnd);
-    window.addEventListener('dragover', handlePointerOrDragEnd);
     window.addEventListener('blur', purgeStaleOverlays);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       observer.disconnect();
       window.removeEventListener('dragend', handlePointerOrDragEnd);
       window.removeEventListener('drop', handlePointerOrDragEnd);
       window.removeEventListener('mouseup', handlePointerOrDragEnd);
       window.removeEventListener('pointerup', handlePointerOrDragEnd);
-      window.removeEventListener('mousemove', handlePointerOrDragEnd);
-      window.removeEventListener('dragover', handlePointerOrDragEnd);
       window.removeEventListener('blur', purgeStaleOverlays);
     };
   }, []);
