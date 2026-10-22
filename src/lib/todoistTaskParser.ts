@@ -92,3 +92,89 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     rawMatchedDateText,
   };
 }
+
+export interface TaskTimeSlot {
+  hasTime: boolean;
+  isAllDay: boolean;
+  startHour: number;
+  startMinute: number;
+  durationMinutes: number;
+  timeLabel: string;
+}
+
+export function getTaskTimeSlot(task: { reminder?: string; title?: string; content?: string }): TaskTimeSlot {
+  // 1. Check reminder ISO string first
+  if (task.reminder) {
+    try {
+      const d = new Date(task.reminder);
+      if (!isNaN(d.getTime())) {
+        const h = d.getHours();
+        const m = d.getMinutes();
+        const endH = (h + 1) % 24;
+        const timeLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        return {
+          hasTime: true,
+          isAllDay: false,
+          startHour: h,
+          startMinute: m,
+          durationMinutes: 60,
+          timeLabel,
+        };
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  // 2. Search for time range in title or content: e.g. "10:00-11:30" or "10:00 - 11:30"
+  const text = `${task.title || ''} ${task.content || ''}`;
+  const rangeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*[-—]\s*([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (rangeMatch) {
+    const startH = parseInt(rangeMatch[1], 10);
+    const startM = parseInt(rangeMatch[2], 10);
+    const endH = parseInt(rangeMatch[3], 10);
+    const endM = parseInt(rangeMatch[4], 10);
+
+    const startTotal = startH * 60 + startM;
+    const endTotal = endH * 60 + endM;
+    const duration = endTotal > startTotal ? endTotal - startTotal : 60;
+    const timeLabel = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+    return {
+      hasTime: true,
+      isAllDay: false,
+      startHour: startH,
+      startMinute: startM,
+      durationMinutes: Math.max(30, Math.min(duration, 360)),
+      timeLabel,
+    };
+  }
+
+  // 3. Search for single time in title or content: e.g. "в 14:00" or "14:00"
+  const singleMatch = text.match(/(?:^|\s|[вВ@])\s*([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (singleMatch) {
+    const startH = parseInt(singleMatch[1], 10);
+    const startM = parseInt(singleMatch[2], 10);
+    const endH = (startH + 1) % 24;
+    const timeLabel = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+
+    return {
+      hasTime: true,
+      isAllDay: false,
+      startHour: startH,
+      startMinute: startM,
+      durationMinutes: 60,
+      timeLabel,
+    };
+  }
+
+  // 4. Default: All-day task
+  return {
+    hasTime: false,
+    isAllDay: true,
+    startHour: 9,
+    startMinute: 0,
+    durationMinutes: 60,
+    timeLabel: 'Весь день',
+  };
+}

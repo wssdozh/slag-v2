@@ -507,9 +507,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Месяц')).toBeVisible();
     await expect(page.locator('text=Сегодня')).toBeVisible();
 
-    // 3. Verify Today date indicator in week header
+    // 3. Verify Today date indicator in week header and All-Day row
     const redTodayBadge = page.locator('.bg-\\[\\#e44332\\]');
     await expect(redTodayBadge.first()).toBeVisible();
+    await expect(page.locator('text=Весь день').first()).toBeVisible();
 
     // 4. Verify Hourly Time Grid (e.g. 08:00, 12:00, 18:00)
     await expect(page.locator('text=08:00').first()).toBeVisible();
@@ -521,9 +522,36 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
 
-    // 6. Switch to Month View
+    // 6. Test Task Details Popover by clicking any task card in the calendar
+    const taskCard = page.locator('text=Купить хороший зеленый чай').first();
+    if (await taskCard.isVisible()) {
+      await taskCard.click();
+      await expect(page.locator('text=Срок выполнения')).toBeVisible();
+      await page.screenshot({
+        path: 'test-results/screenshots/calendar-task-popover.png',
+        fullPage: false,
+      });
+      // Close popover via Escape
+      await page.keyboard.press('Escape');
+      await expect(page.locator('text=Срок выполнения')).not.toBeVisible();
+    }
+
+    // 7. Switch to Month View
     await page.locator('button', { hasText: 'Месяц' }).click();
     await expect(page.locator('button', { hasText: 'Месяц' })).toHaveClass(/bg-white\/10/);
+
+    // Test Expanded Day Card modal by clicking on a month day cell number
+    const todayBadge = page.locator('.grid-cols-7 .bg-\\[\\#e44332\\]').first();
+    if (await todayBadge.isVisible()) {
+      await todayBadge.click();
+      await page.waitForTimeout(100);
+      await page.screenshot({
+        path: 'test-results/screenshots/calendar-month-expanded-day.png',
+        fullPage: false,
+      });
+      // Close modal via Escape
+      await page.keyboard.press('Escape');
+    }
 
     // Capture Month View screenshot
     await page.screenshot({
@@ -531,7 +559,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
 
-    // 7. Open Overdue & Unscheduled Drawer
+    // 8. Open Overdue & Unscheduled Drawer
     const drawerBtn = page.locator('button[title*="просроченных"]').first();
     await drawerBtn.click();
     await expect(page.locator('text=Просроченные')).toBeVisible();

@@ -125,9 +125,44 @@ export const DEFAULT_ITEMS: SlagItem[] = [
     updatedAt: Date.now() - 900000,
     status: 'todo',
     priority: 'low',
+    dueDate: new Date().toISOString().slice(0, 10),
+    reminder: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(),
     subtasks: [
       { id: 'st_tea1', title: 'Проверить чайную лавку у дома', completed: false }
     ],
+    attachments: [],
+  },
+  {
+    id: 'demo_task_3',
+    type: 'task',
+    title: 'Синхронизация по архитектуре баз данных',
+    content: 'Обсудить SQLite vs Markdown хранилище в 14:00-15:30.',
+    folder: 'Проекты/SLAG v2',
+    tags: ['architecture', 'meeting'],
+    createdAt: Date.now() - 800000,
+    updatedAt: Date.now() - 800000,
+    status: 'todo',
+    priority: 'medium',
+    dueDate: new Date().toISOString().slice(0, 10),
+    reminder: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(),
+    subtasks: [
+      { id: 'st_db1', title: 'Подготовить схему таблиц', completed: true },
+      { id: 'st_db2', title: 'Сравнить скорость поиска Orama', completed: false }
+    ],
+    attachments: [],
+  },
+  {
+    id: 'demo_task_4',
+    type: 'task',
+    title: 'Полить цветы в кабинете',
+    content: 'Еженедельный уход за растениями.',
+    folder: 'Входящие',
+    tags: ['быт'],
+    createdAt: Date.now() - 700000,
+    updatedAt: Date.now() - 700000,
+    status: 'todo',
+    priority: 'none',
+    dueDate: new Date().toISOString().slice(0, 10),
     attachments: [],
   }
 ];
