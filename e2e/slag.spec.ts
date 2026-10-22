@@ -363,6 +363,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Wait for search result with "Показать в ленте" button
     const filterBtn = page.locator('button', { hasText: /Показать \d+ в ленте/ }).first();
     await expect(filterBtn).toBeVisible();
+    await filterBtn.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'test-results/screenshots/assistant-telegram-style-button.png' });
     await filterBtn.click();
 
     // Verify AI filter chip appears in FeedHeader
