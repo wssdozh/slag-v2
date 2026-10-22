@@ -407,101 +407,31 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
   });
 
-  test('16. Assistant Dialogue Display Modes (bubbles, document, terminal) switching, styling, and persistence', async ({ page }) => {
+  test('16. Assistant Pure Chat Dialogue, Quick Prompts, and Interactive Draft Generation', async ({ page }) => {
     // 1. Open Center Assistant view
     await page.locator('header button', { hasText: 'Ассистент' }).click();
     await expect(page.locator('text=Все хранилище').first()).toBeVisible();
 
-    // 2. Locate segmented control buttons
-    const bubblesBtn = page.locator('button', { hasText: 'Чат' }).first();
-    const docBtn = page.locator('button', { hasText: 'Документ' }).first();
-    const terminalBtn = page.locator('button', { hasText: 'Терминал' }).first();
-
-    await expect(bubblesBtn).toBeVisible();
-    await expect(docBtn).toBeVisible();
-    await expect(terminalBtn).toBeVisible();
-
-    // Verify initial mode is bubbles
-    await expect(bubblesBtn).toHaveClass(/bg-white\/10/);
-
-    // 3. Send a message via quick prompt
+    // 2. Send a message via quick prompt
     await page.locator('button', { hasText: 'Сводка хранилища' }).click();
     // Wait for assistant response to appear
     await expect(page.locator('text=SLAG').first()).toBeVisible({ timeout: 5000 });
 
-    // Capture bubbles screenshot
+    // Capture chat screenshot
     await page.screenshot({
-      path: 'test-results/screenshots/assistant-mode-bubbles.png',
+      path: 'test-results/screenshots/assistant-chat-mode.png',
       fullPage: false,
     });
 
-    // 4. Switch to Document mode
-    await docBtn.click();
-    await expect(docBtn).toHaveClass(/bg-white\/10/);
-    await expect(bubblesBtn).not.toHaveClass(/bg-white\/10/);
-
-    // Verify document mode elements
-    await expect(page.locator('text=### Вопрос')).toBeVisible();
-    await expect(page.locator('text=> ❯')).toBeVisible();
-
-    // Verify localStorage persistence
-    const savedDocMode = await page.evaluate(() => localStorage.getItem('slag_chat_display_mode'));
-    expect(savedDocMode).toBe('document');
-
-    // Capture document screenshot
-    await page.screenshot({
-      path: 'test-results/screenshots/assistant-mode-document.png',
-      fullPage: false,
-    });
-
-    // 5. Switch to Terminal mode
-    await terminalBtn.click();
-    await expect(terminalBtn).toHaveClass(/bg-white\/10/);
-    await expect(docBtn).not.toHaveClass(/bg-white\/10/);
-
-    // Verify terminal mode elements
-    await expect(page.locator('text=❯ USER:')).toBeVisible();
-    await expect(page.locator('text=✔ [OUTPUT]:')).toBeVisible();
-
-    // Verify localStorage persistence
-    const savedTermMode = await page.evaluate(() => localStorage.getItem('slag_chat_display_mode'));
-    expect(savedTermMode).toBe('terminal');
-
-    // Send a prompt that generates suggestedAction (Draft task)
+    // 3. Send a prompt that generates suggestedAction (Draft task)
     const textarea = page.locator('main textarea');
     await textarea.fill('Создай новую задачу: Проверить синхронизацию заметок');
     await textarea.press('Enter');
     await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible({ timeout: 5000 });
 
-    // Verify ASCII border in terminal mode
-    await expect(page.locator('text=DRAFT TASK')).toBeVisible();
-
-    // Capture terminal screenshot with suggestedAction
-    await page.screenshot({
-      path: 'test-results/screenshots/assistant-mode-terminal.png',
-      fullPage: false,
-    });
-
-    // 6. Switch back to Document mode and verify suggestedAction inline block
-    await docBtn.click();
-    await expect(docBtn).toHaveClass(/bg-white\/10/);
-    await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible();
-    await page.screenshot({
-      path: 'test-results/screenshots/assistant-mode-document.png',
-      fullPage: false,
-    });
-
-    // 7. Switch back to Bubbles mode
-    await bubblesBtn.click();
-    await expect(bubblesBtn).toHaveClass(/bg-white\/10/);
-    await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible();
-    await page.screenshot({
-      path: 'test-results/screenshots/assistant-mode-bubbles.png',
-      fullPage: false,
-    });
-
-    const savedBubblesMode = await page.evaluate(() => localStorage.getItem('slag_chat_display_mode'));
-    expect(savedBubblesMode).toBe('bubbles');
+    // 4. Click Save to Vault
+    await page.locator('button', { hasText: 'Сохранить в хранилище' }).first().click();
+    await expect(page.locator('text=сохранена').or(page.locator('text=Запись'))).toBeVisible();
   });
 
   test('17. Linear-style Kanban Board with TRIZ Dock and Signal Bars', async ({ page }) => {

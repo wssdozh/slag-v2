@@ -91,7 +91,6 @@ export interface AiSettings {
 export type InboxMode = 'unsorted' | 'all' | 'sorted';
 export type FeedViewMode = 'feed' | 'kanban' | 'calendar' | 'assistant';
 export type RightPanelMode = 'info' | 'assistant';
-export type ChatDisplayMode = 'bubbles' | 'document' | 'terminal';
 
 export interface AiItemFilter {
   itemIds: string[];
