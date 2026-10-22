@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
-import { FOLDER_ICONS } from '../Sidebar/FolderTree';
+import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { Folder, X, Trash2 } from 'lucide-react';
 
-export const FolderModal: React.FC = () => {
+const FolderModalDialog: React.FC = () => {
   const {
-    isFolderModalOpen,
     editingFolder,
     closeFolderModal,
     saveFolder,
@@ -14,33 +13,20 @@ export const FolderModal: React.FC = () => {
     folders
   } = useApp();
 
-  const [name, setName] = useState('');
-  const [parentFolder, setParentFolder] = useState<string>('');
-  const [description, setDescription] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState<string>('Folder');
-
   const isEditing = Boolean(editingFolder && editingFolder.name);
 
-  useEffect(() => {
+  const [name, setName] = useState(() => editingFolder?.name || '');
+  const [parentFolder, setParentFolder] = useState<string>(() => {
     if (editingFolder) {
-      setName(editingFolder.name || '');
-      setDescription(editingFolder.description || '');
-      setSelectedIcon(editingFolder.icon || 'Folder');
       const parts = editingFolder.path.split('/');
       if (parts.length > 1) {
-        setParentFolder(parts.slice(0, -1).join('/'));
-      } else {
-        setParentFolder('');
+        return parts.slice(0, -1).join('/');
       }
-    } else {
-      setName('');
-      setDescription('');
-      setSelectedIcon('Folder');
-      setParentFolder('');
     }
-  }, [editingFolder, isFolderModalOpen]);
-
-  if (!isFolderModalOpen) return null;
+    return '';
+  });
+  const [description, setDescription] = useState(() => editingFolder?.description || '');
+  const [selectedIcon, setSelectedIcon] = useState<string>(() => editingFolder?.icon || 'Folder');
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,4 +176,12 @@ export const FolderModal: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const FolderModal: React.FC = () => {
+  const { isFolderModalOpen, editingFolder } = useApp();
+
+  if (!isFolderModalOpen) return null;
+
+  return <FolderModalDialog key={editingFolder?.path || 'new-folder'} />;
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { triageInboxItems } from '../../lib/geminiService';
 import type { TriageSuggestion } from '../../lib/geminiService';
@@ -10,9 +10,8 @@ import {
   Loader2
 } from 'lucide-react';
 
-export const TriageModal: React.FC = () => {
+const TriageModalDialog: React.FC = () => {
   const {
-    isTriageModalOpen,
     setIsTriageModalOpen,
     items,
     folders,
@@ -21,25 +20,39 @@ export const TriageModal: React.FC = () => {
     addToast
   } = useApp();
 
-  const [loading, setLoading] = useState(false);
+  const inboxItems = useMemo(
+    () => items.filter(i => i.folder === 'Входящие'),
+    [items]
+  );
+
+  const [loading, setLoading] = useState(() => inboxItems.length > 0);
   const [suggestions, setSuggestions] = useState<TriageSuggestion[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const inboxItems = items.filter(i => i.folder === 'Входящие');
-
   useEffect(() => {
-    if (isTriageModalOpen && inboxItems.length > 0) {
-      setLoading(true);
-      triageInboxItems(inboxItems, folders, aiSettings)
-        .then(res => {
+    let isCancelled = false;
+
+    if (inboxItems.length === 0) {
+      return;
+    }
+
+    triageInboxItems(inboxItems, folders, aiSettings)
+      .then(res => {
+        if (!isCancelled) {
           setSuggestions(res);
           setSelectedIds(new Set(res.map(s => s.itemId)));
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [isTriageModalOpen]);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      });
 
-  if (!isTriageModalOpen) return null;
+    return () => {
+      isCancelled = true;
+    };
+  }, [inboxItems, folders, aiSettings]);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
@@ -181,4 +194,12 @@ export const TriageModal: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const TriageModal: React.FC = () => {
+  const { isTriageModalOpen } = useApp();
+
+  if (!isTriageModalOpen) return null;
+
+  return <TriageModalDialog />;
 };

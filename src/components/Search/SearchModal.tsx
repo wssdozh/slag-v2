@@ -12,9 +12,8 @@ import {
   Folder
 } from 'lucide-react';
 
-export const SearchModal: React.FC = () => {
+const SearchDialog: React.FC = () => {
   const {
-    isSearchOpen,
     setIsSearchOpen,
     items,
     setCurrentFolder,
@@ -28,28 +27,23 @@ export const SearchModal: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initialize / re-index Orama when items change
   useEffect(() => {
-    initSearchIndex(items);
-  }, [items]);
+    const timer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    if (isSearchOpen) {
-      setQuery('');
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
-      querySearch('', items, filterType).then(setResults);
-    }
-  }, [isSearchOpen]);
-
-  useEffect(() => {
+    let isCancelled = false;
     querySearch(query, items, filterType).then(res => {
-      setResults(res);
-      setSelectedIndex(0);
+      if (!isCancelled) {
+        setResults(res);
+        setSelectedIndex(0);
+      }
     });
+    return () => {
+      isCancelled = true;
+    };
   }, [query, filterType, items]);
-
-  if (!isSearchOpen) return null;
 
   const handleSelectItem = (item: SlagItem) => {
     setCurrentFolder(item.folder);
@@ -190,4 +184,17 @@ export const SearchModal: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const SearchModal: React.FC = () => {
+  const { isSearchOpen, items } = useApp();
+
+  // Initialize / re-index Orama when items change
+  useEffect(() => {
+    initSearchIndex(items);
+  }, [items]);
+
+  if (!isSearchOpen) return null;
+
+  return <SearchDialog />;
 };

@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Circle,
   Maximize2,
-  Trash2,
   MoreVertical,
   Paperclip,
   Calendar,
@@ -15,8 +14,10 @@ import {
   ChevronUp,
   FileText,
   CornerUpLeft,
-  Link2
+  Link2,
+  Pin
 } from 'lucide-react';
+import type { LightboxImage } from '../../types';
 
 interface ItemCardProps {
   item: SlagItem;
@@ -25,22 +26,20 @@ interface ItemCardProps {
 export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const {
     items,
+    filteredItems,
     toggleTaskComplete,
-    deleteItem,
     setSelectedItem,
     setIsFullscreenEditorOpen,
     setActiveTagFilter,
-    folders,
-    moveItem,
     openContextMenu,
     setReplyTarget,
     highlightedItemId,
-    scrollToItem
+    scrollToItem,
+    openLightbox
   } = useApp();
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isMoveMenuOpen, setIsMoveMenuOpen] = useState(false);
+  const [isArticleExpanded, setIsArticleExpanded] = useState(false);
 
   const formattedTime = new Date(item.createdAt).toLocaleTimeString([], {
     hour: '2-digit',
@@ -61,6 +60,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   // Replied parent item
   const replyParent = item.replyToId ? items.find(i => i.id === item.replyToId) : null;
   const repliesCount = items.filter(i => i.replyToId === item.id).length;
+
+  const hasMetadata = isTask || isArticle || (item.folder !== 'Входящие') || Boolean(item.isPinned) || Boolean(item.priority && item.priority !== 'none') || Boolean(item.dueDate);
 
   const handleOpenArticle = () => {
     setSelectedItem(item);
@@ -117,149 +118,107 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
       draggable
       onDragStart={handleDragStart}
       onContextMenu={handleContextMenu}
-      className={`group relative flex flex-col gap-2 max-w-2xl w-full mx-auto p-3.5 rounded-xl transition-all cursor-default ${
+      className={`group relative flex flex-col gap-2 max-w-2xl w-full mx-auto p-3 rounded-xl transition-all cursor-default ${
         isHighlighted
           ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
           : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
       }`}
     >
-      {/* Top Header / Metadata Bar */}
-      <div className="flex items-center justify-between text-xs text-zinc-500">
-        <div className="flex items-center gap-2">
-          {/* Item Type: Plain text, no nested chips */}
-          {isTask && (
-            <span className="text-[11px] font-mono text-amber-400/90 font-medium">
-              Таска
-            </span>
-          )}
-          {isArticle && (
-            <span className="text-[11px] font-mono text-blue-400/90 font-medium">
-              Статья {item.readingTimeMinutes ? `• ${item.readingTimeMinutes} мин` : ''}
-            </span>
-          )}
+      {/* Floating Hover Action Pill (Linear / Telegram style) */}
+      <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-[#18181c]/90 backdrop-blur-md border border-white/[0.08] rounded-md p-0.5 shadow-md z-10 pointer-events-auto">
+        <button
+          onClick={() => setReplyTarget(item)}
+          className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+          title="Ответить (R)"
+        >
+          <CornerUpLeft className="w-3.5 h-3.5" />
+        </button>
 
-          {/* Folder name if not in inbox */}
-          {item.folder !== 'Входящие' && (
-            <span className="text-[11px] text-zinc-500 font-mono">
-              {item.folder}
-            </span>
-          )}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            openContextMenu({
+              x: rect.right - 224,
+              y: rect.bottom + 6,
+              type: 'item',
+              item,
+            });
+          }}
+          className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+          title="Действия (или ПКМ)"
+        >
+          <MoreVertical className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
-          {/* Task Priority */}
-          {isTask && item.priority && item.priority !== 'none' && (
-            <span
-              className={`text-[10px] uppercase font-mono font-medium ${
-                item.priority === 'high'
-                  ? 'text-rose-400'
-                  : item.priority === 'medium'
-                  ? 'text-amber-400'
-                  : 'text-zinc-500'
-              }`}
-            >
-              {item.priority}
-            </span>
-          )}
+      {/* Top Header / Metadata Bar (Rendered ONLY when metadata exists) */}
+      {hasMetadata && (
+        <div className="flex items-center justify-between text-xs text-zinc-500 pr-14">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Item Type: Plain text, no nested chips */}
+            {isTask && (
+              <span className="text-[11px] font-mono text-amber-400/90 font-medium">
+                Таска
+              </span>
+            )}
+            {isArticle && (
+              <span className="text-[11px] font-mono text-blue-400/90 font-medium">
+                Статья {item.readingTimeMinutes ? `• ${item.readingTimeMinutes} мин` : ''}
+              </span>
+            )}
 
-          {/* Task Due Date */}
-          {isTask && item.dueDate && (
-            <span className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
-              <Calendar className="w-3 h-3 text-zinc-600" />
-              {item.dueDate}
-            </span>
-          )}
-        </div>
+            {/* Folder name if not in inbox */}
+            {item.folder !== 'Входящие' && (
+              <span className="text-[11px] text-zinc-500 font-mono">
+                {item.folder}
+              </span>
+            )}
 
-        {/* Message Actions & Timestamp */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-mono text-zinc-500">{formattedTime}</span>
-
-          {/* Quick Reply Button */}
-          <button
-            onClick={() => setReplyTarget(item)}
-            className="p-1 rounded opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-all"
-            title="Ответить"
-          >
-            <CornerUpLeft className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Context Menu Trigger */}
-          <div className="relative">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-1 rounded opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-all"
-            >
-              <MoreVertical className="w-3.5 h-3.5" />
-            </button>
-
-            {isMenuOpen && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-[#1a1a1e] border border-white/[0.08] shadow-2xl p-1 z-30 text-xs flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100"
+            {/* Task Priority */}
+            {isTask && item.priority && item.priority !== 'none' && (
+              <span
+                className={`text-[10px] uppercase font-mono font-medium ${
+                  item.priority === 'high'
+                    ? 'text-rose-400'
+                    : item.priority === 'medium'
+                    ? 'text-amber-400'
+                    : 'text-zinc-500'
+                }`}
               >
-                <button
-                  onClick={() => {
-                    handleOpenArticle();
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors"
-                >
-                  <Maximize2 className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Редактировать в фокусе</span>
-                </button>
+                {item.priority}
+              </span>
+            )}
 
-                <button
-                  onClick={() => setIsMoveMenuOpen(!isMoveMenuOpen)}
-                  className="flex items-center justify-between px-2 py-1.5 rounded text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors"
-                >
-                  <span>Переместить в папку</span>
-                  <ChevronDown className="w-3 h-3 text-zinc-400" />
-                </button>
+            {/* Pin indicator */}
+            {item.isPinned && (
+              <span className="flex items-center gap-1 text-[10px] font-mono text-amber-400/90" title="Закрепленная запись">
+                <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
+                <span>Закреп</span>
+              </span>
+            )}
 
-                {isMoveMenuOpen && (
-                  <div className="pl-3 py-1 flex flex-col gap-0.5 border-l border-white/10 my-0.5">
-                    {folders.map(f => (
-                      <button
-                        key={f.path}
-                        onClick={() => {
-                          moveItem(item.id, f.path);
-                          setIsMenuOpen(false);
-                          setIsMoveMenuOpen(false);
-                        }}
-                        className={`text-left text-[11px] px-1.5 py-1 rounded truncate transition-colors ${
-                          f.path === item.folder ? 'text-white font-medium bg-white/10' : 'text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        {f.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="my-1 border-t border-white/[0.06]" />
-
-                <button
-                  onClick={() => {
-                    deleteItem(item.id);
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Удалить запись</span>
-                </button>
-              </div>
+            {/* Task Due Date */}
+            {isTask && item.dueDate && (
+              <span className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
+                <Calendar className="w-3 h-3 text-zinc-600" />
+                {item.dueDate}
+              </span>
             )}
           </div>
+
+          <span className="text-[10px] font-mono text-zinc-500 shrink-0">{formattedTime}</span>
         </div>
-      </div>
+      )}
 
       {/* Reply Parent Quote Banner */}
       {item.replyToId && (
         <div
           onClick={() => replyParent && scrollToItem(replyParent.id)}
-          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border-l-2 border-white/20 hover:border-blue-400 cursor-pointer transition-colors text-xs text-zinc-400 select-none group/quote"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] cursor-pointer transition-colors text-xs text-zinc-400 select-none group/quote"
         >
-          <CornerUpLeft className="w-3 h-3 text-zinc-500 group-hover/quote:text-blue-400 shrink-0" />
+          <CornerUpLeft className="w-3 h-3 text-zinc-500 group-hover/quote:text-zinc-300 shrink-0" />
           {replyParent ? (
             <div className="flex items-center gap-1.5 truncate">
               <span className="font-mono text-[10px] text-zinc-500 shrink-0">
@@ -282,6 +241,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           <div className="flex items-start gap-2.5">
             <button
               onClick={() => toggleTaskComplete(item.id)}
+              title={item.status === 'done' ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
+              aria-label="Изменить статус задачи"
               className="mt-0.5 text-zinc-400 hover:text-white transition-colors shrink-0"
             >
               {item.status === 'done' ? (
@@ -353,26 +314,51 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           )}
         </div>
       ) : isArticle ? (
-        /* Article Variant */
+        /* Article Variant with Accordion Inline Read + Focus Editor */
         <div
-          onClick={handleOpenArticle}
-          className="flex flex-col gap-1.5 cursor-pointer rounded-lg p-2.5 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] transition-colors"
+          className="flex flex-col gap-2 rounded-lg p-3 bg-white/[0.02] border border-white/[0.05] transition-colors"
         >
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-100 tracking-tight flex items-center gap-1.5">
+            <h3
+              onClick={() => setIsArticleExpanded(!isArticleExpanded)}
+              className="text-sm font-semibold text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
+            >
               <FileText className="w-4 h-4 text-blue-400 shrink-0" />
               <span>{item.title}</span>
             </h3>
-            <Maximize2 className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300" />
+            <button
+              onClick={handleOpenArticle}
+              className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors"
+              title="Открыть в полноэкранном фокус-редакторе (⌘E)"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed font-normal">
-            {item.summary || item.content.slice(0, 180)}
-          </p>
+          {isArticleExpanded ? (
+            <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap font-normal border-t border-white/[0.04] pt-2">
+              {renderContentWithWikiLinks(item.content)}
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed font-normal">
+              {item.summary || item.content.slice(0, 180)}
+            </p>
+          )}
 
-          <span className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
-            Нажмите, чтобы открыть статью целиком →
-          </span>
+          <div className="flex items-center justify-between pt-1 text-[11px] border-t border-white/[0.03]">
+            <button
+              onClick={() => setIsArticleExpanded(!isArticleExpanded)}
+              className="text-blue-400/90 hover:text-blue-300 transition-colors font-mono"
+            >
+              {isArticleExpanded ? 'Свернуть ↑' : `Читать полностью (${item.readingTimeMinutes || 2} мин) ↓`}
+            </button>
+            <button
+              onClick={handleOpenArticle}
+              className="text-zinc-500 hover:text-zinc-300 transition-colors text-[10px]"
+            >
+              Фокус-редактор ↗
+            </button>
+          </div>
         </div>
       ) : (
         /* Note Variant */
@@ -405,7 +391,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       ))}
 
-      {/* Image Attachments Gallery */}
+      {/* Image Attachments Gallery (Obsidian/Linear Lightbox) */}
       {imageAttachments.length > 0 && (
         <div className="grid grid-cols-2 gap-2 pt-1 max-w-md">
           {imageAttachments.map(img => (
@@ -413,8 +399,20 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               key={img.id}
               className="rounded-lg overflow-hidden border border-white/[0.06] bg-black/40 aspect-video flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => {
-                const w = window.open('');
-                w?.document.write(`<body style="margin:0;background:#09090b;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="${img.dataUrl}" style="max-width:95%;max-height:95%;border-radius:8px;" /></body>`);
+                const folderImages: LightboxImage[] = [];
+                filteredItems.forEach(it => {
+                  it.attachments?.forEach(att => {
+                    if (att.type === 'image' && att.dataUrl) {
+                      folderImages.push({
+                        id: att.id,
+                        name: att.name,
+                        url: att.dataUrl,
+                      });
+                    }
+                  });
+                });
+                const targetIdx = folderImages.findIndex(fi => fi.url === img.dataUrl);
+                openLightbox(folderImages, Math.max(0, targetIdx));
               }}
             >
               <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
@@ -443,20 +441,30 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Tags List */}
-      {item.tags && item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-0.5 items-center">
-          {item.tags.map(tag => (
-            <button
-              key={tag}
-              onClick={() => setActiveTagFilter(tag)}
-              className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              #{tag}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Bottom Bar: Tags + Timestamp (when no top metadata bar exists) */}
+      <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
+        {item.tags && item.tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {item.tags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => setActiveTagFilter(tag)}
+                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div />
+        )}
+
+        {!hasMetadata && (
+          <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
+            {formattedTime}
+          </span>
+        )}
+      </div>
 
       {/* Replies Count Link */}
       {repliesCount > 0 && (

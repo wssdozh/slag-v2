@@ -1,47 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
+import { FOLDER_ICONS } from './folderIcons';
 import {
   ChevronRight,
   ChevronDown,
   Folder,
-  MoreHorizontal,
-  Edit2,
-  Trash2,
-  FolderPlus,
-  Code2,
-  Briefcase,
-  Book,
-  Flame,
-  Sparkles,
-  Coffee,
-  Heart,
-  Compass,
-  Tag,
-  Archive,
-  Cpu,
-  Layers,
-  Bookmark,
-  Lightbulb
+  MoreHorizontal
 } from 'lucide-react';
-
-export const FOLDER_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  Folder,
-  Code2,
-  Briefcase,
-  Book,
-  Flame,
-  Sparkles,
-  Coffee,
-  Heart,
-  Compass,
-  Tag,
-  Archive,
-  Cpu,
-  Layers,
-  Bookmark,
-  Lightbulb,
-};
 
 interface TreeNode {
   name: string;
@@ -56,9 +22,6 @@ export const FolderTree: React.FC = () => {
     currentFolder,
     setCurrentFolder,
     items,
-    openCreateFolderModal,
-    openEditFolderModal,
-    deleteFolder,
     moveItem,
     openContextMenu
   } = useApp();
@@ -68,7 +31,6 @@ export const FolderTree: React.FC = () => {
     'Личное': true,
   });
 
-  const [activeMenuPath, setActiveMenuPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
 
   const buildTree = (): TreeNode[] => {
@@ -207,59 +169,22 @@ export const FolderTree: React.FC = () => {
               </span>
             )}
 
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveMenuPath(activeMenuPath === node.fullPath ? null : node.fullPath);
-                }}
-                className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-opacity"
-              >
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </button>
-
-              {activeMenuPath === node.fullPath && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 text-xs flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100"
-                >
-                  <button
-                    onClick={() => {
-                      openCreateFolderModal(node.fullPath);
-                      setActiveMenuPath(null);
-                    }}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors"
-                  >
-                    <FolderPlus className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Создать подпапку</span>
-                  </button>
-
-                  {node.meta && (
-                    <button
-                      onClick={() => {
-                        openEditFolderModal(node.meta!);
-                        setActiveMenuPath(null);
-                      }}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors"
-                    >
-                      <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Иконка и описание</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      deleteFolder(node.fullPath);
-                      setActiveMenuPath(null);
-                    }}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Удалить папку</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                openContextMenu({
+                  x: rect.right + 4,
+                  y: rect.top,
+                  type: 'folder',
+                  folder: node.meta || { path: node.fullPath, name: node.name, description: '' },
+                });
+              }}
+              title="Действия с папкой"
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-opacity"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 

@@ -87,6 +87,13 @@ export const Composer: React.FC = () => {
     const text = e.target.value;
     setContent(text);
 
+    // Smart type inference: typing checklist switches note to task
+    if (itemType === 'note') {
+      if (/^\s*(?:-\s*\[[ xX]?\]|\[[ xX]?\])\s+/m.test(text)) {
+        setItemType('task');
+      }
+    }
+
     const cursorPos = e.target.selectionStart || text.length;
     const textBefore = text.slice(0, cursorPos);
     const match = textBefore.match(/\[\[([^\]\n]*)$/);
@@ -391,10 +398,10 @@ export const Composer: React.FC = () => {
 
       {/* Reply Banner */}
       {replyTarget && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.04] border-l-2 border-blue-400 text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
+        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
           <div className="flex items-center gap-2 truncate min-w-0">
-            <CornerUpLeft className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="text-[11px] font-mono text-blue-400/90 shrink-0">
+            <CornerUpLeft className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <span className="text-[11px] font-mono text-zinc-400 shrink-0">
               {replyTarget.type === 'task' ? 'Ответ на таску:' : replyTarget.type === 'article' ? 'Ответ на статью:' : 'Ответ:'}
             </span>
             <span className="truncate text-zinc-200 font-medium text-xs">

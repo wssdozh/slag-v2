@@ -87,10 +87,25 @@ tags:
 
 ## 4. Движок разбора естественного языка
 
-Разбор строится на библиотеке `chrono-node` с каскадом языков.
+### 4.1. Выбор фреймворка: почему именно chrono-node
+
+При анализе рынка фреймворков для разбора естественных дат выявлено:
+- **`sherlock.js` / `compromise-dates` / `sugar-date`**: поддерживают только английский язык.
+- **`@microsoft/recognizers-text-date-time`**: тяжелый энтерпрайз-пакет (>2 МБ) без поддержки русского языка.
+- **`Duckling` (Meta)**: требует фонового сервиса на Haskell, нарушая Local-First архитектуру.
+- **`Natasha` / `yargy`**: Python-библиотеки, недоступные в браузере без тяжелых WASM-прослоек.
+
+**`chrono-node`** — единственное зрелое решение в JS/TS с полноценной поддержкой русской грамматики (`chrono.ru.casual`), нулевыми зависимостями, быстрым исполнением (<1 мс) и открытой архитектурой рефайнеров.
+
+### 4.2. Архитектура и точечный импорт (Tree-Shaking)
+
+Для минимизации размера бандла подключаются только востребованные локали вместо импорта всех мировых языков:
 
 ```typescript
-import * as chrono from 'chrono-node';
+// Точечный импорт нужных локалей
+import * as chronoRu from 'chrono-node/ru';
+import * as chronoEn from 'chrono-node/en';
+import { rrulestr } from 'rrule';
 
 export interface ParsedDateResult {
   date: Date;
@@ -106,9 +121,9 @@ export function parseNaturalDate(input: string, referenceDate = new Date()): Par
   // 1. Проверка повторяющихся правил (Recurrence)
   const recurrenceRule = detectRecurrence(trimmed);
 
-  // 2. Каскадный запуск парсера: сначала RU, затем EN
+  // 2. Каскадный выбор парсера: сначала RU, затем EN
   const isCyrillic = /[а-яё]/i.test(trimmed);
-  const parser = isCyrillic ? chrono.ru.casual : chrono.en.casual;
+  const parser = isCyrillic ? chronoRu.casual : chronoEn.casual;
 
   const results = parser.parse(trimmed, referenceDate, { forwardDate: true });
   if (!results.length) return null;
@@ -134,6 +149,18 @@ export function parseNaturalDate(input: string, referenceDate = new Date()): Par
   };
 }
 ```
+
+### 4.3. Вычисление повторений через rrule
+
+Для повторяющихся задач используется стандартная библиотека `rrule`:
+1. При создании задачи сохраняется строка правила iCalendar RFC 5545, например:  
+   `recurrence: "FREQ=WEEKLY;BYDAY=FR;BYHOUR=13;BYMINUTE=0"`
+2. При завершении задачи чекбоксом (`done`) система рассчитывает следующий срок:
+   ```typescript
+   const rule = rrulestr(item.recurrence);
+   const nextDate = rule.after(new Date());
+   // Обновление dueDate и reminder на следующую дату без создания дубликата
+   ```
 
 ### Поддерживаемые шаблоны
 

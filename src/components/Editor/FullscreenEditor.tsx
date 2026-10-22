@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemType } from '../../types';
 import {
@@ -20,10 +20,12 @@ import {
   Link2
 } from 'lucide-react';
 
-export const FullscreenEditor: React.FC = () => {
+interface FullscreenEditorContentProps {
+  item: SlagItem;
+}
+
+const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item }) => {
   const {
-    selectedItem,
-    isFullscreenEditorOpen,
     setIsFullscreenEditorOpen,
     updateItem,
     deleteItem,
@@ -31,39 +33,23 @@ export const FullscreenEditor: React.FC = () => {
     addToast
   } = useApp();
 
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [type, setType] = useState<SlagItemType>('article');
-  const [folder, setFolder] = useState('Входящие');
-  const [tags, setTags] = useState<string[]>([]);
+  const [title, setTitle] = useState(item.title || '');
+  const [content, setContent] = useState(item.content || '');
+  const [type, setType] = useState<SlagItemType>(item.type || 'article');
+  const [folder, setFolder] = useState(item.folder || 'Входящие');
+  const [tags, setTags] = useState<string[]>(item.tags || []);
   const [newTagInput, setNewTagInput] = useState('');
-  const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>('none');
-  const [dueDate, setDueDate] = useState('');
-  const [subtasks, setSubtasks] = useState<Array<{ id: string; title: string; completed: boolean }>>([]);
+  const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(item.priority || 'none');
+  const [dueDate, setDueDate] = useState(item.dueDate || '');
+  const [subtasks, setSubtasks] = useState<Array<{ id: string; title: string; completed: boolean }>>(item.subtasks || []);
   const [newSubtaskInput, setNewSubtaskInput] = useState('');
-
-  // Sync state when selectedItem changes
-  useEffect(() => {
-    if (selectedItem) {
-      setTitle(selectedItem.title || '');
-      setContent(selectedItem.content || '');
-      setType(selectedItem.type || 'article');
-      setFolder(selectedItem.folder || 'Входящие');
-      setTags(selectedItem.tags || []);
-      setPriority(selectedItem.priority || 'none');
-      setDueDate(selectedItem.dueDate || '');
-      setSubtasks(selectedItem.subtasks || []);
-    }
-  }, [selectedItem]);
-
-  if (!isFullscreenEditorOpen || !selectedItem) return null;
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const readTime = Math.max(1, Math.round(wordCount / 200));
 
   const handleSave = () => {
     const updated: SlagItem = {
-      ...selectedItem,
+      ...item,
       title: title.trim() || 'Без названия',
       content: content.trim(),
       type,
@@ -191,7 +177,7 @@ export const FullscreenEditor: React.FC = () => {
 
           <button
             onClick={() => {
-              deleteItem(selectedItem.id);
+              deleteItem(item.id);
               setIsFullscreenEditorOpen(false);
             }}
             className="p-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
@@ -398,4 +384,12 @@ export const FullscreenEditor: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const FullscreenEditor: React.FC = () => {
+  const { isFullscreenEditorOpen, selectedItem } = useApp();
+
+  if (!isFullscreenEditorOpen || !selectedItem) return null;
+
+  return <FullscreenEditorContent key={selectedItem.id} item={selectedItem} />;
 };

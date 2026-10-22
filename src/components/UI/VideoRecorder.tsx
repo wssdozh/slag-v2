@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Trash2, Check } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
 
@@ -8,6 +8,7 @@ interface VideoRecorderProps {
 }
 
 export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCancel }) => {
+  const MAX_SECONDS = 60;
   const [seconds, setSeconds] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
@@ -15,6 +16,39 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+
+  const handleFinish = useCallback(() => {
+    if (!mediaRecorderRef.current) return;
+
+    mediaRecorderRef.current.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        const id = 'att_vid_' + Date.now();
+        const attachment: SlagAttachment = {
+          id,
+          name: `square_${new Date().toISOString().slice(11, 19).replace(/:/g, '-')}.webm`,
+          type: 'video',
+          mimeType: 'video/webm',
+          size: blob.size,
+          relativePath: `.attachments/${id}.webm`,
+          dataUrl: base64,
+        };
+        onRecorded(attachment);
+      };
+      reader.readAsDataURL(blob);
+    };
+
+    mediaRecorderRef.current.stop();
+  }, [onRecorded]);
+
+  // Auto-stop at 60s limit
+  useEffect(() => {
+    if (seconds >= MAX_SECONDS) {
+      handleFinish();
+    }
+  }, [seconds, handleFinish]);
 
   useEffect(() => {
     const startCamera = async () => {
@@ -72,32 +106,6 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
     };
   }, [onCancel]);
 
-  const handleFinish = () => {
-    if (!mediaRecorderRef.current) return;
-
-    mediaRecorderRef.current.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        const id = 'att_vid_' + Date.now();
-        const attachment: SlagAttachment = {
-          id,
-          name: `square_${new Date().toISOString().slice(11, 19).replace(/:/g, '-')}.webm`,
-          type: 'video',
-          mimeType: 'video/webm',
-          size: blob.size,
-          relativePath: `.attachments/${id}.webm`,
-          dataUrl: base64,
-        };
-        onRecorded(attachment);
-      };
-      reader.readAsDataURL(blob);
-    };
-
-    mediaRecorderRef.current.stop();
-  };
-
   const handleDiscard = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
@@ -123,10 +131,10 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
           className="w-full h-full object-cover scale-x-[-1]"
         />
 
-        {/* Pulse recording badge */}
+        {/* Pulse recording badge with 60s max */}
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-mono text-white border border-white/10">
           <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-          <span>{formatTimer(seconds)}</span>
+          <span>{formatTimer(seconds)} / 01:00</span>
         </div>
       </div>
 
