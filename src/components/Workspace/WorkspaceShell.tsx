@@ -1,4 +1,5 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useApp } from '../../context/AppContext';
 import {
   DockviewReact,
   type DockviewReadyEvent,
@@ -14,234 +15,203 @@ import { KanbanBoard } from '../Views/KanbanBoard';
 import { CalendarView } from '../Views/CalendarView';
 import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
 import {
-  LayoutGrid,
-  Columns,
-  RotateCcw,
+  Plus,
+  Layers,
+  Kanban,
+  Calendar,
   Sparkles,
-  Maximize2,
-  Monitor,
-  ExternalLink
+  Folder,
+  Info
 } from 'lucide-react';
 
-export type WorkspacePreset = 'default' | 'ai_lab' | 'deep_focus' | 'dual_screen';
+const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
 
-const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v1';
-const WORKSPACE_PRESET_KEY = 'slag_workspace_preset_v1';
-
-interface WorkspaceShellProps {
-  onToggleLayout?: () => void;
-  layoutMode?: 'dockview' | 'classic';
-}
-
-export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
-  onToggleLayout,
-  layoutMode = 'dockview',
-}) => {
-  const apiRef = useRef<DockviewApi | null>(null);
-  const [activePreset, setActivePreset] = useState<WorkspacePreset>(() => {
-    try {
-      const saved = localStorage.getItem(WORKSPACE_PRESET_KEY);
-      if (saved === 'default' || saved === 'ai_lab' || saved === 'deep_focus' || saved === 'dual_screen') {
-        return saved;
-      }
-    } catch {
-      // Ignore
-    }
-    return 'default';
-  });
-
-  // Reusable panel components for Dockview
-  const components: Record<string, React.FC<IDockviewPanelProps>> = {
-    sidebar: () => (
-      <div className="w-full h-full bg-[#0c0c0e] overflow-hidden flex flex-col">
-        <Sidebar />
-      </div>
-    ),
-    feed: () => (
-      <div className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
-        <FeedHeader onToggleLayout={onToggleLayout} layoutMode={layoutMode} />
-        <FeedList />
-        <Composer />
-      </div>
-    ),
-    kanban: () => (
-      <div className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
-        <FeedHeader onToggleLayout={onToggleLayout} layoutMode={layoutMode} />
+// Dynamic Feed Component reacting to feedViewMode
+const DynamicFeedPanel: React.FC = () => {
+  const { feedViewMode } = useApp();
+  return (
+    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+      <FeedHeader />
+      {feedViewMode === 'kanban' ? (
         <KanbanBoard />
-      </div>
-    ),
-    calendar: () => (
-      <div className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
-        <FeedHeader onToggleLayout={onToggleLayout} layoutMode={layoutMode} />
+      ) : feedViewMode === 'calendar' ? (
         <CalendarView />
-      </div>
-    ),
-    assistant: () => (
-      <div className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+      ) : feedViewMode === 'assistant' ? (
         <AssistantChat variant="center" />
-      </div>
-    ),
-    'folder-info': () => (
-      <div className="w-full h-full bg-[#0c0c0e] flex flex-col overflow-hidden min-w-0">
-        <FolderInfoPanel />
-      </div>
-    ),
+      ) : (
+        <>
+          <FeedList />
+          <Composer />
+        </>
+      )}
+    </main>
+  );
+};
+
+// Panel components registry for Dockview
+const components: Record<string, React.FC<IDockviewPanelProps>> = {
+  sidebar: () => (
+    <aside className="w-full h-full bg-[#0c0c0e] overflow-hidden flex flex-col">
+      <Sidebar />
+    </aside>
+  ),
+  feed: () => <DynamicFeedPanel />,
+  kanban: () => (
+    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+      <FeedHeader />
+      <KanbanBoard />
+    </main>
+  ),
+  calendar: () => (
+    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+      <FeedHeader />
+      <CalendarView />
+    </main>
+  ),
+  assistant: () => (
+    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+      <AssistantChat variant="center" />
+    </main>
+  ),
+  'folder-info': () => (
+    <aside className="w-full h-full bg-[#0c0c0e] flex flex-col overflow-hidden min-w-0">
+      <FolderInfoPanel />
+    </aside>
+  ),
+};
+
+const PANELS_TO_ADD = [
+  { id: 'feed', title: 'Лента', icon: Layers },
+  { id: 'kanban', title: 'Канбан', icon: Kanban },
+  { id: 'calendar', title: 'Календарь', icon: Calendar },
+  { id: 'assistant', title: 'Ассистент', icon: Sparkles },
+  { id: 'sidebar', title: 'Навигация', icon: Folder },
+  { id: 'folder-info', title: 'Инфо папки', icon: Info },
+];
+
+// Header action [+] button with floating context menu on each tab group
+const GroupHeaderActions: React.FC<any> = (props) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const panelSeqRef = useRef(0);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    window.addEventListener('mousedown', handleClick);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [isOpen]);
+
+  const addPanel = (panelId: string, title: string) => {
+    setIsOpen(false);
+    const containerApi = props.containerApi as DockviewApi | undefined;
+    if (!containerApi) return;
+
+    panelSeqRef.current += 1;
+    const uniqueId = `panel_${panelId}_${panelSeqRef.current}`;
+
+    try {
+      containerApi.addPanel({
+        id: uniqueId,
+        component: panelId,
+        title,
+        position: { referenceGroup: props.group },
+      });
+    } catch {
+      containerApi.addPanel({
+        id: uniqueId,
+        component: panelId,
+        title,
+      });
+    }
   };
 
-  const applyPresetLayout = useCallback((preset: WorkspacePreset, api: DockviewApi) => {
+  return (
+    <div className="relative flex items-center h-full px-1">
+      <button
+        onClick={() => setIsOpen(prev => !prev)}
+        className="w-5 h-5 rounded hover:bg-white/[0.1] text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+        title="Добавить вкладку в эту группу"
+      >
+        <Plus className="w-3.5 h-3.5" />
+      </button>
+
+      {isOpen && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-2xl py-1 z-50 animate-in fade-in duration-100"
+        >
+          <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04]">
+            Добавить вкладку
+          </div>
+          {PANELS_TO_ADD.map(item => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => addPanel(item.id, item.title)}
+                className="w-full px-2.5 py-1.5 text-left text-xs flex items-center gap-2 text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+              >
+                <Icon className="w-3.5 h-3.5 text-zinc-400" />
+                <span>{item.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const WorkspaceShell: React.FC = () => {
+  const apiRef = useRef<DockviewApi | null>(null);
+
+  const applyDefaultLayout = useCallback((api: DockviewApi) => {
     api.clear();
 
-    if (preset === 'default') {
-      // Canonical Triptych: Left Sidebar, Center Feed/Kanban/Calendar, Right Assistant/Info
-      api.addPanel({
-        id: 'panel_sidebar',
-        component: 'sidebar',
-        title: 'Навигация',
-        position: { direction: 'left' },
-      });
+    // 1. Center workspace panel (DynamicFeedPanel: Feed / Kanban / Calendar / Assistant)
+    const centerPanel = api.addPanel({
+      id: 'panel_feed',
+      component: 'feed',
+      title: 'Лента',
+    });
 
-      api.addPanel({
-        id: 'panel_feed',
-        component: 'feed',
-        title: 'Лента',
-        position: { direction: 'right' },
-      });
+    // 2. Left navigation sidebar
+    api.addPanel({
+      id: 'panel_sidebar',
+      component: 'sidebar',
+      title: 'Навигация',
+      position: { direction: 'left', referencePanel: centerPanel },
+      initialWidth: 260,
+    });
 
-      api.addPanel({
-        id: 'panel_kanban',
-        component: 'kanban',
-        title: 'Канбан',
-      });
+    // 3. Right Assistant & Info in a single group with tabs
+    const assistantPanel = api.addPanel({
+      id: 'panel_assistant',
+      component: 'assistant',
+      title: 'Ассистент',
+      position: { direction: 'right', referencePanel: centerPanel },
+      initialWidth: 320,
+    });
 
-      api.addPanel({
-        id: 'panel_calendar',
-        component: 'calendar',
-        title: 'Календарь',
-      });
-
-      api.addPanel({
-        id: 'panel_assistant',
-        component: 'assistant',
-        title: 'Ассистент',
-        position: { direction: 'right' },
-      });
-
-      api.addPanel({
-        id: 'panel_info',
-        component: 'folder-info',
-        title: 'Инфо',
-      });
-    } else if (preset === 'ai_lab') {
-      // AI Focus: Compact Sidebar Left, Wide Center Assistant, Feed Right
-      api.addPanel({
-        id: 'panel_sidebar',
-        component: 'sidebar',
-        title: 'Навигация',
-        position: { direction: 'left' },
-      });
-
-      api.addPanel({
-        id: 'panel_assistant',
-        component: 'assistant',
-        title: 'ИИ-Лаборатория (Чат & RAG)',
-        position: { direction: 'right' },
-      });
-
-      api.addPanel({
-        id: 'panel_feed',
-        component: 'feed',
-        title: 'Лента заметок',
-        position: { direction: 'right' },
-      });
-    } else if (preset === 'deep_focus') {
-      // Pure Writing Focus: Fullscreen center feed / kanban, 0 sidebars
-      api.addPanel({
-        id: 'panel_feed',
-        component: 'feed',
-        title: 'Фокус: Лента',
-        position: { direction: 'left' },
-      });
-
-      api.addPanel({
-        id: 'panel_kanban',
-        component: 'kanban',
-        title: 'Канбан',
-      });
-
-      api.addPanel({
-        id: 'panel_calendar',
-        component: 'calendar',
-        title: 'Календарь',
-      });
-    } else if (preset === 'dual_screen') {
-      // Dual Screen: Sidebar + Kanban on main, Assistant ready to popout
-      api.addPanel({
-        id: 'panel_sidebar',
-        component: 'sidebar',
-        title: 'Навигация',
-        position: { direction: 'left' },
-      });
-
-      api.addPanel({
-        id: 'panel_kanban',
-        component: 'kanban',
-        title: 'Канбан',
-        position: { direction: 'right' },
-      });
-
-      api.addPanel({
-        id: 'panel_feed',
-        component: 'feed',
-        title: 'Лента',
-      });
-
-      api.addPanel({
-        id: 'panel_assistant',
-        component: 'assistant',
-        title: 'Ассистент (Popout)',
-        position: { direction: 'right' },
-      });
-    }
+    api.addPanel({
+      id: 'panel_info',
+      component: 'folder-info',
+      title: 'Инфо',
+      position: { referencePanel: assistantPanel },
+    });
   }, []);
-
-  const handleSelectPreset = (preset: WorkspacePreset) => {
-    setActivePreset(preset);
-    try {
-      localStorage.setItem(WORKSPACE_PRESET_KEY, preset);
-      localStorage.removeItem(WORKSPACE_LAYOUT_KEY);
-    } catch {
-      // Ignore
-    }
-    if (apiRef.current) {
-      applyPresetLayout(preset, apiRef.current);
-    }
-  };
-
-  const handleResetLayout = () => {
-    try {
-      localStorage.removeItem(WORKSPACE_LAYOUT_KEY);
-    } catch {
-      // Ignore
-    }
-    if (apiRef.current) {
-      applyPresetLayout(activePreset, apiRef.current);
-    }
-  };
-
-  const handlePopoutActive = () => {
-    if (!apiRef.current) return;
-    const activeGroup = apiRef.current.activeGroup;
-    if (activeGroup) {
-      try {
-        apiRef.current.addPopoutGroup(activeGroup);
-      } catch {
-        // Fallback to native window.open
-        window.open('/popout.html', '_blank', 'width=800,height=600');
-      }
-    } else {
-      window.open('/popout.html', '_blank', 'width=800,height=600');
-    }
-  };
 
   const onReady = (event: DockviewReadyEvent) => {
     apiRef.current = event.api;
@@ -269,113 +239,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     }
 
     if (!restored) {
-      applyPresetLayout(activePreset, event.api);
+      applyDefaultLayout(event.api);
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col h-screen w-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none">
-      {/* Top Controls Bar: Presets & Layout Mode */}
-      <div className="h-8 px-3 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-2 text-[11px] shrink-0 select-none">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="flex items-center gap-1 text-zinc-400 font-medium">
-            <LayoutGrid className="w-3 h-3 text-zinc-400" />
-            <span className="hidden sm:inline">Сетка:</span>
-          </span>
-
-          {/* Presets buttons */}
-          <div className="flex items-center p-0.5 rounded-md bg-white/[0.03] border border-white/[0.04]">
-            <button
-              onClick={() => handleSelectPreset('default')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors ${
-                activePreset === 'default'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Стандартный трехколоночный пресет"
-            >
-              <Columns className="w-2.5 h-2.5" />
-              <span>Стандарт</span>
-            </button>
-            <button
-              onClick={() => handleSelectPreset('ai_lab')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors ${
-                activePreset === 'ai_lab'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Фокус на ИИ: Ассистент в центре"
-            >
-              <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-              <span>AI Lab</span>
-            </button>
-            <button
-              onClick={() => handleSelectPreset('deep_focus')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors ${
-                activePreset === 'deep_focus'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Глубокий фокус: только контент"
-            >
-              <Maximize2 className="w-2.5 h-2.5" />
-              <span>Фокус</span>
-            </button>
-            <button
-              onClick={() => handleSelectPreset('dual_screen')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors ${
-                activePreset === 'dual_screen'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Двухэкранный сетап с выносом в окно"
-            >
-              <Monitor className="w-2.5 h-2.5" />
-              <span>2 Экрана</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Right Actions: Popout, Reset, Layout Engine Toggle */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={handlePopoutActive}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-[10px] font-medium transition-colors"
-            title="Открепить активную панель в отдельное окно ОС"
-          >
-            <ExternalLink className="w-2.5 h-2.5" />
-            <span className="hidden md:inline">Popout</span>
-          </button>
-
-          <button
-            onClick={handleResetLayout}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors"
-            title="Сбросить расположение панелей к выбранному пресету"
-          >
-            <RotateCcw className="w-3 h-3" />
-          </button>
-
-          {onToggleLayout && (
-            <button
-              onClick={onToggleLayout}
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 text-[10px] font-medium transition-colors cursor-pointer"
-              title="Переключиться в классический трехколоночный вид"
-            >
-              <span>📑 Классика</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Dockview Container */}
-      <div className="flex-1 w-full h-full relative overflow-hidden">
-        <DockviewReact
-          components={components}
-          onReady={onReady}
-          className="dockview-theme-slag w-full h-full"
-          popoutUrl="/popout.html"
-        />
-      </div>
+    <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none">
+      <DockviewReact
+        components={components}
+        rightHeaderActionsComponent={GroupHeaderActions}
+        onReady={onReady}
+        className="dockview-theme-slag w-full h-full"
+        popoutUrl="/popout.html"
+      />
     </div>
   );
 };

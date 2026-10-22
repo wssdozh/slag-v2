@@ -20,7 +20,6 @@ export const Sidebar: React.FC = () => {
     currentFolder,
     setCurrentFolder,
     items,
-    sidebarWidth,
     setIsSearchOpen,
     setIsSettingsOpen,
     openCreateFolderModal,
@@ -63,8 +62,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      style={{ width: `${sidebarWidth}px` }}
-      className="h-screen flex flex-col bg-[#0c0c0e] border-r border-white/[0.06] select-none text-[#a1a1aa] shrink-0"
+      className="w-full h-full flex flex-col bg-[#0c0c0e] select-none text-[#a1a1aa] overflow-hidden"
     >
       {/* Top Header / App Title */}
       <div className="h-12 px-3.5 flex items-center justify-between border-b border-white/[0.04]">

@@ -387,24 +387,24 @@ export const CalendarView: React.FC = () => {
 
         {/* Right: View Switcher [ Неделя | Месяц ] & Overdue/Unscheduled Drawer Toggle */}
         <div className="flex items-center gap-2">
-          {/* View Mode Switcher */}
-          <div className="flex items-center bg-white/[0.03] p-0.5 rounded-md border border-white/[0.04]">
+          {/* View Mode Switcher: Linear-grade segmented control */}
+          <div aria-label="Режим календаря" className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
             <button
               onClick={() => setViewMode('week')}
-              className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+              className={`h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
                 viewMode === 'week'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
             >
               Неделя
             </button>
             <button
               onClick={() => setViewMode('month')}
-              className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+              className={`h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
                 viewMode === 'month'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
             >
               Месяц

@@ -1,8 +1,8 @@
 @import "dockview-react/dist/styles/dockview.css";
 
 /*
- * SLAG v2 Linear Minimal Dark Dockview Theme (95% Contract)
- * Colors: Deep monochrome #09090b, #0c0c0e, #141416, 1px subtle borders #27272a
+ * SLAG v2 Linear / Arc Minimal Dark Dockview Theme (95% Contract)
+ * Compact 28px height, rounded-t sleek tabs, deep monochrome #09090b, #0c0c0e, #141416
  */
 .dockview-theme-slag {
   --dv-group-view-background-color: #09090b;
@@ -20,8 +20,8 @@
   --dv-separator-border: 1px solid rgba(255, 255, 255, 0.06);
   --dv-sash-color: rgba(255, 255, 255, 0.06);
   --dv-active-sash-color: rgba(59, 130, 246, 0.6);
-  --dv-tab-divider-color: rgba(255, 255, 255, 0.04);
-  --dv-tabs-and-actions-container-height: 34px;
+  --dv-tab-divider-color: transparent;
+  --dv-tabs-and-actions-container-height: 28px;
   --dv-tabs-and-actions-container-font-size: 11px;
 
   --dv-drag-over-background-color: rgba(59, 130, 246, 0.15);
@@ -30,25 +30,53 @@
 
   --dv-floating-border: 1px solid rgba(255, 255, 255, 0.1);
   --dv-floating-titlebar-background-color: #0c0c0e;
-  --dv-border-radius: 0px;
-  --dv-tab-border-radius: 0px;
+  --dv-border-radius: 6px;
+  --dv-tab-border-radius: 6px;
   --dv-sash-border-radius: 0px;
   --dv-tab-margin: 0px;
-  --dv-icon-hover-background-color: rgba(255, 255, 255, 0.06);
+  --dv-icon-hover-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dockview-theme-slag .dockview-tabs-and-actions-container {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 4px;
 }
 
 .dockview-theme-slag .dockview-tab {
   font-family: inherit;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: -0.01em;
-  border-top: 2px solid transparent;
-  transition: color 120ms ease, background-color 120ms ease;
+  padding: 0 10px;
+  margin: 2px 2px 0 2px;
+  border-radius: 6px 6px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: #71717a;
+  background-color: transparent;
+  transition: all 120ms ease;
+  user-select: none;
 }
 
 .dockview-theme-slag .dockview-tab.active {
-  border-top: 2px solid #52525b;
+  background-color: #18181b;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-.dockview-theme-slag .dockview-tab:hover {
-  color: #f4f4f5;
+.dockview-theme-slag .dockview-tab:hover:not(.active) {
+  color: #a1a1aa;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.dockview-theme-slag .dockview-tab .dockview-tab-close-action {
+  opacity: 0.5;
+  transition: opacity 120ms ease;
+  border-radius: 4px;
+  padding: 1px;
+  margin-left: 4px;
+}
+
+.dockview-theme-slag .dockview-tab:hover .dockview-tab-close-action {
+  opacity: 0.9;
 }

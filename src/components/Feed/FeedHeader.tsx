@@ -15,12 +15,7 @@ import {
   Filter
 } from 'lucide-react';
 
-interface FeedHeaderProps {
-  onToggleLayout?: () => void;
-  layoutMode?: 'dockview' | 'classic';
-}
-
-export const FeedHeader: React.FC<FeedHeaderProps> = ({ onToggleLayout, layoutMode = 'classic' }) => {
+export const FeedHeader: React.FC = () => {
   const {
     currentFolder,
     inboxMode,
@@ -60,13 +55,13 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({ onToggleLayout, layoutMo
 
         {/* Inbox Sub-mode Filter (SPEC §8.2) - only in feed mode */}
         {isInbox && feedViewMode === 'feed' && (
-          <div className="flex items-center bg-white/[0.03] p-0.5 rounded-md border border-white/[0.04] ml-1.5 shrink-0">
+          <div aria-label="Фильтр входящих" className="flex items-center h-7.5 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] ml-2 shrink-0">
             <button
               onClick={() => setInboxMode('unsorted')}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                 inboxMode === 'unsorted'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
               title="Только неразобранные заметки во Входящих"
             >
@@ -74,10 +69,10 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({ onToggleLayout, layoutMo
             </button>
             <button
               onClick={() => setInboxMode('all')}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                 inboxMode === 'all'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
               title="Все заметки хранилища сквозным списком"
             >
@@ -85,10 +80,10 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({ onToggleLayout, layoutMo
             </button>
             <button
               onClick={() => setInboxMode('sorted')}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                 inboxMode === 'sorted'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
               title="Только распределенные по папкам"
             >
@@ -128,67 +123,63 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({ onToggleLayout, layoutMo
 
       {/* Center / Right Controls */}
       <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-        {/* Unified View Mode Switcher: [ 📜 Лента | 📋 Канбан | 📅 Календарь | ✨ Ассистент ] */}
-        <div className="flex items-center bg-white/[0.03] p-0.5 rounded-md border border-white/[0.04] shrink-0">
+        {/* Unified View Mode Switcher: Icon-only Linear-grade segmented control */}
+        <nav aria-label="Режимы представления" className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
           <button
             onClick={() => setFeedViewMode('feed')}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+            className={`h-7 px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
               feedViewMode === 'feed'
-                ? 'bg-white/10 text-white font-medium shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
             }`}
-            title="Стрим-лента записей"
+            title="Лента записей"
           >
-            <Layers className="w-3 h-3" />
-            <span className="hidden sm:inline">Лента</span>
+            <Layers className="w-3.5 h-3.5 shrink-0" />
           </button>
           <button
             onClick={() => setFeedViewMode('kanban')}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+            className={`h-7 px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
               feedViewMode === 'kanban'
-                ? 'bg-white/10 text-white font-medium shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
             }`}
             title="Канбан-доска задач"
           >
-            <Kanban className="w-3 h-3" />
-            <span className="hidden 2xl:inline">Канбан</span>
+            <Kanban className="w-3.5 h-3.5 shrink-0" />
           </button>
           <button
             onClick={() => setFeedViewMode('calendar')}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+            className={`h-7 px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
               feedViewMode === 'calendar'
-                ? 'bg-white/10 text-white font-medium shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
             }`}
             title="Календарь дедлайнов"
           >
-            <Calendar className="w-3 h-3" />
-            <span className="hidden 2xl:inline">Календарь</span>
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
           </button>
           <button
             onClick={() => setFeedViewMode('assistant')}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+            className={`h-7 px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
               feedViewMode === 'assistant'
-                ? 'bg-white/10 text-white font-medium shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
             }`}
-            title="Полноэкранный Ассистент"
+            title="Ассистент"
           >
-            <Sparkles className="w-3 h-3 text-amber-300" />
-            <span className="hidden 2xl:inline">Ассистент</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
           </button>
-        </div>
+        </nav>
 
         {/* Type filters (feed mode only) */}
         {feedViewMode === 'feed' && (
-          <div className="flex items-center bg-white/[0.03] p-0.5 rounded-md border border-white/[0.04] shrink-0">
+          <div aria-label="Фильтр по типу" className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
             <button
               onClick={() => setActiveTypeFilter('all')}
-              className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+              className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                 activeTypeFilter === 'all'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
               title="Все типы записей"
             >
@@ -196,36 +187,36 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({ onToggleLayout, layoutMo
             </button>
             <button
               onClick={() => setActiveTypeFilter('note')}
-              className={`p-1 rounded text-[11px] flex items-center transition-colors ${
+              className={`h-7 px-2 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
                 activeTypeFilter === 'note'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
               title="Только заметки"
             >
-              <StickyNote className="w-3 h-3 text-zinc-400" />
+              <StickyNote className="w-3.5 h-3.5 text-zinc-300" />
             </button>
             <button
               onClick={() => setActiveTypeFilter('task')}
-              className={`p-1 rounded text-[11px] flex items-center transition-colors ${
+              className={`h-7 px-2 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
                 activeTypeFilter === 'task'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
               title="Только таски"
             >
-              <CheckSquare className="w-3 h-3 text-amber-400" />
+              <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
             </button>
             <button
               onClick={() => setActiveTypeFilter('article')}
-              className={`p-1 rounded text-[11px] flex items-center transition-colors ${
+              className={`h-7 px-2 rounded-md text-[11px] flex items-center transition-all cursor-pointer ${
                 activeTypeFilter === 'article'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
               title="Только статьи"
             >
-              <FileText className="w-3 h-3 text-blue-400" />
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
             </button>
           </div>
         )}
@@ -244,25 +235,10 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({ onToggleLayout, layoutMo
               ? 'text-white bg-white/10'
               : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
           }`}
-          title="Инфо-панель и Ассистент (⌘J / Ctrl+J)"
+          title="Боковая панель (⌘J / Ctrl+J)"
         >
           <PanelRight className="w-4 h-4" />
         </button>
-
-        {/* Toggle Layout Engine between Dockview Composite Grid and Classic Fixed 3-Column */}
-        {onToggleLayout && (
-          <button
-            onClick={onToggleLayout}
-            className={`px-2 py-1 rounded text-[11px] font-medium transition-colors shrink-0 flex items-center gap-1 ${
-              layoutMode === 'dockview'
-                ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-            }`}
-            title="Переключить режим компоновки: Композитная IDE-сетка (Dockview) / Фиксированный (⌘.)"
-          >
-            <span>{layoutMode === 'dockview' ? '🪟 Сетка' : '📑 Фикс'}</span>
-          </button>
-        )}
       </div>
     </header>
   );

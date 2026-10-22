@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { parseTodoistInput } from '../../lib/todoistTaskParser';
+import { querySearch } from '../../lib/searchService';
 import {
   CircleDashed,
   Circle,
@@ -16,7 +17,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  Search,
+  X,
 } from 'lucide-react';
 
 function isOverdue(dueDate?: string): boolean {
@@ -141,6 +144,10 @@ export const KanbanBoard: React.FC = () => {
   // Collapsible TRIZ materials dock
   const [isMaterialsOpen, setIsMaterialsOpen] = useState(true);
 
+  // Search state for TRIZ Materials Dock
+  const [materialsSearchQuery, setMaterialsSearchQuery] = useState('');
+  const [searchedMaterials, setSearchedMaterials] = useState<SlagItem[]>([]);
+
   // Column drag highlight
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
@@ -160,9 +167,28 @@ export const KanbanBoard: React.FC = () => {
   }, [items, currentFolder]);
 
   // TRIZ Materials: Notes and Articles in this folder
-  const materials = useMemo(() => {
+  const folderMaterials = useMemo(() => {
     return folderItems.filter(item => item.type === 'note' || item.type === 'article');
   }, [folderItems]);
+
+  useEffect(() => {
+    if (!materialsSearchQuery.trim()) return;
+
+    let isMounted = true;
+    querySearch(materialsSearchQuery, folderMaterials).then(results => {
+      if (isMounted) {
+        setSearchedMaterials(results);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [materialsSearchQuery, folderMaterials]);
+
+  const filteredMaterials = useMemo(() => {
+    return materialsSearchQuery.trim() ? searchedMaterials : folderMaterials;
+  }, [materialsSearchQuery, searchedMaterials, folderMaterials]);
 
   // Tasks in this folder
   const tasks = useMemo(() => {
@@ -323,7 +349,9 @@ export const KanbanBoard: React.FC = () => {
               <div className="flex items-center gap-1.5 truncate">
                 <BookOpen className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                 <span className="truncate">Материалы папки</span>
-                <span className="text-[11px] font-mono text-zinc-500">({materials.length})</span>
+                <span className="text-[11px] font-mono text-zinc-500">
+                  ({materialsSearchQuery ? filteredMaterials.length : folderMaterials.length})
+                </span>
               </div>
               <button
                 onClick={() => setIsMaterialsOpen(false)}
@@ -347,17 +375,35 @@ export const KanbanBoard: React.FC = () => {
 
         {/* TRIZ Dock Content */}
         {isMaterialsOpen && (
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-2 scrollbar-thin">
-            <div className="text-[11px] text-zinc-500 px-1 font-mono leading-relaxed">
-              Заметки и статьи папки. Перетащите в колонку или нажмите «В задачу».
+          <>
+            <div className="relative px-3 py-1.5 border-b border-white/[0.04]">
+              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={materialsSearchQuery}
+                onChange={e => setMaterialsSearchQuery(e.target.value)}
+                placeholder="Поиск по материалам..."
+                className="w-full bg-[#141417] border border-white/[0.06] rounded-md pl-8 pr-7 py-1 text-xs text-zinc-200 placeholder-zinc-500 outline-none focus:border-white/20 transition-colors"
+              />
+              {materialsSearchQuery && (
+                <button
+                  onClick={() => setMaterialsSearchQuery('')}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
 
-            {materials.length === 0 ? (
-              <div className="py-8 text-center text-xs text-zinc-600 px-2">
-                В этой папке нет заметок или статей. Все материалы будут отображаться здесь.
-              </div>
-            ) : (
-              materials.map(mat => (
+            <div className="flex-1 overflow-y-auto p-2.5 space-y-2 scrollbar-thin">
+              {filteredMaterials.length === 0 ? (
+                <div className="py-8 text-center text-xs text-zinc-600 px-2">
+                  {materialsSearchQuery
+                    ? 'Ничего не найдено'
+                    : 'В этой папке нет заметок или статей. Все материалы будут отображаться здесь.'}
+                </div>
+              ) : (
+                filteredMaterials.map(mat => (
                 <div
                   key={mat.id}
                   draggable
@@ -433,6 +479,7 @@ export const KanbanBoard: React.FC = () => {
               ))
             )}
           </div>
+        </>
         )}
       </div>
 
@@ -491,47 +538,8 @@ export const KanbanBoard: React.FC = () => {
 
               {/* Column Cards Container */}
               <div className="flex-1 overflow-y-auto p-2.5 space-y-2 scrollbar-thin">
-                {/* Inline task creator */}
-                {addingToColumn === column.id && (
-                  <div className="p-2.5 rounded-lg bg-[#18181c] border border-blue-500/40 shadow-md space-y-2">
-                    <input
-                      autoFocus
-                      type="text"
-                      placeholder="Название задачи... (Enter)"
-                      value={newTitle}
-                      onChange={e => setNewTitle(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleCreateTaskInColumn(column.id);
-                        } else if (e.key === 'Escape') {
-                          setAddingToColumn(null);
-                        }
-                      }}
-                      className="w-full bg-transparent text-xs text-zinc-100 placeholder-zinc-500 outline-none"
-                    />
-                    <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-1">
-                      <span>Нажмите Enter для создания</span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setAddingToColumn(null)}
-                          className="px-2 py-0.5 rounded hover:bg-white/[0.08] text-zinc-400"
-                        >
-                          Отмена
-                        </button>
-                        <button
-                          onClick={() => handleCreateTaskInColumn(column.id)}
-                          className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium"
-                        >
-                          Создать
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Cards List */}
-                {colTasks.length === 0 && addingToColumn !== column.id ? (
+                {colTasks.length === 0 ? (
                   <div className="py-8 text-center text-xs text-zinc-600 font-mono">
                     Нет задач
                   </div>
@@ -707,21 +715,57 @@ export const KanbanBoard: React.FC = () => {
                     );
                   })
                 )}
-              </div>
 
-              {/* Column Bottom Quick Add Button */}
-              {addingToColumn !== column.id && (
-                <button
-                  onClick={() => {
-                    setAddingToColumn(column.id);
-                    setNewTitle('');
-                  }}
-                  className="h-9 px-3 border-t border-white/[0.04] hover:bg-white/[0.03] text-zinc-400 hover:text-zinc-200 text-xs flex items-center gap-1.5 transition-colors shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Новая задача</span>
-                </button>
-              )}
+                {/* Inline task creator or "+ Новая задача" button positioned directly under cards/empty state */}
+                {addingToColumn === column.id ? (
+                  <div className="p-2.5 rounded-lg bg-[#18181c] border border-blue-500/40 shadow-md space-y-2 mt-1">
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Название задачи... (Enter)"
+                      value={newTitle}
+                      onChange={e => setNewTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateTaskInColumn(column.id);
+                        } else if (e.key === 'Escape') {
+                          setAddingToColumn(null);
+                        }
+                      }}
+                      className="w-full bg-transparent text-xs text-zinc-100 placeholder-zinc-500 outline-none"
+                    />
+                    <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-1">
+                      <span>Нажмите Enter для создания</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setAddingToColumn(null)}
+                          className="px-2 py-0.5 rounded hover:bg-white/[0.08] text-zinc-400 cursor-pointer"
+                        >
+                          Отмена
+                        </button>
+                        <button
+                          onClick={() => handleCreateTaskInColumn(column.id)}
+                          className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium cursor-pointer"
+                        >
+                          Создать
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setAddingToColumn(column.id);
+                      setNewTitle('');
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-dashed border-white/[0.08] hover:border-white/[0.16] transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Новая задача</span>
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

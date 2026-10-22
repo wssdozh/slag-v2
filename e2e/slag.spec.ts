@@ -63,17 +63,20 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(allBtn).toBeVisible();
     await expect(sortedBtn).toBeVisible();
 
-    // Switch to "Все"
-    await allBtn.click();
+    // Verify "Все" is active by default
     await expect(allBtn).toHaveClass(/bg-white\/10/);
 
     // Switch to "Разобранные"
     await sortedBtn.click();
     await expect(sortedBtn).toHaveClass(/bg-white\/10/);
 
-    // Switch back to "Неразобранные"
+    // Switch to "Неразобранные"
     await unsortedBtn.click();
     await expect(unsortedBtn).toHaveClass(/bg-white\/10/);
+
+    // Switch back to "Все"
+    await allBtn.click();
+    await expect(allBtn).toHaveClass(/bg-white\/10/);
   });
 
   test('4. Article inline accordion expansion & collapse', async ({ page }) => {
@@ -141,23 +144,26 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('7. Sidebar Resizing with mouse drag', async ({ page }) => {
-    const splitter = page.locator('div[title="Перетащите для изменения ширины"]').first();
-    await expect(splitter).toBeVisible();
+    const splitter = page.locator('.dv-sash, .sash').first();
+    await expect(splitter).toBeAttached();
 
     const leftSidebar = page.locator('aside').first();
     const initialBox = await leftSidebar.boundingBox();
     expect(initialBox).toBeTruthy();
 
     if (initialBox) {
-      await splitter.hover();
-      await page.mouse.down();
-      await page.mouse.move(initialBox.x + initialBox.width + 50, initialBox.y + 100);
-      await page.mouse.up();
+      const splitterBox = await splitter.boundingBox();
+      if (splitterBox) {
+        await page.mouse.move(splitterBox.x + splitterBox.width / 2, splitterBox.y + 100);
+        await page.mouse.down();
+        await page.mouse.move(splitterBox.x + 80, splitterBox.y + 100);
+        await page.mouse.up();
+      }
 
       const newBox = await leftSidebar.boundingBox();
       expect(newBox).toBeTruthy();
-      if (newBox) {
-        expect(newBox.width).toBeGreaterThanOrEqual(initialBox.width);
+      if (newBox && initialBox) {
+        expect(newBox.width).toBeGreaterThan(initialBox.width);
       }
     }
   });
@@ -259,16 +265,16 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('10. Toggle Assistant Mode via Header Button and Shortcut (Ctrl+J)', async ({ page }) => {
-    // 1. Click on "Ассистент" button in center header
-    const assistantBtn = page.locator('header button', { hasText: 'Ассистент' });
+    // 1. Click on Assistant icon button in center header
+    const assistantBtn = page.locator('header button[title*="Ассистент"]');
     await expect(assistantBtn).toBeVisible();
     await assistantBtn.click();
 
     // Verify Assistant view is active
     await expect(page.locator('text=Все хранилище').first()).toBeVisible();
 
-    // 2. Toggle to Feed via button
-    await page.locator('header button', { hasText: 'Лента' }).click();
+    // 2. Toggle to Feed via icon button
+    await page.locator('header button[title*="Лента"]').click();
     await expect(page.locator('main textarea[placeholder*="Мысль, заметка или код"]')).toBeVisible();
 
     // 3. Toggle Right Panel Assistant via shortcut Ctrl+J
@@ -279,7 +285,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('11. Assistant Tool Calling (get_vault_stats) and Reasoning Accordion', async ({ page }) => {
     // Switch to Assistant in center
-    await page.locator('header button', { hasText: 'Ассистент' }).click();
+    await page.locator('header button[title*="Ассистент"]').click();
 
     // Click quick prompt for vault stats
     const statsPromptBtn = page.locator('button', { hasText: 'Сводка хранилища' });
@@ -302,7 +308,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('12. Assistant Draft Note Generation and Creation', async ({ page }) => {
     // Switch to Assistant in center
-    await page.locator('header button', { hasText: 'Ассистент' }).click();
+    await page.locator('header button[title*="Ассистент"]').click();
 
     // Ask to create a task
     const textarea = page.locator('main textarea[placeholder*="Спросите"]');
@@ -322,18 +328,17 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Запись «Проверить Groq API» сохранена')).toBeVisible();
 
     // Switch back to Feed and verify the task exists in the feed!
-    await page.locator('header button', { hasText: 'Лента' }).click();
+    await page.locator('header button[title*="Лента"]').click();
     await expect(page.locator('.group', { hasText: 'Проверить Groq API' })).toBeVisible();
   });
 
   test('13. Right Sidebar Assistant & Feed Filtering', async ({ page }) => {
     // Open Assistant mode in right sidebar
-    const rightPanel = page.locator('aside').last();
-    const assistantTab = rightPanel.locator('button', { hasText: 'Ассистент' });
+    const assistantTab = page.locator('button[title*="Ассистент"]').last();
     await assistantTab.click();
 
     // Verify sidebar assistant is visible
-    const sidebarTextarea = rightPanel.locator('textarea[placeholder*="Спросите"]');
+    const sidebarTextarea = page.locator('aside textarea[placeholder*="Спросите"]');
     await expect(sidebarTextarea).toBeVisible();
 
     // Ask to search design notes
@@ -341,7 +346,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await sidebarTextarea.press('Enter');
 
     // Wait for search result with "Показать в ленте" button
-    const filterBtn = rightPanel.locator('button', { hasText: /Показать \d+ в ленте/ });
+    const filterBtn = page.locator('aside button', { hasText: /Показать \d+ в ленте/ });
     await expect(filterBtn).toBeVisible();
     await filterBtn.click();
 
@@ -390,15 +395,15 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('15. Visual Layout Screenshots of Assistant Views for Agent Audit', async ({ page }) => {
     // 1. Right sidebar assistant screenshot
-    const rightPanel = page.locator('aside').last();
-    await rightPanel.locator('button', { hasText: 'Ассистент' }).click();
+    const assistantTab = page.locator('aside button[title*="Ассистент"]').last();
+    await assistantTab.click();
     await page.screenshot({
       path: 'test-results/screenshots/assistant-sidebar-layout.png',
       fullPage: false,
     });
 
     // 2. Center full-screen assistant screenshot
-    await page.locator('header button', { hasText: 'Ассистент' }).click();
+    await page.locator('header button[title*="Ассистент"]').click();
     await expect(page.locator('text=Все хранилище').first()).toBeVisible();
 
     await page.screenshot({
@@ -409,7 +414,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('16. Assistant Pure Chat Dialogue, Quick Prompts, and Interactive Draft Generation', async ({ page }) => {
     // 1. Open Center Assistant view
-    await page.locator('header button', { hasText: 'Ассистент' }).click();
+    await page.locator('header button[title*="Ассистент"]').click();
     await expect(page.locator('text=Все хранилище').first()).toBeVisible();
 
     // 2. Send a message via quick prompt
@@ -434,15 +439,21 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=сохранена').or(page.locator('text=Запись'))).toBeVisible();
   });
 
-  test('17. Linear-style Kanban Board with TRIZ Dock and Signal Bars', async ({ page }) => {
+  test('17. Linear-style Kanban Board with Inline Task Button and Orama Materials Search', async ({ page }) => {
     // 1. Switch to Kanban view in header
-    const kanbanBtn = page.locator('header button', { hasText: 'Канбан' });
+    const kanbanBtn = page.locator('header button[title*="Канбан"]');
     await expect(kanbanBtn).toBeVisible();
     await kanbanBtn.click();
 
-    // 2. Verify TRIZ Materials Dock exists and shows materials
+    // 2. Verify TRIZ Materials Dock exists and test Orama live search
     const materialsHeader = page.locator('text=Материалы папки');
     await expect(materialsHeader).toBeVisible();
+
+    const materialsSearch = page.locator('input[placeholder*="Поиск по материалам"]');
+    await expect(materialsSearch).toBeVisible();
+    await materialsSearch.fill('манифест');
+    await expect(page.locator('text=Манифест ультра-минимализма').first()).toBeVisible();
+    await materialsSearch.fill('');
 
     // 3. Verify 4 columns exist (Бэклог, К выполнению, В работе, Выполнено)
     await expect(page.locator('h3', { hasText: 'Бэклог' })).toBeVisible();
@@ -450,8 +461,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('h3', { hasText: 'В работе' })).toBeVisible();
     await expect(page.locator('h3', { hasText: 'Выполнено' })).toBeVisible();
 
-    // 4. Create a task inline in "К выполнению" column
-    const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]');
+    // 4. Create a task inline via "+ Новая задача" button placed directly under cards
+    const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]').first();
     await addBtn.click();
 
     const input = page.locator('input[placeholder*="Название задачи"]');
@@ -476,7 +487,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('18. Todoist Upcoming Calendar with Week/Month Views and Overdue Drawer', async ({ page }) => {
     // 1. Switch to Calendar view in header
-    const calendarBtn = page.locator('header button', { hasText: 'Календарь' });
+    const calendarBtn = page.locator('header button[title*="Календарь"]');
     await expect(calendarBtn).toBeVisible();
     await calendarBtn.click();
 
@@ -585,70 +596,36 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     expect(cardText).not.toContain('#culture завтра');
   });
 
-  test('20. Composite Workspace (Dockview), Presets Switching, and Layout Engine Toggle', async ({ page }) => {
-    // 1. Locate the Layout Engine toggle button in FeedHeader
-    const toggleLayoutBtn = page.locator('header button[title*="Композитная IDE-сетка"]');
-    await expect(toggleLayoutBtn).toBeVisible();
-
-    // 2. Click to toggle to Dockview Grid
-    await toggleLayoutBtn.click();
-
-    // 3. Verify Dockview container and Presets controls are visible
+  test('20. Dockview Composite Workspace, Sleek Rounded Tabs, and [+] Group Header Actions', async ({ page }) => {
+    // 1. Verify Dockview container is active by default
     const dockviewContainer = page.locator('.dockview-theme-slag');
     await expect(dockviewContainer).toBeVisible();
-    await expect(page.locator('text=Сетка:')).toBeVisible();
 
-    // 4. Verify Preset buttons exist
-    const defaultPresetBtn = page.locator('button', { hasText: 'Стандарт' }).first();
-    const aiLabPresetBtn = page.locator('button', { hasText: 'AI Lab' }).first();
-    const focusPresetBtn = page.locator('button', { hasText: 'Фокус' }).first();
-    const dualPresetBtn = page.locator('button', { hasText: '2 Экрана' }).first();
+    // 2. Verify top bar is completely removed
+    await expect(page.locator('text=Пресеты:')).not.toBeVisible();
+    await expect(page.locator('text=Сетка:')).not.toBeVisible();
 
-    await expect(defaultPresetBtn).toBeVisible();
-    await expect(aiLabPresetBtn).toBeVisible();
-    await expect(focusPresetBtn).toBeVisible();
-    await expect(dualPresetBtn).toBeVisible();
+    // 3. Locate the [+] button on the tab group header
+    const addTabBtn = page.locator('button[title*="Добавить вкладку в эту группу"]').first();
+    await expect(addTabBtn).toBeVisible();
 
-    // Capture Default Preset screenshot
+    // 4. Click [+] button and verify popup menu
+    await addTabBtn.click();
+    const menu = page.locator('div.shadow-2xl', { hasText: 'Добавить вкладку' });
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('button', { hasText: 'Лента' })).toBeVisible();
+    await expect(menu.locator('button', { hasText: 'Канбан' })).toBeVisible();
+    await expect(menu.locator('button', { hasText: 'Календарь' })).toBeVisible();
+    await expect(menu.locator('button', { hasText: 'Ассистент' })).toBeVisible();
+
+    // 5. Take screenshot of sleek tabs with [+] button
     await page.screenshot({
-      path: 'test-results/screenshots/dockview-default-preset.png',
+      path: 'test-results/screenshots/dockview-sleek-tabs-with-plus.png',
       fullPage: false,
     });
 
-    // 5. Switch to AI Lab Preset
-    await aiLabPresetBtn.click();
-    await expect(aiLabPresetBtn).toHaveClass(/bg-white\/10/);
-    await page.waitForTimeout(200);
-
-    // Capture AI Lab Preset screenshot
-    await page.screenshot({
-      path: 'test-results/screenshots/dockview-ai-lab-preset.png',
-      fullPage: false,
-    });
-
-    // 6. Switch to Deep Focus Preset
-    await focusPresetBtn.click();
-    await expect(focusPresetBtn).toHaveClass(/bg-white\/10/);
-    await page.waitForTimeout(200);
-
-    // Capture Deep Focus Preset screenshot
-    await page.screenshot({
-      path: 'test-results/screenshots/dockview-focus-preset.png',
-      fullPage: false,
-    });
-
-    // 7. Switch to Dual Screen Preset
-    await dualPresetBtn.click();
-    await expect(dualPresetBtn).toHaveClass(/bg-white\/10/);
-    await page.waitForTimeout(200);
-
-    // 8. Switch back to Classic Layout via "Классика" button
-    const classicBtn = page.locator('button', { hasText: 'Классика' });
-    await expect(classicBtn).toBeVisible();
-    await classicBtn.click();
-
-    // Verify returning to classic layout
-    await expect(dockviewContainer).not.toBeVisible();
-    await expect(page.locator('header button', { hasText: 'Лента' })).toBeVisible();
+    // 6. Close menu via Escape
+    await page.keyboard.press('Escape');
+    await expect(menu).not.toBeVisible();
   });
 });

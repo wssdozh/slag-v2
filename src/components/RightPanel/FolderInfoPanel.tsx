@@ -23,11 +23,9 @@ export const FolderInfoPanel: React.FC = () => {
     folders,
     filteredItems,
     items,
-    isRightPanelOpen,
     setIsRightPanelOpen,
     rightPanelMode,
     setRightPanelMode,
-    rightPanelWidth,
     saveFolder,
     setActiveTagFilter,
     addToast,
@@ -38,8 +36,6 @@ export const FolderInfoPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'media' | 'audio' | 'files' | 'links' | 'tags'>('media');
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
-
-  if (!isRightPanelOpen) return null;
 
   const currentFolderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === 'Входящие';
@@ -95,34 +91,33 @@ export const FolderInfoPanel: React.FC = () => {
 
   return (
     <aside
-      style={{ width: `${rightPanelWidth}px` }}
-      className="h-screen flex flex-col bg-[#0c0c0e] border-l border-white/[0.06] select-none text-[#a1a1aa] shrink-0"
+      className="w-full h-full flex flex-col bg-[#0c0c0e] select-none text-[#a1a1aa] overflow-hidden"
     >
       {/* Top Header with [ Инфо | Ассистент ] Toggle */}
       <div className="h-12 px-3 flex items-center justify-between border-b border-white/[0.04] gap-2">
-        <div className="flex items-center bg-white/[0.03] p-0.5 rounded-md border border-white/[0.04] w-fit">
+        <div className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner w-fit">
           <button
             onClick={() => setRightPanelMode('info')}
-            className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] transition-colors ${
+            className={`flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
               rightPanelMode === 'info'
-                ? 'bg-white/10 text-white font-medium shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
             }`}
             title="Информация и статистика папки"
           >
-            <Info className="w-3 h-3 shrink-0" />
+            <Info className="w-3.5 h-3.5 shrink-0" />
             <span>Инфо</span>
           </button>
           <button
             onClick={() => setRightPanelMode('assistant')}
-            className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] transition-colors ${
+            className={`flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
               rightPanelMode === 'assistant'
-                ? 'bg-white/10 text-white font-medium shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
             }`}
             title="ИИ-Копилот и Ассистент (⌘J / Ctrl+J)"
           >
-            <Bot className="w-3 h-3 text-amber-300 shrink-0" />
+            <Bot className="w-3.5 h-3.5 text-amber-300 shrink-0" />
             <span>Ассистент</span>
           </button>
         </div>
@@ -261,59 +256,38 @@ export const FolderInfoPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Media / Files / Links Tabs (matching Telegram Image 3) */}
+        {/* Media / Files / Links Tabs with Linear-style underline indicator */}
         <div className="flex flex-col gap-3 pt-1">
-          <div className="flex items-center gap-0.5 border-b border-white/[0.04] pb-1 text-[10px] font-mono overflow-x-auto scrollbar-none">
-            <button
-              onClick={() => setActiveTab('media')}
-              className={`px-1.5 py-0.5 rounded transition-colors whitespace-nowrap ${
-                activeTab === 'media'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Медиа {allImages.length > 0 ? `(${allImages.length})` : ''}
-            </button>
-            <button
-              onClick={() => setActiveTab('audio')}
-              className={`px-1.5 py-0.5 rounded transition-colors whitespace-nowrap ${
-                activeTab === 'audio'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Аудио {allAudio.length > 0 ? `(${allAudio.length})` : ''}
-            </button>
-            <button
-              onClick={() => setActiveTab('files')}
-              className={`px-1.5 py-0.5 rounded transition-colors whitespace-nowrap ${
-                activeTab === 'files'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Файлы {allFiles.length > 0 ? `(${allFiles.length})` : ''}
-            </button>
-            <button
-              onClick={() => setActiveTab('links')}
-              className={`px-1.5 py-0.5 rounded transition-colors whitespace-nowrap ${
-                activeTab === 'links'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Ссылки {allLinks.length > 0 ? `(${allLinks.length})` : ''}
-            </button>
-            <button
-              onClick={() => setActiveTab('tags')}
-              className={`px-1.5 py-0.5 rounded transition-colors whitespace-nowrap ${
-                activeTab === 'tags'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Теги {folderTags.size > 0 ? `(${folderTags.size})` : ''}
-            </button>
+          <div className="flex items-center gap-1 border-b border-white/[0.06] pb-1 overflow-x-auto scrollbar-none">
+            {[
+              { id: 'media' as const, label: 'Медиа', count: allImages.length },
+              { id: 'audio' as const, label: 'Аудио', count: allAudio.length },
+              { id: 'files' as const, label: 'Файлы', count: allFiles.length },
+              { id: 'links' as const, label: 'Ссылки', count: allLinks.length },
+              { id: 'tags' as const, label: 'Теги', count: folderTags.size },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative pb-1 px-2 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'text-white'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {tab.count > 0 && (
+                  <span className={`text-[10px] font-mono px-1 py-0.2 rounded ${
+                    activeTab === tab.id ? 'bg-white/10 text-zinc-300' : 'bg-white/[0.04] text-zinc-500'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+                {activeTab === tab.id && (
+                  <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-white rounded-full" />
+                )}
+              </button>
+            ))}
           </div>
 
           {/* Tab Content Display */}
