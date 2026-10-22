@@ -19,6 +19,8 @@
   Никаких приветствий, предисловий и вежливых подводок. Ответы строго в `application/json` или Tool Calling. Перед генерацией тегов передается словарь существующих тегов пользователя для исключения дубликатов.
 - **Сквозная визуальная верификация (Playwright + read_image)**  
   Любые изменения в интерфейсе проверяются прогоном Playwright и визуальным анализом созданных скриншотов через инструмент `read_image` на отсутствие сползания верстки, наложений и дефектов.
+- **Структурированная диагностика (Zero-Slop Logging & Privacy)**  
+  Запрещены неструктурированные `console.log`. Все события маршрутизируются через `logger.scope(...)` с автоматическим маскированием API-ключей, замером `durationMs` и кольцевым буфером в памяти.
 
 ---
 
@@ -94,6 +96,7 @@
 | [`anti-deadlock.md`](.agents/rules/anti-deadlock.md) | **Engineering** | Лестница Ponytail, Root-Cause починка, запрет костылей, правило 3 попыток. |
 | [`code-style-ts-react.md`](.agents/rules/code-style-ts-react.md) | **Engineering** | React 19, чистые эффекты, типизация TypeScript, Fast Refresh, правила oxlint. |
 | [`triz-contradiction-resolution.md`](.agents/rules/triz-contradiction-resolution.md) | **Architecture/UX** | Разрешение технических и физических противоречий по ТРИЗ, 4 оператора разделения, ИКР. |
+| [`logging-diagnostics-standard.md`](.agents/rules/logging-diagnostics-standard.md) | **Diagnostics** | Регламент логгера, скоупы `AI/FS/SEARCH/UI/APP/SYNC`, замер длительности, маскирование ключей. |
 
 ---
 
@@ -108,7 +111,8 @@ SLAG v2/
 │       ├── ui-ux-contract.md
 │       ├── anti-deadlock.md
 │       ├── code-style-ts-react.md
-│       └── triz-contradiction-resolution.md
+│       ├── triz-contradiction-resolution.md
+│       └── logging-diagnostics-standard.md
 ├── docs/
 │   └── project-map/                    # База знаний в формате Obsidian
 │       ├── 00_MOC_Map_of_Content.md
@@ -118,21 +122,23 @@ SLAG v2/
 │       ├── 04_Multimedia_Engine.md
 │       ├── 05_Search_Orama_Local_First.md
 │       ├── 06_E2E_Sync_Architecture.md
-│       └── 07_Roadmap_Implementation.md
+│       ├── 07_Roadmap_Implementation.md
+│       └── 12_Logging_Diagnostics_Engine.md
 ├── e2e/                                # Playwright E2E тесты
 │   └── slag.spec.ts
 ├── src/
 │   ├── components/
 │   │   ├── Editor/FullscreenEditor.tsx # Полноэкранный фокус-редактор
 │   │   ├── Feed/                       # Стрим-лента: Composer, FeedList, FeedHeader, ItemCard
+│   │   ├── Logs/                       # In-App Dev HUD: LogViewer.tsx, LogModal.tsx
 │   │   ├── Modals/                     # FolderModal, SettingsModal, TriageModal
 │   │   ├── RightPanel/FolderInfoPanel  # Правая инфо-панель папки и медиа
 │   │   ├── Search/SearchModal.tsx      # Поиск Orama (⌘K)
 │   │   ├── Sidebar/                    # FolderTree, folderIcons, Sidebar
 │   │   └── UI/                         # Lightbox, Toast, Audio/Video рекордеры и плееры
 │   ├── context/AppContext.tsx          # Главное состояние и менеджер слоев
-│   ├── lib/                            # storage.ts, geminiService.ts, searchService.ts
-│   └── types/index.ts                  # Модели данных: SlagItem, FolderMeta, VaultMeta
+│   ├── lib/                            # logger.ts, storage.ts, aiService.ts, searchService.ts
+│   └── types/index.ts                  # Модели данных: SlagItem, FolderMeta, VaultMeta, LogEntry
 ├── AGENTS.md                           # Главный кодекс агента (этот файл)
 ├── SPECIFICATION.md                    # Полная техническая спецификация продукта
 └── playwright.config.ts                # Конфигурация Playwright
