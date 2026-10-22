@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Folder,
+  FolderCheck,
   Inbox,
   CheckSquare,
   FileText,
@@ -53,17 +54,6 @@ export const FeedHeader: React.FC = () => {
         {isInbox && feedViewMode === 'feed' && (
           <div aria-label="Фильтр входящих" className="flex items-center h-7.5 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] ml-2 shrink-0">
             <button
-              onClick={() => setInboxMode('unsorted')}
-              className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                inboxMode === 'unsorted'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-              }`}
-              title="Только неразобранные заметки во Входящих"
-            >
-              Неразобранные
-            </button>
-            <button
               onClick={() => setInboxMode('all')}
               className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                 inboxMode === 'all'
@@ -76,14 +66,25 @@ export const FeedHeader: React.FC = () => {
             </button>
             <button
               onClick={() => setInboxMode('sorted')}
-              className={`h-6.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+              className={`h-6.5 px-1.5 rounded-md text-[11px] flex items-center justify-center transition-all cursor-pointer ${
                 inboxMode === 'sorted'
                   ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
               }`}
-              title="Только распределенные по папкам"
+              title="Только распределенные по папкам (Разобранные)"
             >
-              Разобранные
+              <FolderCheck className="w-3.5 h-3.5 text-zinc-300" />
+            </button>
+            <button
+              onClick={() => setInboxMode('unsorted')}
+              className={`h-6.5 px-1.5 rounded-md text-[11px] flex items-center justify-center transition-all cursor-pointer ${
+                inboxMode === 'unsorted'
+                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+              }`}
+              title="Только неразобранные заметки во Входящих"
+            >
+              <Inbox className="w-3.5 h-3.5 text-zinc-300" />
             </button>
           </div>
         )}

@@ -11,7 +11,10 @@ import {
   Plus,
   Terminal,
   ExternalLink,
-  Filter
+  Filter,
+  BarChart3,
+  Search,
+  CheckSquare
 } from 'lucide-react';
 
 interface AssistantChatProps {
@@ -117,7 +120,10 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
           <span className="truncate">
             {isInbox ? (
-              <strong className="text-zinc-200">🌐 Все хранилище</strong>
+              <span className="inline-flex items-center gap-1.5 font-medium text-zinc-200">
+                <Globe className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Все хранилище</span>
+              </span>
             ) : (
               <span>Контекст: <strong className="text-zinc-200">{folderMeta?.name || currentFolder}</strong></span>
             )}
@@ -155,21 +161,30 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 onClick={() => handleQuickPrompt('Сколько заметок и задач в хранилище?')}
                 className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
               >
-                <span>📊 Сводка хранилища</span>
+                <span className="flex items-center gap-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span>Сводка хранилища</span>
+                </span>
                 <span className="text-[10px] text-zinc-600 font-mono">stats</span>
               </button>
               <button
                 onClick={() => handleQuickPrompt('Найди ключевые заметки')}
                 className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
               >
-                <span>🔍 Поиск заметок</span>
+                <span className="flex items-center gap-2">
+                  <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span>Поиск заметок</span>
+                </span>
                 <span className="text-[10px] text-zinc-600 font-mono">search</span>
               </button>
               <button
                 onClick={() => handleQuickPrompt('Создай новую задачу: Проверить синхронизацию заметок')}
                 className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
               >
-                <span>📝 Создать задачу</span>
+                <span className="flex items-center gap-2">
+                  <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span>Создать задачу</span>
+                </span>
                 <span className="text-[10px] text-zinc-600 font-mono">task</span>
               </button>
             </div>
