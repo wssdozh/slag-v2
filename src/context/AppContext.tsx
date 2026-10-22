@@ -569,17 +569,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       const response = await sendAssistantChat({
-        messages: newHistory.map(m => ({ role: m.role, content: m.content })),
+        messages: newHistory.map(m => {
+          let content = m.content;
+          if (!content.trim() && m.suggestedAction) {
+            content = `[Подготовлен черновик ${m.suggestedAction.itemType || 'note'}: «${m.suggestedAction.title}»:\n${m.suggestedAction.content || ''}]`;
+          }
+          return { role: m.role, content: content.trim() || '[Действие]' };
+        }),
         currentFolder,
         settings: aiSettings,
         folders,
         allItems: items,
       });
 
+      let resolvedContent = response.content;
+      if (!resolvedContent.trim() && response.suggestedAction) {
+        resolvedContent = `[Подготовлен черновик ${response.suggestedAction.itemType || 'note'}: «${response.suggestedAction.title}»:\n${response.suggestedAction.content || ''}]`;
+      }
+
       const assistantMsg: ChatMessage = {
         id: 'msg_res_' + Date.now(),
         role: 'assistant',
-        content: response.content,
+        content: resolvedContent,
         createdAt: Date.now(),
         reasoning: response.reasoning,
         reasoningTimeMs: response.reasoningTimeMs,

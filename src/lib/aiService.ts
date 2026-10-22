@@ -749,7 +749,13 @@ ${isInbox
 \`\`\`action:move_note
 { "action": "move_note", "targetItemId": "id_записи", "title": "Название", "folder": "Целевая/Папка" }
 \`\`\`
-Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.`;
+Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.
+
+4. РАБОТА С КОНТЕКСТОМ И ТРАНСФОРМАЦИЯ ЧЕРНОВИКОВ:
+   - Если пользователь просит переделать, развить или преобразовать предыдущую запись («сделай из этого статью», «преврати в задачу», «добавь деталей»):
+   - Опирайся на тему и текст предыдущего черновика из истории диалога.
+   - Сформируй обновленный блок действия action:create_note (например, с itemType: "article" и развернутым структурированным содержанием).
+   - НЕ вызывай search_notes на такие контекстные просьбы!`;
 
   // 1. External LLM Provider with Tool Calling (Groq / KIE.AI / Gemini)
   const isGroq = settings.provider === 'groq' && Boolean(settings.groqApiKey);
@@ -771,7 +777,13 @@ ${isInbox
       const executedToolCalls: ChatToolCall[] = [];
       const requestMessages: any[] = [
         { role: 'system', content: systemPrompt },
-        ...messages.map(m => ({ role: m.role, content: m.content })),
+        ...messages.map(m => {
+          let content = m.content;
+          if (!content || !content.trim()) {
+            content = '[Действие или черновик подготовлено]';
+          }
+          return { role: m.role, content };
+        }),
       ];
 
       aiLog.info(`Dispatching ${providerName} assistant chat`, { model, messageCount: requestMessages.length });
@@ -1049,23 +1061,66 @@ ${isInbox
     };
   }
 
-  // Check 5: Create note or task
-  if (lowerMsg.includes('создай') || lowerMsg.includes('добавь') || lowerMsg.includes('новая заметка') || lowerMsg.includes('новую задачу')) {
+  // Check 5: Create note, task or article (including contextual transformations)
+  const isCreateIntent =
+    lowerMsg.includes('создай') ||
+    lowerMsg.includes('добавь') ||
+    lowerMsg.includes('сделай') ||
+    lowerMsg.includes('напиши') ||
+    lowerMsg.includes('оформи') ||
+    lowerMsg.includes('преврати') ||
+    lowerMsg.includes('новая заметка') ||
+    lowerMsg.includes('новую задачу') ||
+    lowerMsg.includes('статью');
+
+  if (isCreateIntent) {
     const isTask = lowerMsg.includes('задач') || lowerMsg.includes('таск');
-    const titleMatch = lastUserMsg.match(/["«]([^"»]+)["»]/) || lastUserMsg.split('\n')[0].replace(/(создай|добавь|новая заметка|новую задачу)\s*/i, '');
-    const title = (typeof titleMatch === 'string' ? titleMatch : titleMatch[1]) || (isTask ? 'Новая задача' : 'Новая мысль');
+    const isArticle = lowerMsg.includes('стать') || lowerMsg.includes('лонгрид');
+    const itemType = isArticle ? 'article' : isTask ? 'task' : 'note';
+
+    // Check if user is referencing a previously generated draft ("из этого", "на этот счет", "по этой теме")
+    let previousDraftContent = '';
+    let previousTitle = '';
+    if (
+      lowerMsg.includes('из этого') ||
+      lowerMsg.includes('из этой') ||
+      lowerMsg.includes('на этот счет') ||
+      lowerMsg.includes('на счёт этого') ||
+      lowerMsg.includes('на счет этого') ||
+      lowerMsg.includes('об этом') ||
+      lowerMsg.includes('преврати')
+    ) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const text = messages[i].content;
+        if (text && text.length > 20) {
+          previousDraftContent = text;
+          const titleM = text.match(/[«"]([^»"]+)[»"]/) || text.match(/\[\[([^\]]+)\]\]/);
+          if (titleM) previousTitle = titleM[1];
+          break;
+        }
+      }
+    }
+
+    const titleMatch = lastUserMsg.match(/["«]([^"»]+)["»]/) || lastUserMsg.split('\n')[0].replace(/(создай|добавь|сделай|напиши|оформи|преврати|новая заметка|новую задачу|статью|из этого)\s*/i, '');
+    const title = previousTitle || (typeof titleMatch === 'string' ? titleMatch : titleMatch?.[1]) || (isArticle ? 'Статья' : isTask ? 'Новая задача' : 'Новая мысль');
+
+    const cleanContent = previousDraftContent
+      ? (previousDraftContent.startsWith('[Подготовлен черновик')
+          ? previousDraftContent.replace(/^\[Подготовлен черновик[^:]*:[^\]]*\]\n?/, '')
+          : previousDraftContent)
+      : `Создано через Ассистента: ${lastUserMsg}`;
 
     const suggestedAction: SuggestedAction = {
       type: 'create_note',
       title: title.trim(),
       folder: currentFolder,
-      content: `Создано через Ассистента: ${lastUserMsg}`,
-      tags: isTask ? ['задачи'] : ['ассистент'],
-      itemType: isTask ? 'task' : 'note',
+      content: isArticle ? `# ${title.trim()}\n\n${cleanContent}` : cleanContent,
+      tags: isArticle ? ['статьи', 'база-знаний'] : isTask ? ['задачи'] : ['ассистент'],
+      itemType,
     };
 
     return {
-      content: `Я подготовил черновик ${isTask ? 'задачи' : 'заметки'}. Нажмите кнопку ниже для сохранения в хранилище:`,
+      content: `Я подготовил черновик ${isArticle ? 'статьи' : isTask ? 'задачи' : 'заметки'}. Нажмите кнопку ниже для сохранения в хранилище:`,
       reasoning: 'Сформирован черновик записи согласно правилу Read-Only Safety',
       reasoningTimeMs: Date.now() - startTime,
       suggestedAction,

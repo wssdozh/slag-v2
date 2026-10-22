@@ -523,9 +523,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   )}
 
                   {/* Body Content with rich Markdown & WikiLink formatting */}
-                  <div className="font-sans text-xs flex flex-col gap-1">
-                    {renderRichContent(msg.content)}
-                  </div>
+                  {msg.content && !msg.content.startsWith('[Подготовлен черновик') && (
+                    <div className="font-sans text-xs flex flex-col gap-1">
+                      {renderRichContent(msg.content)}
+                    </div>
+                  )}
 
                   {/* Interactive Action Card (Read-Only Safety) */}
                   {msg.suggestedAction && (
