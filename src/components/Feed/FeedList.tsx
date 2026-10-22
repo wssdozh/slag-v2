@@ -120,7 +120,7 @@ export const FeedList: React.FC = () => {
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="flex-1 overflow-y-auto px-4 py-4 pb-32 flex flex-col gap-6 relative"
+      className="flex-1 overflow-y-auto px-4 pt-4 flex flex-col gap-6 relative"
     >
       {/* Drag & Drop Visual Dropzone Overlay */}
       {isDraggingOver && (
@@ -164,8 +164,8 @@ export const FeedList: React.FC = () => {
           </div>
         ))
       )}
-      {/* Generous bottom spacer so the last card can always scroll fully clear of the floating composer */}
-      <div className="h-44 shrink-0 pointer-events-none" aria-hidden="true" />
+      {/* Bottom spacer so the last card clears the composer with a clean 16px gap */}
+      <div className="h-24 shrink-0 pointer-events-none" aria-hidden="true" />
       <div ref={bottomAnchorRef} />
     </div>
   );
