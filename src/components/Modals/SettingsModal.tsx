@@ -14,8 +14,10 @@ import {
   Database,
   Sliders,
   Keyboard,
-  RotateCcw
+  RotateCcw,
+  Terminal
 } from 'lucide-react';
+import { LogViewer } from '../Logs/LogViewer';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -29,9 +31,11 @@ export const SettingsModal: React.FC = () => {
     addToast
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'ai' | 'vault' | 'ui' | 'shortcuts'>('ai');
+  const [activeTab, setActiveTab] = useState<'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs'>('ai');
   const [provider, setProvider] = useState<AiProvider>(aiSettings.provider || 'groq');
   const [groqApiKey, setGroqApiKey] = useState(aiSettings.groqApiKey || '');
+  const [kieApiKey, setKieApiKey] = useState(aiSettings.kieApiKey || '');
+  const [kieBaseUrl, setKieBaseUrl] = useState(aiSettings.kieBaseUrl || 'https://api.kie.ai');
   const [geminiApiKey, setGeminiApiKey] = useState(aiSettings.geminiApiKey || '');
   const [model, setModel] = useState(aiSettings.model || 'openai/gpt-oss-120b');
   const [maxTags, setMaxTags] = useState(aiSettings.maxTagsPerNote ?? 3);
@@ -46,6 +50,8 @@ export const SettingsModal: React.FC = () => {
     setProvider(newProvider);
     if (newProvider === 'groq') {
       setModel('openai/gpt-oss-120b');
+    } else if (newProvider === 'kie') {
+      setModel('gpt-5-2');
     } else {
       setModel('gemini-2.0-flash');
     }
@@ -56,6 +62,8 @@ export const SettingsModal: React.FC = () => {
     saveAiSettings({
       provider,
       groqApiKey: groqApiKey.trim(),
+      kieApiKey: kieApiKey.trim(),
+      kieBaseUrl: kieBaseUrl.trim() || 'https://api.kie.ai',
       geminiApiKey: geminiApiKey.trim(),
       model,
       maxTagsPerNote: Number(maxTags) || 3,
@@ -180,6 +188,7 @@ export const SettingsModal: React.FC = () => {
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('shortcuts')}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
                 activeTab === 'shortcuts'
@@ -189,6 +198,20 @@ export const SettingsModal: React.FC = () => {
             >
               <Keyboard className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <span>Горячие клавиши</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('logs')}
+              data-testid="settings-tab-logs"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+                activeTab === 'logs'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span>Логи & Диагностика</span>
             </button>
           </div>
 
@@ -516,6 +539,12 @@ export const SettingsModal: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {activeTab === 'logs' && (
+              <div className="h-[490px] -m-5 flex flex-col">
+                <LogViewer variant="dock" />
+              </div>
+            )}
             </div>
 
             {/* Bottom Form Actions */}
@@ -527,12 +556,14 @@ export const SettingsModal: React.FC = () => {
               >
                 Закрыть
               </button>
-              <button
-                type="submit"
-                className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors"
-              >
-                Сохранить
-              </button>
+              {activeTab !== 'logs' && (
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors"
+                >
+                  Сохранить
+                </button>
+              )}
             </div>
           </form>
         </div>

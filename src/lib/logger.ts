@@ -2,10 +2,12 @@ import type { LogEntry, LogLevel, LogScope } from '../types';
 
 export type LogListener = (entry: LogEntry) => void;
 
-// Mask sensitive keys (Groq, Gemini, Bearer tokens, general secrets)
+// Mask sensitive keys (Groq, Gemini, KIE, Bearer tokens, general secrets)
 const SENSITIVE_PATTERNS = [
   /gsk_[a-zA-Z0-9_-]{20,}/g,
   /AIzaSy[a-zA-Z0-9_-]{30,}/g,
+  /sk-kie-[a-zA-Z0-9_-]+/gi,
+  /sk-[a-zA-Z0-9_-]{20,}/gi,
   /Bearer\s+[a-zA-Z0-9._-]+/gi,
   /key=[a-zA-Z0-9_-]{20,}/gi,
 ];

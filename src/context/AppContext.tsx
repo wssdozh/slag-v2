@@ -128,6 +128,8 @@ const RIGHT_PANEL_WIDTH_KEY = 'slag_right_panel_width_v2';
 const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: 'groq',
   groqApiKey: '',
+  kieApiKey: '',
+  kieBaseUrl: 'https://api.kie.ai',
   geminiApiKey: '',
   model: 'openai/gpt-oss-120b',
   reasoningEffort: 'low',

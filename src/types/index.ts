@@ -71,13 +71,15 @@ export interface VaultMeta {
   isCurrent?: boolean;
 }
 
-export type AiProvider = 'groq' | 'gemini';
+export type AiProvider = 'groq' | 'kie' | 'gemini';
 
 export interface AiSettings {
   provider: AiProvider;
   groqApiKey: string;
+  kieApiKey: string;
+  kieBaseUrl?: string;
   geminiApiKey: string;
-  model: string; // e.g. 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'gemini-2.0-flash'
+  model: string; // e.g. 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'gpt-5-2', 'claude-sonnet-4-5'
   reasoningEffort: 'none' | 'low' | 'medium' | 'high';
   autoTagging: boolean;
   autoTriage: boolean;

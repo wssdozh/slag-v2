@@ -12,11 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   Check,
-  ArrowDown,
-  AlertCircle,
-  AlertTriangle,
-  Info as InfoIcon,
-  Bug
+  ArrowDown
 } from 'lucide-react';
 
 interface LogViewerProps {
@@ -24,21 +20,22 @@ interface LogViewerProps {
   onClose?: () => void;
 }
 
-const SCOPE_CLASSES: Record<LogScope, string> = {
-  AI: 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60',
-  FS: 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60',
-  SEARCH: 'bg-amber-950/80 text-amber-300 border-amber-800/60',
-  UI: 'bg-zinc-800/90 text-zinc-300 border-zinc-700/60',
-  APP: 'bg-purple-950/80 text-purple-300 border-purple-800/60',
-  SYNC: 'bg-cyan-950/80 text-cyan-300 border-cyan-800/60',
+// Flat, muted text colors without heavy background fills or thick borders
+const SCOPE_COLORS: Record<LogScope, string> = {
+  AI: 'text-indigo-400/90',
+  FS: 'text-emerald-400/90',
+  SEARCH: 'text-amber-400/90',
+  UI: 'text-zinc-400',
+  APP: 'text-purple-400/90',
+  SYNC: 'text-cyan-400/90',
 };
 
-const LEVEL_CLASSES: Record<LogLevel, { badge: string; text: string; icon: React.FC<any> }> = {
-  trace: { badge: 'bg-zinc-800/60 text-zinc-400 border-zinc-700/50', text: 'text-zinc-400', icon: Bug },
-  debug: { badge: 'bg-zinc-800/60 text-zinc-400 border-zinc-700/50', text: 'text-zinc-400', icon: Bug },
-  info: { badge: 'bg-sky-950/60 text-sky-300 border-sky-800/50', text: 'text-zinc-200', icon: InfoIcon },
-  warn: { badge: 'bg-amber-950/80 text-amber-300 border-amber-800/60', text: 'text-amber-200', icon: AlertTriangle },
-  error: { badge: 'bg-rose-950/80 text-rose-300 border-rose-800/60', text: 'text-rose-200', icon: AlertCircle },
+const LEVEL_COLORS: Record<LogLevel, { text: string; labelColor: string }> = {
+  trace: { text: 'text-zinc-500', labelColor: 'text-zinc-600' },
+  debug: { text: 'text-zinc-400', labelColor: 'text-zinc-500' },
+  info: { text: 'text-zinc-300', labelColor: 'text-zinc-500' },
+  warn: { text: 'text-amber-300/90', labelColor: 'text-amber-500' },
+  error: { text: 'text-rose-300/95', labelColor: 'text-rose-400' },
 };
 
 const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC'];
@@ -170,117 +167,103 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
   return (
     <div
       data-testid="log-viewer"
-      className={`flex flex-col h-full w-full bg-[#08090a] text-[#f4f4f5] select-text font-sans ${
-        variant === 'modal' ? 'rounded-lg border border-[#27272a] shadow-2xl overflow-hidden' : ''
+      className={`flex flex-col h-full w-full bg-[#0a0a0c] text-zinc-300 select-text font-sans ${
+        variant === 'modal' ? 'rounded-lg border border-white/[0.08] shadow-2xl overflow-hidden' : ''
       }`}
     >
-      {/* Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-[#27272a] bg-[#0c0c0e]/90 backdrop-blur-xs shrink-0 select-none">
+      {/* Flat Unified Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 border-b border-white/[0.06] bg-[#0c0c0e] shrink-0 select-none">
         {/* Title and stats */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-300">
-            <Terminal className="w-4 h-4 text-zinc-400" />
-            <span>Логи & HUD</span>
-          </div>
-
-          <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-400 bg-[#141417] px-2 py-0.5 rounded border border-[#27272a]">
-            <span>{counts.total}</span>
-            {counts.errors > 0 && (
-              <span className="text-rose-400 font-medium">· {counts.errors} err</span>
-            )}
-            {counts.warns > 0 && (
-              <span className="text-amber-400 font-medium">· {counts.warns} warn</span>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+          <span className="text-xs font-medium text-zinc-200">Логи & HUD</span>
+          <span className="text-[11px] font-mono text-zinc-500">
+            {counts.total}
+            {counts.errors > 0 && <span className="text-rose-400 ml-1">· {counts.errors}e</span>}
+            {counts.warns > 0 && <span className="text-amber-400 ml-1">· {counts.warns}w</span>}
+          </span>
         </div>
 
-        {/* Search Bar */}
-        <div className="flex-1 max-w-xs min-w-[160px] relative">
-          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+        {/* Flat Minimal Search Input */}
+        <div className="flex-1 max-w-xs min-w-[140px] relative">
+          <Search className="w-3 h-3 text-zinc-600 absolute left-2 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по логам..."
-            className="w-full bg-[#141417] text-xs text-zinc-200 pl-8 pr-7 py-1 rounded border border-[#27272a] focus:border-zinc-500 outline-none transition-colors"
+            className="w-full bg-white/[0.03] text-xs text-zinc-200 pl-7 pr-6 py-1 rounded border border-transparent focus:border-white/10 focus:bg-white/[0.05] outline-none transition-all placeholder-zinc-600"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400"
             >
               <X className="w-3 h-3" />
             </button>
           )}
         </div>
 
-        {/* Actions Toolbar */}
-        <div className="flex items-center gap-1.5">
-          {/* Auto-scroll toggle */}
+        {/* Flat Minimal Actions */}
+        <div className="flex items-center gap-1 text-xs">
           <button
             onClick={() => setAutoScroll(prev => !prev)}
             title={autoScroll ? 'Автопрокрутка включена' : 'Автопрокрутка выключена'}
-            className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors ${
-              autoScroll
-                ? 'bg-zinc-800 text-zinc-200 border-zinc-600'
-                : 'bg-[#141417] text-zinc-400 border-[#27272a] hover:text-zinc-200'
+            className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
+              autoScroll ? 'text-zinc-200 bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            <ArrowDown className={`w-3 h-3 ${autoScroll ? 'text-emerald-400' : 'text-zinc-500'}`} />
+            <ArrowDown className={`w-3 h-3 ${autoScroll ? 'text-zinc-200' : 'text-zinc-600'}`} />
             <span className="text-[11px]">Авто</span>
           </button>
 
-          {/* Copy Markdown Bug Report */}
           <button
             onClick={handleCopyReport}
             title="Копировать отчёт для баг-репорта (Markdown)"
-            className="flex items-center gap-1 px-2 py-1 text-xs bg-[#141417] text-zinc-300 hover:text-zinc-100 hover:bg-[#1e1e24] rounded border border-[#27272a] transition-colors"
+            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
           >
             {reportCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
             <span className="text-[11px] hidden sm:inline">Отчёт</span>
           </button>
 
-          {/* Export JSON */}
           <button
             onClick={handleExportJson}
             title="Скачать JSON"
-            className="flex items-center gap-1 px-2 py-1 text-xs bg-[#141417] text-zinc-300 hover:text-zinc-100 hover:bg-[#1e1e24] rounded border border-[#27272a] transition-colors"
+            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
           >
             <Download className="w-3 h-3" />
             <span className="text-[11px] hidden sm:inline">JSON</span>
           </button>
 
-          {/* Clear Buffer */}
           <button
             onClick={handleClear}
-            title="Очистить буфер логов"
-            className="p-1 text-zinc-400 hover:text-rose-300 hover:bg-[#1e1e24] rounded border border-transparent hover:border-[#27272a] transition-colors"
+            title="Очистить буфер"
+            className="p-1 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] rounded transition-colors"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3 h-3" />
           </button>
 
-          {/* Close button if in modal/dock with onClose */}
           {onClose && (
             <button
               onClick={onClose}
               title="Закрыть"
-              className="p-1 text-zinc-400 hover:text-zinc-100 hover:bg-[#1e1e24] rounded border border-transparent hover:border-[#27272a] transition-colors ml-1"
+              className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors ml-1"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter Chips Bar */}
-      <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-[#1e1e24] bg-[#09090b] text-[11px] shrink-0 select-none">
-        <span className="text-zinc-500 font-mono text-[10px] mr-1">LEVEL:</span>
+      {/* Flat Single-line Filters (No Chips-on-Chips, pure text buttons) */}
+      <div className="flex flex-wrap items-center gap-1 px-3 py-1 border-b border-white/[0.04] bg-[#0c0c0e]/50 text-[11px] font-mono shrink-0 select-none">
+        <span className="text-zinc-600 text-[10px] mr-1">LEVEL:</span>
         <button
           onClick={() => setSelectedLevel('ALL')}
-          className={`px-1.5 py-0.5 rounded border transition-colors ${
+          className={`px-1.5 py-0.5 rounded transition-colors ${
             selectedLevel === 'ALL'
-              ? 'bg-zinc-700/80 text-zinc-100 border-zinc-500 font-medium'
-              : 'bg-[#141417] text-zinc-400 border-[#27272a] hover:text-zinc-200'
+              ? 'text-zinc-100 bg-white/[0.08] font-medium'
+              : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
           ALL
@@ -289,25 +272,25 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
           <button
             key={lvl}
             onClick={() => setSelectedLevel(lvl)}
-            className={`px-1.5 py-0.5 rounded border uppercase transition-colors ${
+            className={`px-1.5 py-0.5 rounded uppercase transition-colors ${
               selectedLevel === lvl
-                ? `${LEVEL_CLASSES[lvl].badge} font-medium`
-                : 'bg-[#141417] text-zinc-400 border-[#27272a] hover:text-zinc-200'
+                ? 'text-zinc-100 bg-white/[0.08] font-medium'
+                : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             {lvl}
           </button>
         ))}
 
-        <div className="w-[1px] h-3 bg-[#27272a] mx-1" />
+        <div className="w-[1px] h-2.5 bg-white/[0.08] mx-1.5" />
 
-        <span className="text-zinc-500 font-mono text-[10px] mr-1">SCOPE:</span>
+        <span className="text-zinc-600 text-[10px] mr-1">SCOPE:</span>
         <button
           onClick={() => setSelectedScope('ALL')}
-          className={`px-1.5 py-0.5 rounded border transition-colors ${
+          className={`px-1.5 py-0.5 rounded transition-colors ${
             selectedScope === 'ALL'
-              ? 'bg-zinc-700/80 text-zinc-100 border-zinc-500 font-medium'
-              : 'bg-[#141417] text-zinc-400 border-[#27272a] hover:text-zinc-200'
+              ? 'text-zinc-100 bg-white/[0.08] font-medium'
+              : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
           ALL
@@ -316,10 +299,10 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
           <button
             key={sc}
             onClick={() => setSelectedScope(sc)}
-            className={`px-1.5 py-0.5 rounded border transition-colors ${
+            className={`px-1.5 py-0.5 rounded transition-colors ${
               selectedScope === sc
-                ? `${SCOPE_CLASSES[sc]} font-medium`
-                : 'bg-[#141417] text-zinc-400 border-[#27272a] hover:text-zinc-200'
+                ? 'text-zinc-100 bg-white/[0.08] font-medium'
+                : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             {sc}
@@ -327,16 +310,16 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
         ))}
       </div>
 
-      {/* Log Entries List */}
+      {/* Flat Log Entries Stream */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-1 font-mono text-xs"
+        className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-0.5 font-mono text-[11px] leading-relaxed"
       >
         {filteredEntries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-zinc-500 text-xs">
-            <Terminal className="w-8 h-8 stroke-1 text-zinc-600 mb-2" />
-            <p>Логов нет или фильтр не дал результатов</p>
+          <div className="flex flex-col items-center justify-center h-44 text-zinc-600 text-xs">
+            <Terminal className="w-6 h-6 stroke-1 text-zinc-700 mb-1.5" />
+            <p>Логов нет или фильтр пуст</p>
           </div>
         ) : (
           filteredEntries.map(entry => {
@@ -350,59 +333,51 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
               fractionalSecondDigits: 3,
             });
 
-            const levelCfg = LEVEL_CLASSES[entry.level];
-            const scopeClass = SCOPE_CLASSES[entry.scope];
+            const levelCfg = LEVEL_COLORS[entry.level];
+            const scopeColor = SCOPE_COLORS[entry.scope];
 
             return (
               <div
                 key={entry.id}
                 onClick={() => hasData && toggleExpand(entry.id)}
-                className={`group relative rounded border border-transparent hover:border-[#27272a] hover:bg-[#121215] transition-colors p-1.5 ${
-                  entry.level === 'error'
-                    ? 'bg-rose-950/20'
-                    : entry.level === 'warn'
-                      ? 'bg-amber-950/15'
-                      : ''
-                } ${hasData ? 'cursor-pointer' : ''}`}
+                className={`group flex flex-col px-2 py-1 rounded transition-colors hover:bg-white/[0.025] ${
+                  hasData ? 'cursor-pointer' : ''
+                }`}
               >
-                <div className="flex items-start gap-2">
+                <div className="flex items-baseline gap-2">
                   {/* Timestamp */}
-                  <span className="text-zinc-500 shrink-0 text-[11px] pt-0.5">
+                  <span className="text-zinc-600 shrink-0 text-[10px]">
                     {timeStr}
                   </span>
 
-                  {/* Level Pill */}
-                  <span
-                    className={`px-1 py-0.2 rounded border text-[10px] font-bold uppercase shrink-0 ${levelCfg.badge}`}
-                  >
+                  {/* Level Text (flat, no glowing box) */}
+                  <span className={`w-9 shrink-0 text-[10px] uppercase font-semibold ${levelCfg.labelColor}`}>
                     {entry.level}
                   </span>
 
-                  {/* Scope Badge */}
-                  <span
-                    className={`px-1.5 py-0.2 rounded border text-[10px] font-bold uppercase shrink-0 ${scopeClass}`}
-                  >
-                    {entry.scope}
+                  {/* Scope (subtle colored text) */}
+                  <span className={`w-14 shrink-0 text-[10px] uppercase font-medium ${scopeColor}`}>
+                    [{entry.scope}]
                   </span>
 
-                  {/* Message */}
+                  {/* Message (clean typography) */}
                   <span className={`flex-1 break-all ${levelCfg.text}`}>
                     {entry.message}
                   </span>
 
                   {/* Duration if available */}
                   {entry.durationMs !== undefined && (
-                    <span className="text-zinc-500 text-[10px] italic shrink-0">
+                    <span className="text-zinc-600 text-[10px] shrink-0">
                       +{Math.round(entry.durationMs)}ms
                     </span>
                   )}
 
-                  {/* Action buttons (copy single entry, expand toggle) */}
+                  {/* Hover Actions */}
                   <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
                     <button
                       onClick={(e) => handleCopyItem(entry, e)}
-                      title="Копировать запись"
-                      className="p-0.5 text-zinc-400 hover:text-zinc-200"
+                      title="Копировать строку"
+                      className="text-zinc-500 hover:text-zinc-300 p-0.5"
                     >
                       {copiedId === entry.id ? (
                         <Check className="w-3 h-3 text-emerald-400" />
@@ -411,18 +386,18 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
                       )}
                     </button>
                     {hasData && (
-                      <span className="text-zinc-400 p-0.5">
+                      <span className="text-zinc-500 p-0.5">
                         {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Expanded Payload Data */}
+                {/* Expanded Payload Data (flat subtle pre) */}
                 {hasData && isExpanded && (
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className="mt-2 p-2 bg-[#09090b] rounded border border-[#27272a] overflow-x-auto text-[11px] text-zinc-300"
+                    className="mt-1.5 p-2 bg-black/40 rounded border border-white/[0.04] overflow-x-auto text-[10px] text-zinc-400"
                   >
                     <pre className="whitespace-pre-wrap font-mono">
                       {JSON.stringify(entry.data, null, 2)}
