@@ -1288,4 +1288,53 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       await expect(page.locator('h3:has-text("AI Triage")')).not.toBeVisible();
     }
   });
+
+  test('29. Slash Command Menu: trigger, keyboard navigation, filtering, and state switching', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('text=Входящие');
+
+    const textarea = page.locator('textarea[placeholder*="ссылки"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 1. Type "/" to trigger the sliding slash command menu
+    await textarea.click();
+    await textarea.fill('/');
+
+    // 2. Verify slash command menu appears with header and commands
+    const menuHeader = page.locator('text=Команды композера').first();
+    await expect(menuHeader).toBeVisible();
+    await expect(page.locator('text=/task').first()).toBeVisible();
+    await expect(page.locator('text=/today').first()).toBeVisible();
+    await expect(page.locator('text=/ai').first()).toBeVisible();
+
+    // 3. Take screenshot of sliding slash command drawer for visual inspection
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-slash-menu.png',
+      fullPage: false,
+    });
+
+    // 4. Filter with query "/тас"
+    await textarea.fill('/тас');
+    const taskOption = page.locator('button', { hasText: '/task' }).first();
+    await expect(taskOption).toBeVisible();
+
+    // 5. Select via Enter
+    await textarea.press('Enter');
+
+    // 6. Verify command token is stripped from textarea and Toast/mode confirms Task switch
+    await expect(textarea).toHaveValue('');
+    await expect(page.locator('text=Режим переключен: Задача').first()).toBeVisible();
+
+    // 7. Test deadline command "/today"
+    await textarea.fill('/today');
+    await textarea.press('Enter');
+    await expect(textarea).toHaveValue('');
+    await expect(page.locator('text=Дедлайн установлен на сегодня').first()).toBeVisible();
+
+    // 8. Test Escape key dismisses slash command menu
+    await textarea.fill('/');
+    await expect(page.locator('text=Команды композера').first()).toBeVisible();
+    await textarea.press('Escape');
+    await expect(page.locator('text=Команды композера')).not.toBeVisible();
+  });
 });

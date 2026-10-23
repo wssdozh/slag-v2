@@ -11,6 +11,8 @@ import { categorizeDraft } from '../../lib/aiService';
 import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import { BaseComposer } from './BaseComposer';
 import { LinearSignalBars } from '../UI/PriorityBadge';
+import { SlashCommandMenu } from './SlashCommandMenu';
+import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
 import {
   Trash2,
   Paperclip,
@@ -29,6 +31,13 @@ import {
   Lock,
   Calendar
 } from 'lucide-react';
+
+const getTodayIso = (): string => new Date().toISOString().split('T')[0];
+const getTomorrowIso = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
+};
 
 export const Composer: React.FC = () => {
   const {
@@ -83,6 +92,10 @@ export const Composer: React.FC = () => {
   const [wikiQuery, setWikiQuery] = useState<string | null>(null);
   const [wikiSelectedIndex, setWikiSelectedIndex] = useState(0);
 
+  // Slash command / state
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+
   // Todoist parser & Ghost-chips state
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
   const [isDateDismissed, setIsDateDismissed] = useState(false);
@@ -108,6 +121,26 @@ export const Composer: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
+  const resetDraftState = () => {
+    setContent('');
+    setTags([]);
+    setTargetFolderOverride(null);
+    setAttachments([]);
+    setPriority('none');
+    setDueDate('');
+    setReplyTarget(null);
+    setWikiQuery(null);
+    setSlashQuery(null);
+    setSlashSelectedIndex(0);
+    setParsedTask(null);
+    setIsDateDismissed(false);
+    setIsPriorityDismissed(false);
+    setDismissedTags(new Set());
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  };
+
   // Focus textarea when replying
   useEffect(() => {
     if (replyTarget && textareaRef.current) {
@@ -122,6 +155,18 @@ export const Composer: React.FC = () => {
         .slice(0, 5)
     : [];
 
+  // Slash commands matching current query
+  const matchingSlashCommands = slashQuery !== null
+    ? SLASH_COMMANDS.filter((cmd) => {
+        const q = slashQuery.toLowerCase().trim();
+        if (!q) return true;
+        if (cmd.command.toLowerCase().includes(q)) return true;
+        if (cmd.title.toLowerCase().includes(q)) return true;
+        if (cmd.description.toLowerCase().includes(q)) return true;
+        return cmd.aliases.some((alias) => alias.toLowerCase().includes(q));
+      })
+    : [];
+
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setContent(text);
@@ -131,6 +176,7 @@ export const Composer: React.FC = () => {
       setIsDateDismissed(false);
       setIsPriorityDismissed(false);
       setDismissedTags(new Set());
+      setSlashQuery(null);
     }
 
     // Smart type inference: typing checklist switches note to task
@@ -142,12 +188,21 @@ export const Composer: React.FC = () => {
 
     const cursorPos = e.target.selectionStart || text.length;
     const textBefore = text.slice(0, cursorPos);
-    const match = textBefore.match(/\[\[([^\]\n]*)$/);
-    if (match) {
-      setWikiQuery(match[1]);
+    const wikiMatch = textBefore.match(/\[\[([^\]\n]*)$/);
+    if (wikiMatch) {
+      setWikiQuery(wikiMatch[1]);
       setWikiSelectedIndex(0);
+      setSlashQuery(null);
     } else {
       setWikiQuery(null);
+      // Slash command trigger: beginning of line or preceded by whitespace, followed by non-space chars
+      const slashMatch = textBefore.match(/(?:^|\s)\/([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
+      if (slashMatch) {
+        setSlashQuery(slashMatch[1]);
+        setSlashSelectedIndex(0);
+      } else {
+        setSlashQuery(null);
+      }
     }
   };
 
@@ -222,6 +277,91 @@ export const Composer: React.FC = () => {
     } finally {
       setIsGeneratingAiTags(false);
     }
+  };
+
+  const executeSlashCommand = (cmd: SlashCommand) => {
+    const el = textareaRef.current;
+    const cursorPos = el ? el.selectionStart || content.length : content.length;
+    const textBefore = content.slice(0, cursorPos);
+    const textAfter = content.slice(cursorPos);
+    const slashMatch = textBefore.match(/(?:^|\s)\/([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
+
+    let newCursor = cursorPos;
+
+    if (slashMatch && slashMatch.index !== undefined) {
+      const isStartOfLine = slashMatch[0].startsWith('/');
+      const replaceStart = isStartOfLine ? slashMatch.index : slashMatch.index + 1;
+      const newText = textBefore.slice(0, replaceStart) + textAfter;
+      newCursor = replaceStart;
+      setContent(newText);
+    }
+    setSlashQuery(null);
+
+    // Execute command action
+    switch (cmd.id) {
+      case 'task':
+        setItemType('task');
+        addToast('Режим переключен: Задача', 'info');
+        break;
+      case 'note':
+        setItemType('note');
+        addToast('Режим переключен: Заметка', 'info');
+        break;
+      case 'article':
+        setItemType('article');
+        addToast('Режим переключен: Статья', 'info');
+        break;
+      case 'today':
+        setItemType('task');
+        setDueDate(getTodayIso());
+        addToast('Дедлайн установлен на сегодня', 'info');
+        break;
+      case 'tomorrow':
+        setItemType('task');
+        setDueDate(getTomorrowIso());
+        addToast('Дедлайн установлен на завтра', 'info');
+        break;
+      case 'urgent':
+        setItemType('task');
+        setPriority('high');
+        addToast('Приоритет: Urgent (P1)', 'info');
+        break;
+      case 'high':
+        setItemType('task');
+        setPriority('high');
+        addToast('Приоритет: High (P2)', 'info');
+        break;
+      case 'medium':
+        setItemType('task');
+        setPriority('medium');
+        addToast('Приоритет: Medium (P3)', 'info');
+        break;
+      case 'low':
+        setItemType('task');
+        setPriority('low');
+        addToast('Приоритет: Low (P4)', 'info');
+        break;
+      case 'ai':
+        handleSmartAiTags();
+        break;
+      case 'audio':
+        setIsRecordingAudio(true);
+        break;
+      case 'video':
+        setIsRecordingVideo(true);
+        break;
+      case 'clear':
+        resetDraftState();
+        addToast('Черновик очищен', 'info');
+        return;
+    }
+
+    setTimeout(() => {
+      if (el) {
+        el.focus();
+        el.setSelectionRange(newCursor, newCursor);
+      }
+    }, 10);
   };
 
   const removeTag = (t: string) => {
@@ -542,21 +682,7 @@ export const Composer: React.FC = () => {
       });
     }
 
-    setContent('');
-    setTags([]);
-    setTargetFolder(null);
-    setAttachments([]);
-    setPriority('none');
-    setDueDate('');
-    setReplyTarget(null);
-    setWikiQuery(null);
-    setParsedTask(null);
-    setIsDateDismissed(false);
-    setIsPriorityDismissed(false);
-    setDismissedTags(new Set());
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    resetDraftState();
   };
 
   const handleSend = () => {
@@ -655,6 +781,32 @@ export const Composer: React.FC = () => {
           setDismissedTags(new Set(parsedTask.tags));
         }
         return;
+      }
+    }
+
+    // Slash commands keyboard controls
+    if (slashQuery !== null) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSlashQuery(null);
+        return;
+      }
+      if (matchingSlashCommands.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setSlashSelectedIndex(prev => (prev < matchingSlashCommands.length - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setSlashSelectedIndex(prev => (prev > 0 ? prev - 1 : matchingSlashCommands.length - 1));
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          executeSlashCommand(matchingSlashCommands[slashSelectedIndex]);
+          return;
+        }
       }
     }
 
@@ -927,30 +1079,41 @@ export const Composer: React.FC = () => {
     </>
   );
 
-  const overlaySlot = wikiQuery !== null && matchingWikiItems.length > 0 && (
-    <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
-      <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
-        Связать заметку [[...]]
-      </div>
-      {matchingWikiItems.map((wikiItem, idx) => {
-        const isSelected = idx === wikiSelectedIndex;
-        return (
-          <button
-            key={wikiItem.id}
-            type="button"
-            onClick={() => insertWikiLink(wikiItem)}
-            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate cursor-pointer ${
-              isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
-            }`}
-          >
-            {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-            {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-            {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-            <span className="truncate">{wikiItem.title || wikiItem.id}</span>
-          </button>
-        );
-      })}
-    </div>
+  const overlaySlot = (
+    <>
+      {slashQuery !== null && (
+        <SlashCommandMenu
+          query={slashQuery}
+          selectedIndex={slashSelectedIndex}
+          onSelect={executeSlashCommand}
+        />
+      )}
+      {wikiQuery !== null && matchingWikiItems.length > 0 && (
+        <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
+          <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
+            Связать заметку [[...]]
+          </div>
+          {matchingWikiItems.map((wikiItem, idx) => {
+            const isSelected = idx === wikiSelectedIndex;
+            return (
+              <button
+                key={wikiItem.id}
+                type="button"
+                onClick={() => insertWikiLink(wikiItem)}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate cursor-pointer ${
+                  isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
+                }`}
+              >
+                {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+                <span className="truncate">{wikiItem.title || wikiItem.id}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 
   const customControls = isRecordingAudio ? (
