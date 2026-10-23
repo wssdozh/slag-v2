@@ -1195,4 +1195,67 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('5. Unified AI Categorization: Composer +AI and Inbox Triage with folder & tags', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    // 1. Test Composer +AI categorization
+    const composerTextarea = page.locator('main textarea').first();
+    await composerTextarea.fill('Разработка новой спецификации и код SLAG v2');
+
+    const aiButton = page.locator('button:has-text("+AI")').first();
+    await expect(aiButton).toBeVisible();
+    await aiButton.click();
+
+    // Verify folder chip appears
+    const folderChip = page.locator('span[title*="Целевая папка для сохранения"]').first();
+    await expect(folderChip).toBeVisible({ timeout: 5000 });
+
+    // Verify tag chip appears in the active preview bar
+    const tagChip = page.locator('span:has-text("#")').first();
+    await expect(tagChip).toBeVisible({ timeout: 5000 });
+
+    // Take screenshot of Composer with chips
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-ai-categorized.png',
+      fullPage: false,
+    });
+
+    // Send note
+    const sendBtn = page.locator('button[title*="Отправить"]').first();
+    await sendBtn.click();
+    await expect(page.locator('text=Разработка новой спецификации и код SLAG v2').first()).toBeVisible({ timeout: 5000 });
+
+    // 2. Test Inbox Triage modal with tags
+    const triageBtn = page.locator('button:has-text("Запустить")').first();
+    if (await triageBtn.isVisible()) {
+      await triageBtn.click();
+      await page.waitForTimeout(300);
+
+      // Verify BaseModal opened
+      await expect(page.locator('h3:has-text("AI Triage")').first()).toBeVisible();
+
+      // Verify suggested tags are rendered
+      const modalTags = page.locator('div[role="dialog"] span:has-text("#")');
+      const count = await modalTags.count();
+      expect(count).toBeGreaterThan(0);
+
+      // Take screenshot of Triage Modal with tags
+      await page.screenshot({
+        path: 'test-results/screenshots/triage-modal-with-tags.png',
+        fullPage: false,
+      });
+
+      // Apply triage
+      const applyBtn = page.locator('button:has-text("Применить перемещение")').first();
+      await expect(applyBtn).toBeVisible();
+      await applyBtn.click();
+      await page.waitForTimeout(300);
+
+      // Modal should be closed
+      await expect(page.locator('h3:has-text("AI Triage")')).not.toBeVisible();
+    }
+  });
 });

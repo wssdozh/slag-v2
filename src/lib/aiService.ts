@@ -18,11 +18,15 @@ export {
 
 const aiLog = logger.scope('AI');
 
-export interface TriageSuggestion {
+export interface CategorizeResult {
+  targetFolder: string;
+  tags: string[];
+  reason: string;
+}
+
+export interface TriageSuggestion extends CategorizeResult {
   itemId: string;
   itemTitle: string;
-  targetFolder: string;
-  reason: string;
 }
 
 function formatTag(tag: string, style: 'lowercase' | 'kebab-case'): string {
@@ -33,216 +37,26 @@ function formatTag(tag: string, style: 'lowercase' | 'kebab-case'): string {
   return clean;
 }
 
-/**
- * Intelligent AI tagging service with Groq, KIE (Claude / Gemini) & Gemini providers and tag taxonomy indexing.
- */
-export async function generateSmartTags(content: string, settings: AiSettings): Promise<string[]> {
-  const existingTags = storage.getAllExistingTags();
-  const maxTags = settings.maxTagsPerNote || 4;
-  const style = settings.tagCaseStyle || 'lowercase';
-
-  // Extract explicit inline #hashtags from content first
+function extractExplicitHashtags(content: string, style: 'lowercase' | 'kebab-case'): string[] {
   const inlineHashtagRegex = /#([\p{L}\p{N}_-]+)/gu;
-  const explicitHashtags: string[] = [];
-  let hashtagMatch: RegExpExecArray | null;
-  while ((hashtagMatch = inlineHashtagRegex.exec(content)) !== null) {
-    const clean = formatTag(hashtagMatch[1], style);
-    if (clean && !explicitHashtags.includes(clean)) {
-      explicitHashtags.push(clean);
+  const explicit: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = inlineHashtagRegex.exec(content)) !== null) {
+    const clean = formatTag(match[1], style);
+    if (clean && !explicit.includes(clean)) {
+      explicit.push(clean);
     }
   }
+  return explicit;
+}
 
-  const baseInstructions = `Ты — экспертный таксономист персональной базы знаний.
-Твоя задача — подобрать от 1 до ${maxTags} наиболее точных и содержательных тегов для заметки.
-
-СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
-[${existingTags.join(', ')}]
-${explicitHashtags.length > 0 ? `ХЕШТЕГИ В ТЕКСТЕ: [${explicitHashtags.join(', ')}]` : ''}
-
-ИНСТРУКЦИЯ И ШАГИ РАССУЖДЕНИЯ (REASONING):
-1. ОПРЕДЕЛЕНИЕ СУТИ: Выдели ключевые темы, стек, сущности или предметную область (например: геймдев, unity, c#, frontend, финансы, здоровье, менеджмент).
-2. ПРИОРИТЕТ СУЩЕСТВУЮЩИХ: Если в словаре есть тег, который ТОЧНО и ПРЯМО соответствует теме (например, 'идея', 'дизайн'), используй его. Не создавай грамматических дубликатов (если есть 'дизайн', не создавай 'дизайны').
-3. СМЕЛОЕ СОЗДАНИЕ НОВЫХ ТЕГОВ: НЕ БОЙСЯ создавать новые теги! Если в словаре нет тегов для специфичной технологии, проекта или инструмента (например, 'юнити', 'unity', 'csharp', 'шарп', 'игры', 'blender', 'react', 'инвестиции') — ОБЯЗАТЕЛЬНО создавай новый тег. Не притягивай за уши неподходящие общие теги из словаря (например, не ставь 'дизайн' на технический код, если это не UI).
-4. ХЕШТЕГИ АВТОРА: Если в тексте есть хештеги (#тег), они отражают прямое намерение пользователя — включи их в приоритетном порядке.
-5. ФОРМАТ: ${style === 'kebab-case' ? 'kebab-case без пробелов' : 'строчные буквы без символа #'}. От 1 до ${maxTags} лучших тегов.
-${settings.customTagRules ? `Пользовательские правила: ${settings.customTagRules}` : ''}
-
-Ответь СТРОГО в формате JSON:
-{
-  "reasoning": "Кратко: о чем заметка, какие теги из словаря реально подходят и почему созданы новые теги",
-  "tags": ["тег1", "тег2"]
-}`;
-
-  // 1. Groq Provider (e.g. openai/gpt-oss-120b, llama-3.3-70b-versatile)
-  if (settings.provider === 'groq' && settings.groqApiKey) {
-    try {
-      const model = settings.model || 'openai/gpt-oss-120b';
-      const isGptOss = model.includes('gpt-oss');
-      const payload: Record<string, any> = {
-        model,
-        messages: [
-          { role: 'system', content: baseInstructions },
-          { role: 'user', content: content.slice(0, 2000) },
-        ],
-        temperature: 0.2,
-      };
-
-      if (!isGptOss) {
-        payload.response_format = { type: 'json_object' };
-      }
-
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.groqApiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const rawContent = data.choices?.[0]?.message?.content;
-        if (rawContent) {
-          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawContent);
-          if (parsed.reasoning) {
-            aiLog.debug('Groq SmartTags reasoning:', parsed.reasoning);
-          }
-          const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
-          const formatted = rawTags
-            .map((t) => formatTag(String(t), style))
-            .filter(Boolean);
-          const combined = Array.from(new Set([...explicitHashtags, ...formatted])).slice(0, maxTags);
-          if (combined.length > 0) return combined;
-        }
-      }
-    } catch (err) {
-      aiLog.warn('Groq Tagging API call failed, falling back to local heuristic', err);
-    }
-  }
-
-  // 2. KIE.AI Provider (supports Claude via Anthropic API and other models via OpenAI API)
-  if (settings.provider === 'kie' && settings.kieApiKey) {
-    try {
-      const model = settings.model || 'gemini-3-8-flash-openai';
-      const isClaude = model.toLowerCase().startsWith('claude-');
-      const baseUrl = (settings.kieBaseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
-      const authHeader = settings.kieApiKey.startsWith('Bearer ') ? settings.kieApiKey : `Bearer ${settings.kieApiKey}`;
-
-      let rawContent = '';
-
-      if (isClaude) {
-        const endpoint = `${baseUrl}/claude/v1/messages`;
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': authHeader,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: 1024,
-            system: baseInstructions,
-            messages: [{ role: 'user', content: content.slice(0, 2000) }],
-            temperature: 0.2,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.content)) {
-            for (const b of data.content) {
-              if (b.type === 'text') rawContent += b.text || '';
-            }
-          }
-        }
-      } else {
-        const endpoint = resolveKieEndpoint(settings.kieBaseUrl, model);
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': authHeader,
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: baseInstructions },
-              { role: 'user', content: content.slice(0, 2000) },
-            ],
-            temperature: 0.2,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.code && data.code !== 200) {
-            throw new Error(data.msg || `KIE.AI Tagging error code ${data.code}`);
-          }
-          rawContent = data.choices?.[0]?.message?.content || '';
-        }
-      }
-
-      if (rawContent) {
-        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawContent);
-        if (parsed.reasoning) {
-          aiLog.debug('KIE SmartTags reasoning:', parsed.reasoning);
-        }
-        const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
-        const formatted = rawTags
-          .map((t) => formatTag(String(t), style))
-          .filter(Boolean);
-        const combined = Array.from(new Set([...explicitHashtags, ...formatted])).slice(0, maxTags);
-        if (combined.length > 0) return combined;
-      }
-    } catch (err) {
-      aiLog.warn('KIE Tagging API call failed, falling back to local heuristic', err);
-    }
-  }
-
-  // 3. Google Gemini Provider
-  if (settings.provider === 'gemini' && settings.geminiApiKey) {
-    try {
-      const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.geminiApiKey}`;
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${baseInstructions}\n\nТекст заметки:\n${content.slice(0, 2000)}` }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: 'application/json',
-          },
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          const parsed = JSON.parse(text);
-          if (parsed.reasoning) {
-            aiLog.debug('Gemini SmartTags reasoning:', parsed.reasoning);
-          }
-          const rawTags: string[] = Array.isArray(parsed) ? parsed : (parsed.tags || parsed.suggestedTags || []);
-          const formatted = rawTags
-            .map((t) => formatTag(String(t), style))
-            .filter(Boolean);
-          const combined = Array.from(new Set([...explicitHashtags, ...formatted])).slice(0, maxTags);
-          if (combined.length > 0) return combined;
-        }
-      }
-    } catch (err) {
-      aiLog.warn('Gemini Tagging API call failed, falling back to local heuristic', err);
-    }
-  }
-
-  // 4. Fallback Local Heuristic Tag Generator (Offline / No API Key)
+function localHeuristicTags(
+  content: string,
+  existingTags: string[],
+  style: 'lowercase' | 'kebab-case',
+  maxTags: number
+): string[] {
+  const explicit = extractExplicitHashtags(content, style);
   const lower = content.toLowerCase();
   const matchedExisting = existingTags.filter((tag) => {
     const clean = tag.toLowerCase().trim();
@@ -268,91 +82,102 @@ ${settings.customTagRules ? `Пользовательские правила: ${
   }
 
   const result = Array.from(
-    new Set([...explicitHashtags, ...matchedExisting.map((t) => formatTag(t, style)), ...detected])
+    new Set([...explicit, ...matchedExisting.map((t) => formatTag(t, style)), ...detected])
   ).slice(0, maxTags);
 
   return result.length > 0 ? result : [formatTag('заметка', style)];
 }
 
-/**
- * Intelligent Inbox Triage: matches inbox notes to folders by folder descriptions.
- */
-export async function triageInboxItems(
-  inboxItems: SlagItem[],
+function localMatchFolder(
+  text: string,
   folders: FolderMeta[],
-  settings: AiSettings
-): Promise<TriageSuggestion[]> {
-  const eligibleFolders = folders.filter((f) => f.path !== 'Входящие');
-  if (inboxItems.length === 0 || eligibleFolders.length === 0) {
-    return [];
+  fallbackFolder: string
+): { folder: string; reason: string } {
+  const eligible = folders.filter((f) => f.path !== 'Входящие');
+  if (eligible.length === 0) {
+    return { folder: fallbackFolder, reason: 'По умолчанию' };
   }
 
-  const foldersContext = eligibleFolders.map((f) => ({
-    path: f.path,
-    name: f.name,
-    description: f.description || 'Общие заметки этой темы',
-  }));
+  let bestFolder = eligible[0];
+  let bestScore = 0;
+  const lower = text.toLowerCase();
 
-  const itemsContext = inboxItems.map((it) => ({
-    id: it.id,
-    title: it.title,
-    content: it.content.slice(0, 300),
-    tags: it.tags,
-    type: it.type,
-  }));
+  eligible.forEach((folder) => {
+    let score = 0;
+    const folderTerms = `${folder.name} ${folder.path} ${folder.description || ''}`
+      .toLowerCase()
+      .split(/[\s/,.-]+/)
+      .filter((t) => t.length > 2);
 
-  const prompt = `Ты — интеллектуальный диспетчер сортировки заметок (AI Triage).
-Твоя задача — распределить неразобранные заметки из папки "Входящие" по существующим папкам на основе их описания.
+    folderTerms.forEach((term) => {
+      const stem = term.length > 4 ? term.slice(0, -1) : term;
+      if (lower.includes(stem)) {
+        score += 1;
+      }
+    });
+    if (score > bestScore) {
+      bestScore = score;
+      bestFolder = folder;
+    }
+  });
 
-СПИСОК ДОСТУПНЫХ ПАПОК:
-${JSON.stringify(foldersContext, null, 2)}
+  return {
+    folder: bestScore > 0 ? bestFolder.path : fallbackFolder,
+    reason: bestScore > 0 ? `Ключевые слова папки «${bestFolder.name}»` : `Предложено в «${bestFolder.name}»`,
+  };
+}
 
-НЕРАЗОБРАННЫЕ ЗАМЕТКИ:
-${JSON.stringify(itemsContext, null, 2)}
+function parseJsonContent<T>(raw: string): T | null {
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (!jsonMatch) return null;
+    return JSON.parse(jsonMatch[0]) as T;
+  } catch {
+    return null;
+  }
+}
 
-ПРАВИЛА:
-1. Выбери для каждой заметки наиболее подходящую папку по смыслу (targetFolder должен в точности совпадать с полем path одной из папок).
-2. Напиши краткую причину на русском языке (поле reason, 5-8 слов).
-3. Верни ТОЛЬКО JSON-массив объектов: [{ "itemId": "...", "targetFolder": "...", "reason": "..." }]`;
-
+/**
+ * Shared low-level JSON LLM dispatcher across providers (Groq, KIE, Gemini).
+ * Cuts duplicate networking boilerplate across tagging and triage.
+ */
+async function callJsonLlm<T>(
+  systemPrompt: string,
+  userPrompt: string,
+  settings: AiSettings,
+  temperature = 0.1
+): Promise<T | null> {
   // 1. Groq Provider
   if (settings.provider === 'groq' && settings.groqApiKey) {
     try {
       const model = settings.model || 'openai/gpt-oss-120b';
+      const isGptOss = model.includes('gpt-oss');
+      const payload: Record<string, any> = {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature,
+      };
+      if (!isGptOss) {
+        payload.response_format = { type: 'json_object' };
+      }
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${settings.groqApiKey}`,
         },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: 'Ты — автономный ассистент каталогизации базы знаний SLAG. Отвечай строго валидным JSON массивом объектов.' },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.1,
-        }),
+        body: JSON.stringify(payload),
       });
-
       if (res.ok) {
         const data = await res.json();
         const raw = data.choices?.[0]?.message?.content;
-        if (raw) {
-          const jsonMatch = raw.match(/\[[\s\S]*\]/);
-          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
-          const list: TriageSuggestion[] = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.items || []);
-          return list.map((s) => {
-            const item = inboxItems.find((i) => i.id === s.itemId);
-            return {
-              ...s,
-              itemTitle: item?.title || 'Без названия',
-            };
-          });
-        }
+        if (raw) return parseJsonContent<T>(raw);
       }
     } catch (err) {
-      aiLog.warn('Groq Triage API failed, falling back to local matching', err);
+      aiLog.warn('Groq LLM call failed, falling back to local heuristic', err);
     }
   }
 
@@ -363,8 +188,8 @@ ${JSON.stringify(itemsContext, null, 2)}
       const isClaude = model.toLowerCase().startsWith('claude-');
       const baseUrl = (settings.kieBaseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
       const authHeader = settings.kieApiKey.startsWith('Bearer ') ? settings.kieApiKey : `Bearer ${settings.kieApiKey}`;
-
       let raw = '';
+
       if (isClaude) {
         const endpoint = `${baseUrl}/claude/v1/messages`;
         const res = await fetch(endpoint, {
@@ -377,12 +202,11 @@ ${JSON.stringify(itemsContext, null, 2)}
           body: JSON.stringify({
             model,
             max_tokens: 2048,
-            system: 'Ты — автономный ассистент каталогизации базы знаний SLAG. Отвечай строго валидным JSON массивом объектов.',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.1,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
+            temperature,
           }),
         });
-
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.content)) {
@@ -402,36 +226,24 @@ ${JSON.stringify(itemsContext, null, 2)}
           body: JSON.stringify({
             model,
             messages: [
-              { role: 'system', content: 'Ты — автономный ассистент каталогизации базы знаний SLAG. Отвечай строго валидным JSON массивом объектов.' },
-              { role: 'user', content: prompt },
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
             ],
-            temperature: 0.1,
+            temperature,
           }),
         });
-
         if (res.ok) {
           const data = await res.json();
           if (data.code && data.code !== 200) {
-            throw new Error(data.msg || `KIE.AI Triage error code ${data.code}`);
+            throw new Error(data.msg || `KIE error ${data.code}`);
           }
           raw = data.choices?.[0]?.message?.content || '';
         }
       }
 
-      if (raw) {
-        const jsonMatch = raw.match(/\[[\s\S]*\]/);
-        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
-        const list: TriageSuggestion[] = Array.isArray(parsed) ? parsed : (parsed.suggestions || parsed.items || []);
-        return list.map((s) => {
-          const item = inboxItems.find((i) => i.id === s.itemId);
-          return {
-            ...s,
-            itemTitle: item?.title || 'Без названия',
-          };
-        });
-      }
+      if (raw) return parseJsonContent<T>(raw);
     } catch (err) {
-      aiLog.warn('KIE Triage API failed, falling back to local matching', err);
+      aiLog.warn('KIE LLM call failed, falling back to local heuristic', err);
     }
   }
 
@@ -440,63 +252,218 @@ ${JSON.stringify(itemsContext, null, 2)}
     try {
       const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.geminiApiKey}`;
-
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
           generationConfig: {
-            temperature: 0.1,
+            temperature,
             responseMimeType: 'application/json',
           },
         }),
       });
-
       if (res.ok) {
         const data = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          const list: TriageSuggestion[] = JSON.parse(text);
-          return list.map((s) => {
-            const item = inboxItems.find((i) => i.id === s.itemId);
-            return {
-              ...s,
-              itemTitle: item?.title || 'Без названия',
-            };
-          });
-        }
+        if (text) return parseJsonContent<T>(text);
       }
     } catch (err) {
-      aiLog.warn('Gemini Triage API failed, fallback to local matching', err);
+      aiLog.warn('Gemini LLM call failed, falling back to local heuristic', err);
     }
   }
 
-  // 4. Fallback Local Matcher
-  return inboxItems.map((item) => {
-    let bestFolder = eligibleFolders[0];
-    let bestScore = 0;
-    const textToMatch = `${item.title} ${item.content} ${item.tags.join(' ')}`.toLowerCase();
+  return null;
+}
 
-    eligibleFolders.forEach((folder) => {
-      let score = 0;
-      const folderTerms = `${folder.name} ${folder.description}`.toLowerCase().split(/\s+/);
-      folderTerms.forEach((term) => {
-        if (term.length > 3 && textToMatch.includes(term)) {
-          score += 1;
-        }
-      });
-      if (score > bestScore) {
-        bestScore = score;
-        bestFolder = folder;
-      }
+/**
+ * Unified Draft Categorization (Pre-save in Composer):
+ * Classifies note content into a target folder, taxonomy-based tags, and reasoning.
+ */
+export async function categorizeDraft(
+  content: string,
+  currentFolder: string,
+  folders: FolderMeta[],
+  settings: AiSettings
+): Promise<CategorizeResult> {
+  const existingTags = storage.getAllExistingTags();
+  const maxTags = settings.maxTagsPerNote || 4;
+  const style = settings.tagCaseStyle || 'lowercase';
+  const explicit = extractExplicitHashtags(content, style);
+
+  const eligibleFolders = folders.filter((f) => f.path !== 'Входящие');
+  const foldersContext = eligibleFolders.map((f) => ({
+    path: f.path,
+    name: f.name,
+    description: f.description || 'Общие заметки этой темы',
+  }));
+
+  const systemPrompt = `Ты — экспертный диспетчер каталогизации и таксономист персональной базы знаний SLAG.
+Твоя задача — для текста заметки определить:
+1. Наиболее подходящую целевую папку (targetFolder).
+2. От 1 до ${maxTags} лучших тегов (tags).
+3. Краткую причину (reason, 5-8 слов на русском).
+
+СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
+[${existingTags.join(', ')}]
+
+СПИСОК ДОСТУПНЫХ ПАПОК:
+${JSON.stringify(foldersContext, null, 2)}
+ТЕКУЩАЯ ПАПКА ПОЛЬЗОВАТЕЛЯ: "${currentFolder}"
+
+ПРАВИЛА:
+1. ПАПКА:
+   - Если текущая папка пользователя — не "Входящие" (например, проект или конкретная тема), отдавай ей приоритет, если заметка подходит по смыслу.
+   - Если текущая папка — "Входящие", обязательно выбери наиболее подходящую папку из доступных по их смыслу и описанию (targetFolder должен совпадать с полем path одной из папок). Если ни одна явно не подходит, верни "${currentFolder}".
+2. ТЕГИ:
+   - Выдели суть темы, стек, ключевые сущности.
+   - Используй существующие теги из словаря при точном совпадении, либо смело создавай новые точные теги.
+   - Формат тегов: ${style === 'kebab-case' ? 'kebab-case без пробелов' : 'строчные буквы без знака #'}.
+3. ПРИЧИНА:
+   - 5-8 слов на русском языке, объясняющих выбор.
+${settings.customTagRules ? `Пользовательские правила: ${settings.customTagRules}` : ''}
+
+Ответь СТРОГО в формате JSON:
+{
+  "targetFolder": "путь_папки",
+  "tags": ["тег1", "тег2"],
+  "reason": "краткая причина"
+}`;
+
+  const userPrompt = `Текст заметки:\n${content.slice(0, 2000)}`;
+
+  const parsed = await callJsonLlm<{
+    targetFolder?: string;
+    tags?: string[];
+    reason?: string;
+  }>(systemPrompt, userPrompt, settings, 0.2);
+
+  if (parsed) {
+    const rawTags: string[] = Array.isArray(parsed.tags) ? parsed.tags : [];
+    const formatted = rawTags
+      .map((t) => formatTag(String(t), style))
+      .filter(Boolean);
+    const combinedTags = Array.from(new Set([...explicit, ...formatted])).slice(0, maxTags);
+
+    let targetFolder = parsed.targetFolder?.trim() || currentFolder;
+    const folderExists = eligibleFolders.some((f) => f.path === targetFolder) || targetFolder === currentFolder || targetFolder === 'Входящие';
+    if (!folderExists) {
+      targetFolder = currentFolder;
+    }
+
+    return {
+      targetFolder,
+      tags: combinedTags.length > 0 ? combinedTags : localHeuristicTags(content, existingTags, style, maxTags),
+      reason: parsed.reason?.trim() || 'По смыслу заметки',
+    };
+  }
+
+  // Local fallback
+  const localMatch = currentFolder === 'Входящие'
+    ? localMatchFolder(content, eligibleFolders, currentFolder)
+    : { folder: currentFolder, reason: 'Текущая папка' };
+
+  return {
+    targetFolder: localMatch.folder,
+    tags: localHeuristicTags(content, existingTags, style, maxTags),
+    reason: localMatch.reason,
+  };
+}
+
+/**
+ * Intelligent AI tagging (backwards-compatible wrapper around categorizeDraft).
+ */
+export async function generateSmartTags(content: string, settings: AiSettings): Promise<string[]> {
+  const result = await categorizeDraft(content, 'Входящие', [], settings);
+  return result.tags;
+}
+
+/**
+ * Intelligent Inbox Triage: matches inbox notes to folders and suggests taxonomy tags.
+ */
+export async function triageInboxItems(
+  inboxItems: SlagItem[],
+  folders: FolderMeta[],
+  settings: AiSettings
+): Promise<TriageSuggestion[]> {
+  const eligibleFolders = folders.filter((f) => f.path !== 'Входящие');
+  if (inboxItems.length === 0 || eligibleFolders.length === 0) {
+    return [];
+  }
+
+  const existingTags = storage.getAllExistingTags();
+  const maxTags = settings.maxTagsPerNote || 4;
+  const style = settings.tagCaseStyle || 'lowercase';
+
+  const foldersContext = eligibleFolders.map((f) => ({
+    path: f.path,
+    name: f.name,
+    description: f.description || 'Общие заметки этой темы',
+  }));
+
+  const itemsContext = inboxItems.map((it) => ({
+    id: it.id,
+    title: it.title,
+    content: it.content.slice(0, 300),
+    tags: it.tags,
+    type: it.type,
+  }));
+
+  const systemPrompt = `Ты — интеллектуальный диспетчер сортировки заметок (AI Triage) и таксономист базы знаний SLAG.
+Твоя задача — для каждой неразобранной заметки из папки "Входящие":
+1. Выбрать наиболее подходящую целевую папку (targetFolder) на основе описаний папок.
+2. Подобрать от 1 до ${maxTags} точных тегов (tags).
+3. Написать краткую причину на русском языке (reason, 5-8 слов).
+
+СПИСОК ДОСТУПНЫХ ПАПОК:
+${JSON.stringify(foldersContext, null, 2)}
+
+СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
+[${existingTags.join(', ')}]
+
+ПРАВИЛА:
+1. targetFolder должен в точности совпадать с полем path одной из папок.
+2. Теги должны отражать суть заметки (${style === 'kebab-case' ? 'kebab-case' : 'строчные буквы без #'}).
+3. reason — 5-8 слов на русском.
+4. Верни ТОЛЬКО JSON-массив объектов: [{ "itemId": "...", "targetFolder": "...", "tags": ["..."], "reason": "..." }]`;
+
+  const userPrompt = `НЕРАЗОБРАННЫЕ ЗАМЕТКИ:\n${JSON.stringify(itemsContext, null, 2)}`;
+
+  const parsed = await callJsonLlm<
+    Array<{ itemId: string; targetFolder: string; tags?: string[]; reason: string }>
+  >(systemPrompt, userPrompt, settings, 0.1);
+
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    return parsed.map((s) => {
+      const item = inboxItems.find((i) => i.id === s.itemId);
+      const rawTags = Array.isArray(s.tags) ? s.tags : [];
+      const formatted = rawTags.map((t) => formatTag(String(t), style)).filter(Boolean);
+      const itemExisting = item?.tags || [];
+      const mergedTags = Array.from(new Set([...itemExisting, ...formatted])).slice(0, maxTags);
+
+      return {
+        itemId: s.itemId,
+        itemTitle: item?.title || 'Без названия',
+        targetFolder: s.targetFolder,
+        tags: mergedTags,
+        reason: s.reason || 'Распределено по смыслу',
+      };
     });
+  }
+
+  // Local fallback
+  return inboxItems.map((item) => {
+    const textToMatch = `${item.title} ${item.content} ${item.tags.join(' ')}`;
+    const matched = localMatchFolder(textToMatch, eligibleFolders, eligibleFolders[0].path);
+    const tags = localHeuristicTags(textToMatch, existingTags, style, maxTags);
+    const mergedTags = Array.from(new Set([...item.tags, ...tags])).slice(0, maxTags);
 
     return {
       itemId: item.id,
       itemTitle: item.title,
-      targetFolder: bestFolder.path,
-      reason: bestScore > 0 ? `Совпадение по ключевым словам папки «${bestFolder.name}»` : `Предложено в «${bestFolder.name}»`,
+      targetFolder: matched.folder,
+      tags: mergedTags,
+      reason: matched.reason,
     };
   });
 }

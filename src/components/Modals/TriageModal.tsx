@@ -17,6 +17,7 @@ const TriageModalDialog: React.FC = () => {
     folders,
     aiSettings,
     moveItem,
+    updateItem,
     addToast
   } = useApp();
 
@@ -65,13 +66,24 @@ const TriageModalDialog: React.FC = () => {
     let count = 0;
     suggestions.forEach(s => {
       if (selectedIds.has(s.itemId)) {
-        moveItem(s.itemId, s.targetFolder);
+        const originalItem = items.find(i => i.id === s.itemId);
+        if (originalItem && s.tags && s.tags.length > 0) {
+          const mergedTags = Array.from(new Set([...originalItem.tags, ...s.tags]));
+          updateItem({
+            ...originalItem,
+            folder: s.targetFolder,
+            tags: mergedTags,
+            updatedAt: Date.now(),
+          });
+        } else {
+          moveItem(s.itemId, s.targetFolder);
+        }
         count++;
       }
     });
 
     setIsTriageModalOpen(false);
-    addToast(`ИИ успешно распределил ${count} заметок по папкам`, 'success');
+    addToast(`ИИ распределил ${count} заметок и обновил теги`, 'success');
   };
 
   const footer = (
@@ -105,7 +117,7 @@ const TriageModalDialog: React.FC = () => {
       isOpen={true}
       onClose={() => setIsTriageModalOpen(false)}
       title="AI Triage — Сортировка Входящих"
-      subtitle="Распределение заметок по смыслу на основе описаний папок"
+      subtitle="Распределение по папкам и авто-тегирование на основе описаний"
       icon={<Sparkles className="w-4 h-4" />}
       maxWidth="max-w-lg"
       footer={footer}
@@ -155,7 +167,7 @@ const TriageModalDialog: React.FC = () => {
                       className="mt-0.5 pointer-events-none"
                     />
 
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-xs font-medium text-zinc-200 truncate">
                           {s.itemTitle}
@@ -167,9 +179,23 @@ const TriageModalDialog: React.FC = () => {
                         </div>
                       </div>
 
-                      <p className="text-[11px] text-zinc-500 leading-normal line-clamp-1">
-                        {s.reason}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {s.tags && s.tags.length > 0 && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            {s.tags.map(t => (
+                              <span
+                                key={t}
+                                className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-zinc-400"
+                              >
+                                #{t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-[11px] text-zinc-500 leading-normal line-clamp-1">
+                          {s.reason}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 );

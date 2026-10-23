@@ -7,7 +7,7 @@ import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { Select } from '../UI/Select';
-import { generateSmartTags } from '../../lib/aiService';
+import { categorizeDraft } from '../../lib/aiService';
 import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import { BaseComposer } from './BaseComposer';
 import { LinearSignalBars } from '../UI/PriorityBadge';
@@ -17,6 +17,7 @@ import {
   Mic,
   Video,
   Sparkles,
+  Folder,
   CheckSquare,
   X,
   Loader2,
@@ -34,6 +35,7 @@ export const Composer: React.FC = () => {
     saveItem,
     updateItem,
     currentFolder,
+    folders,
     aiSettings,
     setSelectedItem,
     setIsFullscreenEditorOpen,
@@ -49,6 +51,11 @@ export const Composer: React.FC = () => {
   const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>('none');
   const [dueDate, setDueDate] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
+  const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(null);
+  const targetFolder = targetFolderOverride?.forCurrent === currentFolder ? targetFolderOverride.folder : null;
+  const setTargetFolder = (folder: string | null) => {
+    setTargetFolderOverride(folder ? { folder, forCurrent: currentFolder } : null);
+  };
   const [attachments, setAttachments] = useState<SlagAttachment[]>([]);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
@@ -197,16 +204,21 @@ export const Composer: React.FC = () => {
 
     setIsGeneratingAiTags(true);
     try {
-      const suggestedTags = await generateSmartTags(content, aiSettings);
-      if (suggestedTags.length > 0) {
-        const merged = Array.from(new Set([...tags, ...suggestedTags]));
+      const res = await categorizeDraft(content, currentFolder, folders, aiSettings);
+      if (res.tags.length > 0) {
+        const merged = Array.from(new Set([...tags, ...res.tags]));
         setTags(merged);
-        addToast(`Теги: ${suggestedTags.map(t => '#' + t).join(' ')}`, 'success');
+      }
+      if (res.targetFolder && res.targetFolder !== currentFolder) {
+        setTargetFolder(res.targetFolder);
+        addToast(`Папка «${res.targetFolder}» · ${res.tags.map(t => '#' + t).join(' ')}`, 'success');
+      } else if (res.tags.length > 0) {
+        addToast(`Теги: ${res.tags.map(t => '#' + t).join(' ')}`, 'success');
       } else {
         addToast('ИИ не нашел подходящих тегов', 'info');
       }
     } catch {
-      addToast('Ошибка запроса к Gemini', 'error');
+      addToast('Ошибка запроса к ИИ', 'error');
     } finally {
       setIsGeneratingAiTags(false);
     }
@@ -505,11 +517,12 @@ export const Composer: React.FC = () => {
           : undefined)
       : undefined;
 
+    const destinationFolder = targetFolder || currentFolder;
     const saved = saveItem({
       type: itemType,
       title,
       content: content.trim(),
-      folder: currentFolder,
+      folder: destinationFolder,
       tags: finalTags,
       attachments: attachmentsToSend,
       replyToId: replyTarget?.id,
@@ -520,9 +533,9 @@ export const Composer: React.FC = () => {
     });
 
     if (aiSettings.autoTagging && finalTags.length === 0 && content.trim().length >= 15) {
-      generateSmartTags(content.trim(), aiSettings).then(autoTags => {
-        if (autoTags && autoTags.length > 0) {
-          updateItem({ ...saved, tags: autoTags, updatedAt: Date.now() });
+      categorizeDraft(content.trim(), destinationFolder, folders, aiSettings).then(res => {
+        if (res.tags && res.tags.length > 0) {
+          updateItem({ ...saved, tags: res.tags, updatedAt: Date.now() });
         }
       }).catch(() => {
         // quiet fallback
@@ -531,6 +544,7 @@ export const Composer: React.FC = () => {
 
     setContent('');
     setTags([]);
+    setTargetFolder(null);
     setAttachments([]);
     setPriority('none');
     setDueDate('');
@@ -784,9 +798,27 @@ export const Composer: React.FC = () => {
         </div>
       )}
 
-      {/* Active Tags Preview */}
-      {tags.length > 0 && (
-        <div className="flex items-center gap-1 px-1 py-0.5 overflow-x-auto scrollbar-none whitespace-nowrap">
+      {/* Active Folder & Tags Preview */}
+      {(targetFolder || tags.length > 0) && (
+        <div className="flex items-center gap-1.5 px-1 py-0.5 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150">
+          {targetFolder && (
+            <span
+              className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 text-[11px] font-medium"
+              title={`Целевая папка для сохранения: «${targetFolder}»`}
+            >
+              <Folder className="w-3 h-3 text-amber-400" />
+              <span>{targetFolder}</span>
+              <button
+                type="button"
+                onClick={() => setTargetFolder(null)}
+                className="hover:text-rose-400 transition-colors cursor-pointer"
+                title="Сбросить в текущую папку"
+                aria-label="Сбросить целевую папку"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          )}
           {tags.map(tag => (
             <span
               key={tag}
@@ -796,6 +828,7 @@ export const Composer: React.FC = () => {
               <button
                 onClick={() => removeTag(tag)}
                 className="hover:text-rose-400 transition-colors cursor-pointer"
+                aria-label={`Удалить тег ${tag}`}
               >
                 <X className="w-2.5 h-2.5" />
               </button>
@@ -962,8 +995,8 @@ export const Composer: React.FC = () => {
               onClick={handleSmartAiTags}
               disabled={isGeneratingAiTags}
               className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-              title="ИИ авто-тегирование (+AI)"
-              aria-label="ИИ авто-тегирование (+AI)"
+              title="ИИ классификация: папка и теги (+AI)"
+              aria-label="ИИ классификация: папка и теги (+AI)"
             >
               {isGeneratingAiTags ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
