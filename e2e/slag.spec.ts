@@ -397,7 +397,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(settingsModal).toBeVisible();
 
     // Verify Groq provider is selectable and default recommended
-    const groqProviderBtn = settingsModal.locator('button', { hasText: 'Groq (Рекомендуется)' });
+    const groqProviderBtn = settingsModal.locator('button', { hasText: 'Groq' }).first();
     await expect(groqProviderBtn).toBeVisible();
     await page.waitForTimeout(100);
     await groqProviderBtn.click();

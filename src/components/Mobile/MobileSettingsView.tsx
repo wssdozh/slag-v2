@@ -78,7 +78,7 @@ export const MobileSettingsView: React.FC = () => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-white tracking-tight truncate">{vault.name || 'SLAG Vault'}</h2>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-mono shrink-0">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.06] text-[10px] font-mono shrink-0">
                 <Shield className="w-2.5 h-2.5" />
                 <span>Local-First Obsidian Vault</span>
               </span>
@@ -100,13 +100,10 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="text-xs font-semibold text-zinc-200">ИИ & Провайдеры</div>
-                  <div className="text-[11px] text-zinc-500">Groq, Gemini Flash, Kie, тегирование</div>
-                </div>
+                <div className="text-xs font-semibold text-zinc-200">ИИ & Провайдеры</div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
             </button>
@@ -116,13 +113,10 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
                   <Database className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="text-xs font-semibold text-zinc-200">Хранилище & Бэкап</div>
-                  <div className="text-[11px] text-zinc-500">Экспорт Markdown в ZIP, бэкап данных</div>
-                </div>
+                <div className="text-xs font-semibold text-zinc-200">Хранилище & Бэкап</div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
             </button>
@@ -132,13 +126,10 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
                   <Sliders className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="text-xs font-semibold text-zinc-200">Интерфейс, масштаб и плотность</div>
-                  <div className="text-2xs text-zinc-500">Масштаб шрифтов, сетка, плотность</div>
-                </div>
+                <div className="text-xs font-semibold text-zinc-200">Интерфейс, масштаб и плотность</div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
             </button>
@@ -148,13 +139,10 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
                   <Keyboard className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="text-xs font-semibold text-zinc-200">Горячие клавиши</div>
-                  <div className="text-[11px] text-zinc-500">Шорткаты ⌘K, Escape, Enter</div>
-                </div>
+                <div className="text-xs font-semibold text-zinc-200">Горячие клавиши</div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
             </button>
@@ -197,7 +185,7 @@ export const MobileSettingsView: React.FC = () => {
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="text-xs font-medium">{tab.label}</span>
                     {isSelected ? (
-                      <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 ml-0.5" />
+                      <Check className="w-3.5 h-3.5 text-zinc-200 shrink-0 ml-0.5" />
                     ) : (
                       <span className="text-[10px] text-zinc-600 font-mono ml-0.5">+</span>
                     )}
@@ -219,13 +207,10 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
                   <Terminal className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="text-xs font-semibold text-zinc-200">Логи & Dev HUD</div>
-                  <div className="text-[11px] text-zinc-500">Журнал операций, FS, AI, ошибки</div>
-                </div>
+                <div className="text-xs font-semibold text-zinc-200">Логи & Dev HUD</div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
             </button>

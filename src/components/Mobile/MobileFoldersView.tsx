@@ -96,73 +96,69 @@ export const MobileFoldersView: React.FC = () => {
           </div>
         </header>
 
-        {/* Scrollable Root Folders List */}
+        {/* Scrollable Root Folders List (Telegram Grouped Style) */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
           {/* Pinned "Входящие" Card */}
-          <button
-            onClick={() => setMobileActiveFolder('Входящие')}
-            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-[#141417]/90 hover:bg-[#18181c] border border-white/[0.06] active:scale-[0.98] transition-all text-left shadow-sm cursor-pointer"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                <Inbox className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-white truncate">Входящие</div>
-                <div className="text-xs text-zinc-500 font-mono">
-                  Все новые заметки и мысли
+          <div className="rounded-2xl bg-[#141417]/80 border border-white/[0.06] overflow-hidden">
+            <button
+              onClick={() => setMobileActiveFolder('Входящие')}
+              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-zinc-200 shrink-0">
+                  <Inbox className="w-4 h-4" />
                 </div>
+                <div className="text-sm font-semibold text-white truncate">Входящие</div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {unsortedCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-xs font-mono font-medium">
-                  {unsortedCount}
-                </span>
-              )}
-              <ChevronRight className="w-4 h-4 text-zinc-600" />
-            </div>
-          </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {unsortedCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-white/10 text-zinc-200 text-xs font-mono font-medium">
+                    {unsortedCount}
+                  </span>
+                )}
+                <ChevronRight className="w-4 h-4 text-zinc-600" />
+              </div>
+            </button>
+          </div>
 
           {/* User Folders Group */}
-          <div className="flex flex-col gap-1.5 mt-2">
+          <div className="flex flex-col gap-1.5 mt-1">
             <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
               Папки
             </div>
 
-            {directSubfolders
-              .filter(f => f.path !== 'Входящие')
-              .map(folder => {
-                const Icon = FOLDER_ICONS[folder.icon || 'Folder'] || Folder;
-                const folderItemsCount = items.filter(i => i.folder === folder.path || i.folder.startsWith(folder.path + '/')).length;
-                const subCount = folders.filter(f => f.path.startsWith(folder.path + '/')).length;
+            <div className="rounded-2xl bg-[#141417]/80 border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
+              {directSubfolders
+                .filter(f => f.path !== 'Входящие')
+                .map(folder => {
+                  const Icon = FOLDER_ICONS[folder.icon || 'Folder'] || Folder;
+                  const folderItemsCount = items.filter(i => i.folder === folder.path || i.folder.startsWith(folder.path + '/')).length;
+                  const subCount = folders.filter(f => f.path.startsWith(folder.path + '/')).length;
 
-                return (
-                  <button
-                    key={folder.path}
-                    onClick={() => setMobileActiveFolder(folder.path)}
-                    className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-[#141417]/70 hover:bg-[#18181c] border border-white/[0.05] active:scale-[0.98] transition-all text-left shadow-sm cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-300 shrink-0">
-                        <Icon className="w-5 h-5 text-zinc-300" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-zinc-200 truncate">{folder.name}</div>
-                        <div className="text-xs text-zinc-500 font-mono truncate">
-                          {subCount > 0 ? `${subCount} подпап. • ` : ''}
-                          {folderItemsCount} {folderItemsCount === 1 ? 'запись' : folderItemsCount < 5 ? 'записи' : 'записей'}
+                  return (
+                    <button
+                      key={folder.path}
+                      onClick={() => setMobileActiveFolder(folder.path)}
+                      className="w-full flex items-center justify-between p-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.06] flex items-center justify-center text-zinc-300 shrink-0">
+                          <Icon className="w-4 h-4 text-zinc-300" />
                         </div>
+                        <div className="text-sm font-medium text-zinc-200 truncate">{folder.name}</div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <ChevronRight className="w-4 h-4 text-zinc-600" />
-                    </div>
-                  </button>
-                );
-              })}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-mono text-zinc-500">
+                          {subCount > 0 ? `${subCount} п. • ` : ''}{folderItemsCount}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-zinc-600" />
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
           </div>
         </div>
       </div>

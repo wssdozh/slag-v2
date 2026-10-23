@@ -163,7 +163,18 @@ export const SettingsModal: React.FC = () => {
             <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white hidden md:flex">
               <Settings className="w-3.5 h-3.5" />
             </div>
-            <h3 className="text-sm font-semibold text-white">Настройки</h3>
+            <h3 className="text-sm font-semibold text-white">
+              Настройки
+              <span className="md:hidden text-zinc-500 font-normal ml-2">
+                / {
+                  activeTab === 'ai' ? 'ИИ & Провайдеры' :
+                  activeTab === 'vault' ? 'Хранилище & Бэкап' :
+                  activeTab === 'ui' ? 'Интерфейс & Панели' :
+                  activeTab === 'shortcuts' ? 'Горячие клавиши' :
+                  'Логи & Диагностика'
+                }
+              </span>
+            </h3>
           </div>
           <button
             onClick={() => setIsSettingsOpen(false)}
@@ -173,10 +184,10 @@ export const SettingsModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Responsive Body: Tabs Navigation on Left (Desktop) or Top in 1 row (Mobile), Tab Content */}
+        {/* Responsive Body: Tabs Navigation on Left (Desktop) or Hidden (Mobile), Tab Content */}
         <div className="flex-1 flex flex-col md:flex-row min-h-0">
-          {/* Tabs Nav: Single row horizontal scroll on mobile, vertical left column on desktop */}
-          <div className="flex md:flex-col md:w-48 overflow-x-auto md:overflow-visible scrollbar-none border-b md:border-b-0 md:border-r border-white/[0.06] bg-[#0c0c0e] p-1.5 md:p-2 gap-1 select-none shrink-0">
+          {/* Tabs Nav: Hidden on mobile (single section subview), vertical left column on desktop */}
+          <div className="hidden md:flex md:flex-col md:w-48 border-r border-white/[0.06] bg-[#0c0c0e] p-2 gap-1 select-none shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('ai')}
@@ -272,7 +283,7 @@ export const SettingsModal: React.FC = () => {
                             : 'text-zinc-400 hover:text-zinc-200'
                         }`}
                       >
-                        <span>⚡ Groq (Рекомендуется)</span>
+                        <span>Groq</span>
                       </button>
 
                       <button
@@ -284,7 +295,7 @@ export const SettingsModal: React.FC = () => {
                             : 'text-zinc-400 hover:text-zinc-200'
                         }`}
                       >
-                        <span>🧠 KIE.AI</span>
+                        <span>KIE.AI</span>
                       </button>
                     </div>
                   </div>
@@ -293,12 +304,7 @@ export const SettingsModal: React.FC = () => {
                   {provider === 'groq' && (
                     <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
                       <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-zinc-100">Groq Cloud API</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                            500+ t/s LPU
-                          </span>
-                        </div>
+                        <span className="text-xs font-semibold text-zinc-100">Groq Cloud API</span>
                         <a
                           href="https://console.groq.com/keys"
                           target="_blank"
@@ -330,51 +336,43 @@ export const SettingsModal: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-medium text-zinc-300">Модель</label>
                           <Select
                             value={model}
                             onChange={(val) => setModel(val)}
                             options={[
-                              { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)' },
-                              { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile (280 t/s, 128K)' },
-                              { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant (560 t/s, 128K)' },
+                              { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B' },
+                              { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
+                              { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B' },
                               { value: 'llama-3.3-70b-specdec', label: 'Llama 3.3 70B SpecDec' },
                             ]}
                           />
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений (Reasoning)</label>
+                          <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений</label>
                           <Select
                             value={reasoningEffort}
                             onChange={(val) => setReasoningEffort(val as any)}
                             options={[
-                              { value: 'none', label: 'Отключено (быстрый ответ)' },
-                              { value: 'low', label: 'Низкая (low effort)' },
-                              { value: 'medium', label: 'Средняя (сбалансированная)' },
-                              { value: 'high', label: 'Высокая (глубокий анализ)' },
+                              { value: 'none', label: 'Отключено' },
+                              { value: 'low', label: 'Низкая' },
+                              { value: 'medium', label: 'Средняя' },
+                              { value: 'high', label: 'Высокая' },
                             ]}
                           />
                         </div>
                       </div>
-                      <span className="text-[11px] text-zinc-500 leading-relaxed">
-                        Аппаратное LPU ускорение с поддержкой многошагового вызова инструментов и рассуждений.
-                      </span>
                     </div>
                   )}
 
-                  {/* Section 2: Настройки KIE.AI (с Gemini 4 Argon) */}
+                  {/* Section 2: Настройки KIE.AI */}
                   {provider === 'kie' && (
                     <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
                       <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-zinc-100">KIE.AI Unified Gateway</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                            Gemini 4 Argon
-                          </span>
-                        </div>
+                        <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
                         <a
                           href="https://kie.ai/api-key"
                           target="_blank"
@@ -413,7 +411,7 @@ export const SettingsModal: React.FC = () => {
                             value={model}
                             onChange={(val) => setModel(val)}
                             options={[
-                              { value: 'gemini-4-argon-openai', label: 'Gemini 4 Argon (OpenAI, Рекомендуется)' },
+                              { value: 'gemini-4-argon-openai', label: 'Gemini 4 Argon' },
                               { value: 'gpt-5-2', label: 'GPT 5.2' },
                               { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
                               { value: 'deepseek-v4-1-flash', label: 'DeepSeek V4.1 Flash' },
@@ -429,10 +427,10 @@ export const SettingsModal: React.FC = () => {
                             value={reasoningEffort}
                             onChange={(val) => setReasoningEffort(val as any)}
                             options={[
-                              { value: 'none', label: 'Отключено (быстро, экономия)' },
-                              { value: 'low', label: 'Низкая (low effort)' },
-                              { value: 'medium', label: 'Средняя (сбалансированная)' },
-                              { value: 'high', label: 'Высокая (high effort)' },
+                              { value: 'none', label: 'Отключено' },
+                              { value: 'low', label: 'Низкая' },
+                              { value: 'medium', label: 'Средняя' },
+                              { value: 'high', label: 'Высокая' },
                             ]}
                           />
                         </div>
@@ -448,10 +446,6 @@ export const SettingsModal: React.FC = () => {
                           />
                         </div>
                       </div>
-
-                      <span className="text-[11px] text-zinc-500 leading-relaxed">
-                        Маршрут Gemini 4 Argon: /gemini-4-argon-openai/v1/chat/completions с поддержкой Google Search и цепочек мыслей.
-                      </span>
                     </div>
                   )}
 
@@ -461,31 +455,25 @@ export const SettingsModal: React.FC = () => {
                       <span className="text-xs font-semibold text-zinc-100">
                         Автоматизация и поиск
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        Smart Services
-                      </span>
                     </div>
 
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2.5">
                       <Checkbox
                         checked={autoTagging}
                         onChange={setAutoTagging}
                         label="Автоматический подбор тегов"
-                        description="При сохранении заметки без тегов ИИ подбирает их по таксономии базы"
                       />
 
                       <Checkbox
                         checked={autoTriage}
                         onChange={setAutoTriage}
                         label="Интеллектуальная диспетчеризация (AI Triage)"
-                        description="Автоматически сопоставляет неразобранные записи с подходящими папками"
                       />
 
                       <Checkbox
                         checked={webSearchEnabled}
                         onChange={setWebSearchEnabled}
                         label="Поиск в реальном времени (Web Search)"
-                        description="Включает Google Search в Gemini 4 Argon или веб-поиск в Groq"
                       />
                     </div>
                   </div>
@@ -495,9 +483,6 @@ export const SettingsModal: React.FC = () => {
                     <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
                         Норма таксономии и правила тегирования
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        Zero-Slop Taxonomy
                       </span>
                     </div>
 

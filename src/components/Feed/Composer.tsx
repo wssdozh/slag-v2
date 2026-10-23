@@ -917,7 +917,7 @@ export const Composer: React.FC = () => {
           )}
 
           {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 shrink-0">
             {/* +AI Smart Tagging Button - Text preserved, height matching row */}
             <button
               type="button"
@@ -950,7 +950,7 @@ export const Composer: React.FC = () => {
               </button>
 
               {isTypeDropdownOpen && (
-                <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-30 text-xs flex flex-col gap-0.5 animate-in fade-in">
+                <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in">
                   <button
                     type="button"
                     onClick={() => {
@@ -1008,7 +1008,7 @@ export const Composer: React.FC = () => {
               onPointerDown={(e) => handlePointerDown(e, 'audio')}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
-              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer touch-none ${
+              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
                 isRecordingAudio
                   ? 'bg-rose-500/20 text-rose-400'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -1033,7 +1033,7 @@ export const Composer: React.FC = () => {
               onPointerDown={(e) => handlePointerDown(e, 'video')}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
-              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer touch-none ${
+              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
                 isRecordingVideo
                   ? 'bg-rose-500/20 text-rose-400'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -1048,7 +1048,7 @@ export const Composer: React.FC = () => {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
               title="Прикрепить файл"
             >
               <Paperclip className="w-4 h-4" />

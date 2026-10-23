@@ -57,6 +57,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const testNoteText = 'Мобильная мысль с телефона ' + Date.now();
     await composerTextarea.fill(testNoteText);
 
+    await page.screenshot({ path: 'test-results/screenshots/composer_alignment.png' });
+
     const sendBtn = page.locator('button[title*="Отправить"]').first();
     await expect(sendBtn).toBeEnabled();
     await sendBtn.click();
@@ -111,6 +113,10 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('button', { hasText: /В работе/ })).toBeVisible();
     await expect(page.locator('button', { hasText: /Готово/ })).toBeVisible();
     await expect(page.locator('button', { hasText: /Бэклог/ })).toBeVisible();
+
+    // Verify view switcher and inline add button
+    await expect(page.locator('button', { hasText: 'Календарь' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Добавить задачу' })).toBeVisible();
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_tasks.png' });
   });
@@ -168,7 +174,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(actionSheet).not.toBeVisible();
   });
 
-  test('8. Mobile Settings Modal Fullscreen with Horizontal Tabs', async ({ page }) => {
+  test('8. Mobile Settings Modal Fullscreen with Clean Subview (No Tabs)', async ({ page }) => {
     // Tap on "Настройки" tab in dock
     const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
     await settingsTab.click();
@@ -176,13 +182,12 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Click "ИИ & Провайдеры" item
     await page.locator('button', { hasText: 'ИИ & Провайдеры' }).click();
 
-    // Verify modal is open and has horizontal tab bar
+    // Verify modal is open and has clean header with back button
     const modalHeader = page.locator('h3', { hasText: 'Настройки' });
     await expect(modalHeader).toBeVisible();
 
-    // Verify tabs inside modal
-    await expect(page.getByRole('button', { name: 'Хранилище & Бэкап', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Интерфейс & Панели', exact: true })).toBeVisible();
+    // Verify content inside modal (Groq button is visible without horizontal tabs clutter)
+    await expect(page.locator('button', { hasText: 'Groq' }).first()).toBeVisible();
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_settings_modal.png' });
 
