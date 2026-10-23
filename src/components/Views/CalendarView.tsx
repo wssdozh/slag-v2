@@ -86,7 +86,7 @@ const RUSSIAN_MONTHS = [
 ];
 
 const RUSSIAN_WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
-const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
   bg: string;
@@ -188,6 +188,15 @@ export const CalendarView: React.FC = () => {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-scroll time grid to current hour - 1 on mount/view change
+  useEffect(() => {
+    if (viewMode === 'week' && timeGridRef.current) {
+      const currentHour = Math.floor(nowMinute / 60);
+      const scrollHour = Math.max(0, currentHour - 1);
+      timeGridRef.current.scrollTop = scrollHour * 52;
+    }
+  }, [viewMode, nowMinute]);
 
   // Keyboard shortcut for closing modals
   useEffect(() => {
@@ -500,8 +509,8 @@ export const CalendarView: React.FC = () => {
     const isDone = task.status === 'done';
     const styling = getPriorityBadge(task.priority);
 
-    const startH = Math.max(8, Math.min(22, slot.startHour));
-    const topPx = (startH - 8) * 52 + (slot.startMinute / 60) * 52;
+    const startH = Math.max(0, Math.min(23, slot.startHour));
+    const topPx = startH * 52 + (slot.startMinute / 60) * 52;
     const heightPx = Math.max(44, (slot.durationMinutes / 60) * 52);
 
     const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
@@ -789,8 +798,8 @@ export const CalendarView: React.FC = () => {
                     const timedTasks = dayTasks.filter(t => !getTaskTimeSlot(t).isAllDay);
 
                     // Red time ribbon position
-                    const showRedRibbon = isToday && nowMinute >= 8 * 60 && nowMinute <= 23 * 60;
-                    const redRibbonTopPx = showRedRibbon ? ((nowMinute - 8 * 60) / 60) * 52 : 0;
+                    const showRedRibbon = isToday;
+                    const redRibbonTopPx = (nowMinute / 60) * 52;
 
                     return (
                       <div

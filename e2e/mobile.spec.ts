@@ -349,5 +349,18 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Close Month Picker
     await monthPickerSheet.locator('button', { hasText: 'Отмена' }).click();
     await expect(monthPickerSheet).not.toBeVisible();
+
+    // Switch layout to "3 дня" (24-hour multi-day grid)
+    const threeDaysBtn = page.locator('button', { hasText: '3 дня' });
+    await expect(threeDaysBtn).toBeVisible();
+    await threeDaysBtn.click();
+
+    // Verify 24-hour grid contains time rails
+    await expect(page.locator('text=00:00')).toBeVisible();
+    await expect(page.locator('text=12:00')).toBeVisible();
+    await expect(page.locator('text=23:00')).toBeVisible();
+
+    // Take screenshot of the 3-day 24h multi-day time grid for visual audit
+    await page.screenshot({ path: 'test-results/screenshots/mobile_calendar_3day_grid.png' });
   });
 });
