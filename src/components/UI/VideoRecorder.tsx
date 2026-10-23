@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, RefreshCw } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
+import { logger } from '../../lib/logger';
+
+const mediaLog = logger.scope('MEDIA');
 
 interface VideoRecorderProps {
   onRecorded: (attachment: SlagAttachment, autoSend?: boolean) => void;
@@ -42,6 +45,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
           dataUrl: base64,
           duration: Number(finalDuration.toFixed(1)),
         };
+        mediaLog.info(`Video circle recording finished (${attachment.duration}s, ${attachment.size} bytes)`);
         onRecorded(attachment, autoSend);
       };
       reader.readAsDataURL(blob);
@@ -93,8 +97,9 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
             },
             audio: true,
           });
+          mediaLog.info(`Camera & mic access granted (${facingMode})`);
         } catch (mediaErr) {
-          console.warn('Camera/Mic not accessible, fallback to synthetic stream:', mediaErr);
+          mediaLog.warn('Camera/Mic not accessible, fallback to synthetic stream:', mediaErr);
           try {
             const canvas = document.createElement('canvas');
             canvas.width = 480;
@@ -106,6 +111,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
             }
             stream = canvas.captureStream(15);
           } catch {
+            mediaLog.error('Failed to initialize fallback video stream');
             onCancel();
             return;
           }
@@ -135,6 +141,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
         };
 
         mediaRecorder.start(100);
+        mediaLog.debug('Video MediaRecorder recording loop active');
         startTimeRef.current = Date.now();
         setIsReady(true);
 
@@ -142,7 +149,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
           setElapsedMs(Date.now() - startTimeRef.current);
         }, 80);
       } catch (err) {
-        console.error('Camera/Microphone error:', err);
+        mediaLog.error('Camera/Microphone error:', err);
         onCancel();
       }
     };

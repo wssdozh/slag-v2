@@ -73,6 +73,7 @@ const SCOPE_STYLES: Record<LogScope, { bg: string; fg: string }> = {
   UI: { bg: '#27272a', fg: '#d4d4d8' },
   APP: { bg: '#4c1d95', fg: '#ddd6fe' },
   SYNC: { bg: '#164e63', fg: '#67e8f9' },
+  MEDIA: { bg: '#831843', fg: '#fbcfe8' },
 };
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -88,8 +89,27 @@ class LoggerEngine {
   private maxEntries = 1000;
   private listeners: Set<LogListener> = new Set();
   private timers: Map<string, number> = new Map();
+  private persistTimeout: number | null = null;
 
   constructor() {
+    // Restore breadcrumbs from previous session if crashed or reloaded
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const raw = sessionStorage.getItem('slag_session_breadcrumbs');
+        if (raw) {
+          const parsed: LogEntry[] = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.buffer = parsed.slice(-50).map(e => ({
+              ...e,
+              message: `[PREV_SESSION] ${e.message}`,
+            }));
+          }
+        }
+      } catch {
+        // Ignore session read error
+      }
+    }
+
     // Intercept uncaught errors in browser window
     if (typeof window !== 'undefined') {
       window.addEventListener('error', (event) => {
@@ -109,6 +129,27 @@ class LoggerEngine {
     }
   }
 
+  private persistToSession(): void {
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    if (this.persistTimeout !== null) return;
+    this.persistTimeout = window.setTimeout(() => {
+      this.persistTimeout = null;
+      try {
+        const compact = this.buffer.slice(-60).map(e => ({
+          id: e.id,
+          timestamp: e.timestamp,
+          level: e.level,
+          scope: e.scope,
+          message: e.message,
+          durationMs: e.durationMs,
+        }));
+        sessionStorage.setItem('slag_session_breadcrumbs', JSON.stringify(compact));
+      } catch {
+        // Ignore quota
+      }
+    }, 250);
+  }
+
   private emit(entry: LogEntry): void {
     // Add to buffer
     this.buffer.push(entry);
@@ -118,6 +159,9 @@ class LoggerEngine {
 
     // Print to browser console with styled badges
     this.printToConsole(entry);
+
+    // Persist lightweight breadcrumb trail across page reloads
+    this.persistToSession();
 
     // Notify in-app subscribers
     this.listeners.forEach((listener) => {
@@ -271,11 +315,11 @@ class LoggerEngine {
   // Scoped helper for module-level cleanly bound callers
   public scope(scope: LogScope) {
     return {
-      trace: (msg: string, data?: unknown) => this.trace(scope, msg, data),
-      debug: (msg: string, data?: unknown) => this.debug(scope, msg, data),
-      info: (msg: string, data?: unknown) => this.info(scope, msg, data),
-      warn: (msg: string, data?: unknown) => this.warn(scope, msg, data),
-      error: (msg: string, data?: unknown) => this.error(scope, msg, data),
+      trace: (msg: string, data?: unknown, durationMs?: number) => this.log('trace', scope, msg, data, durationMs),
+      debug: (msg: string, data?: unknown, durationMs?: number) => this.log('debug', scope, msg, data, durationMs),
+      info: (msg: string, data?: unknown, durationMs?: number) => this.log('info', scope, msg, data, durationMs),
+      warn: (msg: string, data?: unknown, durationMs?: number) => this.log('warn', scope, msg, data, durationMs),
+      error: (msg: string, data?: unknown, durationMs?: number) => this.log('error', scope, msg, data, durationMs),
       time: (label: string) => this.time(scope, label),
       trackAsync: <T>(label: string, fn: () => Promise<T>) => this.trackAsync(scope, label, fn),
     };
@@ -287,8 +331,49 @@ class LoggerEngine {
 
   public clear(): void {
     this.buffer = [];
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.removeItem('slag_session_breadcrumbs');
+      } catch {
+        // Ignore
+      }
+    }
     // Notify with a sentinel or just trigger listeners with dummy entry or re-render
     this.log('info', 'APP', 'Log buffer cleared');
+  }
+
+  public getStorageHealth(): {
+    usedKb: number;
+    totalKeys: number;
+    isNearQuota: boolean;
+    quotaWarning?: string;
+  } {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return { usedKb: 0, totalKeys: 0, isNearQuota: false };
+    }
+    try {
+      let bytes = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          bytes += key.length * 2;
+          const val = localStorage.getItem(key);
+          if (val) bytes += val.length * 2;
+        }
+      }
+      const usedKb = Math.round(bytes / 1024);
+      const isNearQuota = usedKb > 4000;
+      return {
+        usedKb,
+        totalKeys: localStorage.length,
+        isNearQuota,
+        quotaWarning: isNearQuota
+          ? `Хранилище заполнено на ${usedKb} KB (~${Math.round((usedKb / 5120) * 100)}% квоты браузера)`
+          : undefined,
+      };
+    } catch {
+      return { usedKb: 0, totalKeys: 0, isNearQuota: false };
+    }
   }
 
   public subscribe(listener: LogListener): () => void {
@@ -307,10 +392,14 @@ class LoggerEngine {
     const total = this.buffer.length;
     const errors = this.buffer.filter(e => e.level === 'error').length;
     const warns = this.buffer.filter(e => e.level === 'warn').length;
+    const storageHealth = this.getStorageHealth();
+    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
     const lines: string[] = [
       `# SLAG v2 — Application Diagnostics Report`,
       `**Generated:** ${now}`,
+      `**Network Status:** ${isOnline ? 'Online 🟢' : 'Offline 🔴'}`,
+      `**Storage Usage:** ${storageHealth.usedKb} KB (${storageHealth.totalKeys} keys)${storageHealth.isNearQuota ? ' ⚠️ NEAR QUOTA' : ''}`,
       `**User Agent:** ${typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'}`,
       `**Total Log Entries:** ${total} (${errors} errors, ${warns} warnings)`,
       ``,

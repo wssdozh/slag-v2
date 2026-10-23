@@ -376,7 +376,15 @@ export class StorageService {
       fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     }
 
-    localStorage.setItem(this.getItemsKey(), JSON.stringify(items));
+    try {
+      localStorage.setItem(this.getItemsKey(), JSON.stringify(items));
+    } catch (err) {
+      fsLog.error('Failed to save items to localStorage (storage quota exceeded)', {
+        itemCount: items.length,
+        error: err,
+      });
+      throw err;
+    }
     return updatedItem;
   }
 
@@ -444,11 +452,16 @@ export class StorageService {
 
   // Attachments
   public saveAttachment(attachment: SlagAttachment): void {
+    const key = `${ATTACHMENTS_STORAGE_PREFIX}${attachment.id}`;
     try {
-      const key = `${ATTACHMENTS_STORAGE_PREFIX}${attachment.id}`;
       localStorage.setItem(key, JSON.stringify(attachment));
-    } catch {
-      // ignore
+      fsLog.info(`Saved attachment "${attachment.name}" (${attachment.type}, ${Math.round(attachment.size / 1024)} KB)`);
+    } catch (err) {
+      fsLog.error(`Failed to save attachment "${attachment.name}" (storage quota exceeded)`, {
+        attachmentId: attachment.id,
+        sizeBytes: attachment.size,
+        error: err,
+      });
     }
   }
 

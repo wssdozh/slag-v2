@@ -763,10 +763,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const logViewer = page.locator('[data-testid="log-viewer"]');
     await expect(logViewer).toBeVisible();
 
-    // 3. Verify title and chips
+    // 3. Verify title, stats, storage badge and chips
     await expect(logViewer.locator('text=Логи & HUD')).toBeVisible();
     await expect(logViewer.locator('text=LEVEL:')).toBeVisible();
     await expect(logViewer.locator('text=SCOPE:')).toBeVisible();
+    await expect(logViewer.locator('button', { hasText: 'MEDIA' })).toBeVisible();
+    await expect(logViewer.locator('text=KB').first()).toBeVisible();
 
     // 4. Verify system initialization logs are present
     await expect(logViewer.locator('text=SLAG v2 application initialized').first()).toBeVisible();

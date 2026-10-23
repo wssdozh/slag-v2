@@ -21,6 +21,9 @@ import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { useIsMobile } from '../hooks/useIsMobile';
 
+const uiLog = logger.scope('UI');
+const appLog = logger.scope('APP');
+
 interface ToastMessage {
   id: string;
   type: 'info' | 'success' | 'error';
@@ -393,12 +396,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const currentVault = storage.getCurrentVault();
     const currentItems = storage.getItems();
     const currentFolders = storage.getFolders();
-    logger.info('APP', 'SLAG v2 application initialized', {
+    appLog.info('SLAG v2 application initialized', {
       vault: currentVault.name,
       itemsCount: currentItems.length,
       foldersCount: currentFolders.length,
     });
   }, []);
+
+  // Network online/offline diagnostics
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => appLog.info('Network connection restored (online)');
+    const handleOffline = () => appLog.warn('Network connection lost (offline)');
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // User Breadcrumbs: Folder navigation & View switching
+  const prevFolderRef = useRef(currentFolder);
+  useEffect(() => {
+    if (prevFolderRef.current !== currentFolder) {
+      uiLog.debug(`Navigated to folder: "${currentFolder}"`);
+      prevFolderRef.current = currentFolder;
+    }
+  }, [currentFolder]);
+
+  const prevViewRef = useRef(feedViewMode);
+  useEffect(() => {
+    if (prevViewRef.current !== feedViewMode) {
+      uiLog.debug(`Switched view mode to: "${feedViewMode}"`);
+      prevViewRef.current = feedViewMode;
+    }
+  }, [feedViewMode]);
+
+  // User Breadcrumbs: Modal visibility tracking
+  useEffect(() => {
+    if (isSearchOpen) uiLog.debug('Search modal opened (⌘K)');
+  }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (isTriageModalOpen) uiLog.debug('AI Triage modal opened');
+  }, [isTriageModalOpen]);
+
+  useEffect(() => {
+    if (isSettingsOpen) uiLog.debug(`Settings modal opened [tab: ${settingsTab}]`);
+  }, [isSettingsOpen, settingsTab]);
+
+  useEffect(() => {
+    if (isFullscreenEditorOpen) uiLog.debug('Fullscreen editor opened');
+  }, [isFullscreenEditorOpen]);
 
   // Listen to window storage events if multi-window sync is used
   useEffect(() => {
@@ -588,6 +640,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = { ...aiSettings, ...newSettings };
     setAiSettings(updated);
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
+    uiLog.info(`AI settings updated: provider=${updated.provider}, model=${updated.model || 'default'}`);
     addToast('Настройки сохранены', 'success');
   };
 

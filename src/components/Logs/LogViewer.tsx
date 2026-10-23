@@ -28,6 +28,7 @@ const SCOPE_COLORS: Record<LogScope, string> = {
   UI: 'text-zinc-400',
   APP: 'text-purple-400/90',
   SYNC: 'text-cyan-400/90',
+  MEDIA: 'text-pink-400/90',
 };
 
 const LEVEL_COLORS: Record<LogLevel, { text: string; labelColor: string }> = {
@@ -38,7 +39,7 @@ const LEVEL_COLORS: Record<LogLevel, { text: string; labelColor: string }> = {
   error: { text: 'text-rose-300/95', labelColor: 'text-rose-400' },
 };
 
-const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC'];
+const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC', 'MEDIA'];
 const ALL_LEVELS: LogLevel[] = ['error', 'warn', 'info', 'debug'];
 
 export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose }) => {
@@ -102,6 +103,8 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
     }
     return { total: entries.length, errors, warns, infos };
   }, [entries]);
+
+  const storageHealth = logger.getStorageHealth();
 
   const filteredEntries = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -181,6 +184,16 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             {counts.total}
             {counts.errors > 0 && <span className="text-rose-400 ml-1">· {counts.errors}e</span>}
             {counts.warns > 0 && <span className="text-amber-400 ml-1">· {counts.warns}w</span>}
+          </span>
+          <span
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+              storageHealth.isNearQuota
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                : 'text-zinc-500 bg-white/[0.03]'
+            }`}
+            title={`Использование localStorage: ${storageHealth.usedKb} KB (${storageHealth.totalKeys} ключей)`}
+          >
+            {storageHealth.usedKb} KB
           </span>
         </div>
 

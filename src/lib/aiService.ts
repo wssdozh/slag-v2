@@ -157,11 +157,15 @@ async function callJsonLlm<T>(
   settings: AiSettings,
   temperature = 0.1
 ): Promise<T | null> {
+  const promptLength = systemPrompt.length + userPrompt.length;
+
   // 1. Groq Provider
   if (settings.provider === 'groq' && settings.groqApiKey) {
+    const model = settings.model || 'openai/gpt-oss-120b';
+    const isGptOss = model.includes('gpt-oss');
+    const start = performance.now();
     try {
-      const model = settings.model || 'openai/gpt-oss-120b';
-      const isGptOss = model.includes('gpt-oss');
+      aiLog.debug(`Calling Groq LLM [${model}]`, { promptChars: promptLength, temperature });
       const payload: Record<string, any> = {
         model,
         messages: [
@@ -181,25 +185,35 @@ async function callJsonLlm<T>(
         },
         body: JSON.stringify(payload),
       });
+      const durationMs = performance.now() - start;
       if (res.ok) {
         const data = await res.json();
         const raw = data.choices?.[0]?.message?.content;
+        aiLog.info(`Groq [${model}] response received (${Math.round(durationMs)}ms)`, {
+          status: res.status,
+          durationMs,
+          replyChars: raw?.length || 0,
+        }, durationMs);
         if (raw) return parseJsonContent<T>(raw);
+      } else {
+        aiLog.warn(`Groq [${model}] returned HTTP ${res.status}`, { status: res.status, statusText: res.statusText });
       }
     } catch (err) {
-      aiLog.warn('Groq LLM call failed, falling back to local heuristic', err);
+      aiLog.warn(`Groq LLM call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
     }
   }
 
   // 2. KIE.AI Provider (Claude / OpenAI)
   if (settings.provider === 'kie' && settings.kieApiKey) {
-    try {
-      const model = settings.model || 'gemini-3-8-flash-openai';
-      const isClaude = model.toLowerCase().startsWith('claude-');
-      const baseUrl = (settings.kieBaseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
-      const authHeader = settings.kieApiKey.startsWith('Bearer ') ? settings.kieApiKey : `Bearer ${settings.kieApiKey}`;
-      let raw = '';
+    const model = settings.model || 'gemini-3-8-flash-openai';
+    const isClaude = model.toLowerCase().startsWith('claude-');
+    const baseUrl = (settings.kieBaseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
+    const authHeader = settings.kieApiKey.startsWith('Bearer ') ? settings.kieApiKey : `Bearer ${settings.kieApiKey}`;
+    const start = performance.now();
+    let raw = '';
 
+    try {
+      aiLog.debug(`Calling KIE [${model}]`, { promptChars: promptLength, isClaude, temperature });
       if (isClaude) {
         const endpoint = `${baseUrl}/claude/v1/messages`;
         const res = await fetch(endpoint, {
@@ -217,6 +231,7 @@ async function callJsonLlm<T>(
             temperature,
           }),
         });
+        const durationMs = performance.now() - start;
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.content)) {
@@ -224,6 +239,13 @@ async function callJsonLlm<T>(
               if (b.type === 'text') raw += b.text || '';
             }
           }
+          aiLog.info(`KIE Claude [${model}] response received (${Math.round(durationMs)}ms)`, {
+            status: res.status,
+            durationMs,
+            replyChars: raw.length,
+          }, durationMs);
+        } else {
+          aiLog.warn(`KIE Claude [${model}] returned HTTP ${res.status}`, { status: res.status });
         }
       } else {
         const endpoint = resolveKieEndpoint(settings.kieBaseUrl, model);
@@ -242,25 +264,35 @@ async function callJsonLlm<T>(
             temperature,
           }),
         });
+        const durationMs = performance.now() - start;
         if (res.ok) {
           const data = await res.json();
           if (data.code && data.code !== 200) {
             throw new Error(data.msg || `KIE error ${data.code}`);
           }
           raw = data.choices?.[0]?.message?.content || '';
+          aiLog.info(`KIE OpenAI [${model}] response received (${Math.round(durationMs)}ms)`, {
+            status: res.status,
+            durationMs,
+            replyChars: raw.length,
+          }, durationMs);
+        } else {
+          aiLog.warn(`KIE OpenAI [${model}] returned HTTP ${res.status}`, { status: res.status });
         }
       }
 
       if (raw) return parseJsonContent<T>(raw);
     } catch (err) {
-      aiLog.warn('KIE LLM call failed, falling back to local heuristic', err);
+      aiLog.warn(`KIE LLM call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
     }
   }
 
   // 3. Google Gemini Provider
   if (settings.provider === 'gemini' && settings.geminiApiKey) {
+    const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
+    const start = performance.now();
     try {
-      const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
+      aiLog.debug(`Calling Gemini [${model}]`, { promptChars: promptLength, temperature });
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.geminiApiKey}`;
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -273,13 +305,21 @@ async function callJsonLlm<T>(
           },
         }),
       });
+      const durationMs = performance.now() - start;
       if (res.ok) {
         const data = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        aiLog.info(`Gemini [${model}] response received (${Math.round(durationMs)}ms)`, {
+          status: res.status,
+          durationMs,
+          replyChars: text?.length || 0,
+        }, durationMs);
         if (text) return parseJsonContent<T>(text);
+      } else {
+        aiLog.warn(`Gemini [${model}] returned HTTP ${res.status}`, { status: res.status });
       }
     } catch (err) {
-      aiLog.warn('Gemini LLM call failed, falling back to local heuristic', err);
+      aiLog.warn(`Gemini LLM call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
     }
   }
 
@@ -361,11 +401,13 @@ ${settings.customTagRules ? `Пользовательские правила: ${
       targetFolder = currentFolder;
     }
 
-    return {
+    const finalResult = {
       targetFolder,
       tags: combinedTags.length > 0 ? combinedTags : localHeuristicTags(content, existingTags, style, maxTags),
       reason: parsed.reason?.trim() || 'По смыслу заметки',
     };
+    aiLog.info(`Draft categorized: -> "${finalResult.targetFolder}" [${finalResult.tags.map(t => '#' + t).join(' ')}]`);
+    return finalResult;
   }
 
   // Local fallback
@@ -373,11 +415,13 @@ ${settings.customTagRules ? `Пользовательские правила: ${
     ? localMatchFolder(content, eligibleFolders, currentFolder)
     : { folder: currentFolder, reason: 'Текущая папка' };
 
-  return {
+  const fallbackResult = {
     targetFolder: localMatch.folder,
     tags: localHeuristicTags(content, existingTags, style, maxTags),
     reason: localMatch.reason,
   };
+  aiLog.info(`Draft categorized (heuristic): -> "${fallbackResult.targetFolder}" [${fallbackResult.tags.map(t => '#' + t).join(' ')}]`);
+  return fallbackResult;
 }
 
 /**
@@ -416,8 +460,11 @@ export async function triageInboxItems(
   const CHUNK_SIZE = 5;
   const allSuggestions: TriageSuggestion[] = [];
   let processedCount = 0;
+  const totalChunks = Math.ceil(inboxItems.length / CHUNK_SIZE);
+  aiLog.info(`Starting batch triage for ${inboxItems.length} items (${totalChunks} chunks)`);
 
   for (let i = 0; i < inboxItems.length; i += CHUNK_SIZE) {
+    const chunkIndex = Math.floor(i / CHUNK_SIZE) + 1;
     const chunk = inboxItems.slice(i, i + CHUNK_SIZE);
     const itemsContext = chunk.map((it) => ({
       id: it.id,
@@ -498,6 +545,10 @@ ${JSON.stringify(foldersContext, null, 2)}
 
     allSuggestions.push(...chunkResult);
     processedCount += chunk.length;
+    aiLog.debug(`Triage chunk ${chunkIndex}/${totalChunks} completed (${chunk.length} items)`, {
+      processed: processedCount,
+      total: inboxItems.length,
+    });
 
     if (onProgress) {
       onProgress(chunkResult, {

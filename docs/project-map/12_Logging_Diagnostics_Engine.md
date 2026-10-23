@@ -27,10 +27,12 @@ tags:
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   SLAG Logger Engine                   │
-│  - Скоупы: AI | FS | SEARCH | UI | APP | SYNC          │
+│  - Скоупы: AI | FS | SEARCH | UI | APP | SYNC | MEDIA  │
 │  - Уровни: trace | debug | info | warn | error         │
 │  - Sensitive Redactor: маскирование API-ключей         │
 │  - Time Tracking: logger.time / logger.trackAsync      │
+│  - Storage Health: getStorageHealth (KB / квота)       │
+│  - Session Breadcrumbs: переживает перезагрузку F5     │
 └───────────┬────────────────────────────────┬───────────┘
             │                                │
             ▼                                ▼
@@ -56,7 +58,7 @@ tags:
 
 ```typescript
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
-export type LogScope = 'AI' | 'FS' | 'SEARCH' | 'UI' | 'APP' | 'SYNC';
+export type LogScope = 'AI' | 'FS' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA';
 
 export interface LogEntry {
   id: string;

@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
+import { logger } from '../../lib/logger';
+
+const mediaLog = logger.scope('MEDIA');
 
 interface AudioRecorderProps {
   onRecorded: (attachment: SlagAttachment, autoSend?: boolean) => void;
@@ -62,6 +65,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
           duration: Number(finalDuration.toFixed(1)),
           waveform: finalWaveform,
         };
+        mediaLog.info(`Voice audio recording finished (${attachment.duration}s, ${attachment.size} bytes)`);
         onRecorded(attachment, autoSend);
       };
       reader.readAsDataURL(blob);
@@ -93,8 +97,9 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
       let stream: MediaStream | null = null;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaLog.info('Microphone access granted, audio stream initialized');
       } catch (mediaErr) {
-        console.warn('Microphone not accessible, fallback to synthetic stream:', mediaErr);
+        mediaLog.warn('Microphone not accessible, fallback to synthetic stream:', mediaErr);
         try {
           const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
           const audioCtx = new AudioContextClass();
@@ -102,6 +107,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
           const dest = audioCtx.createMediaStreamDestination();
           stream = dest.stream;
         } catch {
+          mediaLog.error('Failed to initialize fallback audio stream');
           onCancel();
           return;
         }
@@ -153,7 +159,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
 
           animFrameRef.current = requestAnimationFrame(updateLiveWave);
         } catch (audioErr) {
-          console.warn('AudioContext visualization not available:', audioErr);
+          mediaLog.warn('AudioContext visualization not available:', audioErr);
         }
 
         const mediaRecorder = new MediaRecorder(stream);
@@ -165,13 +171,14 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
         };
 
         mediaRecorder.start(100);
+        mediaLog.debug('MediaRecorder recording loop active');
         startTimeRef.current = Date.now();
 
         timerIntervalRef.current = window.setInterval(() => {
           setElapsedMs(Date.now() - startTimeRef.current);
         }, 80);
       } catch (err) {
-        console.error('MediaRecorder error:', err);
+        mediaLog.error('MediaRecorder error:', err);
         onCancel();
       }
     };
