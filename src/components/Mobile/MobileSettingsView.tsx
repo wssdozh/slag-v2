@@ -16,6 +16,7 @@ import {
   Sliders,
   Keyboard
 } from 'lucide-react';
+import { MobileScreenHeader } from './MobileScreenHeader';
 
 const ALL_AVAILABLE_TABS: { id: MobileTabId; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'folders', label: 'Папки', icon: Folder },
@@ -56,17 +57,10 @@ export const MobileSettingsView: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none">
       {/* Top Header */}
-      <header
-        className="h-14 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-4 flex items-center justify-between shrink-0"
-        style={{ paddingTop: 'max(var(--sat), 0px)' }}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white">
-            <SettingsIcon className="w-3.5 h-3.5" />
-          </div>
-          <h1 className="text-base font-bold text-white tracking-tight">Настройки</h1>
-        </div>
-      </header>
+      <MobileScreenHeader
+        title="Настройки"
+        icon={<SettingsIcon className="w-3.5 h-3.5" />}
+      />
 
       {/* Main Settings List (Matching iOS/Telegram grouped style) */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">

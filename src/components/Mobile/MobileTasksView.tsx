@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { MobileCalendarView } from './MobileCalendarView';
+import { MobileScreenHeader } from './MobileScreenHeader';
 
 interface ColumnDef {
   id: TaskStatus;
@@ -152,23 +153,21 @@ export const MobileTasksView: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none">
       {/* Top Header */}
-      <header
-        className="h-14 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-4 flex items-center justify-between shrink-0"
-        style={{ paddingTop: 'max(var(--sat), 0px)' }}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white">
-            <CheckSquare className="w-3.5 h-3.5" />
+      <MobileScreenHeader
+        title="Задачи"
+        leftSlot={
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white">
+              <CheckSquare className="w-3.5 h-3.5" />
+            </div>
+            <h1 className="text-base font-bold text-white tracking-tight">Задачи</h1>
+            <span className="text-xs font-mono text-zinc-500">
+              ({allTasks.length})
+            </span>
           </div>
-          <h1 className="text-base font-bold text-white tracking-tight">Задачи</h1>
-          <span className="text-xs font-mono text-zinc-500">
-            ({allTasks.length})
-          </span>
-        </div>
-
-        {/* View Switcher: Tasks vs Calendar */}
-        {switcher}
-      </header>
+        }
+        rightSlot={switcher}
+      />
 
       {/* Segmented Status Tabs (Pills style matching MobileFolderInfoView) */}
       <div className="px-3 py-2 bg-[#0c0c0e]/60 border-b border-white/[0.04] shrink-0">

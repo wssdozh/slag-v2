@@ -9,7 +9,6 @@ import {
   FolderPlus,
   FolderCheck,
   ChevronRight,
-  ArrowLeft,
   Info,
   Search,
   Inbox,
@@ -24,6 +23,7 @@ import {
   Filter
 } from 'lucide-react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
+import { MobileScreenHeader } from './MobileScreenHeader';
 
 export const MobileFoldersView: React.FC = () => {
   const {
@@ -79,36 +79,32 @@ export const MobileFoldersView: React.FC = () => {
     return (
       <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none">
         {/* Top Header */}
-        <header
-          className="h-14 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-4 flex items-center justify-between shrink-0"
-          style={{ paddingTop: 'max(var(--sat), 0px)' }}
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center font-mono font-bold text-xs text-white">
-              S
-            </div>
-            <h1 className="text-base font-bold text-white tracking-tight">Заметки</h1>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
-              title="Поиск"
-              aria-label="Поиск"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => openCreateFolderModal()}
-              className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
-              title="Новая папка"
-              aria-label="Новая папка"
-            >
-              <FolderPlus className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
+        <MobileScreenHeader
+          title="Заметки"
+          icon="S"
+          rightSlot={
+            <>
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                title="Поиск"
+                aria-label="Поиск"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => openCreateFolderModal()}
+                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                title="Новая папка"
+                aria-label="Новая папка"
+              >
+                <FolderPlus className="w-5 h-5" />
+              </button>
+            </>
+          }
+        />
 
         {/* Scrollable Root Folders List (Telegram Grouped Style) */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
@@ -185,43 +181,37 @@ export const MobileFoldersView: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none relative">
       {/* Top Header */}
-      <header
-        className="h-14 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-3 flex items-center justify-between shrink-0 z-20"
-        style={{ paddingTop: 'max(var(--sat), 0px)' }}
-      >
-        <button
-          onClick={handleBack}
-          className="h-10 px-2 rounded-lg text-zinc-400 hover:text-white flex items-center gap-1 text-sm active:scale-95 transition-all cursor-pointer"
-          title="Назад к списку папок"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="max-w-[90px] truncate">
-            {mobileActiveFolder.includes('/')
-              ? mobileActiveFolder.split('/')[mobileActiveFolder.split('/').length - 2]
-              : 'Папки'}
-          </span>
-        </button>
-
-        {/* Center Title */}
-        <div className="flex flex-col items-center min-w-0 px-2">
-          <span className="text-sm font-bold text-white truncate max-w-[160px]">
-            {activeMeta?.name || mobileActiveFolder}
-          </span>
-          <span className="text-[10px] font-mono text-zinc-500">
-            {isInbox ? 'Лента входящих' : mobileActiveFolder}
-          </span>
-        </div>
-
-        {/* Right Info Button */}
-        <button
-          onClick={() => setMobileFolderInfoOpen(true)}
-          className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
-          title="Инфо папки и медиа"
-          aria-label="Информация о папке"
-        >
-          <Info className="w-5 h-5" />
-        </button>
-      </header>
+      <MobileScreenHeader
+        onBack={handleBack}
+        backLabel={
+          mobileActiveFolder.includes('/')
+            ? mobileActiveFolder.split('/')[mobileActiveFolder.split('/').length - 2]
+            : 'Папки'
+        }
+        backTitle="Назад к списку папок"
+        className="z-20"
+        centerSlot={
+          <>
+            <span className="text-sm font-bold text-white truncate max-w-[160px]">
+              {activeMeta?.name || mobileActiveFolder}
+            </span>
+            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[160px]">
+              {isInbox ? 'Лента входящих' : mobileActiveFolder}
+            </span>
+          </>
+        }
+        rightSlot={
+          <button
+            type="button"
+            onClick={() => setMobileFolderInfoOpen(true)}
+            className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+            title="Инфо папки и медиа"
+            aria-label="Информация о папке"
+          >
+            <Info className="w-5 h-5" />
+          </button>
+        }
+      />
 
       {/* Subfolders Quick Ribbon (If folder has subfolders) */}
       {directSubfolders.length > 0 && (
