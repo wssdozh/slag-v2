@@ -51,6 +51,44 @@ const FolderModalDialog: React.FC = () => {
 
   const CurrentIconComp = FOLDER_ICONS[selectedIcon] || Folder;
 
+  const footer = (
+    <div className="flex items-center justify-between">
+      {isEditing && editingFolder?.path !== 'Входящие' ? (
+        <button
+          type="button"
+          onClick={() => {
+            deleteFolder(editingFolder!.path);
+            closeFolderModal();
+          }}
+          className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Удалить папку</span>
+        </button>
+      ) : (
+        <div />
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={closeFolderModal}
+          className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+        >
+          Отмена
+        </button>
+        <button
+          type="submit"
+          form="folder-modal-form"
+          disabled={!name.trim()}
+          className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        >
+          Сохранить
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <BaseModal
       isOpen={true}
@@ -58,9 +96,10 @@ const FolderModalDialog: React.FC = () => {
       title={isEditing ? 'Настройки папки' : 'Создать новую папку'}
       icon={<CurrentIconComp className="w-4 h-4" />}
       maxWidth="max-w-md"
+      footer={footer}
     >
       {/* Form Body */}
-      <form onSubmit={handleSave} className="p-5 flex flex-col gap-4">
+      <form id="folder-modal-form" onSubmit={handleSave} className="p-5 flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-zinc-400">Название папки</label>
           <input
@@ -120,42 +159,6 @@ const FolderModalDialog: React.FC = () => {
             rows={2}
             className="w-full bg-black/40 border border-white/[0.08] rounded-lg p-2.5 text-xs text-white placeholder-zinc-600 resize-none leading-relaxed"
           />
-        </div>
-
-        {/* Footer Controls */}
-        <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] mt-1">
-          {isEditing && editingFolder?.path !== 'Входящие' ? (
-            <button
-              type="button"
-              onClick={() => {
-                deleteFolder(editingFolder!.path);
-                closeFolderModal();
-              }}
-              className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Удалить папку</span>
-            </button>
-          ) : (
-            <div />
-          )}
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={closeFolderModal}
-              className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              Сохранить
-            </button>
-          </div>
         </div>
       </form>
     </BaseModal>

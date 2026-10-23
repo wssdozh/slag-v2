@@ -110,7 +110,7 @@ const TriageModalDialog: React.FC = () => {
       maxWidth="max-w-lg"
       footer={footer}
     >
-      <div className="p-5 flex flex-col gap-3">
+      <div className="p-3 md:p-4 flex flex-col gap-2">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-400">
             <Loader2 className="w-6 h-6 animate-spin text-white" />
@@ -121,8 +121,8 @@ const TriageModalDialog: React.FC = () => {
             Нет заметок во «Входящих» для распределения.
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center text-[11px] text-zinc-500 pb-1">
+          <div className="flex flex-col">
+            <div className="flex justify-between items-center text-[11px] text-zinc-500 px-3 py-1.5 border-b border-white/[0.04] mb-1">
               <span>Предложенные перемещения:</span>
               <button
                 type="button"
@@ -136,43 +136,45 @@ const TriageModalDialog: React.FC = () => {
               </button>
             </div>
 
-            {suggestions.map(s => {
-              const isChecked = selectedIds.has(s.itemId);
-              return (
-                <div
-                  key={s.itemId}
-                  onClick={() => toggleSelect(s.itemId)}
-                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                    isChecked
-                      ? 'bg-white/[0.04] border-white/[0.12] text-white'
-                      : 'bg-transparent border-white/[0.04] text-zinc-500 opacity-60'
-                  }`}
-                >
-                  <Checkbox
-                    checked={isChecked}
-                    onChange={() => toggleSelect(s.itemId)}
-                    className="mt-0.5 pointer-events-none"
-                  />
+            <div className="flex flex-col gap-0.5 max-h-[380px] overflow-y-auto">
+              {suggestions.map(s => {
+                const isChecked = selectedIds.has(s.itemId);
+                return (
+                  <div
+                    key={s.itemId}
+                    onClick={() => toggleSelect(s.itemId)}
+                    className={`group flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                      isChecked
+                        ? 'text-zinc-200 hover:bg-white/[0.04]'
+                        : 'text-zinc-500 opacity-40 hover:opacity-75 hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={isChecked}
+                      onChange={() => toggleSelect(s.itemId)}
+                      className="mt-0.5 pointer-events-none"
+                    />
 
-                  <div className="flex-1 min-w-0 flex flex-col gap-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-zinc-200 truncate">
-                        {s.itemTitle}
-                      </span>
-                      <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-400 shrink-0">
-                        <span>Входящие</span>
-                        <ArrowRight className="w-3 h-3 text-zinc-500" />
-                        <span className="text-white font-medium">{s.targetFolder}</span>
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-medium text-zinc-200 truncate">
+                          {s.itemTitle}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-400 shrink-0">
+                          <span className="text-zinc-500">Входящие</span>
+                          <ArrowRight className="w-3 h-3 text-zinc-600" />
+                          <span className="text-zinc-200 font-medium">{s.targetFolder}</span>
+                        </div>
                       </div>
-                    </div>
 
-                    <span className="text-[11px] text-zinc-400 italic">
-                      {s.reason}
-                    </span>
+                      <p className="text-[11px] text-zinc-500 leading-normal line-clamp-1">
+                        {s.reason}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
