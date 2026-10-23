@@ -1511,4 +1511,65 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('32. Hashtag clean extraction and note title de-duplication verification', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(500);
+
+    const textarea = page.locator('main textarea').first();
+    await textarea.click();
+
+    // 1. Type note with trailing tag on a new line
+    await textarea.fill('вот такая вот собачка\n#паста');
+    await page.waitForTimeout(200);
+
+    // Verify tag preview badge appears in composer toolbar
+    const previewTag = page.locator('span', { hasText: '#паста' }).first();
+    await expect(previewTag).toBeVisible();
+
+    // Screenshot composer with active tag preview
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-tag-preview.png',
+      fullPage: false,
+    });
+
+    // Send note
+    await textarea.press('Enter');
+    await page.waitForTimeout(300);
+
+    // Find the created note card
+    const noteCard = page.locator('.group').filter({ hasText: 'вот такая вот собачка' }).first();
+    await expect(noteCard).toBeVisible();
+    await noteCard.scrollIntoViewIfNeeded();
+
+    // Verify note body has clean content without trailing '#паста'
+    const noteBody = noteCard.locator('.whitespace-pre-wrap').first();
+    await expect(noteBody).toHaveText('вот такая вот собачка');
+
+    // Verify tag is present in bottom bar as clickable tag button
+    const bottomTag = noteCard.locator('button', { hasText: '#паста' }).first();
+    await expect(bottomTag).toBeVisible();
+
+    // Verify note has no duplicate cut-off <h3> header
+    await expect(noteCard.locator('h3')).toHaveCount(0);
+
+    // 2. Test note with long first line: verify no chopped h3 header
+    await textarea.fill('я переродился в геймдевера SSS-ранга, но вместо unity мне выдали игрушечный молот первого уровня\n#паста');
+    await textarea.press('Enter');
+    await page.waitForTimeout(300);
+
+    const longNoteCard = page.locator('.group').filter({ hasText: 'геймдевера SSS-ранга' }).first();
+    await expect(longNoteCard).toBeVisible();
+    await longNoteCard.scrollIntoViewIfNeeded();
+
+    // Ensure it does NOT have an h3 header (especially not a chopped one like '...но вместо un')
+    await expect(longNoteCard.locator('h3')).toHaveCount(0);
+
+    // Screenshot card in feed showing clean text and bottom tag
+    await page.screenshot({
+      path: 'test-results/screenshots/feed-clean-hashtag-note.png',
+      fullPage: false,
+    });
+  });
 });

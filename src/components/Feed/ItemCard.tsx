@@ -140,15 +140,28 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
       t === 'изображение' ||
       t === 'видео-сообщение' ||
       t === 'заметка' ||
+      t === 'черновик' ||
+      t === 'новая заметка' ||
+      t === 'без названия' ||
+      t === 'untitled' ||
       t === 'вложение' ||
       item.attachments.some(a => a.name && a.name.toLowerCase() === t)
     );
   };
 
+  // For notes, check if title is just an excerpt or prefix of the content
+  const isTitleExcerptOfContent = Boolean(
+    item.title &&
+    item.content &&
+    (item.content.trim().toLowerCase().startsWith(item.title.trim().toLowerCase()) ||
+      item.title.trim().toLowerCase().startsWith(item.content.trim().toLowerCase()) ||
+      item.content.trim().toLowerCase().startsWith(item.title.trim().toLowerCase().slice(0, 25)))
+  );
+
   const shouldRenderNoteTitle = Boolean(
     item.title &&
-    item.title !== item.content.slice(0, 40) &&
-    (item.content.trim().length > 0 || !isGenericMediaTitle(item.title))
+    !isGenericMediaTitle(item.title) &&
+    !isTitleExcerptOfContent
   );
 
   const handleImageClick = (img: SlagAttachment) => {

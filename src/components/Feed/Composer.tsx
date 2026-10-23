@@ -8,7 +8,7 @@ import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { Select } from '../UI/Select';
 import { categorizeDraft } from '../../lib/aiService';
-import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
+import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import { BaseComposer } from './BaseComposer';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { SlashCommandMenu } from './SlashCommandMenu';
@@ -29,7 +29,8 @@ import {
   FileText,
   StickyNote,
   Lock,
-  Calendar
+  Calendar,
+  Hash
 } from 'lucide-react';
 
 const getTodayIso = (): string => new Date().toISOString().split('T')[0];
@@ -114,6 +115,11 @@ export const Composer: React.FC = () => {
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
 
+  // Tag # autocomplete state
+  const [tagQuery, setTagQuery] = useState<string | null>(null);
+  const [tagSelectedIndex, setTagSelectedIndex] = useState(0);
+  const [isTagNavigated, setIsTagNavigated] = useState(false);
+
   // Todoist parser & Ghost-chips state
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
   const [isDateDismissed, setIsDateDismissed] = useState(false);
@@ -151,6 +157,9 @@ export const Composer: React.FC = () => {
     setWikiQuery(null);
     setSlashQuery(null);
     setSlashSelectedIndex(0);
+    setTagQuery(null);
+    setTagSelectedIndex(0);
+    setIsTagNavigated(false);
     setParsedTask(null);
     setIsDateDismissed(false);
     setIsPriorityDismissed(false);
@@ -166,6 +175,36 @@ export const Composer: React.FC = () => {
       textareaRef.current.focus();
     }
   }, [replyTarget]);
+
+  // All unique tags in vault
+  const allVaultTags = React.useMemo(() => {
+    const set = new Set<string>();
+    items.forEach(it => {
+      it.tags?.forEach(t => {
+        if (t && t.trim()) set.add(t.trim());
+      });
+    });
+    return Array.from(set);
+  }, [items]);
+
+  // Tags matching current # autocomplete query
+  const matchingAutocompleteTags = React.useMemo(() => {
+    if (tagQuery === null) return [];
+    const q = tagQuery.toLowerCase().trim();
+    return allVaultTags
+      .filter(t => !q || t.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [tagQuery, allVaultTags]);
+
+  // Live tags recognized from content (excluding dismissed)
+  const currentInlineTags = React.useMemo(() => {
+    return extractAndStripTags(content).tags.filter(t => !dismissedTags.has(t));
+  }, [content, dismissedTags]);
+
+  // Combined preview tags (manually selected + live inline hashtags)
+  const allPreviewTags = React.useMemo(() => {
+    return Array.from(new Set([...tags, ...currentInlineTags]));
+  }, [tags, currentInlineTags]);
 
   // WikiLink items matching current query
   const matchingWikiItems = wikiQuery !== null
@@ -196,6 +235,7 @@ export const Composer: React.FC = () => {
       setIsPriorityDismissed(false);
       setDismissedTags(new Set());
       setSlashQuery(null);
+      setTagQuery(null);
     }
 
     // Smart type inference: typing checklist switches note to task
@@ -212,6 +252,7 @@ export const Composer: React.FC = () => {
       setWikiQuery(wikiMatch[1]);
       setWikiSelectedIndex(0);
       setSlashQuery(null);
+      setTagQuery(null);
     } else {
       setWikiQuery(null);
       // Slash command trigger: beginning of line or preceded by whitespace, followed by non-space chars
@@ -219,9 +260,39 @@ export const Composer: React.FC = () => {
       if (slashMatch) {
         setSlashQuery(slashMatch[1]);
         setSlashSelectedIndex(0);
+        setTagQuery(null);
       } else {
         setSlashQuery(null);
+        // Tag trigger: beginning of line or preceded by whitespace, followed by # and letters/digits
+        const tagMatch = textBefore.match(/(?:^|\s)#([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
+        if (tagMatch) {
+          setTagQuery(tagMatch[1]);
+          setTagSelectedIndex(0);
+          setIsTagNavigated(false);
+        } else {
+          setTagQuery(null);
+          setIsTagNavigated(false);
+        }
       }
+    }
+  };
+
+  const insertTag = (selectedTag: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const cursorPos = el.selectionStart || content.length;
+    const textBefore = content.slice(0, cursorPos);
+    const textAfter = content.slice(cursorPos);
+    const hashIndex = textBefore.lastIndexOf('#');
+    if (hashIndex !== -1) {
+      const newText = textBefore.slice(0, hashIndex) + `#${selectedTag} ` + textAfter;
+      setContent(newText);
+      setTagQuery(null);
+      setTimeout(() => {
+        el.focus();
+        const newCursor = hashIndex + selectedTag.length + 2;
+        el.setSelectionRange(newCursor, newCursor);
+      }, 10);
     }
   };
 
@@ -609,8 +680,12 @@ export const Composer: React.FC = () => {
     // Parse Todoist input synchronously for immediate state accuracy
     const currentParsed = parseTodoistInput(content);
 
+    // Extract and strip hashtags from content
+    const { cleanContent, tags: extractedTags } = extractAndStripTags(content);
+    const finalContent = (cleanContent || content).trim();
+
     let title = '';
-    const lines = content.trim().split('\n');
+    const lines = finalContent.split('\n');
     const firstLine = lines[0].replace(/^#+\s*/, '').trim();
 
     if (itemType === 'article') {
@@ -630,10 +705,8 @@ export const Composer: React.FC = () => {
     }
 
     const rawGhostTags = currentParsed.tags.filter(t => !dismissedTags.has(t));
-    const inlineTags = Array.from(content.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g))
-      .map(m => m[1])
-      .filter(t => !dismissedTags.has(t));
-    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...inlineTags]));
+    const activeExtractedTags = extractedTags.filter(t => !dismissedTags.has(t));
+    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...activeExtractedTags]));
 
     let subtasks: Array<{ id: string; title: string; completed: boolean }> = [];
     if (itemType === 'task') {
@@ -672,7 +745,7 @@ export const Composer: React.FC = () => {
     const saved = saveItem({
       type: itemType,
       title,
-      content: content.trim(),
+      content: finalContent,
       folder: destinationFolder,
       tags: finalTags,
       attachments: attachmentsToSend,
@@ -728,7 +801,9 @@ export const Composer: React.FC = () => {
 
   // Expand into Fullscreen Focus Mode directly from composer
   const handleExpandToFullscreen = () => {
-    const lines = content.trim().split('\n');
+    const { cleanContent, tags: extractedTags } = extractAndStripTags(content);
+    const finalContent = (cleanContent || content).trim();
+    const lines = finalContent.split('\n');
     const firstLine = lines[0]?.replace(/^#+\s*/, '').trim() || (itemType === 'article' ? 'Новая статья' : 'Черновик');
     const currentParsed = parseTodoistInput(content);
 
@@ -737,10 +812,8 @@ export const Composer: React.FC = () => {
       : firstLine;
 
     const rawGhostTags = currentParsed.tags.filter(t => !dismissedTags.has(t));
-    const inlineTags = Array.from(content.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g))
-      .map(m => m[1])
-      .filter(t => !dismissedTags.has(t));
-    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...inlineTags]));
+    const activeExtractedTags = extractedTags.filter(t => !dismissedTags.has(t));
+    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...activeExtractedTags]));
 
     const taskPriority = itemType === 'task'
       ? (!isPriorityDismissed && currentParsed.priority
@@ -765,7 +838,7 @@ export const Composer: React.FC = () => {
       id: 'draft_' + Date.now(),
       type: itemType,
       title: taskTitle,
-      content: content.trim(),
+      content: finalContent,
       folder: currentFolder,
       tags: finalTags,
       attachments,
@@ -844,6 +917,34 @@ export const Composer: React.FC = () => {
       if (e.key === 'Escape') {
         e.preventDefault();
         setWikiQuery(null);
+        return;
+      }
+    }
+
+    // Tag autocomplete keyboard controls
+    if (tagQuery !== null && matchingAutocompleteTags.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setIsTagNavigated(true);
+        setTagSelectedIndex(prev => (prev < matchingAutocompleteTags.length - 1 ? prev + 1 : prev));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setIsTagNavigated(true);
+        setTagSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && isTagNavigated)) {
+        e.preventDefault();
+        insertTag(matchingAutocompleteTags[tagSelectedIndex]);
+        setIsTagNavigated(false);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setTagQuery(null);
+        setIsTagNavigated(false);
         return;
       }
     }
@@ -965,7 +1066,7 @@ export const Composer: React.FC = () => {
       )}
 
       {/* Active Folder & Tags Preview */}
-      {(targetFolder || tags.length > 0) && (
+      {(targetFolder || allPreviewTags.length > 0) && (
         <div className="flex items-center gap-1.5 px-1 py-0.5 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150">
           {targetFolder && (
             <span
@@ -985,7 +1086,7 @@ export const Composer: React.FC = () => {
               </button>
             </span>
           )}
-          {tags.map(tag => (
+          {allPreviewTags.map(tag => (
             <span
               key={tag}
               className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] text-zinc-300 text-[10px] font-mono"
@@ -1051,6 +1152,30 @@ export const Composer: React.FC = () => {
                 {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
                 {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
                 <span className="truncate">{wikiItem.title || wikiItem.id}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {tagQuery !== null && matchingAutocompleteTags.length > 0 && (
+        <div className="absolute left-0 bottom-full mb-1 w-56 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
+          <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider flex items-center justify-between">
+            <span>Теги</span>
+            <span className="text-zinc-600">#{tagQuery}</span>
+          </div>
+          {matchingAutocompleteTags.map((tagItem, idx) => {
+            const isSelected = idx === tagSelectedIndex;
+            return (
+              <button
+                key={tagItem}
+                type="button"
+                onClick={() => insertTag(tagItem)}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-mono text-left transition-colors truncate cursor-pointer ${
+                  isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
+                }`}
+              >
+                <Hash className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span className="truncate">#{tagItem}</span>
               </button>
             );
           })}

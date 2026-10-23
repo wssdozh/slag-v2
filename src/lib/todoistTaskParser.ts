@@ -169,7 +169,7 @@ export function getTaskTimeSlot(task: { reminder?: string; title?: string; conte
     };
   }
 
-  // 4. Default: All-day task
+// 4. Default: All-day task
   return {
     hasTime: false,
     isAllDay: true,
@@ -179,3 +179,40 @@ export function getTaskTimeSlot(task: { reminder?: string; title?: string; conte
     timeLabel: 'Весь день',
   };
 }
+
+/**
+ * Extracts all hashtags from text and strips standalone / trailing hashtags
+ * so they don't redundantly clutter the note body while living in metadata.
+ */
+export function extractAndStripTags(text: string): { cleanContent: string; tags: string[] } {
+  if (!text) return { cleanContent: '', tags: [] };
+
+  const tagRegex = /(?:^|\s)#([a-zA-Zа-яА-ЯёЁ0-9_-]+)/g;
+  const tags: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = tagRegex.exec(text)) !== null) {
+    const tag = match[1].trim();
+    if (tag && !tags.includes(tag)) {
+      tags.push(tag);
+    }
+  }
+
+  // 1. Remove lines that consist only of tags and whitespace
+  const lines = text.split('\n');
+  const filteredLines = lines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+    return !/^(?:#[a-zA-Zа-яА-ЯёЁ0-9_-]+\s*)+$/.test(trimmed);
+  });
+
+  let cleanContent = filteredLines.join('\n');
+
+  // 2. Strip trailing tags at the very end of the content
+  cleanContent = cleanContent.replace(/(?:\s*#[a-zA-Zа-яА-ЯёЁ0-9_-]+)+\s*$/, '').trim();
+
+  return {
+    cleanContent,
+    tags,
+  };
+}
+
