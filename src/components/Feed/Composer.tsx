@@ -25,6 +25,7 @@ import {
 export const Composer: React.FC = () => {
   const {
     saveItem,
+    updateItem,
     currentFolder,
     aiSettings,
     setSelectedItem,
@@ -276,7 +277,7 @@ export const Composer: React.FC = () => {
           : undefined)
       : undefined;
 
-    saveItem({
+    const saved = saveItem({
       type: itemType,
       title,
       content: content.trim(),
@@ -289,6 +290,16 @@ export const Composer: React.FC = () => {
       reminder: taskReminder,
       subtasks: subtasks.length > 0 ? subtasks : undefined,
     });
+
+    if (aiSettings.autoTagging && finalTags.length === 0 && content.trim().length >= 15) {
+      generateSmartTags(content.trim(), aiSettings).then(autoTags => {
+        if (autoTags && autoTags.length > 0) {
+          updateItem({ ...saved, tags: autoTags, updatedAt: Date.now() });
+        }
+      }).catch(() => {
+        // quiet fallback
+      });
+    }
 
     setContent('');
     setTags([]);

@@ -1015,14 +1015,28 @@ ${isInbox
           temperature: 0.2,
         };
 
-        if (isKie && (model.includes('gemini-4-argon') || model === 'gemini-4-argon-openai')) {
-          payload.include_thoughts = true;
-          payload.reasoning_effort = settings.reasoningEffort === 'high' ? 'high' : 'low';
+        const isArgon = isKie && (model.includes('gemini-4-argon') || model === 'gemini-4-argon-openai');
+
+        if (isArgon) {
+          payload.include_thoughts = settings.reasoningEffort !== 'none';
+          if (settings.reasoningEffort === 'high') {
+            payload.reasoning_effort = 'high';
+          } else if (settings.reasoningEffort !== 'none') {
+            payload.reasoning_effort = 'low';
+          }
         }
 
         if (!isLastAllowedRound) {
-          payload.tools = groqTools;
-          payload.tool_choice = 'auto';
+          if (isArgon) {
+            // Per KIE.AI docs, Gemini 4 Argon is chat-only and not adapted for custom agent tools.
+            // Google Search is supported via {"type": "function", "function": {"name": "googleSearch"}}
+            if (settings.webSearchEnabled) {
+              payload.tools = [{ type: 'function', function: { name: 'googleSearch' } }];
+            }
+          } else {
+            payload.tools = groqTools;
+            payload.tool_choice = 'auto';
+          }
         }
 
         const res = await fetch(endpointUrl, {
@@ -1317,17 +1331,104 @@ ${isInbox
     };
   }
 
-  // Check 4: Decompose task into checklist
+  // Check 4: Decompose task into checklist or add concrete subtask
   if (lowerMsg.includes('разбей') || lowerMsg.includes('декомпози') || lowerMsg.includes('подзадач') || lowerMsg.includes('шаги')) {
-    const targetTask = allItems.find(i => {
-      if (i.type !== 'task') return false;
-      const lowerTitle = i.title.toLowerCase();
-      if (lowerMsg.includes(lowerTitle)) return true;
-      const titleTokens = lowerTitle.split(/\s+/).filter(w => w.length > 3);
-      return titleTokens.some(tok => lowerMsg.includes(tok));
-    });
-    const taskTitle = targetTask ? targetTask.title : 'Реализовать ИИ-тегирование заметок';
+    const recentActionMsg = [...messages].reverse().find(m => m.content && (
+      m.content.includes('[Действие ассистента:') ||
+      m.content.includes('[Подготовлен черновик') ||
+      m.content.includes('«')
+    ));
+    const titleFromHistory = recentActionMsg?.content.match(/[«"]([^»"]+)[»"]/) || recentActionMsg?.content.match(/Заголовок:\s*«([^»]+)»/);
+
+    // 1. First, check explicit user task designation: "есть задача <X>", "в задаче <X>", "для задачи <X>", "таска <X>"
+    let taskTitle = '';
+    const explicitTaskM = lastUserMsg.match(/(?:есть\s+задача|задача|задачу|таска|таску|в\s+задаче|к\s+задаче|для\s+задачи)\s+[«"]?([^«".,\n]+)[»"]?/i);
+    if (explicitTaskM) {
+      const candidate = explicitTaskM[1].trim().split(/\s+(?:нужно|надо|сделай|добавь|хочу|на\s+подзадачи|на\s+шаги)/i)[0].trim();
+      if (candidate) {
+        taskTitle = candidate;
+      }
+    }
+
+    // 2. Match whole task title against allItems or history
+    let targetTask = taskTitle
+      ? allItems.find(i => i.type === 'task' && (
+          i.title.toLowerCase() === taskTitle.toLowerCase() ||
+          i.title.toLowerCase().includes(taskTitle.toLowerCase()) ||
+          taskTitle.toLowerCase().includes(i.title.toLowerCase())
+        ))
+      : allItems.find(i => i.type === 'task' && lowerMsg.includes(i.title.toLowerCase()));
+
+    if (targetTask) {
+      taskTitle = targetTask.title;
+    }
+
+    // 3. Fallback to title from history or token matching
+    if (!targetTask && !taskTitle) {
+      if (titleFromHistory && lowerMsg.includes(titleFromHistory[1].toLowerCase())) {
+        taskTitle = titleFromHistory[1];
+        targetTask = allItems.find(i => i.type === 'task' && i.title.toLowerCase() === taskTitle.toLowerCase());
+      } else {
+        targetTask = allItems.find(i => {
+          if (i.type !== 'task') return false;
+          const lowerTitle = i.title.toLowerCase();
+          const titleTokens = lowerTitle.split(/\s+/).filter(w => w.length > 3);
+          return titleTokens.length > 0 && titleTokens.every(tok => lowerMsg.includes(tok));
+        });
+      }
+    }
+
+    if (!taskTitle) {
+      taskTitle = targetTask ? targetTask.title : (titleFromHistory ? titleFromHistory[1] : 'Реализовать ИИ-тегирование заметок');
+    }
     const taskId = targetTask?.id || allItems.find(i => i.type === 'task')?.id;
+
+    // Extract explicit subtasks if specified by user
+    const parsedSubtaskTitles: string[] = [];
+    const lines = lastUserMsg.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Skip generic decomposition trigger lines ("на подзадачи", "на шаги")
+      if (/на\s+(?:подзадачи|шаги|подзадач)\s*$/i.test(trimmed)) {
+        continue;
+      }
+
+      const subtaskMatch = trimmed.match(/(?:сделать|добавить|создать|включить)?\s*подзадач(?:у|а|е|и)?\s*[:\-–—]\s*(.+)/i)
+        || trimmed.match(/(?:сделать|добавить|создать|включить)\s+подзадач(?:у|а|е|и)?\s+(.+)/i);
+
+      if (subtaskMatch) {
+        const cleanSub = subtaskMatch[1].replace(/^(сделать|добавить|создать|записать)\s*/i, '').trim();
+        if (cleanSub.length >= 2 && !parsedSubtaskTitles.includes(cleanSub) && !/^на\s+(?:подзадачи|шаги)$/i.test(cleanSub)) {
+          parsedSubtaskTitles.push(cleanSub);
+        }
+      }
+      const listMatch = trimmed.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/);
+      if (listMatch) {
+        const itemText = listMatch[1].trim();
+        if (itemText && !parsedSubtaskTitles.includes(itemText)) {
+          parsedSubtaskTitles.push(itemText);
+        }
+      }
+    }
+
+    const subtasks = parsedSubtaskTitles.length > 0
+      ? parsedSubtaskTitles.map((stTitle, idx) => ({
+          id: `st_${Date.now()}_${idx + 1}`,
+          title: stTitle.charAt(0).toUpperCase() + stTitle.slice(1),
+          completed: false,
+        }))
+      : taskTitle.toLowerCase().includes('тегирован') || taskTitle.toLowerCase().includes('архитектур')
+      ? [
+          { id: `st_${Date.now()}_1`, title: 'Собрать требования и составить список спецификаций', completed: false },
+          { id: `st_${Date.now()}_2`, title: 'Разработать архитектурный прототип', completed: false },
+          { id: `st_${Date.now()}_3`, title: 'Написать E2E-тесты и провести визуальную верификацию', completed: false },
+          { id: `st_${Date.now()}_4`, title: 'Зафиксировать изменения коммитом и обновить документацию', completed: false },
+        ]
+      : [
+          { id: `st_${Date.now()}_1`, title: `Подготовить принадлежности для «${taskTitle}»`, completed: false },
+          { id: `st_${Date.now()}_2`, title: `Выполнить действия по задаче «${taskTitle}»`, completed: false },
+          { id: `st_${Date.now()}_3`, title: 'Проверить результат', completed: false },
+        ];
 
     const suggestedAction: SuggestedAction = {
       type: 'decompose_task',
@@ -1337,16 +1438,16 @@ ${isInbox
       content: '',
       tags: [],
       itemType: 'task',
-      subtasks: [
-        { id: `st_${Date.now()}_1`, title: 'Собрать требования и составить список спецификаций', completed: false },
-        { id: `st_${Date.now()}_2`, title: 'Разработать архитектурный прототип', completed: false },
-        { id: `st_${Date.now()}_3`, title: 'Написать E2E-тесты и провести визуальную верификацию', completed: false },
-        { id: `st_${Date.now()}_4`, title: 'Зафиксировать изменения коммитом и обновить документацию', completed: false },
-      ],
+      subtasks,
+      actionState: 'suggested',
     };
 
+    const replyText = parsedSubtaskTitles.length > 0
+      ? `Я подготовил ${subtasks.length === 1 ? `подзадачу «${subtasks[0].title}»` : `${subtasks.length} подзадач`} для задачи «${taskTitle}». Нажмите кнопку ниже, чтобы применить:`
+      : `Я составил план декомпозиции для задачи «${taskTitle}». Нажмите кнопку ниже, чтобы применить шаги:`;
+
     return {
-      content: `Я составил план декомпозиции для задачи «${taskTitle}». Нажмите кнопку ниже, чтобы применить шаги:`,
+      content: replyText,
       reasoning: 'Сформирован чеклист декомпозиции (action:decompose_task)',
       reasoningTimeMs: Date.now() - startTime,
       suggestedAction,

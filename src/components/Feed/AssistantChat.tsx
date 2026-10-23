@@ -642,7 +642,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                               {action.type === 'decompose_task' && (
                                 <>
                                   <ListTodo className="w-3.5 h-3.5" />
-                                  <span>Применить {action.subtasks?.length} подзадач</span>
+                                  <span>
+                                    {action.subtasks?.length === 1
+                                      ? 'Применить 1 подзадачу'
+                                      : `Применить ${action.subtasks?.length || 0} подзадач`}
+                                  </span>
                                 </>
                               )}
                               {action.type === 'schedule_task' && (

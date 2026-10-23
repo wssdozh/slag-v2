@@ -962,4 +962,59 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     expect(endpoints.argonUrl).toBe('https://api.kie.ai/gemini-4-argon-openai/v1/chat/completions');
     expect(endpoints.gptUrl).toBe('https://api.kie.ai/v1/chat/completions');
   });
+
+  test('27. Contextual Subtask Extraction and Reasoning Effort Settings Verification', async ({ page }) => {
+    // 1. Open Settings and verify Reasoning Effort & Automation checkboxes
+    await page.locator('button[title*="Настройки"]').first().click();
+    const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
+    await expect(settingsModal).toBeVisible();
+
+    await expect(settingsModal.locator('text=Глубина рассуждений').first()).toBeVisible();
+    await expect(settingsModal.locator('text=Автоматизация и поиск')).toBeVisible();
+    await expect(settingsModal.locator('text=Автоматический подбор тегов')).toBeVisible();
+    await expect(settingsModal.locator('text=Интеллектуальная диспетчеризация (AI Triage)')).toBeVisible();
+    await expect(settingsModal.locator('text=Поиск в реальном времени (Web Search)')).toBeVisible();
+
+    // Select Reasoning Effort: high
+    const reasoningSelect = settingsModal.locator('select', { hasText: /Низкая|Высокая|Отключено/ }).first();
+    await reasoningSelect.selectOption('high');
+
+    // Take screenshot of rich settings tab
+    await page.screenshot({
+      path: 'test-results/screenshots/settings-modal-reasoning-automation.png',
+    });
+
+    await settingsModal.locator('button', { hasText: 'Сохранить' }).click();
+    await expect(settingsModal).not.toBeVisible();
+
+    // 2. Open Assistant Chat
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 3. User prompt: "есть задача почистить яйца\nнужно её дополнить\nсделать подзадачу купить бритву"
+    await textarea.fill('есть задача почистить яйца\nнужно её дополнить\nсделать подзадачу купить бритву');
+    await textarea.press('Enter');
+
+    // 4. Verify that action card has EXACT subtask "Купить бритву" and NOT hardcoded specs
+    await expect(page.locator('text=почистить яйца').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Купить бритву').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Собрать требования и составить список спецификаций')).not.toBeVisible();
+
+    // Verify button says "Применить 1 подзадачу"
+    const applySubtaskBtn = page.locator('button', { hasText: 'Применить 1 подзадачу' }).first();
+    await expect(applySubtaskBtn).toBeVisible();
+
+    // Capture visual screenshot
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-contextual-subtask.png',
+      fullPage: false,
+    });
+
+    // 5. Apply subtask and check toast
+    await applySubtaskBtn.click();
+    await expect(page.locator('text=подзадач').first()).toBeVisible();
+  });
 });

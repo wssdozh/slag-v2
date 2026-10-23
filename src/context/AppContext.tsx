@@ -543,7 +543,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Decompose Task (add subtasks to target task)
     else if (action.type === 'decompose_task') {
-      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
+      const lowerActionTitle = action.title.toLowerCase();
+      const target = items.find(i =>
+        i.type === 'task' && (
+          i.id === action.targetItemId ||
+          i.title.toLowerCase() === lowerActionTitle ||
+          i.title.toLowerCase().includes(lowerActionTitle) ||
+          lowerActionTitle.includes(i.title.toLowerCase())
+        )
+      );
       if (target) {
         const existingSubtasks = target.subtasks || [];
         const newSubtasks = action.subtasks || [];
@@ -553,14 +561,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         savedItem = updated;
         addToast(`К задаче «${target.title}» добавлено ${newSubtasks.length} подзадач`, 'success');
       } else {
-        addToast(`Задача «${action.title}» не найдена`, 'error');
-        if (messageId) {
-          setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
-            ? { ...m, suggestedAction: { ...m.suggestedAction, actionState: 'suggested', error: 'Задача не найдена' } }
-            : m
-          ));
-        }
-        return;
+        const created = saveItem({
+          type: 'task',
+          title: action.title.trim(),
+          content: action.content || '',
+          folder: action.folder || currentFolder,
+          tags: ['задачи'],
+          subtasks: action.subtasks || [],
+        });
+        savedItem = created;
+        addToast(`Создана задача «${created.title}» с ${action.subtasks?.length || 0} подзадачами`, 'success');
       }
     }
 

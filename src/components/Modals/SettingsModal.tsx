@@ -38,6 +38,10 @@ export const SettingsModal: React.FC = () => {
   const [kieBaseUrl, setKieBaseUrl] = useState(aiSettings.kieBaseUrl || 'https://api.kie.ai');
   const geminiApiKey = aiSettings.geminiApiKey || '';
   const [model, setModel] = useState(aiSettings.model || 'openai/gpt-oss-120b');
+  const [reasoningEffort, setReasoningEffort] = useState<'none' | 'low' | 'medium' | 'high'>(aiSettings.reasoningEffort || 'low');
+  const [autoTagging, setAutoTagging] = useState(aiSettings.autoTagging ?? true);
+  const [autoTriage, setAutoTriage] = useState(aiSettings.autoTriage ?? true);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(aiSettings.webSearchEnabled ?? false);
   const [maxTags, setMaxTags] = useState(aiSettings.maxTagsPerNote ?? 3);
   const [allowNewTags, setAllowNewTags] = useState(aiSettings.allowNewTags ?? true);
   const [tagCaseStyle, setTagCaseStyle] = useState(aiSettings.tagCaseStyle || 'lowercase');
@@ -64,6 +68,10 @@ export const SettingsModal: React.FC = () => {
       kieBaseUrl: kieBaseUrl.trim() || 'https://api.kie.ai',
       geminiApiKey: geminiApiKey.trim(),
       model,
+      reasoningEffort,
+      autoTagging,
+      autoTriage,
+      webSearchEnabled,
       maxTagsPerNote: Number(maxTags) || 3,
       allowNewTags,
       tagCaseStyle: tagCaseStyle as any,
@@ -128,7 +136,7 @@ export const SettingsModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="w-full max-w-2xl rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden h-[580px] max-h-[92vh]">
+      <div className="w-full max-w-[720px] rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden h-[670px] max-h-[94vh]">
         {/* Top Header */}
         <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
@@ -215,9 +223,9 @@ export const SettingsModal: React.FC = () => {
 
           {/* Right Tab Content */}
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-[#141416]">
-            <div className="flex-1 overflow-y-auto p-5">
+            <div className="flex-1 overflow-y-auto p-4">
               {activeTab === 'ai' && (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   {/* Section 1: Выбор провайдера ИИ (Groq & KIE.AI) */}
                   <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-2.5">
                     <div className="flex items-center justify-between">
@@ -299,22 +307,38 @@ export const SettingsModal: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-medium text-zinc-300">Модель</label>
-                        <select
-                          value={model}
-                          onChange={(e) => setModel(e.target.value)}
-                          className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
-                        >
-                          <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)</option>
-                          <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (280 t/s, 128K)</option>
-                          <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (560 t/s, 128K)</option>
-                          <option value="llama-3.3-70b-specdec">Llama 3.3 70B SpecDec</option>
-                        </select>
-                        <span className="text-[11px] text-zinc-500 leading-relaxed">
-                          Аппаратное LPU ускорение с поддержкой многошагового вызова инструментов и рассуждений.
-                        </span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-medium text-zinc-300">Модель</label>
+                          <select
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
+                          >
+                            <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)</option>
+                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (280 t/s, 128K)</option>
+                            <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (560 t/s, 128K)</option>
+                            <option value="llama-3.3-70b-specdec">Llama 3.3 70B SpecDec</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений (Reasoning)</label>
+                          <select
+                            value={reasoningEffort}
+                            onChange={(e) => setReasoningEffort(e.target.value as any)}
+                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
+                          >
+                            <option value="none">Отключено (быстрый ответ)</option>
+                            <option value="low">Низкая (low effort)</option>
+                            <option value="medium">Средняя (сбалансированная)</option>
+                            <option value="high">Высокая (глубокий анализ)</option>
+                          </select>
+                        </div>
                       </div>
+                      <span className="text-[11px] text-zinc-500 leading-relaxed">
+                        Аппаратное LPU ускорение с поддержкой многошагового вызова инструментов и рассуждений.
+                      </span>
                     </div>
                   )}
 
@@ -359,13 +383,13 @@ export const SettingsModal: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-3 gap-2.5">
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-medium text-zinc-300">Модель</label>
                           <select
                             value={model}
                             onChange={(e) => setModel(e.target.value)}
-                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
+                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-2.5 py-2 text-xs text-zinc-200 transition-colors"
                           >
                             <option value="gemini-4-argon-openai">Gemini 4 Argon (OpenAI, Рекомендуется)</option>
                             <option value="gpt-5-2">GPT 5.2</option>
@@ -377,13 +401,27 @@ export const SettingsModal: React.FC = () => {
                         </div>
 
                         <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений</label>
+                          <select
+                            value={reasoningEffort}
+                            onChange={(e) => setReasoningEffort(e.target.value as any)}
+                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-2.5 py-2 text-xs text-zinc-200 transition-colors"
+                          >
+                            <option value="none">Отключено (быстро, экономия)</option>
+                            <option value="low">Низкая (low effort)</option>
+                            <option value="medium">Средняя (сбалансированная)</option>
+                            <option value="high">Высокая (high effort)</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-medium text-zinc-300">Base URL эндпоинта</label>
                           <input
                             type="text"
                             value={kieBaseUrl}
                             onChange={(e) => setKieBaseUrl(e.target.value)}
                             placeholder="https://api.kie.ai"
-                            className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
+                            className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-2.5 py-2 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
                           />
                         </div>
                       </div>
@@ -394,7 +432,60 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Section 3: Норма таксономии и правила тегирования */}
+                  {/* Section 3: Автоматизация и интеллектуальные сервисы */}
+                  <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                      <span className="text-xs font-semibold text-zinc-100">
+                        Автоматизация и поиск
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Smart Services
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5">
+                      <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={autoTagging}
+                          onChange={(e) => setAutoTagging(e.target.checked)}
+                          className="mt-0.5 rounded border-white/20 bg-black/40 text-blue-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium text-zinc-200">Автоматический подбор тегов</span>
+                          <span className="text-[11px] text-zinc-500">При сохранении заметки без тегов ИИ подбирает их по таксономии базы</span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={autoTriage}
+                          onChange={(e) => setAutoTriage(e.target.checked)}
+                          className="mt-0.5 rounded border-white/20 bg-black/40 text-blue-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium text-zinc-200">Интеллектуальная диспетчеризация (AI Triage)</span>
+                          <span className="text-[11px] text-zinc-500">Автоматически сопоставляет неразобранные записи с подходящими папками</span>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={webSearchEnabled}
+                          onChange={(e) => setWebSearchEnabled(e.target.checked)}
+                          className="mt-0.5 rounded border-white/20 bg-black/40 text-blue-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium text-zinc-200">Поиск в реальном времени (Web Search)</span>
+                          <span className="text-[11px] text-zinc-500">Включает Google Search в Gemini 4 Argon или веб-поиск в Groq</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Section 4: Норма таксономии и правила тегирования */}
                   <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
                     <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
