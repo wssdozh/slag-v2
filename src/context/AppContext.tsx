@@ -101,6 +101,9 @@ interface AppContextType {
   setIsFullscreenEditorOpen: (open: boolean) => void;
   setIsSearchOpen: (open: boolean) => void;
   setIsSettingsOpen: (open: boolean) => void;
+  settingsTab: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs';
+  setSettingsTab: (tab: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs') => void;
+  openSettingsModal: (tab?: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs') => void;
   setIsLogViewerOpen: (open: boolean) => void;
   openCreateFolderModal: (parentPath?: string) => void;
   openEditFolderModal: (folder: FolderMeta) => void;
@@ -209,6 +212,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isFullscreenEditorOpen, setIsFullscreenEditorOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs'>('ai');
+
+  const openSettingsModal = useCallback((tab?: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs') => {
+    if (tab) setSettingsTab(tab);
+    setIsSettingsOpen(true);
+  }, []);
+
   const [isLogViewerOpen, setIsLogViewerOpen] = useState<boolean>(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [editingFolder, setEditingFolder] = useState<FolderMeta | null>(null);
@@ -980,6 +990,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsFullscreenEditorOpen,
         setIsSearchOpen,
         setIsSettingsOpen,
+        settingsTab,
+        setSettingsTab,
+        openSettingsModal,
         isLogViewerOpen,
         setIsLogViewerOpen,
         openCreateFolderModal,

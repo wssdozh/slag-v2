@@ -443,11 +443,11 @@ export const Composer: React.FC = () => {
 
       {/* Attachments Preview Strip */}
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-1 py-1">
+        <div className="flex items-center gap-1.5 px-1 py-1 overflow-x-auto scrollbar-none whitespace-nowrap">
           {attachments.map(att => (
             <div
               key={att.id}
-              className="flex items-center gap-2 p-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 relative group"
+              className="shrink-0 flex items-center gap-2 p-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 relative group"
             >
               {att.type === 'image' && (
                 <img src={att.dataUrl} alt={att.name} className="w-8 h-8 object-cover rounded-md" />
@@ -474,11 +474,11 @@ export const Composer: React.FC = () => {
 
       {/* Active Tags Preview */}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 px-1">
+        <div className="flex items-center gap-1 px-1 py-0.5 overflow-x-auto scrollbar-none whitespace-nowrap">
           {tags.map(tag => (
             <span
               key={tag}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] text-zinc-300 text-[10px] font-mono"
+              className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] text-zinc-300 text-[10px] font-mono"
             >
               #{tag}
               <button
@@ -532,9 +532,9 @@ export const Composer: React.FC = () => {
 
       {/* Interactive Ghost-chips right above the textarea */}
       {hasAnyActiveGhostChips && (
-        <div className="flex flex-wrap items-center gap-1.5 px-1 py-1 text-xs animate-in fade-in duration-150">
+        <div className="flex items-center gap-1.5 px-1 py-1 text-xs overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150">
           {hasActiveDateChip && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
               <span>📅</span>
               <span>{parsedTask?.rawMatchedDateText || parsedTask?.dueDate}</span>
               <button
@@ -550,7 +550,7 @@ export const Composer: React.FC = () => {
 
           {hasActivePriorityChip && (
             <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono border ${
+              className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono border ${
                 parsedTask?.priority === 'high'
                   ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
                   : parsedTask?.priority === 'medium'
@@ -592,7 +592,7 @@ export const Composer: React.FC = () => {
           {activeGhostTags.map(tag => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/[0.08] text-zinc-300 text-[11px] font-mono"
+              className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/[0.08] text-zinc-300 text-[11px] font-mono"
             >
               <span>🏷</span>
               <span>#{tag}</span>
@@ -657,8 +657,8 @@ export const Composer: React.FC = () => {
 
       {/* Task Extra Controls (Priority & Due Date) */}
       {itemType === 'task' && (
-        <div className="flex items-center gap-3 px-1 py-1 text-xs text-zinc-400 border-t border-white/[0.04]">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-zinc-400 border-t border-white/[0.04] overflow-x-auto scrollbar-none whitespace-nowrap">
+          <div className="shrink-0 flex items-center gap-1.5">
             <span className="text-[11px] text-zinc-500">Приоритет:</span>
             <select
               value={priority}
@@ -672,7 +672,7 @@ export const Composer: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="shrink-0 flex items-center gap-1.5">
             <span className="text-[11px] text-zinc-500">Дедлайн:</span>
             <input
               type="date"

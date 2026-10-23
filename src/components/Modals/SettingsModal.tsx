@@ -15,7 +15,8 @@ import {
   Sliders,
   Keyboard,
   RotateCcw,
-  Terminal
+  Terminal,
+  ArrowLeft
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
 
@@ -23,6 +24,8 @@ export const SettingsModal: React.FC = () => {
   const {
     isSettingsOpen,
     setIsSettingsOpen,
+    settingsTab: activeTab,
+    setSettingsTab: setActiveTab,
     aiSettings,
     saveAiSettings,
     setSidebarWidth,
@@ -31,7 +34,6 @@ export const SettingsModal: React.FC = () => {
     addToast
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs'>('ai');
   const [provider, setProvider] = useState<AiProvider>(aiSettings.provider || 'groq');
   const [groqApiKey, setGroqApiKey] = useState(aiSettings.groqApiKey || '');
   const [kieApiKey, setKieApiKey] = useState(aiSettings.kieApiKey || '');
@@ -135,31 +137,42 @@ export const SettingsModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="w-full max-w-[720px] rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden h-[670px] max-h-[94vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none">
+      <div className="w-full h-full md:h-[670px] md:max-w-[720px] rounded-none md:rounded-2xl bg-[#141416] border-0 md:border md:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
         {/* Top Header */}
-        <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0">
+        <div
+          className="px-4 md:px-5 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+          style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
+        >
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white">
+            <button
+              onClick={() => setIsSettingsOpen(false)}
+              className="md:hidden p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer active:scale-95"
+              title="Назад"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white hidden md:flex">
               <Settings className="w-3.5 h-3.5" />
             </div>
             <h3 className="text-sm font-semibold text-white">Настройки</h3>
           </div>
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors hidden md:block cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* 2-Column Body: Tabs Navigation on Left, Tab Content on Right */}
-        <div className="flex-1 flex min-h-0">
-          {/* Left Tabs Nav */}
-          <div className="w-48 border-r border-white/[0.06] bg-[#0c0c0e] p-2 flex flex-col gap-1 select-none shrink-0">
+        {/* Responsive Body: Tabs Navigation on Left (Desktop) or Top in 1 row (Mobile), Tab Content */}
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          {/* Tabs Nav: Single row horizontal scroll on mobile, vertical left column on desktop */}
+          <div className="flex md:flex-col md:w-48 overflow-x-auto md:overflow-visible scrollbar-none border-b md:border-b-0 md:border-r border-white/[0.06] bg-[#0c0c0e] p-1.5 md:p-2 gap-1 select-none shrink-0">
             <button
+              type="button"
               onClick={() => setActiveTab('ai')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
                 activeTab === 'ai'
                   ? 'bg-white/10 text-white font-medium'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -170,8 +183,9 @@ export const SettingsModal: React.FC = () => {
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('vault')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
                 activeTab === 'vault'
                   ? 'bg-white/10 text-white font-medium'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -182,8 +196,9 @@ export const SettingsModal: React.FC = () => {
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('ui')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
                 activeTab === 'ui'
                   ? 'bg-white/10 text-white font-medium'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -196,7 +211,7 @@ export const SettingsModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('shortcuts')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
                 activeTab === 'shortcuts'
                   ? 'bg-white/10 text-white font-medium'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -210,7 +225,7 @@ export const SettingsModal: React.FC = () => {
               type="button"
               onClick={() => setActiveTab('logs')}
               data-testid="settings-tab-logs"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left ${
+              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
                 activeTab === 'logs'
                   ? 'bg-white/10 text-white font-medium'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'

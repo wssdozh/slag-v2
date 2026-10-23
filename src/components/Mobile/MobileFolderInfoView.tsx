@@ -123,32 +123,32 @@ export const MobileFolderInfoView: React.FC = () => {
       </header>
 
       {/* Main Content Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-5 pb-16">
-        {/* Profile Card Header (Matching user reference) */}
-        <div className="flex flex-col items-center text-center gap-3 py-2">
-          <div className="w-20 h-20 rounded-full bg-[#18181c] border border-white/[0.08] flex items-center justify-center text-zinc-200 shadow-xl">
-            {isInbox ? <Inbox className="w-9 h-9" /> : <Folder className="w-9 h-9 text-zinc-400" />}
+      <div className="flex-1 overflow-y-auto px-4 py-3.5 flex flex-col gap-3.5 pb-16">
+        {/* Profile Card Header (Matching user reference, compact height) */}
+        <div className="flex flex-col items-center text-center gap-2 py-1">
+          <div className="w-14 h-14 rounded-full bg-[#18181c] border border-white/[0.08] flex items-center justify-center text-zinc-200 shadow-md">
+            {isInbox ? <Inbox className="w-7 h-7" /> : <Folder className="w-7 h-7 text-zinc-400" />}
           </div>
 
-          <div className="flex flex-col gap-1">
-            <h1 className="text-lg font-bold text-white tracking-tight">
+          <div className="flex flex-col gap-0.5">
+            <h1 className="text-base font-bold text-white tracking-tight">
               {currentFolderMeta?.name || currentFolder}
             </h1>
             <p className="text-xs text-zinc-500 font-mono">
               {filteredItems.length} {filteredItems.length === 1 ? 'запись' : filteredItems.length < 5 ? 'записи' : 'записей'} • {currentFolder}
             </p>
             {currentFolderMeta?.description && (
-              <p className="text-xs text-zinc-400 max-w-sm mt-1 px-4 leading-relaxed">
+              <p className="text-xs text-zinc-400 max-w-sm mt-0.5 px-3 leading-relaxed line-clamp-2">
                 {currentFolderMeta.description}
               </p>
             )}
           </div>
 
           {/* Action Buttons Row */}
-          <div className="flex items-center gap-2.5 mt-2">
+          <div className="flex items-center gap-2 mt-1">
             <button
               onClick={handleCreateNote}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium active:scale-95 transition-all cursor-pointer border border-white/[0.08]"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium active:scale-95 transition-all cursor-pointer border border-white/[0.08]"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Запись</span>
@@ -160,7 +160,7 @@ export const MobileFolderInfoView: React.FC = () => {
                   setMobileFolderInfoOpen(false);
                   setIsTriageModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-xs font-medium active:scale-95 transition-all cursor-pointer border border-blue-500/20"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-xs font-medium active:scale-95 transition-all cursor-pointer border border-blue-500/20"
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                 <span>Трибунал</span>
@@ -171,15 +171,15 @@ export const MobileFolderInfoView: React.FC = () => {
 
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-2 p-1 bg-[#141417]/80 rounded-xl border border-white/[0.06] text-center">
-          <div className="py-2 flex flex-col items-center">
+          <div className="py-1.5 flex flex-col items-center">
             <span className="text-sm font-bold text-zinc-200">{notesCount}</span>
             <span className="text-[10px] font-mono text-zinc-500 uppercase">Заметки</span>
           </div>
-          <div className="py-2 flex flex-col items-center border-x border-white/[0.06]">
+          <div className="py-1.5 flex flex-col items-center border-x border-white/[0.06]">
             <span className="text-sm font-bold text-amber-400">{tasksCount}</span>
             <span className="text-[10px] font-mono text-zinc-500 uppercase">Таски</span>
           </div>
-          <div className="py-2 flex flex-col items-center">
+          <div className="py-1.5 flex flex-col items-center">
             <span className="text-sm font-bold text-blue-400">{articlesCount}</span>
             <span className="text-[10px] font-mono text-zinc-500 uppercase">Статьи</span>
           </div>

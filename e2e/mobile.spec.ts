@@ -167,4 +167,27 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.locator('button', { hasText: 'Отмена' }).click();
     await expect(actionSheet).not.toBeVisible();
   });
+
+  test('8. Mobile Settings Modal Fullscreen with Horizontal Tabs', async ({ page }) => {
+    // Tap on "Настройки" tab in dock
+    const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
+    await settingsTab.click();
+
+    // Click "ИИ & Провайдеры" item
+    await page.locator('button', { hasText: 'ИИ & Провайдеры' }).click();
+
+    // Verify modal is open and has horizontal tab bar
+    const modalHeader = page.locator('h3', { hasText: 'Настройки' });
+    await expect(modalHeader).toBeVisible();
+
+    // Verify tabs inside modal
+    await expect(page.getByRole('button', { name: 'Хранилище & Бэкап', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Интерфейс & Панели', exact: true })).toBeVisible();
+
+    await page.screenshot({ path: 'test-results/screenshots/mobile_settings_modal.png' });
+
+    // Dismiss by tapping back button
+    await page.locator('button[title="Назад"]').click();
+    await expect(modalHeader).not.toBeVisible();
+  });
 });
