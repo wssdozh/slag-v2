@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, Mic, Music, Play, Pause, ExternalLink } from 'lucide-react';
-import type { AudioTrack } from '../../lib/audioHelper';
+import { X, Search, Mic, Music, Play, Pause, ExternalLink, Folder } from 'lucide-react';
+import type { AudioTrack, AudioTypeFilter } from '../../lib/audioHelper';
 import { formatAudioDuration } from '../../lib/audioHelper';
+import type { FolderMeta } from '../../types';
 
 interface AudioPlaylistDrawerProps {
   isOpen: boolean;
@@ -11,6 +12,13 @@ interface AudioPlaylistDrawerProps {
   isPlaying: boolean;
   onSelectTrack: (track: AudioTrack) => void;
   onJumpToNote?: (itemId: string) => void;
+  // Filters & Scope in drawer
+  typeFilters: AudioTypeFilter[];
+  onToggleTypeFilter: (type: AudioTypeFilter) => void;
+  folders: FolderMeta[];
+  scopeMode: 'active' | 'pinned';
+  pinnedFolder: string;
+  onSelectPinnedFolder: (folder: string) => void;
 }
 
 export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
@@ -21,8 +29,15 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   isPlaying,
   onSelectTrack,
   onJumpToNote,
+  typeFilters,
+  onToggleTypeFilter,
+  folders,
+  scopeMode,
+  pinnedFolder,
+  onSelectPinnedFolder,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFolderSelectOpen, setIsFolderSelectOpen] = useState(false);
 
   const filteredTracks = useMemo(() => {
     if (!searchQuery.trim()) return tracks;
@@ -56,6 +71,73 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
         >
           <X className="w-4 h-4" />
         </button>
+      </div>
+
+      {/* Filter toolbar inside drawer */}
+      <div className="px-3 py-2 border-b border-white/[0.04] bg-white/[0.02] flex items-center justify-between gap-2 flex-wrap">
+        {/* Multi-type chips */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onToggleTypeFilter('voice')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer ${
+              typeFilters.includes('voice')
+                ? 'bg-white/10 text-white font-medium border border-white/10'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Mic className="w-3 h-3" />
+            <span>Войсы</span>
+          </button>
+          <button
+            onClick={() => onToggleTypeFilter('file')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer ${
+              typeFilters.includes('file')
+                ? 'bg-white/10 text-white font-medium border border-white/10'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Music className="w-3 h-3" />
+            <span>Файлы</span>
+          </button>
+        </div>
+
+        {/* Pinned Folder selector (when pinned) */}
+        {scopeMode === 'pinned' && (
+          <div className="relative">
+            <button
+              onClick={() => setIsFolderSelectOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 border border-white/[0.06]"
+            >
+              <Folder className="w-3 h-3 text-zinc-400" />
+              <span className="max-w-[100px] truncate">{pinnedFolder}</span>
+            </button>
+            {isFolderSelectOpen && (
+              <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto">
+                <button
+                  onClick={() => {
+                    onSelectPinnedFolder('Входящие');
+                    setIsFolderSelectOpen(false);
+                  }}
+                  className="w-full px-2.5 py-1 text-left text-xs text-zinc-300 hover:bg-white/[0.08]"
+                >
+                  Входящие
+                </button>
+                {folders.map((f) => (
+                  <button
+                    key={f.path}
+                    onClick={() => {
+                      onSelectPinnedFolder(f.path);
+                      setIsFolderSelectOpen(false);
+                    }}
+                    className="w-full px-2.5 py-1 text-left text-xs text-zinc-300 hover:bg-white/[0.08] truncate"
+                  >
+                    {f.path}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Search Input */}

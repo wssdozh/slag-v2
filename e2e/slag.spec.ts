@@ -1661,33 +1661,38 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // Verify scope buttons (Активная / Закрепить)
-    const activeScopeBtn = page.locator('button[title*="Следовать за активной"]');
-    const pinnedScopeBtn = page.locator('button[title*="Зафиксировать определенную"]');
+    // Verify scope pill switcher buttons (Активная / Закрепить)
+    const activeScopeBtn = page.locator('button', { hasText: 'Активная' });
+    const pinnedScopeBtn = page.locator('button', { hasText: 'Закрепить' });
     await expect(activeScopeBtn).toBeVisible();
     await expect(pinnedScopeBtn).toBeVisible();
 
-    // Verify multi-type filter chips (Войсы / Файлы)
-    const voiceChip = page.locator('button[title*="Показывать голосовые"]');
-    const fileChip = page.locator('button[title*="Показывать аудиофайлы"]');
-    await expect(voiceChip).toBeVisible();
-    await expect(fileChip).toBeVisible();
+    // Toggle scope to pinned
+    await pinnedScopeBtn.click();
+    await expect(pinnedScopeBtn).toHaveClass(/bg-white/);
+
+    // Toggle back to active
+    await activeScopeBtn.click();
+    await expect(activeScopeBtn).toHaveClass(/bg-white/);
 
     // Verify Now Playing screen elements: track title, note link, artwork
     await expect(page.locator('text=Never_Enough_The_Cure.mp3')).toBeVisible();
     await expect(page.locator('text=Саундтрек проекта и голосовой лог')).toBeVisible();
 
-    // Verify transport controls (Rewind, Play/Pause, Forward)
+    // Verify transport controls (embedded Play/Pause in center of cover art)
     const playPauseBtn = page.locator('button[title*="Воспроизведение"], button[title*="Пауза"]');
     await expect(playPauseBtn).toBeVisible();
 
-    // Verify Queue / Playlist button is present
-    const queueBtn = page.locator('button[title*="Открыть очередь"]').first();
+    // Verify Queue / Playlist button is present in bottom bar
+    const queueBtn = page.locator('button[aria-label="Очередь воспроизведения"]').first();
     await expect(queueBtn).toBeVisible();
 
-    // Open Queue drawer and check track entry
+    // Open Queue drawer and check track entry + filters
     await queueBtn.click();
     await expect(page.locator('text=Очередь воспроизведения')).toBeVisible();
+    const audioPanel = page.locator('[role="tabpanel"]').filter({ hasText: 'Очередь воспроизведения' }).first();
+    await expect(audioPanel.locator('button', { hasText: 'Войсы' })).toBeVisible();
+    await expect(audioPanel.locator('button', { hasText: 'Файлы' })).toBeVisible();
     await expect(page.locator('text=Never_Enough_The_Cure.mp3').first()).toBeVisible();
 
     // Close Queue drawer
@@ -1696,15 +1701,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await closeQueueBtn.click();
     await expect(page.locator('text=Очередь воспроизведения')).not.toBeVisible();
 
-    // Verify bottom bar utilities (speed, repeat, volume)
-    const speedBtn = page.locator('button[title*="Скорость воспроизведения"]');
+    // Verify bottom bar utilities (speed, repeat, favorite)
+    const speedBtn = page.locator('button[aria-label="Скорость"]');
     await expect(speedBtn).toBeVisible();
     await speedBtn.click();
     await expect(speedBtn).toHaveText('1.25x');
 
+    const favBtn = page.locator('button[aria-label="Избранное"]');
+    await expect(favBtn).toBeVisible();
+    await favBtn.click();
+
     // Take screenshot of the center AudioPlayer panel in full Now Playing glory
     await page.screenshot({
-      path: 'test-results/screenshots/dockview-audioplayer-nowplaying.png',
+      path: 'test-results/screenshots/dockview-audioplayer-nowplaying-clean.png',
       fullPage: false,
     });
   });

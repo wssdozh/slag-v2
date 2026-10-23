@@ -1,21 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  RotateCcw,
-  RotateCw,
   Repeat,
   Repeat1,
   Volume2,
   VolumeX,
   ListMusic,
+  ExternalLink,
+  Heart,
   Folder,
-  Pin,
-  Mic,
-  Music,
-  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -38,8 +30,8 @@ export const AudioPanel: React.FC = () => {
   const [scopeMode, setScopeMode] = useState<AudioScopeMode>('active');
   const [pinnedFolder, setPinnedFolder] = useState<string>(currentFolder || 'Входящие');
   const [typeFilters, setTypeFilters] = useState<AudioTypeFilter[]>(['voice', 'file']);
-  const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Audio Playback State
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
@@ -48,13 +40,12 @@ export const AudioPanel: React.FC = () => {
   const [duration, setDuration] = useState<number>(0);
   const [speedIndex, setSpeedIndex] = useState<number>(0);
   const [isLoop, setIsLoop] = useState<boolean>(false);
-  const [volume, setVolume] = useState<number>(1);
+  const [volume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
-  const folderPickerRef = useRef<HTMLDivElement | null>(null);
 
   // Effective folder based on mode
   const effectiveFolder = scopeMode === 'active' ? currentFolder || 'Входящие' : pinnedFolder;
@@ -63,18 +54,6 @@ export const AudioPanel: React.FC = () => {
   useEffect(() => {
     return setupAudioCollisionGuard();
   }, []);
-
-  // Close folder picker on outside click
-  useEffect(() => {
-    if (!isFolderPickerOpen) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (folderPickerRef.current && !folderPickerRef.current.contains(e.target as Node)) {
-        setIsFolderPickerOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handleOutsideClick);
-    return () => window.removeEventListener('mousedown', handleOutsideClick);
-  }, [isFolderPickerOpen]);
 
   // Extract tracks for current folder and filters
   const tracks = useMemo(() => {
@@ -209,15 +188,6 @@ export const AudioPanel: React.FC = () => {
     }
   };
 
-  // Jump by 10s
-  const handleSkipTime = (delta: number) => {
-    if (!audioRef.current) return;
-    const targetDur = duration || currentTrack?.duration || 0;
-    const nextTime = Math.max(0, Math.min(targetDur, audioRef.current.currentTime + delta));
-    audioRef.current.currentTime = nextTime;
-    setCurrentTime(nextTime);
-  };
-
   // Timeline Scrubbing
   const seekFromClientX = useCallback(
     (clientX: number) => {
@@ -266,19 +236,11 @@ export const AudioPanel: React.FC = () => {
     audioRef.current.volume = nextMuted ? 0 : volume;
   };
 
-  const handleVolumeChange = (newVol: number) => {
-    setVolume(newVol);
-    setIsMuted(false);
-    if (audioRef.current) {
-      audioRef.current.volume = newVol;
-    }
-  };
-
-  // Filter Toggles (Ensure at least one filter remains active)
+  // Filter Toggles
   const toggleTypeFilter = (type: AudioTypeFilter) => {
     setTypeFilters((prev) => {
       if (prev.includes(type)) {
-        if (prev.length === 1) return prev; // Do not allow empty filter
+        if (prev.length === 1) return prev;
         return prev.filter((t) => t !== type);
       }
       return [...prev, type];
@@ -294,10 +256,10 @@ export const AudioPanel: React.FC = () => {
       togglePlay();
     } else if (e.code === 'ArrowLeft') {
       e.preventDefault();
-      handleSkipTime(-10);
+      handlePrevTrack();
     } else if (e.code === 'ArrowRight') {
       e.preventDefault();
-      handleSkipTime(10);
+      handleNextTrack();
     }
   };
 
@@ -308,7 +270,7 @@ export const AudioPanel: React.FC = () => {
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative w-full h-full bg-[#09090b] text-zinc-100 flex flex-col justify-between overflow-hidden select-none outline-none"
+      className="relative w-full h-full bg-[#09090b] text-zinc-100 flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden select-none outline-none"
     >
       {/* Hidden HTML5 Audio Element */}
       <audio ref={audioRef} preload="metadata" />
@@ -340,318 +302,204 @@ export const AudioPanel: React.FC = () => {
           scrollToItem(itemId);
           setIsPlaylistOpen(false);
         }}
+        typeFilters={typeFilters}
+        onToggleTypeFilter={toggleTypeFilter}
+        folders={folders}
+        scopeMode={scopeMode}
+        pinnedFolder={pinnedFolder}
+        onSelectPinnedFolder={(f) => setPinnedFolder(f)}
       />
 
-      {/* Top Header: Folder scope & Filter toolbar */}
-      <header className="relative z-10 flex items-center justify-between px-3 py-2 border-b border-white/[0.06] bg-black/30 backdrop-blur-md gap-2 flex-wrap">
-        {/* Scope selector */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className="flex items-center bg-white/[0.04] p-0.5 rounded-lg border border-white/[0.06] shrink-0">
-            <button
-              onClick={() => setScopeMode('active')}
-              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
-                scopeMode === 'active'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Следовать за активной выбранной папкой"
-            >
-              <Sparkles className="w-3 h-3 text-zinc-400 shrink-0" />
-              <span className="hidden min-[420px]:inline">Активная</span>
-            </button>
-            <button
-              onClick={() => {
-                setScopeMode('pinned');
-                if (!pinnedFolder) setPinnedFolder(currentFolder || 'Входящие');
-              }}
-              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors cursor-pointer ${
-                scopeMode === 'pinned'
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-              title="Зафиксировать определенную папку"
-            >
-              <Pin className="w-3 h-3 text-zinc-400 shrink-0" />
-              <span className="hidden min-[420px]:inline">Закрепить</span>
-            </button>
-          </div>
-
-          {/* Folder name badge / picker */}
-          <div className="relative min-w-0" ref={folderPickerRef}>
-            {scopeMode === 'pinned' ? (
-              <button
-                onClick={() => setIsFolderPickerOpen((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-zinc-200 transition-colors cursor-pointer max-w-[120px] truncate"
-              >
-                <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span className="truncate">{pinnedFolder}</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-transparent text-xs text-zinc-400 max-w-[120px] truncate">
-                <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                <span className="truncate">{effectiveFolder}</span>
-              </div>
-            )}
-
-            {/* Folder Dropdown when in pinned mode */}
-            {isFolderPickerOpen && scopeMode === 'pinned' && (
-              <div className="absolute left-0 top-full mt-1.5 w-52 rounded-xl bg-[#18181c] border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-60 overflow-y-auto">
-                <div className="px-3 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04] mb-1">
-                  Выбрать папку
-                </div>
-                <button
-                  onClick={() => {
-                    setPinnedFolder('Входящие');
-                    setIsFolderPickerOpen(false);
-                  }}
-                  className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
-                    pinnedFolder === 'Входящие' ? 'text-white font-medium bg-white/[0.04]' : 'text-zinc-400'
-                  }`}
-                >
-                  <Folder className="w-3.5 h-3.5" />
-                  <span>Входящие</span>
-                </button>
-                {folders.map((f) => (
-                  <button
-                    key={f.path}
-                    onClick={() => {
-                      setPinnedFolder(f.path);
-                      setIsFolderPickerOpen(false);
-                    }}
-                    className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
-                      pinnedFolder === f.path ? 'text-white font-medium bg-white/[0.04]' : 'text-zinc-400'
-                    }`}
-                  >
-                    <Folder className="w-3.5 h-3.5" />
-                    <span className="truncate">{f.path}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Multi-type Filter Chips */}
-        <div className="flex items-center gap-1 shrink-0 ml-auto">
-          <button
-            onClick={() => toggleTypeFilter('voice')}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
-              typeFilters.includes('voice')
-                ? 'bg-white/10 text-zinc-100 border border-white/10 font-medium'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-            title="Показывать голосовые заметки"
-          >
-            <Mic className="w-3 h-3 shrink-0" />
-            <span className="hidden min-[380px]:inline">Войсы</span>
-          </button>
-          <button
-            onClick={() => toggleTypeFilter('file')}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
-              typeFilters.includes('file')
-                ? 'bg-white/10 text-zinc-100 border border-white/10 font-medium'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-            title="Показывать аудиофайлы (mp3, wav, flac)"
-          >
-            <Music className="w-3 h-3 shrink-0" />
-            <span className="hidden min-[380px]:inline">Файлы</span>
-          </button>
-
-          <div className="h-3 w-px bg-white/10 mx-0.5" />
-
-          {/* Queue Button */}
-          <button
-            onClick={() => setIsPlaylistOpen(true)}
-            className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Открыть очередь воспроизведения"
-          >
-            <ListMusic className="w-3.5 h-3.5 shrink-0" />
-            <span className="font-mono text-[11px]">{tracks.length}</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Now Playing Center Stage */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-4 overflow-y-auto min-h-0">
+      {/* Main Center Now Playing Card */}
+      <div className="relative z-10 w-full max-w-sm flex flex-col items-center my-auto">
         {tracks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center max-w-sm px-4">
+          <div className="flex flex-col items-center justify-center text-center py-10 px-4">
             <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
-              <Music className="w-7 h-7 text-zinc-500" />
+              <Folder className="w-7 h-7 text-zinc-500" />
             </div>
             <h3 className="text-sm font-medium text-zinc-200 mb-1">В папке нет аудиозаписей</h3>
             <p className="text-xs text-zinc-500 mb-4">
               В папке «{effectiveFolder}» отсутствуют вложения выбранных типов.
             </p>
-            <button
-              onClick={() => {
-                setTypeFilters(['voice', 'file']);
-                setScopeMode('active');
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-zinc-200 transition-colors"
-            >
-              Сбросить фильтры
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setScopeMode('active')}
+                className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-zinc-200 transition-colors cursor-pointer"
+              >
+                Активная папка
+              </button>
+              <button
+                onClick={() => setIsPlaylistOpen(true)}
+                className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/10 text-zinc-400 transition-colors cursor-pointer"
+              >
+                Очередь и фильтры
+              </button>
+            </div>
           </div>
         ) : (
-          <div className="w-full max-w-md flex flex-col items-center justify-center gap-5 my-auto">
-            {/* Square Art Tile */}
-            <AudioCoverArt track={currentTrack} isPlaying={isPlaying} />
+          <>
+            {/* 1. Square Art Tile with embedded Center Play/Pause button */}
+            <AudioCoverArt
+              track={currentTrack}
+              isPlaying={isPlaying}
+              onTogglePlay={togglePlay}
+              onPrevTrack={handlePrevTrack}
+              onNextTrack={handleNextTrack}
+            />
 
-            {/* Track Info */}
-            <div className="text-center w-full px-2 flex flex-col items-center gap-1">
-              <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-full">
-                {currentTrack?.name || 'Аудиозапись'}
-              </h2>
+            {/* 2. Track Title (Like "Огонь в окне" in reference) */}
+            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-full text-center mt-5 mb-1 px-2">
+              {currentTrack?.name || 'Аудиозапись'}
+            </h2>
+
+            {/* 3. Subtitle: Note title • Folder • Format */}
+            <div className="text-xs text-zinc-400 text-center flex items-center justify-center gap-1.5 max-w-full truncate px-2 mb-4">
               {currentTrack?.itemTitle && (
                 <button
                   onClick={() => scrollToItem(currentTrack.itemId)}
-                  className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors truncate max-w-xs cursor-pointer flex items-center gap-1"
-                  title="Перейти к заметке в ленте"
+                  className="hover:text-zinc-200 transition-colors truncate cursor-pointer underline-offset-2 hover:underline"
+                  title="Перейти к заметке"
                 >
-                  <span className="truncate">{currentTrack.itemTitle}</span>
-                  <span className="text-[10px] text-zinc-600">• {currentTrack.itemFolder}</span>
+                  {currentTrack.itemTitle}
                 </button>
               )}
+              <span className="text-zinc-600">•</span>
+              <span className="text-zinc-500 truncate">{currentTrack?.itemFolder}</span>
+              <span className="text-zinc-600">•</span>
+              <span className="text-zinc-500 text-[10px] font-mono uppercase">{currentTrack?.format}</span>
             </div>
 
-            {/* Timeline Progress Bar (Scrubber) */}
-            <div className="w-full flex flex-col gap-1.5">
+            {/* 4. Pill Switcher under Subtitle (Like "Вариант 1 / Вариант 2" in reference) */}
+            <div className="flex items-center bg-white/[0.06] p-1 rounded-full border border-white/[0.08] mb-5 select-none shadow-inner">
+              <button
+                onClick={() => setScopeMode('active')}
+                className={`px-4 py-1 text-xs rounded-full transition-all cursor-pointer ${
+                  scopeMode === 'active'
+                    ? 'bg-white text-black font-semibold shadow-md'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Активная
+              </button>
+              <button
+                onClick={() => {
+                  setScopeMode('pinned');
+                  if (!pinnedFolder) setPinnedFolder(currentFolder || 'Входящие');
+                }}
+                className={`px-4 py-1 text-xs rounded-full transition-all cursor-pointer ${
+                  scopeMode === 'pinned'
+                    ? 'bg-white text-black font-semibold shadow-md'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Закрепить
+              </button>
+            </div>
+
+            {/* 5. Scrubber Timeline in a single clean row: [0:00] ────── [1:12] */}
+            <div className="w-full flex items-center gap-3 mb-6 select-none">
+              <span className="text-[11px] font-mono text-zinc-400 w-8 text-left shrink-0">
+                {formatAudioDuration(currentTime)}
+              </span>
+
               <div
                 ref={timelineRef}
                 onMouseDown={handleTimelineMouseDown}
-                className="group relative flex items-center h-4 cursor-pointer select-none"
+                className="group relative flex-1 flex items-center h-4 cursor-pointer select-none"
               >
-                {/* Track Background */}
-                <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden transition-all group-hover:h-1.5">
+                <div className="w-full h-1 bg-white/15 rounded-full overflow-hidden transition-all group-hover:h-1.5">
                   <div
                     style={{ width: `${progressPercent}%` }}
                     className="h-full bg-white transition-all duration-75"
                   />
                 </div>
-                {/* Thumb */}
                 <div
                   style={{ left: `${progressPercent}%` }}
                   className="absolute -ml-1.5 w-3 h-3 rounded-full bg-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
                 />
               </div>
 
-              {/* Time display */}
-              <div className="flex justify-between items-center text-[11px] font-mono text-zinc-500">
-                <span>{formatAudioDuration(currentTime)}</span>
-                <span>{formatAudioDuration(effectiveDuration)}</span>
-              </div>
+              <span className="text-[11px] font-mono text-zinc-500 w-8 text-right shrink-0">
+                {formatAudioDuration(effectiveDuration)}
+              </span>
             </div>
 
-            {/* Transport Controls (5 buttons: -10s, Prev, Play/Pause, Next, +10s) */}
-            <div className="flex items-center justify-center gap-3 sm:gap-4">
+            {/* 6. Unified Bottom Controls Row (Strictly according to reference: Queue, Loop, Share/Jump | Speed, Vol, Fav) */}
+            <div className="flex items-center justify-between w-full max-w-[300px] text-zinc-400 select-none">
+              {/* Queue Button */}
               <button
-                onClick={() => handleSkipTime(-10)}
-                className="w-8 h-8 rounded-full text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
-                title="Назад на 10 секунд (←)"
+                onClick={() => setIsPlaylistOpen(true)}
+                className="p-2 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                title="Очередь воспроизведения"
+                aria-label="Очередь воспроизведения"
               >
-                <RotateCcw className="w-4 h-4" />
+                <ListMusic className="w-4 h-4" />
               </button>
 
+              {/* Loop Button */}
               <button
-                onClick={handlePrevTrack}
-                className="w-9 h-9 rounded-full text-zinc-300 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
-                title="Предыдущий трек"
+                onClick={() => setIsLoop((prev) => !prev)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                  isLoop ? 'text-white bg-white/10' : 'hover:text-white hover:bg-white/[0.08]'
+                }`}
+                title={isLoop ? 'Повтор включен' : 'Повтор выключен'}
+                aria-label="Повтор"
               >
-                <SkipBack className="w-5 h-5 fill-current" />
+                {isLoop ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
               </button>
 
+              {/* Go to Note Link Button (Share/Jump) */}
               <button
-                onClick={togglePlay}
-                className="w-13 h-13 rounded-full bg-white hover:bg-zinc-200 active:scale-95 text-black flex items-center justify-center transition-all shadow-xl cursor-pointer"
-                title={isPlaying ? 'Пауза (Пробел)' : 'Воспроизведение (Пробел)'}
+                onClick={() => currentTrack && scrollToItem(currentTrack.itemId)}
+                className="p-2 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                title="Перейти к заметке"
+                aria-label="Перейти к заметке"
               >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6 fill-current" />
+                <ExternalLink className="w-4 h-4" />
+              </button>
+
+              {/* Subtle Vertical Divider */}
+              <div className="h-4 w-px bg-white/15 mx-1" />
+
+              {/* Playback Speed */}
+              <button
+                onClick={toggleSpeed}
+                className="px-2 py-1 rounded text-[11px] font-mono text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                title="Скорость воспроизведения"
+                aria-label="Скорость"
+              >
+                {PLAYBACK_SPEEDS[speedIndex]}x
+              </button>
+
+              {/* Volume / Mute Button */}
+              <button
+                onClick={toggleMute}
+                className="p-2 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                title={isMuted ? 'Включить звук' : 'Выключить звук'}
+                aria-label="Громкость"
+              >
+                {isMuted || volume === 0 ? (
+                  <VolumeX className="w-4 h-4 text-red-400" />
                 ) : (
-                  <Play className="w-6 h-6 fill-current ml-0.5" />
+                  <Volume2 className="w-4 h-4" />
                 )}
               </button>
 
+              {/* Heart / Favorite Button */}
               <button
-                onClick={handleNextTrack}
-                className="w-9 h-9 rounded-full text-zinc-300 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
-                title="Следующий трек"
+                onClick={() => setIsFavorite((prev) => !prev)}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                  isFavorite ? 'text-red-400' : 'hover:text-white hover:bg-white/[0.08]'
+                }`}
+                title={isFavorite ? 'В избранном' : 'Добавить в избранное'}
+                aria-label="Избранное"
               >
-                <SkipForward className="w-5 h-5 fill-current" />
-              </button>
-
-              <button
-                onClick={() => handleSkipTime(10)}
-                className="w-8 h-8 rounded-full text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
-                title="Вперед на 10 секунд (→)"
-              >
-                <RotateCw className="w-4 h-4" />
+                <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
               </button>
             </div>
-          </div>
+          </>
         )}
-      </main>
-
-      {/* Bottom Bar: Utilities (Speed, Repeat, Volume) */}
-      <footer className="relative z-10 flex items-center justify-between px-3 sm:px-6 py-2.5 border-t border-white/[0.06] bg-black/40 backdrop-blur-md text-xs gap-2">
-        {/* Left: Queue Toggle */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => setIsPlaylistOpen(true)}
-            className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-          >
-            <ListMusic className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Очередь</span>
-          </button>
-        </div>
-
-        {/* Center: Playback Speed & Repeat */}
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <button
-            onClick={toggleSpeed}
-            className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-[11px] font-mono text-zinc-300 transition-colors cursor-pointer"
-            title="Скорость воспроизведения"
-          >
-            {PLAYBACK_SPEEDS[speedIndex]}x
-          </button>
-
-          <button
-            onClick={() => setIsLoop((prev) => !prev)}
-            className={`p-1 rounded transition-colors cursor-pointer ${
-              isLoop ? 'text-white bg-white/10' : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-            title={isLoop ? 'Повтор включен' : 'Повтор выключен'}
-          >
-            {isLoop ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
-          </button>
-        </div>
-
-        {/* Right: Volume Slider */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={toggleMute}
-            className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-            title={isMuted ? 'Включить звук' : 'Выключить звук'}
-          >
-            {isMuted || volume === 0 ? (
-              <VolumeX className="w-4 h-4 text-red-400" />
-            ) : (
-              <Volume2 className="w-4 h-4" />
-            )}
-          </button>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={isMuted ? 0 : volume}
-            onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-            className="w-12 sm:w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white hidden min-[320px]:block"
-            title={`Громкость: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
-          />
-        </div>
-      </footer>
+      </div>
     </div>
   );
 };
