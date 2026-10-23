@@ -7,6 +7,7 @@ interface AudioPlayerProps {
   size?: number;
   waveform?: number[];
   compact?: boolean;
+  timeContext?: string;
 }
 
 function formatBytes(bytes?: number): string {
@@ -29,11 +30,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   size,
   waveform: customWaveform,
   compact = false,
+  timeContext,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(initialDuration || 0);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const [isScrubbing, setIsScrubbing] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -112,13 +113,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     window.addEventListener('mouseup', onMouseUp);
   };
 
-  const cycleSpeed = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
-    setPlaybackRate(nextRate);
-    if (audioRef.current) audioRef.current.playbackRate = nextRate;
-  };
-
   const barsCount = compact ? 22 : 40;
 
   // Generate or sample waveform bars
@@ -135,13 +129,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       return sampled;
     }
 
-    // Deterministic procedural waveform pattern (resembles human speech envelope)
+    // Deterministic procedural waveform pattern with speech-like dynamics
     const generated: number[] = [];
     for (let i = 0; i < barsCount; i++) {
-      const envelope = Math.sin((i / barsCount) * Math.PI); // tapering edges
-      const noise = Math.sin(i * 1.8) * 0.35 + Math.cos(i * 3.7) * 0.25;
-      const val = Math.max(0.18, (0.4 + noise) * envelope + 0.15);
-      generated.push(Math.min(1, val));
+      const t = i / barsCount;
+      const envelope = Math.sin(t * Math.PI); // tapering edges
+      const noise = Math.sin(i * 1.7) * 0.35 + Math.cos(i * 3.3) * 0.25 + Math.sin(i * 0.8) * 0.2;
+      const val = Math.max(0.12, (0.45 + noise) * envelope + 0.12);
+      generated.push(Math.min(1, Math.max(0.15, val)));
     }
     return generated;
   }, [customWaveform, barsCount]);
@@ -153,7 +148,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-6 h-6 rounded-full bg-[#2a82e4] hover:bg-[#2473cb] active:scale-95 flex items-center justify-center text-white shrink-0 cursor-pointer transition-transform shadow-sm"
+          className="w-6 h-6 rounded-full bg-white hover:bg-zinc-200 active:scale-95 flex items-center justify-center text-black shrink-0 cursor-pointer transition-transform shadow-sm"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >
           {isPlaying ? (
@@ -177,7 +172,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 key={i}
                 style={{ height: `${height}px` }}
                 className={`w-[2px] rounded-full transition-colors ${
-                  isFilled ? 'bg-[#529ee8]' : 'bg-white/20'
+                  isFilled ? 'bg-white' : 'bg-white/20'
                 }`}
               />
             );
@@ -194,14 +189,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const formattedSize = formatBytes(size);
 
   return (
-    <div className="flex items-center gap-3 py-1 max-w-sm w-full select-none">
+    <div className="flex items-center gap-3 py-1 w-full select-none">
       <audio ref={audioRef} src={src} preload="metadata" />
 
-      {/* Telegram Blue Play/Pause round button */}
+      {/* Linear Monochrome Play/Pause round button */}
       <button
         type="button"
         onClick={togglePlay}
-        className="w-10 h-10 rounded-full bg-[#2a82e4] hover:bg-[#2473cb] active:scale-95 flex items-center justify-center text-white transition-all shrink-0 shadow-md shadow-[#2a82e4]/20 cursor-pointer"
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-zinc-200 active:scale-95 flex items-center justify-center text-black transition-all shrink-0 shadow-sm cursor-pointer"
         title={isPlaying ? 'Пауза' : 'Воспроизвести'}
         aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
       >
@@ -217,7 +212,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <div
           ref={waveTrackRef}
           onMouseDown={handleMouseDown}
-          className="flex items-center gap-[2px] h-6 cursor-pointer select-none py-1"
+          className="flex items-center justify-between gap-[2px] h-6 cursor-pointer select-none py-1 w-full"
           title="Перемотка"
         >
           {bars.map((norm, i) => {
@@ -228,15 +223,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               <div
                 key={i}
                 style={{ height: `${height}px` }}
-                className={`w-[2.5px] rounded-full transition-colors ${
-                  isFilled ? 'bg-[#529ee8]' : 'bg-white/20 hover:bg-white/30'
+                className={`flex-1 min-w-[2px] max-w-[4px] rounded-full transition-colors ${
+                  isFilled ? 'bg-white' : 'bg-white/20 hover:bg-white/30'
                 }`}
               />
             );
           })}
         </div>
 
-        {/* Subtitle with Telegram-style details: 00:08, 30.2 KB */}
+        {/* Subtitle with details: 00:08, 30.2 KB, timestamp */}
         <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400">
           <div className="flex items-center gap-1.5 truncate">
             <span>{isPlaying ? formatTime(currentTime) : formatTime(currentDur)}</span>
@@ -248,15 +243,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             )}
           </div>
 
-          {/* Speed badge */}
-          <button
-            type="button"
-            onClick={cycleSpeed}
-            className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors shrink-0 cursor-pointer"
-            title="Скорость воспроизведения"
-          >
-            {playbackRate}x
-          </button>
+          {timeContext && (
+            <span className="text-zinc-500 text-[10px] font-mono ml-auto shrink-0 select-none">
+              {timeContext}
+            </span>
+          )}
         </div>
       </div>
     </div>

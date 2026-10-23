@@ -1165,12 +1165,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.reload();
     await expect(page.locator('text=Тестовый войс').first()).toBeVisible({ timeout: 10000 });
 
-    // Verify Telegram-style AudioPlayer components
+    // Verify Linear Monochrome AudioPlayer components (no redundant 1x speed button)
     const audioCard = page.locator('.group', { hasText: 'Тестовый войс' });
     await audioCard.scrollIntoViewIfNeeded();
     await expect(audioCard.locator('button[title*="Воспроизвести"]').first()).toBeVisible();
     await expect(audioCard.locator('text=31.6 KB').or(audioCard.locator('text=32.4 KB')).or(audioCard.locator('text=31.6')).or(audioCard.locator('text=KB')).first()).toBeVisible();
-    await expect(audioCard.locator('button', { hasText: '1x' }).first()).toBeVisible();
+    await expect(audioCard.locator('button', { hasText: '1x' })).not.toBeVisible();
 
     // Capture visual screenshot of Feed AudioPlayer
     await page.screenshot({
@@ -1375,6 +1375,139 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Screenshot feed with flat reply quote
     await page.screenshot({
       path: 'test-results/screenshots/feed-flat-reply.png',
+      fullPage: false,
+    });
+  });
+
+  test('31. Media redesign verification: compact voice card and natural image layout', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(500);
+
+    // Seed a pure voice note, a single image note, and a 4-image gallery note
+    await page.evaluate(() => {
+      const voiceId = 'test_pure_voice_' + Date.now();
+      const singleImageId = 'test_single_image_' + Date.now();
+      const multiImageId = 'test_multi_image_' + Date.now();
+
+      const makeSvg = (title: string, color: string) =>
+        `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380"><rect width="600" height="380" fill="%2318181b" rx="8"/><rect x="20" y="20" width="180" height="24" fill="%2327272a" rx="4"/><text x="30" y="37" fill="%23a1a1aa" font-family="sans-serif" font-size="12">${title}</text><rect x="20" y="60" width="560" height="240" fill="%2309090b" rx="6" stroke="%2327272a"/><text x="40" y="110" fill="%23f4f4f5" font-family="sans-serif" font-size="15" font-weight="600">Screen View</text><circle cx="50" cy="180" r="14" fill="${color}"/></svg>`;
+
+      const voiceItem = {
+        id: voiceId,
+        title: 'Голосовая заметка',
+        content: '',
+        folder: 'Входящие',
+        type: 'note',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        attachments: [
+          {
+            id: 'att_voice_pure',
+            name: 'pure_voice.webm',
+            type: 'audio',
+            mimeType: 'audio/webm',
+            size: 1536,
+            duration: 4,
+            relativePath: '.attachments/pure_voice.webm',
+            dataUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+          }
+        ],
+      };
+
+      const singleImageItem = {
+        id: singleImageId,
+        title: 'Изображение',
+        content: '',
+        folder: 'Входящие',
+        type: 'note',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        attachments: [
+          {
+            id: 'att_img_hero',
+            name: 'ui-preview.png',
+            type: 'image',
+            mimeType: 'image/svg+xml',
+            size: 2048,
+            relativePath: '.attachments/ui-preview.png',
+            dataUrl: makeSvg('Одиночный скриншот', '%233b82f6'),
+          }
+        ],
+      };
+
+      const multiImageItem = {
+        id: multiImageId,
+        title: 'Изображение',
+        content: '',
+        folder: 'Входящие',
+        type: 'note',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        attachments: [
+          { id: 'm1', name: 'img1.png', type: 'image', mimeType: 'image/svg+xml', size: 1024, relativePath: '.attachments/img1.png', dataUrl: makeSvg('Кадр 1', '%2310b981') },
+          { id: 'm2', name: 'img2.png', type: 'image', mimeType: 'image/svg+xml', size: 1024, relativePath: '.attachments/img2.png', dataUrl: makeSvg('Кадр 2', '%23f59e0b') },
+          { id: 'm3', name: 'img3.png', type: 'image', mimeType: 'image/svg+xml', size: 1024, relativePath: '.attachments/img3.png', dataUrl: makeSvg('Кадр 3', '%238b5cf6') },
+          { id: 'm4', name: 'img4.png', type: 'image', mimeType: 'image/svg+xml', size: 1024, relativePath: '.attachments/img4.png', dataUrl: makeSvg('Кадр 4', '%23ec4899') },
+        ],
+      };
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('slag_items_')) {
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          items.unshift(multiImageItem);
+          items.unshift(singleImageItem);
+          items.unshift(voiceItem);
+          localStorage.setItem(key, JSON.stringify(items));
+        }
+      }
+    });
+
+    await page.reload();
+    await page.waitForTimeout(500);
+
+    // 1. Verify pure voice card has no fake "Голосовая заметка" h3 header
+    const voiceCard = page.locator('.group').filter({ has: page.locator('audio') }).first();
+    await voiceCard.scrollIntoViewIfNeeded();
+    await expect(voiceCard).toBeVisible();
+    await expect(voiceCard.locator('h3')).toHaveCount(0);
+
+    // Verify monochrome play button is present
+    const playBtn = voiceCard.locator('button[title*="Воспроизвести"]').first();
+    await expect(playBtn).toBeVisible();
+
+    // Screenshot compact voice card
+    await page.screenshot({
+      path: 'test-results/screenshots/feed-audioplayer-monochrome.png',
+      fullPage: false,
+    });
+
+    // 2. Verify pure single image card has no fake "Изображение" h3 header and uses natural object-contain
+    const singleImageCard = page.locator('.group').filter({ has: page.locator('img[alt="ui-preview.png"]') }).first();
+    await singleImageCard.scrollIntoViewIfNeeded();
+    await expect(singleImageCard).toBeVisible();
+    await expect(singleImageCard.locator('h3')).toHaveCount(0);
+
+    const singleImg = singleImageCard.locator('img[alt="ui-preview.png"]').first();
+    await expect(singleImg).toBeVisible();
+    await expect(singleImg).toHaveClass(/object-contain/);
+
+    // Screenshot natural single image card
+    await page.screenshot({
+      path: 'test-results/screenshots/feed-images-single-natural.png',
+      fullPage: false,
+    });
+
+    // 3. Verify multi-image card has 4 images in 4:3 grid without fake header
+    const multiImageCard = page.locator('.group').filter({ has: page.locator('img[alt="img1.png"]') }).first();
+    await multiImageCard.scrollIntoViewIfNeeded();
+    await expect(multiImageCard).toBeVisible();
+    await expect(multiImageCard.locator('h3')).toHaveCount(0);
+
+    // Screenshot multi-image 4:3 grid
+    await page.screenshot({
+      path: 'test-results/screenshots/feed-images-multi-grid.png',
       fullPage: false,
     });
   });

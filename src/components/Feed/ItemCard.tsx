@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem } from '../../types';
+import type { SlagItem, LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import {
@@ -16,7 +16,6 @@ import {
   CornerUpLeft,
   Pin
 } from 'lucide-react';
-import type { LightboxImage } from '../../types';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 
 interface ItemCardProps {
@@ -119,6 +118,53 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const replyParent = item.replyToId ? items.find(i => i.id === item.replyToId) : null;
   const repliesCount = items.filter(i => i.replyToId === item.id).length;
 
+  const isPureVoice =
+    audioAttachments.length === 1 &&
+    videoAttachments.length === 0 &&
+    imageAttachments.length === 0 &&
+    fileAttachments.length === 0 &&
+    !item.content.trim() &&
+    !isTask &&
+    !isArticle &&
+    (!item.subtasks || item.subtasks.length === 0) &&
+    (!item.tags || item.tags.length === 0) &&
+    !item.replyToId &&
+    !item.isPinned &&
+    (!item.priority || item.priority === 'none');
+
+  const isGenericMediaTitle = (title?: string) => {
+    if (!title) return true;
+    const t = title.trim().toLowerCase();
+    return (
+      t === 'голосовая заметка' ||
+      t === 'изображение' ||
+      t === 'видео-сообщение' ||
+      t === 'заметка' ||
+      t === 'вложение' ||
+      item.attachments.some(a => a.name && a.name.toLowerCase() === t)
+    );
+  };
+
+  const shouldRenderNoteTitle = Boolean(
+    item.title &&
+    item.title !== item.content.slice(0, 40) &&
+    (item.content.trim().length > 0 || !isGenericMediaTitle(item.title))
+  );
+
+  const handleImageClick = (img: SlagAttachment) => {
+    const folderImages: LightboxImage[] = filteredItems.flatMap(it =>
+      (it.attachments || [])
+        .filter(att => att.type === 'image' && att.dataUrl)
+        .map(att => ({
+          id: att.id,
+          name: att.name,
+          url: att.dataUrl!,
+        }))
+    );
+    const targetIdx = folderImages.findIndex(fi => fi.url === img.dataUrl);
+    openLightbox(folderImages, Math.max(0, targetIdx));
+  };
+
   const hasMetadata = isTask || isArticle || (item.folder !== 'Входящие') || Boolean(item.isPinned) || Boolean(item.priority && item.priority !== 'none') || Boolean(item.dueDate);
 
   const handleOpenArticle = () => {
@@ -202,7 +248,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined,
           transition: swipeOffset ? 'none' : 'transform 150ms ease-out',
         }}
-        className={`group relative flex flex-col gap-2 w-full p-3 rounded-xl transition-all cursor-default select-none ${
+        className={`group relative flex flex-col ${
+          isPureVoice ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-2 w-full'
+        } p-3 rounded-xl transition-all cursor-default select-none ${
           isHighlighted
             ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
             : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
@@ -455,19 +503,21 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       ) : (
         /* Note Variant */
-        <div className="flex flex-col gap-1.5">
-          {item.title && item.title !== item.content.slice(0, 40) && (
-            <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
-              {item.title}
-            </h3>
-          )}
+        (shouldRenderNoteTitle || item.content) && (
+          <div className="flex flex-col gap-1.5">
+            {shouldRenderNoteTitle && (
+              <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
+                {item.title}
+              </h3>
+            )}
 
-          {item.content && (
-            <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap font-normal">
-              {renderContentWithWikiLinks(item.content)}
-            </div>
-          )}
-        </div>
+            {item.content && (
+              <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap font-normal">
+                {renderContentWithWikiLinks(item.content)}
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {/* Video Circle Notes (Telegram style) */}
@@ -479,43 +529,54 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
       {/* Audio Notes Player */}
       {audioAttachments.map(att => (
-        <div key={att.id} className="pt-1">
+        <div key={att.id} className="pt-0.5 w-full">
           <AudioPlayer
             src={att.dataUrl || ''}
             duration={att.duration}
             size={att.size}
             waveform={att.waveform}
+            timeContext={isPureVoice ? formattedTime : undefined}
           />
         </div>
       ))}
 
       {/* Image Attachments Gallery (Obsidian/Linear Lightbox) */}
       {imageAttachments.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 pt-1 max-w-md">
-          {imageAttachments.map(img => (
-            <div
-              key={img.id}
-              className="rounded-lg overflow-hidden border border-white/[0.06] bg-black/40 aspect-video flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => {
-                const folderImages: LightboxImage[] = [];
-                filteredItems.forEach(it => {
-                  it.attachments?.forEach(att => {
-                    if (att.type === 'image' && att.dataUrl) {
-                      folderImages.push({
-                        id: att.id,
-                        name: att.name,
-                        url: att.dataUrl,
-                      });
-                    }
-                  });
-                });
-                const targetIdx = folderImages.findIndex(fi => fi.url === img.dataUrl);
-                openLightbox(folderImages, Math.max(0, targetIdx));
-              }}
-            >
-              <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+        <div className="pt-1 w-full">
+          {imageAttachments.length === 1 ? (
+            <div className="flex items-start max-w-full">
+              <div
+                className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 cursor-pointer hover:opacity-95 transition-opacity max-h-[420px] max-w-full"
+                onClick={() => handleImageClick(imageAttachments[0])}
+              >
+                <img
+                  src={imageAttachments[0].dataUrl}
+                  alt={imageAttachments[0].name}
+                  className="w-auto h-auto max-h-[420px] max-w-full object-contain rounded-lg"
+                />
+              </div>
             </div>
-          ))}
+          ) : (
+            <div
+              className={`grid ${
+                imageAttachments.length === 2 || imageAttachments.length === 4
+                  ? 'grid-cols-2'
+                  : imageAttachments.length === 3
+                  ? 'grid-cols-3'
+                  : 'grid-cols-2 sm:grid-cols-3'
+              } gap-1.5 w-full`}
+            >
+              {imageAttachments.map(img => (
+                <div
+                  key={img.id}
+                  className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 aspect-[4/3] flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
+                  onClick={() => handleImageClick(img)}
+                >
+                  <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -540,29 +601,31 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
       )}
 
       {/* Bottom Bar: Tags + Timestamp (when no top metadata bar exists) */}
-      <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
-        {item.tags && item.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {item.tags.map(tag => (
-              <button
-                key={tag}
-                onClick={() => setActiveTagFilter(tag)}
-                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                #{tag}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div />
-        )}
+      {!isPureVoice && (
+        <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
+          {item.tags && item.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {item.tags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setActiveTagFilter(tag)}
+                  className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div />
+          )}
 
-        {!hasMetadata && (
-          <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
-            {formattedTime}
-          </span>
-        )}
-      </div>
+          {!hasMetadata && (
+            <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
+              {formattedTime}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Replies Count Link */}
       {repliesCount > 0 && (
