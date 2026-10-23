@@ -11,11 +11,13 @@ import type {
   FeedViewMode,
   AiItemFilter,
   ChatMessage,
-  SuggestedAction
+  SuggestedAction,
+  MobileTabId
 } from '../types';
 import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 interface ToastMessage {
   id: string;
@@ -120,11 +122,28 @@ interface AppContextType {
   addToast: (text: string, type?: 'info' | 'success' | 'error') => void;
   removeToast: (id: string) => void;
   refreshData: () => void;
+
+  // Mobile Navigation & Touch Actions
+  isMobile: boolean;
+  activeMobileTab: MobileTabId;
+  setActiveMobileTab: (tab: MobileTabId) => void;
+  mobileActiveFolder: string | null;
+  setMobileActiveFolder: (folder: string | null) => void;
+  mobileFolderInfoOpen: boolean;
+  setMobileFolderInfoOpen: (open: boolean) => void;
+  mobileActionSheetItem: SlagItem | null;
+  setMobileActionSheetItem: (item: SlagItem | null) => void;
+  mobileDockTabs: MobileTabId[];
+  setMobileDockTabs: (tabs: MobileTabId[]) => void;
+  dismissTopLayer: () => boolean;
 }
 
 const AI_SETTINGS_KEY = 'slag_ai_settings_v2';
 const SIDEBAR_WIDTH_KEY = 'slag_sidebar_width_v2';
 const RIGHT_PANEL_WIDTH_KEY = 'slag_right_panel_width_v2';
+const MOBILE_DOCK_TABS_KEY = 'slag_mobile_dock_tabs_v2';
+
+const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
 
 const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: 'groq',
@@ -219,6 +238,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(clamped));
   };
 
+  // Mobile navigation & touch state
+  const isMobile = useIsMobile(768);
+  const [activeMobileTab, setActiveMobileTab] = useState<MobileTabId>('folders');
+  const [mobileActiveFolder, setMobileActiveFolderState] = useState<string | null>(null);
+  const [mobileFolderInfoOpen, setMobileFolderInfoOpen] = useState<boolean>(false);
+  const [mobileActionSheetItem, setMobileActionSheetItem] = useState<SlagItem | null>(null);
+  const [mobileDockTabs, setMobileDockTabsState] = useState<MobileTabId[]>(() => {
+    try {
+      const saved = localStorage.getItem(MOBILE_DOCK_TABS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // Ignore
+    }
+    return DEFAULT_MOBILE_DOCK_TABS;
+  });
+
+  const setMobileDockTabs = useCallback((tabs: MobileTabId[]) => {
+    setMobileDockTabsState(tabs);
+    try {
+      localStorage.setItem(MOBILE_DOCK_TABS_KEY, JSON.stringify(tabs));
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const setMobileActiveFolder = useCallback((folder: string | null) => {
+    setMobileActiveFolderState(folder);
+    if (folder) {
+      setCurrentFolder(folder);
+    }
+  }, []);
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
@@ -280,7 +331,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setContextMenu(null);
   }, []);
 
-  // Strict Layered Dismiss Stack for Escape key & Global Hotkeys
+  // Strict Layered Dismiss Stack (LIFO) for Escape key, Android Hardware Back & Swipes
+  const dismissTopLayer = useCallback((): boolean => {
+    if (activeLightboxIndex !== null) {
+      closeLightbox();
+      return true;
+    }
+    if (mobileActionSheetItem !== null) {
+      setMobileActionSheetItem(null);
+      return true;
+    }
+    if (contextMenu !== null) {
+      closeContextMenu();
+      return true;
+    }
+    if (isLogViewerOpen) {
+      setIsLogViewerOpen(false);
+      return true;
+    }
+    if (isFolderModalOpen) {
+      setIsFolderModalOpen(false);
+      setEditingFolder(null);
+      return true;
+    }
+    if (isTriageModalOpen) {
+      setIsTriageModalOpen(false);
+      return true;
+    }
+    if (isSettingsOpen) {
+      setIsSettingsOpen(false);
+      return true;
+    }
+    if (isSearchOpen) {
+      setIsSearchOpen(false);
+      return true;
+    }
+    if (replyTarget !== null) {
+      setReplyTarget(null);
+      return true;
+    }
+    if (isFullscreenEditorOpen) {
+      setIsFullscreenEditorOpen(false);
+      return true;
+    }
+    if (mobileFolderInfoOpen) {
+      setMobileFolderInfoOpen(false);
+      return true;
+    }
+    if (mobileActiveFolder !== null) {
+      if (mobileActiveFolder.includes('/')) {
+        const parent = mobileActiveFolder.substring(0, mobileActiveFolder.lastIndexOf('/'));
+        setMobileActiveFolder(parent);
+      } else {
+        setMobileActiveFolder(null);
+      }
+      return true;
+    }
+    if (activeMobileTab !== 'folders') {
+      setActiveMobileTab('folders');
+      return true;
+    }
+    return false;
+  }, [
+    activeLightboxIndex,
+    closeLightbox,
+    mobileActionSheetItem,
+    contextMenu,
+    closeContextMenu,
+    isLogViewerOpen,
+    isFolderModalOpen,
+    isTriageModalOpen,
+    isSettingsOpen,
+    isSearchOpen,
+    replyTarget,
+    isFullscreenEditorOpen,
+    mobileFolderInfoOpen,
+    mobileActiveFolder,
+    setMobileActiveFolder,
+    activeMobileTab,
+  ]);
+
+  // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -296,54 +427,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (e.key === 'Escape') {
-        // Hierarchy of layered closing: Lightbox -> ContextMenu -> LogViewer -> FolderModal/TriageModal/SettingsModal -> SearchModal -> FullscreenEditor
-        if (activeLightboxIndex !== null) {
+        if (dismissTopLayer()) {
           e.preventDefault();
-          closeLightbox();
-        } else if (contextMenu) {
-          e.preventDefault();
-          closeContextMenu();
-        } else if (isLogViewerOpen) {
-          e.preventDefault();
-          setIsLogViewerOpen(false);
-        } else if (isFolderModalOpen) {
-          e.preventDefault();
-          setIsFolderModalOpen(false);
-          setEditingFolder(null);
-        } else if (isTriageModalOpen) {
-          e.preventDefault();
-          setIsTriageModalOpen(false);
-        } else if (isSettingsOpen) {
-          e.preventDefault();
-          setIsSettingsOpen(false);
-        } else if (isSearchOpen) {
-          e.preventDefault();
-          setIsSearchOpen(false);
-        } else if (replyTarget) {
-          e.preventDefault();
-          setReplyTarget(null);
-        } else if (isFullscreenEditorOpen) {
-          e.preventDefault();
-          setIsFullscreenEditorOpen(false);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    activeLightboxIndex,
-    closeLightbox,
-    contextMenu,
-    isLogViewerOpen,
-    isFolderModalOpen,
-    isTriageModalOpen,
-    isSettingsOpen,
-    isSearchOpen,
-    replyTarget,
-    isFullscreenEditorOpen,
-    closeContextMenu
-  ]);
+  }, [dismissTopLayer]);
+
+  // Android Back Gesture & PopState Handler
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.history.replaceState({ slagApp: true }, '');
+    } catch {
+      // Ignore
+    }
+
+    const handlePopState = () => {
+      const handled = dismissTopLayer();
+      if (handled) {
+        try {
+          window.history.pushState({ slagApp: true }, '');
+        } catch {
+          // Ignore
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [dismissTopLayer]);
 
   const scrollToItem = useCallback((idOrTitle: string) => {
     const cleanQuery = idOrTitle.trim().replace(/^\[\[/, '').replace(/\]\]$/, '');
@@ -872,6 +988,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addToast,
         removeToast,
         refreshData,
+        isMobile,
+        activeMobileTab,
+        setActiveMobileTab,
+        mobileActiveFolder,
+        setMobileActiveFolder,
+        mobileFolderInfoOpen,
+        setMobileFolderInfoOpen,
+        mobileActionSheetItem,
+        setMobileActionSheetItem,
+        mobileDockTabs,
+        setMobileDockTabs,
+        dismissTopLayer,
       }}
     >
       {children}

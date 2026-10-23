@@ -14,6 +14,19 @@
     --text-secondary: #a1a1aa;
     --text-muted: #71717a;
     --text-dim: #52525b;
+
+    /* Mobile Safe Area Insets & Dynamic Keyboard */
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --keyboard-inset-bottom: 0px;
+  }
+
+  html, body {
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
   }
 
   * {
@@ -38,6 +51,29 @@
   input, textarea, [contenteditable="true"] {
     user-select: text;
   }
+
+  /* Prevent iOS automatic zoom on focus when font-size is below 16px */
+  @media (max-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+}
+
+/* Safe area padding utilities */
+.safe-pt {
+  padding-top: max(var(--sat), 0.5rem);
+}
+.safe-pb {
+  padding-bottom: max(var(--sab), 0.5rem);
+}
+.safe-pl {
+  padding-left: max(var(--sal), 0.5rem);
+}
+.safe-pr {
+  padding-right: max(var(--sar), 0.5rem);
 }
 
 /* Custom discreet scrollbars */

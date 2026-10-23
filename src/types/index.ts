@@ -92,6 +92,7 @@ export interface AiSettings {
 
 export type InboxMode = 'unsorted' | 'all' | 'sorted';
 export type FeedViewMode = 'feed' | 'kanban' | 'calendar';
+export type MobileTabId = 'folders' | 'tasks' | 'assistant' | 'settings' | 'calendar';
 
 export interface AiItemFilter {
   itemIds: string[];

@@ -650,7 +650,7 @@ export const Composer: React.FC = () => {
               ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
               : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
           }
-          className="w-full bg-transparent text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal py-0 px-1 outline-none border-none"
+          className="w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal py-0 px-1 outline-none border-none"
           style={{ minHeight: '22px', maxHeight: '220px' }}
         />
       </div>

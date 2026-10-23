@@ -9,7 +9,8 @@ import {
   CheckSquare,
   StickyNote,
   CornerDownLeft,
-  Folder
+  Folder,
+  ArrowLeft
 } from 'lucide-react';
 
 const SearchDialog: React.FC = () => {
@@ -70,14 +71,24 @@ const SearchDialog: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-100">
+    <div className="fixed inset-0 z-50 flex items-start justify-center md:pt-20 p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-100">
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden max-h-[70vh] animate-in zoom-in-95 duration-100"
+        className="w-full h-full md:h-auto md:max-w-xl rounded-none md:rounded-2xl bg-[#141416] border-0 md:border md:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden md:max-h-[70vh] animate-in zoom-in-95 duration-100"
       >
         {/* Search Input Bar */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">
-          <Search className="w-4 h-4 text-zinc-400 shrink-0" />
+        <div
+          className="flex items-center gap-2.5 px-4 py-3.5 border-b border-white/[0.06] bg-[#0c0c0e]"
+          style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
+        >
+          <button
+            onClick={() => setIsSearchOpen(false)}
+            className="md:hidden p-1 -ml-1 text-zinc-400 hover:text-white"
+            title="Назад"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <Search className="w-4 h-4 text-zinc-400 shrink-0 hidden md:block" />
           <input
             ref={inputRef}
             type="text"
@@ -85,17 +96,17 @@ const SearchDialog: React.FC = () => {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Поиск по заметкам, тегам, таскам и статьям..."
-            className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 border-none focus:outline-none"
+            className="flex-1 bg-transparent text-base md:text-sm text-white placeholder-zinc-500 border-none focus:outline-none"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="p-1 rounded text-zinc-500 hover:text-zinc-300"
+              className="p-1.5 rounded text-zinc-500 hover:text-zinc-300"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           )}
-          <span className="text-[10px] font-mono text-zinc-500 px-1.5 py-0.5 rounded border border-white/[0.06]">
+          <span className="hidden md:inline-block text-[10px] font-mono text-zinc-500 px-1.5 py-0.5 rounded border border-white/[0.06]">
             ESC
           </span>
         </div>

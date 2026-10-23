@@ -154,24 +154,27 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   return (
     <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]">
       {/* Top Floating Control Bar - Centered to match content width */}
-      <header className="h-14 border-b border-white/[0.06] bg-[#0c0c0e] shrink-0">
-        <div className="max-w-4xl mx-auto w-full h-full flex items-center justify-between px-6">
-          <div className="flex items-center gap-3">
+      <header
+        className="min-h-14 border-b border-white/[0.06] bg-[#0c0c0e] shrink-0"
+        style={{ paddingTop: 'max(var(--sat), 0px)' }}
+      >
+        <div className="max-w-4xl mx-auto w-full h-full flex flex-wrap md:flex-nowrap items-center justify-between px-4 md:px-6 py-2 md:py-0 gap-2">
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
             <button
               onClick={handleClose}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Назад (Esc)</span>
+              <span>Назад</span>
             </button>
 
-            <span className="text-zinc-600">/</span>
+            <span className="text-zinc-600 hidden md:inline">/</span>
 
             {/* Folder Selector */}
             <select
               value={folder}
               onChange={(e) => setFolder(e.target.value)}
-              className="bg-white/[0.04] border border-white/[0.08] rounded-md px-2.5 py-1 text-xs text-zinc-300 outline-none cursor-pointer"
+              className="bg-white/[0.04] border border-white/[0.08] rounded-md px-2.5 py-1 text-xs text-zinc-300 outline-none cursor-pointer max-w-[130px] md:max-w-none truncate"
             >
               {folders.map(f => (
                 <option key={f.path} value={f.path}>
@@ -186,7 +189,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   key={t}
                   onClick={() => setType(t)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] capitalize transition-colors cursor-pointer ${
+                  className={`px-2 md:px-2.5 py-1 rounded-md text-[11px] capitalize transition-colors cursor-pointer ${
                     type === t ? 'bg-white/10 text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
@@ -197,8 +200,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           </div>
 
           {/* Stats & Actions */}
-          <div className="flex items-center gap-3 text-xs text-zinc-500">
-            <div className="flex items-center gap-2 font-mono text-[11px]">
+          <div className="flex items-center gap-2 md:gap-3 text-xs text-zinc-500 ml-auto">
+            <div className="hidden sm:flex items-center gap-2 font-mono text-[11px]">
               <span>{wordCount} слов</span>
               <span>•</span>
               <span>~{readTime} мин</span>
@@ -206,7 +209,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
             <button
               onClick={handleSave}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors cursor-pointer shadow-sm shadow-blue-500/20"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors cursor-pointer shadow-sm shadow-blue-500/20 active:scale-95"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Сохранить</span>
@@ -228,19 +231,19 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       </header>
 
       {/* Editor Body */}
-      <div className="flex-1 overflow-y-auto py-8">
-        <div className="max-w-4xl mx-auto w-full px-6 flex flex-col gap-6">
+      <div className="flex-1 overflow-y-auto py-4 md:py-8">
+        <div className="max-w-4xl mx-auto w-full px-4 md:px-6 flex flex-col gap-5 md:gap-6">
           {/* Title Input */}
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Заголовок..."
-            className="w-full bg-transparent text-2xl font-semibold tracking-tight text-white placeholder-zinc-600 border-none px-0 outline-none"
+            className="w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight text-white placeholder-zinc-600 border-none px-0 outline-none"
           />
 
           {/* Formatting Shortcut Toolbar */}
-          <div className="flex items-center gap-1 py-1.5 border-y border-white/[0.04] text-zinc-400 flex-wrap">
+          <div className="flex items-center gap-1 py-1.5 border-y border-white/[0.04] text-zinc-400 overflow-x-auto scrollbar-none">
             <button
               onClick={() => insertMarkdown('# ', '')}
               className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"

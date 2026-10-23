@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
@@ -35,11 +35,69 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     setReplyTarget,
     highlightedItemId,
     scrollToItem,
-    openLightbox
+    openLightbox,
+    isMobile,
+    setMobileActionSheetItem
   } = useApp();
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
   const [isArticleExpanded, setIsArticleExpanded] = useState(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+
+  const longPressTimerRef = useRef<number | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      try {
+        navigator.vibrate?.(15);
+      } catch {
+        // Ignore
+      }
+      setMobileActionSheetItem(item);
+      longPressTimerRef.current = null;
+    }, 450);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPosRef.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartPosRef.current.x;
+    const dy = touch.clientY - touchStartPosRef.current.y;
+
+    // Cancel long press on movement
+    if (Math.hypot(dx, dy) > 10 && longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    // Horizontal swipe left for reply (Telegram style)
+    if (dx < 0 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      setSwipeOffset(Math.max(-70, dx));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    if (swipeOffset < -45) {
+      try {
+        navigator.vibrate?.(10);
+      } catch {
+        // Ignore
+      }
+      setReplyTarget(item);
+    }
+    setSwipeOffset(0);
+    touchStartPosRef.current = null;
+  };
 
   const formattedTime = new Date(item.createdAt).toLocaleTimeString([], {
     hour: '2-digit',
@@ -113,45 +171,67 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const isHighlighted = highlightedItemId === item.id;
 
   return (
-    <div
-      id={`item-${item.id}`}
-      draggable
-      onDragStart={handleDragStart}
-      onContextMenu={handleContextMenu}
-      className={`group relative flex flex-col gap-2 max-w-2xl w-full mx-auto p-3 rounded-xl transition-all cursor-default ${
-        isHighlighted
-          ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
-          : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
-      }`}
-    >
-      {/* Floating Hover Action Pill (Linear / Telegram style) */}
-      <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-[#18181c]/90 backdrop-blur-md border border-white/[0.08] rounded-md p-0.5 shadow-md z-10 pointer-events-auto">
-        <button
-          onClick={() => setReplyTarget(item)}
-          className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-          title="Ответить (R)"
-        >
-          <CornerUpLeft className="w-3.5 h-3.5" />
-        </button>
+    <div className="relative max-w-2xl w-full mx-auto overflow-hidden">
+      {/* Background Reply Swipe Indicator */}
+      {swipeOffset < 0 && (
+        <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center text-blue-400">
+          <div className="w-8 h-8 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+            <CornerUpLeft className="w-4 h-4" />
+          </div>
+        </div>
+      )}
 
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            openContextMenu({
-              x: rect.right - 224,
-              y: rect.bottom + 6,
-              type: 'item',
-              item,
-            });
-          }}
-          className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-          title="Действия (или ПКМ)"
-        >
-          <MoreVertical className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      <div
+        id={`item-${item.id}`}
+        draggable={!isMobile}
+        onDragStart={handleDragStart}
+        onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{
+          transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined,
+          transition: swipeOffset ? 'none' : 'transform 150ms ease-out',
+        }}
+        className={`group relative flex flex-col gap-2 w-full p-3 rounded-xl transition-all cursor-default select-none ${
+          isHighlighted
+            ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
+            : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
+        }`}
+      >
+        {/* Action Pill (Visible on mobile, Hover on desktop) */}
+        <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 bg-[#18181c]/90 backdrop-blur-md border border-white/[0.08] rounded-md p-0.5 shadow-md z-10 pointer-events-auto">
+          <button
+            onClick={() => setReplyTarget(item)}
+            className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+            title="Ответить (R)"
+          >
+            <CornerUpLeft className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isMobile) {
+                setMobileActionSheetItem(item);
+              } else {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                openContextMenu({
+                  x: rect.right - 224,
+                  y: rect.bottom + 6,
+                  type: 'item',
+                  item,
+                });
+              }
+            }}
+            className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+            title="Действия"
+          >
+            <MoreVertical className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
       {/* Top Header / Metadata Bar (Rendered ONLY when metadata exists) */}
       {hasMetadata && (
@@ -479,6 +559,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           <span>{repliesCount} {repliesCount === 1 ? 'ответ' : repliesCount < 5 ? 'ответа' : 'ответов'}</span>
         </button>
       )}
+      </div>
     </div>
   );
 };
