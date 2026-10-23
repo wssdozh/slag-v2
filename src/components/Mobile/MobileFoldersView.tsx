@@ -105,8 +105,8 @@ export const MobileFoldersView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-zinc-200 shrink-0">
-                  <Inbox className="w-4 h-4" />
+                <div className="w-6 h-6 flex items-center justify-center text-zinc-200 shrink-0">
+                  <Inbox className="w-5 h-5" />
                 </div>
                 <div className="text-sm font-semibold text-white truncate">Входящие</div>
               </div>
@@ -143,8 +143,8 @@ export const MobileFoldersView: React.FC = () => {
                       className="w-full flex items-center justify-between p-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.06] flex items-center justify-center text-zinc-300 shrink-0">
-                          <Icon className="w-4 h-4 text-zinc-300" />
+                        <div className="w-6 h-6 flex items-center justify-center text-zinc-400 shrink-0">
+                          <Icon className="w-5 h-5" />
                         </div>
                         <div className="text-sm font-medium text-zinc-200 truncate">{folder.name}</div>
                       </div>
