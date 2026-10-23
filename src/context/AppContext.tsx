@@ -1013,7 +1013,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Filter items by current folder, hybrid inbox mode, type filter, and tag filter
   const filteredItems = items.filter(item => {
     let matchesFolder = false;
-    if (currentFolder === 'Входящие') {
+    if (aiItemFilter) {
+      matchesFolder = true;
+    } else if (currentFolder === 'Входящие') {
       if (inboxMode === 'unsorted') {
         matchesFolder = item.folder === 'Входящие';
       } else if (inboxMode === 'all') {
