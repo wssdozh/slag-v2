@@ -11,8 +11,7 @@ import {
   Check,
   PlusCircle,
   FolderSync,
-  Terminal,
-  Smartphone
+  Terminal
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -28,8 +27,7 @@ export const Sidebar: React.FC = () => {
     openCreateFolderModal,
     switchVault,
     createVault,
-    addToast,
-    toggleMobileMode
+    addToast
   } = useApp();
 
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
@@ -79,15 +77,6 @@ export const Sidebar: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
-          {/* Mobile Preview Toggle */}
-          <button
-            onClick={toggleMobileMode}
-            className="w-ctrl-sm h-ctrl-sm rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors cursor-pointer flex items-center justify-center"
-            title="Переключить в мобильный режим"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-          </button>
-
           {/* Global Quick Search Button */}
           <button
             onClick={() => setIsSearchOpen(true)}
