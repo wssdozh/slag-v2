@@ -9,8 +9,9 @@ import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { Select } from '../UI/Select';
 import { generateSmartTags } from '../../lib/aiService';
 import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
+import { BaseComposer } from './BaseComposer';
+import { LinearSignalBars } from '../UI/PriorityBadge';
 import {
-  Send,
   Trash2,
   Paperclip,
   Mic,
@@ -106,15 +107,6 @@ export const Composer: React.FC = () => {
       textareaRef.current.focus();
     }
   }, [replyTarget]);
-
-  // Auto-resize textarea as user types
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const targetHeight = content.trim() ? Math.min(textareaRef.current.scrollHeight, 220) : 22;
-      textareaRef.current.style.height = `${targetHeight}px`;
-    }
-  }, [content]);
 
   // WikiLink items matching current query
   const matchingWikiItems = wikiQuery !== null
@@ -702,9 +694,8 @@ export const Composer: React.FC = () => {
     );
   }
 
-  return (
-    <div className="w-full select-none">
-      <div className="rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50">
+  const topSlot = (
+    <>
         {/* Reply Banner */}
         {replyTarget && (
         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
@@ -860,15 +851,7 @@ export const Composer: React.FC = () => {
                   : 'bg-zinc-500/10 border-zinc-500/20 text-zinc-300'
               }`}
             >
-              <span>
-                {parsedTask?.priority === 'high'
-                  ? '🔴'
-                  : parsedTask?.priority === 'medium'
-                  ? '🟠'
-                  : parsedTask?.priority === 'low'
-                  ? '🔵'
-                  : '⚪'}
-              </span>
+              <LinearSignalBars priority={parsedTask?.priority} className="w-3 h-3" />
               <span>
                 {parsedTask?.priority === 'high'
                   ? 'p1 (High)'
@@ -908,98 +891,72 @@ export const Composer: React.FC = () => {
           ))}
         </div>
       )}
+    </>
+  );
 
-      {/* Textarea Input Container with WikiLink popover - Monolithic, direct on card surface */}
-      <div className="relative">
-        {wikiQuery !== null && matchingWikiItems.length > 0 && (
-          <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
-            <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
-              Связать заметку [[...]]
-            </div>
-            {matchingWikiItems.map((wikiItem, idx) => {
-              const isSelected = idx === wikiSelectedIndex;
-              return (
-                <button
-                  key={wikiItem.id}
-                  type="button"
-                  onClick={() => insertWikiLink(wikiItem)}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate cursor-pointer ${
-                    isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
-                  }`}
-                >
-                  {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                  {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-                  {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-                  <span className="truncate">{wikiItem.title || wikiItem.id}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={handleContentChange}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          rows={1}
-          placeholder={
-            isMobile
-              ? itemType === 'task'
-                ? 'Задача... ([[ для ссылки)'
-                : itemType === 'article'
-                ? 'Черновик статьи... ([[ для ссылки)'
-                : 'Мысль, заметка или задача...'
-              : itemType === 'task'
-              ? 'Задача... (- [ ] для подзадач, [[ для ссылки)'
-              : itemType === 'article'
-              ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
-              : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
-          }
-          className="w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal py-0 px-1 outline-none border-none"
-          style={{ minHeight: '22px', maxHeight: '220px' }}
-        />
+  const overlaySlot = wikiQuery !== null && matchingWikiItems.length > 0 && (
+    <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
+      <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
+        Связать заметку [[...]]
       </div>
+      {matchingWikiItems.map((wikiItem, idx) => {
+        const isSelected = idx === wikiSelectedIndex;
+        return (
+          <button
+            key={wikiItem.id}
+            type="button"
+            onClick={() => insertWikiLink(wikiItem)}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate cursor-pointer ${
+              isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
+            }`}
+          >
+            {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+            {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+            {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+            <span className="truncate">{wikiItem.title || wikiItem.id}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
-      {/* Bottom Control Bar: Unified MD height (32px desktop / 38px mobile) */}
-      {isRecordingAudio ? (
-        <div className="pt-1 w-full animate-in fade-in duration-150">
-          <AudioRecorder
-            finishTriggerRef={triggerFinishRef}
-            onRecorded={handleRecordedAudio}
-            onCancel={() => {
-              setIsRecordingAudio(false);
-              setRecordMode('idle');
-              setLockHint(null);
-            }}
-          />
-        </div>
-      ) : isRecordingVideo ? (
-        <div className="pt-1 w-full flex flex-col items-center animate-in fade-in duration-150">
-          <VideoRecorder
-            finishTriggerRef={triggerFinishRef}
-            onRecorded={handleRecordedVideo}
-            onCancel={() => {
-              setIsRecordingVideo(false);
-              setRecordMode('idle');
-              setLockHint(null);
-            }}
-          />
-        </div>
-      ) : (
-        <div className="flex items-center justify-between pt-1 gap-1.5 relative min-w-0">
-          {/* Lock Hint Banner when holding mic/video button */}
-          {lockHint && recordMode === 'holding' && (
-            <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-[#141417] border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
-              <Lock className="w-3.5 h-3.5 text-[#529ee8] animate-bounce" />
-              <span>Потяните вверх для фиксации</span>
-            </div>
-          )}
+  const customControls = isRecordingAudio ? (
+    <div className="pt-1 w-full animate-in fade-in duration-150">
+      <AudioRecorder
+        finishTriggerRef={triggerFinishRef}
+        onRecorded={handleRecordedAudio}
+        onCancel={() => {
+          setIsRecordingAudio(false);
+          setRecordMode('idle');
+          setLockHint(null);
+        }}
+      />
+    </div>
+  ) : isRecordingVideo ? (
+    <div className="pt-1 w-full flex flex-col items-center animate-in fade-in duration-150">
+      <VideoRecorder
+        finishTriggerRef={triggerFinishRef}
+        onRecorded={handleRecordedVideo}
+        onCancel={() => {
+          setIsRecordingVideo(false);
+          setRecordMode('idle');
+          setLockHint(null);
+        }}
+      />
+    </div>
+  ) : undefined;
 
-          {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* +AI Smart Tagging Button - Seamless embedded button */}
+  const leftControls = (
+    <div className="flex items-center gap-1 shrink-0 relative">
+      {/* Lock Hint Banner when holding mic/video button */}
+      {lockHint && recordMode === 'holding' && (
+        <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-[#141417] border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
+          <Lock className="w-3.5 h-3.5 text-[#529ee8] animate-bounce" />
+          <span>Потяните вверх для фиксации</span>
+        </div>
+      )}
+
+      {/* +AI Smart Tagging Button - Seamless embedded button */}
             <button
               type="button"
               onClick={handleSmartAiTags}
@@ -1212,81 +1169,96 @@ export const Composer: React.FC = () => {
               <Paperclip className="w-4 h-4" />
             </button>
           </div>
+  );
 
-          {/* Right Side: Clear draft, Fullscreen Expand Icon, and Send / Media Button */}
-          <div className="flex items-center gap-1 shrink-0 ml-auto">
-            {(content.trim() || attachments.length > 0) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setContent('');
-                  setAttachments([]);
-                  setTags([]);
-                  setPriority('none');
-                  setDueDate('');
-                  setParsedTask(null);
-                  setIsDateDismissed(false);
-                  setIsPriorityDismissed(false);
-                  setDismissedTags(new Set());
-                }}
-                className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
-                title="Очистить"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Expand to Fullscreen Editor Icon Button */}
-            <button
-              type="button"
-              onClick={handleExpandToFullscreen}
-              className="w-ctrl-md h-ctrl-md rounded-md hidden sm:flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Раскрыть в полноэкранный редактор"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-
-            {/* Send or Mobile Media Record Button */}
-            {isMobile && !content.trim() && attachments.length === 0 ? (
-              <button
-                type="button"
-                onPointerDown={handleMobileMediaPointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
-                className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
-                title={
-                  mobileMediaType === 'audio'
-                    ? 'Записать аудио (удерживайте) / Нажмите для видео'
-                    : 'Записать видео (удерживайте) / Нажмите для аудио'
-                }
-                aria-label={mobileMediaType === 'audio' ? 'Записать аудио' : 'Записать видео'}
-              >
-                {mobileMediaType === 'audio' ? (
-                  <Mic className="w-4 h-4 transition-transform duration-150" />
-                ) : (
-                  <Video className="w-4 h-4 transition-transform duration-150" />
-                )}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!content.trim() && attachments.length === 0}
-                className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 ${
-                  content.trim() || attachments.length > 0
-                    ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-sm cursor-pointer'
-                    : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
-                }`}
-                title="Отправить (Enter)"
-              >
-                <Send className="w-4 h-4 ml-0.5 fill-current" />
-              </button>
-            )}
-          </div>
-        </div>
+  const rightControls = (
+    <>
+      {(content.trim() || attachments.length > 0) && (
+        <button
+          type="button"
+          onClick={() => {
+            setContent('');
+            setAttachments([]);
+            setTags([]);
+            setPriority('none');
+            setDueDate('');
+            setParsedTask(null);
+            setIsDateDismissed(false);
+            setIsPriorityDismissed(false);
+            setDismissedTags(new Set());
+          }}
+          className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
+          title="Очистить"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       )}
-    </div>
-  </div>
+
+      {/* Expand to Fullscreen Editor Icon Button */}
+      <button
+        type="button"
+        onClick={handleExpandToFullscreen}
+        className="w-ctrl-md h-ctrl-md rounded-md hidden sm:flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+        title="Раскрыть в полноэкранный редактор"
+      >
+        <Maximize2 className="w-4 h-4" />
+      </button>
+    </>
+  );
+
+  const sendButton =
+    isMobile && !content.trim() && attachments.length === 0 ? (
+      <button
+        type="button"
+        onPointerDown={handleMobileMediaPointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
+        title={
+          mobileMediaType === 'audio'
+            ? 'Записать аудио (удерживайте) / Нажмите для видео'
+            : 'Записать видео (удерживайте) / Нажмите для аудио'
+        }
+        aria-label={mobileMediaType === 'audio' ? 'Записать аудио' : 'Записать видео'}
+      >
+        {mobileMediaType === 'audio' ? (
+          <Mic className="w-4 h-4 transition-transform duration-150" />
+        ) : (
+          <Video className="w-4 h-4 transition-transform duration-150" />
+        )}
+      </button>
+    ) : undefined;
+
+  return (
+    <BaseComposer
+      value={content}
+      onChange={handleContentChange}
+      onSubmit={handleSend}
+      onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
+      placeholder={
+        isMobile
+          ? itemType === 'task'
+            ? 'Задача... ([[ для ссылки)'
+            : itemType === 'article'
+            ? 'Черновик статьи... ([[ для ссылки)'
+            : 'Мысль, заметка или задача...'
+          : itemType === 'task'
+          ? 'Задача... (- [ ] для подзадач, [[ для ссылки)'
+          : itemType === 'article'
+          ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
+          : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
+      }
+      textareaRef={textareaRef}
+      isSubmitDisabled={!content.trim() && attachments.length === 0}
+      submitTitle="Отправить (Enter)"
+      topSlot={topSlot}
+      overlaySlot={overlaySlot}
+      customControls={customControls}
+      leftControls={leftControls}
+      rightControls={rightControls}
+      sendButton={sendButton}
+    />
   );
 };

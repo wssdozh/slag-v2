@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { BaseComposer } from './BaseComposer';
 import {
   Sparkles,
-  Send,
   Loader2,
   Trash2,
   Globe,
@@ -25,6 +25,7 @@ import {
   Clock
 } from 'lucide-react';
 import { Select } from '../UI/Select';
+import { LinearSignalBars } from '../UI/PriorityBadge';
 
 interface AssistantChatProps {
   variant?: 'center' | 'sidebar';
@@ -51,7 +52,6 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   const [input, setInput] = useState('');
   const [expandedReasoningIds, setExpandedReasoningIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === 'Входящие';
@@ -61,31 +61,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isChatLoading]);
 
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const scrollHeight = textareaRef.current.scrollHeight;
-      const targetHeight = Math.max(28, Math.min(scrollHeight || 28, isSidebar ? 120 : 160));
-      textareaRef.current.style.height = `${targetHeight}px`;
-    }
-  }, [input, isSidebar]);
-
   const handleSend = () => {
     if (!input.trim() || isChatLoading) return;
     const text = input;
     setInput('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
     sendChatMessage(text);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
   };
 
   const toggleReasoning = (msgId: string) => {
@@ -547,12 +527,15 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             {action.title}
                           </span>
                           {action.priority && !isRejected && (
-                            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
-                              action.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
-                              action.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
-                              'bg-blue-500/15 text-blue-300'
-                            }`}>
-                              {action.priority.toUpperCase()}
+                            <span className="flex items-center gap-1">
+                              <LinearSignalBars priority={action.priority} className="w-3 h-3" />
+                              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                                action.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
+                                action.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
+                                'bg-blue-500/15 text-blue-300'
+                              }`}>
+                                {action.priority.toUpperCase()}
+                              </span>
                             </span>
                           )}
                         </div>
@@ -716,13 +699,16 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       </div>
 
       {/* Floating Bottom Composer */}
-      <div className="p-2.5 border-t border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md shrink-0">
-        <div className="flex flex-col gap-1.5 bg-[#141416] border border-white/[0.08] rounded-xl p-2 focus-within:border-white/20 transition-colors">
-          <textarea
-            ref={textareaRef}
+      <div className="p-2.5 border-t border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md shrink-0 flex justify-center">
+        <div className={`w-full ${isSidebar ? '' : 'max-w-2xl'}`}>
+          <BaseComposer
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onSubmit={handleSend}
+            disabled={isChatLoading}
+            isSubmitDisabled={!input.trim() || isChatLoading}
+            submitTitle="Отправить сообщение (Enter)"
+            maxHeight={isSidebar ? 120 : 180}
             placeholder={
               isSidebar
                 ? 'Спросите ассистента...'
@@ -732,84 +718,66 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 ? 'Спросите ассистента по всем заметкам базы знаний... (Enter для отправки)'
                 : `Спросите о заметках папки «${folderMeta?.name || currentFolder}»... (Enter для отправки)`
             }
-            rows={1}
-            className="w-full min-h-[28px] bg-transparent text-xs text-white placeholder-zinc-500 resize-none outline-none border-none leading-relaxed"
-          />
+            leftControls={
+              <div className="flex items-center gap-1 flex-wrap">
+                {/* Provider badge - Embedded Linear Monochrome */}
+                {isConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-mono cursor-pointer transition-colors"
+                    title={`Провайдер ${aiSettings.provider}: ${aiSettings.model} (нажмите для настроек)`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                    <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 text-xs font-mono transition-colors cursor-pointer"
+                    title="Нажмите для настройки API-ключа (⌘,)"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
+                    <span>Локальный</span>
+                  </button>
+                )}
 
-          {/* Controls Bar: Unified MD height row matching Composer (32px desktop / 38px touch) */}
-          <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] gap-2">
-            <div className="flex items-center gap-1 flex-wrap">
-              {/* Provider badge - Embedded Linear Monochrome */}
-              {isConnected ? (
+                {/* Reasoning Selector - Embedded ghost */}
+                <div className="flex items-center gap-0.5 text-xs font-mono text-zinc-400">
+                  <span className="text-zinc-500 pl-0.5">R:</span>
+                  <Select
+                    size="md"
+                    variant="ghost"
+                    direction="up"
+                    value={aiSettings.reasoningEffort || 'low'}
+                    onChange={(val) => saveAiSettings({ reasoningEffort: val as any })}
+                    options={[
+                      { value: 'none', label: 'Off' },
+                      { value: 'low', label: 'Low' },
+                      { value: 'medium', label: 'Med' },
+                      { value: 'high', label: 'High' },
+                    ]}
+                  />
+                </div>
+
+                {/* Web search toggle - Embedded ghost */}
                 <button
                   type="button"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-mono cursor-pointer transition-colors"
-                  title={`Провайдер ${aiSettings.provider}: ${aiSettings.model} (нажмите для настроек)`}
+                  onClick={() => saveAiSettings({ webSearchEnabled: !aiSettings.webSearchEnabled })}
+                  className={`h-ctrl-md flex items-center gap-1 px-2 rounded-md text-xs font-mono transition-colors cursor-pointer ${
+                    aiSettings.webSearchEnabled
+                      ? 'text-sky-400 bg-sky-500/10 hover:bg-sky-500/15 font-medium'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+                  }`}
+                  title="Поиск информации в глобальной сети Интернет"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                  <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
+                  <Globe className="w-4 h-4" />
+                  <span className="hidden sm:inline">Сеть</span>
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 text-xs font-mono transition-colors cursor-pointer"
-                  title="Нажмите для настройки API-ключа (⌘,)"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
-                  <span>Локальный</span>
-                </button>
-              )}
-
-              {/* Reasoning Selector - Embedded ghost */}
-              <div className="flex items-center gap-0.5 text-xs font-mono text-zinc-400">
-                <span className="text-zinc-500 pl-0.5">R:</span>
-                <Select
-                  size="md"
-                  variant="ghost"
-                  direction="up"
-                  value={aiSettings.reasoningEffort || 'low'}
-                  onChange={(val) => saveAiSettings({ reasoningEffort: val as any })}
-                  options={[
-                    { value: 'none', label: 'Off' },
-                    { value: 'low', label: 'Low' },
-                    { value: 'medium', label: 'Med' },
-                    { value: 'high', label: 'High' },
-                  ]}
-                />
               </div>
-
-              {/* Web search toggle - Embedded ghost */}
-              <button
-                type="button"
-                onClick={() => saveAiSettings({ webSearchEnabled: !aiSettings.webSearchEnabled })}
-                className={`h-ctrl-md flex items-center gap-1 px-2 rounded-md text-xs font-mono transition-colors cursor-pointer ${
-                  aiSettings.webSearchEnabled
-                    ? 'text-sky-400 bg-sky-500/10 hover:bg-sky-500/15 font-medium'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-                }`}
-                title="Поиск информации в глобальной сети Интернет"
-              >
-                <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">Сеть</span>
-              </button>
-            </div>
-
-            {/* Send Button - Copied directly from Composer */}
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isChatLoading}
-              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 ${
-                input.trim() && !isChatLoading
-                  ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-sm cursor-pointer'
-                  : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
-              }`}
-              title="Отправить сообщение (Enter)"
-            >
-              <Send className="w-4 h-4 ml-0.5 fill-current" />
-            </button>
-          </div>
+            }
+          />
         </div>
       </div>
     </div>
