@@ -14,7 +14,6 @@ import {
   ChevronUp,
   FileText,
   CornerUpLeft,
-  Link2,
   Pin
 } from 'lucide-react';
 import type { LightboxImage } from '../../types';
@@ -153,15 +152,23 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         return (
           <span
             key={idx}
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               scrollToItem(linkTarget);
             }}
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white font-mono text-2xs cursor-pointer transition-colors border border-white/[0.06] align-baseline"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                scrollToItem(linkTarget);
+              }
+            }}
+            className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
             title={`Перейти к «${linkTarget}»`}
           >
-            <Link2 className="w-2.5 h-2.5 text-blue-400 shrink-0" />
-            <span className="underline decoration-white/20 underline-offset-2">{linkTarget}</span>
+            {linkTarget}
           </span>
         );
       }

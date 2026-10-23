@@ -19,7 +19,6 @@ import {
   ListTodo,
   Check,
   FolderOpen,
-  Link2,
   X,
   Circle,
   Clock
@@ -107,27 +106,36 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
               href={mdLinkMatch[2]}
               target="_blank"
               rel="noreferrer"
-              className="inline text-blue-400 hover:text-blue-300 underline underline-offset-2"
+              className="text-blue-400 hover:text-blue-300 hover:underline"
             >
               {mdLinkMatch[1]}
             </a>
           );
         }
 
-        // [[WikiLink]] - Clean badge rendering without raw brackets or detached arrow
+        // [[WikiLink]] - Clean inline text link without boxes, chips or icons
         if (part.startsWith('[[') && part.endsWith(']')) {
           const title = part.replace(/^\[+|\]+$/g, '').trim();
           return (
-            <button
+            <span
               key={key}
-              type="button"
-              onClick={() => scrollToItem(title)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 hover:text-blue-200 font-medium cursor-pointer transition-colors border border-blue-500/20 align-baseline text-[11px]"
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                scrollToItem(title);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  scrollToItem(title);
+                }
+              }}
+              className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
               title={`Перейти к «${title}»`}
             >
-              <Link2 className="w-2.5 h-2.5 text-blue-400 shrink-0 select-none" />
-              <span className="underline decoration-blue-400/30 underline-offset-2">{title}</span>
-            </button>
+              {title}
+            </span>
           );
         }
 

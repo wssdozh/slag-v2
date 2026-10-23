@@ -876,7 +876,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await textarea.press('Enter');
 
     // 3. Verify that typo "прафилам" matches "12 правил эффективности"
-    const matchedLink = page.locator('button', { hasText: '12 правил эффективности' }).first();
+    const matchedLink = page.locator('[role="button"], span', { hasText: '12 правил эффективности' }).first();
     await expect(matchedLink).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=записей не найдено')).not.toBeVisible();
 
