@@ -116,8 +116,8 @@ export const Select: React.FC<SelectProps> = ({
         aria-label={ariaLabel || placeholder}
         className={`w-full flex items-center justify-between gap-1.5 transition-all cursor-pointer text-left ${
           isSmall
-            ? 'px-2 py-1 text-xs rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300'
-            : 'px-3 py-2 text-xs rounded-lg bg-black/50 hover:bg-black/70 border border-white/[0.08] focus:border-white/20 text-zinc-200'
+            ? 'h-ctrl-sm px-2 text-xs rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300'
+            : 'h-ctrl-md px-3 text-xs rounded-lg bg-black/50 hover:bg-black/70 border border-white/[0.08] focus:border-white/20 text-zinc-200'
         } ${disabled ? 'opacity-40 cursor-not-allowed' : 'active:scale-[0.99]'}`}
       >
         <span className="truncate flex items-center gap-1.5">
@@ -128,7 +128,7 @@ export const Select: React.FC<SelectProps> = ({
         </span>
         <ChevronDown
           className={`shrink-0 transition-transform duration-150 text-zinc-500 ${
-            isSmall ? 'w-3 h-3' : 'w-3.5 h-3.5'
+            isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'
           } ${isOpen ? 'rotate-180 text-zinc-300' : ''}`}
         />
       </button>

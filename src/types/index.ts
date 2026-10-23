@@ -163,3 +163,16 @@ export interface LogEntry {
   durationMs?: number;
 }
 
+export type UiDensity = 'compact' | 'normal' | 'spacious';
+export type UiFontScale = 'small' | 'normal' | 'large';
+
+export interface DeviceUiConfig {
+  fontScale: UiFontScale;
+  density: UiDensity;
+}
+
+export interface AppUiConfig {
+  desktop: DeviceUiConfig;
+  mobile: DeviceUiConfig;
+}
+

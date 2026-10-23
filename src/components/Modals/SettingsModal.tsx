@@ -34,8 +34,13 @@ export const SettingsModal: React.FC = () => {
     setSidebarWidth,
     setRightPanelWidth,
     refreshData,
-    addToast
+    addToast,
+    uiConfig,
+    updateUiConfig,
+    isMobile
   } = useApp();
+
+  const [selectedDevice, setSelectedDevice] = useState<'desktop' | 'mobile'>(isMobile ? 'mobile' : 'desktop');
 
   const [provider, setProvider] = useState<AiProvider>(aiSettings.provider || 'groq');
   const [groqApiKey, setGroqApiKey] = useState(aiSettings.groqApiKey || '');
@@ -598,31 +603,149 @@ export const SettingsModal: React.FC = () => {
 
             {activeTab === 'ui' && (
               <div className="flex flex-col gap-4">
-                <span className="text-xs font-semibold text-zinc-200">
-                  Внешний вид и панели
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-200">
+                    Внешний вид, масштабы и плотность
+                  </span>
+                  {/* Device profile switcher */}
+                  <div className="flex items-center h-ctrl-sm bg-[#09090b] p-0.5 rounded-lg border border-white/[0.08]">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDevice('desktop')}
+                      className={`h-full px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        selectedDevice === 'desktop'
+                          ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                      }`}
+                    >
+                      Десктоп
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDevice('mobile')}
+                      className={`h-full px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        selectedDevice === 'mobile'
+                          ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                      }`}
+                    >
+                      Смартфон
+                    </button>
+                  </div>
+                </div>
 
-                <div className="flex flex-col gap-2 p-3 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs">
+                {/* Font Scale Control */}
+                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-zinc-300">Масштаб шрифтов и типографики:</span>
+                    <span className="text-2xs font-mono text-zinc-500">
+                      {uiConfig[selectedDevice].fontScale === 'small' ? '90%' : uiConfig[selectedDevice].fontScale === 'large' ? '115%' : '100%'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateUiConfig(selectedDevice, { fontScale: 'small' })}
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        uiConfig[selectedDevice].fontScale === 'small'
+                          ? 'bg-white/10 text-white border-white/20'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      Мелкий (90%)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateUiConfig(selectedDevice, { fontScale: 'normal' })}
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        uiConfig[selectedDevice].fontScale === 'normal'
+                          ? 'bg-white/10 text-white border-white/20'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      Обычный (100%)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateUiConfig(selectedDevice, { fontScale: 'large' })}
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        uiConfig[selectedDevice].fontScale === 'large'
+                          ? 'bg-white/10 text-white border-white/20'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      Крупный (115%)
+                    </button>
+                  </div>
+                  <span className="text-2xs text-zinc-500 leading-relaxed">
+                    Масштабирует базовый шрифт заметок, карточек и интерфейса без искажения пропорций.
+                  </span>
+                </div>
+
+                {/* Density Control */}
+                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-zinc-300">Плотность сетки и хитбоксов:</span>
+                    <span className="text-2xs font-mono text-zinc-500 uppercase">
+                      {uiConfig[selectedDevice].density}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateUiConfig(selectedDevice, { density: 'compact' })}
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        uiConfig[selectedDevice].density === 'compact'
+                          ? 'bg-white/10 text-white border-white/20'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      Компактный
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateUiConfig(selectedDevice, { density: 'normal' })}
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        uiConfig[selectedDevice].density === 'normal'
+                          ? 'bg-white/10 text-white border-white/20'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      Стандарт
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateUiConfig(selectedDevice, { density: 'spacious' })}
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        uiConfig[selectedDevice].density === 'spacious'
+                          ? 'bg-white/10 text-white border-white/20'
+                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      Просторный / Тач
+                    </button>
+                  </div>
+                  <span className="text-2xs text-zinc-500 leading-relaxed">
+                    Регулирует высоту контролов (26px–34px), зону тапа и отступы между карточками в ленте.
+                  </span>
+                </div>
+
+                {/* Panel Resizing Reset */}
+                <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-300">Размеры панелей:</span>
                     <button
                       type="button"
                       onClick={resetPanelSizes}
-                      className="flex items-center gap-1 px-2 py-1 rounded bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-[11px] transition-colors"
+                      className="h-ctrl-sm flex items-center gap-1 px-2.5 rounded-md bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-xs transition-colors cursor-pointer"
                     >
                       <RotateCcw className="w-3 h-3" />
                       <span>Сбросить размеры</span>
                     </button>
                   </div>
-                  <span className="text-[11px] text-zinc-500">
+                  <span className="text-2xs text-zinc-500">
                     Панели можно перетаскивать за разделители левой и правой границы.
                   </span>
-                </div>
-
-                <div className="flex flex-col gap-1 text-[11px] text-zinc-500">
-                  <div>• Цветовая схема: Linear Dark Monochrome (#09090b)</div>
-                  <div>• Скругления: согласованная сетка (6px кнопки, 10px карточки, 14px модалки)</div>
-                  <div>• Рамки фокуса: полностью отключены</div>
                 </div>
               </div>
             )}

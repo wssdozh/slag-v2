@@ -24,7 +24,7 @@ export const MobileAssistantView: React.FC = () => {
           <button
             onClick={() => setActiveMobileTab('folders')}
             aria-label="Назад"
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+            className="h-ctrl-md px-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-xs font-medium">Назад</span>
@@ -39,30 +39,30 @@ export const MobileAssistantView: React.FC = () => {
             </div>
             <h1 className="text-sm font-bold text-white tracking-tight">Ассистент</h1>
           </div>
-          <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[160px]">
+          <span className="text-2xs font-mono text-zinc-500 truncate max-w-[160px]">
             {aiSettings.model}
           </span>
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center justify-end gap-1 min-w-[70px]">
+        <div className="flex items-center justify-end gap-1.5 min-w-[70px]">
           {chatMessages.length > 0 && (
             <button
               onClick={clearChatMessages}
-              className="w-8 h-8 rounded-full hover:bg-white/[0.06] text-zinc-500 hover:text-rose-400 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              className="w-ctrl-md h-ctrl-md rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-rose-400 flex items-center justify-center active:scale-95 transition-all cursor-pointer touch-target"
               title="Очистить диалог"
               aria-label="Очистить диалог"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4 h-4" />
             </button>
           )}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="w-8 h-8 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+            className="w-ctrl-md h-ctrl-md rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer touch-target"
             title="Настройки ИИ"
             aria-label="Настройки ИИ"
           >
-            <Settings className="w-3.5 h-3.5" />
+            <Settings className="w-4 h-4" />
           </button>
         </div>
       </header>

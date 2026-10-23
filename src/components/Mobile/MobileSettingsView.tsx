@@ -136,8 +136,8 @@ export const MobileSettingsView: React.FC = () => {
                   <Sliders className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-zinc-200">Интерфейс & Панели</div>
-                  <div className="text-[11px] text-zinc-500">Ширина панелей, анимации</div>
+                  <div className="text-xs font-semibold text-zinc-200">Интерфейс, масштаб и плотность</div>
+                  <div className="text-2xs text-zinc-500">Масштаб шрифтов, сетка, плотность</div>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />

@@ -156,7 +156,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               e.stopPropagation();
               scrollToItem(linkTarget);
             }}
-            className="inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white font-mono text-[11px] cursor-pointer transition-colors border border-white/[0.06]"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white font-mono text-2xs cursor-pointer transition-colors border border-white/[0.06] align-baseline"
             title={`Перейти к «${linkTarget}»`}
           >
             <Link2 className="w-2.5 h-2.5 text-blue-400 shrink-0" />
@@ -201,10 +201,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         }`}
       >
         {/* Action Pill (Visible on mobile, Hover on desktop) */}
-        <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 bg-[#18181c]/90 backdrop-blur-md border border-white/[0.08] rounded-md p-0.5 shadow-md z-10 pointer-events-auto">
+        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 bg-[#18181c]/90 backdrop-blur-md border border-white/[0.08] rounded-md p-0.5 shadow-md z-10 pointer-events-auto">
           <button
             onClick={() => setReplyTarget(item)}
-            className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+            className="w-ctrl-sm h-ctrl-sm rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer touch-target flex items-center justify-center"
             title="Ответить (R)"
           >
             <CornerUpLeft className="w-3.5 h-3.5" />
@@ -226,7 +226,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                 });
               }
             }}
-            className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+            className="w-ctrl-sm h-ctrl-sm rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer touch-target flex items-center justify-center"
             title="Действия"
           >
             <MoreVertical className="w-3.5 h-3.5" />
@@ -239,19 +239,19 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Item Type: Plain text, no nested chips */}
             {isTask && (
-              <span className="text-[11px] font-mono text-amber-400/90 font-medium">
+              <span className="text-2xs font-mono text-amber-400/90 font-medium">
                 Таска
               </span>
             )}
             {isArticle && (
-              <span className="text-[11px] font-mono text-blue-400/90 font-medium">
+              <span className="text-2xs font-mono text-blue-400/90 font-medium">
                 Статья {item.readingTimeMinutes ? `• ${item.readingTimeMinutes} мин` : ''}
               </span>
             )}
 
             {/* Folder name if not in inbox */}
             {item.folder !== 'Входящие' && (
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-2xs text-zinc-500 font-mono">
                 {item.folder}
               </span>
             )}
@@ -259,7 +259,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             {/* Task Priority */}
             {isTask && item.priority && item.priority !== 'none' && (
               <span
-                className={`text-[10px] uppercase font-mono font-medium ${
+                className={`text-2xs uppercase font-mono font-medium ${
                   item.priority === 'high'
                     ? 'text-rose-400'
                     : item.priority === 'medium'
@@ -273,7 +273,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
             {/* Pin indicator */}
             {item.isPinned && (
-              <span className="flex items-center gap-1 text-[10px] font-mono text-amber-400/90" title="Закрепленная запись">
+              <span className="flex items-center gap-1 text-2xs font-mono text-amber-400/90" title="Закрепленная запись">
                 <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
                 <span>Закреп</span>
               </span>
@@ -281,14 +281,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
             {/* Task Due Date */}
             {isTask && item.dueDate && (
-              <span className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
+              <span className="flex items-center gap-1 text-2xs text-zinc-500 font-mono">
                 <Calendar className="w-3 h-3 text-zinc-600" />
                 {item.dueDate}
               </span>
             )}
           </div>
 
-          <span className="text-[10px] font-mono text-zinc-500 shrink-0">{formattedTime}</span>
+          <span className="text-2xs font-mono text-zinc-500 shrink-0">{formattedTime}</span>
         </div>
       )}
 
@@ -301,7 +301,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           <CornerUpLeft className="w-3 h-3 text-zinc-500 group-hover/quote:text-zinc-300 shrink-0" />
           {replyParent ? (
             <div className="flex items-center gap-1.5 truncate">
-              <span className="font-mono text-[10px] text-zinc-500 shrink-0">
+              <span className="font-mono text-2xs text-zinc-500 shrink-0">
                 {replyParent.type === 'task' ? 'Таска' : replyParent.type === 'article' ? 'Статья' : 'Заметка'}:
               </span>
               <span className="text-zinc-300 truncate font-medium text-xs">
@@ -309,7 +309,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               </span>
             </div>
           ) : (
-            <span className="text-[11px] text-zinc-600 italic">Исходная запись удалена</span>
+            <span className="text-2xs text-zinc-600 italic">Исходная запись удалена</span>
           )}
         </div>
       )}

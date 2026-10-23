@@ -248,4 +248,55 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     await option.click();
   });
+
+  test('11. UI Scale & Density Configuration (Control Matrix)', async ({ page }) => {
+    // Navigate to mobile settings
+    const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
+    await settingsTab.click();
+
+    // Click "Интерфейс, масштаб и плотность"
+    await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
+
+    // Verify UI settings panel opened
+    await expect(page.locator('span', { hasText: 'Внешний вид, масштабы и плотность' })).toBeVisible();
+
+    // Switch Font scale to "Крупный (115%)"
+    const largeFontBtn = page.getByRole('button', { name: 'Крупный (115%)' });
+    await expect(largeFontBtn).toBeVisible();
+    await largeFontBtn.click();
+
+    // Verify document root has updated font scale
+    const rootFontScale = await page.evaluate(() => {
+      return document.documentElement.style.getPropertyValue('--slag-font-scale');
+    });
+    expect(rootFontScale).toBe('1.15');
+
+    // Switch Density to "Компактный"
+    const compactDensityBtn = page.getByRole('button', { name: 'Компактный' });
+    await expect(compactDensityBtn).toBeVisible();
+    await compactDensityBtn.click();
+
+    // Verify document root has updated density attribute
+    const rootDensity = await page.evaluate(() => {
+      return document.documentElement.dataset.density;
+    });
+    expect(rootDensity).toBe('compact');
+
+    await page.screenshot({ path: 'test-results/screenshots/mobile_ui_scale_settings.png' });
+
+    // Switch back to "Обычный (100%)" and "Просторный / Тач"
+    await page.getByRole('button', { name: 'Обычный (100%)' }).click();
+    await page.getByRole('button', { name: 'Просторный / Тач' }).click();
+
+    // Dismiss settings modal
+    await page.locator('button[title="Назад"]').click();
+
+    // Navigate to Assistant to take a screenshot of the unified bottom controls
+    const aiTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="ИИ"]');
+    await aiTab.click();
+    await expect(page.locator('header h1', { hasText: 'Ассистент' })).toBeVisible();
+
+    // Take screenshot of Assistant with unified controls
+    await page.screenshot({ path: 'test-results/screenshots/mobile_assistant_unified_controls.png' });
+  });
 });

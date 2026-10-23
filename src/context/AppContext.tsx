@@ -12,7 +12,9 @@ import type {
   AiItemFilter,
   ChatMessage,
   SuggestedAction,
-  MobileTabId
+  MobileTabId,
+  AppUiConfig,
+  DeviceUiConfig
 } from '../types';
 import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
@@ -141,12 +143,26 @@ interface AppContextType {
   dismissTopLayer: () => boolean;
   toggleMobileMode: () => void;
   forceMobileMode: boolean | null;
+  uiConfig: AppUiConfig;
+  updateUiConfig: (device: 'desktop' | 'mobile', updates: Partial<DeviceUiConfig>) => void;
 }
 
 const AI_SETTINGS_KEY = 'slag_ai_settings_v2';
 const SIDEBAR_WIDTH_KEY = 'slag_sidebar_width_v2';
 const RIGHT_PANEL_WIDTH_KEY = 'slag_right_panel_width_v2';
 const MOBILE_DOCK_TABS_KEY = 'slag_mobile_dock_tabs_v2';
+const UI_CONFIG_KEY = 'slag_ui_config_v2';
+
+const DEFAULT_UI_CONFIG: AppUiConfig = {
+  desktop: {
+    fontScale: 'normal',
+    density: 'normal',
+  },
+  mobile: {
+    fontScale: 'normal',
+    density: 'spacious',
+  },
+};
 
 const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
 
@@ -302,6 +318,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return DEFAULT_AI_SETTINGS;
     }
   });
+
+  const [uiConfig, setUiConfig] = useState<AppUiConfig>(() => {
+    try {
+      const saved = localStorage.getItem(UI_CONFIG_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          desktop: { ...DEFAULT_UI_CONFIG.desktop, ...parsed.desktop },
+          mobile: { ...DEFAULT_UI_CONFIG.mobile, ...parsed.mobile },
+        };
+      }
+      return DEFAULT_UI_CONFIG;
+    } catch {
+      return DEFAULT_UI_CONFIG;
+    }
+  });
+
+  const updateUiConfig = useCallback((device: 'desktop' | 'mobile', updates: Partial<DeviceUiConfig>) => {
+    setUiConfig(prev => {
+      const next: AppUiConfig = {
+        ...prev,
+        [device]: {
+          ...prev[device],
+          ...updates,
+        },
+      };
+      try {
+        localStorage.setItem(UI_CONFIG_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }, []);
+
+  // Dynamically apply density and font scale CSS properties to document root
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const currentDevice = isMobile ? 'mobile' : 'desktop';
+    const cfg = uiConfig[currentDevice];
+
+    document.documentElement.dataset.density = cfg.density;
+
+    const scaleNum = cfg.fontScale === 'small' ? 0.9 : cfg.fontScale === 'large' ? 1.15 : 1.0;
+    document.documentElement.style.setProperty('--slag-font-scale', String(scaleNum));
+  }, [isMobile, uiConfig]);
 
   const addToast = useCallback((text: string, type: 'info' | 'success' | 'error' = 'info') => {
     const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
@@ -1027,6 +1089,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dismissTopLayer,
         toggleMobileMode,
         forceMobileMode,
+        uiConfig,
+        updateUiConfig,
       }}
     >
       {children}

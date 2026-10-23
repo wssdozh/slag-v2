@@ -34,7 +34,8 @@ export const Composer: React.FC = () => {
     replyTarget,
     setReplyTarget,
     items,
-    addToast
+    addToast,
+    isMobile
   } = useApp();
 
   const [content, setContent] = useState('');
@@ -645,7 +646,13 @@ export const Composer: React.FC = () => {
           onKeyDown={handleKeyDown}
           rows={1}
           placeholder={
-            itemType === 'task'
+            isMobile
+              ? itemType === 'task'
+                ? 'Задача... ([[ для ссылки)'
+                : itemType === 'article'
+                ? 'Черновик статьи... ([[ для ссылки)'
+                : 'Мысль, заметка или задача...'
+              : itemType === 'task'
               ? 'Задача... (- [ ] для подзадач, [[ для ссылки)'
               : itemType === 'article'
               ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
@@ -687,21 +694,21 @@ export const Composer: React.FC = () => {
         </div>
       )}
 
-      {/* Bottom Control Bar */}
-      <div className="flex items-center justify-between pt-0.5">
+      {/* Bottom Control Bar: Unified MD height (32px desktop / 38px mobile) */}
+      <div className="flex items-center justify-between pt-1 gap-2">
         {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* +Ai Smart Tagging Button */}
           <button
             onClick={handleSmartAiTags}
             disabled={isGeneratingAiTags}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition-colors border border-white/[0.05] cursor-pointer"
+            className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition-colors border border-white/[0.05] cursor-pointer flex items-center gap-1.5"
             title="ИИ тегирование"
           >
             {isGeneratingAiTags ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+              <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
             ) : (
-              <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+              <Sparkles className="w-4 h-4 text-zinc-300" />
             )}
             <span>+Ai</span>
           </button>
@@ -710,12 +717,12 @@ export const Composer: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-              className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 transition-colors cursor-pointer"
+              className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1 border border-white/[0.04]"
             >
               <span>
                 {itemType === 'note' ? 'Заметка' : itemType === 'task' ? 'Таска' : 'Статья'}
               </span>
-              <ChevronDown className="w-3 h-3 text-zinc-500" />
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
             </button>
 
             {isTypeDropdownOpen && (
@@ -763,7 +770,7 @@ export const Composer: React.FC = () => {
               setIsRecordingVideo(false);
               setIsRecordingAudio(!isRecordingAudio);
             }}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
               isRecordingAudio
                 ? 'bg-rose-500/20 text-rose-400'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -779,7 +786,7 @@ export const Composer: React.FC = () => {
               setIsRecordingAudio(false);
               setIsRecordingVideo(!isRecordingVideo);
             }}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
               isRecordingVideo
                 ? 'bg-rose-500/20 text-rose-400'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -792,7 +799,7 @@ export const Composer: React.FC = () => {
           {/* File Attach Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Прикрепить файл"
           >
             <Paperclip className="w-4 h-4" />
@@ -800,7 +807,7 @@ export const Composer: React.FC = () => {
         </div>
 
         {/* Right Side: Clear draft, Fullscreen Expand Icon, and Send Button */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           {(content.trim() || attachments.length > 0) && (
             <button
               onClick={() => {
@@ -814,7 +821,7 @@ export const Composer: React.FC = () => {
                 setIsPriorityDismissed(false);
                 setDismissedTags(new Set());
               }}
-              className="p-1.5 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
+              className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
               title="Очистить"
             >
               <Trash2 className="w-4 h-4" />
@@ -824,24 +831,24 @@ export const Composer: React.FC = () => {
           {/* Expand to Fullscreen Editor Icon Button */}
           <button
             onClick={handleExpandToFullscreen}
-            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Раскрыть в полноэкранный редактор"
           >
             <Maximize2 className="w-4 h-4" />
           </button>
 
-          {/* Telegram-style Circular Send Button */}
+          {/* Linear / Telegram style Send Button */}
           <button
             onClick={handleSend}
             disabled={!content.trim() && attachments.length === 0}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all btn-press ${
+            className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press ${
               content.trim() || attachments.length > 0
                 ? 'bg-[#3b82f6] text-white hover:bg-[#2563eb] shadow-lg shadow-blue-500/20 cursor-pointer'
                 : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
             }`}
             title="Отправить (Enter)"
           >
-            <Send className="w-4 h-4 ml-0.5 fill-current" />
+            <Send className="w-4 h-4 fill-current" />
           </button>
         </div>
       </div>
