@@ -744,35 +744,36 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
           {/* Controls Bar: Unified MD height row matching Composer (32px desktop / 38px touch) */}
           <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {/* Provider badge - Linear Monochrome */}
+            <div className="flex items-center gap-1 flex-wrap">
+              {/* Provider badge - Embedded Linear Monochrome */}
               {isConnected ? (
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="h-ctrl-md inline-flex items-center gap-1.5 px-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] text-xs font-mono cursor-pointer transition-colors"
+                  className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-mono cursor-pointer transition-colors"
                   title={`Провайдер ${aiSettings.provider}: ${aiSettings.model} (нажмите для настроек)`}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                   <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="h-ctrl-md inline-flex items-center gap-1.5 px-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.06] text-xs font-mono transition-colors cursor-pointer"
+                  className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 text-xs font-mono transition-colors cursor-pointer"
                   title="Нажмите для настройки API-ключа (⌘,)"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
                   <span>Локальный</span>
                 </button>
               )}
 
-              {/* Reasoning Selector */}
-              <div className="flex items-center gap-1 text-xs font-mono text-zinc-400">
-                <span className="text-zinc-500">R:</span>
+              {/* Reasoning Selector - Embedded ghost */}
+              <div className="flex items-center gap-0.5 text-xs font-mono text-zinc-400">
+                <span className="text-zinc-500 pl-0.5">R:</span>
                 <Select
                   size="md"
+                  variant="ghost"
                   direction="up"
                   value={aiSettings.reasoningEffort || 'low'}
                   onChange={(val) => saveAiSettings({ reasoningEffort: val as any })}
@@ -785,14 +786,14 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 />
               </div>
 
-              {/* Web search toggle - Linear Monochrome */}
+              {/* Web search toggle - Embedded ghost */}
               <button
                 type="button"
                 onClick={() => saveAiSettings({ webSearchEnabled: !aiSettings.webSearchEnabled })}
-                className={`h-ctrl-md flex items-center gap-1.5 px-3 rounded-lg text-xs font-mono transition-colors cursor-pointer border ${
+                className={`h-ctrl-md flex items-center gap-1 px-2 rounded-md text-xs font-mono transition-colors cursor-pointer ${
                   aiSettings.webSearchEnabled
-                    ? 'bg-white/12 text-zinc-100 border-white/20 shadow-sm'
-                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border-white/[0.06]'
+                    ? 'text-sky-400 bg-sky-500/10 hover:bg-sky-500/15 font-medium'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
                 }`}
                 title="Поиск информации в глобальной сети Интернет"
               >
