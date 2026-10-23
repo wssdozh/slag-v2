@@ -19,6 +19,7 @@ import {
   Quote,
   Link2
 } from 'lucide-react';
+import { Select } from '../UI/Select';
 
 interface FullscreenEditorContentProps {
   item: SlagItem;
@@ -171,17 +172,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <span className="text-zinc-600 hidden md:inline">/</span>
 
             {/* Folder Selector */}
-            <select
+            <Select
+              size="sm"
               value={folder}
-              onChange={(e) => setFolder(e.target.value)}
-              className="bg-white/[0.04] border border-white/[0.08] rounded-md px-2.5 py-1 text-xs text-zinc-300 outline-none cursor-pointer max-w-[130px] md:max-w-none truncate"
-            >
-              {folders.map(f => (
-                <option key={f.path} value={f.path}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+              onChange={setFolder}
+              options={folders.map(f => ({ value: f.path, label: f.name }))}
+              className="max-w-[150px] md:max-w-[200px]"
+            />
 
             {/* Item Type Switcher */}
             <div className="flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/[0.06]">
@@ -315,16 +312,17 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               <div className="flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="text-zinc-500">Приоритет:</span>
-                  <select
+                  <Select
+                    size="sm"
                     value={priority}
-                    onChange={(e) => setPriority(e.target.value as any)}
-                    className="bg-black/50 border border-white/[0.08] rounded px-2 py-1 text-zinc-300"
-                  >
-                    <option value="none">Обычный</option>
-                    <option value="low">Низкий</option>
-                    <option value="medium">Средний</option>
-                    <option value="high">Высокий</option>
-                  </select>
+                    onChange={(val) => setPriority(val as any)}
+                    options={[
+                      { value: 'none', label: 'Обычный' },
+                      { value: 'low', label: 'Низкий' },
+                      { value: 'medium', label: 'Средний' },
+                      { value: 'high', label: 'Высокий' },
+                    ]}
+                  />
                 </div>
 
                 <div className="flex items-center gap-2">

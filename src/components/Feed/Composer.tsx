@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
+import { Select } from '../UI/Select';
 import { generateSmartTags } from '../../lib/aiService';
 import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import {
@@ -660,16 +661,18 @@ export const Composer: React.FC = () => {
         <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-zinc-400 border-t border-white/[0.04] overflow-x-auto scrollbar-none whitespace-nowrap">
           <div className="shrink-0 flex items-center gap-1.5">
             <span className="text-[11px] text-zinc-500">Приоритет:</span>
-            <select
+            <Select
+              size="sm"
+              direction="up"
               value={priority}
-              onChange={(e) => setPriority(e.target.value as any)}
-              className="bg-black/40 border border-white/[0.08] rounded px-1.5 py-0.5 text-xs text-zinc-300"
-            >
-              <option value="none">Обычный</option>
-              <option value="low">Низкий</option>
-              <option value="medium">Средний</option>
-              <option value="high">Высокий</option>
-            </select>
+              onChange={(val) => setPriority(val as any)}
+              options={[
+                { value: 'none', label: 'Обычный' },
+                { value: 'low', label: 'Низкий' },
+                { value: 'medium', label: 'Средний' },
+                { value: 'high', label: 'Высокий' },
+              ]}
+            />
           </div>
 
           <div className="shrink-0 flex items-center gap-1.5">

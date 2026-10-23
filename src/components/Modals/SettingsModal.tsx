@@ -19,6 +19,9 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
+import { Select } from '../UI/Select';
+import { Checkbox } from '../UI/Checkbox';
+import { NumberInput } from '../UI/NumberInput';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -325,30 +328,30 @@ export const SettingsModal: React.FC = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-medium text-zinc-300">Модель</label>
-                          <select
+                          <Select
                             value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
-                          >
-                            <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)</option>
-                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (280 t/s, 128K)</option>
-                            <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (560 t/s, 128K)</option>
-                            <option value="llama-3.3-70b-specdec">Llama 3.3 70B SpecDec</option>
-                          </select>
+                            onChange={(val) => setModel(val)}
+                            options={[
+                              { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B (500 t/s, 128K, Рекомендуется)' },
+                              { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile (280 t/s, 128K)' },
+                              { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant (560 t/s, 128K)' },
+                              { value: 'llama-3.3-70b-specdec', label: 'Llama 3.3 70B SpecDec' },
+                            ]}
+                          />
                         </div>
 
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений (Reasoning)</label>
-                          <select
+                          <Select
                             value={reasoningEffort}
-                            onChange={(e) => setReasoningEffort(e.target.value as any)}
-                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 text-xs text-zinc-200 transition-colors"
-                          >
-                            <option value="none">Отключено (быстрый ответ)</option>
-                            <option value="low">Низкая (low effort)</option>
-                            <option value="medium">Средняя (сбалансированная)</option>
-                            <option value="high">Высокая (глубокий анализ)</option>
-                          </select>
+                            onChange={(val) => setReasoningEffort(val as any)}
+                            options={[
+                              { value: 'none', label: 'Отключено (быстрый ответ)' },
+                              { value: 'low', label: 'Низкая (low effort)' },
+                              { value: 'medium', label: 'Средняя (сбалансированная)' },
+                              { value: 'high', label: 'Высокая (глубокий анализ)' },
+                            ]}
+                          />
                         </div>
                       </div>
                       <span className="text-[11px] text-zinc-500 leading-relaxed">
@@ -398,35 +401,35 @@ export const SettingsModal: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-medium text-zinc-300">Модель</label>
-                          <select
+                          <Select
                             value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-2.5 py-2 text-xs text-zinc-200 transition-colors"
-                          >
-                            <option value="gemini-4-argon-openai">Gemini 4 Argon (OpenAI, Рекомендуется)</option>
-                            <option value="gpt-5-2">GPT 5.2</option>
-                            <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-                            <option value="deepseek-v4-1-flash">DeepSeek V4.1 Flash</option>
-                            <option value="grok-4-5">Grok 4.5</option>
-                            <option value="openai/gpt-oss-120b">OpenAI GPT-OSS 120B</option>
-                          </select>
+                            onChange={(val) => setModel(val)}
+                            options={[
+                              { value: 'gemini-4-argon-openai', label: 'Gemini 4 Argon (OpenAI, Рекомендуется)' },
+                              { value: 'gpt-5-2', label: 'GPT 5.2' },
+                              { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+                              { value: 'deepseek-v4-1-flash', label: 'DeepSeek V4.1 Flash' },
+                              { value: 'grok-4-5', label: 'Grok 4.5' },
+                              { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B' },
+                            ]}
+                          />
                         </div>
 
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений</label>
-                          <select
+                          <Select
                             value={reasoningEffort}
-                            onChange={(e) => setReasoningEffort(e.target.value as any)}
-                            className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-2.5 py-2 text-xs text-zinc-200 transition-colors"
-                          >
-                            <option value="none">Отключено (быстро, экономия)</option>
-                            <option value="low">Низкая (low effort)</option>
-                            <option value="medium">Средняя (сбалансированная)</option>
-                            <option value="high">Высокая (high effort)</option>
-                          </select>
+                            onChange={(val) => setReasoningEffort(val as any)}
+                            options={[
+                              { value: 'none', label: 'Отключено (быстро, экономия)' },
+                              { value: 'low', label: 'Низкая (low effort)' },
+                              { value: 'medium', label: 'Средняя (сбалансированная)' },
+                              { value: 'high', label: 'Высокая (high effort)' },
+                            ]}
+                          />
                         </div>
 
                         <div className="flex flex-col gap-1.5">
@@ -458,45 +461,27 @@ export const SettingsModal: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-2.5">
-                      <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={autoTagging}
-                          onChange={(e) => setAutoTagging(e.target.checked)}
-                          className="mt-0.5 rounded border-white/20 bg-black/40 text-blue-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-medium text-zinc-200">Автоматический подбор тегов</span>
-                          <span className="text-[11px] text-zinc-500">При сохранении заметки без тегов ИИ подбирает их по таксономии базы</span>
-                        </div>
-                      </label>
+                    <div className="flex flex-col gap-3">
+                      <Checkbox
+                        checked={autoTagging}
+                        onChange={setAutoTagging}
+                        label="Автоматический подбор тегов"
+                        description="При сохранении заметки без тегов ИИ подбирает их по таксономии базы"
+                      />
 
-                      <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={autoTriage}
-                          onChange={(e) => setAutoTriage(e.target.checked)}
-                          className="mt-0.5 rounded border-white/20 bg-black/40 text-blue-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-medium text-zinc-200">Интеллектуальная диспетчеризация (AI Triage)</span>
-                          <span className="text-[11px] text-zinc-500">Автоматически сопоставляет неразобранные записи с подходящими папками</span>
-                        </div>
-                      </label>
+                      <Checkbox
+                        checked={autoTriage}
+                        onChange={setAutoTriage}
+                        label="Интеллектуальная диспетчеризация (AI Triage)"
+                        description="Автоматически сопоставляет неразобранные записи с подходящими папками"
+                      />
 
-                      <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={webSearchEnabled}
-                          onChange={(e) => setWebSearchEnabled(e.target.checked)}
-                          className="mt-0.5 rounded border-white/20 bg-black/40 text-blue-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-medium text-zinc-200">Поиск в реальном времени (Web Search)</span>
-                          <span className="text-[11px] text-zinc-500">Включает Google Search в Gemini 4 Argon или веб-поиск в Groq</span>
-                        </div>
-                      </label>
+                      <Checkbox
+                        checked={webSearchEnabled}
+                        onChange={setWebSearchEnabled}
+                        label="Поиск в реальном времени (Web Search)"
+                        description="Включает Google Search в Gemini 4 Argon или веб-поиск в Groq"
+                      />
                     </div>
                   </div>
 
@@ -511,41 +496,37 @@ export const SettingsModal: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 items-center">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-medium text-zinc-300">Максимум тегов на запись</label>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           max={8}
                           value={maxTags}
-                          onChange={(e) => setMaxTags(Number(e.target.value))}
-                          className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-1.5 text-xs text-white transition-colors"
+                          onChange={setMaxTags}
+                          aria-label="Максимум тегов на запись"
                         />
                       </div>
 
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-medium text-zinc-300">Стиль регистра тегов</label>
-                        <select
+                        <Select
                           value={tagCaseStyle}
-                          onChange={(e) => setTagCaseStyle(e.target.value as any)}
-                          className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-1.5 text-xs text-zinc-200 transition-colors"
-                        >
-                          <option value="lowercase">lowercase (#дизайн)</option>
-                          <option value="kebab-case">kebab-case (#ui-ux)</option>
-                        </select>
+                          onChange={(val) => setTagCaseStyle(val as any)}
+                          options={[
+                            { value: 'lowercase', label: 'lowercase (#дизайн)' },
+                            { value: 'kebab-case', label: 'kebab-case (#ui-ux)' },
+                          ]}
+                        />
                       </div>
                     </div>
 
-                    <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer pt-1">
-                      <input
-                        type="checkbox"
-                        checked={allowNewTags}
-                        onChange={(e) => setAllowNewTags(e.target.checked)}
-                        className="rounded border-white/20 bg-black/40 text-blue-500"
-                      />
-                      <span>Разрешить ИИ создавать новые теги (если выкл — строгий выбор из имеющихся)</span>
-                    </label>
+                    <Checkbox
+                      checked={allowNewTags}
+                      onChange={setAllowNewTags}
+                      label="Разрешить ИИ создавать новые теги (если выкл — строгий выбор из имеющихся)"
+                      className="pt-1"
+                    />
 
                     <div className="flex flex-col gap-1.5 pt-1">
                       <label className="text-[11px] font-medium text-zinc-300">Пользовательские правила промпта</label>

@@ -52,6 +52,31 @@
     user-select: text;
   }
 
+  /* Suppress default browser number input spinners */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  /* Dark mode invert for native date pickers */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8) brightness(1.2);
+    cursor: pointer;
+  }
+
+  /* Default dark styling for native select options and checkboxes if ever invoked */
+  select option {
+    background-color: #141416;
+    color: #f4f4f5;
+  }
+  input[type="checkbox"] {
+    accent-color: #ffffff;
+  }
+
   /* Prevent iOS automatic zoom on focus when font-size is below 16px */
   @media (max-width: 768px) {
     input:not([type="checkbox"]):not([type="radio"]),

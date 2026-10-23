@@ -15,8 +15,9 @@ export const MobileShell: React.FC = () => {
     mobileFolderInfoOpen
   } = useApp();
 
-  // Show floating dock when at the root level of tabs (not deep in a folder's feed)
+  // Show floating dock when at the root level of tabs (not deep in a folder's feed, and not in assistant)
   const isInsideFolderFeed = activeMobileTab === 'folders' && mobileActiveFolder !== null;
+  const isFloatingDockVisible = !isInsideFolderFeed && activeMobileTab !== 'assistant';
 
   return (
     <div className="w-full h-full flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden relative">
@@ -29,8 +30,8 @@ export const MobileShell: React.FC = () => {
         {activeMobileTab === 'calendar' && <MobileCalendarView />}
       </main>
 
-      {/* Floating Linear Island Dock (Visible on root views) */}
-      {!isInsideFolderFeed && <MobileFloatingDock />}
+      {/* Floating Linear Island Dock (Visible on root views except Assistant) */}
+      {isFloatingDockVisible && <MobileFloatingDock />}
 
       {/* Fullscreen Slide-over Folder Info & Media Profile */}
       {mobileFolderInfoOpen && <MobileFolderInfoView />}

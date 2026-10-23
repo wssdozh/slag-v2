@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { Folder, X, Trash2 } from 'lucide-react';
+import { Select } from '../UI/Select';
 
 const FolderModalDialog: React.FC = () => {
   const {
@@ -109,18 +110,14 @@ const FolderModalDialog: React.FC = () => {
           {!isEditing && (
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-400">Родительская папка (опционально)</label>
-              <select
+              <Select
                 value={parentFolder}
-                onChange={(e) => setParentFolder(e.target.value)}
-                className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white"
-              >
-                <option value="">Корневой уровень (без родителя)</option>
-                {eligibleParentFolders.map(f => (
-                  <option key={f.path} value={f.path}>
-                    {f.path}
-                  </option>
-                ))}
-              </select>
+                onChange={setParentFolder}
+                options={[
+                  { value: '', label: 'Корневой уровень (без родителя)' },
+                  ...eligibleParentFolders.map(f => ({ value: f.path, label: f.path })),
+                ]}
+              />
             </div>
           )}
 

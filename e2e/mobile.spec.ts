@@ -190,4 +190,62 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.locator('button[title="Назад"]').click();
     await expect(modalHeader).not.toBeVisible();
   });
+
+  test('9. Mobile Assistant Header & Floating Dock Hidden', async ({ page }) => {
+    // Tap on "ИИ" tab in dock
+    const aiTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="ИИ"]');
+    await expect(aiTab).toBeVisible();
+    await aiTab.click();
+
+    // Verify floating dock is hidden on assistant screen
+    const dock = page.locator('nav[aria-label="Мобильная навигация"]');
+    await expect(dock).not.toBeVisible();
+
+    // Verify header has centered title and back button
+    await expect(page.locator('header h1', { hasText: 'Ассистент' })).toBeVisible();
+    const backBtn = page.locator('header button[aria-label="Назад"]');
+    await expect(backBtn).toBeVisible();
+
+    // Take screenshot of redesigned Mobile Assistant
+    await page.screenshot({ path: 'test-results/screenshots/mobile_assistant_redesign.png' });
+
+    // Tap back button to return to folders
+    await backBtn.click();
+
+    // Dock is visible again and root folders are shown
+    await expect(dock).toBeVisible();
+    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+  });
+
+  test('10. Custom Form Controls (Select, Checkbox, NumberInput)', async ({ page }) => {
+    // Tap on Settings tab
+    const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
+    await settingsTab.click();
+
+    // Click "ИИ & Провайдеры" item
+    await page.locator('button', { hasText: 'ИИ & Провайдеры' }).click();
+
+    // Verify custom Checkbox elements
+    const autoTagCheckbox = page.locator('div[role="checkbox"]').filter({ hasText: 'Автоматический подбор тегов' });
+    await expect(autoTagCheckbox).toBeVisible();
+    await autoTagCheckbox.click(); // toggle
+
+    // Verify NumberInput stepper
+    const incButton = page.locator('button[aria-label="Увеличить"]').first();
+    await expect(incButton).toBeVisible();
+    await incButton.click();
+
+    // Verify custom dark Select opens
+    const caseSelect = page.locator('button[aria-haspopup="listbox"]').last();
+    await expect(caseSelect).toBeVisible();
+    await caseSelect.click();
+
+    // Verify custom popover options
+    const option = page.locator('button[role="option"]').filter({ hasText: 'kebab-case' });
+    await expect(option).toBeVisible();
+
+    await page.screenshot({ path: 'test-results/screenshots/mobile_custom_controls.png' });
+
+    await option.click();
+  });
 });

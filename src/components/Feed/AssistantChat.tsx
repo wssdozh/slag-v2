@@ -22,6 +22,7 @@ import {
   Link2,
   X
 } from 'lucide-react';
+import { Select } from '../UI/Select';
 
 interface AssistantChatProps {
   variant?: 'center' | 'sidebar';
@@ -773,16 +774,18 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
               {/* Reasoning Selector */}
               <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-500">
                 <span>R:</span>
-                <select
+                <Select
+                  size="sm"
+                  direction="up"
                   value={aiSettings.reasoningEffort || 'low'}
-                  onChange={(e) => saveAiSettings({ reasoningEffort: e.target.value as any })}
-                  className="bg-black/40 border border-white/[0.06] rounded px-1 py-0.5 text-[10px] font-mono text-zinc-300 outline-none cursor-pointer"
-                >
-                  <option value="none">Off</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Med</option>
-                  <option value="high">High</option>
-                </select>
+                  onChange={(val) => saveAiSettings({ reasoningEffort: val as any })}
+                  options={[
+                    { value: 'none', label: 'Off' },
+                    { value: 'low', label: 'Low' },
+                    { value: 'medium', label: 'Med' },
+                    { value: 'high', label: 'High' },
+                  ]}
+                />
               </div>
 
               {/* Web search toggle */}

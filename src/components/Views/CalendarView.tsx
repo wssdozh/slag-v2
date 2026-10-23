@@ -16,6 +16,7 @@ import {
   Folder as FolderIcon,
   ListTodo
 } from 'lucide-react';
+import { Select } from '../UI/Select';
 
 function getISODateString(d: Date): string {
   const y = d.getFullYear();
@@ -1465,21 +1466,22 @@ export const CalendarView: React.FC = () => {
               <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-mono text-zinc-500">Приоритет:</span>
-                  <select
+                  <Select
+                    size="sm"
                     value={inspectingTask.priority || 'none'}
-                    onChange={e => {
-                      const newPrio = e.target.value as any;
+                    onChange={val => {
+                      const newPrio = val as any;
                       const updated = { ...inspectingTask, priority: newPrio };
                       updateItem(updated);
                       setInspectingTask(updated);
                     }}
-                    className="bg-[#18181c] border border-white/[0.08] rounded px-2 py-0.5 text-xs text-zinc-300 outline-none"
-                  >
-                    <option value="high">Высокий (P1)</option>
-                    <option value="medium">Средний (P2)</option>
-                    <option value="low">Низкий (P3)</option>
-                    <option value="none">Обычный (P4)</option>
-                  </select>
+                    options={[
+                      { value: 'high', label: 'Высокий (P1)' },
+                      { value: 'medium', label: 'Средний (P2)' },
+                      { value: 'low', label: 'Низкий (P3)' },
+                      { value: 'none', label: 'Обычный (P4)' },
+                    ]}
+                  />
                 </div>
 
                 {inspectingTask.tags && inspectingTask.tags.length > 0 && (

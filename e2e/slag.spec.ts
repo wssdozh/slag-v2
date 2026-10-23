@@ -268,12 +268,23 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     if (await focusEditorBtn.isVisible()) {
       await focusEditorBtn.click();
       await expect(page.locator('#fullscreen-textarea')).toBeVisible();
+
+      // Open the custom folder dropdown to verify dark styling
+      const folderSelect = page.locator('header button[aria-haspopup="listbox"]').first();
+      await expect(folderSelect).toBeVisible();
+      await folderSelect.click();
+      await expect(page.locator('button[role="option"]').first()).toBeVisible();
+
       await page.screenshot({
         path: 'test-results/screenshots/fullscreen-editor-layout.png',
         fullPage: false,
       });
+
+      // Close dropdown by clicking trigger again
+      await folderSelect.click();
+
       // Click "Назад" to return
-      await page.locator('button', { hasText: 'Назад' }).click();
+      await page.locator('header button', { hasText: 'Назад' }).click();
       await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();
     }
   });
@@ -401,7 +412,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(settingsModal.locator('input[placeholder*="sk-kie"]')).toBeVisible();
 
     // Verify Gemini 4 Argon model option is visible in KIE.AI
-    const kieModelSelect = settingsModal.locator('select', { hasText: /Gemini 4 Argon/ });
+    const kieModelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /Gemini 4 Argon/ });
     await expect(kieModelSelect).toBeVisible();
 
     // Take screenshot of KIE.AI settings with Argon for visual audit
@@ -412,7 +423,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await groqProviderBtn.click();
 
     // Verify gpt-oss-120b model option exists
-    const modelSelect = settingsModal.locator('select', { hasText: /OpenAI GPT-OSS 120B/ });
+    const modelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /OpenAI GPT-OSS 120B/ });
     await expect(modelSelect).toBeVisible();
 
     // Verify Tag Taxonomy controls exist
@@ -936,8 +947,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await kieBtn.click();
 
     // 3. Verify Gemini 4 Argon is selected and visible
-    const select = settingsModal.locator('select').first();
-    await expect(select).toHaveValue('gemini-4-argon-openai');
+    const select = settingsModal.locator('button[aria-haspopup="listbox"]').first();
+    await expect(select).toContainText('Gemini 4 Argon');
 
     // 4. Fill in token and save
     const keyInput = settingsModal.locator('input[placeholder*="sk-kie"]');
@@ -976,8 +987,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(settingsModal.locator('text=Поиск в реальном времени (Web Search)')).toBeVisible();
 
     // Select Reasoning Effort: high
-    const reasoningSelect = settingsModal.locator('select', { hasText: /Низкая|Высокая|Отключено/ }).first();
-    await reasoningSelect.selectOption('high');
+    const reasoningSelect = settingsModal.locator('button[aria-haspopup="listbox"]').filter({ hasText: /Отключено|Низкая|Средняя|Высокая/ }).first();
+    await reasoningSelect.click();
+    await page.locator('button[role="option"]', { hasText: /Высокая/ }).click();
 
     // Take screenshot of rich settings tab
     await page.screenshot({
