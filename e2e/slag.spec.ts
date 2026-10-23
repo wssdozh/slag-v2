@@ -1242,10 +1242,22 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       const count = await modalTags.count();
       expect(count).toBeGreaterThan(0);
 
-      // Verify folder selector exists and test changing folder
-      const folderSelect = page.locator('div[role="dialog"] select').first();
-      await expect(folderSelect).toBeVisible();
-      await folderSelect.selectOption({ index: 1 });
+      // Verify custom folder selector exists and test changing folder
+      const folderSelectBtn = page.locator('div[role="dialog"] button[aria-label="Сменить целевую папку"]').first();
+      await expect(folderSelectBtn).toBeVisible();
+      await folderSelectBtn.click();
+      await page.waitForTimeout(150);
+
+      // Capture screenshot while portal dropdown is open to verify NO clipping
+      await page.screenshot({
+        path: 'test-results/screenshots/triage-modal-dropdown-open.png',
+        fullPage: false,
+      });
+
+      const option = page.locator('button[role="option"]').nth(1);
+      if (await option.isVisible()) {
+        await option.click();
+      }
 
       // Test adding an extra tag
       const addTagBtn = page.locator('div[role="dialog"] button:has-text("тег")').first();

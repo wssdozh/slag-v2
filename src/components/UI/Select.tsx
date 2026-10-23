@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface SelectOption {
@@ -37,43 +38,82 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [calculatedDirection, setCalculatedDirection] = useState<'down' | 'up'>('down');
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
-  // Determine direction based on viewport bounds if direction is 'auto'
-  const updateDirection = useCallback(() => {
-    if (direction !== 'auto') {
-      setCalculatedDirection(direction);
-      return;
+  // Calculate fixed viewport coordinates for portal
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const dropdownHeight = 220;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    let dir: 'down' | 'up' = 'down';
+    if (direction === 'up') {
+      dir = 'up';
+    } else if (direction === 'down') {
+      dir = 'down';
+    } else {
+      dir = spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'up' : 'down';
     }
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      if (spaceBelow < 220 && spaceAbove > spaceBelow) {
-        setCalculatedDirection('up');
-      } else {
-        setCalculatedDirection('down');
-      }
+
+    setCalculatedDirection(dir);
+
+    // Keep dropdown within viewport horizontal bounds
+    const width = Math.max(rect.width, 160);
+    let left = rect.left;
+    if (left + width > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - width - 8);
     }
+
+    setCoords({
+      top: dir === 'up' ? rect.top - 6 : rect.bottom + 6,
+      left,
+      width,
+    });
   }, [direction]);
 
   const handleToggle = () => {
     if (disabled) return;
     if (!isOpen) {
-      updateDirection();
+      updatePosition();
     }
     setIsOpen(!isOpen);
   };
 
-  // Close on outside click
+  // Re-align on scroll or resize while open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, updatePosition]);
+
+  // Close on outside click or Escape
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDown = (e: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        listRef.current &&
+        !listRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -103,6 +143,55 @@ export const Select: React.FC<SelectProps> = ({
   };
 
   const isSmall = size === 'sm';
+
+  const portalContent = isOpen && coords && typeof document !== 'undefined'
+    ? createPortal(
+        <div
+          ref={listRef}
+          role="listbox"
+          style={{
+            position: 'fixed',
+            left: `${coords.left}px`,
+            top: calculatedDirection === 'up' ? undefined : `${coords.top}px`,
+            bottom: calculatedDirection === 'up' ? `${window.innerHeight - coords.top}px` : undefined,
+            minWidth: `${coords.width}px`,
+          }}
+          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100 ${
+            calculatedDirection === 'up' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
+          } ${dropdownClassName}`}
+        >
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                disabled={opt.disabled}
+                onClick={() => handleSelect(opt.value, opt.disabled)}
+                className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
+                  opt.disabled
+                    ? 'opacity-40 cursor-not-allowed text-zinc-600'
+                    : isSelected
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  {opt.icon && <span className="shrink-0 text-zinc-400">{opt.icon}</span>}
+                  <span className="truncate">{opt.label}</span>
+                </div>
+                {isSelected && (
+                  <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
+                )}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
+      )
+    : null;
 
   return (
     <div
@@ -139,46 +228,7 @@ export const Select: React.FC<SelectProps> = ({
         />
       </button>
 
-      {isOpen && (
-        <div
-          ref={listRef}
-          role="listbox"
-          className={`absolute left-0 z-[150] w-full min-w-[160px] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl shadow-black/80 p-1 backdrop-blur-xl animate-in fade-in duration-100 ${
-            calculatedDirection === 'up'
-              ? 'bottom-full mb-1.5 slide-in-from-bottom-1'
-              : 'top-full mt-1.5 slide-in-from-top-1'
-          } ${dropdownClassName}`}
-        >
-          {options.map((opt) => {
-            const isSelected = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                disabled={opt.disabled}
-                onClick={() => handleSelect(opt.value, opt.disabled)}
-                className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
-                  opt.disabled
-                    ? 'opacity-40 cursor-not-allowed text-zinc-600'
-                    : isSelected
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  {opt.icon && <span className="shrink-0 text-zinc-400">{opt.icon}</span>}
-                  <span className="truncate">{opt.label}</span>
-                </div>
-                {isSelected && (
-                  <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {portalContent}
     </div>
   );
 };

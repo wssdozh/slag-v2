@@ -6,12 +6,12 @@ import {
   Sparkles,
   ArrowRight,
   Loader2,
-  ChevronDown,
   X,
   Plus
 } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { Checkbox } from '../UI/Checkbox';
+import { Select } from '../UI/Select';
 
 const TriageModalDialog: React.FC = () => {
   const {
@@ -32,6 +32,11 @@ const TriageModalDialog: React.FC = () => {
   const eligibleFolders = useMemo(
     () => folders.filter(f => f.path !== 'Входящие'),
     [folders]
+  );
+
+  const folderOptions = useMemo(
+    () => eligibleFolders.map(f => ({ value: f.path, label: f.name })),
+    [eligibleFolders]
   );
 
   const [loading, setLoading] = useState(true);
@@ -181,17 +186,9 @@ const TriageModalDialog: React.FC = () => {
 
   const footer = (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <span>
-          Выбрано: {selectedIds.size} из {suggestions.length}
-        </span>
-        {isAnalyzing && (
-          <span className="text-[11px] text-amber-400/80 flex items-center gap-1">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            <span>обрабатываются следующие...</span>
-          </span>
-        )}
-      </div>
+      <span className="text-xs text-zinc-500">
+        Выбрано: {selectedIds.size} из {suggestions.length}
+      </span>
 
       <div className="flex gap-2">
         <button
@@ -285,27 +282,14 @@ const TriageModalDialog: React.FC = () => {
                             Входящие
                           </span>
                           <ArrowRight className="w-3 h-3 text-zinc-600 hidden sm:inline" />
-                          <div className="relative inline-flex items-center">
-                            <select
-                              value={s.targetFolder}
-                              onChange={(e) =>
-                                updateSuggestionFolder(s.itemId, e.target.value)
-                              }
-                              className="bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-[11px] font-medium rounded px-2 py-0.5 border border-white/10 outline-none cursor-pointer appearance-none pr-5 transition-colors"
-                              title="Сменить целевую папку"
-                            >
-                              {eligibleFolders.map(f => (
-                                <option
-                                  key={f.path}
-                                  value={f.path}
-                                  className="bg-[#141417] text-zinc-200"
-                                >
-                                  {f.name}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="w-3 h-3 text-zinc-400 absolute right-1.5 pointer-events-none" />
-                          </div>
+                          <Select
+                            value={s.targetFolder}
+                            onChange={(val) => updateSuggestionFolder(s.itemId, val)}
+                            options={folderOptions}
+                            size="sm"
+                            className="w-28 sm:w-32"
+                            aria-label="Сменить целевую папку"
+                          />
                         </div>
                       </div>
 
