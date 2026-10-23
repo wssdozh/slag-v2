@@ -13,10 +13,13 @@ import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
 import { LogModal } from './components/Logs/LogModal';
 import { useVisualViewport } from './hooks/useVisualViewport';
+import { Monitor } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const {
     isMobile,
+    forceMobileMode,
+    toggleMobileMode,
     lightboxImages,
     activeLightboxIndex,
     closeLightbox,
@@ -24,6 +27,45 @@ const AppContent: React.FC = () => {
   } = useApp();
 
   useVisualViewport();
+
+  const isDesktopWidth = typeof window !== 'undefined' && window.innerWidth >= 768;
+
+  if (isMobile && forceMobileMode && isDesktopWidth) {
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-[#050507] flex flex-col items-center justify-center p-4 relative select-none">
+        {/* Top Banner with Toggle Back */}
+        <div className="absolute top-3 inset-x-0 flex items-center justify-center pointer-events-none z-50">
+          <button
+            onClick={toggleMobileMode}
+            className="pointer-events-auto px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs text-white backdrop-blur-md border border-white/[0.08] shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span>Вернуться в десктопный режим</span>
+          </button>
+        </div>
+
+        <div className="w-full max-w-[390px] h-[844px] max-h-[92vh] bg-[#09090b] rounded-[40px] border-4 border-white/[0.12] shadow-2xl flex flex-col overflow-hidden relative">
+          <MobileShell />
+        </div>
+
+        <MobileActionSheet />
+        <FullscreenEditor />
+        <SearchModal />
+        <SettingsModal />
+        <FolderModal />
+        <TriageModal />
+        <LogModal />
+        <ToastContainer />
+        <ImageLightbox
+          images={lightboxImages}
+          currentIndex={activeLightboxIndex ?? 0}
+          isOpen={activeLightboxIndex !== null}
+          onClose={closeLightbox}
+          onNavigate={navigateLightbox}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative">

@@ -186,62 +186,34 @@ export const MobileFolderInfoView: React.FC = () => {
         </div>
 
         {/* Segmented Media Tabs */}
-        <div className="flex items-center gap-1 bg-[#141417] p-1 rounded-xl border border-white/[0.06] overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setActiveTab('media')}
-            className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
-              activeTab === 'media'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <ImageIcon className="w-3.5 h-3.5" />
-            <span>Фото ({allImages.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('audio')}
-            className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
-              activeTab === 'audio'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Mic className="w-3.5 h-3.5" />
-            <span>Аудио ({allAudio.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('files')}
-            className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
-              activeTab === 'files'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <File className="w-3.5 h-3.5" />
-            <span>Файлы ({allFiles.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('links')}
-            className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
-              activeTab === 'links'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <LinkIcon className="w-3.5 h-3.5" />
-            <span>Ссылки ({allLinks.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('tags')}
-            className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
-              activeTab === 'tags'
-                ? 'bg-white/10 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <TagIcon className="w-3.5 h-3.5" />
-            <span>Теги ({folderTags.size})</span>
-          </button>
+        <div className="flex items-center gap-1.5 bg-[#141417]/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+          {[
+            { id: 'media', label: 'Фото', icon: ImageIcon, count: allImages.length },
+            { id: 'audio', label: 'Аудио', icon: Mic, count: allAudio.length },
+            { id: 'files', label: 'Файлы', icon: File, count: allFiles.length },
+            { id: 'links', label: 'Ссылки', icon: LinkIcon, count: allLinks.length },
+            { id: 'tags', label: 'Теги', icon: TagIcon, count: folderTags.size },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 ${
+                  isActive
+                    ? 'bg-white/10 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+                <span className={`text-[10px] font-mono shrink-0 ${isActive ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                  ({tab.count})
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab Content Panes */}

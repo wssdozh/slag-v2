@@ -136,6 +136,8 @@ interface AppContextType {
   mobileDockTabs: MobileTabId[];
   setMobileDockTabs: (tabs: MobileTabId[]) => void;
   dismissTopLayer: () => boolean;
+  toggleMobileMode: () => void;
+  forceMobileMode: boolean | null;
 }
 
 const AI_SETTINGS_KEY = 'slag_ai_settings_v2';
@@ -239,7 +241,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Mobile navigation & touch state
-  const isMobile = useIsMobile(768);
+  const isMobileScreen = useIsMobile(768);
+  const [forceMobileMode, setForceMobileMode] = useState<boolean | null>(null);
+  const isMobile = forceMobileMode !== null ? forceMobileMode : isMobileScreen;
+
+  const toggleMobileMode = useCallback(() => {
+    setForceMobileMode(prev => {
+      if (prev === null) return !isMobileScreen;
+      return !prev;
+    });
+  }, [isMobileScreen]);
+
   const [activeMobileTab, setActiveMobileTab] = useState<MobileTabId>('folders');
   const [mobileActiveFolder, setMobileActiveFolderState] = useState<string | null>(null);
   const [mobileFolderInfoOpen, setMobileFolderInfoOpen] = useState<boolean>(false);
@@ -1000,6 +1012,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mobileDockTabs,
         setMobileDockTabs,
         dismissTopLayer,
+        toggleMobileMode,
+        forceMobileMode,
       }}
     >
       {children}

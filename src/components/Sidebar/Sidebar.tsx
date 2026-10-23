@@ -11,7 +11,8 @@ import {
   Check,
   PlusCircle,
   FolderSync,
-  Terminal
+  Terminal,
+  Smartphone
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -27,7 +28,8 @@ export const Sidebar: React.FC = () => {
     openCreateFolderModal,
     switchVault,
     createVault,
-    addToast
+    addToast,
+    toggleMobileMode
   } = useApp();
 
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
@@ -76,15 +78,26 @@ export const Sidebar: React.FC = () => {
           <span className="text-[10px] text-zinc-500 font-mono">v2.0</span>
         </div>
 
-        {/* Global Quick Search Button */}
-        <button
-          onClick={() => setIsSearchOpen(true)}
-          className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
-          title="Поиск (Ctrl+K / Cmd+K)"
-        >
-          <Search className="w-3.5 h-3.5" />
-          <span className="text-[10px] font-mono text-zinc-500">⌘K</span>
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Mobile Preview Toggle */}
+          <button
+            onClick={toggleMobileMode}
+            className="flex items-center justify-center w-7 h-7 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title="Переключить в мобильный режим"
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Global Quick Search Button */}
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs transition-colors cursor-pointer"
+            title="Поиск (Ctrl+K / Cmd+K)"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-mono text-zinc-500">⌘K</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Folder Navigation */}
