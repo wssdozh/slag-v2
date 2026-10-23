@@ -287,7 +287,8 @@ const TriageModalDialog: React.FC = () => {
                             onChange={(val) => updateSuggestionFolder(s.itemId, val)}
                             options={folderOptions}
                             size="sm"
-                            className="w-28 sm:w-32"
+                            variant="ghost"
+                            className="w-auto min-w-[5rem]"
                             aria-label="Сменить целевую папку"
                           />
                         </div>
@@ -295,19 +296,19 @@ const TriageModalDialog: React.FC = () => {
 
                       {/* Interactive Tags Row */}
                       <div
-                        className="flex items-center gap-1 flex-wrap"
+                        className="flex items-center gap-2 flex-wrap pt-0.5"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {s.tags.map(t => (
                           <span
                             key={t}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-zinc-300 border border-white/[0.04]"
+                            className="group/tag inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors"
                           >
                             <span>#{t}</span>
                             <button
                               type="button"
                               onClick={() => removeSuggestionTag(s.itemId, t)}
-                              className="text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
+                              className="text-zinc-600 hover:text-rose-400 opacity-60 group-hover/tag:opacity-100 transition-all cursor-pointer p-0.5"
                               title={`Удалить тег #${t}`}
                               aria-label={`Удалить тег #${t}`}
                             >
@@ -318,7 +319,8 @@ const TriageModalDialog: React.FC = () => {
 
                         {/* Inline Tag Adder */}
                         {activeTagInputId === s.itemId ? (
-                          <div className="inline-flex items-center">
+                          <div className="inline-flex items-center text-[11px] font-mono text-zinc-400">
+                            <span>#</span>
                             <input
                               ref={tagInputRef}
                               type="text"
@@ -341,7 +343,7 @@ const TriageModalDialog: React.FC = () => {
                                 }
                               }}
                               placeholder="тег..."
-                              className="w-16 px-1.5 py-0.5 rounded bg-black/60 border border-white/20 text-[10px] font-mono text-zinc-200 outline-none"
+                              className="w-16 px-0.5 py-0 bg-transparent border-b border-zinc-600 focus:border-zinc-300 text-[11px] font-mono text-zinc-200 outline-none"
                             />
                           </div>
                         ) : (
@@ -351,7 +353,7 @@ const TriageModalDialog: React.FC = () => {
                               setActiveTagInputId(s.itemId);
                               setTagInputText('');
                             }}
-                            className="px-1.5 py-0.5 rounded hover:bg-white/[0.06] text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer flex items-center gap-0.5"
+                            className="inline-flex items-center gap-0.5 text-[11px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer py-0.5"
                             title="Добавить тег к этой заметке"
                           >
                             <Plus className="w-2.5 h-2.5" />
