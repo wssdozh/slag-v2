@@ -97,16 +97,16 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   };
 
   return (
-    <div className="w-full select-none">
+    <div className="w-full select-none relative">
+      {overlaySlot}
       <div
         className={`rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors ${className}`}
       >
         {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
         {topSlot}
 
-        {/* Зона ввода с относительным позиционированием для автокомплит-оверлеев */}
+        {/* Зона ввода */}
         <div className="relative">
-          {overlaySlot}
           <textarea
             ref={effectiveRef}
             value={value}

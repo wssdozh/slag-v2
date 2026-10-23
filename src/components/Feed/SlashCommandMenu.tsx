@@ -36,9 +36,9 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
 
   if (filteredCommands.length === 0) {
     return (
-      <div className="absolute left-0 right-0 bottom-full mb-1.5 w-full rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-3 z-40 animate-in slide-in-from-bottom-2 fade-in duration-150 ease-out select-none">
+      <div className="absolute left-0 right-0 bottom-full mb-2 w-full rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-3 z-40 animate-in slide-in-from-bottom-2 fade-in duration-150 ease-out select-none">
         <div className="flex items-center gap-2 text-xs text-zinc-400">
-          <Command className="w-3.5 h-3.5 text-zinc-500" />
+          <Command className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
           <span>Команда «/{query}» не найдена</span>
         </div>
       </div>
@@ -48,7 +48,7 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
   return (
     <div
       ref={listRef}
-      className="absolute left-0 right-0 bottom-full mb-1.5 w-full max-h-72 overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-40 flex flex-col gap-0.5 animate-in slide-in-from-bottom-3 fade-in duration-150 ease-out select-none"
+      className="absolute left-0 right-0 bottom-full mb-2 w-full max-h-72 overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-40 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 fade-in duration-150 ease-out select-none"
     >
       {/* Шапка формы команд */}
       <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider">
@@ -84,32 +84,34 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
                 type="button"
                 data-selected={isSelected}
                 onClick={() => onSelect(cmd)}
-                className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer ${
+                className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
                   isSelected
                     ? 'bg-white/10 text-white font-medium shadow-sm'
-                    : 'text-zinc-300 hover:bg-white/[0.05]'
+                    : 'text-zinc-300 hover:bg-white/[0.04]'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
-                      isSelected ? 'bg-white/15 text-white' : 'bg-white/[0.04] text-zinc-400'
+                  <IconComponent
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      isSelected ? 'text-zinc-100' : 'text-zinc-400'
                     }`}
-                  >
-                    <IconComponent className="w-3.5 h-3.5" />
-                  </div>
+                  />
 
-                  <div className="flex items-baseline gap-2 truncate">
-                    <span className="text-xs font-medium text-zinc-100">{cmd.command}</span>
-                    <span className="text-[11px] text-zinc-400 truncate">{cmd.title}</span>
-                    <span className="text-[10px] text-zinc-500 truncate hidden sm:inline">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="text-xs font-mono font-medium text-zinc-100 shrink-0">
+                      {cmd.command}
+                    </span>
+                    <span className="text-xs text-zinc-300 font-medium truncate">
+                      {cmd.title}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 truncate hidden sm:inline">
                       — {cmd.description}
                     </span>
                   </div>
                 </div>
 
                 {cmd.badge && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.06] text-zinc-400 border border-white/[0.06] shrink-0">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0">
                     {cmd.badge}
                   </span>
                 )}
