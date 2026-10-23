@@ -313,10 +313,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           <Sparkles className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span className="truncate">
             {isInbox ? (
-              <span className="inline-flex items-center gap-1.5 font-medium text-zinc-200">
-                <Globe className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Все хранилище</span>
-              </span>
+              <span className="font-medium text-zinc-200">Все хранилище</span>
             ) : (
               <span>Контекст: <strong className="text-zinc-200">{folderMeta?.name || currentFolder}</strong></span>
             )}
