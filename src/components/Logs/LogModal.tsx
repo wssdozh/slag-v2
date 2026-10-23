@@ -19,7 +19,7 @@ export const LogModal: React.FC = () => {
       ref={overlayRef}
       onClick={handleBackdropClick}
       data-testid="log-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 sm:p-6 select-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 sm:p-6 select-none animate-in fade-in duration-150"
     >
       <div className="w-full max-w-4xl h-[82vh] max-h-[800px] flex flex-col shadow-2xl animate-in zoom-in-95 duration-150">
         <LogViewer variant="modal" onClose={() => setIsLogViewerOpen(false)} />

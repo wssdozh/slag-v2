@@ -182,7 +182,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
     <div
       ref={containerRef}
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col justify-between select-none animate-in fade-in duration-200 outline-none"
+      className="fixed inset-0 z-50 z-[130] bg-black/95 backdrop-blur-xl flex flex-col justify-between select-none animate-in fade-in duration-200 outline-none"
     >
       {/* 3. Upper Toolbar */}
       <div

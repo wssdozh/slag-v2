@@ -5,6 +5,9 @@
  * Borderless rounded tabs, inline '+' button after tabs, concise close action
  */
 .dockview-theme-slag {
+  isolation: isolate;
+  position: relative;
+  z-index: 0;
   --dv-group-view-background-color: #08090a;
   --dv-tabs-and-actions-container-background-color: #0c0c0e;
   --dv-activegroup-visiblepanel-tab-background-color: rgba(255, 255, 255, 0.08);
@@ -33,6 +36,11 @@
   --dv-floating-titlebar-background-color: #0c0c0e;
   --dv-border-radius: 8px;
   --dv-icon-hover-background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Confine splitview sashes to Dockview's local layer so they never leak above modals */
+.dockview-theme-slag .dv-split-view-container .dv-sash-container .dv-sash {
+  z-index: 10 !important;
 }
 
 /* Ensure empty space (void-container) accepts tab drops and fills entire remaining header width */

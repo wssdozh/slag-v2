@@ -152,7 +152,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]">
+    <div className="fixed inset-0 z-50 z-[100] bg-[#09090b] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]">
       {/* Top Floating Control Bar - Centered to match content width */}
       <header
         className="min-h-14 border-b border-white/[0.06] bg-[#0c0c0e] shrink-0"

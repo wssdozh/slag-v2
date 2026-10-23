@@ -75,7 +75,7 @@ const TriageModalDialog: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
       <div className="w-full max-w-lg rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">

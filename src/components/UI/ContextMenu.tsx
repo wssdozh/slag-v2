@@ -98,7 +98,7 @@ export const ContextMenu: React.FC = () => {
     <div
       onClick={(e) => e.stopPropagation()}
       style={{ left: `${clampedX}px`, top: `${clampedY}px` }}
-      className="fixed z-50 w-56 rounded-xl bg-[#121215]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-50 z-[110] w-56 rounded-xl bg-[#121215]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
     >
       {type === 'item' && item && (
         <>

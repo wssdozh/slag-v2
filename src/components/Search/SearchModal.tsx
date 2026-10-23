@@ -71,7 +71,7 @@ const SearchDialog: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center md:pt-20 p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-100">
+    <div className="fixed inset-0 z-50 z-[100] flex items-start justify-center md:pt-20 p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-100">
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full h-full md:h-auto md:max-w-xl rounded-none md:rounded-2xl bg-[#141416] border-0 md:border md:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden md:max-h-[70vh] animate-in zoom-in-95 duration-100"

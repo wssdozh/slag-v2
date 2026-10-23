@@ -90,7 +90,7 @@ export const MobileActionSheet: React.FC = () => {
   return (
     <div
       onClick={handleClose}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col justify-end animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-50 z-[110] bg-black/60 backdrop-blur-md flex flex-col justify-end animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={e => e.stopPropagation()}

@@ -50,7 +50,7 @@ const FolderModalDialog: React.FC = () => {
   const CurrentIconComp = FOLDER_ICONS[selectedIcon] || Folder;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
       <div className="w-full max-w-md rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">

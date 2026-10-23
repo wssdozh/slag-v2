@@ -137,7 +137,7 @@ export const SettingsModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none">
+    <div className="fixed inset-0 z-50 z-[100] flex items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none">
       <div className="w-full h-full md:h-[670px] md:max-w-[720px] rounded-none md:rounded-2xl bg-[#141416] border-0 md:border md:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
         {/* Top Header */}
         <div

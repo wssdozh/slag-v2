@@ -355,7 +355,7 @@ export const WorkspaceShell: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none">
+    <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
       <DockviewReact
         components={components}
         rightHeaderActionsComponent={GroupHeaderActions}
