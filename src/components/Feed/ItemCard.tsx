@@ -18,6 +18,7 @@ import {
   Pin
 } from 'lucide-react';
 import type { LightboxImage } from '../../types';
+import { LinearSignalBars } from '../UI/PriorityBadge';
 
 interface ItemCardProps {
   item: SlagItem;
@@ -258,16 +259,19 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
             {/* Task Priority */}
             {isTask && item.priority && item.priority !== 'none' && (
-              <span
-                className={`text-2xs uppercase font-mono font-medium ${
-                  item.priority === 'high'
-                    ? 'text-rose-400'
-                    : item.priority === 'medium'
-                    ? 'text-amber-400'
-                    : 'text-zinc-500'
-                }`}
-              >
-                {item.priority}
+              <span className="flex items-center gap-1">
+                <LinearSignalBars priority={item.priority} className="w-3 h-3" />
+                <span
+                  className={`text-2xs uppercase font-mono font-medium ${
+                    item.priority === 'high'
+                      ? 'text-rose-400'
+                      : item.priority === 'medium'
+                      ? 'text-amber-400'
+                      : 'text-zinc-500'
+                  }`}
+                >
+                  {item.priority}
+                </span>
               </span>
             )}
 

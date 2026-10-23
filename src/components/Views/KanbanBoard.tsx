@@ -20,62 +20,13 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { LinearSignalBars } from '../UI/PriorityBadge';
 
 function isOverdue(dueDate?: string): boolean {
   if (!dueDate) return false;
   const today = new Date().toISOString().split('T')[0];
   return dueDate < today;
 }
-
-// Linear-style 3 Signal Bars Priority Icon
-export const LinearSignalBars: React.FC<{ priority?: 'none' | 'low' | 'medium' | 'high' }> = ({ priority }) => {
-  const p = priority || 'none';
-  return (
-    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-label={`Приоритет: ${p}`}>
-      {/* Bar 1 (Short) */}
-      <rect
-        x="2"
-        y="10"
-        width="2.5"
-        height="4"
-        rx="0.75"
-        className={
-          p === 'high'
-            ? 'fill-rose-500'
-            : p === 'medium'
-            ? 'fill-amber-400'
-            : p === 'low'
-            ? 'fill-zinc-400'
-            : 'fill-zinc-700'
-        }
-      />
-      {/* Bar 2 (Medium) */}
-      <rect
-        x="6.75"
-        y="7"
-        width="2.5"
-        height="7"
-        rx="0.75"
-        className={
-          p === 'high'
-            ? 'fill-rose-500'
-            : p === 'medium'
-            ? 'fill-amber-400'
-            : 'fill-zinc-700'
-        }
-      />
-      {/* Bar 3 (Tall) */}
-      <rect
-        x="11.5"
-        y="4"
-        width="2.5"
-        height="10"
-        rx="0.75"
-        className={p === 'high' ? 'fill-rose-500' : 'fill-zinc-700'}
-      />
-    </svg>
-  );
-};
 
 // Half-filled Circle for Linear "In Progress"
 const InProgressIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5 text-amber-500' }) => (
