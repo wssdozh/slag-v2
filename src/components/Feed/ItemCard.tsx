@@ -307,15 +307,15 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
       {item.replyToId && (
         <div
           onClick={() => replyParent && scrollToItem(replyParent.id)}
-          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] cursor-pointer transition-colors text-xs text-zinc-400 select-none group/quote"
+          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors select-none group/quote pt-0.5"
         >
-          <CornerUpLeft className="w-3 h-3 text-zinc-500 group-hover/quote:text-zinc-300 shrink-0" />
+          <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 group-hover/quote:text-zinc-300 shrink-0" />
           {replyParent ? (
             <div className="flex items-center gap-1.5 truncate">
               <span className="font-mono text-2xs text-zinc-500 shrink-0">
                 {replyParent.type === 'task' ? 'Таска' : replyParent.type === 'article' ? 'Статья' : 'Заметка'}:
               </span>
-              <span className="text-zinc-300 truncate font-medium text-xs">
+              <span className="text-zinc-400 group-hover/quote:text-zinc-200 truncate font-medium text-xs">
                 {replyParent.title || replyParent.content.slice(0, 45)}
               </span>
             </div>

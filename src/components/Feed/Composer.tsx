@@ -876,21 +876,21 @@ export const Composer: React.FC = () => {
 
   const topSlot = (
     <>
-        {/* Reply Banner */}
+        {/* Reply Banner (Flat, Anti-Matryoshka) */}
         {replyTarget && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
-          <div className="flex items-center gap-2 truncate min-w-0">
-            <CornerUpLeft className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-            <span className="text-[11px] font-mono text-zinc-400 shrink-0">
+        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 animate-in fade-in slide-in-from-bottom-1 select-none">
+          <div className="flex items-center gap-1.5 truncate min-w-0">
+            <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            <span className="text-[11px] font-mono text-zinc-500 shrink-0">
               {replyTarget.type === 'task' ? 'Ответ на таску:' : replyTarget.type === 'article' ? 'Ответ на статью:' : 'Ответ:'}
             </span>
-            <span className="truncate text-zinc-200 font-medium text-xs">
+            <span className="truncate text-zinc-300 font-medium text-xs">
               {replyTarget.title || replyTarget.content.slice(0, 45)}
             </span>
           </div>
           <button
             onClick={() => setReplyTarget(null)}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 cursor-pointer"
+            className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 cursor-pointer"
             title="Отменить ответ"
           >
             <X className="w-3.5 h-3.5" />

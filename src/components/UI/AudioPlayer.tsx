@@ -148,7 +148,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   if (compact) {
     return (
-      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs">
+      <div className="flex items-center gap-2 text-xs select-none">
         <audio ref={audioRef} src={src} preload="metadata" />
         <button
           type="button"
@@ -194,7 +194,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const formattedSize = formatBytes(size);
 
   return (
-    <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.06] border border-white/[0.07] max-w-sm transition-colors select-none">
+    <div className="flex items-center gap-3 py-1 max-w-sm w-full select-none">
       <audio ref={audioRef} src={src} preload="metadata" />
 
       {/* Telegram Blue Play/Pause round button */}

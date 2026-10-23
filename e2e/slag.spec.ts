@@ -1338,4 +1338,44 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await textarea.press('Escape');
     await expect(page.locator('text=Команды композера')).not.toBeVisible();
   });
+
+  test('30. Anti-matryoshka verification: flat reply in composer and feed item card', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(500);
+
+    // Hover over first card and click reply button
+    const firstCard = page.locator('.group').filter({ hasText: 'Синхронизация по архитектуре' }).first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.hover();
+    const replyBtn = firstCard.locator('button[title*="Ответить"]').first();
+    await replyBtn.click();
+
+    // Verify flat composer reply banner is visible
+    const composerReply = page.locator('text=Ответ на таску:').first();
+    await expect(composerReply).toBeVisible();
+
+    // Screenshot composer with flat reply
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-flat-reply.png',
+      fullPage: false,
+    });
+
+    // Type reply content and submit
+    const textarea = page.locator('main textarea').first();
+    await textarea.fill('Мой плоский ответ без матрёшек');
+    await textarea.press('Enter');
+
+    // Wait for the new item to appear in the feed
+    const newReplyCard = page.locator('.group').filter({ hasText: 'Мой плоский ответ без матрёшек' }).first();
+    await expect(newReplyCard).toBeVisible();
+    await newReplyCard.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+
+    // Screenshot feed with flat reply quote
+    await page.screenshot({
+      path: 'test-results/screenshots/feed-flat-reply.png',
+      fullPage: false,
+    });
+  });
 });
