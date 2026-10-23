@@ -208,7 +208,7 @@ export const Select: React.FC<SelectProps> = ({
         className={`w-full flex items-center justify-between gap-1 transition-all cursor-pointer text-left ${
           variant === 'ghost'
             ? isSmall
-              ? 'h-ctrl-sm px-1.5 text-xs rounded-md bg-transparent hover:bg-white/[0.06] text-zinc-300 hover:text-white border-0'
+              ? 'h-6 px-1.5 text-xs rounded-md bg-transparent hover:bg-white/[0.06] text-zinc-300 hover:text-white border-0'
               : 'h-ctrl-md px-1.5 text-xs rounded-md bg-transparent hover:bg-white/[0.06] text-zinc-300 hover:text-white border-0'
             : isSmall
               ? 'h-ctrl-sm px-2 text-xs rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300'

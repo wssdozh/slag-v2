@@ -255,19 +255,20 @@ const TriageModalDialog: React.FC = () => {
                   <div
                     key={s.itemId}
                     onClick={() => toggleSelect(s.itemId)}
-                    className={`group flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                    className={`group flex items-start gap-3 px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
                       isChecked
-                        ? 'text-zinc-200 hover:bg-white/[0.04]'
+                        ? 'text-zinc-200 hover:bg-white/[0.03]'
                         : 'text-zinc-500 opacity-40 hover:opacity-75 hover:bg-white/[0.02]'
                     }`}
                   >
                     <Checkbox
                       checked={isChecked}
                       onChange={() => toggleSelect(s.itemId)}
-                      className="mt-0.5 pointer-events-none"
+                      className="mt-0.5 pointer-events-none shrink-0"
                     />
 
-                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      {/* Top line: Title & Folder Selector */}
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-xs font-medium text-zinc-200 truncate">
                           {s.itemTitle}
@@ -275,10 +276,10 @@ const TriageModalDialog: React.FC = () => {
 
                         {/* Interactive Folder Selector */}
                         <div
-                          className="flex items-center gap-1.5 text-[11px] shrink-0"
+                          className="flex items-center gap-1.5 text-[11px] shrink-0 font-mono"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <span className="text-zinc-500 font-mono hidden sm:inline">
+                          <span className="text-zinc-500 hidden sm:inline">
                             Входящие
                           </span>
                           <ArrowRight className="w-3 h-3 text-zinc-600 hidden sm:inline" />
@@ -294,15 +295,15 @@ const TriageModalDialog: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Interactive Tags Row */}
+                      {/* Bottom line: Interactive Tags */}
                       <div
-                        className="flex items-center gap-2 flex-wrap pt-0.5"
+                        className="flex items-center gap-2 flex-wrap"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {s.tags.map(t => (
                           <span
                             key={t}
-                            className="group/tag inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors"
+                            className="group/tag inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
                           >
                             <span>#{t}</span>
                             <button
@@ -319,7 +320,7 @@ const TriageModalDialog: React.FC = () => {
 
                         {/* Inline Tag Adder */}
                         {activeTagInputId === s.itemId ? (
-                          <div className="inline-flex items-center text-[11px] font-mono text-zinc-400">
+                          <div className="inline-flex items-center text-[11px] font-mono text-zinc-400 shrink-0">
                             <span>#</span>
                             <input
                               ref={tagInputRef}
@@ -353,7 +354,7 @@ const TriageModalDialog: React.FC = () => {
                               setActiveTagInputId(s.itemId);
                               setTagInputText('');
                             }}
-                            className="inline-flex items-center gap-0.5 text-[11px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer py-0.5"
+                            className="inline-flex items-center gap-0.5 text-[11px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer py-0.5 shrink-0"
                             title="Добавить тег к этой заметке"
                           >
                             <Plus className="w-2.5 h-2.5" />
