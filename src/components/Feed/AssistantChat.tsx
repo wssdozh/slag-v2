@@ -328,7 +328,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       {/* Scope Context Header Banner */}
       <div className={`px-3 py-2 border-b border-white/[0.04] bg-white/[0.01] flex items-center justify-between text-xs text-zinc-400 shrink-0 ${isSidebar ? 'gap-1' : ''}`}>
         <div className="flex items-center gap-2 truncate min-w-0">
-          <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span className="truncate">
             {isInbox ? (
               <span className="inline-flex items-center gap-1.5 font-medium text-zinc-200">
@@ -358,7 +358,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
         {chatMessages.length === 0 ? (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
             <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-300 mb-2.5">
-              <Sparkles className="w-4 h-4 text-amber-300" />
+              <Sparkles className="w-4 h-4 text-zinc-300" />
             </div>
             <h3 className="text-xs font-semibold text-zinc-200 mb-1">
               {isInbox ? 'Ассистент по всем заметкам' : `Ассистент «${folderMeta?.name || currentFolder}»`}
@@ -373,7 +373,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                   <span>План на сегодня</span>
                 </span>
                 <span className="text-[10px] text-zinc-600 font-mono">agenda</span>
@@ -427,7 +427,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono px-1">
                   {msg.role === 'assistant' ? (
                     <>
-                      <Sparkles className="w-3 h-3 text-amber-300" />
+                      <Sparkles className="w-3 h-3 text-zinc-400" />
                       <span>SLAG</span>
                     </>
                   ) : (
@@ -632,7 +632,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             disabled
                             className="mt-1 w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 font-semibold text-xs opacity-80 cursor-not-allowed shadow-sm"
                           >
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
                             <span>Применение...</span>
                           </button>
                         ) : (
@@ -700,7 +700,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     title="Отобразить только эти найденные записи в центральной ленте"
                   >
                     <div className="flex items-center gap-2">
-                      <Filter className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+                      <Filter className="w-3.5 h-3.5 text-zinc-400 group-hover:scale-110 transition-transform" />
                       <span>Показать {filterItemIds.length} в ленте</span>
                     </div>
                     <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
@@ -713,7 +713,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
         {isChatLoading && (
           <div className="flex items-center gap-2 text-zinc-500 text-xs px-2 py-1">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
             <span>Ассистент думает...</span>
           </div>
         )}

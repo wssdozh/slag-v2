@@ -111,7 +111,7 @@ export const FeedHeader: React.FC = () => {
               }`}
               title="Только таски"
             >
-              <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+              <CheckSquare className="w-3.5 h-3.5 text-zinc-300" />
             </button>
             <button
               onClick={() => setActiveTypeFilter('article')}
@@ -122,15 +122,15 @@ export const FeedHeader: React.FC = () => {
               }`}
               title="Только статьи"
             >
-              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              <FileText className="w-3.5 h-3.5 text-zinc-300" />
             </button>
           </div>
         )}
 
         {/* AI Filter Chip when Assistant filtered the feed */}
         {aiItemFilter && (
-          <div className="flex items-center gap-1.5 px-2.5 h-ctrl-sm rounded-md bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-mono shrink-0">
-            <Filter className="w-3.5 h-3.5 text-blue-400" />
+          <div className="flex items-center gap-1.5 px-2.5 h-ctrl-sm rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 text-xs font-mono shrink-0">
+            <Filter className="w-3.5 h-3.5 text-zinc-400" />
             <span className="truncate max-w-[140px]">ИИ: "{aiItemFilter.queryLabel}" ({aiItemFilter.itemIds.length})</span>
             <button
               onClick={clearAiFilter}

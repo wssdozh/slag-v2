@@ -34,7 +34,7 @@ export const MobileAssistantView: React.FC = () => {
         {/* Center: Title & Model badge */}
         <div className="flex-1 flex flex-col items-center justify-center text-center px-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+            <div className="w-4 h-4 rounded bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-zinc-300 shrink-0">
               <Sparkles className="w-2.5 h-2.5" />
             </div>
             <h1 className="text-sm font-bold text-white tracking-tight">Ассистент</h1>
