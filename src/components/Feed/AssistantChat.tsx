@@ -21,7 +21,8 @@ import {
   FolderOpen,
   X,
   Circle,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react';
 import { Select } from '../UI/Select';
 import { LinearSignalBars } from '../UI/PriorityBadge';
@@ -50,7 +51,22 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
   const [input, setInput] = useState('');
   const [expandedReasoningIds, setExpandedReasoningIds] = useState<Set<string>>(new Set());
+  const [expandedResultsMap, setExpandedResultsMap] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const isResultsExpanded = (msgId: string, count: number) => {
+    if (expandedResultsMap[msgId] !== undefined) {
+      return expandedResultsMap[msgId];
+    }
+    return count <= 3;
+  };
+
+  const toggleResultsExpanded = (msgId: string, count: number) => {
+    setExpandedResultsMap(prev => ({
+      ...prev,
+      [msgId]: !isResultsExpanded(msgId, count)
+    }));
+  };
 
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === 'Входящие';
@@ -402,8 +418,17 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             const searchCall = msg.toolCalls?.find(
               tc => tc.name === 'search_notes' && Array.isArray(tc.result) && tc.result.length > 0
             );
-            const filterItemIds = (searchCall?.result || []).map((r: any) => r.id).filter(Boolean);
+            const searchResults = (searchCall?.result || []) as Array<{
+              id: string;
+              title: string;
+              type?: string;
+              folder?: string;
+              tags?: string[];
+              snippet?: string;
+            }>;
+            const filterItemIds = searchResults.map(r => r.id).filter(Boolean);
             const filterQuery = searchCall?.args?.query || 'поиск';
+            const isExpanded = isResultsExpanded(msg.id, filterItemIds.length);
 
             return (
               <div
@@ -442,10 +467,32 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   </div>
                 )}
 
-                {/* Message Bubble - only rendered if has body text, reasoning or action */}
+                {/* Reasoning Accordion: outside message bubble, underneath tool calls */}
+                {msg.role === 'assistant' && msg.reasoning && (
+                  <div className="flex flex-col gap-1 px-1 -mt-0.5 mb-1 max-w-[92%] select-text">
+                    <button
+                      onClick={() => toggleReasoning(msg.id)}
+                      className="flex items-center gap-1 text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer w-fit"
+                    >
+                      {expandedReasoningIds.has(msg.id) ? (
+                        <ChevronDown className="w-3 h-3 text-amber-400" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3 text-amber-400" />
+                      )}
+                      <span>Рассуждения {msg.reasoningTimeMs ? `(${(msg.reasoningTimeMs / 1000).toFixed(1)}s)` : ''}</span>
+                    </button>
+
+                    {expandedReasoningIds.has(msg.id) && (
+                      <div className="pl-3 py-0.5 text-[10px] font-mono text-zinc-500 whitespace-pre-wrap leading-relaxed select-text">
+                        {msg.reasoning}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Message Bubble - only rendered if has body text or action */}
                 {Boolean(
                   (msg.content && !msg.content.startsWith('[Подготовлен черновик')) ||
-                    msg.reasoning ||
                     msg.suggestedAction
                 ) && (
                   <div
@@ -455,29 +502,6 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                         : 'bg-[#141416] text-zinc-200 border border-white/[0.06] shadow-sm'
                     }`}
                   >
-                  {/* Reasoning Accordion */}
-                  {msg.reasoning && (
-                    <div className="mb-2 pb-1.5 border-b border-white/[0.06]">
-                      <button
-                        onClick={() => toggleReasoning(msg.id)}
-                        className="flex items-center gap-1 text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-                      >
-                        {expandedReasoningIds.has(msg.id) ? (
-                          <ChevronDown className="w-3 h-3 text-amber-400" />
-                        ) : (
-                          <ChevronRight className="w-3 h-3 text-amber-400" />
-                        )}
-                        <span>Рассуждения {msg.reasoningTimeMs ? `(${(msg.reasoningTimeMs / 1000).toFixed(1)}s)` : ''}</span>
-                      </button>
-
-                      {expandedReasoningIds.has(msg.id) && (
-                        <div className="mt-1.5 p-2 rounded-lg bg-black/40 border border-white/[0.04] text-[10px] font-mono text-zinc-400 whitespace-pre-wrap leading-relaxed">
-                          {msg.reasoning}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* Body Content with rich Markdown & WikiLink formatting */}
                   {msg.content && !msg.content.startsWith('[Подготовлен черновик') && (
                     <div className="font-sans text-xs flex flex-col gap-1">
@@ -674,20 +698,82 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 </div>
               )}
 
-                {/* Telegram-style Inline Action Button below the message bubble */}
-                {filterItemIds.length > 0 && (
-                  <button
-                    onClick={() => applyAiFilter(filterItemIds, filterQuery)}
-                    className="max-w-[92%] w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-[#18181c] hover:bg-[#202024] text-zinc-200 border border-white/[0.08] hover:border-white/[0.14] text-xs font-medium transition-all shadow-sm cursor-pointer group mt-0.5"
-                    title="Отобразить только эти найденные записи в центральной ленте"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Filter className="w-3.5 h-3.5 text-zinc-400 group-hover:scale-110 transition-transform" />
-                      <span>Показать {filterItemIds.length} в ленте</span>
+                {/* Expandable found notes list with instant navigation */}
+                {filterItemIds.length > 0 && (() => {
+                  const count = filterItemIds.length;
+                  const showHeader = count > 3;
+                  const showFilterButton = count > 1;
+
+                  return (
+                    <div className="max-w-[92%] w-full rounded-xl bg-[#141416] border border-white/[0.08] overflow-hidden mt-0.5 text-xs shadow-sm">
+                      {/* Header trigger only when more than 3 results */}
+                      {showHeader && (
+                        <button
+                          onClick={() => toggleResultsExpanded(msg.id, count)}
+                          className="w-full flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.05] transition-colors cursor-pointer text-zinc-300"
+                        >
+                          <div className="flex items-center gap-1.5 text-xs font-medium">
+                            <Search className="w-3.5 h-3.5 text-zinc-400" />
+                            <span>Найдено {count} в хранилище</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-500">
+                            {isExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+                            )}
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Items list: always rendered when count <= 3, or when isExpanded */}
+                      {(isExpanded || !showHeader) && (
+                        <div className={`flex flex-col divide-y divide-white/[0.04] ${showHeader ? 'border-t border-white/[0.06]' : ''}`}>
+                          {searchResults.map((res, rIdx) => (
+                            <button
+                              key={res.id || rIdx}
+                              onClick={() => scrollToItem(res.id || res.title)}
+                              className="flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-white/[0.04] transition-colors cursor-pointer group"
+                              title={`Перейти к «${res.title}» (${res.folder || 'Входящие'})`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                {res.type === 'task' ? (
+                                  <CheckSquare className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                ) : (
+                                  <FileText className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                )}
+                                <span className="text-zinc-200 group-hover:text-white truncate font-medium">
+                                  {res.title}
+                                </span>
+                                {res.folder && (
+                                  <span className="text-[10px] font-mono text-zinc-500 shrink-0 truncate max-w-[120px]">
+                                    {res.folder}
+                                  </span>
+                                )}
+                              </div>
+                              <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-zinc-300 shrink-0 transition-colors" />
+                            </button>
+                          ))}
+
+                          {/* Button to show in feed (only if more than 1 result) */}
+                          {showFilterButton && (
+                            <button
+                              onClick={() => applyAiFilter(filterItemIds, filterQuery)}
+                              className="flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer text-[11px] font-medium"
+                              title="Отобразить только эти найденные записи в центральной ленте"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Filter className="w-3 h-3 text-zinc-400" />
+                                <span>Показать {count} в ленте</span>
+                              </div>
+                              <ArrowUpRight className="w-3 h-3 text-zinc-500" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
-                  </button>
-                )}
+                  );
+                })()}
               </div>
             );
           })
