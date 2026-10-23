@@ -15,6 +15,7 @@ import { KanbanBoard } from '../Views/KanbanBoard';
 import { CalendarView } from '../Views/CalendarView';
 import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
 import { LogViewer } from '../Logs/LogViewer';
+import { AudioPanel } from '../Audio/AudioPanel';
 import {
   Plus,
   Layers,
@@ -23,7 +24,8 @@ import {
   Sparkles,
   Folder,
   Info,
-  Terminal
+  Terminal,
+  Music,
 } from 'lucide-react';
 
 const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
@@ -88,6 +90,11 @@ const components: Record<string, React.FC<IDockviewPanelProps>> = {
       <LogViewer variant="dock" />
     </div>
   ),
+  audio: () => (
+    <div className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+      <AudioPanel />
+    </div>
+  ),
 };
 
 const PANELS_TO_ADD = [
@@ -95,6 +102,7 @@ const PANELS_TO_ADD = [
   { id: 'kanban', title: 'Канбан', icon: Kanban },
   { id: 'calendar', title: 'Календарь', icon: Calendar },
   { id: 'assistant', title: 'Ассистент', icon: Sparkles },
+  { id: 'audio', title: 'Аудиоплеер', icon: Music },
   { id: 'sidebar', title: 'Навигация', icon: Folder },
   { id: 'folder-info', title: 'Инфо папки', icon: Info },
   { id: 'logs', title: 'Логи & HUD', icon: Terminal },

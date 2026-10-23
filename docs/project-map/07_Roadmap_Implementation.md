@@ -69,9 +69,12 @@ tags:
 
 ### Майлстоун 5: Композитный Workspace на Dockview и Popout Windows
 - [x] Архитектурная спецификация модульной IDE-сетки (`11_Composite_Workspace_Dockview`).
-- [ ] Установка и изоляция пакета `dockview-react` без разрыва стилей Tailwind v4.
-- [ ] Фирменная монохромная тема `dockview-theme-slag` (95% контракт: `#08090a`, `#141417`, 1px бордеры `#27272a`).
-- [ ] Регистрация независимых модулей интерфейса: `sidebar`, `feed`, `kanban`, `calendar`, `assistant`, `folder-info`, `editor`.
+- [x] Установка и изоляция пакета `dockview-react` без разрыва стилей Tailwind v4.
+- [x] Фирменная монохромная тема `dockview-theme-slag` (95% контракт: `#08090a`, `#141417`, 1px бордеры `#27272a`).
+- [x] Регистрация независимых модулей интерфейса: `sidebar`, `feed`, `kanban`, `calendar`, `assistant`, `folder-info`, `logs`, `audio`.
+- [x] Вкладка «Иммерсивный аудиоплеер папки» (Now Playing, автопереход войсов, два режима скоупа: активная/закрепленная, мультифильтр типов: войсы/файлы, Audio Collision Guard).
+- [ ] Вкладка «Мудборд (Moodboard)»: бесконечная витрина медиа/картинок папки без текста (Are.na / Pinterest style).
+- [ ] Вкладка «Сплит-эдитор (Split Editor)»: постоянный фокусный Markdown-редактор заметки в тайлинговой сетке рядом с лентой/канбаном.
 - [ ] Пресеты рабочего пространства (`Default`, `AI Lab`, `Deep Focus`, `Dual Screen`) с сохранением лейаута в `localStorage`.
 - [ ] Интеграция `public/popout.html` и нативный вынос панелей в отдельные окна ОС через Tauri v2 / `window.open`.
 

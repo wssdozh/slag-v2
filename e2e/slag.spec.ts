@@ -1572,4 +1572,140 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('50. AudioPlayer dockview tab: scope mode, filters, transport controls and visual audit', async ({ page }) => {
+    // Seed an item with an audio track and cover artwork
+    await page.evaluate(() => {
+      let found = false;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('slag_items_')) {
+          found = true;
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          const testAudioItem = {
+            id: 'test_audio_item_now_playing',
+            type: 'note',
+            title: 'Саундтрек проекта и голосовой лог',
+            content: 'Аудиозапись фонового трека для концентрации',
+            folder: 'Входящие',
+            tags: ['audio', 'music'],
+            attachments: [
+              {
+                id: 'att_audio_test_1',
+                name: 'Never_Enough_The_Cure.mp3',
+                type: 'audio',
+                mimeType: 'audio/mp3',
+                size: 4500000,
+                duration: 266,
+                relativePath: '.attachments/Never_Enough.mp3',
+                dataUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+              },
+              {
+                id: 'att_img_cover_test_1',
+                name: 'the_cure_cover.png',
+                type: 'image',
+                mimeType: 'image/png',
+                size: 120000,
+                relativePath: '.attachments/the_cure_cover.png',
+                dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="%231a1b26"/><circle cx="150" cy="150" r="100" fill="%237aa2f7" opacity="0.3"/><text x="150" y="155" fill="%23ffffff" font-family="sans-serif" font-size="20" font-weight="bold" text-anchor="middle">THE CURE</text></svg>',
+              },
+            ],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          items.unshift(testAudioItem);
+          localStorage.setItem(key, JSON.stringify(items));
+        }
+      }
+      if (!found) {
+        localStorage.setItem('slag_items_default_vault', JSON.stringify([{
+          id: 'test_audio_item_now_playing',
+          type: 'note',
+          title: 'Саундтрек проекта и голосовой лог',
+          content: 'Аудиозапись фонового трека для концентрации',
+          folder: 'Входящие',
+          tags: ['audio', 'music'],
+          attachments: [
+            {
+              id: 'att_audio_test_1',
+              name: 'Never_Enough_The_Cure.mp3',
+              type: 'audio',
+              mimeType: 'audio/mp3',
+              size: 4500000,
+              duration: 266,
+              relativePath: '.attachments/Never_Enough.mp3',
+              dataUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+            },
+          ],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }]));
+      }
+    });
+
+    // Reload page to pick up seeded storage item
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    // Click [+] button in the center group header (Feed area)
+    const centerAddTabBtn = page.locator('.dv-groupview').nth(1).locator('button[title="Добавить вкладку в эту группу"]');
+    await expect(centerAddTabBtn).toBeVisible();
+    await centerAddTabBtn.click();
+
+    // Select "Аудиоплеер" from the dropdown
+    const audioMenuOption = page.locator('button', { hasText: 'Аудиоплеер' });
+    await expect(audioMenuOption).toBeVisible();
+    await audioMenuOption.click();
+
+    // Verify Audio tab is now visible and active in center group
+    const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
+    await expect(audioTab).toBeVisible();
+
+    // Verify scope buttons (Активная / Закрепить)
+    const activeScopeBtn = page.locator('button[title*="Следовать за активной"]');
+    const pinnedScopeBtn = page.locator('button[title*="Зафиксировать определенную"]');
+    await expect(activeScopeBtn).toBeVisible();
+    await expect(pinnedScopeBtn).toBeVisible();
+
+    // Verify multi-type filter chips (Войсы / Файлы)
+    const voiceChip = page.locator('button[title*="Показывать голосовые"]');
+    const fileChip = page.locator('button[title*="Показывать аудиофайлы"]');
+    await expect(voiceChip).toBeVisible();
+    await expect(fileChip).toBeVisible();
+
+    // Verify Now Playing screen elements: track title, note link, artwork
+    await expect(page.locator('text=Never_Enough_The_Cure.mp3')).toBeVisible();
+    await expect(page.locator('text=Саундтрек проекта и голосовой лог')).toBeVisible();
+
+    // Verify transport controls (Rewind, Play/Pause, Forward)
+    const playPauseBtn = page.locator('button[title*="Воспроизведение"], button[title*="Пауза"]');
+    await expect(playPauseBtn).toBeVisible();
+
+    // Verify Queue / Playlist button is present
+    const queueBtn = page.locator('button[title*="Открыть очередь"]').first();
+    await expect(queueBtn).toBeVisible();
+
+    // Open Queue drawer and check track entry
+    await queueBtn.click();
+    await expect(page.locator('text=Очередь воспроизведения')).toBeVisible();
+    await expect(page.locator('text=Never_Enough_The_Cure.mp3').first()).toBeVisible();
+
+    // Close Queue drawer
+    const closeQueueBtn = page.locator('button[title="Закрыть список"]');
+    await expect(closeQueueBtn).toBeVisible();
+    await closeQueueBtn.click();
+    await expect(page.locator('text=Очередь воспроизведения')).not.toBeVisible();
+
+    // Verify bottom bar utilities (speed, repeat, volume)
+    const speedBtn = page.locator('button[title*="Скорость воспроизведения"]');
+    await expect(speedBtn).toBeVisible();
+    await speedBtn.click();
+    await expect(speedBtn).toHaveText('1.25x');
+
+    // Take screenshot of the center AudioPlayer panel in full Now Playing glory
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-audioplayer-nowplaying.png',
+      fullPage: false,
+    });
+  });
 });
