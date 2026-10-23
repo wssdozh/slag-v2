@@ -982,11 +982,15 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       return {
         argonUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gemini-4-argon-openai'),
         gptUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gpt-5-2'),
+        haikuUrl: module.resolveKieEndpoint('https://api.kie.ai', 'claude-haiku-4-5'),
+        geminiFlashUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gemini-3-8-flash-openai'),
       };
     });
 
     expect(endpoints.argonUrl).toBe('https://api.kie.ai/gemini-4-argon-openai/v1/chat/completions');
     expect(endpoints.gptUrl).toBe('https://api.kie.ai/v1/chat/completions');
+    expect(endpoints.haikuUrl).toBe('https://api.kie.ai/claude/v1/messages');
+    expect(endpoints.geminiFlashUrl).toBe('https://api.kie.ai/gemini-3-8-flash-openai/v1/chat/completions');
   });
 
   test('27. Contextual Subtask Extraction and Reasoning Effort Settings Verification', async ({ page }) => {

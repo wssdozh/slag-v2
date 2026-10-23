@@ -372,7 +372,10 @@ export const SettingsModal: React.FC = () => {
                   {provider === 'kie' && (
                     <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
                       <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
-                        <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">Anthropic & OpenAI</span>
+                        </div>
                         <a
                           href="https://kie.ai/api-key"
                           target="_blank"
@@ -412,9 +415,11 @@ export const SettingsModal: React.FC = () => {
                             onChange={(val) => setModel(val)}
                             options={[
                               { value: 'gemini-4-argon-openai', label: 'Gemini 4 Argon' },
-                              { value: 'gpt-5-2', label: 'GPT 5.2' },
-                              { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+                              { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Anthropic)' },
+                              { value: 'gemini-3-8-flash-openai', label: 'Gemini 3.8 Flash (Дешёвый)' },
+                              { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (Anthropic)' },
                               { value: 'deepseek-v4-1-flash', label: 'DeepSeek V4.1 Flash' },
+                              { value: 'gpt-5-2', label: 'GPT 5.2' },
                               { value: 'grok-4-5', label: 'Grok 4.5' },
                               { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B' },
                             ]}
