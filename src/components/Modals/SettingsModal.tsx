@@ -415,6 +415,7 @@ export const SettingsModal: React.FC = () => {
                             onChange={(val) => setModel(val)}
                             options={[
                               { value: 'gemini-4-argon-openai', label: 'Gemini 4 Argon' },
+                              { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 ($0.06/1M, 1M ctx)' },
                               { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Anthropic)' },
                               { value: 'gemini-3-8-flash-openai', label: 'Gemini 3.8 Flash (Дешёвый)' },
                               { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (Anthropic)' },
