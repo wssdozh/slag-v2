@@ -39,6 +39,24 @@ const getTomorrowIso = (): string => {
   return d.toISOString().split('T')[0];
 };
 
+const formatDueDateLabel = (dateIso: string, rawMatchedText?: string): string => {
+  if (rawMatchedText && rawMatchedText.length <= 16) {
+    return rawMatchedText.charAt(0).toUpperCase() + rawMatchedText.slice(1);
+  }
+  const today = getTodayIso();
+  const tomorrow = getTomorrowIso();
+  if (dateIso === today) return 'Сегодня';
+  if (dateIso === tomorrow) return 'Завтра';
+
+  try {
+    const [y, m, d] = dateIso.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  } catch {
+    return dateIso;
+  }
+};
+
 export const Composer: React.FC = () => {
   const {
     saveItem,
@@ -120,6 +138,7 @@ export const Composer: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   const resetDraftState = () => {
     setContent('');
@@ -314,31 +333,37 @@ export const Composer: React.FC = () => {
       case 'today':
         setItemType('task');
         setDueDate(getTodayIso());
+        setIsDateDismissed(false);
         addToast('Дедлайн установлен на сегодня', 'info');
         break;
       case 'tomorrow':
         setItemType('task');
         setDueDate(getTomorrowIso());
+        setIsDateDismissed(false);
         addToast('Дедлайн установлен на завтра', 'info');
         break;
       case 'urgent':
         setItemType('task');
         setPriority('high');
+        setIsPriorityDismissed(false);
         addToast('Приоритет: Urgent (P1)', 'info');
         break;
       case 'high':
         setItemType('task');
         setPriority('high');
+        setIsPriorityDismissed(false);
         addToast('Приоритет: High (P2)', 'info');
         break;
       case 'medium':
         setItemType('task');
         setPriority('medium');
+        setIsPriorityDismissed(false);
         addToast('Приоритет: Medium (P3)', 'info');
         break;
       case 'low':
         setItemType('task');
         setPriority('low');
+        setIsPriorityDismissed(false);
         addToast('Приоритет: Low (P4)', 'info');
         break;
       case 'ai':
@@ -372,11 +397,6 @@ export const Composer: React.FC = () => {
     setAttachments(attachments.filter(a => a.id !== id));
   };
 
-  const hasDetectedDateOrPriority = Boolean(
-    parsedTask && (parsedTask.dueDate || (parsedTask.priority && parsedTask.priority !== 'none'))
-  );
-  const isGhostActive = itemType === 'task' || hasDetectedDateOrPriority;
-
   const effectivePriority = itemType === 'task'
     ? (!isPriorityDismissed && parsedTask?.priority && parsedTask.priority !== 'none'
         ? parsedTask.priority
@@ -390,21 +410,12 @@ export const Composer: React.FC = () => {
     : '';
 
   const effectiveDateLabel = itemType === 'task'
-    ? (!isDateDismissed && (parsedTask?.rawMatchedDateText || parsedTask?.dueDate)
-        ? (parsedTask.rawMatchedDateText || parsedTask.dueDate)
-        : dueDate)
+    ? (!isDateDismissed && parsedTask?.dueDate
+        ? formatDueDateLabel(parsedTask.dueDate, parsedTask.rawMatchedDateText)
+        : dueDate
+        ? formatDueDateLabel(dueDate)
+        : '')
     : '';
-
-  const hasActiveDateChip = Boolean(isGhostActive && parsedTask?.dueDate && !isDateDismissed);
-  const hasActivePriorityChip = Boolean(
-    isGhostActive && parsedTask?.priority && !isPriorityDismissed
-  );
-  const activeGhostTags = isGhostActive && parsedTask?.tags
-    ? parsedTask.tags.filter(t => !dismissedTags.has(t))
-    : [];
-  const hasActiveTagChips = activeGhostTags.length > 0;
-
-  const hasAnyActiveGhostChips = hasActiveDateChip || hasActivePriorityChip || hasActiveTagChips;
 
   const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardFiles: File[] = [];
@@ -771,19 +782,6 @@ export const Composer: React.FC = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Dismiss active ghost chips first on Escape
-    if (e.key === 'Escape') {
-      if (hasAnyActiveGhostChips) {
-        e.preventDefault();
-        setIsDateDismissed(true);
-        setIsPriorityDismissed(true);
-        if (parsedTask?.tags) {
-          setDismissedTags(new Set(parsedTask.tags));
-        }
-        return;
-      }
-    }
-
     // Slash commands keyboard controls
     if (slashQuery !== null) {
       if (e.key === 'Escape') {
@@ -807,6 +805,22 @@ export const Composer: React.FC = () => {
           executeSlashCommand(matchingSlashCommands[slashSelectedIndex]);
           return;
         }
+      }
+    }
+
+    // Dismiss active date / priority on Escape if not in popup
+    if (e.key === 'Escape') {
+      if (!isDateDismissed && (parsedTask?.dueDate || dueDate)) {
+        e.preventDefault();
+        setIsDateDismissed(true);
+        setDueDate('');
+        return;
+      }
+      if (!isPriorityDismissed && (parsedTask?.priority || priority !== 'none')) {
+        e.preventDefault();
+        setIsPriorityDismissed(true);
+        setPriority('none');
+        return;
       }
     }
 
@@ -1005,77 +1019,6 @@ export const Composer: React.FC = () => {
         className="hidden"
         onChange={(e) => handleFileUpload(e, 'image')}
       />
-
-      {/* Interactive Ghost-chips right above the textarea */}
-      {hasAnyActiveGhostChips && (
-        <div className="flex items-center gap-1.5 px-1 py-1 text-xs overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150">
-          {hasActiveDateChip && (
-            <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-mono">
-              <span>📅</span>
-              <span>{parsedTask?.rawMatchedDateText || parsedTask?.dueDate}</span>
-              <button
-                type="button"
-                onClick={() => setIsDateDismissed(true)}
-                className="ml-0.5 p-0.5 rounded text-blue-400/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                title="Отменить дату для этого черновика"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </span>
-          )}
-
-          {hasActivePriorityChip && (
-            <span
-              className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono border ${
-                parsedTask?.priority === 'high'
-                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-                  : parsedTask?.priority === 'medium'
-                  ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
-                  : parsedTask?.priority === 'low'
-                  ? 'bg-sky-500/10 border-sky-500/20 text-sky-300'
-                  : 'bg-zinc-500/10 border-zinc-500/20 text-zinc-300'
-              }`}
-            >
-              <LinearSignalBars priority={parsedTask?.priority} className="w-3 h-3" />
-              <span>
-                {parsedTask?.priority === 'high'
-                  ? 'p1 (High)'
-                  : parsedTask?.priority === 'medium'
-                  ? 'p2 (Medium)'
-                  : parsedTask?.priority === 'low'
-                  ? 'p3 (Low)'
-                  : 'p4 (None)'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsPriorityDismissed(true)}
-                className="ml-0.5 p-0.5 rounded hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                title="Отменить приоритет"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </span>
-          )}
-
-          {activeGhostTags.map(tag => (
-            <span
-              key={tag}
-              className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/[0.08] text-zinc-300 text-[11px] font-mono"
-            >
-              <span>🏷</span>
-              <span>#{tag}</span>
-              <button
-                type="button"
-                onClick={() => setDismissedTags(prev => new Set(prev).add(tag))}
-                className="ml-0.5 p-0.5 rounded text-zinc-400 hover:text-rose-400 hover:bg-white/10 transition-colors cursor-pointer"
-                title="Отменить тег"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
     </>
   );
 
@@ -1231,74 +1174,94 @@ export const Composer: React.FC = () => {
             {/* Task Controls: Due Date & Priority directly in toolbar */}
             {itemType === 'task' && (
               <div className="flex items-center gap-1 shrink-0">
-                {/* Due Date Chip or Trigger */}
-                {effectiveDueDate && !hasActiveDateChip ? (
-                  <div className="flex items-center gap-1 px-2 h-ctrl-md rounded-md bg-white/[0.08] border border-white/[0.08] text-xs font-mono text-zinc-200 shrink-0">
-                    <label className="flex items-center gap-1 cursor-pointer" title="Изменить срок">
-                      <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                      <span className="truncate max-w-[85px]">{effectiveDateLabel}</span>
-                      <input
-                        type="date"
-                        value={effectiveDueDate}
-                        onChange={(e) => {
-                          setDueDate(e.target.value);
-                          setIsDateDismissed(false);
-                        }}
-                        className="sr-only"
-                      />
-                    </label>
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={effectiveDueDate}
+                  onChange={(e) => {
+                    setDueDate(e.target.value);
+                    setIsDateDismissed(false);
+                  }}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+
+                {/* Due Date Trigger */}
+                {effectiveDueDate ? (
+                  <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => dateInputRef.current?.showPicker?.()}
+                      className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                      title="Изменить срок"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span className="font-medium max-w-[85px] truncate">{effectiveDateLabel}</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
                         setIsDateDismissed(true);
                         setDueDate('');
                       }}
-                      className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
+                      className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
                       title="Снять срок"
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-                ) : !effectiveDueDate ? (
-                  <label
-                    className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => dateInputRef.current?.showPicker?.()}
+                    className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
                     title="Установить срок задачи"
                   >
-                    <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                    <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                     <span className="hidden sm:inline">Срок</span>
-                    <input
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => {
-                        setDueDate(e.target.value);
-                        setIsDateDismissed(false);
-                      }}
-                      className="sr-only"
-                    />
-                  </label>
-                ) : null}
+                  </button>
+                )}
 
                 {/* Priority Selector */}
-                {!hasActivePriorityChip && (
-                  <div className="flex items-center shrink-0">
-                    <Select
-                      size="md"
-                      variant="ghost"
-                      direction="up"
-                      value={effectivePriority}
-                      onChange={(val) => {
-                        setPriority(val as any);
-                        setIsPriorityDismissed(false);
-                      }}
-                      options={[
-                        { value: 'none', label: 'Обычный' },
-                        { value: 'low', label: 'Низкий' },
-                        { value: 'medium', label: 'Средний' },
-                        { value: 'high', label: 'Высокий' },
-                      ]}
-                    />
-                  </div>
-                )}
+                <div className="flex items-center shrink-0">
+                  <Select
+                    size="md"
+                    variant="ghost"
+                    direction="up"
+                    value={effectivePriority}
+                    onChange={(val) => {
+                      setPriority(val as any);
+                      setIsPriorityDismissed(false);
+                    }}
+                    options={[
+                      {
+                        value: 'none',
+                        label: 'Обычный',
+                        icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
+                        color: 'text-zinc-400',
+                      },
+                      {
+                        value: 'low',
+                        label: 'Низкий',
+                        icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
+                        color: 'text-zinc-300',
+                      },
+                      {
+                        value: 'medium',
+                        label: 'Средний',
+                        icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
+                        color: 'text-amber-400',
+                      },
+                      {
+                        value: 'high',
+                        label: 'Высокий',
+                        icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
+                        color: 'text-rose-400',
+                      },
+                    ]}
+                  />
+                </div>
               </div>
             )}
 

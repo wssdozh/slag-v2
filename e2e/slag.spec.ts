@@ -631,7 +631,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
   });
 
-  test('19. Todoist task parser and interactive Ghost chips', async ({ page }) => {
+  test('19. Todoist task parser: inline parsing fills toolbar controls directly, no ghost chips', async ({ page }) => {
     const composerTextarea = page.locator('main textarea');
     await expect(composerTextarea).toBeVisible();
 
@@ -641,42 +641,40 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 2. Wait for 150ms debounce
     await page.waitForTimeout(250);
 
-    // 3. Verify Ghost chips are visible right above textarea
-    const dateChip = page.locator('span.font-mono', { hasText: '📅' }).first();
-    const priorityChip = page.locator('span.font-mono', { hasText: 'p1 (High)' });
-    const tagChip = page.locator('span.font-mono', { hasText: '#groceries' });
+    // 3. Verify Ghost chips are NOT rendered above textarea
+    const oldPriorityChip = page.locator('span.font-mono', { hasText: 'p1 (High)' });
+    await expect(oldPriorityChip).not.toBeVisible();
 
-    await expect(dateChip).toBeVisible();
-    await expect(priorityChip).toBeVisible();
-    await expect(tagChip).toBeVisible();
+    // 4. Verify toolbar controls are filled directly on the bottom bar
+    const dueDateBtn = page.locator('button[title="Изменить срок"]');
+    await expect(dueDateBtn).toBeVisible();
+    await expect(dueDateBtn).toContainText('Завтра');
 
-    // 4. Take screenshot of Ghost chips
+    const prioBtn = page.locator('button', { hasText: 'Высокий' });
+    await expect(prioBtn).toBeVisible();
+
+    // 5. Take screenshot of unified toolbar controls
     await page.screenshot({
-      path: 'test-results/screenshots/todoist-ghost-chips.png',
+      path: 'test-results/screenshots/todoist-toolbar-controls.png',
       fullPage: false,
     });
 
-    // 5. Test Escape key dismisses all ghost chips
-    await composerTextarea.press('Escape');
-    await expect(dateChip).not.toBeVisible();
-    await expect(priorityChip).not.toBeVisible();
-    await expect(tagChip).not.toBeVisible();
+    // 6. Test removing date via its X button in toolbar
+    const dateClearBtn = page.locator('button[title="Снять срок"]');
+    await expect(dateClearBtn).toBeVisible();
+    await dateClearBtn.click();
+    await expect(page.locator('button[title="Установить срок задачи"]')).toBeVisible();
 
-    // 6. Retype to bring chips back and test individual dismiss
+    // 7. Retype and send task via Enter
     await composerTextarea.fill('');
     await page.waitForTimeout(100);
     await composerTextarea.fill('Заказать билеты в театр завтра p2 #culture');
     await page.waitForTimeout(250);
 
-    const newPriorityChip = page.locator('span.font-mono', { hasText: 'p2 (Medium)' });
-    await expect(newPriorityChip).toBeVisible();
+    // Verify priority updated to medium
+    await expect(page.locator('button', { hasText: 'Средний' })).toBeVisible();
 
-    // Dismiss priority chip via its X button
-    const prioX = newPriorityChip.locator('button');
-    await prioX.click();
-    await expect(newPriorityChip).not.toBeVisible();
-
-    // 7. Send task via Enter
+    // Send task via Enter
     await composerTextarea.press('Enter');
 
     // 8. Verify created task card in feed has clean title
@@ -688,6 +686,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // Verify task type badge is present
     await expect(createdCard.locator('span', { hasText: 'Таска' })).toBeVisible();
+
+    // Verify task priority badge is present
+    await expect(createdCard.getByText('Средний', { exact: true })).toBeVisible();
 
     // Verify title does NOT contain raw syntax (p2, #culture, tomorrow)
     const cardText = await createdCard.innerText();

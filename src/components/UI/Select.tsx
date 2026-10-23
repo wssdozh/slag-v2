@@ -6,6 +6,7 @@ export interface SelectOption {
   value: string;
   label: string;
   icon?: React.ReactNode;
+  color?: string;
   disabled?: boolean;
 }
 
@@ -179,8 +180,8 @@ export const Select: React.FC<SelectProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
-                  {opt.icon && <span className="shrink-0 text-zinc-400">{opt.icon}</span>}
-                  <span className="truncate">{opt.label}</span>
+                  {opt.icon && <span className="shrink-0">{opt.icon}</span>}
+                  <span className={`truncate ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>{opt.label}</span>
                 </div>
                 {isSelected && (
                   <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
@@ -217,7 +218,7 @@ export const Select: React.FC<SelectProps> = ({
       >
         <span className="truncate flex items-center gap-1.5">
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
-          <span className={selectedOption ? 'text-zinc-200' : 'text-zinc-500'}>
+          <span className={selectedOption?.color || (selectedOption ? 'text-zinc-200' : 'text-zinc-500')}>
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </span>

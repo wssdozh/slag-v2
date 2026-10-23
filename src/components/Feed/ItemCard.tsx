@@ -277,7 +277,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                       : 'text-zinc-500'
                   }`}
                 >
-                  {item.priority}
+                  {item.priority === 'high' ? 'Высокий' : item.priority === 'medium' ? 'Средний' : 'Низкий'}
                 </span>
               </span>
             )}

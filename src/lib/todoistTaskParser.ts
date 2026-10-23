@@ -16,8 +16,8 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
   let workingText = (lines[0] ?? '').replace(/^#+\s+/, '');
   let priority: 'none' | 'low' | 'medium' | 'high' | undefined = undefined;
 
-  // a) Priority: p1-p4, !!1-!!4, !urgent/!high/!med/!medium/!low
-  const prioRegex = /(?:^|\s|\b)(p[1-4]|!![1-4]|!(?:urgent|high|med|medium|low))(?:\b|\s|$)/i;
+  // a) Priority: p1-p4, !!1-!!4, !urgent/!high/!med/!medium/!low (exclude slash commands like /p1, /urgent)
+  const prioRegex = /(?:^|\s)(?!\/)(p[1-4]|!![1-4]|!(?:urgent|high|med|medium|low))(?:\b|\s|$)/i;
   const prioMatch = text.match(prioRegex);
   if (prioMatch) {
     const token = prioMatch[1].toLowerCase();
@@ -30,7 +30,7 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     } else if (token === 'p4' || token === '!!4') {
       priority = 'none';
     }
-    workingText = workingText.replace(/(?:^|\s|\b)(?:p[1-4]|!![1-4]|!(?:urgent|high|med|medium|low))(?:\b|\s|$)/gi, ' ');
+    workingText = workingText.replace(/(?:^|\s)(?!\/)(?:p[1-4]|!![1-4]|!(?:urgent|high|med|medium|low))(?:\b|\s|$)/gi, ' ');
   }
 
   // b) Tags: #tag (scanned from all lines, stripped from title line)
@@ -54,9 +54,10 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     const chrono = isCyrillic ? chronoRu.casual : chronoEn.casual;
     const matches = chrono.parse(trimmedText, referenceDate, { forwardDate: true });
 
-    // Edge anchoring: match must be at the start (index === 0) or at the end
-    const edgeMatch = matches.find(m => m.index + m.text.length >= trimmedText.length - 2)
-      ?? matches.find(m => m.index === 0);
+    // Edge anchoring: match must be at the start (index === 0) or at the end, and NOT preceded by '/' (slash commands)
+    const validMatches = matches.filter(m => m.index === 0 || trimmedText[m.index - 1] !== '/');
+    const edgeMatch = validMatches.find(m => m.index + m.text.length >= trimmedText.length - 2)
+      ?? validMatches.find(m => m.index === 0);
 
     if (edgeMatch) {
       const date = edgeMatch.start.date();
