@@ -200,11 +200,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
         }`}
       >
-        {/* Action Pill (Visible on mobile, Hover on desktop) */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 bg-[#18181c]/90 backdrop-blur-md border border-white/[0.08] rounded-md p-0.5 shadow-md z-10 pointer-events-auto">
+        {/* Action Buttons (Seamless, no bulky background pill) */}
+        <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 z-10 pointer-events-auto">
           <button
             onClick={() => setReplyTarget(item)}
-            className="w-ctrl-sm h-ctrl-sm rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer touch-target flex items-center justify-center"
+            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center justify-center"
             title="Ответить (R)"
           >
             <CornerUpLeft className="w-3.5 h-3.5" />
@@ -226,7 +226,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                 });
               }
             }}
-            className="w-ctrl-sm h-ctrl-sm rounded text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer touch-target flex items-center justify-center"
+            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center justify-center"
             title="Действия"
           >
             <MoreVertical className="w-3.5 h-3.5" />
@@ -235,7 +235,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
       {/* Top Header / Metadata Bar (Rendered ONLY when metadata exists) */}
       {hasMetadata && (
-        <div className="flex items-center justify-between text-xs text-zinc-500 pr-14">
+        <div className="flex items-center justify-between text-xs text-zinc-500 pr-12">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Item Type: Plain text, no nested chips */}
             {isTask && (
