@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType } from '../../types';
+import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
+import { AudioPlayer } from '../UI/AudioPlayer';
+import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
+import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import {
   ArrowLeft,
   Save,
@@ -17,7 +20,11 @@ import {
   CheckSquare,
   Code,
   Quote,
-  Link2
+  Link2,
+  Paperclip,
+  UploadCloud,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Select } from '../UI/Select';
 
@@ -33,7 +40,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     deleteItem,
     setSelectedItem,
     folders,
-    addToast
+    addToast,
+    openLightbox
   } = useApp();
 
   const [title, setTitle] = useState(item.title || '');
@@ -46,7 +54,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const [dueDate, setDueDate] = useState(item.dueDate || '');
   const [subtasks, setSubtasks] = useState<Array<{ id: string; title: string; completed: boolean }>>(item.subtasks || []);
   const [newSubtaskInput, setNewSubtaskInput] = useState('');
+  const [attachments, setAttachments] = useState<SlagAttachment[]>(item.attachments || []);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const readTime = Math.max(1, Math.round(wordCount / 200));
@@ -69,6 +81,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       type,
       folder,
       tags,
+      attachments,
       priority: type === 'task' ? priority : undefined,
       dueDate: type === 'task' ? dueDate : undefined,
       subtasks: type === 'task' ? subtasks : undefined,
@@ -85,7 +98,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     }
     setIsFullscreenEditorOpen(false);
     setSelectedItem(null);
-  }, [item, title, content, type, folder, tags, priority, dueDate, subtasks, readTime, saveItem, updateItem, addToast, setIsFullscreenEditorOpen, setSelectedItem]);
+  }, [item, title, content, type, folder, tags, attachments, priority, dueDate, subtasks, readTime, saveItem, updateItem, addToast, setIsFullscreenEditorOpen, setSelectedItem]);
 
   const handleClose = useCallback(() => {
     // Pure back / cancel: DO NOT save or publish note to feed
@@ -152,8 +165,160 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     }, 10);
   };
 
+  const insertAttachmentMarkdown = (attName: string) => {
+    const textarea = textareaRef.current;
+    const link = `![[${attName}]]\n`;
+    if (!textarea) {
+      setContent(prev => (prev.trim() ? prev + '\n\n' + link : link));
+      addToast(`Ссылка ![[${attName}]] добавлена в текст`, 'info');
+      return;
+    }
+    const start = textarea.selectionStart ?? content.length;
+    const end = textarea.selectionEnd ?? content.length;
+    const next = content.slice(0, start) + link + content.slice(end);
+    setContent(next);
+    addToast(`Ссылка ![[${attName}]] добавлена в позицию курсора`, 'info');
+    setTimeout(() => {
+      textarea.focus();
+      const pos = start + link.length;
+      textarea.setSelectionRange(pos, pos);
+    }, 10);
+  };
+
+  const handleAttachmentsAdded = (newAtts: SlagAttachment[]) => {
+    setAttachments(prev => [...prev, ...newAtts]);
+    const textarea = textareaRef.current;
+    const links = newAtts.map(a => `![[${a.name}]]`).join('\n') + '\n';
+    if (!textarea) {
+      setContent(prev => (prev.trim() ? prev + '\n\n' + links : links));
+    } else {
+      const start = textarea.selectionStart ?? content.length;
+      const end = textarea.selectionEnd ?? content.length;
+      const next = content.slice(0, start) + links + content.slice(end);
+      setContent(next);
+      setTimeout(() => {
+        textarea.focus();
+        const pos = start + links.length;
+        textarea.setSelectionRange(pos, pos);
+      }, 10);
+    }
+    addToast(`Добавлено медиа: ${newAtts.length} ${newAtts.length === 1 ? 'файл' : 'файла'}`, 'success');
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const files: File[] = [];
+    if (e.clipboardData.items) {
+      for (let i = 0; i < e.clipboardData.items.length; i++) {
+        const it = e.clipboardData.items[i];
+        if (it.kind === 'file') {
+          const file = it.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      e.preventDefault();
+      try {
+        const processed = await processFileListToAttachments(files);
+        if (processed.length > 0) {
+          handleAttachmentsAdded(processed);
+        }
+      } catch {
+        addToast('Не удалось вставить медиа из буфера', 'error');
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(false);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        try {
+          const processed = await processFileListToAttachments(e.dataTransfer.files);
+          if (processed.length > 0) {
+            handleAttachmentsAdded(processed);
+          }
+        } catch {
+          addToast('Не удалось обработать файлы', 'error');
+        }
+      }
+    }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      try {
+        const processed = await processFileListToAttachments(e.target.files);
+        if (processed.length > 0) {
+          handleAttachmentsAdded(processed);
+        }
+      } catch {
+        addToast('Ошибка при чтении файлов', 'error');
+      }
+      e.target.value = '';
+    }
+  };
+
+  const moveAttachment = (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= attachments.length) return;
+    const next = [...attachments];
+    const it = next[index];
+    next[index] = next[targetIdx];
+    next[targetIdx] = it;
+    setAttachments(next);
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments(attachments.filter(a => a.id !== id));
+  };
+
   return (
-    <div className="fixed inset-0 z-50 z-[100] bg-[#09090b] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]">
+    <div
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="fixed inset-0 z-50 z-[100] bg-[#09090b] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]"
+    >
+      {/* Hidden File Picker Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {/* Drag & Drop Visual Overlay */}
+      {isDraggingOver && (
+        <div className="fixed inset-4 z-[120] rounded-3xl bg-[#09090b]/92 backdrop-blur-md border-2 border-dashed border-[#2a82e4] flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
+          <UploadCloud className="w-12 h-12 text-[#529ee8] animate-bounce" />
+          <span className="text-base font-semibold text-white">
+            Перетащите медиафайлы сюда
+          </span>
+          <span className="text-xs text-zinc-400 font-mono">
+            Войсы, видео, изображения или документы прикрепятся к заметке
+          </span>
+        </div>
+      )}
       {/* Top Floating Control Bar - Centered to match content width */}
       <header
         className="min-h-14 border-b border-white/[0.06] bg-[#0c0c0e] shrink-0"
@@ -304,7 +469,151 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             >
               <Link2 className="w-4 h-4" />
             </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1"
+              title="Прикрепить файл или медиа"
+            >
+              <Paperclip className="w-4 h-4 text-zinc-400" />
+            </button>
           </div>
+
+          {/* Media Attachments Section in Fullscreen Editor */}
+          {attachments.length > 0 && (
+            <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span className="font-medium flex items-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Медиа и вложения ({attachments.length})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  + Добавить еще
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2.5 pt-1">
+                {attachments.map((att, idx) => (
+                  <div
+                    key={att.id}
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg bg-black/40 border border-white/[0.06]"
+                  >
+                    {/* Media Rendering */}
+                    <div className="flex-1 min-w-0">
+                      {att.type === 'audio' ? (
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono text-zinc-400 font-medium">
+                              🎙 Войс:
+                            </span>
+                            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[200px]">
+                              {att.name}
+                            </span>
+                          </div>
+                          <AudioPlayer
+                            src={att.dataUrl || ''}
+                            duration={att.duration}
+                            waveform={att.waveform}
+                            size={att.size}
+                          />
+                        </div>
+                      ) : att.type === 'video' ? (
+                        <div className="flex items-center gap-3">
+                          <VideoCirclePlayer src={att.dataUrl || ''} compact={true} />
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-xs font-mono text-zinc-300 font-medium truncate">
+                              {att.name}
+                            </span>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              Видео-кружок {att.duration ? `• ${att.duration} сек` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      ) : att.type === 'image' ? (
+                        <div className="flex items-center gap-3">
+                          <div
+                            onClick={() => {
+                              if (att.dataUrl) {
+                                openLightbox([{ id: att.id, name: att.name, url: att.dataUrl }], 0);
+                              }
+                            }}
+                            className="w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"
+                          >
+                            <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-xs font-mono text-zinc-300 font-medium truncate">
+                              {att.name}
+                            </span>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              {Math.round(att.size / 1024)} KB
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="w-4 h-4 text-zinc-400 shrink-0" />
+                          <span className="text-xs font-mono text-zinc-300 truncate">{att.name}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">
+                            {Math.round(att.size / 1024)} KB
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions: Insert into text, Move up/down, Delete */}
+                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => insertAttachmentMarkdown(att.name)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white text-[11px] font-mono transition-colors cursor-pointer"
+                        title="Вставить ссылку ![[файл]] в позицию курсора markdown для структурирования заметки"
+                      >
+                        <Link2 className="w-3 h-3 text-[#529ee8]" />
+                        <span>Вставить в текст</span>
+                      </button>
+
+                      {/* Reorder Up */}
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => moveAttachment(idx, 'up')}
+                        className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="Переместить выше"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Reorder Down */}
+                      <button
+                        type="button"
+                        disabled={idx === attachments.length - 1}
+                        onClick={() => moveAttachment(idx, 'down')}
+                        className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="Переместить ниже"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Remove */}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(att.id)}
+                        className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Task-Specific Metadata Options */}
           {type === 'task' && (
@@ -390,6 +699,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             id="fullscreen-textarea"
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            onPaste={handlePaste}
             placeholder="Пишите здесь... Поддерживается полный синтаксис Markdown (#, **, -, [ ], таблицы, ссылки)"
             className="w-full bg-transparent font-mono text-[13px] text-[#f4f4f5] placeholder-zinc-600 resize-none leading-relaxed border-none focus:outline-none overflow-hidden"
           />

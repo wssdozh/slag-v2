@@ -9,6 +9,8 @@ export interface SlagAttachment {
   size: number;
   relativePath: string;
   dataUrl?: string; // Base64 or Object URL for rendering
+  duration?: number; // Duration in seconds (e.g. 5.8)
+  waveform?: number[]; // Normalized waveform peak array [0..1]
 }
 
 export interface SlagSubtask {

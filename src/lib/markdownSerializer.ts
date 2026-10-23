@@ -48,6 +48,8 @@ export function serializeItemToMarkdown(item: SlagItem): string {
       mimeType: att.mimeType,
       size: att.size,
       relativePath: att.relativePath,
+      ...(att.duration !== undefined ? { duration: att.duration } : {}),
+      ...(att.waveform ? { waveform: att.waveform } : {}),
     }));
   }
 

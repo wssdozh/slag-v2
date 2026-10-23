@@ -1029,4 +1029,149 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await applySubtaskBtn.click();
     await expect(page.locator('text=подзадач').first()).toBeVisible();
   });
+
+  test('28. Telegram-style voice and circle recording, audio player and fullscreen media editor', async ({ page }) => {
+    // 1. Check monolithic Telegram-style voice recording in composer (no block in block)
+    const micButton = page.locator('button[aria-label="Записать голосовую заметку"]').first();
+    await expect(micButton).toBeVisible();
+
+    await micButton.click();
+
+    // Verify monolithic recording bar is active with cancel and send buttons
+    const cancelBtn = page.locator('button', { hasText: 'ОТМЕНА' }).first();
+    await expect(cancelBtn).toBeVisible({ timeout: 5000 });
+
+    const sendVoiceBtn = page.locator('button[title="Отправить войс"]').first();
+    await expect(sendVoiceBtn).toBeVisible();
+
+    // Verify placeholder textarea is NOT visible in pure voice recording (no nested block)
+    const emptyPlaceholder = page.locator('textarea[placeholder*="Мысль, заметка или код"]');
+    await expect(emptyPlaceholder).not.toBeVisible();
+
+    // Capture visual screenshot of the sleek monolithic recording pill
+    await page.screenshot({
+      path: 'test-results/screenshots/telegram-recording-pill.png',
+      fullPage: false,
+    });
+
+    // Cancel recording
+    await cancelBtn.click();
+    await expect(emptyPlaceholder).toBeVisible();
+
+    // 2. Open Fullscreen Focus Editor from Composer
+    const expandBtn = page.locator('button[title*="Раскрыть в полноэкранный редактор"]').first();
+    await expandBtn.click();
+
+    const fullscreenTextarea = page.locator('#fullscreen-textarea');
+    await expect(fullscreenTextarea).toBeVisible();
+
+    // Verify paperclip attach button in toolbar
+    const attachBtn = page.locator('button[title*="Прикрепить файл или медиа"]').first();
+    await expect(attachBtn).toBeVisible();
+
+    // Simulate pasting an image file into the fullscreen editor
+    await fullscreenTextarea.evaluate((node) => {
+      const dt = new DataTransfer();
+      const file = new File(['mock_image_bytes'], 'mock_screenshot.png', { type: 'image/png' });
+      dt.items.add(file);
+      node.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+
+    // Verify "Медиа и вложения" section appeared with the attached image
+    await expect(page.locator('text=Медиа и вложения').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=mock_screenshot.png').first()).toBeVisible();
+
+    // Verify markdown link was inserted into content
+    const updatedContent = await fullscreenTextarea.inputValue();
+    expect(updatedContent).toContain('![[mock_screenshot.png]]');
+
+    // Test "Вставить в текст" button click
+    const insertInTextBtn = page.locator('button', { hasText: 'Вставить в текст' }).first();
+    await expect(insertInTextBtn).toBeVisible();
+    await insertInTextBtn.click();
+
+    // Capture visual screenshot of Fullscreen Editor with media
+    await page.screenshot({
+      path: 'test-results/screenshots/fullscreen-editor-media.png',
+      fullPage: false,
+    });
+
+    // Close Fullscreen Editor via Escape
+    await page.keyboard.press('Escape');
+    await expect(fullscreenTextarea).not.toBeVisible();
+
+    // 3. Verify AudioPlayer and VideoCirclePlayer in Feed
+    // Switch to "Все" to ensure demo items are visible
+    await page.locator('header button[title*="Все заметки хранилища"]').click();
+
+    // Create a note with voice attachment to test feed player
+    await page.evaluate(() => {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('slag_items_')) {
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          items.unshift({
+            id: 'test_voice_item_' + Date.now(),
+            type: 'note',
+            title: 'Тестовый войс',
+            content: 'Заметка с голосовым сообщением в стиле Telegram',
+            folder: 'Входящие',
+            tags: ['войс'],
+            attachments: [
+              {
+                id: 'att_voice_test',
+                name: 'voice_note.webm',
+                type: 'audio',
+                mimeType: 'audio/webm',
+                size: 32400,
+                relativePath: '.attachments/voice_note.webm',
+                duration: 8.4,
+                dataUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+              },
+            ],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          localStorage.setItem(key, JSON.stringify(items));
+        }
+      }
+    });
+
+    // Reload page to reflect new item
+    await page.reload();
+    await expect(page.locator('text=Тестовый войс').first()).toBeVisible({ timeout: 10000 });
+
+    // Verify Telegram-style AudioPlayer components
+    const audioCard = page.locator('.group', { hasText: 'Тестовый войс' });
+    await audioCard.scrollIntoViewIfNeeded();
+    await expect(audioCard.locator('button[title*="Воспроизвести"]').first()).toBeVisible();
+    await expect(audioCard.locator('text=31.6 KB').or(audioCard.locator('text=32.4 KB')).or(audioCard.locator('text=31.6')).or(audioCard.locator('text=KB')).first()).toBeVisible();
+    await expect(audioCard.locator('button', { hasText: '1x' }).first()).toBeVisible();
+
+    // Capture visual screenshot of Feed AudioPlayer
+    await page.screenshot({
+      path: 'test-results/screenshots/feed-audioplayer.png',
+      fullPage: false,
+    });
+
+    // 4. Test Composer attached voice preview card (compact mini-player)
+    // Click reply on the voice item to set a draft or paste audio
+    const composerEl = page.locator('main textarea').first();
+    await composerEl.fill('Заметка с прикрепленным войсом для проверки превью');
+
+    // Simulate pasting an audio file in the composer
+    await composerEl.evaluate((node) => {
+      const dt = new DataTransfer();
+      const file = new File(['mock_audio_bytes'], 'my_voice_idea.webm', { type: 'audio/webm' });
+      dt.items.add(file);
+      node.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+
+    // Verify compact mini-player in composer attachment strip
+    await expect(page.locator('button[title*="Удалить войс"]').first()).toBeVisible({ timeout: 5000 });
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-attached-voice.png',
+      fullPage: false,
+    });
+  });
 });

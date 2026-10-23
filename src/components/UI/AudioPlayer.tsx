@@ -1,23 +1,58 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause } from 'lucide-react';
 
 interface AudioPlayerProps {
   src: string;
+  duration?: number;
+  size?: number;
+  waveform?: number[];
+  compact?: boolean;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src }) => {
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatTime(secs: number): string {
+  if (isNaN(secs) || secs < 0) return '0:00';
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  src,
+  duration: initialDuration,
+  size,
+  waveform: customWaveform,
+  compact = false,
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(initialDuration || 0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const waveTrackRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onLoadedMetadata = () => setDuration(audio.duration || 0);
+    const onTimeUpdate = () => {
+      if (!isScrubbing) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+    const onLoadedMetadata = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
     const onEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
@@ -32,9 +67,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src }) => {
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
     };
-  }, []);
+  }, [isScrubbing]);
 
-  const togglePlay = () => {
+  const currentDur = duration > 0 ? duration : (initialDuration || 0);
+  const progressPercent = currentDur > 0 ? (currentTime / currentDur) * 100 : 0;
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
@@ -44,77 +83,182 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src }) => {
     }
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
+  const seekFromEvent = useCallback((e: React.MouseEvent | MouseEvent) => {
+    if (!audioRef.current || !waveTrackRef.current) return;
+    const rect = waveTrackRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
-    const newFraction = Math.max(0, Math.min(1, clickX / rect.width));
-    audioRef.current.currentTime = newFraction * duration;
-    setCurrentTime(audioRef.current.currentTime);
+    const fraction = Math.max(0, Math.min(1, clickX / rect.width));
+    const targetDur = duration || initialDuration || audioRef.current.duration || 0;
+    const targetTime = fraction * targetDur;
+    audioRef.current.currentTime = targetTime;
+    setCurrentTime(targetTime);
+  }, [duration, initialDuration]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsScrubbing(true);
+    seekFromEvent(e);
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      seekFromEvent(moveEvent);
+    };
+    const onMouseUp = () => {
+      setIsScrubbing(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
   };
 
-  const cycleSpeed = () => {
+  const cycleSpeed = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
     setPlaybackRate(nextRate);
     if (audioRef.current) audioRef.current.playbackRate = nextRate;
   };
 
-  const formatTime = (secs: number) => {
-    if (isNaN(secs) || secs < 0) return '0:00';
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
+  const barsCount = compact ? 22 : 40;
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  // Generate or sample waveform bars
+  const bars = React.useMemo(() => {
+    if (customWaveform && customWaveform.length > 0) {
+      // Interpolate or sample down to barsCount
+      const sampled: number[] = [];
+      const step = customWaveform.length / barsCount;
+      for (let i = 0; i < barsCount; i++) {
+        const idx = Math.min(customWaveform.length - 1, Math.floor(i * step));
+        const val = customWaveform[idx] ?? 0.3;
+        sampled.push(Math.max(0.15, Math.min(1, val)));
+      }
+      return sampled;
+    }
 
-  // Telegram-style faux waveform bars
-  const barsCount = 28;
+    // Deterministic procedural waveform pattern (resembles human speech envelope)
+    const generated: number[] = [];
+    for (let i = 0; i < barsCount; i++) {
+      const envelope = Math.sin((i / barsCount) * Math.PI); // tapering edges
+      const noise = Math.sin(i * 1.8) * 0.35 + Math.cos(i * 3.7) * 0.25;
+      const val = Math.max(0.18, (0.4 + noise) * envelope + 0.15);
+      generated.push(Math.min(1, val));
+    }
+    return generated;
+  }, [customWaveform, barsCount]);
 
-  return (
-    <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] max-w-sm">
-      <audio ref={audioRef} src={src} preload="metadata" />
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs">
+        <audio ref={audioRef} src={src} preload="metadata" />
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="w-6 h-6 rounded-full bg-[#2a82e4] hover:bg-[#2473cb] active:scale-95 flex items-center justify-center text-white shrink-0 cursor-pointer transition-transform shadow-sm"
+          title={isPlaying ? 'Пауза' : 'Воспроизвести'}
+        >
+          {isPlaying ? (
+            <Pause className="w-3 h-3 fill-current" />
+          ) : (
+            <Play className="w-3 h-3 fill-current ml-0.5" />
+          )}
+        </button>
 
-      {/* Play/Pause round button */}
-      <button
-        onClick={togglePlay}
-        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white transition-all shrink-0"
-      >
-        {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-      </button>
-
-      {/* Waveform / Progress track */}
-      <div className="flex-1 flex flex-col justify-center gap-1 cursor-pointer" onClick={handleSeek}>
-        <div className="flex items-center gap-[2px] h-5">
-          {Array.from({ length: barsCount }).map((_, i) => {
+        <div
+          ref={waveTrackRef}
+          onMouseDown={handleMouseDown}
+          className="flex items-center gap-[1.5px] h-4 cursor-pointer select-none"
+        >
+          {bars.map((norm, i) => {
             const barFraction = (i / barsCount) * 100;
             const isFilled = barFraction <= progressPercent;
-            // Generate pseudo-random deterministic heights for waveform aesthetics
-            const height = 6 + Math.abs(Math.sin(i * 1.3) * 12);
+            const height = Math.round(4 + norm * 11);
             return (
               <div
                 key={i}
                 style={{ height: `${height}px` }}
-                className={`w-[3px] rounded-full transition-colors ${
-                  isFilled ? 'bg-zinc-200' : 'bg-zinc-700'
+                className={`w-[2px] rounded-full transition-colors ${
+                  isFilled ? 'bg-[#529ee8]' : 'bg-white/20'
                 }`}
               />
             );
           })}
         </div>
-        <div className="flex justify-between items-center text-[10px] text-zinc-500 font-mono">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
+
+        <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+          {isPlaying ? formatTime(currentTime) : formatTime(currentDur)}
+        </span>
+      </div>
+    );
+  }
+
+  const formattedSize = formatBytes(size);
+
+  return (
+    <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.06] border border-white/[0.07] max-w-sm transition-colors select-none">
+      <audio ref={audioRef} src={src} preload="metadata" />
+
+      {/* Telegram Blue Play/Pause round button */}
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="w-10 h-10 rounded-full bg-[#2a82e4] hover:bg-[#2473cb] active:scale-95 flex items-center justify-center text-white transition-all shrink-0 shadow-md shadow-[#2a82e4]/20 cursor-pointer"
+        title={isPlaying ? 'Пауза' : 'Воспроизвести'}
+        aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
+      >
+        {isPlaying ? (
+          <Pause className="w-4 h-4 fill-current" />
+        ) : (
+          <Play className="w-4 h-4 fill-current ml-0.5" />
+        )}
+      </button>
+
+      {/* Waveform and Time metadata */}
+      <div className="flex-1 flex flex-col justify-center gap-1.5 min-w-0">
+        <div
+          ref={waveTrackRef}
+          onMouseDown={handleMouseDown}
+          className="flex items-center gap-[2px] h-6 cursor-pointer select-none py-1"
+          title="Перемотка"
+        >
+          {bars.map((norm, i) => {
+            const barFraction = (i / barsCount) * 100;
+            const isFilled = barFraction <= progressPercent;
+            const height = Math.round(4 + norm * 18);
+            return (
+              <div
+                key={i}
+                style={{ height: `${height}px` }}
+                className={`w-[2.5px] rounded-full transition-colors ${
+                  isFilled ? 'bg-[#529ee8]' : 'bg-white/20 hover:bg-white/30'
+                }`}
+              />
+            );
+          })}
+        </div>
+
+        {/* Subtitle with Telegram-style details: 00:08, 30.2 KB */}
+        <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400">
+          <div className="flex items-center gap-1.5 truncate">
+            <span>{isPlaying ? formatTime(currentTime) : formatTime(currentDur)}</span>
+            {formattedSize && (
+              <>
+                <span className="text-zinc-600">•</span>
+                <span className="text-zinc-500">{formattedSize}</span>
+              </>
+            )}
+          </div>
+
+          {/* Speed badge */}
+          <button
+            type="button"
+            onClick={cycleSpeed}
+            className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors shrink-0 cursor-pointer"
+            title="Скорость воспроизведения"
+          >
+            {playbackRate}x
+          </button>
         </div>
       </div>
-
-      {/* Speed multiplier button */}
-      <button
-        onClick={cycleSpeed}
-        className="px-1.5 py-0.5 rounded text-[10px] font-mono text-zinc-400 hover:text-white hover:bg-white/5 transition-colors shrink-0"
-      >
-        {playbackRate}x
-      </button>
     </div>
   );
 };

@@ -1,24 +1,30 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Trash2, Check } from 'lucide-react';
+import { Send, RefreshCw } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
 
 interface VideoRecorderProps {
-  onRecorded: (attachment: SlagAttachment) => void;
+  onRecorded: (attachment: SlagAttachment, autoSend?: boolean) => void;
   onCancel: () => void;
+  finishTriggerRef?: React.MutableRefObject<((autoSend?: boolean) => void) | null>;
 }
 
-export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCancel }) => {
+export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCancel, finishTriggerRef }) => {
   const MAX_SECONDS = 60;
-  const [seconds, setSeconds] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
 
-  const handleFinish = useCallback(() => {
-    if (!mediaRecorderRef.current) return;
+  const handleFinish = useCallback((autoSend: boolean = false) => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+
+    const finalDuration = Math.max(0.5, (Date.now() - startTimeRef.current) / 1000);
 
     mediaRecorderRef.current.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
@@ -28,14 +34,15 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
         const id = 'att_vid_' + Date.now();
         const attachment: SlagAttachment = {
           id,
-          name: `square_${new Date().toISOString().slice(11, 19).replace(/:/g, '-')}.webm`,
+          name: `circle_${new Date().toISOString().slice(11, 19).replace(/:/g, '-')}.webm`,
           type: 'video',
           mimeType: 'video/webm',
           size: blob.size,
           relativePath: `.attachments/${id}.webm`,
           dataUrl: base64,
+          duration: Number(finalDuration.toFixed(1)),
         };
-        onRecorded(attachment);
+        onRecorded(attachment, autoSend);
       };
       reader.readAsDataURL(blob);
     };
@@ -43,25 +50,71 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
     mediaRecorderRef.current.stop();
   }, [onRecorded]);
 
+  useEffect(() => {
+    if (finishTriggerRef) {
+      finishTriggerRef.current = (autoSend: boolean = true) => handleFinish(autoSend);
+      return () => {
+        finishTriggerRef.current = null;
+      };
+    }
+  }, [finishTriggerRef, handleFinish]);
+
   // Auto-stop at 60s limit
   useEffect(() => {
-    if (seconds >= MAX_SECONDS) {
+    if (elapsedMs >= MAX_SECONDS * 1000) {
       handleFinish();
     }
-  }, [seconds, handleFinish]);
+  }, [elapsedMs, handleFinish]);
+
+  const handleDiscard = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    onCancel();
+  }, [onCancel]);
 
   useEffect(() => {
-    const startCamera = async () => {
+    let active = true;
+
+    const initCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 480 },
-            height: { ideal: 480 },
-            aspectRatio: 1,
-            facingMode: 'user',
-          },
-          audio: true,
-        });
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+        }
+
+        let stream: MediaStream | null = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 480 },
+              height: { ideal: 480 },
+              aspectRatio: 1,
+              facingMode,
+            },
+            audio: true,
+          });
+        } catch (mediaErr) {
+          console.warn('Camera/Mic not accessible, fallback to synthetic stream:', mediaErr);
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 480;
+            canvas.height = 480;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#18181c';
+              ctx.fillRect(0, 0, 480, 480);
+            }
+            stream = canvas.captureStream(15);
+          } catch {
+            onCancel();
+            return;
+          }
+        }
+
+        if (!active || !stream) {
+          stream?.getTracks().forEach(t => t.stop());
+          return;
+        }
 
         streamRef.current = stream;
         if (videoPreviewRef.current) {
@@ -81,22 +134,24 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
           if (e.data.size > 0) chunksRef.current.push(e.data);
         };
 
-        mediaRecorder.start(250);
+        mediaRecorder.start(100);
+        startTimeRef.current = Date.now();
         setIsReady(true);
 
-        timerRef.current = window.setInterval(() => {
-          setSeconds(s => s + 1);
-        }, 1000);
+        timerIntervalRef.current = window.setInterval(() => {
+          setElapsedMs(Date.now() - startTimeRef.current);
+        }, 80);
       } catch (err) {
         console.error('Camera/Microphone error:', err);
         onCancel();
       }
     };
 
-    startCamera();
+    initCamera();
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      active = false;
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
@@ -104,60 +159,103 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
         streamRef.current.getTracks().forEach(t => t.stop());
       }
     };
-  }, [onCancel]);
+  }, [facingMode, onCancel]);
 
-  const handleDiscard = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    onCancel();
+  const toggleCamera = () => {
+    setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
   };
 
-  const formatTimer = (s: number) => {
-    const mins = Math.floor(s / 60);
-    const secs = s % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  const progressFraction = Math.min(1, elapsedMs / (MAX_SECONDS * 1000));
+  const radius = 106;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - progressFraction * circumference;
+
+  const formatTelegramTimer = (ms: number) => {
+    const totalSecs = ms / 1000;
+    const mins = Math.floor(totalSecs / 60);
+    const secs = Math.floor(totalSecs % 60);
+    const tenths = Math.floor((ms % 1000) / 100);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs},${tenths}`;
   };
 
   return (
-    <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-[#141417] border border-white/[0.08] shadow-2xl animate-in fade-in max-w-xs mx-auto">
-      {/* Square Camera Preview */}
-      <div className="relative w-44 h-44 rounded-2xl overflow-hidden bg-black border border-white/[0.1] shadow-inner">
+    <div className="flex flex-col items-center gap-2.5 p-1 select-none animate-in fade-in w-full max-w-sm mx-auto">
+      {/* Telegram Circular Video Preview with SVG Progress Ring */}
+      <div className="relative w-52 h-52 sm:w-60 sm:h-60 rounded-full overflow-hidden bg-black border-2 border-white/20 shadow-2xl">
         <video
           ref={videoPreviewRef}
           autoPlay
           playsInline
           muted
-          className="w-full h-full object-cover scale-x-[-1]"
+          className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
         />
 
-        {/* Pulse recording badge with 60s max */}
-        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-mono text-white border border-white/10">
-          <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-          <span>{formatTimer(seconds)} / 01:00</span>
-        </div>
+        {/* Circular Progress Arc */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none -rotate-90"
+          viewBox="0 0 240 240"
+        >
+          <circle
+            cx="120"
+            cy="120"
+            r={radius}
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.15)"
+            strokeWidth="4"
+          />
+          <circle
+            cx="120"
+            cy="120"
+            r={radius}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="4"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            className="transition-all duration-75"
+          />
+        </svg>
+
+        {/* Switch Camera Button floating inside circle */}
+        <button
+          type="button"
+          onClick={toggleCamera}
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 p-2 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:text-white border border-white/10 hover:bg-black/80 transition-all cursor-pointer"
+          title="Сменить камеру"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
-      <div className="flex items-center justify-between w-full px-2 text-xs">
-        <button
-          onClick={handleDiscard}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-white/[0.06] transition-colors"
-          title="Отмена"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+      {/* Bottom Bar: Red pulse timer, CANCEL, Send Blue Button */}
+      <div className="flex items-center justify-between w-full px-1 py-1">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+          <span className="font-mono text-xs font-semibold text-white">
+            {formatTelegramTimer(elapsedMs)}
+          </span>
+        </div>
 
-        <span className="text-[11px] text-zinc-500 font-medium">Видео-квадратик</span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleDiscard}
+            className="text-xs font-semibold text-[#529ee8] hover:text-rose-400 transition-colors uppercase tracking-wider cursor-pointer"
+          >
+            ОТМЕНА
+          </button>
 
-        <button
-          onClick={handleFinish}
-          disabled={!isReady}
-          className="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors flex items-center gap-1.5"
-          title="Прикрепить видео"
-        >
-          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Готово</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => handleFinish(true)}
+            disabled={!isReady}
+            className="w-8 h-8 rounded-full bg-[#2a82e4] hover:bg-[#2473cb] active:scale-95 flex items-center justify-center text-white transition-all shadow-md shadow-[#2a82e4]/30 cursor-pointer disabled:opacity-50"
+            title="Отправить видео-кружок"
+          >
+            <Send className="w-3.5 h-3.5 ml-0.5 fill-current" />
+          </button>
+        </div>
       </div>
     </div>
   );

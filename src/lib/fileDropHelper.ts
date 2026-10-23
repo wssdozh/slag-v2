@@ -1,6 +1,6 @@
 import type { SlagAttachment } from '../types';
 
-export async function processFileListToAttachments(fileList: FileList): Promise<SlagAttachment[]> {
+export async function processFileListToAttachments(fileList: FileList | File[]): Promise<SlagAttachment[]> {
   const files = Array.from(fileList);
   const attachments: SlagAttachment[] = [];
 

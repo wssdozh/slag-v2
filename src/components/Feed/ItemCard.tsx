@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
-import { VideoSquarePlayer } from '../UI/VideoSquarePlayer';
+import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import {
   CheckCircle2,
   Circle,
@@ -457,17 +457,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Video Square Notes (instead of round video circles) */}
+      {/* Video Circle Notes (Telegram style) */}
       {videoAttachments.map(att => (
         <div key={att.id} className="pt-1 flex">
-          <VideoSquarePlayer src={att.dataUrl || ''} />
+          <VideoCirclePlayer src={att.dataUrl || ''} />
         </div>
       ))}
 
       {/* Audio Notes Player */}
       {audioAttachments.map(att => (
         <div key={att.id} className="pt-1">
-          <AudioPlayer src={att.dataUrl || ''} />
+          <AudioPlayer
+            src={att.dataUrl || ''}
+            duration={att.duration}
+            size={att.size}
+            waveform={att.waveform}
+          />
         </div>
       ))}
 
