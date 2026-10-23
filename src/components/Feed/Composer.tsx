@@ -56,8 +56,19 @@ export const Composer: React.FC = () => {
   // Hold-to-record & lock state
   const [recordMode, setRecordMode] = useState<'idle' | 'holding' | 'locked'>('idle');
   const [lockHint, setLockHint] = useState<'audio' | 'video' | null>(null);
+  const [mobileMediaType, setMobileMediaType] = useState<'audio' | 'video'>('audio');
   const pointerStartRef = useRef<{ x: number; y: number; time: number; target: 'audio' | 'video' } | null>(null);
   const triggerFinishRef = useRef<((autoSend?: boolean) => void) | null>(null);
+  const holdTimerRef = useRef<number | null>(null);
+
+  // Clear hold timer on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
 
   // WikiLink [[ autocomplete state
   const [wikiQuery, setWikiQuery] = useState<string | null>(null);
@@ -285,10 +296,67 @@ export const Composer: React.FC = () => {
     }
   };
 
+  const handleMobileMediaPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    if (isRecordingAudio || isRecordingVideo) return;
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    const currentTarget = mobileMediaType;
+    pointerStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      time: Date.now(),
+      target: currentTarget,
+    };
+
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+    }
+
+    // 220ms hold threshold to differentiate single tap (toggle audio/video) from holding (record)
+    holdTimerRef.current = window.setTimeout(() => {
+      holdTimerRef.current = null;
+      setRecordMode('holding');
+      setLockHint(currentTarget);
+      if (currentTarget === 'audio') {
+        setIsRecordingVideo(false);
+        setIsRecordingAudio(true);
+      } else {
+        setIsRecordingAudio(false);
+        setIsRecordingVideo(true);
+      }
+      try {
+        navigator.vibrate?.(15);
+      } catch {}
+    }, 220);
+  };
+
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!pointerStartRef.current || recordMode !== 'holding') return;
+    if (!pointerStartRef.current) return;
     const dy = e.clientY - pointerStartRef.current.y;
     const dx = e.clientX - pointerStartRef.current.x;
+
+    // If hold timer is still pending and user moved noticeably, trigger hold immediately
+    if (holdTimerRef.current && (dy < -15 || dx < -15)) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+      const target = pointerStartRef.current.target;
+      setRecordMode('holding');
+      setLockHint(target);
+      if (target === 'audio') {
+        setIsRecordingVideo(false);
+        setIsRecordingAudio(true);
+      } else {
+        setIsRecordingAudio(false);
+        setIsRecordingVideo(true);
+      }
+    }
+
+    if (recordMode !== 'holding') return;
 
     // Swipe up -> Lock hands-free recording
     if (dy < -35) {
@@ -320,9 +388,20 @@ export const Composer: React.FC = () => {
     const holdTime = Date.now() - pointerStartRef.current.time;
     pointerStartRef.current = null;
 
+    if (holdTimerRef.current) {
+      // Tap detected (<220ms): toggle audio <-> video mode
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+      setMobileMediaType((prev) => (prev === 'audio' ? 'video' : 'audio'));
+      try {
+        navigator.vibrate?.(10);
+      } catch {}
+      return;
+    }
+
     if (recordMode === 'holding') {
       if (holdTime < 350) {
-        // Short tap -> lock in hands-free mode for comfortable recording
+        // Short tap while in holding mode -> lock in hands-free mode for comfortable recording
         setRecordMode('locked');
         setLockHint(null);
       } else {
@@ -334,6 +413,20 @@ export const Composer: React.FC = () => {
         }
       }
     }
+  };
+
+  const handlePointerCancel = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (recordMode === 'holding') {
+      setIsRecordingAudio(false);
+      setIsRecordingVideo(false);
+      setRecordMode('idle');
+      setLockHint(null);
+    }
+    pointerStartRef.current = null;
   };
 
   const sendItemWithAttachments = (attachmentsToSend: SlagAttachment[]) => {
@@ -852,11 +945,12 @@ export const Composer: React.FC = () => {
 
       {/* Task Extra Controls (Priority & Due Date) */}
       {itemType === 'task' && (
-        <div className="flex items-center gap-2.5 px-1 py-1 text-xs text-zinc-400 border-t border-white/[0.04] overflow-x-auto scrollbar-none whitespace-nowrap">
-          <div className="shrink-0 flex items-center gap-1.5">
+        <div className="flex items-center gap-2 px-1 py-1 text-xs text-zinc-400 border-t border-white/[0.04] overflow-x-auto scrollbar-none whitespace-nowrap">
+          <div className="shrink-0 flex items-center gap-1">
             <span className="text-[11px] text-zinc-500">Приоритет:</span>
             <Select
               size="sm"
+              variant="ghost"
               direction="up"
               value={priority}
               onChange={(val) => setPriority(val as any)}
@@ -869,13 +963,13 @@ export const Composer: React.FC = () => {
             />
           </div>
 
-          <div className="shrink-0 flex items-center gap-1.5">
+          <div className="shrink-0 flex items-center gap-1">
             <span className="text-[11px] text-zinc-500">Дедлайн:</span>
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="bg-black/40 border border-white/[0.08] rounded px-1.5 py-0.5 text-xs text-zinc-300"
+              className="bg-transparent hover:bg-white/[0.06] rounded px-1.5 py-0.5 text-xs text-zinc-300 outline-none transition-colors"
             />
           </div>
         </div>
@@ -910,43 +1004,43 @@ export const Composer: React.FC = () => {
         <div className="flex items-center justify-between pt-1 gap-2 relative">
           {/* Lock Hint Banner when holding mic/video button */}
           {lockHint && recordMode === 'holding' && (
-            <div className="absolute bottom-full mb-3 right-8 z-50 px-3 py-1.5 rounded-full bg-[#141417] border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
+            <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-[#141417] border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
               <Lock className="w-3.5 h-3.5 text-[#529ee8] animate-bounce" />
               <span>Потяните вверх для фиксации</span>
             </div>
           )}
 
           {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* +AI Smart Tagging Button - Text preserved, height matching row */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* +AI Smart Tagging Button - Seamless embedded button */}
             <button
               type="button"
               onClick={handleSmartAiTags}
               disabled={isGeneratingAiTags}
-              className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
               title="ИИ авто-тегирование (+AI)"
               aria-label="ИИ авто-тегирование (+AI)"
             >
               {isGeneratingAiTags ? (
-                <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
               ) : (
-                <Sparkles className="w-4 h-4 text-zinc-300" />
+                <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
               )}
               <span>+AI</span>
             </button>
 
-            {/* Type Selector Dropdown - Text preserved, height matching row */}
+            {/* Type Selector Dropdown - Seamless embedded button */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 border border-white/[0.06]"
+                className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center gap-1"
                 aria-label="Сменить тип записи"
               >
                 <span>
                   {itemType === 'note' ? 'Заметка' : itemType === 'task' ? 'Таска' : 'Статья'}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+                <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 ${isTypeDropdownOpen ? 'rotate-180 text-zinc-300' : ''}`} />
               </button>
 
               {isTypeDropdownOpen && (
@@ -994,68 +1088,71 @@ export const Composer: React.FC = () => {
               )}
             </div>
 
-            {/* Voice Mic Button with Press-to-Talk & Lock */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!isRecordingAudio) {
-                  setIsRecordingVideo(false);
-                  setIsRecordingAudio(true);
-                  setRecordMode('locked');
-                  setLockHint(null);
-                }
-              }}
-              onPointerDown={(e) => handlePointerDown(e, 'audio')}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
-                isRecordingAudio
-                  ? 'bg-rose-500/20 text-rose-400'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-              }`}
-              title="Записать голосовую заметку (кликните или удерживайте)"
-              aria-label="Записать голосовую заметку"
-            >
-              <Mic className="w-4 h-4" />
-            </button>
+            {/* Desktop Dedicated Mic & Video Buttons (Hidden on mobile where they merge into Send/Media button) */}
+            {!isMobile && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isRecordingAudio) {
+                      setIsRecordingVideo(false);
+                      setIsRecordingAudio(true);
+                      setRecordMode('locked');
+                      setLockHint(null);
+                    }
+                  }}
+                  onPointerDown={(e) => handlePointerDown(e, 'audio')}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
+                    isRecordingAudio
+                      ? 'bg-rose-500/20 text-rose-400'
+                      : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                  }`}
+                  title="Записать голосовую заметку (кликните или удерживайте)"
+                  aria-label="Записать голосовую заметку"
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
 
-            {/* Video Round Circle Camera Button with Press-to-Talk & Lock */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!isRecordingVideo) {
-                  setIsRecordingAudio(false);
-                  setIsRecordingVideo(true);
-                  setRecordMode('locked');
-                  setLockHint(null);
-                }
-              }}
-              onPointerDown={(e) => handlePointerDown(e, 'video')}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
-                isRecordingVideo
-                  ? 'bg-rose-500/20 text-rose-400'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-              }`}
-              title="Записать видео-кружок (кликните или удерживайте)"
-              aria-label="Записать видео-кружок"
-            >
-              <Video className="w-4 h-4" />
-            </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isRecordingVideo) {
+                      setIsRecordingAudio(false);
+                      setIsRecordingVideo(true);
+                      setRecordMode('locked');
+                      setLockHint(null);
+                    }
+                  }}
+                  onPointerDown={(e) => handlePointerDown(e, 'video')}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
+                    isRecordingVideo
+                      ? 'bg-rose-500/20 text-rose-400'
+                      : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                  }`}
+                  title="Записать видео-кружок (кликните или удерживайте)"
+                  aria-label="Записать видео-кружок"
+                >
+                  <Video className="w-4 h-4" />
+                </button>
+              </>
+            )}
 
             {/* File Attach Button */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
+              className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
               title="Прикрепить файл"
             >
               <Paperclip className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Right Side: Clear draft, Fullscreen Expand Icon, and Send Button */}
+          {/* Right Side: Clear draft, Fullscreen Expand Icon, and Send / Media Button */}
           <div className="flex items-center gap-1.5 shrink-0">
             {(content.trim() || attachments.length > 0) && (
               <button
@@ -1071,7 +1168,7 @@ export const Composer: React.FC = () => {
                   setIsPriorityDismissed(false);
                   setDismissedTags(new Set());
                 }}
-                className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
                 title="Очистить"
               >
                 <Trash2 className="w-4 h-4" />
@@ -1082,26 +1179,49 @@ export const Composer: React.FC = () => {
             <button
               type="button"
               onClick={handleExpandToFullscreen}
-              className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
               title="Раскрыть в полноэкранный редактор"
             >
               <Maximize2 className="w-4 h-4" />
             </button>
 
-            {/* Telegram-style Circular Send Button */}
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!content.trim() && attachments.length === 0}
-              className={`w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 ${
-                content.trim() || attachments.length > 0
-                  ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-md cursor-pointer'
-                  : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
-              }`}
-              title="Отправить (Enter)"
-            >
-              <Send className="w-4 h-4 ml-0.5 fill-current" />
-            </button>
+            {/* Send or Mobile Media Record Button */}
+            {isMobile && !content.trim() && attachments.length === 0 ? (
+              <button
+                type="button"
+                onPointerDown={handleMobileMediaPointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+                className="w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
+                title={
+                  mobileMediaType === 'audio'
+                    ? 'Записать аудио (удерживайте) / Нажмите для видео'
+                    : 'Записать видео (удерживайте) / Нажмите для аудио'
+                }
+                aria-label={mobileMediaType === 'audio' ? 'Записать аудио' : 'Записать видео'}
+              >
+                {mobileMediaType === 'audio' ? (
+                  <Mic className="w-4 h-4 transition-transform duration-150" />
+                ) : (
+                  <Video className="w-4 h-4 transition-transform duration-150" />
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!content.trim() && attachments.length === 0}
+                className={`w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 ${
+                  content.trim() || attachments.length > 0
+                    ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-md cursor-pointer'
+                    : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
+                }`}
+                title="Отправить (Enter)"
+              >
+                <Send className="w-4 h-4 ml-0.5 fill-current" />
+              </button>
+            )}
           </div>
         </div>
       )}
