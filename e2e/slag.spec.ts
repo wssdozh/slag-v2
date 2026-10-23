@@ -1242,7 +1242,23 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       const count = await modalTags.count();
       expect(count).toBeGreaterThan(0);
 
-      // Take screenshot of Triage Modal with tags
+      // Verify folder selector exists and test changing folder
+      const folderSelect = page.locator('div[role="dialog"] select').first();
+      await expect(folderSelect).toBeVisible();
+      await folderSelect.selectOption({ index: 1 });
+
+      // Test adding an extra tag
+      const addTagBtn = page.locator('div[role="dialog"] button:has-text("тег")').first();
+      if (await addTagBtn.isVisible()) {
+        await addTagBtn.click();
+        const tagInput = page.locator('div[role="dialog"] input[placeholder="тег..."]').first();
+        await expect(tagInput).toBeVisible();
+        await tagInput.fill('важно');
+        await tagInput.press('Enter');
+        await expect(page.locator('div[role="dialog"] span:has-text("#важно")').first()).toBeVisible();
+      }
+
+      // Take screenshot of Triage Modal with interactive selectors
       await page.screenshot({
         path: 'test-results/screenshots/triage-modal-with-tags.png',
         fullPage: false,

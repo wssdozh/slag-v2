@@ -29,6 +29,16 @@ export interface TriageSuggestion extends CategorizeResult {
   itemTitle: string;
 }
 
+export interface TriageProgress {
+  processed: number;
+  total: number;
+}
+
+export type TriageProgressCallback = (
+  chunkSuggestions: TriageSuggestion[],
+  progress: TriageProgress
+) => void;
+
 function formatTag(tag: string, style: 'lowercase' | 'kebab-case'): string {
   let clean = tag.toLowerCase().replace(/^#/, '').trim();
   if (style === 'kebab-case') {
@@ -379,12 +389,14 @@ export async function generateSmartTags(content: string, settings: AiSettings): 
 }
 
 /**
- * Intelligent Inbox Triage: matches inbox notes to folders and suggests taxonomy tags.
+ * Intelligent Inbox Triage: matches inbox notes to folders and suggests taxonomy tags in batches of 5.
+ * Emits progressive chunk results via onProgress callback.
  */
 export async function triageInboxItems(
   inboxItems: SlagItem[],
   folders: FolderMeta[],
-  settings: AiSettings
+  settings: AiSettings,
+  onProgress?: TriageProgressCallback
 ): Promise<TriageSuggestion[]> {
   const eligibleFolders = folders.filter((f) => f.path !== 'Входящие');
   if (inboxItems.length === 0 || eligibleFolders.length === 0) {
@@ -401,15 +413,21 @@ export async function triageInboxItems(
     description: f.description || 'Общие заметки этой темы',
   }));
 
-  const itemsContext = inboxItems.map((it) => ({
-    id: it.id,
-    title: it.title,
-    content: it.content.slice(0, 300),
-    tags: it.tags,
-    type: it.type,
-  }));
+  const CHUNK_SIZE = 5;
+  const allSuggestions: TriageSuggestion[] = [];
+  let processedCount = 0;
 
-  const systemPrompt = `Ты — интеллектуальный диспетчер сортировки заметок (AI Triage) и таксономист базы знаний SLAG.
+  for (let i = 0; i < inboxItems.length; i += CHUNK_SIZE) {
+    const chunk = inboxItems.slice(i, i + CHUNK_SIZE);
+    const itemsContext = chunk.map((it) => ({
+      id: it.id,
+      title: it.title,
+      content: it.content.slice(0, 350),
+      tags: it.tags,
+      type: it.type,
+    }));
+
+    const systemPrompt = `Ты — интеллектуальный диспетчер сортировки заметок (AI Triage) и таксономист базы знаний SLAG.
 Твоя задача — для каждой неразобранной заметки из папки "Входящие":
 1. Выбрать наиболее подходящую целевую папку (targetFolder) на основе описаний папок.
 2. Подобрать от 1 до ${maxTags} точных тегов (tags).
@@ -427,45 +445,69 @@ ${JSON.stringify(foldersContext, null, 2)}
 3. reason — 5-8 слов на русском.
 4. Верни ТОЛЬКО JSON-массив объектов: [{ "itemId": "...", "targetFolder": "...", "tags": ["..."], "reason": "..." }]`;
 
-  const userPrompt = `НЕРАЗОБРАННЫЕ ЗАМЕТКИ:\n${JSON.stringify(itemsContext, null, 2)}`;
+    const userPrompt = `НЕРАЗОБРАННЫЕ ЗАМЕТКИ (ПАКЕТ):\n${JSON.stringify(itemsContext, null, 2)}`;
 
-  const parsed = await callJsonLlm<
-    Array<{ itemId: string; targetFolder: string; tags?: string[]; reason: string }>
-  >(systemPrompt, userPrompt, settings, 0.1);
+    let chunkResult: TriageSuggestion[] | null = null;
 
-  if (Array.isArray(parsed) && parsed.length > 0) {
-    return parsed.map((s) => {
-      const item = inboxItems.find((i) => i.id === s.itemId);
-      const rawTags = Array.isArray(s.tags) ? s.tags : [];
-      const formatted = rawTags.map((t) => formatTag(String(t), style)).filter(Boolean);
-      const itemExisting = item?.tags || [];
-      const mergedTags = Array.from(new Set([...itemExisting, ...formatted])).slice(0, maxTags);
+    try {
+      const parsed = await callJsonLlm<
+        Array<{ itemId: string; targetFolder: string; tags?: string[]; reason: string }>
+      >(systemPrompt, userPrompt, settings, 0.1);
 
-      return {
-        itemId: s.itemId,
-        itemTitle: item?.title || 'Без названия',
-        targetFolder: s.targetFolder,
-        tags: mergedTags,
-        reason: s.reason || 'Распределено по смыслу',
-      };
-    });
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        chunkResult = chunk.map((item) => {
+          const match = parsed.find((s) => s.itemId === item.id);
+          const rawTags = Array.isArray(match?.tags) ? match!.tags : [];
+          const formatted = rawTags.map((t) => formatTag(String(t), style)).filter(Boolean);
+          const itemExisting = item.tags || [];
+          const mergedTags = Array.from(new Set([...itemExisting, ...formatted])).slice(0, maxTags);
+          const targetFolder = match?.targetFolder && eligibleFolders.some((f) => f.path === match.targetFolder)
+            ? match.targetFolder
+            : eligibleFolders[0].path;
+
+          return {
+            itemId: item.id,
+            itemTitle: item.title || 'Без названия',
+            targetFolder,
+            tags: mergedTags,
+            reason: match?.reason || 'Распределено по смыслу',
+          };
+        });
+      }
+    } catch (err) {
+      aiLog.warn('Chunk triage failed, fallback to local heuristic for this chunk', err);
+    }
+
+    // Local fallback for this chunk if LLM failed
+    if (!chunkResult) {
+      chunkResult = chunk.map((item) => {
+        const textToMatch = `${item.title} ${item.content} ${item.tags.join(' ')}`;
+        const matched = localMatchFolder(textToMatch, eligibleFolders, eligibleFolders[0].path);
+        const tags = localHeuristicTags(textToMatch, existingTags, style, maxTags);
+        const mergedTags = Array.from(new Set([...item.tags, ...tags])).slice(0, maxTags);
+
+        return {
+          itemId: item.id,
+          itemTitle: item.title,
+          targetFolder: matched.folder,
+          tags: mergedTags,
+          reason: matched.reason,
+        };
+      });
+    }
+
+    allSuggestions.push(...chunkResult);
+    processedCount += chunk.length;
+
+    if (onProgress) {
+      onProgress(chunkResult, {
+        processed: processedCount,
+        total: inboxItems.length,
+      });
+    }
   }
 
-  // Local fallback
-  return inboxItems.map((item) => {
-    const textToMatch = `${item.title} ${item.content} ${item.tags.join(' ')}`;
-    const matched = localMatchFolder(textToMatch, eligibleFolders, eligibleFolders[0].path);
-    const tags = localHeuristicTags(textToMatch, existingTags, style, maxTags);
-    const mergedTags = Array.from(new Set([...item.tags, ...tags])).slice(0, maxTags);
-
-    return {
-      itemId: item.id,
-      itemTitle: item.title,
-      targetFolder: matched.folder,
-      tags: mergedTags,
-      reason: matched.reason,
-    };
-  });
+  return allSuggestions;
 }
 
 /**
