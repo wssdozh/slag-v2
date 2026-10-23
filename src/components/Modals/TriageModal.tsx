@@ -179,23 +179,18 @@ const TriageModalDialog: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {s.tags && s.tags.length > 0 && (
-                          <div className="flex items-center gap-1 shrink-0">
-                            {s.tags.map(t => (
-                              <span
-                                key={t}
-                                className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-zinc-400"
-                              >
-                                #{t}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <p className="text-[11px] text-zinc-500 leading-normal line-clamp-1">
-                          {s.reason}
-                        </p>
-                      </div>
+                      {s.tags && s.tags.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {s.tags.map(t => (
+                            <span
+                              key={t}
+                              className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-zinc-400"
+                            >
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
