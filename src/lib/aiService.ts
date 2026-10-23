@@ -577,6 +577,25 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
   const startTime = Date.now();
   let capturedAction: SuggestedAction | undefined;
 
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const tomorrowDate = new Date(now.getTime() + 86400000);
+  const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
+  const dayNamesRu = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  const todayDayName = dayNamesRu[now.getDay()];
+  const tomorrowDayName = dayNamesRu[tomorrowDate.getDay()];
+
+  const scopedTasks = allItems.filter(i => {
+    if (i.type !== 'task') return false;
+    if (!isInbox && i.folder !== currentFolder && !i.folder.startsWith(currentFolder + '/')) return false;
+    return true;
+  });
+
+  const tasksToday = scopedTasks.filter(t => t.dueDate === todayStr);
+  const tasksTomorrow = scopedTasks.filter(t => t.dueDate === tomorrowStr);
+  const overdueTasks = scopedTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < todayStr);
+  const unscheduledTasks = scopedTasks.filter(t => t.status !== 'done' && !t.dueDate);
+
   // Local Tool Executor
   const executeLocalTool = async (name: string, args: Record<string, any>): Promise<any> => {
     if (name === 'search_notes') {
@@ -913,6 +932,22 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
   const systemPrompt = `Ты — персональный ИИ-ассистент базы знаний SLAG v2.
 Твой тон: фактологический, прямой, без приветствий и пустых речевых оборотов (Zero-Slop).
 
+ТЕКУЩЕЕ ВРЕМЯ И КАЛЕНДАРЬ:
+- Сегодня: ${todayStr} (${todayDayName})
+- Завтра: ${tomorrowStr} (${tomorrowDayName})
+
+АКТУАЛЬНЫЙ СРЕЗ ЗАДАЧ ИЗ ЛОКАЛЬНОЙ БАЗЫ SLAG v2:
+- Задачи на сегодня (${tasksToday.length}): ${tasksToday.length > 0 ? tasksToday.map(t => `«${t.title}» [статус: ${t.status}, приоритет: ${t.priority || 'обычный'}]`).join(', ') : 'нет'}
+- Задачи на завтра (${tasksTomorrow.length}): ${tasksTomorrow.length > 0 ? tasksTomorrow.map(t => `«${t.title}» [статус: ${t.status}, приоритет: ${t.priority || 'обычный'}]`).join(', ') : 'нет'}
+- Просроченные задачи (${overdueTasks.length}): ${overdueTasks.length > 0 ? overdueTasks.map(t => `«${t.title}» [срок: ${t.dueDate}]`).join(', ') : 'нет'}
+- Задачи без даты (${unscheduledTasks.length}): ${unscheduledTasks.length > 0 ? unscheduledTasks.slice(0, 5).map(t => `«${t.title}»`).join(', ') : 'нет'}
+
+КАТЕГОРИЧЕСКИЙ ЗАПРЕТ ВНЕШНИХ СЕРВИСОВ И GOOGLE CALENDAR:
+Ты работаешь ИСКЛЮЧИТЕЛЬНО с локальной базой заметок и задач SLAG v2 (Local-First).
+В приложении НЕТ Google Calendar, Google Workspace, Apple Calendar или сторонних расширений!
+КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО упоминать Google Calendar, писать "Чтобы активировать это расширение, вам нужно подключиться к Google Calendar" или предлагать подключение внешних сервисов.
+Все данные о задачах на сегодня, завтра и расписание уже предоставлены тебе в блоке «АКТУАЛЬНЫЙ СРЕЗ ЗАДАЧ» выше. Если пользователь спрашивает «чо на завтра», «что на сегодня», «какие дела» — отвечай прямо на основе этого среза!
+
 КОНТЕКСТ ВИДИМОСТИ:
 ${isInbox
   ? 'ВЫ НАХОДИТЕСЬ ВО «ВХОДЯЩИХ»: вам доступно ВСЕ ХРАНИЛИЩЕ целиком (все папки, таски, статьи).'
@@ -1186,6 +1221,25 @@ ${isInbox
         }
       }
 
+      // Google Calendar Hallucination Interceptor & Fallback
+      const isGoogleCalendarHallucination = (text: string) =>
+        /Google\s*Calendar|активировать это расширение|подключиться к Google/i.test(text);
+
+      if (isGoogleCalendarHallucination(finalContent)) {
+        aiLog.warn('Intercepted Google Calendar hallucination, substituting with local SLAG v2 agenda');
+        const lastUserText = [...messages].reverse().find(m => m.role === 'user')?.content.toLowerCase() || '';
+        const isTomorrow = lastUserText.includes('завтра');
+        const targetLabel = isTomorrow ? `завтра (${tomorrowStr})` : `сегодня (${todayStr})`;
+        const targetTasks = isTomorrow ? tasksTomorrow : tasksToday;
+
+        if (targetTasks.length === 0) {
+          finalContent = `На ${targetLabel} запланированных задач нет. День свободен для работы.`;
+        } else {
+          finalContent = `Задачи на ${targetLabel} (${targetTasks.length}):\n` +
+            targetTasks.map(t => `- [[${t.title}]] (${t.status}, приоритет: ${t.priority || 'обычный'}${t.reminder ? `, время: ${t.reminder}` : ''})`).join('\n');
+        }
+      }
+
       const { cleanText, suggestedAction: blockAction } = extractActionBlock(finalContent);
       const suggestedAction = capturedAction || blockAction;
       return {
@@ -1282,6 +1336,10 @@ ${isInbox
     lowerMsg.includes('послезавтра') ||
     lowerMsg.includes('вчера') ||
     lowerMsg === 'а на завтра чо' ||
+    lowerMsg === 'а на завтра то чо' ||
+    lowerMsg.includes('чо на завтра') ||
+    lowerMsg.includes('че на завтра') ||
+    lowerMsg.includes('что на завтра') ||
     lowerMsg.includes('на завтра') ||
     (lowerMsg.includes('дела') && (lowerMsg.includes('день') || lowerMsg.includes('сегодня') || lowerMsg.includes('завтра'))) ||
     (lowerMsg.includes('задач') && (lowerMsg.includes('день') || lowerMsg.includes('сегодня') || lowerMsg.includes('завтра') || lowerMsg.includes('просроч')))) &&

@@ -806,9 +806,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             <button
               onClick={handleSend}
               disabled={!input.trim() || isChatLoading}
-              className={`w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 ${
+              className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 ${
                 input.trim() && !isChatLoading
-                  ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-md cursor-pointer'
+                  ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-sm cursor-pointer'
                   : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
               }`}
               title="Отправить сообщение (Enter)"

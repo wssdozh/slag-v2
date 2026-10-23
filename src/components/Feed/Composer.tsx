@@ -24,7 +24,8 @@ import {
   CornerUpLeft,
   FileText,
   StickyNote,
-  Lock
+  Lock,
+  Calendar
 } from 'lucide-react';
 
 export const Composer: React.FC = () => {
@@ -231,6 +232,24 @@ export const Composer: React.FC = () => {
     parsedTask && (parsedTask.dueDate || (parsedTask.priority && parsedTask.priority !== 'none'))
   );
   const isGhostActive = itemType === 'task' || hasDetectedDateOrPriority;
+
+  const effectivePriority = itemType === 'task'
+    ? (!isPriorityDismissed && parsedTask?.priority && parsedTask.priority !== 'none'
+        ? parsedTask.priority
+        : priority)
+    : 'none';
+
+  const effectiveDueDate = itemType === 'task'
+    ? (!isDateDismissed && parsedTask?.dueDate
+        ? parsedTask.dueDate
+        : dueDate)
+    : '';
+
+  const effectiveDateLabel = itemType === 'task'
+    ? (!isDateDismissed && (parsedTask?.rawMatchedDateText || parsedTask?.dueDate)
+        ? (parsedTask.rawMatchedDateText || parsedTask.dueDate)
+        : dueDate)
+    : '';
 
   const hasActiveDateChip = Boolean(isGhostActive && parsedTask?.dueDate && !isDateDismissed);
   const hasActivePriorityChip = Boolean(
@@ -685,7 +704,7 @@ export const Composer: React.FC = () => {
 
   return (
     <div className="w-full select-none">
-      <div className="rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50">
+      <div className="rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50">
         {/* Reply Banner */}
         {replyTarget && (
         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 animate-in fade-in slide-in-from-bottom-1">
@@ -893,7 +912,7 @@ export const Composer: React.FC = () => {
       {/* Textarea Input Container with WikiLink popover - Monolithic, direct on card surface */}
       <div className="relative">
         {wikiQuery !== null && matchingWikiItems.length > 0 && (
-          <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
             <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
               Связать заметку [[...]]
             </div>
@@ -943,38 +962,6 @@ export const Composer: React.FC = () => {
         />
       </div>
 
-      {/* Task Extra Controls (Priority & Due Date) */}
-      {itemType === 'task' && (
-        <div className="flex items-center gap-2 px-1 py-1 text-xs text-zinc-400 border-t border-white/[0.04] overflow-x-auto scrollbar-none whitespace-nowrap">
-          <div className="shrink-0 flex items-center gap-1">
-            <span className="text-[11px] text-zinc-500">Приоритет:</span>
-            <Select
-              size="sm"
-              variant="ghost"
-              direction="up"
-              value={priority}
-              onChange={(val) => setPriority(val as any)}
-              options={[
-                { value: 'none', label: 'Обычный' },
-                { value: 'low', label: 'Низкий' },
-                { value: 'medium', label: 'Средний' },
-                { value: 'high', label: 'Высокий' },
-              ]}
-            />
-          </div>
-
-          <div className="shrink-0 flex items-center gap-1">
-            <span className="text-[11px] text-zinc-500">Дедлайн:</span>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="bg-transparent hover:bg-white/[0.06] rounded px-1.5 py-0.5 text-xs text-zinc-300 outline-none transition-colors"
-            />
-          </div>
-        </div>
-      )}
-
       {/* Bottom Control Bar: Unified MD height (32px desktop / 38px mobile) */}
       {isRecordingAudio ? (
         <div className="pt-1 w-full animate-in fade-in duration-150">
@@ -1001,7 +988,7 @@ export const Composer: React.FC = () => {
           />
         </div>
       ) : (
-        <div className="flex items-center justify-between pt-1 gap-2 relative">
+        <div className="flex items-center justify-between pt-1 gap-1.5 relative min-w-0">
           {/* Lock Hint Banner when holding mic/video button */}
           {lockHint && recordMode === 'holding' && (
             <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-[#141417] border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
@@ -1044,7 +1031,7 @@ export const Composer: React.FC = () => {
               </button>
 
               {isTypeDropdownOpen && (
-                <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in">
+                <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
                   <button
                     type="button"
                     onClick={() => {
@@ -1087,6 +1074,80 @@ export const Composer: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Task Controls: Due Date & Priority directly in toolbar */}
+            {itemType === 'task' && (
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Due Date Chip or Trigger */}
+                {effectiveDueDate && !hasActiveDateChip ? (
+                  <div className="flex items-center gap-1 px-2 h-ctrl-md rounded-md bg-white/[0.08] border border-white/[0.08] text-xs font-mono text-zinc-200 shrink-0">
+                    <label className="flex items-center gap-1 cursor-pointer" title="Изменить срок">
+                      <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                      <span className="truncate max-w-[85px]">{effectiveDateLabel}</span>
+                      <input
+                        type="date"
+                        value={effectiveDueDate}
+                        onChange={(e) => {
+                          setDueDate(e.target.value);
+                          setIsDateDismissed(false);
+                        }}
+                        className="sr-only"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDateDismissed(true);
+                        setDueDate('');
+                      }}
+                      className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
+                      title="Снять срок"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : !effectiveDueDate ? (
+                  <label
+                    className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Установить срок задачи"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="hidden sm:inline">Срок</span>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => {
+                        setDueDate(e.target.value);
+                        setIsDateDismissed(false);
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                ) : null}
+
+                {/* Priority Selector */}
+                {!hasActivePriorityChip && (
+                  <div className="flex items-center shrink-0">
+                    <Select
+                      size="md"
+                      variant="ghost"
+                      direction="up"
+                      value={effectivePriority}
+                      onChange={(val) => {
+                        setPriority(val as any);
+                        setIsPriorityDismissed(false);
+                      }}
+                      options={[
+                        { value: 'none', label: 'Обычный' },
+                        { value: 'low', label: 'Низкий' },
+                        { value: 'medium', label: 'Средний' },
+                        { value: 'high', label: 'Высокий' },
+                      ]}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Desktop Dedicated Mic & Video Buttons (Hidden on mobile where they merge into Send/Media button) */}
             {!isMobile && (
@@ -1153,7 +1214,7 @@ export const Composer: React.FC = () => {
           </div>
 
           {/* Right Side: Clear draft, Fullscreen Expand Icon, and Send / Media Button */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             {(content.trim() || attachments.length > 0) && (
               <button
                 type="button"
@@ -1179,7 +1240,7 @@ export const Composer: React.FC = () => {
             <button
               type="button"
               onClick={handleExpandToFullscreen}
-              className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="w-ctrl-md h-ctrl-md rounded-md hidden sm:flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
               title="Раскрыть в полноэкранный редактор"
             >
               <Maximize2 className="w-4 h-4" />
@@ -1193,7 +1254,7 @@ export const Composer: React.FC = () => {
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerCancel}
-                className="w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
+                className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
                 title={
                   mobileMediaType === 'audio'
                     ? 'Записать аудио (удерживайте) / Нажмите для видео'
@@ -1212,9 +1273,9 @@ export const Composer: React.FC = () => {
                 type="button"
                 onClick={handleSend}
                 disabled={!content.trim() && attachments.length === 0}
-                className={`w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 ${
+                className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 ${
                   content.trim() || attachments.length > 0
-                    ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-md cursor-pointer'
+                    ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-sm cursor-pointer'
                     : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
                 }`}
                 title="Отправить (Enter)"

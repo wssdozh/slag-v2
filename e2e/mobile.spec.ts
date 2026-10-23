@@ -363,4 +363,70 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Take screenshot of the 3-day 24h multi-day time grid for visual audit
     await page.screenshot({ path: 'test-results/screenshots/mobile_calendar_3day_grid.png' });
   });
+
+  test('13. Mobile Filters alignment, streamlined Task Composer & Assistant calendar grounding', async ({ page }) => {
+    // 1. Navigate to "Входящие"
+    await page.locator('button', { hasText: 'Входящие' }).first().click();
+
+    // 2. Verify filter strip matching desktop
+    const inboxFilter = page.locator('div[aria-label="Фильтр входящих"]');
+    await expect(inboxFilter).toBeVisible();
+    await expect(inboxFilter.locator('button', { hasText: 'Все' })).toBeVisible();
+
+    const typeFilter = page.locator('div[aria-label="Фильтр по типу"]');
+    await expect(typeFilter).toBeVisible();
+    await expect(typeFilter.locator('button', { hasText: 'Все' })).toBeVisible();
+
+    const viewSwitcher = page.locator('nav[aria-label="Режимы представления"]');
+    await expect(viewSwitcher).toBeVisible();
+
+    // 3. Switch composer to Task mode
+    const typeBtn = page.locator('button[aria-label="Сменить тип записи"]');
+    await typeBtn.click();
+    await page.locator('.z-50 button', { hasText: 'Таска' }).click();
+
+    // Verify the old bloated row "Приоритет:" & "Дедлайн:" is completely absent
+    await expect(page.locator('text=Приоритет:')).not.toBeVisible();
+    await expect(page.locator('text=Дедлайн:')).not.toBeVisible();
+
+    // Type a task with date
+    const textarea = page.locator('main textarea, .relative textarea').first();
+    await textarea.fill('завтра проверить отчет');
+    await page.waitForTimeout(250);
+
+    // Verify sleek Linear send button (with rounded-lg, not rounded-full)
+    const sendBtn = page.locator('button[title*="Отправить"]').first();
+    await expect(sendBtn).toHaveClass(/rounded-lg/);
+
+    // Capture screenshot of mobile folder filters and streamlined task composer
+    await page.screenshot({ path: 'test-results/screenshots/mobile_composer_task_mode.png' });
+
+    // 4. Test Assistant grounding on "чо на завтра"
+    // Tap Back to root folders
+    await page.locator('button[title*="Назад к списку папок"]').click();
+
+    // Tap "ИИ" dock tab
+    const dock = page.locator('nav[aria-label="Мобильная навигация"]');
+    await dock.locator('button[aria-label="ИИ"]').click();
+
+    // Wait for chat to open
+    const chatInput = page.locator('textarea[placeholder*="ассистента"]');
+    await expect(chatInput).toBeVisible();
+
+    // Ask "чо на завтра"
+    await chatInput.fill('чо на завтра');
+    await page.locator('button[title*="Отправить сообщение"]').click();
+
+    // Wait for assistant response
+    const replyLocator = page.locator('text=Повестка на').or(page.locator('text=завтра')).first();
+    await expect(replyLocator).toBeVisible({ timeout: 8000 });
+
+    // Verify no Google Calendar hallucination in the page
+    const pageText = await page.locator('body').innerText();
+    expect(pageText).not.toContain('Google Calendar');
+    expect(pageText).not.toContain('активировать это расширение');
+
+    // Capture screenshot of Assistant calendar response
+    await page.screenshot({ path: 'test-results/screenshots/mobile_assistant_tomorrow.png' });
+  });
 });
