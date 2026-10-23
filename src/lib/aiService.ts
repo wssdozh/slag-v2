@@ -679,7 +679,7 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
       };
       return {
         status: 'proposed',
-        message: `Черновик ${args.itemType || 'записи'} «${args.title}» подготовлен к сохранению в хранилище. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
+        message: `Черновик ${args.itemType || 'записи'} «${args.title}» подготовлен. Не пишите служебных фраз подтверждения или инструкций клика.`,
       };
     }
 
@@ -698,7 +698,7 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
       };
       return {
         status: 'proposed',
-        message: `Задача «${args.title}» на дату ${args.dueDate} подготовлена к планированию. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
+        message: `Задача «${args.title}» на дату ${args.dueDate} подготовлена. Не пишите служебных фраз подтверждения или инструкций клика.`,
       };
     }
 
@@ -718,7 +718,7 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
       };
       return {
         status: 'proposed',
-        message: `Декомпозиция задачи «${args.title}» на ${subtasks.length} подзадач подготовлена к применению. Завершите ответ кратким пояснением.`,
+        message: `Подзадачи к «${args.title}» подготовлены. Не пишите служебных фраз подтверждения или инструкций клика.`,
       };
     }
 
@@ -735,7 +735,7 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
       };
       return {
         status: 'proposed',
-        message: `Смена статуса задачи «${args.title}» на «${args.status}» подготовлена к подтверждению.`,
+        message: `Смена статуса задачи «${args.title}» на «${args.status}» подготовлена. Не пишите инструкций подтверждения.`,
       };
     }
 
@@ -751,7 +751,7 @@ export async function sendAssistantChat(params: SendAssistantChatParams): Promis
       };
       return {
         status: 'proposed',
-        message: `Перемещение «${args.title}» в папку «${args.folder}» подготовлено к подтверждению.`,
+        message: `Перемещение «${args.title}» в папку «${args.folder}» подготовлено. Не пишите инструкций подтверждения.`,
       };
     }
 
@@ -970,6 +970,8 @@ ${isInbox
 3. ПРАВИЛО READ-ONLY SAFETY И ДЕЙСТВИЯ:
    - Прямое удаление заметок запрещено политикой безопасности. Если пользователь просит удалить заметку («удали эту заметку»), прямо поясни, что удаление через чат недоступно, но можно предложить перенести её в архив/корзину через блок action:move_note или сменить статус.
    - Любые другие мутации (создание, перенос, декомпозиция, расписание) оформляй ТОЛЬКО через блок action:
+   - КАТЕГОРИЧЕСКИЙ ЗАПРЕТ БЮРОКРАТИИ И СЛУЖЕБНЫХ ПРЕАМБУЛ (ZERO-SLOP):
+     Запрещено писать пустые фразы вроде «Подтвердите действие, чтобы...», «Нажмите кнопку ниже...», «В интерфейсе отображена карточка...», «Декомпозиция задачи X на Y готова». Пользователь видит кнопки действия сам. Твой текстовый ответ должен быть предельно кратким и содержательным.
 - Создание заметки/задачи:
 \`\`\`action:create_note
 { "action": "create_note", "title": "Название", "folder": "${currentFolder}", "content": "Текст...", "tags": ["тег"], "itemType": "note" }
@@ -1500,9 +1502,7 @@ ${isInbox
       actionState: 'suggested',
     };
 
-    const replyText = parsedSubtaskTitles.length > 0
-      ? `Я подготовил ${subtasks.length === 1 ? `подзадачу «${subtasks[0].title}»` : `${subtasks.length} подзадач`} для задачи «${taskTitle}». Нажмите кнопку ниже, чтобы применить:`
-      : `Я составил план декомпозиции для задачи «${taskTitle}». Нажмите кнопку ниже, чтобы применить шаги:`;
+    const replyText = `Подзадачи для «${taskTitle}»:`;
 
     return {
       content: replyText,
@@ -1551,7 +1551,7 @@ ${isInbox
     };
 
     return {
-      content: `Я обновил черновик задачи «${existingTitle}» с указанием подробностей. Нажмите кнопку ниже для подтверждения:`,
+      content: `Обновлен черновик задачи «${existingTitle}»:`,
       reasoning: 'Обновлен черновик задачи на основе контекста диалога (Read-Only Safety)',
       reasoningTimeMs: Date.now() - startTime,
       suggestedAction,
@@ -1633,7 +1633,7 @@ ${isInbox
     };
 
     return {
-      content: `Я подготовил черновик ${isArticle ? 'статьи' : isTask ? (dueDate ? 'задачи в календарь' : 'задачи') : 'заметки'}. Нажмите кнопку ниже для сохранения в хранилище:`,
+      content: `Черновик ${isArticle ? 'статьи' : isTask ? (dueDate ? 'задачи в календарь' : 'задачи') : 'заметки'}:`,
       reasoning: 'Сформирован черновик записи согласно правилу Read-Only Safety',
       reasoningTimeMs: Date.now() - startTime,
       suggestedAction,

@@ -20,7 +20,9 @@ import {
   Check,
   FolderOpen,
   Link2,
-  X
+  X,
+  Circle,
+  Clock
 } from 'lucide-react';
 import { Select } from '../UI/Select';
 
@@ -507,24 +509,24 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     const isExecuting = actionState === 'executing';
 
                     return (
-                      <div className={`mt-2.5 p-2.5 rounded-xl border flex flex-col gap-2 transition-all ${
-                        isRejected
-                          ? 'bg-white/[0.01] border-white/[0.04] opacity-60'
-                          : isApplied
-                          ? 'bg-emerald-500/[0.04] border-emerald-500/20 shadow-sm'
-                          : 'bg-white/[0.03] border-white/[0.08]'
+                      <div className={`mt-2 pt-2 border-t border-white/[0.06] flex flex-col gap-2 transition-all ${
+                        isRejected ? 'opacity-50' : ''
                       }`}>
-                        {/* Header: Action type & Folder */}
-                        <div className="flex items-center justify-between">
+                        {/* Header: Action type & Folder (Clean monochrome, no raw emojis, no nested pills) */}
+                        <div className="flex items-center justify-between text-2xs font-mono">
                           <div className="flex items-center gap-1.5">
-                            <span className={`text-[10px] font-mono uppercase tracking-wider ${
-                              isRejected ? 'text-zinc-500' : isApplied ? 'text-emerald-400' : 'text-amber-300'
-                            }`}>
-                              {action.type === 'schedule_task' && '📅 Планирование в календарь'}
-                              {action.type === 'decompose_task' && '☑️ Декомпозиция задачи'}
-                              {action.type === 'update_task_status' && '📊 Смена статуса канбан'}
-                              {action.type === 'reschedule_task' && '⏱ Перенос срока'}
-                              {action.type === 'move_note' && '📁 Перемещение по папкам'}
+                            {action.type === 'schedule_task' && <Calendar className="w-3 h-3 text-zinc-500" />}
+                            {action.type === 'decompose_task' && <CheckSquare className="w-3 h-3 text-zinc-500" />}
+                            {action.type === 'update_task_status' && <CheckSquare className="w-3 h-3 text-zinc-500" />}
+                            {action.type === 'reschedule_task' && <Clock className="w-3 h-3 text-zinc-500" />}
+                            {action.type === 'move_note' && <FolderOpen className="w-3 h-3 text-zinc-500" />}
+                            {(!action.type || action.type === 'create_note') && <Plus className="w-3 h-3 text-zinc-500" />}
+                            <span className={isRejected ? 'text-zinc-500' : isApplied ? 'text-emerald-400' : 'text-zinc-300'}>
+                              {action.type === 'schedule_task' && 'Планирование в календарь'}
+                              {action.type === 'decompose_task' && 'Декомпозиция задачи'}
+                              {action.type === 'update_task_status' && 'Смена статуса канбан'}
+                              {action.type === 'reschedule_task' && 'Перенос срока'}
+                              {action.type === 'move_note' && 'Перемещение по папкам'}
                               {action.type === 'create_note' && (
                                 action.itemType === 'task'
                                   ? 'Черновик задачи'
@@ -533,14 +535,8 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                   : 'Черновик заметки'
                               )}
                             </span>
-                            {/* Action category pill */}
-                            {!isRejected && !isApplied && (
-                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
-                                {action.type === 'create_note' ? (action.itemType === 'article' ? 'Статья' : 'Запись') : 'Действие'}
-                              </span>
-                            )}
                           </div>
-                          <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[120px]">
+                          <span className="text-2xs font-mono text-zinc-500 truncate max-w-[120px]">
                             {action.folder}
                           </span>
                         </div>
@@ -576,13 +572,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
                         {/* Subtasks checklist if decompose_task */}
                         {action.subtasks && action.subtasks.length > 0 && (
-                          <div className="space-y-1 py-1">
+                          <div className="flex flex-col gap-1.5 py-0.5">
                             {action.subtasks.map((st, sIdx) => (
-                              <div key={sIdx} className="flex items-center gap-1.5 text-[11px] text-zinc-300">
-                                <span className="w-3.5 h-3.5 rounded border border-zinc-600 flex items-center justify-center shrink-0">
-                                  {st.completed && <Check className="w-2 h-2 text-white" />}
-                                </span>
-                                <span className="truncate">{st.title}</span>
+                              <div key={sIdx} className="flex items-center gap-2 text-xs text-zinc-300">
+                                <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                                <span className="leading-tight">{st.title}</span>
                               </div>
                             ))}
                           </div>
