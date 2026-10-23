@@ -1,29 +1,22 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { LogViewer } from './LogViewer';
+import { BaseModal } from '../Modals/BaseModal';
 
 export const LogModal: React.FC = () => {
   const { isLogViewerOpen, setIsLogViewerOpen } = useApp();
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-
-  if (!isLogViewerOpen) return null;
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) {
-      setIsLogViewerOpen(false);
-    }
-  };
 
   return (
-    <div
-      ref={overlayRef}
-      onClick={handleBackdropClick}
-      data-testid="log-modal-backdrop"
-      className="fixed inset-0 z-50 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 sm:p-6 select-none animate-in fade-in duration-150"
+    <BaseModal
+      isOpen={isLogViewerOpen}
+      onClose={() => setIsLogViewerOpen(false)}
+      hideHeader
+      maxWidth="max-w-4xl"
+      maxHeight="h-[82vh] max-h-[800px]"
+      contentClassName="h-full flex flex-col"
+      containerClassName="p-0 border border-white/[0.08]"
     >
-      <div className="w-full max-w-4xl h-[82vh] max-h-[800px] flex flex-col shadow-2xl animate-in zoom-in-95 duration-150">
-        <LogViewer variant="modal" onClose={() => setIsLogViewerOpen(false)} />
-      </div>
-    </div>
+      <LogViewer variant="modal" onClose={() => setIsLogViewerOpen(false)} />
+    </BaseModal>
   );
 };

@@ -1,0 +1,147 @@
+import React, { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
+
+export interface BaseModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  maxWidth?: string;
+  maxHeight?: string;
+  className?: string;
+  containerClassName?: string;
+  contentClassName?: string;
+  hideHeader?: boolean;
+  customHeader?: React.ReactNode;
+  showCloseButton?: boolean;
+  headerRightSlot?: React.ReactNode;
+  closeOnBackdropClick?: boolean;
+  closeOnEsc?: boolean;
+  role?: 'dialog' | 'alertdialog';
+  ariaLabel?: string;
+  footer?: React.ReactNode;
+}
+
+export const BaseModal: React.FC<BaseModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  children,
+  maxWidth = 'max-w-md',
+  maxHeight,
+  className = '',
+  containerClassName = '',
+  contentClassName = '',
+  hideHeader = false,
+  customHeader,
+  showCloseButton = true,
+  headerRightSlot,
+  closeOnBackdropClick = true,
+  closeOnEsc = true,
+  role = 'dialog',
+  ariaLabel,
+  footer,
+}) => {
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !closeOnEsc) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, closeOnEsc, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (closeOnBackdropClick && e.target === overlayRef.current) {
+      onClose();
+    }
+  };
+
+  const ariaLabelString = typeof title === 'string' ? title : ariaLabel;
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleBackdropClick}
+      role={role}
+      aria-modal="true"
+      aria-label={ariaLabelString}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none ${className}`}
+    >
+      <div
+        className={`w-full ${maxWidth} ${maxHeight || ''} rounded-none md:rounded-2xl bg-[#141416] border-0 md:border md:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 ${containerClassName}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        {!hideHeader && (
+          customHeader || (
+            <div
+              className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+              style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {icon && (
+                  <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                    {icon}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  {title && (
+                    <h3 className="text-sm font-semibold text-white tracking-tight truncate">
+                      {title}
+                    </h3>
+                  )}
+                  {subtitle && (
+                    <p className="text-[11px] text-zinc-400 truncate">
+                      {subtitle}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {headerRightSlot}
+                {showCloseButton && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                    title="Закрыть (Esc)"
+                    aria-label="Закрыть"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        )}
+
+        {/* Modal Content Body */}
+        <div className={`flex-1 overflow-y-auto min-h-0 ${contentClassName}`}>
+          {children}
+        </div>
+
+        {/* Optional Footer */}
+        {footer && (
+          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
