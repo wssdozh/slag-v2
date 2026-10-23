@@ -100,8 +100,8 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4" />
+                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
+                  <Sparkles className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-semibold text-zinc-200">ИИ & Провайдеры</div>
               </div>
@@ -113,8 +113,8 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
-                  <Database className="w-4 h-4" />
+                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
+                  <Database className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-semibold text-zinc-200">Хранилище & Бэкап</div>
               </div>
@@ -126,8 +126,8 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
-                  <Sliders className="w-4 h-4" />
+                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
+                  <Sliders className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-semibold text-zinc-200">Интерфейс, масштаб и плотность</div>
               </div>
@@ -139,8 +139,8 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
-                  <Keyboard className="w-4 h-4" />
+                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
+                  <Keyboard className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-semibold text-zinc-200">Горячие клавиши</div>
               </div>
@@ -207,8 +207,8 @@ export const MobileSettingsView: React.FC = () => {
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/[0.06] text-zinc-300 border border-white/[0.06] flex items-center justify-center shrink-0">
-                  <Terminal className="w-4 h-4" />
+                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
+                  <Terminal className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-semibold text-zinc-200">Логи & Dev HUD</div>
               </div>
