@@ -698,26 +698,28 @@ export const Composer: React.FC = () => {
       <div className="flex items-center justify-between pt-1 gap-2">
         {/* Left Side: +Ai Button, Type Selector, Voice Mic, Video Square, Attach */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* +Ai Smart Tagging Button */}
+          {/* +AI Smart Tagging Button - Text preserved, height matching row */}
           <button
             onClick={handleSmartAiTags}
             disabled={isGeneratingAiTags}
-            className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition-colors border border-white/[0.05] cursor-pointer flex items-center gap-1.5"
-            title="ИИ тегирование"
+            className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+            title="ИИ авто-тегирование (+AI)"
+            aria-label="ИИ авто-тегирование (+AI)"
           >
             {isGeneratingAiTags ? (
               <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
             ) : (
               <Sparkles className="w-4 h-4 text-zinc-300" />
             )}
-            <span>+Ai</span>
+            <span>+AI</span>
           </button>
 
-          {/* Type Selector Dropdown */}
-          <div className="relative">
+          {/* Type Selector Dropdown - Text preserved, height matching row */}
+          <div className="relative shrink-0">
             <button
               onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-              className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1 border border-white/[0.04]"
+              className="h-ctrl-md px-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 border border-white/[0.06]"
+              aria-label="Сменить тип записи"
             >
               <span>
                 {itemType === 'note' ? 'Заметка' : itemType === 'task' ? 'Таска' : 'Статья'}
@@ -726,39 +728,42 @@ export const Composer: React.FC = () => {
             </button>
 
             {isTypeDropdownOpen && (
-              <div className="absolute left-0 bottom-full mb-1 w-32 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 text-xs flex flex-col gap-0.5 animate-in fade-in">
+              <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-30 text-xs flex flex-col gap-0.5 animate-in fade-in">
                 <button
                   onClick={() => {
                     setItemType('note');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
-                    itemType === 'note' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                    itemType === 'note' ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
-                  Заметка
+                  <StickyNote className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Заметка</span>
                 </button>
                 <button
                   onClick={() => {
                     setItemType('task');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
-                    itemType === 'task' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                    itemType === 'task' ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
-                  Таска
+                  <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Таска</span>
                 </button>
                 <button
                   onClick={() => {
                     setItemType('article');
                     setIsTypeDropdownOpen(false);
                   }}
-                  className={`text-left px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
-                    itemType === 'article' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.06]'
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                    itemType === 'article' ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
                   }`}
                 >
-                  Статья
+                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Статья</span>
                 </button>
               </div>
             )}
@@ -837,18 +842,18 @@ export const Composer: React.FC = () => {
             <Maximize2 className="w-4 h-4" />
           </button>
 
-          {/* Linear / Telegram style Send Button */}
+          {/* Telegram-style Circular Send Button */}
           <button
             onClick={handleSend}
             disabled={!content.trim() && attachments.length === 0}
-            className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press ${
+            className={`w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 ${
               content.trim() || attachments.length > 0
-                ? 'bg-[#3b82f6] text-white hover:bg-[#2563eb] shadow-lg shadow-blue-500/20 cursor-pointer'
+                ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-md cursor-pointer'
                 : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
             }`}
             title="Отправить (Enter)"
           >
-            <Send className="w-4 h-4 fill-current" />
+            <Send className="w-4 h-4 ml-0.5 fill-current" />
           </button>
         </div>
       </div>

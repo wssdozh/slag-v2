@@ -742,34 +742,28 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             className="w-full min-h-[28px] bg-transparent text-xs text-white placeholder-zinc-500 resize-none outline-none border-none leading-relaxed"
           />
 
-          {/* Controls Bar: Unified SM height row (28px desktop / 32px touch) */}
+          {/* Controls Bar: Unified MD height row matching Composer (32px desktop / 38px touch) */}
           <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] gap-2">
             <div className="flex items-center gap-1.5 flex-wrap">
-              {/* Provider badge */}
+              {/* Provider badge - Linear Monochrome */}
               {isConnected ? (
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className={`h-ctrl-sm inline-flex items-center gap-1.5 px-2.5 rounded-md text-xs font-mono cursor-pointer transition-colors ${
-                    aiSettings.provider === 'groq'
-                      ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
-                      : aiSettings.provider === 'kie'
-                      ? 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20'
-                      : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20'
-                  }`}
+                  className="h-ctrl-md inline-flex items-center gap-1.5 px-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.06] text-xs font-mono cursor-pointer transition-colors"
                   title={`Провайдер ${aiSettings.provider}: ${aiSettings.model} (нажмите для настроек)`}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="h-ctrl-sm inline-flex items-center gap-1.5 px-2.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.06] text-xs font-mono transition-colors cursor-pointer"
+                  className="h-ctrl-md inline-flex items-center gap-1.5 px-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border border-white/[0.06] text-xs font-mono transition-colors cursor-pointer"
                   title="Нажмите для настройки API-ключа (⌘,)"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
                   <span>Локальный</span>
                 </button>
               )}
@@ -778,7 +772,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
               <div className="flex items-center gap-1 text-xs font-mono text-zinc-400">
                 <span className="text-zinc-500">R:</span>
                 <Select
-                  size="sm"
+                  size="md"
                   direction="up"
                   value={aiSettings.reasoningEffort || 'low'}
                   onChange={(val) => saveAiSettings({ reasoningEffort: val as any })}
@@ -791,29 +785,34 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 />
               </div>
 
-              {/* Web search toggle */}
+              {/* Web search toggle - Linear Monochrome */}
               <button
                 type="button"
                 onClick={() => saveAiSettings({ webSearchEnabled: !aiSettings.webSearchEnabled })}
-                className={`h-ctrl-sm flex items-center gap-1.5 px-2 rounded-md text-xs font-mono transition-colors cursor-pointer border ${
+                className={`h-ctrl-md flex items-center gap-1.5 px-3 rounded-lg text-xs font-mono transition-colors cursor-pointer border ${
                   aiSettings.webSearchEnabled
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                    ? 'bg-white/12 text-zinc-100 border-white/20 shadow-sm'
                     : 'bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 border-white/[0.06]'
                 }`}
                 title="Поиск информации в глобальной сети Интернет"
               >
-                <Globe className="w-3.5 h-3.5" />
+                <Globe className="w-4 h-4" />
                 <span className="hidden sm:inline">Сеть</span>
               </button>
             </div>
 
+            {/* Send Button - Copied directly from Composer */}
             <button
               onClick={handleSend}
               disabled={!input.trim() || isChatLoading}
-              className="w-ctrl-sm h-ctrl-sm rounded-md bg-white text-black hover:bg-zinc-200 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-sm flex items-center justify-center cursor-pointer shrink-0"
+              className={`w-ctrl-md h-ctrl-md rounded-full flex items-center justify-center transition-all btn-press shrink-0 ${
+                input.trim() && !isChatLoading
+                  ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-md cursor-pointer'
+                  : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
+              }`}
               title="Отправить сообщение (Enter)"
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-4 h-4 ml-0.5 fill-current" />
             </button>
           </div>
         </div>
