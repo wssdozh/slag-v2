@@ -83,8 +83,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Switch to "Все" to see all demo articles or navigate to design
     await page.locator('header button[title*="Все заметки хранилища"]').click();
 
+    const taskCard = page.locator('.group', { hasText: 'Синхронизация по архитектуре баз данных' }).first();
+    if (await taskCard.isVisible()) {
+      await taskCard.screenshot({
+        path: 'test-results/screenshots/task-card-with-subtasks.png',
+      });
+    }
+
     const articleCard = page.locator('#item-demo_article_1');
     await expect(articleCard).toBeVisible();
+
+    await articleCard.screenshot({
+      path: 'test-results/screenshots/article-card-collapsed.png',
+    });
 
     // Check expand button
     const readFullBtn = articleCard.locator('button', { hasText: /Читать полностью/ });
@@ -93,6 +104,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // Verify expanded text is visible
     await expect(articleCard.locator('text=Три ключевых принципа SLAG')).toBeVisible();
+
+    await articleCard.screenshot({
+      path: 'test-results/screenshots/article-card-expanded.png',
+    });
 
     // Check collapse button
     const collapseBtn = articleCard.locator('button', { hasText: 'Свернуть ↑' });
