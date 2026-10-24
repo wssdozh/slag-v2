@@ -1661,27 +1661,31 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // Verify scope pill switcher buttons (Активная / Закрепить)
-    const activeScopeBtn = page.locator('button', { hasText: 'Активная' });
-    const pinnedScopeBtn = page.locator('button', { hasText: 'Закрепить' });
-    await expect(activeScopeBtn).toBeVisible();
-    await expect(pinnedScopeBtn).toBeVisible();
-
-    // Toggle scope to pinned
-    await pinnedScopeBtn.click();
-    await expect(pinnedScopeBtn).toHaveClass(/bg-white/);
-
-    // Toggle back to active
-    await activeScopeBtn.click();
-    await expect(activeScopeBtn).toHaveClass(/bg-white/);
-
     // Verify Now Playing screen elements: track title, note link, artwork
     await expect(page.locator('text=Never_Enough_The_Cure.mp3')).toBeVisible();
     await expect(page.locator('text=Саундтрек проекта и голосовой лог')).toBeVisible();
 
-    // Verify transport controls (embedded Play/Pause in center of cover art)
+    // Verify transport controls (5 buttons under timeline: -10s, Prev, Play/Pause, Next, +10s)
     const playPauseBtn = page.locator('button[title*="Воспроизведение"], button[title*="Пауза"]');
     await expect(playPauseBtn).toBeVisible();
+    await expect(page.locator('button[title*="Предыдущий трек"]')).toBeVisible();
+    await expect(page.locator('button[title*="Следующий трек"]')).toBeVisible();
+    await expect(page.locator('button[title*="Назад на 10 секунд"]')).toBeVisible();
+    await expect(page.locator('button[title*="Вперед на 10 секунд"]')).toBeVisible();
+
+    // Verify folder toggle button in bottom bar (toggle between unpinned active and pinned)
+    const folderToggleBtn = page.locator('button[title*="следует за активной папкой"], button[title*="играет только эта папка"]').first();
+    await expect(folderToggleBtn).toBeVisible();
+    await expect(folderToggleBtn).toHaveText(/Входящие/);
+
+    // Click to pin
+    await folderToggleBtn.click();
+    await expect(page.locator('button[title*="играет только эта папка"]')).toBeVisible();
+
+    // Click to unpin back
+    const pinnedBtn = page.locator('button[title*="играет только эта папка"]').first();
+    await pinnedBtn.click();
+    await expect(page.locator('button[title*="следует за активной папкой"]')).toBeVisible();
 
     // Verify Queue / Playlist button is present in bottom bar
     const queueBtn = page.locator('button[aria-label="Очередь воспроизведения"]').first();

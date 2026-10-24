@@ -1,12 +1,19 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  RotateCcw,
+  RotateCw,
   Repeat,
   Repeat1,
   Volume2,
   VolumeX,
   ListMusic,
-  ExternalLink,
+  Pin,
   Folder,
+  ChevronDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -30,6 +37,7 @@ export const AudioPanel: React.FC = () => {
   const [pinnedFolder, setPinnedFolder] = useState<string>(currentFolder || 'Входящие');
   const [typeFilters, setTypeFilters] = useState<AudioTypeFilter[]>(['voice', 'file']);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
+  const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
 
   // Audio Playback State
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
@@ -44,6 +52,7 @@ export const AudioPanel: React.FC = () => {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const folderPickerRef = useRef<HTMLDivElement | null>(null);
 
   // Effective folder based on mode
   const effectiveFolder = scopeMode === 'active' ? currentFolder || 'Входящие' : pinnedFolder;
@@ -52,6 +61,18 @@ export const AudioPanel: React.FC = () => {
   useEffect(() => {
     return setupAudioCollisionGuard();
   }, []);
+
+  // Close folder picker on outside click
+  useEffect(() => {
+    if (!isFolderPickerOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (folderPickerRef.current && !folderPickerRef.current.contains(e.target as Node)) {
+        setIsFolderPickerOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    return () => window.removeEventListener('mousedown', handleOutsideClick);
+  }, [isFolderPickerOpen]);
 
   // Extract tracks for current folder and filters
   const tracks = useMemo(() => {
@@ -186,6 +207,15 @@ export const AudioPanel: React.FC = () => {
     }
   };
 
+  // Skip 10s
+  const handleSkipTime = (delta: number) => {
+    if (!audioRef.current) return;
+    const targetDur = duration || currentTrack?.duration || 0;
+    const nextTime = Math.max(0, Math.min(targetDur, audioRef.current.currentTime + delta));
+    audioRef.current.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  };
+
   // Timeline Scrubbing
   const seekFromClientX = useCallback(
     (clientX: number) => {
@@ -234,6 +264,16 @@ export const AudioPanel: React.FC = () => {
     audioRef.current.volume = nextMuted ? 0 : volume;
   };
 
+  // Scope toggle (active <-> pinned)
+  const toggleScopeMode = () => {
+    if (scopeMode === 'active') {
+      setScopeMode('pinned');
+      if (!pinnedFolder) setPinnedFolder(currentFolder || 'Входящие');
+    } else {
+      setScopeMode('active');
+    }
+  };
+
   // Filter Toggles
   const toggleTypeFilter = (type: AudioTypeFilter) => {
     setTypeFilters((prev) => {
@@ -254,10 +294,10 @@ export const AudioPanel: React.FC = () => {
       togglePlay();
     } else if (e.code === 'ArrowLeft') {
       e.preventDefault();
-      handlePrevTrack();
+      handleSkipTime(-10);
     } else if (e.code === 'ArrowRight') {
       e.preventDefault();
-      handleNextTrack();
+      handleSkipTime(10);
     }
   };
 
@@ -336,22 +376,16 @@ export const AudioPanel: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* 1. Square Art Tile with embedded Center Play/Pause button */}
-            <AudioCoverArt
-              track={currentTrack}
-              isPlaying={isPlaying}
-              onTogglePlay={togglePlay}
-              onPrevTrack={handlePrevTrack}
-              onNextTrack={handleNextTrack}
-            />
+            {/* 1. Square Art Tile (Clean, without buttons) */}
+            <AudioCoverArt track={currentTrack} isPlaying={isPlaying} />
 
-            {/* 2. Track Title (Like "Огонь в окне" in reference) */}
+            {/* 2. Track Title (Like "The Lovecats" in reference) */}
             <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-full text-center mt-5 mb-1 px-2">
               {currentTrack?.name || 'Аудиозапись'}
             </h2>
 
             {/* 3. Subtitle: Note title • Folder • Format */}
-            <div className="text-xs text-zinc-400 text-center flex items-center justify-center gap-1.5 max-w-full truncate px-2 mb-4">
+            <div className="text-xs text-zinc-400 text-center flex items-center justify-center gap-1.5 max-w-full truncate px-2 mb-5">
               {currentTrack?.itemTitle && (
                 <button
                   onClick={() => scrollToItem(currentTrack.itemId)}
@@ -367,35 +401,8 @@ export const AudioPanel: React.FC = () => {
               <span className="text-zinc-500 text-[10px] font-mono uppercase">{currentTrack?.format}</span>
             </div>
 
-            {/* 4. Pill Switcher under Subtitle (Like "Вариант 1 / Вариант 2" in reference) */}
-            <div className="flex items-center bg-white/[0.06] p-1 rounded-full border border-white/[0.08] mb-5 select-none shadow-inner">
-              <button
-                onClick={() => setScopeMode('active')}
-                className={`px-4 py-1 text-xs rounded-full transition-all cursor-pointer ${
-                  scopeMode === 'active'
-                    ? 'bg-white text-black font-semibold shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                Активная
-              </button>
-              <button
-                onClick={() => {
-                  setScopeMode('pinned');
-                  if (!pinnedFolder) setPinnedFolder(currentFolder || 'Входящие');
-                }}
-                className={`px-4 py-1 text-xs rounded-full transition-all cursor-pointer ${
-                  scopeMode === 'pinned'
-                    ? 'bg-white text-black font-semibold shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                Закрепить
-              </button>
-            </div>
-
-            {/* 5. Scrubber Timeline in a single clean row: [0:00] ────── [1:12] */}
-            <div className="w-full flex items-center gap-3 mb-6 select-none">
+            {/* 4. Scrubber Timeline: [0:49] ────── [3:39] */}
+            <div className="w-full flex items-center gap-3 mb-5 select-none">
               <span className="text-[11px] font-mono text-zinc-400 w-8 text-left shrink-0">
                 {formatAudioDuration(currentTime)}
               </span>
@@ -422,22 +429,160 @@ export const AudioPanel: React.FC = () => {
               </span>
             </div>
 
-            {/* 6. Unified Bottom Controls Row (Queue, Loop, Share/Jump | Speed, Vol) */}
-            <div className="flex items-center justify-between w-full max-w-[260px] text-zinc-400 select-none">
+            {/* 5. Transport Controls Row: [<<]  [|<]  [Play/Pause]  [>|]  [>>] */}
+            <div className="flex items-center justify-center gap-4 sm:gap-5 mb-7 select-none">
+              {/* -10s */}
+              <button
+                onClick={() => handleSkipTime(-10)}
+                className="w-8 h-8 rounded-full text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
+                title="Назад на 10 секунд (←)"
+                aria-label="Назад на 10 секунд"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+
+              {/* Prev */}
+              <button
+                onClick={handlePrevTrack}
+                className="w-9 h-9 rounded-full text-zinc-300 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
+                title="Предыдущий трек"
+                aria-label="Предыдущий трек"
+              >
+                <SkipBack className="w-5 h-5 fill-current" />
+              </button>
+
+              {/* Central Round Play / Pause */}
+              <button
+                onClick={togglePlay}
+                className="w-13 h-13 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center shadow-xl transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                title={isPlaying ? 'Пауза (Пробел)' : 'Воспроизведение (Пробел)'}
+                aria-label={isPlaying ? 'Пауза' : 'Воспроизведение'}
+              >
+                {isPlaying ? (
+                  <Pause className="w-6 h-6 fill-current" />
+                ) : (
+                  <Play className="w-6 h-6 fill-current ml-0.5" />
+                )}
+              </button>
+
+              {/* Next */}
+              <button
+                onClick={handleNextTrack}
+                className="w-9 h-9 rounded-full text-zinc-300 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
+                title="Следующий трек"
+                aria-label="Следующий трек"
+              >
+                <SkipForward className="w-5 h-5 fill-current" />
+              </button>
+
+              {/* +10s */}
+              <button
+                onClick={() => handleSkipTime(10)}
+                className="w-8 h-8 rounded-full text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
+                title="Вперед на 10 секунд (→)"
+                aria-label="Вперед на 10 секунд"
+              >
+                <RotateCw className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 6. Unified Bottom Controls Row (Queue, Folder Toggle, Loop | Speed, Vol) */}
+            <div className="flex items-center justify-between w-full max-w-[320px] text-zinc-400 select-none">
               {/* Queue Button */}
               <button
                 onClick={() => setIsPlaylistOpen(true)}
-                className="p-2 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
                 title="Очередь воспроизведения"
                 aria-label="Очередь воспроизведения"
               >
                 <ListMusic className="w-4 h-4" />
               </button>
 
+              {/* Folder Pin/Unpin Toggle Button */}
+              <div className="relative" ref={folderPickerRef}>
+                <div
+                  className={`flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full text-xs border transition-colors ${
+                    scopeMode === 'pinned'
+                      ? 'bg-white/10 text-white border-white/20'
+                      : 'bg-white/[0.04] text-zinc-400 border-white/[0.06] hover:text-zinc-200 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  <button
+                    onClick={toggleScopeMode}
+                    className="flex items-center gap-1 cursor-pointer"
+                    title={
+                      scopeMode === 'pinned'
+                        ? 'Закреплено: играет только эта папка (нажмите для открепления)'
+                        : 'Откреплено: следует за активной папкой (нажмите для закрепления)'
+                    }
+                  >
+                    <Pin
+                      className={`w-3 h-3 transition-transform ${
+                        scopeMode === 'pinned' ? 'text-white fill-current' : 'text-zinc-500'
+                      }`}
+                    />
+                    <span className="max-w-[90px] sm:max-w-[120px] truncate">
+                      {effectiveFolder}
+                    </span>
+                  </button>
+
+                  {/* Dropdown arrow when in pinned mode */}
+                  {scopeMode === 'pinned' && (
+                    <button
+                      onClick={() => setIsFolderPickerOpen((prev) => !prev)}
+                      className="p-0.5 text-zinc-400 hover:text-white rounded cursor-pointer transition-colors"
+                      title="Выбрать другую папку для закрепления"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Folder Picker Popover */}
+                {isFolderPickerOpen && scopeMode === 'pinned' && (
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 rounded-xl bg-[#18181c] border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-52 overflow-y-auto">
+                    <div className="px-3 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04] mb-1">
+                      Закрепить папку
+                    </div>
+                    <button
+                      onClick={() => {
+                        setPinnedFolder('Входящие');
+                        setIsFolderPickerOpen(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
+                        pinnedFolder === 'Входящие'
+                          ? 'text-white font-medium bg-white/[0.04]'
+                          : 'text-zinc-400'
+                      }`}
+                    >
+                      <Folder className="w-3.5 h-3.5" />
+                      <span>Входящие</span>
+                    </button>
+                    {folders.map((f) => (
+                      <button
+                        key={f.path}
+                        onClick={() => {
+                          setPinnedFolder(f.path);
+                          setIsFolderPickerOpen(false);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
+                          pinnedFolder === f.path
+                            ? 'text-white font-medium bg-white/[0.04]'
+                            : 'text-zinc-400'
+                        }`}
+                      >
+                        <Folder className="w-3.5 h-3.5" />
+                        <span className="truncate">{f.path}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Loop Button */}
               <button
                 onClick={() => setIsLoop((prev) => !prev)}
-                className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                   isLoop ? 'text-white bg-white/10' : 'hover:text-white hover:bg-white/[0.08]'
                 }`}
                 title={isLoop ? 'Повтор включен' : 'Повтор выключен'}
@@ -446,18 +591,8 @@ export const AudioPanel: React.FC = () => {
                 {isLoop ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
               </button>
 
-              {/* Go to Note Link Button (Share/Jump) */}
-              <button
-                onClick={() => currentTrack && scrollToItem(currentTrack.itemId)}
-                className="p-2 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-                title="Перейти к заметке"
-                aria-label="Перейти к заметке"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </button>
-
               {/* Subtle Vertical Divider */}
-              <div className="h-4 w-px bg-white/15 mx-1" />
+              <div className="h-4 w-px bg-white/15 mx-0.5" />
 
               {/* Playback Speed */}
               <button
@@ -472,7 +607,7 @@ export const AudioPanel: React.FC = () => {
               {/* Volume / Mute Button */}
               <button
                 onClick={toggleMute}
-                className="p-2 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
                 title={isMuted ? 'Включить звук' : 'Выключить звук'}
                 aria-label="Громкость"
               >
