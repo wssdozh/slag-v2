@@ -6,7 +6,6 @@ import {
   VolumeX,
   ListMusic,
   ExternalLink,
-  Heart,
   Folder,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -31,7 +30,6 @@ export const AudioPanel: React.FC = () => {
   const [pinnedFolder, setPinnedFolder] = useState<string>(currentFolder || 'Входящие');
   const [typeFilters, setTypeFilters] = useState<AudioTypeFilter[]>(['voice', 'file']);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
 
   // Audio Playback State
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
@@ -424,8 +422,8 @@ export const AudioPanel: React.FC = () => {
               </span>
             </div>
 
-            {/* 6. Unified Bottom Controls Row (Strictly according to reference: Queue, Loop, Share/Jump | Speed, Vol, Fav) */}
-            <div className="flex items-center justify-between w-full max-w-[300px] text-zinc-400 select-none">
+            {/* 6. Unified Bottom Controls Row (Queue, Loop, Share/Jump | Speed, Vol) */}
+            <div className="flex items-center justify-between w-full max-w-[260px] text-zinc-400 select-none">
               {/* Queue Button */}
               <button
                 onClick={() => setIsPlaylistOpen(true)}
@@ -483,18 +481,6 @@ export const AudioPanel: React.FC = () => {
                 ) : (
                   <Volume2 className="w-4 h-4" />
                 )}
-              </button>
-
-              {/* Heart / Favorite Button */}
-              <button
-                onClick={() => setIsFavorite((prev) => !prev)}
-                className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                  isFavorite ? 'text-red-400' : 'hover:text-white hover:bg-white/[0.08]'
-                }`}
-                title={isFavorite ? 'В избранном' : 'Добавить в избранное'}
-                aria-label="Избранное"
-              >
-                <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
               </button>
             </div>
           </>

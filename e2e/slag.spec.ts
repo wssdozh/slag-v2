@@ -1701,15 +1701,11 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await closeQueueBtn.click();
     await expect(page.locator('text=Очередь воспроизведения')).not.toBeVisible();
 
-    // Verify bottom bar utilities (speed, repeat, favorite)
+    // Verify bottom bar utilities (speed, repeat)
     const speedBtn = page.locator('button[aria-label="Скорость"]');
     await expect(speedBtn).toBeVisible();
     await speedBtn.click();
     await expect(speedBtn).toHaveText('1.25x');
-
-    const favBtn = page.locator('button[aria-label="Избранное"]');
-    await expect(favBtn).toBeVisible();
-    await favBtn.click();
 
     // Take screenshot of the center AudioPlayer panel in full Now Playing glory
     await page.screenshot({
