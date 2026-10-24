@@ -19,161 +19,165 @@ void main() {
 `;
 
 /**
- * ChatGPT Voice Orb GLSL Shader
- * - Smooth, meditative fractal ink drifting across a soft circular mask
- * - Pure White luminous core blooming into Soft Azure Blue (#38bdf8 / #7dd3fc)
- * - Continuous, living, organic volume (no center void, no fan petals, no flickering blades)
- * - Swells and swirls gently with voice/audio energy; calms down during silence
+ * Authentic ChatGPT Advanced Voice Liquid Orb Shader
+ * - Smooth, silky liquid light droplet (NO noisy ripple waves, NO grain)
+ * - Elastic zero-gravity blob harmonics that deform gracefully with speech
+ * - Soft volumetric gradient: Brilliant White core -> Pure Azure -> Sapphire aura
+ * - Multi-band audio-reactive: Bass swells the body, Mids morph the contour, Highs ignite the white core
  */
 const fragmentShaderSource = `
 precision highp float;
 
 uniform vec2 uResolution;
 uniform float uTime;
-uniform float uAudioVolume;
+uniform float uVolume;
+uniform float uBass;
+uniform float uMid;
+uniform float uHigh;
 varying vec2 vUv;
 
-// 2D Simplex / Gradient Noise
-vec2 hash2(vec2 p) {
-    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-    return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
-}
-
-float snoise(vec2 p) {
-    const float K1 = 0.366025404; // (sqrt(3)-1)/2
-    const float K2 = 0.211324865; // (3-sqrt(3))/6
-
-    vec2 i = floor(p + (p.x + p.y) * K1);
-    vec2 a = p - i + (i.x + i.y) * K2;
-    vec2 o = (a.x > a.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec2 b = a - o + K2;
-    vec2 c = a - 1.0 + 2.0 * K2;
-
-    vec3 h = max(0.5 - vec3(dot(a, a), dot(b, b), dot(c, c)), 0.0);
-    vec3 n = h * h * h * h * vec3(dot(a, hash2(i)), dot(b, hash2(i + o)), dot(c, hash2(i + 1.0)));
-
-    return dot(n, vec3(70.0));
-}
-
-// Fractal Brownian Motion (Simulating drifting smoke / ink in liquid)
-float fbm(vec2 p) {
-    float f = 0.0;
-    mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
-    f += 0.5000 * snoise(p); p = m * p;
-    f += 0.2500 * snoise(p); p = m * p;
-    f += 0.1250 * snoise(p); p = m * p;
-    f += 0.0625 * snoise(p);
-    return f;
-}
+const float PI = 3.14159265358979323846;
 
 void main() {
-    // Coordinate space centered at (0, 0)
     vec2 p = vUv;
     float dist = length(p);
+    float angle = atan(p.y, p.x);
 
-    // Audio-reactive parameters
-    float vol = uAudioVolume;
-    float t = uTime * (0.6 + vol * 0.6);
+    // Dynamic deformation harmonics (Pure smooth liquid droplet modes - NO noise wrinkles)
+    float t = uTime * 1.2;
+    
+    // Mode 2: Elliptical stretch
+    float m2 = sin(angle * 2.0 + t * 0.8) * (0.04 + uMid * 0.08);
+    // Mode 3: Triangular fluid sway
+    float m3 = cos(angle * 3.0 - t * 0.6) * (0.03 + uBass * 0.07);
+    // Mode 4: Soft quad pulsation
+    float m4 = sin(angle * 4.0 + t * 0.4) * (0.015 + uHigh * 0.04);
+    // Mode 1: Floating dipole drift
+    float m1 = cos(angle - t * 0.5) * (0.02 + uVolume * 0.04);
 
-    // Domain warping: simulates fluid ink curling and drifting inside the sphere
-    vec2 q = vec2(
-        fbm(p + vec2(0.0, t * 0.2)),
-        fbm(p + vec2(4.3, 1.2) + vec2(t * 0.18, 0.0))
-    );
+    // Smooth elastic radius (base + breathing + audio swell + modes)
+    float baseR = 0.52 + sin(uTime * 1.5) * 0.015 + uBass * 0.12;
+    float blobRadius = baseR + m1 + m2 + m3 + m4;
 
-    vec2 r = vec2(
-        fbm(p + 2.8 * q + vec2(1.7, 9.2) + vec2(0.0, t * 0.25)),
-        fbm(p + 2.8 * q + vec2(8.3, 2.8) - vec2(t * 0.22, 0.0))
-    );
+    // Outer soft edge mask with buttery antialiasing
+    float edgeSoftness = 0.06 + uVolume * 0.04;
+    float alpha = smoothstep(blobRadius + edgeSoftness, blobRadius - 0.02, dist);
 
-    // Dynamic swirling fluid field
-    float fluid = fbm(p + 2.2 * r + t * 0.35);
-
-    // Sphere radius with gentle organic breathing and voice swelling
-    float breath = sin(uTime * 1.4) * 0.02 + vol * 0.08;
-    float orbRadius = 0.68 + breath;
-
-    // Edge softness for the circular mask (ChatGPT orb style)
-    float mask = smoothstep(orbRadius, orbRadius - 0.08, dist);
-    if (mask <= 0.001) {
+    if (alpha <= 0.001) {
         discard;
     }
 
-    // Color definitions: Pure White into Soft Azure Blue (#38bdf8 / #7dd3fc)
-    vec3 colAzureDark  = vec3(0.06, 0.38, 0.72); // Deep velvety azure edge
-    vec3 colAzureMid   = vec3(0.22, 0.74, 0.97); // Soft radiant cyan/azure (#38bdf8)
-    vec3 colAzureLight = vec3(0.73, 0.90, 0.99); // Ice azure glow (#bae6fd)
-    vec3 colWhite      = vec3(1.0, 1.0, 1.0);    // Pure white blooming ink
+    // Color ramp: Pure White core -> Soft Azure Cyan -> Deep Cerulean Halo
+    vec3 colWhite    = vec3(1.0, 1.0, 1.0);       // Incandescent heart
+    vec3 colCyan     = vec3(0.42, 0.84, 0.99);   // Radiant bright cyan (#67e8f9)
+    vec3 colAzure    = vec3(0.14, 0.60, 0.94);   // Soft azure blue (#38bdf8)
+    vec3 colDeepBlue = vec3(0.02, 0.32, 0.68);   // Deep ocean cerulean (#0284c7)
 
-    // Mix color based on distance and fluid swirl
-    float inkDensity = (fluid * 0.5 + 0.5); // 0 to 1
-    float radialFalloff = clamp(1.0 - (dist / orbRadius), 0.0, 1.0);
+    // Radial distance relative to dynamic blob radius
+    float normalizedDist = clamp(dist / blobRadius, 0.0, 1.0);
 
-    // Ink distribution: white bursts in the active zones, azure in the body
-    float whiteMix = pow(inkDensity, 1.8) * pow(radialFalloff, 0.75) * (0.85 + vol * 0.4);
-    whiteMix = clamp(whiteMix, 0.0, 1.0);
+    // Smooth interior liquid gradient
+    vec3 liquidColor;
+    if (normalizedDist < 0.35) {
+        // Core to bright cyan transition
+        float f = normalizedDist / 0.35;
+        liquidColor = mix(colWhite, colCyan, smoothstep(0.0, 1.0, f));
+    } else if (normalizedDist < 0.75) {
+        // Bright cyan to azure body transition
+        float f = (normalizedDist - 0.35) / 0.4;
+        liquidColor = mix(colCyan, colAzure, smoothstep(0.0, 1.0, f));
+    } else {
+        // Azure body to deep blue rim transition
+        float f = (normalizedDist - 0.75) / 0.25;
+        liquidColor = mix(colAzure, colDeepBlue, smoothstep(0.0, 1.0, f));
+    }
 
-    // Ambient body gradient
-    vec3 bodyColor = mix(colAzureDark, colAzureMid, pow(radialFalloff, 0.8));
-    bodyColor = mix(bodyColor, colAzureLight, inkDensity * 0.6);
+    // Core energy ignition: high frequencies and speech intensity burst the white light outward
+    float coreGlow = smoothstep(0.45 + uHigh * 0.25, 0.0, dist) * (0.8 + uVolume * 0.4);
+    liquidColor = mix(liquidColor, colWhite, clamp(coreGlow, 0.0, 1.0));
 
-    // Final color with blooming white ink
-    vec3 finalColor = mix(bodyColor, colWhite, whiteMix);
+    // Delicate translucent surface sheen (liquid glass feel)
+    float rimLight = smoothstep(blobRadius - 0.15, blobRadius - 0.01, dist) * (0.35 + uMid * 0.4);
+    liquidColor += colCyan * rimLight;
 
-    // Extra center luminescence so the heart is always softly glowing and living
-    float centerGlow = smoothstep(0.4, 0.0, dist) * (0.4 + vol * 0.3);
-    finalColor = mix(finalColor, colWhite, centerGlow);
-
-    // Soft antialiased circular edge
-    gl_FragColor = vec4(finalColor * mask, mask);
+    gl_FragColor = vec4(liquidColor * alpha, alpha);
 }
 `;
 
 /**
- * ChatGPT Voice Orb Canvas Component
+ * ChatGPT Voice Liquid Orb Component
  */
 const ChatGPTOrbCanvas: React.FC<{
   isPlaying: boolean;
   audioRef?: React.RefObject<HTMLAudioElement | null>;
 }> = ({ isPlaying, audioRef }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const audioSourceConnected = useRef<boolean>(false);
 
-  // Setup Web Audio Analyser if supported
+  // Setup Web Audio Analyser and ensure AudioContext is active
   useEffect(() => {
     if (!audioRef?.current) return;
     const audioElement = audioRef.current;
 
-    let audioCtx: AudioContext | null = null;
-    let sourceNode: MediaElementAudioSourceNode | null = null;
+    const initAudioGraph = () => {
+      try {
+        const AudioCtxClass =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
 
-    try {
-      const AudioCtxClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtxClass && !audioSourceConnected.current) {
-        audioCtx = new AudioCtxClass();
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
-        analyser.smoothingTimeConstant = 0.8;
+        if (AudioCtxClass && !audioCtxRef.current) {
+          const audioCtx = new AudioCtxClass();
+          audioCtxRef.current = audioCtx;
 
-        sourceNode = audioCtx.createMediaElementSource(audioElement);
-        sourceNode.connect(analyser);
-        analyser.connect(audioCtx.destination);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.82;
 
-        analyserRef.current = analyser;
-        dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
-        audioSourceConnected.current = true;
+          const sourceNode = audioCtx.createMediaElementSource(audioElement);
+          sourceNode.connect(analyser);
+          analyser.connect(audioCtx.destination);
+
+          analyserRef.current = analyser;
+          dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+          audioSourceConnected.current = true;
+        }
+
+        // Resume AudioContext if suspended
+        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+          audioCtxRef.current.resume().catch(() => {});
+        }
+      } catch {
+        analyserRef.current = null;
+        dataArrayRef.current = null;
       }
-    } catch {
-      analyserRef.current = null;
-      dataArrayRef.current = null;
-    }
+    };
 
-    return () => {};
+    initAudioGraph();
+
+    const handleUserInteraction = () => {
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    };
+
+    audioElement.addEventListener('play', handleUserInteraction);
+    window.addEventListener('click', handleUserInteraction, { once: true });
+
+    return () => {
+      audioElement.removeEventListener('play', handleUserInteraction);
+      window.removeEventListener('click', handleUserInteraction);
+    };
   }, [audioRef]);
+
+  // Ensure AudioContext resumes whenever playback starts
+  useEffect(() => {
+    if (isPlaying && audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+  }, [isPlaying]);
 
   // WebGL Render Loop
   useEffect(() => {
@@ -222,12 +226,18 @@ const ChatGPTOrbCanvas: React.FC<{
     gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
 
     const uTimeLoc = gl.getUniformLocation(program, 'uTime');
-    const uVolLoc = gl.getUniformLocation(program, 'uAudioVolume');
+    const uVolLoc = gl.getUniformLocation(program, 'uVolume');
+    const uBassLoc = gl.getUniformLocation(program, 'uBass');
+    const uMidLoc = gl.getUniformLocation(program, 'uMid');
+    const uHighLoc = gl.getUniformLocation(program, 'uHigh');
     const uResLoc = gl.getUniformLocation(program, 'uResolution');
 
     let animationId: number;
     let time = 0;
     let curVol = 0;
+    let curBass = 0;
+    let curMid = 0;
+    let curHigh = 0;
 
     const render = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -239,29 +249,67 @@ const ChatGPTOrbCanvas: React.FC<{
         gl.viewport(0, 0, displayW, displayH);
       }
 
-      // Read audio energy from Web Audio API
-      let currentEnergy = 0;
-      if (isPlaying && analyserRef.current && dataArrayRef.current) {
-        try {
-          analyserRef.current.getByteFrequencyData(dataArrayRef.current);
-          let sum = 0;
-          for (let i = 0; i < dataArrayRef.current.length; i++) {
-            sum += dataArrayRef.current[i];
+      // Read audio spectrum bands
+      let targetBass = 0;
+      let targetMid = 0;
+      let targetHigh = 0;
+      let targetVol = 0;
+
+      if (isPlaying) {
+        if (analyserRef.current && dataArrayRef.current) {
+          try {
+            analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+            const data = dataArrayRef.current;
+            const len = data.length;
+
+            // Low bins (0..3): Bass & voice fundamentals
+            let sumBass = 0;
+            const bassCount = Math.max(1, Math.min(4, len));
+            for (let i = 0; i < bassCount; i++) sumBass += data[i];
+            targetBass = sumBass / (bassCount * 255);
+
+            // Mid bins (4..14): Voice formants and speech clarity
+            let sumMid = 0;
+            const midEnd = Math.min(15, len);
+            const midCount = Math.max(1, midEnd - bassCount);
+            for (let i = bassCount; i < midEnd; i++) sumMid += data[i];
+            targetMid = sumMid / (midCount * 255);
+
+            // High bins (15..end): Consonants, breath, transients
+            let sumHigh = 0;
+            const highCount = Math.max(1, len - midEnd);
+            for (let i = midEnd; i < len; i++) sumHigh += data[i];
+            targetHigh = sumHigh / (highCount * 255);
+
+            targetVol = targetBass * 0.5 + targetMid * 0.35 + targetHigh * 0.15;
+          } catch {
+            targetVol = 0;
           }
-          currentEnergy = sum / (dataArrayRef.current.length * 255);
-        } catch {
-          currentEnergy = 0;
         }
+
+        // Natural fallback dynamic breathing if audio is silent
+        if (targetVol < 0.03) {
+          targetBass = 0.35 + Math.sin(time * 2.2) * 0.15;
+          targetMid = 0.3 + Math.cos(time * 1.8) * 0.15;
+          targetHigh = 0.25 + Math.sin(time * 3.1) * 0.1;
+          targetVol = (targetBass + targetMid + targetHigh) / 3;
+        }
+      } else {
+        // Gentle resting state
+        targetBass = 0.05 + Math.sin(time * 1.2) * 0.03;
+        targetMid = 0.04;
+        targetHigh = 0.02;
+        targetVol = 0.04;
       }
 
-      // Smooth volume interpolation
-      const targetEnergy = isPlaying
-        ? (currentEnergy > 0.05 ? currentEnergy : 0.45 + Math.sin(time * 2.2) * 0.22)
-        : 0.06;
-      curVol += (targetEnergy - curVol) * 0.1;
+      // Smooth fluid inertia interpolation
+      curVol += (targetVol - curVol) * 0.12;
+      curBass += (targetBass - curBass) * 0.14;
+      curMid += (targetMid - curMid) * 0.12;
+      curHigh += (targetHigh - curHigh) * 0.16;
 
-      // Time progression (calm and smooth)
-      const speed = isPlaying ? 0.016 + curVol * 0.02 : 0.007;
+      // Time progression
+      const speed = isPlaying ? 0.016 + curVol * 0.02 : 0.008;
       time += speed;
 
       gl.clearColor(0, 0, 0, 0);
@@ -269,6 +317,9 @@ const ChatGPTOrbCanvas: React.FC<{
 
       gl.uniform1f(uTimeLoc, time);
       gl.uniform1f(uVolLoc, curVol);
+      gl.uniform1f(uBassLoc, curBass);
+      gl.uniform1f(uMidLoc, curMid);
+      gl.uniform1f(uHighLoc, curHigh);
       gl.uniform2f(uResLoc, displayW, displayH);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -320,8 +371,8 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({
     );
   }
 
-  // ChatGPT Voice Orb (Pure White into Soft Azure Blue)
-  // Continuous living fluid ink, soft circular mask, floating on dark player canvas
+  // Smooth ChatGPT Voice Liquid Light Orb (Pure White into Soft Azure Blue)
+  // Perfectly smooth, zero ripple noise, fluid elastic droplet responding to live frequencies
   return (
     <div
       className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center select-none ${className}`}
