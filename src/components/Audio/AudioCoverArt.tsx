@@ -8,26 +8,145 @@ interface AudioCoverArtProps {
   className?: string;
 }
 
-interface Spore {
-  x: number;
-  y: number;
-  baseAngle: number;
-  dist: number;
-  speed: number;
-  size: number;
-  alpha: number;
-  phase: number;
+const vertexShaderSource = `
+attribute vec2 aPosition;
+varying vec2 vUv;
+
+void main() {
+  vUv = aPosition;
+  gl_Position = vec4(aPosition, 0.0, 1.0);
 }
+`;
 
 /**
- * Avatar Bioluminescent Jellyfish Visualizer (Living Ethereal Organism)
- * - Solid luminous heart in the center (NO black hole / void)
- * - Translucent, shimmering gelatinous membranes (iridescent caustics)
- * - Silky flowing bioluminescent filaments & floating avatar spores
- * - Two-color palette: Pure White energy into Soft Azure Blue (#38bdf8 / #7dd3fc)
- * - Seamlessly floating on player canvas without tile background
+ * Avatar Bioluminescent Fluid Orb (Domain-Warped Volumetric Liquid Shader)
+ * - Continuous living core (NO black holes, NO fan petals, NO hard geometric cutoffs)
+ * - Shimmering gelatinous caustics & organic fluid turbulence (Perlin/Simplex FBM)
+ * - Two-color palette: Pure White core luminescence into Soft Azure Blue (#38bdf8)
+ * - Soft ethereal bloom fading naturally into the player's dark background
  */
-const AvatarBioluminescentJellyfishCanvas: React.FC<{
+const fragmentShaderSource = `
+precision highp float;
+
+uniform vec2 uResolution;
+uniform float uTime;
+uniform float uAudioVolume;
+varying vec2 vUv;
+
+// 2D Rotation
+mat2 rot(float a) {
+    float c = cos(a);
+    float s = sin(a);
+    return mat2(c, -s, s, c);
+}
+
+// Hash function
+vec2 hash2(vec2 p) {
+    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+    return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
+
+// Simplex / Gradient Noise
+float snoise(vec2 p) {
+    const float K1 = 0.366025404; // (sqrt(3)-1)/2;
+    const float K2 = 0.211324865; // (3-sqrt(3))/6;
+
+    vec2 i = floor(p + (p.x + p.y) * K1);
+    vec2 a = p - i + (i.x + i.y) * K2;
+    vec2 o = (a.x > a.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec2 b = a - o + K2;
+    vec2 c = a - 1.0 + 2.0 * K2;
+
+    vec3 h = max(0.5 - vec3(dot(a, a), dot(b, b), dot(c, c)), 0.0);
+    vec3 n = h * h * h * h * vec3(dot(a, hash2(i)), dot(b, hash2(i + o)), dot(c, hash2(i + 1.0)));
+
+    return dot(n, vec3(70.0));
+}
+
+// Fractal Brownian Motion (Smooth volumetric liquid layers)
+float fbm(vec2 p) {
+    float f = 0.0;
+    mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+    f += 0.5000 * snoise(p); p = m * p;
+    f += 0.2500 * snoise(p); p = m * p;
+    f += 0.1250 * snoise(p); p = m * p;
+    f += 0.0625 * snoise(p);
+    return f;
+}
+
+void main() {
+    // Aspect-ratio corrected coordinates centered at (0, 0)
+    vec2 p = vUv;
+    float dist = length(p);
+
+    // Audio-reactive fluid dynamics
+    float vol = uAudioVolume;
+    float t = uTime * 0.7;
+
+    // Organic domain warping (simulating zero-gravity liquid flow / jellyfish bell)
+    vec2 q = vec2(
+        fbm(p + vec2(0.0, t * 0.2)),
+        fbm(p + vec2(5.2, 1.3) + vec2(t * 0.15, 0.0))
+    );
+
+    vec2 r = vec2(
+        fbm(p + 3.0 * q + vec2(1.7, 9.2) + vec2(0.0, t * 0.25)),
+        fbm(p + 3.0 * q + vec2(8.3, 2.8) - vec2(t * 0.2, 0.0))
+    );
+
+    // Living turbulent field
+    float fluid = fbm(p + 2.4 * r + t * 0.3);
+
+    // Soft organic jellyfish boundary with breathing pulsation
+    float breath = sin(uTime * 1.5) * 0.04 + vol * 0.12;
+    float baseRadius = 0.52 + breath;
+    float distortedRadius = baseRadius + fluid * (0.16 + vol * 0.14);
+
+    // Multi-layer gelatinous density
+    float innerCore = smoothstep(distortedRadius * 0.45, 0.0, dist);
+    float midBody   = smoothstep(distortedRadius, distortedRadius * 0.2, dist);
+    float outerAura = smoothstep(distortedRadius + 0.35 + vol * 0.25, distortedRadius * 0.3, dist);
+
+    // Caustics & bioluminescent veins inside the medusa
+    float caustics = pow(max(0.0, fluid + 0.25), 2.8) * midBody;
+
+    // Palette: Pure White core -> Soft Luminous Azure Blue -> Deep Marine Void
+    vec3 colDeep    = vec3(0.03, 0.04, 0.06);     // Dark backdrop
+    vec3 colAzure   = vec3(0.05, 0.55, 0.95);     // Rich soft azure (#0ea5e9)
+    vec3 colCyan    = vec3(0.22, 0.74, 0.97);     // Radiant cyan (#38bdf8)
+    vec3 colLight   = vec3(0.73, 0.90, 0.99);     // Pale azure shimmer (#bae6fd)
+    vec3 colWhite   = vec3(1.0, 1.0, 1.0);        // Pure bioluminescent white
+
+    // Color synthesis across layers
+    vec3 finalColor = vec3(0.0);
+
+    // Ambient floating halo
+    finalColor += colAzure * outerAura * (0.45 + vol * 0.4);
+
+    // Translucent gelatinous membrane
+    finalColor = mix(finalColor, colCyan, midBody * 0.85);
+
+    // Internal fluid veins & caustics
+    finalColor += colLight * caustics * (1.2 + vol * 0.8);
+
+    // Radiant solid living nucleus (NO hole in the center!)
+    finalColor = mix(finalColor, colWhite, innerCore * (0.95 + vol * 0.05));
+
+    // Specular photon highlight at the very heart
+    float heartDot = smoothstep(0.12 + vol * 0.06, 0.0, dist);
+    finalColor = mix(finalColor, colWhite, heartDot);
+
+    // Soft feathered outer alpha for seamless floating without square bounds
+    float alpha = clamp(outerAura * 0.7 + midBody * 0.6 + innerCore * 0.5, 0.0, 1.0);
+
+    gl_FragColor = vec4(finalColor * alpha, alpha);
+}
+`;
+
+/**
+ * Avatar Fluid Orb Canvas Component
+ */
+const AvatarFluidOrbCanvas: React.FC<{
   isPlaying: boolean;
   audioRef?: React.RefObject<HTMLAudioElement | null>;
 }> = ({ isPlaying, audioRef }) => {
@@ -36,7 +155,7 @@ const AvatarBioluminescentJellyfishCanvas: React.FC<{
   const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const audioSourceConnected = useRef<boolean>(false);
 
-  // Setup Web Audio Analyser if supported and safe
+  // Setup Web Audio Analyser if supported
   useEffect(() => {
     if (!audioRef?.current) return;
     const audioElement = audioRef.current;
@@ -63,50 +182,78 @@ const AvatarBioluminescentJellyfishCanvas: React.FC<{
         audioSourceConnected.current = true;
       }
     } catch {
-      // In case of browser autoplay / CORS restriction on file URL,
-      // fallback smoothly to procedural audio-driven physics
       analyserRef.current = null;
       dataArrayRef.current = null;
     }
 
-    return () => {
-      // Keep connection intact
-    };
+    return () => {};
   }, [audioRef]);
 
-  // Main Canvas render loop
+  // WebGL Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+
+    const gl =
+      canvas.getContext('webgl', { alpha: true, antialias: true, premultipliedAlpha: true }) ||
+      (canvas.getContext('experimental-webgl') as WebGLRenderingContext | null);
+
+    if (!gl) return;
+
+    const compileShader = (type: number, src: string) => {
+      const shader = gl.createShader(type);
+      if (!shader) return null;
+      gl.shaderSource(shader, src);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    };
+
+    const vs = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const fs = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+    if (!vs || !fs) return;
+
+    const program = gl.createProgram();
+    if (!program) return;
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+    gl.useProgram(program);
+
+    // Quad geometry
+    const quadVertices = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
+    const posBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
+
+    const aPosLoc = gl.getAttribLocation(program, 'aPosition');
+    gl.enableVertexAttribArray(aPosLoc);
+    gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const uTimeLoc = gl.getUniformLocation(program, 'uTime');
+    const uVolLoc = gl.getUniformLocation(program, 'uAudioVolume');
+    const uResLoc = gl.getUniformLocation(program, 'uResolution');
 
     let animationId: number;
     let time = 0;
-    let smoothedVolume = 0;
-
-    // Floating bioluminescent spores (like Avatar Woodsprites / deep sea embers)
-    const sporeCount = 20;
-    const spores: Spore[] = Array.from({ length: sporeCount }, (_, i) => ({
-      x: 0,
-      y: 0,
-      baseAngle: (i / sporeCount) * Math.PI * 2,
-      dist: 50 + Math.random() * 65,
-      speed: 0.005 + Math.random() * 0.01,
-      size: 1 + Math.random() * 1.6,
-      alpha: 0.3 + Math.random() * 0.5,
-      phase: Math.random() * Math.PI * 2,
-    }));
+    let curVol = 0;
 
     const render = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
-      const cx = width / 2;
-      const cy = height / 2;
-      const maxRadius = Math.min(width, height) * 0.44;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const displayW = Math.floor(canvas.clientWidth * dpr);
+      const displayH = Math.floor(canvas.clientHeight * dpr);
+      if (canvas.width !== displayW || canvas.height !== displayH) {
+        canvas.width = displayW;
+        canvas.height = displayH;
+        gl.viewport(0, 0, displayW, displayH);
+      }
 
-      // Read audio energy if analyser is available
+      // Read audio energy
       let currentEnergy = 0;
       if (isPlaying && analyserRef.current && dataArrayRef.current) {
         try {
@@ -121,228 +268,40 @@ const AvatarBioluminescentJellyfishCanvas: React.FC<{
         }
       }
 
-      // Smooth energy with damping
       const targetEnergy = isPlaying
-        ? (currentEnergy > 0.05 ? currentEnergy : 0.45 + Math.sin(time * 2.6) * 0.25)
-        : 0.06;
-      smoothedVolume += (targetEnergy - smoothedVolume) * 0.09;
+        ? (currentEnergy > 0.05 ? currentEnergy : 0.45 + Math.sin(time * 2.2) * 0.22)
+        : 0.08;
+      curVol += (targetEnergy - curVol) * 0.1;
 
-      // Breathing cycle: contraction and expansion of the jellyfish bell
-      const pulseSpeed = isPlaying ? 0.024 + smoothedVolume * 0.03 : 0.01;
-      time += pulseSpeed;
-      const breath = Math.sin(time * 1.8); // -1 to 1
+      // Time progression
+      const speed = isPlaying ? 0.02 + curVol * 0.025 : 0.009;
+      time += speed;
 
-      // Clear with full transparency so it floats organically on dark player background
-      ctx.clearRect(0, 0, width, height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
 
-      // 1. Ethereal ambient halo (soft bioluminescent aura)
-      const haloRadius = maxRadius * (1.05 + smoothedVolume * 0.35);
-      const haloGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloRadius);
-      const auraAlpha = isPlaying ? 0.32 + smoothedVolume * 0.35 : 0.12;
-      haloGrad.addColorStop(0, `rgba(56, 189, 248, ${(auraAlpha * 0.6).toFixed(3)})`);
-      haloGrad.addColorStop(0.45, `rgba(14, 165, 233, ${(auraAlpha * 0.3).toFixed(3)})`);
-      haloGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+      gl.uniform1f(uTimeLoc, time);
+      gl.uniform1f(uVolLoc, curVol);
+      gl.uniform2f(uResLoc, displayW, displayH);
 
-      ctx.save();
-      ctx.fillStyle = haloGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, haloRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      // 2. Floating Bioluminescent Avatar Spores (Woodsprites)
-      ctx.save();
-      for (const spore of spores) {
-        spore.baseAngle += spore.speed * (isPlaying ? 1.5 : 0.7);
-        const currentDist = spore.dist * (1 + breath * 0.12 + smoothedVolume * 0.25);
-        const sx = cx + Math.cos(spore.baseAngle) * currentDist;
-        const sy = cy + Math.sin(spore.baseAngle) * currentDist + Math.sin(time + spore.phase) * 6;
-
-        const currentAlpha = spore.alpha * (0.6 + Math.sin(time * 2 + spore.phase) * 0.4);
-        ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha.toFixed(3)})`;
-        ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.arc(sx, sy, spore.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-
-      // 3. Silky Outer Bioluminescent Filaments (Jellyfish Tendrils / Ethereal Feathers)
-      // 28 fine silky lines weaving in zero-gravity water currents
-      const filamentCount = 28;
-      const segments = 90;
-
-      for (let f = 0; f < filamentCount; f++) {
-        const u = f / (filamentCount - 1); // 0 to 1
-        const layerR = maxRadius * (0.42 + u * 0.5 + breath * 0.08 * (1 - u * 0.5));
-        const amp = (8 + smoothedVolume * 22) * Math.sin(u * Math.PI) ** 0.8;
-
-        ctx.save();
-        ctx.beginPath();
-
-        for (let i = 0; i <= segments; i++) {
-          const theta = (i / segments) * Math.PI * 2;
-          // Fluid organic ripples mimicking gelatinous movement
-          const w1 = Math.sin(theta * 4 + time * 1.5 + u * 2.8) * 0.55;
-          const w2 = Math.cos(theta * 6 - time * 1.1 - u * 2.1) * 0.32;
-          const w3 = Math.sin(theta * 8 + time * 0.8 + u * 3.5) * 0.13;
-          const harmonic = w1 + w2 + w3;
-
-          const r = Math.max(15, layerR + harmonic * amp);
-          const px = cx + Math.cos(theta) * r;
-          const py = cy + Math.sin(theta) * r;
-
-          if (i === 0) {
-            ctx.moveTo(px, py);
-          } else {
-            ctx.lineTo(px, py);
-          }
-        }
-        ctx.closePath();
-
-        // Shimmering color: pure white crest lines near core, fading to soft azure filaments
-        const alpha = (0.2 + (1 - u) * 0.55 + smoothedVolume * 0.25).toFixed(3);
-        if (u < 0.2) {
-          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 1.4;
-          ctx.shadowColor = '#38bdf8';
-          ctx.shadowBlur = isPlaying ? 10 + smoothedVolume * 10 : 4;
-        } else {
-          ctx.strokeStyle = `rgba(56, 189, 248, ${(Number(alpha) * 0.7).toFixed(3)})`;
-          ctx.lineWidth = 1.0;
-          ctx.shadowBlur = 0;
-        }
-
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // 4. Multi-layered Translucent Gelatinous Bell (The Jellyfish Body - Filled & Shimmering)
-      // 4 overlapping undulating translucent domes (caustics effect)
-      const domeCount = 4;
-      for (let d = domeCount - 1; d >= 0; d--) {
-        const du = d / (domeCount - 1);
-        const domeR = maxRadius * (0.32 + du * 0.35 + breath * 0.1);
-        const domeAmp = (6 + smoothedVolume * 14) * (0.6 + du * 0.4);
-
-        ctx.save();
-        ctx.beginPath();
-        for (let i = 0; i <= segments; i++) {
-          const theta = (i / segments) * Math.PI * 2;
-          const wobble =
-            Math.sin(theta * 3 + time * 1.8 + d * 1.2) * 0.55 +
-            Math.cos(theta * 5 - time * 1.4 - d * 0.8) * 0.45;
-          const r = Math.max(20, domeR + wobble * domeAmp);
-          const px = cx + Math.cos(theta) * r;
-          const py = cy + Math.sin(theta) * r;
-
-          if (i === 0) {
-            ctx.moveTo(px, py);
-          } else {
-            ctx.lineTo(px, py);
-          }
-        }
-        ctx.closePath();
-
-        // Gelatinous iridescent gradient fill
-        const domeGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, domeR * 1.15);
-        const fillAlpha = isPlaying ? 0.22 + smoothedVolume * 0.25 : 0.12;
-        domeGrad.addColorStop(0, `rgba(224, 242, 254, ${(fillAlpha * 0.9).toFixed(3)})`);
-        domeGrad.addColorStop(0.4, `rgba(56, 189, 248, ${(fillAlpha * 0.65).toFixed(3)})`);
-        domeGrad.addColorStop(0.85, `rgba(14, 165, 233, ${(fillAlpha * 0.25).toFixed(3)})`);
-        domeGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
-
-        ctx.fillStyle = domeGrad;
-        ctx.fill();
-
-        // Delicate glowing membrane border
-        ctx.strokeStyle = `rgba(186, 230, 253, ${(0.4 + smoothedVolume * 0.4).toFixed(3)})`;
-        ctx.lineWidth = 1.3;
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // 5. Living Luminous Heart / Nucleus (NO HOLE - Solid Radiant Core)
-      // Pure White glowing energy center that pulses with sound
-      const coreR = maxRadius * (0.18 + smoothedVolume * 0.12 + breath * 0.04);
-      const coreWobbleAmp = 3 + smoothedVolume * 6;
-
-      ctx.save();
-      ctx.beginPath();
-      for (let i = 0; i <= segments; i++) {
-        const theta = (i / segments) * Math.PI * 2;
-        const w =
-          Math.sin(theta * 2 + time * 2.2) * 0.6 +
-          Math.sin(theta * 4 - time * 1.7) * 0.4;
-        const r = coreR + w * coreWobbleAmp;
-        const px = cx + Math.cos(theta) * r;
-        const py = cy + Math.sin(theta) * r;
-
-        if (i === 0) {
-          ctx.moveTo(px, py);
-        } else {
-          ctx.lineTo(px, py);
-        }
-      }
-      ctx.closePath();
-
-      // Radiant Core Gradient: Pure White -> Soft Azure
-      const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 1.25);
-      const heartWhite = isPlaying ? 0.98 : 0.85;
-      const heartAzure = isPlaying ? 0.8 + smoothedVolume * 0.2 : 0.5;
-
-      coreGrad.addColorStop(0, `rgba(255, 255, 255, ${heartWhite})`);
-      coreGrad.addColorStop(0.25, `rgba(240, 249, 255, ${heartWhite})`);
-      coreGrad.addColorStop(0.6, `rgba(125, 211, 252, ${heartAzure})`);
-      coreGrad.addColorStop(0.9, `rgba(56, 189, 248, ${(heartAzure * 0.6).toFixed(3)})`);
-      coreGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
-
-      ctx.fillStyle = coreGrad;
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = isPlaying ? 24 + smoothedVolume * 20 : 12;
-      ctx.fill();
-
-      // White inner photon burst highlight
-      const centerBrightR = coreR * 0.35;
-      const brightGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, centerBrightR);
-      brightGrad.addColorStop(0, '#ffffff');
-      brightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      ctx.fillStyle = brightGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, centerBrightR, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       animationId = requestAnimationFrame(render);
     };
 
-    // Auto-resize canvas for sharp High-DPI rendering
-    const resizeObserver = new ResizeObserver(() => {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        ctx.resetTransform();
-        ctx.scale(dpr, dpr);
-      }
-    });
-
-    resizeObserver.observe(canvas);
     animationId = requestAnimationFrame(render);
 
     return () => {
-      resizeObserver.disconnect();
       cancelAnimationFrame(animationId);
+      gl.deleteBuffer(posBuffer);
+      gl.deleteProgram(program);
     };
   }, [isPlaying]);
 
   return (
     <canvas
       ref={canvasRef}
-      data-testid="ocean-waves-canvas"
+      data-testid="avatar-fluid-orb-canvas"
       className="w-full h-full block"
     />
   );
@@ -374,13 +333,13 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({
     );
   }
 
-  // Floating Bioluminescent Jellyfish Organism (Pure White into Soft Azure Blue)
-  // Completely solid living center (no hole), iridescent shimmering membranes, floating without background podlozhka
+  // Avatar Bioluminescent Fluid Orb (Pure White into Soft Azure Blue)
+  // Continuous living core, organic gelatinous caustics, floating on dark player canvas
   return (
     <div
       className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center select-none ${className}`}
     >
-      <AvatarBioluminescentJellyfishCanvas isPlaying={isPlaying} audioRef={audioRef} />
+      <AvatarFluidOrbCanvas isPlaying={isPlaying} audioRef={audioRef} />
     </div>
   );
 };

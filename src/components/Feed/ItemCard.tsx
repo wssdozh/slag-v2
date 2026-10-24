@@ -624,11 +624,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                   {expandedOcrIds.has(imageAttachments[0].id) && (
                     <div className="mt-1 pt-1 pl-2.5 border-l border-white/10 text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
                       {imageAttachments[0].extractedText}
-                      {imageAttachments[0].summary && (
-                        <div className="text-[11px] text-zinc-500 font-sans pt-1">
-                          Суть: {imageAttachments[0].summary}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
