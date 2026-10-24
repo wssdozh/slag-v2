@@ -153,9 +153,9 @@ export const FeedList: React.FC = () => {
       ) : (
         grouped.map(group => (
           <div key={group.dateLabel} className="flex flex-col gap-3">
-            {/* Telegram-style date sticky bubble */}
-            <div className="flex justify-center sticky top-0 z-10 py-1 pointer-events-none">
-              <span className="px-3 py-1 rounded-full bg-[#18181b]/90 border border-white/[0.06] text-[11px] font-mono text-zinc-400 shadow-md">
+            {/* Telegram-style date bubble */}
+            <div className="flex justify-center py-1 select-none">
+              <span className="px-3 py-0.5 rounded-full bg-[#18181b] border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
                 {group.dateLabel}
               </span>
             </div>

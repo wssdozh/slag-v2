@@ -154,7 +154,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     window.addEventListener('mouseup', onMouseUp);
   };
 
-  const barsCount = compact ? 22 : 40;
+  const barsCount = compact ? 26 : 56;
 
   // Generate or sample waveform bars
   const bars = React.useMemo(() => {
@@ -165,7 +165,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       for (let i = 0; i < barsCount; i++) {
         const idx = Math.min(customWaveform.length - 1, Math.floor(i * step));
         const val = customWaveform[idx] ?? 0.3;
-        sampled.push(Math.max(0.15, Math.min(1, val)));
+        sampled.push(Math.max(0.08, Math.min(1, val)));
       }
       return sampled;
     }
@@ -174,10 +174,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const generated: number[] = [];
     for (let i = 0; i < barsCount; i++) {
       const t = i / barsCount;
-      const envelope = Math.sin(t * Math.PI); // tapering edges
-      const noise = Math.sin(i * 1.7) * 0.35 + Math.cos(i * 3.3) * 0.25 + Math.sin(i * 0.8) * 0.2;
-      const val = Math.max(0.12, (0.45 + noise) * envelope + 0.12);
-      generated.push(Math.min(1, Math.max(0.15, val)));
+      const envelope = Math.sin(t * Math.PI) * 0.4 + 0.6;
+      const speechBurst = Math.sin(i * 1.35) * 0.35 + Math.cos(i * 2.8) * 0.3 + Math.sin(i * 0.55) * 0.25;
+      const raw = Math.max(0, (0.42 + speechBurst) * envelope);
+      generated.push(Math.min(1, Math.max(0.06, raw)));
     }
     return generated;
   }, [customWaveform, barsCount]);
@@ -207,7 +207,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           {bars.map((norm, i) => {
             const barFraction = (i / barsCount) * 100;
             const isFilled = barFraction <= progressPercent;
-            const height = Math.round(4 + norm * 11);
+            const height = Math.round(2 + norm * 12);
             return (
               <div
                 key={i}
@@ -220,7 +220,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           })}
         </div>
 
-        <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+        <span className="text-[11px] font-sans tabular-nums text-zinc-400 shrink-0">
           {isPlaying ? formatTime(currentTime) : formatTime(currentDur)}
         </span>
       </div>
@@ -231,42 +231,42 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   return (
     <div className="w-full flex flex-col">
-      <div className="flex items-center gap-2.5 py-1 w-full select-none">
+      <div className="flex items-center gap-2.5 py-0.5 w-full select-none">
         <audio ref={audioRef} src={src} preload="metadata" />
 
-        {/* Linear Monochrome Play/Pause round button */}
+        {/* Telegram-proportional Play/Pause round button */}
         <button
           type="button"
           onClick={togglePlay}
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-zinc-200 active:scale-95 flex items-center justify-center text-black transition-all shrink-0 shadow-sm cursor-pointer"
+          className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-full bg-white hover:bg-zinc-200 active:scale-95 flex items-center justify-center text-black transition-all shrink-0 shadow-sm cursor-pointer"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
           aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >
           {isPlaying ? (
-            <Pause className="w-4 h-4 fill-current" />
+            <Pause className="w-3.5 h-3.5 fill-current" />
           ) : (
-            <Play className="w-4 h-4 fill-current ml-0.5" />
+            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
           )}
         </button>
 
         {/* Waveform and Time metadata */}
-        <div className="flex-1 flex flex-col justify-center gap-1.5 min-w-0">
+        <div className="flex-1 flex flex-col justify-center gap-1 min-w-0">
           <div
             ref={waveTrackRef}
             onMouseDown={handleMouseDown}
-            className="flex items-center justify-between gap-[2px] h-6 cursor-pointer select-none py-1 w-full"
+            className="flex items-center justify-between gap-[1.5px] h-5 cursor-pointer select-none py-0.5 w-full"
             title="Перемотка"
           >
             {bars.map((norm, i) => {
               const barFraction = (i / barsCount) * 100;
               const isFilled = barFraction <= progressPercent;
-              const height = Math.round(4 + norm * 18);
+              const height = Math.round(2 + norm * 16);
               return (
                 <div
                   key={i}
                   style={{ height: `${height}px` }}
-                  className={`flex-1 min-w-[2px] max-w-[4px] rounded-full transition-colors ${
-                    isFilled ? 'bg-white' : 'bg-white/20 hover:bg-white/30'
+                  className={`w-[2px] rounded-full transition-colors ${
+                    isFilled ? 'bg-white' : 'bg-white/25 hover:bg-white/40'
                   }`}
                 />
               );
@@ -274,32 +274,32 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           </div>
 
           {/* Subtitle with details: 00:08, 30.2 KB, timestamp */}
-          <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400">
-            <div className="flex items-center gap-1.5 truncate">
+          <div className="flex justify-between items-center text-[11px] font-sans tabular-nums text-zinc-400">
+            <div className="flex items-center gap-1 truncate">
               <span>{isPlaying ? formatTime(currentTime) : formatTime(currentDur)}</span>
               {formattedSize && (
                 <>
-                  <span className="text-zinc-600">•</span>
+                  <span className="text-zinc-600 font-normal">,</span>
                   <span className="text-zinc-500">{formattedSize}</span>
                 </>
               )}
             </div>
 
             {timeContext && (
-              <span className="text-zinc-500 text-[10px] font-mono ml-auto shrink-0 select-none">
+              <span className="text-zinc-500 text-[11px] font-sans ml-auto shrink-0 select-none">
                 {timeContext}
               </span>
             )}
           </div>
         </div>
 
-        {/* Telegram-style Transcription Button (->A / Loader / Chevron) */}
+        {/* Telegram-style Transcription Button (Seamless ->A / Loader / Chevron) */}
         {(onEnrich || transcript || enrichmentStatus === 'processing') && (
           <button
             type="button"
             onClick={handleTranscriptToggle}
             disabled={enrichmentStatus === 'processing'}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 text-zinc-300 hover:text-white transition-all flex items-center justify-center shrink-0 cursor-pointer border border-white/[0.06] disabled:opacity-50 disabled:pointer-events-none"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             title={
               enrichmentStatus === 'processing'
                 ? 'Идет расшифровка...'
@@ -316,15 +316,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             ) : transcript && isExpanded ? (
               <ChevronUp className="w-4 h-4 text-zinc-300" />
             ) : (
-              <TelegramTranscribeIcon className="w-3.5 h-3.5 text-zinc-400" />
+              <TelegramTranscribeIcon className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
             )}
           </button>
         )}
       </div>
 
-      {/* Telegram-style Transcript (Clean text, no headers, directly under player) */}
+      {/* Telegram-style Transcript with user-approved divider line */}
       {isExpanded && transcript && (
-        <div className="mt-2 pt-2 border-t border-white/[0.07] text-xs text-zinc-200 font-sans leading-relaxed select-text flex flex-col animate-in fade-in duration-150">
+        <div className="mt-2 pt-2 border-t border-white/[0.08] text-xs sm:text-[13px] text-zinc-200 font-sans leading-relaxed select-text flex flex-col animate-in fade-in duration-150">
           <p className="whitespace-pre-wrap">{transcript}</p>
         </div>
       )}
