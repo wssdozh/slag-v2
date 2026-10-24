@@ -29,13 +29,14 @@ export const ComposerModal: React.FC = () => {
       closeOnBackdropClick={true}
       closeOnEsc={true}
     >
-      <div className="pt-1">
+      <div className="pt-0.5">
         <Composer
           isModal
           initialType={composerModalOptions?.type}
           initialStatus={composerModalOptions?.status}
           initialFolder={composerModalOptions?.folder}
           initialDueDate={composerModalOptions?.dueDate}
+          initialReminder={composerModalOptions?.reminder}
           onComplete={closeComposerModal}
           onCancel={closeComposerModal}
         />

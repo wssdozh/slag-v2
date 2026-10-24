@@ -65,6 +65,7 @@ export interface ComposerProps {
   initialStatus?: SlagItemStatus;
   initialFolder?: string;
   initialDueDate?: string;
+  initialReminder?: string;
   onComplete?: () => void;
   onCancel?: () => void;
 }
@@ -75,6 +76,7 @@ export const Composer: React.FC<ComposerProps> = ({
   initialStatus,
   initialFolder,
   initialDueDate,
+  initialReminder,
   onComplete,
   onCancel,
 }) => {
@@ -98,6 +100,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
   const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>('none');
   const [dueDate, setDueDate] = useState<string>(initialDueDate || '');
+  const [reminder] = useState<string | undefined>(initialReminder);
   const [tags, setTags] = useState<string[]>([]);
   const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(
     initialFolder ? { folder: initialFolder, forCurrent: currentFolder } : null
@@ -760,7 +763,7 @@ export const Composer: React.FC<ComposerProps> = ({
     const taskReminder = itemType === 'task'
       ? (!isDateDismissed && currentParsed.reminder
           ? currentParsed.reminder
-          : undefined)
+          : (reminder || undefined))
       : undefined;
 
     const destinationFolder = targetFolder || currentFolder;
@@ -860,7 +863,7 @@ export const Composer: React.FC<ComposerProps> = ({
     const taskReminder = itemType === 'task'
       ? (!isDateDismissed && currentParsed.reminder
           ? currentParsed.reminder
-          : undefined)
+          : (reminder || undefined))
       : undefined;
 
     // Create a temporary draft object in memory WITHOUT saving to vault storage yet
@@ -1553,6 +1556,7 @@ export const Composer: React.FC<ComposerProps> = ({
   return (
     <BaseComposer
       value={content}
+      variant={isModal ? 'flat' : 'card'}
       onChange={handleContentChange}
       onSubmit={handleSend}
       onKeyDown={handleKeyDown}

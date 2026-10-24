@@ -121,8 +121,8 @@ interface AppContextType {
   closeFolderModal: () => void;
   setIsTriageModalOpen: (open: boolean) => void;
   isComposerModalOpen: boolean;
-  composerModalOptions: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string } | null;
-  openComposerModal: (options?: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string }) => void;
+  composerModalOptions: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string } | null;
+  openComposerModal: (options?: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string }) => void;
   closeComposerModal: () => void;
   
   // Storage operations
@@ -263,6 +263,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status?: SlagItemStatus;
     folder?: string;
     dueDate?: string;
+    reminder?: string;
   } | null>(null);
 
   const openComposerModal = useCallback((options?: {
@@ -270,6 +271,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status?: SlagItemStatus;
     folder?: string;
     dueDate?: string;
+    reminder?: string;
   }) => {
     setComposerModalOptions(options || null);
     setIsComposerModalOpen(true);

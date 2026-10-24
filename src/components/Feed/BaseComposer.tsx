@@ -38,6 +38,8 @@ export interface BaseComposerProps {
   minHeight?: number;
   /** Максимальная высота поля ввода в px (по умолчанию 220) */
   maxHeight?: number;
+  /** Вариант отображения: 'card' (со своей рамкой/фоном) или 'flat' (для модалок без матрёшки) */
+  variant?: 'card' | 'flat';
   /** Дополнительные классы для контейнера-каркаса */
   className?: string;
 }
@@ -66,6 +68,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   customControls,
   minHeight = 22,
   maxHeight = 220,
+  variant = 'card',
   className = '',
 }) => {
   const localRef = useRef<HTMLTextAreaElement | null>(null);
@@ -96,11 +99,17 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
     }
   };
 
+  const isFlat = variant === 'flat';
+
   return (
     <div className="w-full select-none relative">
       {overlaySlot}
       <div
-        className={`rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors ${className}`}
+        className={
+          isFlat
+            ? `p-1 flex flex-col gap-2 bg-transparent border-0 shadow-none ${className}`
+            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors ${className}`
+        }
       >
         {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
         {topSlot}

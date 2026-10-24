@@ -1945,5 +1945,37 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       await page.keyboard.press('Escape');
       await expect(page.locator('text=Срок выполнения:')).not.toBeVisible();
     }
+
+    // 7. Verify clicking hour slot in Week time grid spawns ComposerModal
+    const hourSlot = page.locator('.grid-cols-7 .h-\\[52px\\]').first();
+    await hourSlot.click();
+    await page.waitForTimeout(200);
+    await expect(page.locator('[role="dialog"]').filter({ hasText: 'Новая задача' })).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-slot-composer-modal.png',
+      fullPage: false,
+    });
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+
+    // 8. Verify Month View day card "Добавить задачу..." spawns ComposerModal
+    await page.locator('button', { hasText: 'Месяц' }).click();
+    await page.waitForTimeout(200);
+    const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
+    if (await monthTodayBadge.isVisible()) {
+      await monthTodayBadge.click();
+      await page.waitForTimeout(200);
+      const addDayTaskBtn = page.locator('button', { hasText: 'Добавить задачу...' });
+      if (await addDayTaskBtn.isVisible()) {
+        await addDayTaskBtn.click();
+        await page.waitForTimeout(200);
+        await expect(page.locator('[role="dialog"]').filter({ hasText: 'Новая задача' })).toBeVisible();
+        await page.screenshot({
+          path: 'test-results/screenshots/calendar-month-composer-modal.png',
+          fullPage: false,
+        });
+        await page.keyboard.press('Escape');
+      }
+    }
   });
 });

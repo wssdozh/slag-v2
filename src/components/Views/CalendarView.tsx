@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
-import { parseTodoistInput, getTaskTimeSlot } from '../../lib/todoistTaskParser';
+import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
 import {
   ChevronLeft,
   ChevronRight,
@@ -133,12 +133,12 @@ export const CalendarView: React.FC = () => {
     items,
     currentFolder,
     updateItem,
-    saveItem,
     toggleTaskComplete,
     setSelectedItem,
     setIsFullscreenEditorOpen,
     openContextMenu,
-    addToast
+    addToast,
+    openComposerModal,
   } = useApp();
 
   // Mode: 'week' | 'month'
@@ -154,17 +154,8 @@ export const CalendarView: React.FC = () => {
   // Drag over target date
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
-  // Quick Inline Add state for All-Day or Month cell
-  const [addingDate, setAddingDate] = useState<string | null>(null);
-  const [newTaskInput, setNewTaskInput] = useState('');
-
-  // Quick Add for specific hour slot: { dateStr: string; hour: number }
-  const [addingSlot, setAddingSlot] = useState<{ dateStr: string; hour: number } | null>(null);
-  const [slotTaskInput, setSlotTaskInput] = useState('');
-
   // Expanded Day Card modal for Month view
   const [expandedDayDateStr, setExpandedDayDateStr] = useState<string | null>(null);
-  const [dayCardInput, setDayCardInput] = useState('');
 
   // Live minute ticker for Red Ribbon Indicator
   const [nowMinute, setNowMinute] = useState(() => {
@@ -196,13 +187,11 @@ export const CalendarView: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (expandedDayDateStr) setExpandedDayDateStr(null);
-        else if (addingSlot) setAddingSlot(null);
-        else if (addingDate) setAddingDate(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [expandedDayDateStr, addingSlot, addingDate]);
+  }, [expandedDayDateStr]);
 
   // Scoped tasks in current folder
   const folderTasks = useMemo(() => {
@@ -338,80 +327,6 @@ export const CalendarView: React.FC = () => {
     } catch {
       // Ignored
     }
-  };
-
-  // Quick Add for specific hour slot in Week Time-blocking
-  const handleQuickAddSlotTask = (dateStr: string, hour: number) => {
-    if (!slotTaskInput.trim()) {
-      setAddingSlot(null);
-      return;
-    }
-
-    const parsed = parseTodoistInput(slotTaskInput.trim());
-    const reminderDate = new Date(dateStr);
-    reminderDate.setHours(hour, 0, 0, 0);
-
-    saveItem({
-      type: 'task',
-      title: parsed.cleanTitle || slotTaskInput.trim(),
-      content: '',
-      folder: currentFolder,
-      status: 'todo',
-      priority: parsed.priority || 'none',
-      tags: parsed.tags || [],
-      dueDate: parsed.dueDate || dateStr,
-      reminder: parsed.reminder || reminderDate.toISOString(),
-    });
-
-    setSlotTaskInput('');
-    setAddingSlot(null);
-    addToast(`Задача запланирована на ${hour}:00`, 'success');
-  };
-
-  // Inline Quick Add Task for All-Day or Month cell
-  const handleQuickAddTask = (dateStr: string) => {
-    if (!newTaskInput.trim()) {
-      setAddingDate(null);
-      return;
-    }
-
-    const parsed = parseTodoistInput(newTaskInput.trim());
-    saveItem({
-      type: 'task',
-      title: parsed.cleanTitle || newTaskInput.trim(),
-      content: '',
-      folder: currentFolder,
-      status: 'todo',
-      priority: parsed.priority || 'none',
-      tags: parsed.tags || [],
-      dueDate: parsed.dueDate || dateStr,
-      reminder: parsed.reminder,
-    });
-
-    setNewTaskInput('');
-    setAddingDate(null);
-    addToast('Задача запланирована', 'success');
-  };
-
-  // Add task in Expanded Day Card
-  const handleAddDayCardTask = (dateStr: string) => {
-    if (!dayCardInput.trim()) return;
-
-    const parsed = parseTodoistInput(dayCardInput.trim());
-    saveItem({
-      type: 'task',
-      title: parsed.cleanTitle || dayCardInput.trim(),
-      content: '',
-      folder: currentFolder,
-      status: 'todo',
-      priority: parsed.priority || 'none',
-      tags: parsed.tags || [],
-      dueDate: parsed.dueDate || dateStr,
-      reminder: parsed.reminder,
-    });
-
-    setDayCardInput('');
-    addToast('Задача добавлена', 'success');
   };
 
   // Render a Compact All-Day Task Pill
@@ -702,41 +617,20 @@ export const CalendarView: React.FC = () => {
                       >
                         {allDayTasks.map(task => renderAllDayTaskPill(task))}
 
-                        {/* Inline add input if active for this day */}
-                        {addingDate === dateStr && (
-                          <div className="p-1 rounded bg-[#18181c] border border-blue-500/40">
-                            <input
-                              autoFocus
-                              type="text"
-                              placeholder="Новая задача..."
-                              value={newTaskInput}
-                              onChange={e => setNewTaskInput(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleQuickAddTask(dateStr);
-                                } else if (e.key === 'Escape') {
-                                  setAddingDate(null);
-                                }
-                              }}
-                              className="w-full bg-transparent text-[11px] text-zinc-100 outline-none"
-                            />
-                          </div>
-                        )}
-
                         {/* Add Task Hover Trigger */}
-                        {addingDate !== dateStr && (
-                          <button
-                            onClick={() => {
-                              setAddingDate(dateStr);
-                              setNewTaskInput('');
-                            }}
-                            className="w-full opacity-0 hover:opacity-100 focus:opacity-100 py-0.5 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] rounded flex items-center justify-center transition-opacity text-[10px] cursor-pointer"
-                            title="Добавить задачу на весь день"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            openComposerModal({
+                              type: 'task',
+                              dueDate: dateStr,
+                              folder: currentFolder,
+                            });
+                          }}
+                          className="w-full opacity-0 hover:opacity-100 focus:opacity-100 py-0.5 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] rounded flex items-center justify-center transition-opacity text-[10px] cursor-pointer"
+                          title="Добавить задачу на весь день"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
                       </div>
                     );
                   })}
@@ -779,14 +673,16 @@ export const CalendarView: React.FC = () => {
                       >
                         {/* Hour slot background rows with 1-click add */}
                         {HOURS.map(hour => {
-                          const isSlotAdding = addingSlot?.dateStr === dateStr && addingSlot?.hour === hour;
-
                           return (
                             <div
                               key={hour}
                               onClick={() => {
-                                setAddingSlot({ dateStr, hour });
-                                setSlotTaskInput('');
+                                openComposerModal({
+                                  type: 'task',
+                                  dueDate: dateStr,
+                                  reminder: `${dateStr}T${String(hour).padStart(2, '0')}:00:00`,
+                                  folder: currentFolder,
+                                });
                               }}
                               onDragOver={e => handleDragOverDate(e, dateStr)}
                               onDragLeave={handleDragLeaveDate}
@@ -800,31 +696,6 @@ export const CalendarView: React.FC = () => {
                                   <span>{String(hour).padStart(2, '0')}:00</span>
                                 </span>
                               </div>
-
-                              {/* Inline Quick Add Input on slot click */}
-                              {isSlotAdding && (
-                                <div
-                                  onClick={e => e.stopPropagation()}
-                                  className="absolute inset-x-1 top-1 z-30 p-2 rounded-lg bg-[#18181c] border border-white/[0.15] shadow-xl"
-                                >
-                                  <input
-                                    autoFocus
-                                    type="text"
-                                    placeholder={`Задача на ${hour}:00...`}
-                                    value={slotTaskInput}
-                                    onChange={e => setSlotTaskInput(e.target.value)}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        handleQuickAddSlotTask(dateStr, hour);
-                                      } else if (e.key === 'Escape') {
-                                        setAddingSlot(null);
-                                      }
-                                    }}
-                                    className="w-full bg-transparent text-xs text-zinc-100 outline-none"
-                                  />
-                                </div>
-                              )}
                             </div>
                           );
                         })}
@@ -903,8 +774,11 @@ export const CalendarView: React.FC = () => {
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            setAddingDate(cell.dateStr);
-                            setNewTaskInput('');
+                            openComposerModal({
+                              type: 'task',
+                              dueDate: cell.dateStr,
+                              folder: currentFolder,
+                            });
                           }}
                           className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-opacity cursor-pointer"
                           title="Добавить задачу"
@@ -942,31 +816,6 @@ export const CalendarView: React.FC = () => {
                             </div>
                           );
                         })}
-
-                        {/* Inline input if active */}
-                        {addingDate === cell.dateStr && (
-                          <div
-                            onClick={e => e.stopPropagation()}
-                            className="p-1 rounded bg-[#18181c] border border-blue-500/40"
-                          >
-                            <input
-                              autoFocus
-                              type="text"
-                              placeholder="Новая задача..."
-                              value={newTaskInput}
-                              onChange={e => setNewTaskInput(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleQuickAddTask(cell.dateStr);
-                                } else if (e.key === 'Escape') {
-                                  setAddingDate(null);
-                                }
-                              }}
-                              className="w-full bg-transparent text-[10px] text-zinc-100 outline-none"
-                            />
-                          </div>
-                        )}
                       </div>
 
                       {/* Overflow badge "+N еще" */}
@@ -1257,22 +1106,20 @@ export const CalendarView: React.FC = () => {
 
             {/* Quick Add at bottom */}
             <div className="p-3 border-t border-white/[0.06] bg-[#18181c]">
-              <div className="flex items-center gap-2 bg-[#09090b] border border-white/[0.08] rounded-xl px-3 py-1.5 focus-within:border-white/20 transition-colors">
-                <Plus className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Добавить задачу..."
-                  value={dayCardInput}
-                  onChange={e => setDayCardInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddDayCardTask(expandedDayDateStr);
-                    }
-                  }}
-                  className="w-full bg-transparent text-xs text-zinc-100 placeholder-zinc-500 outline-none"
-                />
-              </div>
+              <button
+                onClick={() => {
+                  if (!expandedDayDateStr) return;
+                  openComposerModal({
+                    type: 'task',
+                    dueDate: expandedDayDateStr,
+                    folder: currentFolder,
+                  });
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-[#09090b] hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Добавить задачу...</span>
+              </button>
             </div>
           </div>
         </div>
