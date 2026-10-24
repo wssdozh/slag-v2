@@ -87,47 +87,49 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       >
         {/* Header */}
         {!hideHeader && (
-          customHeader || (
-            <div
-              className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
-              style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                {icon && (
-                  <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
-                    {icon}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  {title && (
-                    <h3 className="text-sm font-semibold text-white tracking-tight truncate">
-                      {title}
-                    </h3>
+          <div className="rounded-t-none md:rounded-t-[15px] overflow-hidden shrink-0">
+            {customHeader || (
+              <div
+                className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+                style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {icon && (
+                    <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                      {icon}
+                    </div>
                   )}
-                  {subtitle && (
-                    <p className="text-[11px] text-zinc-400 truncate">
-                      {subtitle}
-                    </p>
+                  <div className="min-w-0">
+                    {title && (
+                      <h3 className="text-sm font-semibold text-white tracking-tight truncate">
+                        {title}
+                      </h3>
+                    )}
+                    {subtitle && (
+                      <p className="text-[11px] text-zinc-400 truncate">
+                        {subtitle}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {headerRightSlot}
+                  {showCloseButton && (
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                      title="Закрыть (Esc)"
+                      aria-label="Закрыть"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                {headerRightSlot}
-                {showCloseButton && (
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-                    title="Закрыть (Esc)"
-                    aria-label="Закрыть"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )
+            )}
+          </div>
         )}
 
         {/* Modal Content Body */}
@@ -137,7 +139,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0">
+          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0 rounded-b-none md:rounded-b-[15px]">
             {footer}
           </div>
         )}
