@@ -1613,7 +1613,30 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };
+          const testVoiceItem = {
+            id: 'test_voice_item_cassette',
+            type: 'note',
+            title: 'Голосовая заметка разработчика',
+            content: 'Быстрая голосовая мысль',
+            folder: 'Входящие',
+            tags: ['войс'],
+            attachments: [
+              {
+                id: 'att_voice_cassette',
+                name: 'voice_16-12-53.webm',
+                type: 'audio',
+                mimeType: 'audio/webm',
+                size: 32000,
+                duration: 48,
+                relativePath: '.attachments/voice_16-12-53.webm',
+                dataUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+              },
+            ],
+            createdAt: Date.now() - 10000,
+            updatedAt: Date.now() - 10000,
+          };
           items.unshift(testAudioItem);
+          items.unshift(testVoiceItem);
           localStorage.setItem(key, JSON.stringify(items));
         }
       }
@@ -1661,9 +1684,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // Verify Now Playing screen elements: track title, note link, artwork
-    await expect(page.locator('text=Never_Enough_The_Cure.mp3')).toBeVisible();
-    await expect(page.locator('text=Саундтрек проекта и голосовой лог')).toBeVisible();
+    // Verify Now Playing screen elements: track title, note link, microcassette artwork
+    await expect(page.locator('text=voice_16-12-53.webm')).toBeVisible();
+    await expect(page.locator('text=Голосовая заметка разработчика')).toBeVisible();
+    await expect(page.locator('text=VOICE LOG')).toBeVisible();
+    await expect(page.locator('text=TP-60')).toBeVisible();
+    await expect(page.locator('text=SIDE A').first()).toBeVisible();
 
     // Verify transport controls (5 buttons under timeline: -10s, Prev, Play/Pause, Next, +10s)
     const playPauseBtn = page.locator('button[title*="Воспроизведение"], button[title*="Пауза"]');
@@ -1705,7 +1731,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const audioPanel = page.locator('[role="tabpanel"]').filter({ hasText: 'Очередь воспроизведения' }).first();
     await expect(audioPanel.locator('button', { hasText: 'Войсы' })).toBeVisible();
     await expect(audioPanel.locator('button', { hasText: 'Файлы' })).toBeVisible();
-    await expect(page.locator('text=Never_Enough_The_Cure.mp3').first()).toBeVisible();
+    await expect(page.locator('text=voice_16-12-53.webm').first()).toBeVisible();
 
     // Close Queue drawer
     const closeQueueBtn = page.locator('button[title="Закрыть список"]');
