@@ -1682,6 +1682,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await folderToggleBtn.click();
     await expect(page.locator('button[title*="играет только эта папка"]')).toBeVisible();
 
+    // Open folder picker dropdown when pinned and verify "Входящие" is not duplicated
+    const folderPickerChevron = page.locator('button[title*="Выбрать другую папку"]').first();
+    await expect(folderPickerChevron).toBeVisible();
+    await folderPickerChevron.click();
+
+    // Verify "Закрепить папку" popover is open and has exactly 1 "Входящие" (no duplicate)
+    const popover = page.locator('.absolute.z-40').filter({ hasText: 'Закрепить папку' });
+    await expect(popover).toBeVisible();
+    expect(await popover.locator('button', { hasText: 'Входящие' }).count()).toBe(1);
+
+    // Close folder picker by clicking outside / chevron
+    await folderPickerChevron.click();
+
     // Click to unpin back
     const pinnedBtn = page.locator('button[title*="играет только эта папка"]').first();
     await pinnedBtn.click();

@@ -113,27 +113,24 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
             </button>
             {isFolderSelectOpen && (
               <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto">
-                <button
-                  onClick={() => {
-                    onSelectPinnedFolder('Входящие');
-                    setIsFolderSelectOpen(false);
-                  }}
-                  className="w-full px-2.5 py-1 text-left text-xs text-zinc-300 hover:bg-white/[0.08]"
-                >
-                  Входящие
-                </button>
-                {folders.map((f) => (
-                  <button
-                    key={f.path}
-                    onClick={() => {
-                      onSelectPinnedFolder(f.path);
-                      setIsFolderSelectOpen(false);
-                    }}
-                    className="w-full px-2.5 py-1 text-left text-xs text-zinc-300 hover:bg-white/[0.08] truncate"
-                  >
-                    {f.path}
-                  </button>
-                ))}
+                {Array.from(new Set(['Входящие', ...folders.map((f) => f.path).filter(Boolean)])).map(
+                  (folderPath) => (
+                    <button
+                      key={folderPath}
+                      onClick={() => {
+                        onSelectPinnedFolder(folderPath);
+                        setIsFolderSelectOpen(false);
+                      }}
+                      className={`w-full px-2.5 py-1 text-left text-xs transition-colors cursor-pointer truncate ${
+                        pinnedFolder === folderPath
+                          ? 'text-white font-medium bg-white/[0.06]'
+                          : 'text-zinc-300 hover:bg-white/[0.08]'
+                      }`}
+                    >
+                      {folderPath}
+                    </button>
+                  )
+                )}
               </div>
             )}
           </div>
