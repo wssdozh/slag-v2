@@ -9,7 +9,6 @@ import {
   FileText,
   Copy,
   Check,
-  Sparkles,
   AlertCircle,
   Loader2,
 } from 'lucide-react';
@@ -242,25 +241,20 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
         {/* Right: Text button + Zoom controls + Close button */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Toggle Text / OCR Panel */}
+          {/* Toggle Text / OCR Panel (Monochrome, no LED dots) */}
           <button
             type="button"
             onClick={() => setIsTextPanelOpen(prev => !prev)}
             title={isTextPanelOpen ? 'Скрыть текст (T)' : 'Распознанный текст и описание (T)'}
             aria-label="Распознанный текст"
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all outline-none border cursor-pointer active:scale-95 ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all outline-none cursor-pointer active:scale-95 ${
               isTextPanelOpen
-                ? 'bg-white/15 text-white border-white/20 shadow-sm'
-                : hasText
-                  ? 'bg-white/[0.06] text-zinc-300 hover:text-white border-white/10 hover:bg-white/10'
-                  : 'text-zinc-500 hover:text-zinc-300 border-transparent hover:bg-white/[0.04]'
+                ? 'bg-white/15 text-white'
+                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
             }`}
           >
             <FileText className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">Текст</span>
-            {hasText && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-            )}
           </button>
 
           <div className="w-px h-4 bg-white/[0.08]" />
@@ -384,25 +378,22 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           )}
         </div>
 
-        {/* Right: Text / OCR Side Panel */}
+        {/* Right: Text / OCR Side Panel (Flat Anti-Matryoshka Canvas) */}
         {isTextPanelOpen && (
           <aside
             onClick={e => e.stopPropagation()}
             className="w-full sm:w-80 md:w-96 border-l border-white/[0.08] bg-[#0c0d0e]/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 animate-in slide-in-from-right-4 duration-200 min-h-0 select-text"
           >
             {/* Header */}
-            <div className="h-12 px-4 border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-zinc-400" />
-                <span className="text-xs font-medium text-zinc-200">Текст и описание</span>
-              </div>
-              <div className="flex items-center gap-1">
+            <div className="h-12 px-5 border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">
+              <span className="text-xs font-medium text-zinc-200">Текст изображения</span>
+              <div className="flex items-center gap-1.5">
                 {hasText && (
                   <button
                     type="button"
                     onClick={handleCopyText}
                     title="Скопировать текст в буфер"
-                    className="px-2 py-1 rounded-md text-[11px] font-mono text-zinc-300 hover:text-white hover:bg-white/[0.08] flex items-center gap-1.5 transition-all border border-white/[0.06] active:scale-95 cursor-pointer"
+                    className="px-2 py-1 rounded-md text-[11px] text-zinc-400 hover:text-white hover:bg-white/[0.08] flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                   >
                     {isCopied ? (
                       <>
@@ -421,34 +412,39 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   type="button"
                   onClick={() => setIsTextPanelOpen(false)}
                   title="Закрыть панель (T)"
-                  className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
+                  className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Scrollable Body */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 min-h-0 scrollbar-thin">
+            {/* Flat Scrollable Body (Single surface, zero nested boxes) */}
+            <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 min-h-0 scrollbar-thin">
               {/* Summary if present */}
               {currentImage.summary && (
-                <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] flex flex-col gap-1.5 shrink-0">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-amber-400" /> Суть изображения
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-medium">
+                    Суть изображения
                   </span>
-                  <p className="text-xs text-zinc-200 leading-relaxed">
+                  <p className="text-xs text-zinc-300 leading-relaxed font-sans">
                     {currentImage.summary}
                   </p>
                 </div>
               )}
 
-              {/* OCR Text if present */}
+              {/* Clean Divider between Summary and OCR if both exist */}
+              {currentImage.summary && currentImage.extractedText && (
+                <div className="w-full h-px bg-white/[0.06]" />
+              )}
+
+              {/* OCR Text if present (flat on the panel plane) */}
               {currentImage.extractedText && (
-                <div className="flex-1 flex flex-col min-h-0 gap-1.5">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">
-                    Распознанный текст (OCR)
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-medium">
+                    Распознанный текст
                   </span>
-                  <div className="flex-1 overflow-y-auto rounded-lg bg-black/40 border border-white/[0.06] p-3 text-xs font-mono text-zinc-300 leading-relaxed whitespace-pre-wrap select-text scrollbar-thin">
+                  <div className="text-xs font-mono text-zinc-300 leading-relaxed whitespace-pre-wrap select-text">
                     {currentImage.extractedText}
                   </div>
                 </div>
@@ -456,7 +452,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
               {/* Processing status */}
               {currentImage.enrichmentStatus === 'processing' && (
-                <div className="flex flex-col items-center justify-center py-12 gap-2 text-zinc-400">
+                <div className="flex flex-col items-center justify-center py-16 gap-2 text-zinc-400">
                   <Loader2 className="w-5 h-5 animate-spin text-zinc-300" />
                   <span className="text-xs font-mono">Распознавание текста через Qwen 3.8 27B...</span>
                 </div>
@@ -464,18 +460,18 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
               {/* Error status */}
               {currentImage.enrichmentStatus === 'error' && (
-                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                <div className="flex flex-col gap-2 pt-2">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-rose-400">
                     <AlertCircle className="w-4 h-4 shrink-0" /> Ошибка распознавания
                   </div>
                   {currentImage.enrichmentError && (
-                    <div className="text-[11px] font-mono opacity-80 break-words">{currentImage.enrichmentError}</div>
+                    <div className="text-[11px] font-mono text-rose-300/80 break-words">{currentImage.enrichmentError}</div>
                   )}
                   {onRetryEnrich && (
                     <button
                       type="button"
                       onClick={() => onRetryEnrich(currentImage)}
-                      className="mt-1 px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-medium self-start flex items-center gap-1.5 cursor-pointer active:scale-95"
+                      className="mt-1 px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 text-xs font-medium self-start flex items-center gap-1.5 cursor-pointer active:scale-95"
                     >
                       <RotateCcw className="w-3 h-3" /> Повторить OCR
                     </button>
@@ -485,16 +481,16 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
               {/* Empty state */}
               {!hasText && currentImage.enrichmentStatus !== 'processing' && currentImage.enrichmentStatus !== 'error' && (
-                <div className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-500 text-center">
-                  <FileText className="w-8 h-8 opacity-40" />
-                  <div className="text-xs">На изображении нет распознанного текста</div>
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500 text-center">
+                  <FileText className="w-7 h-7 opacity-30" />
+                  <div className="text-xs">На изображении нет текста</div>
                   {onRetryEnrich && (
                     <button
                       type="button"
                       onClick={() => onRetryEnrich(currentImage)}
-                      className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-white/[0.08]"
+                      className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Распознать текст
+                      <FileText className="w-3.5 h-3.5 text-zinc-400" /> Распознать текст
                     </button>
                   )}
                 </div>

@@ -185,7 +185,7 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
     await textToggleBtn.click();
 
     // Verify side panel elements
-    await expect(page.locator('text=Текст и описание')).toBeVisible();
+    await expect(page.locator('text=Текст изображения')).toBeVisible();
     await expect(page.locator('text=Чек за протеин 2400 руб')).toBeVisible();
     await expect(page.locator('text=PROTEIN WHEY 1000g - 2400 RUB').last()).toBeVisible();
     await expect(page.locator('button', { hasText: 'Копировать' })).toBeVisible();
@@ -198,14 +198,14 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
 
     // Test hotkey 'T' toggle
     await page.keyboard.press('t');
-    await expect(page.locator('text=Текст и описание')).toBeHidden();
+    await expect(page.locator('text=Текст изображения')).toBeHidden();
 
     await page.keyboard.press('t');
-    await expect(page.locator('text=Текст и описание')).toBeVisible();
+    await expect(page.locator('text=Текст изображения')).toBeVisible();
 
     // Close panel by Escape, then close lightbox
     await page.keyboard.press('Escape');
-    await expect(page.locator('text=Текст и описание')).toBeHidden();
+    await expect(page.locator('text=Текст изображения')).toBeHidden();
 
     await page.keyboard.press('Escape');
     await expect(textToggleBtn).toBeHidden();
