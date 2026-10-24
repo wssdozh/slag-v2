@@ -8,18 +8,26 @@ interface AudioCoverArtProps {
   className?: string;
 }
 
-interface Ripple {
-  progress: number; // 0 to 1
+interface Spore {
+  x: number;
+  y: number;
+  baseAngle: number;
+  dist: number;
   speed: number;
-  strength: number;
+  size: number;
+  alpha: number;
+  phase: number;
 }
 
 /**
- * Generative Circular Ocean Wave / Fluid Orb ("Моя волна" style, but oceanic & soft)
- * Two-color palette: Pure White into Soft Azure Blue (#38bdf8 / #7dd3fc)
- * Radiates outwards from center as circular water waves without rays or inner labels.
+ * Avatar Bioluminescent Jellyfish Visualizer (Living Ethereal Organism)
+ * - Solid luminous heart in the center (NO black hole / void)
+ * - Translucent, shimmering gelatinous membranes (iridescent caustics)
+ * - Silky flowing bioluminescent filaments & floating avatar spores
+ * - Two-color palette: Pure White energy into Soft Azure Blue (#38bdf8 / #7dd3fc)
+ * - Seamlessly floating on player canvas without tile background
  */
-const CircularOceanWaveCanvas: React.FC<{
+const AvatarBioluminescentJellyfishCanvas: React.FC<{
   isPlaying: boolean;
   audioRef?: React.RefObject<HTMLAudioElement | null>;
 }> = ({ isPlaying, audioRef }) => {
@@ -77,13 +85,18 @@ const CircularOceanWaveCanvas: React.FC<{
     let time = 0;
     let smoothedVolume = 0;
 
-    // Expanding concentric ripples (rings born at center and expanding outwards)
-    const ripples: Ripple[] = [
-      { progress: 0.1, speed: 0.004, strength: 1 },
-      { progress: 0.35, speed: 0.004, strength: 0.9 },
-      { progress: 0.6, speed: 0.004, strength: 0.8 },
-      { progress: 0.85, speed: 0.004, strength: 0.7 },
-    ];
+    // Floating bioluminescent spores (like Avatar Woodsprites / deep sea embers)
+    const sporeCount = 20;
+    const spores: Spore[] = Array.from({ length: sporeCount }, (_, i) => ({
+      x: 0,
+      y: 0,
+      baseAngle: (i / sporeCount) * Math.PI * 2,
+      dist: 50 + Math.random() * 65,
+      speed: 0.005 + Math.random() * 0.01,
+      size: 1 + Math.random() * 1.6,
+      alpha: 0.3 + Math.random() * 0.5,
+      phase: Math.random() * Math.PI * 2,
+    }));
 
     const render = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -91,7 +104,7 @@ const CircularOceanWaveCanvas: React.FC<{
       const height = canvas.height / dpr;
       const cx = width / 2;
       const cy = height / 2;
-      const maxRadius = Math.min(width, height) * 0.48;
+      const maxRadius = Math.min(width, height) * 0.44;
 
       // Read audio energy if analyser is available
       let currentEnergy = 0;
@@ -110,60 +123,75 @@ const CircularOceanWaveCanvas: React.FC<{
 
       // Smooth energy with damping
       const targetEnergy = isPlaying
-        ? (currentEnergy > 0.05 ? currentEnergy : 0.45 + Math.sin(time * 2.2) * 0.25)
+        ? (currentEnergy > 0.05 ? currentEnergy : 0.45 + Math.sin(time * 2.6) * 0.25)
         : 0.06;
-      smoothedVolume += (targetEnergy - smoothedVolume) * 0.08;
+      smoothedVolume += (targetEnergy - smoothedVolume) * 0.09;
 
-      // Time progression (faster and more active on playback)
-      time += isPlaying ? 0.025 + smoothedVolume * 0.025 : 0.01;
+      // Breathing cycle: contraction and expansion of the jellyfish bell
+      const pulseSpeed = isPlaying ? 0.024 + smoothedVolume * 0.03 : 0.01;
+      time += pulseSpeed;
+      const breath = Math.sin(time * 1.8); // -1 to 1
 
-      // Dark sea background clear
-      ctx.fillStyle = '#080a0f';
-      ctx.fillRect(0, 0, width, height);
+      // Clear with full transparency so it floats organically on dark player background
+      ctx.clearRect(0, 0, width, height);
 
-      // 1. Soft Ambient Fluid Glow Behind Core (fading out smoothly)
-      const glowRadius = maxRadius * (0.6 + smoothedVolume * 0.45);
-      const ambientGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowRadius);
-      const azureAlpha = isPlaying ? 0.28 + smoothedVolume * 0.35 : 0.12;
-      ambientGlow.addColorStop(0, `rgba(56, 189, 248, ${azureAlpha.toFixed(3)})`);
-      ambientGlow.addColorStop(0.5, `rgba(14, 165, 233, ${(azureAlpha * 0.4).toFixed(3)})`);
-      ambientGlow.addColorStop(1, 'rgba(8, 10, 15, 0)');
+      // 1. Ethereal ambient halo (soft bioluminescent aura)
+      const haloRadius = maxRadius * (1.05 + smoothedVolume * 0.35);
+      const haloGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloRadius);
+      const auraAlpha = isPlaying ? 0.32 + smoothedVolume * 0.35 : 0.12;
+      haloGrad.addColorStop(0, `rgba(56, 189, 248, ${(auraAlpha * 0.6).toFixed(3)})`);
+      haloGrad.addColorStop(0.45, `rgba(14, 165, 233, ${(auraAlpha * 0.3).toFixed(3)})`);
+      haloGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
 
-      ctx.fillStyle = ambientGlow;
+      ctx.save();
+      ctx.fillStyle = haloGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy, glowRadius, 0, Math.PI * 2);
+      ctx.arc(cx, cy, haloRadius, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
 
-      // 2. Expanding Concentric Ripple Waves (Water Surface Waves)
-      // Born from center, undulating smoothly and expanding to the edges
-      const rippleExpansionSpeed = isPlaying ? 0.005 + smoothedVolume * 0.005 : 0.002;
+      // 2. Floating Bioluminescent Avatar Spores (Woodsprites)
+      ctx.save();
+      for (const spore of spores) {
+        spore.baseAngle += spore.speed * (isPlaying ? 1.5 : 0.7);
+        const currentDist = spore.dist * (1 + breath * 0.12 + smoothedVolume * 0.25);
+        const sx = cx + Math.cos(spore.baseAngle) * currentDist;
+        const sy = cy + Math.sin(spore.baseAngle) * currentDist + Math.sin(time + spore.phase) * 6;
 
-      for (const ripple of ripples) {
-        ripple.progress += rippleExpansionSpeed;
-        if (ripple.progress > 1) {
-          ripple.progress = 0;
-          ripple.strength = 0.6 + Math.random() * 0.4;
-        }
+        const currentAlpha = spore.alpha * (0.6 + Math.sin(time * 2 + spore.phase) * 0.4);
+        ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha.toFixed(3)})`;
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(sx, sy, spore.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
 
-        const r = maxRadius * (0.15 + ripple.progress * 0.85);
-        const fade = Math.sin(ripple.progress * Math.PI); // Fades in at center, fades out at boundary
-        const waveUndulation = (6 + smoothedVolume * 14) * (1 - ripple.progress * 0.4);
+      // 3. Silky Outer Bioluminescent Filaments (Jellyfish Tendrils / Ethereal Feathers)
+      // 28 fine silky lines weaving in zero-gravity water currents
+      const filamentCount = 28;
+      const segments = 90;
+
+      for (let f = 0; f < filamentCount; f++) {
+        const u = f / (filamentCount - 1); // 0 to 1
+        const layerR = maxRadius * (0.42 + u * 0.5 + breath * 0.08 * (1 - u * 0.5));
+        const amp = (8 + smoothedVolume * 22) * Math.sin(u * Math.PI) ** 0.8;
 
         ctx.save();
         ctx.beginPath();
 
-        // Sample closed organic fluid contour in polar coordinates (60 steps)
-        const segments = 64;
         for (let i = 0; i <= segments; i++) {
-          const angle = (i / segments) * Math.PI * 2;
-          // Organic fluid harmonic wobble: soft water tension without sharp spikes
-          const wobble =
-            Math.sin(angle * 3 + time * 1.5 + ripple.progress * 4) * 0.6 +
-            Math.cos(angle * 4 - time * 1.2) * 0.4;
-          const currentR = Math.max(4, r + wobble * waveUndulation);
+          const theta = (i / segments) * Math.PI * 2;
+          // Fluid organic ripples mimicking gelatinous movement
+          const w1 = Math.sin(theta * 4 + time * 1.5 + u * 2.8) * 0.55;
+          const w2 = Math.cos(theta * 6 - time * 1.1 - u * 2.1) * 0.32;
+          const w3 = Math.sin(theta * 8 + time * 0.8 + u * 3.5) * 0.13;
+          const harmonic = w1 + w2 + w3;
 
-          const px = cx + Math.cos(angle) * currentR;
-          const py = cy + Math.sin(angle) * currentR;
+          const r = Math.max(15, layerR + harmonic * amp);
+          const px = cx + Math.cos(theta) * r;
+          const py = cy + Math.sin(theta) * r;
 
           if (i === 0) {
             ctx.moveTo(px, py);
@@ -173,20 +201,16 @@ const CircularOceanWaveCanvas: React.FC<{
         }
         ctx.closePath();
 
-        // Soft azure fluid fill between waves
-        const ringAlpha = (fade * (0.08 + smoothedVolume * 0.16) * ripple.strength).toFixed(3);
-        ctx.fillStyle = `rgba(56, 189, 248, ${ringAlpha})`;
-        ctx.fill();
-
-        // White crest line with soft azure bloom
-        const crestAlpha = (fade * (0.4 + smoothedVolume * 0.55) * ripple.strength).toFixed(3);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${crestAlpha})`;
-        ctx.lineWidth = 1.2 + (1 - ripple.progress) * 0.8;
-
-        if (isPlaying) {
-          ctx.shadowColor = 'rgba(56, 189, 248, 0.85)';
-          ctx.shadowBlur = 6 + smoothedVolume * 10;
+        // Shimmering color: pure white crest lines near core, fading to soft azure filaments
+        const alpha = (0.2 + (1 - u) * 0.55 + smoothedVolume * 0.25).toFixed(3);
+        if (u < 0.2) {
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.lineWidth = 1.4;
+          ctx.shadowColor = '#38bdf8';
+          ctx.shadowBlur = isPlaying ? 10 + smoothedVolume * 10 : 4;
         } else {
+          ctx.strokeStyle = `rgba(56, 189, 248, ${(Number(alpha) * 0.7).toFixed(3)})`;
+          ctx.lineWidth = 1.0;
           ctx.shadowBlur = 0;
         }
 
@@ -194,22 +218,66 @@ const CircularOceanWaveCanvas: React.FC<{
         ctx.restore();
       }
 
-      // 3. Central Fluid Core / Water Droplet (White center -> Azure perimeter)
-      // Breathes and undulates like liquid water
-      const coreBaseR = maxRadius * (0.2 + smoothedVolume * 0.14);
-      const coreUndulation = 4 + smoothedVolume * 8;
+      // 4. Multi-layered Translucent Gelatinous Bell (The Jellyfish Body - Filled & Shimmering)
+      // 4 overlapping undulating translucent domes (caustics effect)
+      const domeCount = 4;
+      for (let d = domeCount - 1; d >= 0; d--) {
+        const du = d / (domeCount - 1);
+        const domeR = maxRadius * (0.32 + du * 0.35 + breath * 0.1);
+        const domeAmp = (6 + smoothedVolume * 14) * (0.6 + du * 0.4);
+
+        ctx.save();
+        ctx.beginPath();
+        for (let i = 0; i <= segments; i++) {
+          const theta = (i / segments) * Math.PI * 2;
+          const wobble =
+            Math.sin(theta * 3 + time * 1.8 + d * 1.2) * 0.55 +
+            Math.cos(theta * 5 - time * 1.4 - d * 0.8) * 0.45;
+          const r = Math.max(20, domeR + wobble * domeAmp);
+          const px = cx + Math.cos(theta) * r;
+          const py = cy + Math.sin(theta) * r;
+
+          if (i === 0) {
+            ctx.moveTo(px, py);
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+        ctx.closePath();
+
+        // Gelatinous iridescent gradient fill
+        const domeGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, domeR * 1.15);
+        const fillAlpha = isPlaying ? 0.22 + smoothedVolume * 0.25 : 0.12;
+        domeGrad.addColorStop(0, `rgba(224, 242, 254, ${(fillAlpha * 0.9).toFixed(3)})`);
+        domeGrad.addColorStop(0.4, `rgba(56, 189, 248, ${(fillAlpha * 0.65).toFixed(3)})`);
+        domeGrad.addColorStop(0.85, `rgba(14, 165, 233, ${(fillAlpha * 0.25).toFixed(3)})`);
+        domeGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+
+        ctx.fillStyle = domeGrad;
+        ctx.fill();
+
+        // Delicate glowing membrane border
+        ctx.strokeStyle = `rgba(186, 230, 253, ${(0.4 + smoothedVolume * 0.4).toFixed(3)})`;
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 5. Living Luminous Heart / Nucleus (NO HOLE - Solid Radiant Core)
+      // Pure White glowing energy center that pulses with sound
+      const coreR = maxRadius * (0.18 + smoothedVolume * 0.12 + breath * 0.04);
+      const coreWobbleAmp = 3 + smoothedVolume * 6;
 
       ctx.save();
       ctx.beginPath();
-      const coreSegments = 48;
-      for (let i = 0; i <= coreSegments; i++) {
-        const angle = (i / coreSegments) * Math.PI * 2;
-        const wobble =
-          Math.sin(angle * 2 + time * 2) * 0.55 +
-          Math.sin(angle * 4 - time * 1.6) * 0.45;
-        const currentR = coreBaseR + wobble * coreUndulation;
-        const px = cx + Math.cos(angle) * currentR;
-        const py = cy + Math.sin(angle) * currentR;
+      for (let i = 0; i <= segments; i++) {
+        const theta = (i / segments) * Math.PI * 2;
+        const w =
+          Math.sin(theta * 2 + time * 2.2) * 0.6 +
+          Math.sin(theta * 4 - time * 1.7) * 0.4;
+        const r = coreR + w * coreWobbleAmp;
+        const px = cx + Math.cos(theta) * r;
+        const py = cy + Math.sin(theta) * r;
 
         if (i === 0) {
           ctx.moveTo(px, py);
@@ -219,26 +287,30 @@ const CircularOceanWaveCanvas: React.FC<{
       }
       ctx.closePath();
 
-      // Central water droplet gradient: Pure White core -> Soft Azure
-      const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreBaseR * 1.3);
-      const coreWhiteAlpha = isPlaying ? 0.95 : 0.75;
-      const coreAzureAlpha = isPlaying ? 0.75 + smoothedVolume * 0.25 : 0.4;
-      coreGrad.addColorStop(0, `rgba(255, 255, 255, ${coreWhiteAlpha})`);
-      coreGrad.addColorStop(0.35, `rgba(186, 230, 253, ${coreAzureAlpha})`);
-      coreGrad.addColorStop(0.7, `rgba(56, 189, 248, ${(coreAzureAlpha * 0.6).toFixed(3)})`);
+      // Radiant Core Gradient: Pure White -> Soft Azure
+      const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 1.25);
+      const heartWhite = isPlaying ? 0.98 : 0.85;
+      const heartAzure = isPlaying ? 0.8 + smoothedVolume * 0.2 : 0.5;
+
+      coreGrad.addColorStop(0, `rgba(255, 255, 255, ${heartWhite})`);
+      coreGrad.addColorStop(0.25, `rgba(240, 249, 255, ${heartWhite})`);
+      coreGrad.addColorStop(0.6, `rgba(125, 211, 252, ${heartAzure})`);
+      coreGrad.addColorStop(0.9, `rgba(56, 189, 248, ${(heartAzure * 0.6).toFixed(3)})`);
       coreGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
 
       ctx.fillStyle = coreGrad;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = isPlaying ? 24 + smoothedVolume * 20 : 12;
       ctx.fill();
 
-      // Delicate bright white center specular highlight
-      const highlightR = coreBaseR * 0.25;
-      const highlightGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, highlightR);
-      highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-      highlightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      ctx.fillStyle = highlightGrad;
+      // White inner photon burst highlight
+      const centerBrightR = coreR * 0.35;
+      const brightGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, centerBrightR);
+      brightGrad.addColorStop(0, '#ffffff');
+      brightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = brightGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy, highlightR, 0, Math.PI * 2);
+      ctx.arc(cx, cy, centerBrightR, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -271,7 +343,7 @@ const CircularOceanWaveCanvas: React.FC<{
     <canvas
       ref={canvasRef}
       data-testid="ocean-waves-canvas"
-      className="w-full h-full block rounded-3xl"
+      className="w-full h-full block"
     />
   );
 };
@@ -302,13 +374,13 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({
     );
   }
 
-  // Generative Circular Ocean Wave / Water Ripple (Pure White to Soft Azure Blue)
-  // Completely clean without text, badges or labels inside
+  // Floating Bioluminescent Jellyfish Organism (Pure White into Soft Azure Blue)
+  // Completely solid living center (no hole), iridescent shimmering membranes, floating without background podlozhka
   return (
     <div
-      className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 rounded-3xl bg-[#080a0f] border border-white/[0.08] border-t-white/[0.14] shadow-2xl overflow-hidden select-none ${className}`}
+      className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center select-none ${className}`}
     >
-      <CircularOceanWaveCanvas isPlaying={isPlaying} audioRef={audioRef} />
+      <AvatarBioluminescentJellyfishCanvas isPlaying={isPlaying} audioRef={audioRef} />
     </div>
   );
 };

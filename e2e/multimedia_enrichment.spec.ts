@@ -56,12 +56,35 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
       updatedAt: Date.now(),
     };
 
-    await page.addInitScript(({ item }) => {
+    // A pure raw voice note without prior transcription (like freshly recorded)
+    const rawVoiceItem = {
+      id: 'raw_voice_' + Date.now(),
+      type: 'note',
+      title: 'Голосовая заметка',
+      content: '',
+      folder: 'Входящие',
+      tags: [],
+      attachments: [{
+        id: 'att_raw_audio_' + Date.now(),
+        name: 'voice_09-37.webm',
+        type: 'audio',
+        mimeType: 'audio/webm',
+        size: 123100,
+        relativePath: '.attachments/voice_09-37.webm',
+        dataUrl: 'data:audio/webm;base64,GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAA',
+        duration: 8.0,
+      }],
+      createdAt: Date.now() - 360000,
+      updatedAt: Date.now() - 360000,
+    };
+
+    await page.addInitScript(({ item, rawItem }) => {
       const existing = localStorage.getItem('slag_items_default_vault');
       const items = existing ? JSON.parse(existing) : [];
+      items.unshift(rawItem);
       items.unshift(item);
       localStorage.setItem('slag_items_default_vault', JSON.stringify(items));
-    }, { item: testItem });
+    }, { item: testItem, rawItem: rawVoiceItem });
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
@@ -70,17 +93,16 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
     const card = page.locator('.group', { hasText: 'Мультимедиа Заметка с Войсом и Файлами' });
     await expect(card).toBeVisible();
 
-    // 3. Verify AudioPlayer and "Раскрыть текст" button
-    const expandAudioBtn = card.locator('button', { hasText: 'Раскрыть текст' });
-    await expect(expandAudioBtn).toBeVisible();
+    // 3. Verify AudioPlayer and Telegram-style transcribe button
+    const transcribeBtn = card.locator('button[aria-label="Расшифровка"]');
+    await expect(transcribeBtn).toBeVisible();
 
-    // Click to unfold transcript accordion
-    await expandAudioBtn.click();
-
-    // Verify transcript is displayed with Whisper header and copy button
-    const transcriptHeader = card.locator('text=РАСШИФРОВКА WHISPER');
-    await expect(transcriptHeader).toBeVisible();
+    // Verify transcript is rendered cleanly directly beneath the player (like Telegram)
     await expect(card.locator('text=Купить сывороточный протеин и креатин после тренировки')).toBeVisible();
+
+    // Verify raw un-transcribed voice has the Telegram transcribe button
+    const rawVoiceTranscribeBtn = page.locator('button[title*="Расшифровать войс"]').first();
+    await expect(rawVoiceTranscribeBtn).toBeVisible();
 
     // 4. Verify Image OCR toggle
     const ocrBtn = card.locator('button', { hasText: 'Текст с фото (OCR)' });

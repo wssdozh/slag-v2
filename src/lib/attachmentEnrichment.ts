@@ -47,6 +47,20 @@ export async function dataUrlToText(dataUrl: string, maxBytes: number = 8192): P
   }
 }
 
+function getGroqApiUrl(endpoint: string): string {
+  // If running in Vite dev server (e.g. localhost:5173), route through local Vite proxy
+  // to avoid browser CORS / NetworkError
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.port === '5173' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1')
+  ) {
+    return `/api/groq${endpoint}`;
+  }
+  return `https://api.groq.com/openai/v1${endpoint}`;
+}
+
 /**
  * Transcribes audio/video using Groq Whisper API (whisper-large-v3-turbo).
  */
@@ -69,7 +83,7 @@ async function transcribeAudioGroq(
     formData.append('prompt', focalContext);
   }
 
-  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+  const res = await fetch(getGroqApiUrl('/audio/transcriptions'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -98,6 +112,50 @@ async function transcribeAudioGroq(
 }
 
 /**
+ * Fallback: Transcribes audio with Gemini 2.0 Flash.
+ */
+async function transcribeAudioGemini(
+  attachment: SlagAttachment,
+  focalContext: string,
+  apiKey: string
+): Promise<{ extractedText: string; summary: string }> {
+  const base64Data = (attachment.dataUrl || '').split(',')[1] || '';
+  const prompt = `Контекст: "${focalContext}". Сделай точную дословную расшифровку аудиозаписи. Без лишних вступительных слов. Выведи строго расшифрованный текст.`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: attachment.mimeType || 'audio/webm',
+                  data: base64Data,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Gemini Audio failed (${res.status}): ${errText.slice(0, 150)}`);
+  }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  return { extractedText: text, summary: text.slice(0, 100) };
+}
+
+/**
  * Analyzes an image with Groq Vision (llama-3.2-11b-vision-preview).
  */
 async function analyzeImageGroq(
@@ -117,7 +175,7 @@ async function analyzeImageGroq(
 Ответ верни СТРОГО в формате JSON без разметки:
 {"extractedText": "весь найденный текст или пусто", "summary": "краткое описание сути изображения"}`;
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetch(getGroqApiUrl('/chat/completions'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -160,6 +218,60 @@ async function analyzeImageGroq(
       extractedText: '',
       summary: rawContent.slice(0, 150).trim(),
     };
+  }
+}
+
+/**
+ * Fallback: Analyzes image with Gemini 2.0 Flash.
+ */
+async function analyzeImageGemini(
+  attachment: SlagAttachment,
+  focalContext: string,
+  apiKey: string
+): Promise<{ extractedText: string; summary: string }> {
+  const base64Data = (attachment.dataUrl || '').split(',')[1] || '';
+  const prompt = `Контекст: "${focalContext}". Извлеки весь читаемый текст на изображении (OCR) и дай краткое описание сути в 1-2 предложениях.
+Ответ верни СТРОГО в формате JSON: {"extractedText": "найденный текст", "summary": "краткое описание"}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: attachment.mimeType || 'image/png',
+                  data: base64Data,
+                },
+              },
+            ],
+          },
+        ],
+        generationConfig: { responseMimeType: 'application/json' },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Gemini Vision failed (${res.status}): ${errText.slice(0, 150)}`);
+  }
+
+  const data = await res.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  try {
+    const parsed = JSON.parse(rawText);
+    return {
+      extractedText: (parsed.extractedText || '').trim(),
+      summary: (parsed.summary || '').trim(),
+    };
+  } catch {
+    return { extractedText: '', summary: rawText.slice(0, 150).trim() };
   }
 }
 
@@ -269,9 +381,37 @@ export async function enrichAttachment(
     let result: { extractedText: string; summary: string };
 
     if (attachment.type === 'audio' || attachment.type === 'video') {
-      result = await transcribeAudioGroq(attachment, focalContext, groqKey);
+      if (groqKey) {
+        try {
+          result = await transcribeAudioGroq(attachment, focalContext, groqKey);
+        } catch (groqErr) {
+          if (settings.geminiApiKey) {
+            result = await transcribeAudioGemini(attachment, focalContext, settings.geminiApiKey);
+          } else {
+            throw groqErr;
+          }
+        }
+      } else if (settings.geminiApiKey) {
+        result = await transcribeAudioGemini(attachment, focalContext, settings.geminiApiKey);
+      } else {
+        throw new Error('API ключ Groq не указан в настройках');
+      }
     } else if (attachment.type === 'image') {
-      result = await analyzeImageGroq(attachment, focalContext, groqKey);
+      if (groqKey) {
+        try {
+          result = await analyzeImageGroq(attachment, focalContext, groqKey);
+        } catch (groqErr) {
+          if (settings.geminiApiKey) {
+            result = await analyzeImageGemini(attachment, focalContext, settings.geminiApiKey);
+          } else {
+            throw groqErr;
+          }
+        }
+      } else if (settings.geminiApiKey) {
+        result = await analyzeImageGemini(attachment, focalContext, settings.geminiApiKey);
+      } else {
+        throw new Error('API ключ Groq не указан в настройках');
+      }
     } else {
       result = await analyzeFileGroq(attachment, focalContext, groqKey);
     }

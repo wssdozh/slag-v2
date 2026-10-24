@@ -14,7 +14,8 @@ import {
   ChevronUp,
   FileText,
   CornerUpLeft,
-  Pin
+  Pin,
+  Sparkles
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
@@ -607,7 +608,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                 />
               </div>
               {/* OCR text display for single image */}
-              {imageAttachments[0].extractedText && (
+              {imageAttachments[0].extractedText ? (
                 <div className="w-full mt-1.5">
                   <button
                     type="button"
@@ -631,6 +632,23 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                     </div>
                   )}
                 </div>
+              ) : imageAttachments[0].enrichmentStatus === 'processing' ? (
+                <div className="text-[10px] text-zinc-400 animate-pulse font-mono mt-1 flex items-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  Анализ изображения...
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEnrichAttachment(imageAttachments[0]);
+                  }}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 cursor-pointer select-none font-mono mt-1"
+                >
+                  <Sparkles className="w-2.5 h-2.5 text-zinc-400" />
+                  <span>{imageAttachments[0].enrichmentStatus === 'error' ? 'Повторить OCR' : 'Распознать текст'}</span>
+                </button>
               )}
             </div>
           ) : (

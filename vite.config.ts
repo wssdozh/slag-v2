@@ -9,6 +9,14 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    proxy: {
+      '/api/groq': {
+        target: 'https://api.groq.com/openai/v1',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/groq/, ''),
+        secure: false,
+      },
+    },
   },
   resolve: {
     alias: {

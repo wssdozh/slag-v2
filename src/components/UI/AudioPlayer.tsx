@@ -1,5 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, ChevronDown, Copy, Check, Sparkles } from 'lucide-react';
+import { Play, Pause, ChevronUp, Loader2 } from 'lucide-react';
+
+const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    {/* Arrow: -> */}
+    <path d="M2 8.5h4.5" />
+    <path d="M4.5 6l2.5 2.5-2.5 2.5" />
+    {/* Capital letter A: */}
+    <path d="M9.5 12l2-7 2 7" />
+    <path d="M10.2 9.7h2.6" />
+  </svg>
+);
 
 interface AudioPlayerProps {
   src: string;
@@ -36,7 +55,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   compact = false,
   timeContext,
   transcript,
-  summary,
+  summary: _summary,
   enrichmentStatus = 'idle',
   onEnrich,
 }) => {
@@ -44,20 +63,20 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(initialDuration || 0);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => Boolean(transcript));
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveTrackRef = useRef<HTMLDivElement | null>(null);
 
-  const handleCopyTranscript = useCallback((e: React.MouseEvent) => {
+  const handleTranscriptToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!transcript) return;
-    navigator.clipboard.writeText(transcript).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [transcript]);
+    if (transcript) {
+      setIsExpanded(prev => !prev);
+    } else if (onEnrich && enrichmentStatus !== 'processing') {
+      setIsExpanded(true);
+      onEnrich();
+    }
+  }, [transcript, onEnrich, enrichmentStatus]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -209,7 +228,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   return (
     <div className="w-full flex flex-col">
-      <div className="flex items-center gap-3 py-1 w-full select-none">
+      <div className="flex items-center gap-2.5 py-1 w-full select-none">
         <audio ref={audioRef} src={src} preload="metadata" />
 
         {/* Linear Monochrome Play/Pause round button */}
@@ -261,50 +280,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                   <span className="text-zinc-500">{formattedSize}</span>
                 </>
               )}
-
-              {/* Transcript toggle or status */}
-              {enrichmentStatus === 'processing' && (
-                <>
-                  <span className="text-zinc-600">•</span>
-                  <span className="text-zinc-400 animate-pulse font-sans flex items-center gap-1">
-                    <Sparkles className="w-2.5 h-2.5" />
-                    Расшифровка...
-                  </span>
-                </>
-              )}
-
-              {transcript && (
-                <>
-                  <span className="text-zinc-600">•</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsExpanded(prev => !prev);
-                    }}
-                    className="text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-0.5 font-sans"
-                  >
-                    <span>{isExpanded ? 'Скрыть текст' : 'Раскрыть текст'}</span>
-                    <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                  </button>
-                </>
-              )}
-
-              {!transcript && enrichmentStatus === 'idle' && onEnrich && (
-                <>
-                  <span className="text-zinc-600">•</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEnrich();
-                    }}
-                    className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer font-sans"
-                  >
-                    Распознать
-                  </button>
-                </>
-              )}
             </div>
 
             {timeContext && (
@@ -314,29 +289,40 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             )}
           </div>
         </div>
+
+        {/* Telegram-style Transcription Button (->A / Loader / Chevron) */}
+        {(onEnrich || transcript || enrichmentStatus === 'processing') && (
+          <button
+            type="button"
+            onClick={handleTranscriptToggle}
+            disabled={enrichmentStatus === 'processing'}
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 text-zinc-300 hover:text-white transition-all flex items-center justify-center shrink-0 cursor-pointer border border-white/[0.06] disabled:opacity-50 disabled:pointer-events-none"
+            title={
+              enrichmentStatus === 'processing'
+                ? 'Идет расшифровка...'
+                : transcript
+                ? isExpanded
+                  ? 'Скрыть текст'
+                  : 'Показать текст'
+                : 'Расшифровать войс'
+            }
+            aria-label="Расшифровка"
+          >
+            {enrichmentStatus === 'processing' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+            ) : transcript && isExpanded ? (
+              <ChevronUp className="w-4 h-4 text-zinc-300" />
+            ) : (
+              <TelegramTranscribeIcon className="w-3.5 h-3.5 text-zinc-400" />
+            )}
+          </button>
+        )}
       </div>
 
-      {/* Transcript Accordion (Linear 95%, Anti-matryoshka: clean left guide line) */}
+      {/* Telegram-style Transcript (Clean text, no headers, directly under player) */}
       {isExpanded && transcript && (
-        <div className="mt-2 pt-1.5 pl-3 border-l border-white/10 text-xs text-zinc-300 font-sans leading-relaxed select-text flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 select-none">
-            <span>РАСШИФРОВКА WHISPER</span>
-            <button
-              type="button"
-              onClick={handleCopyTranscript}
-              className="text-[10px] text-zinc-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-              title="Скопировать расшифровку"
-            >
-              {copied ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
-              <span>{copied ? 'Скопировано' : 'Копировать'}</span>
-            </button>
-          </div>
+        <div className="mt-2 pt-2 border-t border-white/[0.07] text-xs text-zinc-200 font-sans leading-relaxed select-text flex flex-col animate-in fade-in duration-150">
           <p className="whitespace-pre-wrap">{transcript}</p>
-          {summary && summary !== transcript && (
-            <div className="text-[11px] text-zinc-500 font-mono pt-0.5">
-              Суть: {summary}
-            </div>
-          )}
         </div>
       )}
     </div>
