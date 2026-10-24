@@ -1673,32 +1673,27 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('button[title*="Назад на 10 секунд"]')).toBeVisible();
     await expect(page.locator('button[title*="Вперед на 10 секунд"]')).toBeVisible();
 
-    // Verify folder toggle button in bottom bar (toggle between unpinned active and pinned)
-    const folderToggleBtn = page.locator('button[title*="следует за активной папкой"], button[title*="играет только эта папка"]').first();
-    await expect(folderToggleBtn).toBeVisible();
-    await expect(folderToggleBtn).toHaveText(/Входящие/);
+    // Verify folder toggle button in bottom bar (subtle ghost without pill background)
+    const pinToggleBtn = page.locator('button[title*="активн" i], button[title*="закреплен" i]').first();
+    await expect(pinToggleBtn).toBeVisible();
 
-    // Click to pin
-    await folderToggleBtn.click();
-    await expect(page.locator('button[title*="играет только эта папка"]')).toBeVisible();
+    const folderPickerBtn = page.locator('button[title*="Выбрать папку"]').first();
+    await expect(folderPickerBtn).toBeVisible();
+    await expect(folderPickerBtn).toHaveText(/Входящие/);
 
-    // Open folder picker dropdown when pinned and verify "Входящие" is not duplicated
-    const folderPickerChevron = page.locator('button[title*="Выбрать другую папку"]').first();
-    await expect(folderPickerChevron).toBeVisible();
-    await folderPickerChevron.click();
-
-    // Verify "Закрепить папку" popover is open and has exactly 1 "Входящие" (no duplicate)
+    // Open folder picker dropdown (always available) and verify "Входящие" is not duplicated
+    await folderPickerBtn.click();
     const popover = page.locator('.absolute.z-40').filter({ hasText: 'Закрепить папку' });
     await expect(popover).toBeVisible();
     expect(await popover.locator('button', { hasText: 'Входящие' }).count()).toBe(1);
 
-    // Close folder picker by clicking outside / chevron
-    await folderPickerChevron.click();
+    // Select "Входящие" from dropdown to verify auto-pin
+    await popover.locator('button', { hasText: 'Входящие' }).click();
+    await expect(page.locator('button[title*="закреплен" i]').first()).toBeVisible();
 
-    // Click to unpin back
-    const pinnedBtn = page.locator('button[title*="играет только эта папка"]').first();
-    await pinnedBtn.click();
-    await expect(page.locator('button[title*="следует за активной папкой"]')).toBeVisible();
+    // Toggle unpin back via pin button
+    await pinToggleBtn.click();
+    await expect(page.locator('button[title*="активн" i]').first()).toBeVisible();
 
     // Verify Queue / Playlist button is present in bottom bar
     const queueBtn = page.locator('button[aria-label="Очередь воспроизведения"]').first();

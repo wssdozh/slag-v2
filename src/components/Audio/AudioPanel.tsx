@@ -548,49 +548,48 @@ export const AudioPanel: React.FC = () => {
         </div>
       </main>
 
-      {/* 7. Bottom Pinned Folder Toggle strictly at the bottom ("прям внизу внизу") */}
-      <footer className="relative z-10 w-full flex items-center justify-center py-3 select-none">
+      {/* 7. Bottom Folder Toggle strictly at the bottom ("прям внизу внизу") */}
+      <footer className="relative z-10 w-full flex items-center justify-center py-2.5 select-none">
         <div className="relative" ref={folderPickerRef}>
-          <div
-            className={`flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-full text-xs border transition-colors ${
-              scopeMode === 'pinned'
-                ? 'bg-white/10 text-white border-white/20'
-                : 'bg-white/[0.04] text-zinc-400 border-white/[0.06] hover:text-zinc-200 hover:bg-white/[0.08]'
-            }`}
-          >
+          <div className="group flex items-center gap-1 py-0.5 text-xs select-none transition-colors">
+            {/* Pin Icon Toggle */}
             <button
               onClick={toggleScopeMode}
-              className="flex items-center gap-1.5 cursor-pointer"
+              className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
               title={
                 scopeMode === 'pinned'
-                  ? 'Закреплено: играет только эта папка (нажмите для открепления)'
-                  : 'Откреплено: следует за активной папкой (нажмите для закрепления)'
+                  ? 'Папка закреплена (нажмите, чтобы открепить)'
+                  : 'Следовать за активной (нажмите, чтобы закрепить)'
               }
             >
               <Pin
-                className={`w-3 h-3 transition-transform ${
-                  scopeMode === 'pinned' ? 'text-white fill-current' : 'text-zinc-500'
+                className={`w-3.5 h-3.5 transition-all ${
+                  scopeMode === 'pinned'
+                    ? 'text-zinc-200 fill-current scale-105'
+                    : 'text-zinc-500 group-hover:text-zinc-300'
                 }`}
               />
-              <span className="max-w-[120px] sm:max-w-[160px] truncate">
-                {effectiveFolder}
-              </span>
             </button>
 
-            {/* Dropdown arrow when in pinned mode */}
-            {scopeMode === 'pinned' && (
-              <button
-                onClick={() => setIsFolderPickerOpen((prev) => !prev)}
-                className="p-0.5 text-zinc-400 hover:text-white rounded cursor-pointer transition-colors"
-                title="Выбрать другую папку для закрепления"
+            {/* Folder Name & Arrow (Always visible, opens picker and auto-pins on select) */}
+            <button
+              onClick={() => setIsFolderPickerOpen((prev) => !prev)}
+              className="flex items-center gap-1 px-1 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+              title="Выбрать папку (автоматически закрепит)"
+            >
+              <span
+                className={`max-w-[120px] sm:max-w-[160px] truncate transition-colors ${
+                  scopeMode === 'pinned' ? 'text-zinc-300 group-hover:text-zinc-100 font-medium' : 'text-zinc-500 group-hover:text-zinc-300'
+                }`}
               >
-                <ChevronDown className="w-3 h-3" />
-              </button>
-            )}
+                {effectiveFolder}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+            </button>
           </div>
 
           {/* Folder Picker Popover */}
-          {isFolderPickerOpen && scopeMode === 'pinned' && (
+          {isFolderPickerOpen && (
             <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 rounded-xl bg-[#18181c] border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-52 overflow-y-auto">
               <div className="px-3 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04] mb-1">
                 Закрепить папку
@@ -600,10 +599,11 @@ export const AudioPanel: React.FC = () => {
                   key={folderPath}
                   onClick={() => {
                     setPinnedFolder(folderPath);
+                    setScopeMode('pinned');
                     setIsFolderPickerOpen(false);
                   }}
                   className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
-                    pinnedFolder === folderPath
+                    scopeMode === 'pinned' && pinnedFolder === folderPath
                       ? 'text-white font-medium bg-white/[0.04]'
                       : 'text-zinc-400'
                   }`}
