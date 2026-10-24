@@ -11,6 +11,10 @@ export interface SlagAttachment {
   dataUrl?: string; // Base64 or Object URL for rendering
   duration?: number; // Duration in seconds (e.g. 5.8)
   waveform?: number[]; // Normalized waveform peak array [0..1]
+  extractedText?: string; // Whisper transcription (audio/video), OCR text (image), or file sample
+  summary?: string; // 1-2 sentence context-aware summary or insight
+  enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
+  enrichmentError?: string;
 }
 
 export interface SlagSubtask {

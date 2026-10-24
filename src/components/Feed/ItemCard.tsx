@@ -17,6 +17,7 @@ import {
   Pin
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
+import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
 
 interface ItemCardProps {
   item: SlagItem;
@@ -36,12 +37,45 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     scrollToItem,
     openLightbox,
     isMobile,
-    setMobileActionSheetItem
+    setMobileActionSheetItem,
+    updateItem,
+    aiSettings,
+    addToast
   } = useApp();
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
   const [isArticleExpanded, setIsArticleExpanded] = useState(false);
+  const [expandedOcrIds, setExpandedOcrIds] = useState<Set<string>>(new Set());
   const [swipeOffset, setSwipeOffset] = useState(0);
+
+  const toggleOcr = (id: string) => {
+    setExpandedOcrIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleEnrichAttachment = React.useCallback(async (targetAtt: SlagAttachment) => {
+    if (!aiSettings.groqApiKey) {
+      addToast('Укажите ключ Groq в настройках ИИ для распознавания', 'info');
+      return;
+    }
+    const focalContext = extractFocalContext(item);
+    const inFlightAttachments = item.attachments.map(a =>
+      a.id === targetAtt.id ? { ...a, enrichmentStatus: 'processing' as const } : a
+    );
+    updateItem({ ...item, attachments: inFlightAttachments });
+
+    try {
+      const enriched = await enrichAttachment(targetAtt, focalContext, aiSettings);
+      const updatedAttachments = item.attachments.map(a => a.id === targetAtt.id ? enriched : a);
+      updateItem({ ...item, attachments: updatedAttachments });
+    } catch {
+      // quiet fallback
+    }
+  }, [aiSettings, item, updateItem, addToast]);
 
   const longPressTimerRef = useRef<number | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -549,15 +583,19 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             size={att.size}
             waveform={att.waveform}
             timeContext={isPureVoice ? formattedTime : undefined}
+            transcript={att.extractedText}
+            summary={att.summary}
+            enrichmentStatus={att.enrichmentStatus}
+            onEnrich={() => handleEnrichAttachment(att)}
           />
         </div>
       ))}
 
       {/* Image Attachments Gallery (Obsidian/Linear Lightbox) */}
       {imageAttachments.length > 0 && (
-        <div className="pt-1 w-full">
+        <div className="pt-1 w-full flex flex-col gap-1">
           {imageAttachments.length === 1 ? (
-            <div className="flex items-start max-w-full">
+            <div className="flex flex-col items-start max-w-full">
               <div
                 className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 cursor-pointer hover:opacity-95 transition-opacity max-h-[420px] max-w-full"
                 onClick={() => handleImageClick(imageAttachments[0])}
@@ -568,6 +606,32 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                   className="w-auto h-auto max-h-[420px] max-w-full object-contain rounded-lg"
                 />
               </div>
+              {/* OCR text display for single image */}
+              {imageAttachments[0].extractedText && (
+                <div className="w-full mt-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleOcr(imageAttachments[0].id);
+                    }}
+                    className="text-[10px] text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1 cursor-pointer select-none font-mono"
+                  >
+                    <span>{expandedOcrIds.has(imageAttachments[0].id) ? 'Скрыть текст с фото' : 'Текст с фото (OCR)'}</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${expandedOcrIds.has(imageAttachments[0].id) ? 'rotate-180' : ''}`} />
+                  </button>
+                  {expandedOcrIds.has(imageAttachments[0].id) && (
+                    <div className="mt-1 pt-1 pl-2.5 border-l border-white/10 text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+                      {imageAttachments[0].extractedText}
+                      {imageAttachments[0].summary && (
+                        <div className="text-[11px] text-zinc-500 font-sans pt-1">
+                          Суть: {imageAttachments[0].summary}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div
@@ -580,12 +644,33 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               } gap-1.5 w-full`}
             >
               {imageAttachments.map(img => (
-                <div
-                  key={img.id}
-                  className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 aspect-[4/3] flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
-                  onClick={() => handleImageClick(img)}
-                >
-                  <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+                <div key={img.id} className="flex flex-col">
+                  <div
+                    className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 aspect-[4/3] flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
+                    onClick={() => handleImageClick(img)}
+                  >
+                    <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+                  </div>
+                  {img.extractedText && (
+                    <div className="w-full mt-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleOcr(img.id);
+                        }}
+                        className="text-[9px] text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-0.5 cursor-pointer select-none font-mono"
+                      >
+                        <span>{expandedOcrIds.has(img.id) ? 'Скрыть OCR' : 'OCR'}</span>
+                        <ChevronDown className={`w-2.5 h-2.5 transition-transform ${expandedOcrIds.has(img.id) ? 'rotate-180' : ''}`} />
+                      </button>
+                      {expandedOcrIds.has(img.id) && (
+                        <div className="mt-0.5 pt-0.5 pl-2 border-l border-white/10 text-[11px] font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+                          {img.extractedText}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -595,20 +680,26 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
       {/* File Attachments */}
       {fileAttachments.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
+        <div className="flex flex-col gap-1.5 pt-1">
           {fileAttachments.map(file => (
-            <a
-              key={file.id}
-              href={file.dataUrl}
-              download={file.name}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 border border-white/[0.05] transition-colors"
-            >
-              <Paperclip className="w-3 h-3 text-zinc-400" />
-              <span className="truncate max-w-[150px]">{file.name}</span>
-              <span className="text-[10px] text-zinc-500 font-mono">
-                {Math.round(file.size / 1024)} KB
-              </span>
-            </a>
+            <div key={file.id} className="flex items-center gap-2 flex-wrap">
+              <a
+                href={file.dataUrl}
+                download={file.name}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 border border-white/[0.05] transition-colors shrink-0"
+              >
+                <Paperclip className="w-3 h-3 text-zinc-400" />
+                <span className="truncate max-w-[150px]">{file.name}</span>
+                <span className="text-[10px] text-zinc-500 font-mono">
+                  {Math.round(file.size / 1024)} KB
+                </span>
+              </a>
+              {file.summary && (
+                <span className="text-[11px] text-zinc-400 truncate max-w-[320px] font-sans" title={file.summary}>
+                  → {file.summary}
+                </span>
+              )}
+            </div>
           ))}
         </div>
       )}

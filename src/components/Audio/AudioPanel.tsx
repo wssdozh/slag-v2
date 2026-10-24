@@ -398,7 +398,7 @@ export const AudioPanel: React.FC = () => {
           ) : (
             <>
               {/* 1. Square Art Tile (Clean, without buttons) */}
-              <AudioCoverArt track={currentTrack} isPlaying={isPlaying} />
+              <AudioCoverArt track={currentTrack} isPlaying={isPlaying} audioRef={audioRef} />
 
               {/* 2. Track Title (Like "The Lovecats" in reference) */}
               <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-full text-center mt-5 mb-1 px-2">

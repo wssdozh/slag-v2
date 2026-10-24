@@ -1684,12 +1684,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // Verify Now Playing screen elements: track title, note link, microcassette artwork
+    // Verify Now Playing screen elements: track title, note link, clean circular ocean wave canvas
     await expect(page.locator('text=voice_16-12-53.webm')).toBeVisible();
     await expect(page.locator('text=Голосовая заметка разработчика')).toBeVisible();
-    await expect(page.locator('text=VOICE LOG')).toBeVisible();
-    await expect(page.locator('text=TP-60')).toBeVisible();
-    await expect(page.locator('text=SIDE A').first()).toBeVisible();
+    await expect(page.locator('canvas[data-testid="ocean-waves-canvas"]')).toBeVisible();
 
     // Verify transport controls (5 buttons under timeline: -10s, Prev, Play/Pause, Next, +10s)
     const playPauseBtn = page.locator('button[title*="Воспроизведение"], button[title*="Пауза"]');
@@ -1725,34 +1723,31 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const queueBtn = page.locator('button[aria-label="Очередь воспроизведения"]').first();
     await expect(queueBtn).toBeVisible();
 
-    // Open Queue drawer and check track entry + filters
+    // Open Queue drawer and select the voice note
     await queueBtn.click();
     await expect(page.locator('text=Очередь воспроизведения')).toBeVisible();
     const audioPanel = page.locator('[role="tabpanel"]').filter({ hasText: 'Очередь воспроизведения' }).first();
     await expect(audioPanel.locator('button', { hasText: 'Войсы' })).toBeVisible();
     await expect(audioPanel.locator('button', { hasText: 'Файлы' })).toBeVisible();
-    await expect(page.locator('text=voice_16-12-53.webm').first()).toBeVisible();
-
-    // Close Queue drawer
-    const closeQueueBtn = page.locator('button[title="Закрыть список"]');
-    await expect(closeQueueBtn).toBeVisible();
-    await closeQueueBtn.click();
+    const voiceTrackRow = page.locator('text=voice_16-12-53.webm').first();
+    await expect(voiceTrackRow).toBeVisible();
+    await voiceTrackRow.click();
     await expect(page.locator('text=Очередь воспроизведения')).not.toBeVisible();
 
     // Verify bottom bar utilities (speed, repeat, shuffle)
     const shuffleBtn = page.locator('button[aria-label="Перемешать"]');
     await expect(shuffleBtn).toBeVisible();
-    await shuffleBtn.click();
-    await expect(shuffleBtn).toHaveClass(/bg-white\/10/);
 
     const speedBtn = page.locator('button[aria-label="Скорость"]');
     await expect(speedBtn).toBeVisible();
     await speedBtn.click();
     await expect(speedBtn).toHaveText('1.25x');
 
-    // Take screenshot of the center AudioPlayer panel in full Now Playing glory
+    await page.waitForTimeout(600);
+
+    // Take screenshot of the center AudioPlayer panel in full active ocean wave glory
     await page.screenshot({
-      path: 'test-results/screenshots/dockview-audioplayer-nowplaying-clean.png',
+      path: 'test-results/screenshots/dockview-audioplayer-ocean-waves-active.png',
       fullPage: false,
     });
   });

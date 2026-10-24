@@ -10,7 +10,10 @@ import {
   StickyNote,
   CornerDownLeft,
   Folder,
-  ArrowLeft
+  ArrowLeft,
+  Mic,
+  Image as ImageIcon,
+  Paperclip
 } from 'lucide-react';
 import { BaseModal } from '../Modals/BaseModal';
 
@@ -178,14 +181,37 @@ const SearchDialog: React.FC = () => {
                     <StickyNote className="w-4 h-4 text-zinc-400 shrink-0" />
                   )}
 
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-medium truncate text-zinc-100">
-                      {item.title}
-                    </span>
-                    <span className="text-[11px] text-zinc-500 truncate">
-                      {item.content ? item.content.slice(0, 80) : 'Пустая заметка'}
-                    </span>
-                  </div>
+                  {(() => {
+                    const matchedAtt = item.attachments?.find(a => 
+                      (a.summary && a.summary.toLowerCase().includes(query.toLowerCase())) ||
+                      (a.extractedText && a.extractedText.toLowerCase().includes(query.toLowerCase()))
+                    ) || item.attachments?.find(a => a.summary || a.extractedText);
+
+                    const snippet = item.content
+                      ? item.content.slice(0, 90)
+                      : (matchedAtt?.summary || matchedAtt?.extractedText || 'Пустая заметка');
+
+                    return (
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-medium truncate text-zinc-100">
+                            {item.title}
+                          </span>
+                          {matchedAtt && (matchedAtt.summary || matchedAtt.extractedText) && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.06] text-zinc-400 shrink-0">
+                              {matchedAtt.type === 'audio' && <Mic className="w-2.5 h-2.5" />}
+                              {matchedAtt.type === 'image' && <ImageIcon className="w-2.5 h-2.5" />}
+                              {matchedAtt.type === 'file' && <Paperclip className="w-2.5 h-2.5" />}
+                              {matchedAtt.type === 'audio' ? 'аудио' : matchedAtt.type === 'image' ? 'фото' : 'файл'}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-zinc-500 truncate">
+                          {snippet}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">

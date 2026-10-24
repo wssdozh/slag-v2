@@ -4,6 +4,7 @@ import { ItemCard } from './ItemCard';
 import type { SlagItem } from '../../types';
 import { Inbox, UploadCloud } from 'lucide-react';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
+import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 
 function subscribeToNow() {
   return () => {};
@@ -16,7 +17,7 @@ function getTodayMidnight() {
 }
 
 export const FeedList: React.FC = () => {
-  const { filteredItems, openContextMenu, saveItem, currentFolder, addToast } = useApp();
+  const { filteredItems, openContextMenu, saveItem, updateItem, aiSettings, currentFolder, addToast } = useApp();
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -61,7 +62,7 @@ export const FeedList: React.FC = () => {
         try {
           const attachments = await processFileListToAttachments(e.dataTransfer.files);
           if (attachments.length > 0) {
-            saveItem({
+            const created = saveItem({
               type: 'note',
               title: attachments.length === 1 ? attachments[0].name : `Файлы (${attachments.length})`,
               content: '',
@@ -69,6 +70,10 @@ export const FeedList: React.FC = () => {
               attachments,
             });
             addToast(`Заметка создана с ${attachments.length} ${attachments.length === 1 ? 'файлом' : 'файлами'}`, 'success');
+
+            if (aiSettings.groqApiKey) {
+              enrichItemAttachments(created, updateItem, aiSettings).catch(() => {});
+            }
           }
         } catch {
           addToast('Не удалось обработать прикрепленные файлы', 'error');

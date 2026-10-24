@@ -105,6 +105,13 @@ export function extractKeywords(text: string): string[] {
   return filtered.length > 0 ? filtered : words.filter(w => w.length >= 2);
 }
 
+export function getSearchableAttachmentText(attachments?: SlagItem['attachments']): string {
+  if (!attachments || attachments.length === 0) return '';
+  return attachments
+    .map(a => [a.name, a.summary, a.extractedText].filter(Boolean).join(' '))
+    .join(' ');
+}
+
 export async function initSearchIndex(items: SlagItem[]) {
   const endTimer = searchLog.time(`Indexing ${items.length} items in Orama`);
   try {
@@ -116,6 +123,7 @@ export async function initSearchIndex(items: SlagItem[]) {
         content: 'string',
         tags: 'string[]',
         folder: 'string',
+        attachmentsText: 'string',
       },
     });
 
@@ -127,6 +135,7 @@ export async function initSearchIndex(items: SlagItem[]) {
         content: item.content || '',
         tags: item.tags || [],
         folder: item.folder || '',
+        attachmentsText: getSearchableAttachmentText(item.attachments),
       });
     }
 
@@ -218,10 +227,13 @@ export async function querySearch(
     const titleWords = extractKeywords(item.title || '');
     const contentWords = extractKeywords((item.content || '').slice(0, 1000));
     const tagWords = (item.tags || []).map(t => t.toLowerCase());
+    const attachText = getSearchableAttachmentText(item.attachments).toLowerCase();
+    const attachWords = extractKeywords(attachText.slice(0, 1500));
 
     // Exact full substring bonuses
     if (item.title?.toLowerCase().includes(trimmed)) score += 30;
     if (item.content?.toLowerCase().includes(trimmed)) score += 15;
+    if (attachText.includes(trimmed)) score += 20;
     if (item.tags?.some(t => t.toLowerCase().includes(trimmed))) score += 20;
 
     // Token-by-token fuzzy matching
@@ -232,6 +244,10 @@ export async function querySearch(
       }
       // Tag match (medium-high weight)
       if (tagWords.some(tag => tokenMatches(kw, tag))) {
+        score += 12;
+      }
+      // Attachment transcription/OCR match
+      if (attachWords.some(aw => tokenMatches(kw, aw))) {
         score += 12;
       }
       // Content match (context weight)

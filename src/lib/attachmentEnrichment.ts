@@ -1,0 +1,357 @@
+import type { SlagAttachment, SlagItem, AiSettings } from '../types';
+import { logger } from './logger';
+import { storage } from './storage';
+
+const enrichLog = logger.scope('AI');
+
+/**
+ * Extracts a compact, high-value focal context snapshot (under 50 tokens).
+ * This prevents context overflow while providing Whisper and Vision models
+ * with exact terminology, names, and user intent.
+ */
+export function extractFocalContext(item: { title?: string; tags?: string[]; content?: string }): string {
+  const parts: string[] = [];
+  if (item.title && item.title.trim()) {
+    parts.push(`Тема: ${item.title.trim()}`);
+  }
+  if (item.tags && item.tags.length > 0) {
+    parts.push(`Теги: ${item.tags.join(', ')}`);
+  }
+  if (item.content && item.content.trim()) {
+    // Keep only the first 160 characters to avoid noise and token waste
+    const snippet = item.content.trim().slice(0, 160).replace(/\s+/g, ' ');
+    parts.push(`Контекст: ${snippet}`);
+  }
+  return parts.join(' | ');
+}
+
+/**
+ * Converts a base64 / blob data URL into a native Web Blob.
+ */
+export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  const res = await fetch(dataUrl);
+  return await res.blob();
+}
+
+/**
+ * Extracts up to maxBytes of text content from a text/file data URL.
+ */
+export async function dataUrlToText(dataUrl: string, maxBytes: number = 8192): Promise<string> {
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const slice = blob.slice(0, maxBytes);
+    return await slice.text();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Transcribes audio/video using Groq Whisper API (whisper-large-v3-turbo).
+ */
+async function transcribeAudioGroq(
+  attachment: SlagAttachment,
+  focalContext: string,
+  apiKey: string
+): Promise<{ extractedText: string; summary: string }> {
+  const blob = await dataUrlToBlob(attachment.dataUrl || '');
+  const formData = new FormData();
+  const ext = attachment.type === 'video' ? 'webm' : 'webm';
+  const fileName = attachment.name || `audio_${Date.now()}.${ext}`;
+
+  formData.append('file', blob, fileName);
+  formData.append('model', 'whisper-large-v3-turbo');
+  formData.append('response_format', 'json');
+  formData.append('temperature', '0');
+
+  if (focalContext) {
+    formData.append('prompt', focalContext);
+  }
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Groq Whisper failed (${res.status}): ${errText.slice(0, 150)}`);
+  }
+
+  const data = await res.json();
+  const extractedText = (data.text || '').trim();
+
+  // Create a concise summary if text is substantial
+  let summary = '';
+  if (extractedText.length > 120) {
+    const firstSentence = extractedText.split(/[.!?\n]/)[0]?.trim();
+    summary = firstSentence && firstSentence.length >= 10 ? firstSentence : extractedText.slice(0, 100);
+  } else {
+    summary = extractedText;
+  }
+
+  return { extractedText, summary };
+}
+
+/**
+ * Analyzes an image with Groq Vision (llama-3.2-11b-vision-preview).
+ */
+async function analyzeImageGroq(
+  attachment: SlagAttachment,
+  focalContext: string,
+  apiKey: string
+): Promise<{ extractedText: string; summary: string }> {
+  if (!attachment.dataUrl) {
+    throw new Error('Image dataUrl is missing');
+  }
+
+  const systemInstruction = `Ты — модуль мультимодального анализа заметок.
+Твоя задача:
+1. Извлечь весь читаемый текст на изображении (OCR), если он есть (чеки, код, скриншоты, надписи, кнопки).
+2. Сформулировать краткую выжимку (summary) в 1-2 предложения с учетом контекста заметки: "${focalContext}".
+Если текста на картинке нет, extractedText оставь пустым.
+Ответ верни СТРОГО в формате JSON без разметки:
+{"extractedText": "весь найденный текст или пусто", "summary": "краткое описание сути изображения"}`;
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.2-11b-vision-preview',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: systemInstruction },
+            {
+              type: 'image_url',
+              image_url: { url: attachment.dataUrl },
+            },
+          ],
+        },
+      ],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Groq Vision failed (${res.status}): ${errText.slice(0, 150)}`);
+  }
+
+  const data = await res.json();
+  const rawContent = data.choices?.[0]?.message?.content || '{}';
+  try {
+    const parsed = JSON.parse(rawContent);
+    return {
+      extractedText: (parsed.extractedText || '').trim(),
+      summary: (parsed.summary || '').trim(),
+    };
+  } catch {
+    return {
+      extractedText: '',
+      summary: rawContent.slice(0, 150).trim(),
+    };
+  }
+}
+
+/**
+ * Analyzes arbitrary files (logs, code, configs, text) with Groq LLM.
+ */
+async function analyzeFileGroq(
+  attachment: SlagAttachment,
+  focalContext: string,
+  apiKey: string
+): Promise<{ extractedText: string; summary: string }> {
+  const isLikelyText =
+    attachment.mimeType.startsWith('text/') ||
+    attachment.mimeType.includes('json') ||
+    attachment.mimeType.includes('javascript') ||
+    attachment.mimeType.includes('typescript') ||
+    /\.(log|txt|md|json|yml|yaml|ts|tsx|js|jsx|py|rs|css|html|env|toml|csv)$/i.test(attachment.name);
+
+  if (!isLikelyText || !attachment.dataUrl) {
+    const readableSize = attachment.size > 1024 * 1024
+      ? `${(attachment.size / (1024 * 1024)).toFixed(1)} МБ`
+      : `${Math.round(attachment.size / 1024)} КБ`;
+    return {
+      extractedText: '',
+      summary: `Вложенный файл ${attachment.name} (${readableSize})`,
+    };
+  }
+
+  const sample = await dataUrlToText(attachment.dataUrl, 4096);
+  if (!sample.trim()) {
+    return {
+      extractedText: '',
+      summary: `Файл ${attachment.name}`,
+    };
+  }
+
+  const prompt = `Контекст заметки: "${focalContext}".
+Имя файла: "${attachment.name}".
+Фрагмент файла (первые 4 КБ):
+\`\`\`
+${sample.slice(0, 2500)}
+\`\`\`
+
+Сформулируй краткую суть файла в 1-2 предложениях (что внутри, ключевые параметры, ошибки или данные).
+Ответ верни СТРОГО в JSON:
+{"summary": "суть файла", "extractedText": "ключевые строки/ошибки/тезисы"}`;
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!res.ok) {
+    return {
+      extractedText: sample.slice(0, 300),
+      summary: `Файл ${attachment.name} (${sample.length} символов)`,
+    };
+  }
+
+  const data = await res.json();
+  const rawContent = data.choices?.[0]?.message?.content || '{}';
+  try {
+    const parsed = JSON.parse(rawContent);
+    return {
+      extractedText: (parsed.extractedText || sample.slice(0, 300)).trim(),
+      summary: (parsed.summary || '').trim(),
+    };
+  } catch {
+    return {
+      extractedText: sample.slice(0, 300),
+      summary: rawContent.slice(0, 150).trim(),
+    };
+  }
+}
+
+/**
+ * Single Entrypoint: Enriches any attachment using context-aware dispatching.
+ */
+export async function enrichAttachment(
+  attachment: SlagAttachment,
+  focalContext: string,
+  settings: AiSettings
+): Promise<SlagAttachment> {
+  const groqKey = settings.groqApiKey || '';
+  if (!groqKey) {
+    return {
+      ...attachment,
+      enrichmentStatus: 'idle',
+    };
+  }
+
+  const startMs = performance.now();
+  enrichLog.info(`Enriching attachment "${attachment.name}" (${attachment.type})`, {
+    context: focalContext.slice(0, 60),
+  });
+
+  try {
+    let result: { extractedText: string; summary: string };
+
+    if (attachment.type === 'audio' || attachment.type === 'video') {
+      result = await transcribeAudioGroq(attachment, focalContext, groqKey);
+    } else if (attachment.type === 'image') {
+      result = await analyzeImageGroq(attachment, focalContext, groqKey);
+    } else {
+      result = await analyzeFileGroq(attachment, focalContext, groqKey);
+    }
+
+    const duration = Math.round(performance.now() - startMs);
+    enrichLog.info(`Enriched "${attachment.name}" in ${duration}ms`, {
+      hasText: Boolean(result.extractedText),
+      summary: result.summary.slice(0, 60),
+    });
+
+    const enriched: SlagAttachment = {
+      ...attachment,
+      extractedText: result.extractedText || undefined,
+      summary: result.summary || undefined,
+      enrichmentStatus: 'ready',
+      enrichmentError: undefined,
+    };
+
+    // Cache updated attachment in local storage
+    storage.saveAttachment(enriched);
+    return enriched;
+  } catch (err: any) {
+    enrichLog.warn(`Enrichment failed for "${attachment.name}":`, err?.message || err);
+    return {
+      ...attachment,
+      enrichmentStatus: 'error',
+      enrichmentError: err?.message || 'Ошибка обработки',
+    };
+  }
+}
+
+/**
+ * Enriches all pending/idle attachments for a given note item asynchronously.
+ * Updates the note in storage and triggers the callback so UI and Orama search update.
+ */
+export async function enrichItemAttachments(
+  item: SlagItem,
+  onUpdated: (updatedItem: SlagItem) => void,
+  settings: AiSettings
+): Promise<void> {
+  if (!item.attachments || item.attachments.length === 0) return;
+  if (!settings.groqApiKey) return;
+
+  const needsEnrichment = item.attachments.some(
+    (a) => !a.extractedText && !a.summary && a.enrichmentStatus !== 'processing'
+  );
+  if (!needsEnrichment) return;
+
+  const focalContext = extractFocalContext(item);
+
+  // Mark in-flight in UI
+  const inFlightAttachments = item.attachments.map((a) => {
+    if (!a.extractedText && !a.summary && a.enrichmentStatus !== 'processing') {
+      return { ...a, enrichmentStatus: 'processing' as const };
+    }
+    return a;
+  });
+
+  const inFlightItem: SlagItem = {
+    ...item,
+    attachments: inFlightAttachments,
+    updatedAt: Date.now(),
+  };
+  onUpdated(inFlightItem);
+
+  // Run enrichments in parallel
+  const enrichedAttachments = await Promise.all(
+    inFlightAttachments.map(async (att) => {
+      if (att.enrichmentStatus === 'processing') {
+        return await enrichAttachment(att, focalContext, settings);
+      }
+      return att;
+    })
+  );
+
+  const finalItem: SlagItem = {
+    ...item,
+    attachments: enrichedAttachments,
+    updatedAt: Date.now(),
+  };
+
+  onUpdated(finalItem);
+}

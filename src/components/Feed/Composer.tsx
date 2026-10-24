@@ -8,6 +8,7 @@ import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { Select } from '../UI/Select';
 import { categorizeDraft } from '../../lib/aiService';
+import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import { BaseComposer } from './BaseComposer';
 import { LinearSignalBars } from '../UI/PriorityBadge';
@@ -755,6 +756,10 @@ export const Composer: React.FC = () => {
       reminder: taskReminder,
       subtasks: subtasks.length > 0 ? subtasks : undefined,
     });
+
+    if (attachmentsToSend.length > 0 && aiSettings.groqApiKey) {
+      enrichItemAttachments(saved, updateItem, aiSettings).catch(() => {});
+    }
 
     if (aiSettings.autoTagging && finalTags.length === 0 && content.trim().length >= 15) {
       categorizeDraft(content.trim(), destinationFolder, folders, aiSettings).then(res => {
