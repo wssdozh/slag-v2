@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
-import { parseTodoistInput } from '../../lib/todoistTaskParser';
 import { querySearch } from '../../lib/searchService';
 import {
   CircleDashed,
@@ -63,13 +62,13 @@ export const KanbanBoard: React.FC = () => {
     items,
     currentFolder,
     updateItem,
-    saveItem,
     setSelectedItem,
     setIsFullscreenEditorOpen,
     openContextMenu,
     addToast,
     setActiveTagFilter,
     activeTagFilter,
+    openComposerModal,
   } = useApp();
 
   // Collapsible TRIZ materials dock
@@ -81,10 +80,6 @@ export const KanbanBoard: React.FC = () => {
 
   // Column drag highlight
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
-
-  // Adding task inline in column
-  const [addingToColumn, setAddingToColumn] = useState<TaskStatus | null>(null);
-  const [newTitle, setNewTitle] = useState('');
 
   // Active status dropdown card ID
   const [statusMenuTaskId, setStatusMenuTaskId] = useState<string | null>(null);
@@ -208,31 +203,6 @@ export const KanbanBoard: React.FC = () => {
     } catch {
       // Ignored non-json drops
     }
-  };
-
-  // Submit inline new task
-  const handleCreateTaskInColumn = (status: TaskStatus) => {
-    if (!newTitle.trim()) {
-      setAddingToColumn(null);
-      return;
-    }
-
-    const parsed = parseTodoistInput(newTitle.trim());
-    saveItem({
-      type: 'task',
-      title: parsed.cleanTitle || newTitle.trim(),
-      content: '',
-      folder: currentFolder,
-      status,
-      priority: parsed.priority || 'none',
-      tags: parsed.tags || [],
-      dueDate: parsed.dueDate,
-      reminder: parsed.reminder,
-    });
-
-    setNewTitle('');
-    setAddingToColumn(null);
-    addToast('Задача создана', 'success');
   };
 
   const renderColumnIcon = (type: ColumnConfig['iconType'], colorClass: string) => {
@@ -407,10 +377,9 @@ export const KanbanBoard: React.FC = () => {
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => {
-                      setAddingToColumn(addingToColumn === column.id ? null : column.id);
-                      setNewTitle('');
+                      openComposerModal({ type: 'task', status: column.id, folder: currentFolder });
                     }}
-                    className="p-1 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors"
+                    className="p-1 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors cursor-pointer"
                     title={`Добавить задачу в ${column.title}`}
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -607,55 +576,16 @@ export const KanbanBoard: React.FC = () => {
                   })
                 )}
 
-                {/* Inline task creator or "+ Новая задача" button positioned directly under cards/empty state */}
-                {addingToColumn === column.id ? (
-                  <div className="p-2.5 rounded-lg bg-[#18181c] border border-blue-500/40 shadow-md space-y-2 mt-1">
-                    <input
-                      autoFocus
-                      type="text"
-                      placeholder="Название задачи... (Enter)"
-                      value={newTitle}
-                      onChange={e => setNewTitle(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleCreateTaskInColumn(column.id);
-                        } else if (e.key === 'Escape') {
-                          setAddingToColumn(null);
-                        }
-                      }}
-                      className="w-full bg-transparent text-xs text-zinc-100 placeholder-zinc-500 outline-none"
-                    />
-                    <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-1">
-                      <span>Нажмите Enter для создания</span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setAddingToColumn(null)}
-                          className="px-2 py-0.5 rounded hover:bg-white/[0.08] text-zinc-400 cursor-pointer"
-                        >
-                          Отмена
-                        </button>
-                        <button
-                          onClick={() => handleCreateTaskInColumn(column.id)}
-                          className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium cursor-pointer"
-                        >
-                          Создать
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setAddingToColumn(column.id);
-                      setNewTitle('');
-                    }}
-                    className="w-full py-1.5 px-2.5 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-dashed border-white/[0.08] hover:border-white/[0.16] transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Новая задача</span>
-                  </button>
-                )}
+                {/* "+ Новая задача" button positioned directly under cards/empty state */}
+                <button
+                  onClick={() => {
+                    openComposerModal({ type: 'task', status: column.id, folder: currentFolder });
+                  }}
+                  className="w-full py-1.5 px-2.5 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] border border-dashed border-white/[0.08] hover:border-white/[0.16] transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Новая задача</span>
+                </button>
               </div>
             </div>
           );

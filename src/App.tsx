@@ -8,6 +8,7 @@ import { SearchModal } from './components/Search/SearchModal';
 import { SettingsModal } from './components/Modals/SettingsModal';
 import { FolderModal } from './components/Modals/FolderModal';
 import { TriageModal } from './components/Modals/TriageModal';
+import { ComposerModal } from './components/Modals/ComposerModal';
 import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
@@ -89,6 +90,7 @@ const AppContent: React.FC = () => {
         <SettingsModal />
         <FolderModal />
         <TriageModal />
+        <ComposerModal />
         <LogModal />
         <ToastContainer />
         <ImageLightbox
@@ -117,6 +119,7 @@ const AppContent: React.FC = () => {
       <SettingsModal />
       <FolderModal />
       <TriageModal />
+      <ComposerModal />
       <LogModal />
       <ToastContainer />
       <ImageLightbox

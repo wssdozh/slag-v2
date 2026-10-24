@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagSubtask } from '../../types';
+import type { SlagItem } from '../../types';
 import { parseTodoistInput, getTaskTimeSlot } from '../../lib/todoistTaskParser';
 import {
   ChevronLeft,
@@ -12,11 +12,8 @@ import {
   Clock,
   Inbox,
   X,
-  Maximize2,
-  Folder as FolderIcon,
   ListTodo
 } from 'lucide-react';
-import { Select } from '../UI/Select';
 
 function getISODateString(d: Date): string {
   const y = d.getFullYear();
@@ -169,10 +166,6 @@ export const CalendarView: React.FC = () => {
   const [expandedDayDateStr, setExpandedDayDateStr] = useState<string | null>(null);
   const [dayCardInput, setDayCardInput] = useState('');
 
-  // Task Details Popover state
-  const [inspectingTask, setInspectingTask] = useState<SlagItem | null>(null);
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
-
   // Live minute ticker for Red Ribbon Indicator
   const [nowMinute, setNowMinute] = useState(() => {
     const d = new Date();
@@ -202,15 +195,14 @@ export const CalendarView: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (inspectingTask) setInspectingTask(null);
-        else if (expandedDayDateStr) setExpandedDayDateStr(null);
+        if (expandedDayDateStr) setExpandedDayDateStr(null);
         else if (addingSlot) setAddingSlot(null);
         else if (addingDate) setAddingDate(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [inspectingTask, expandedDayDateStr, addingSlot, addingDate]);
+  }, [expandedDayDateStr, addingSlot, addingDate]);
 
   // Scoped tasks in current folder
   const folderTasks = useMemo(() => {
@@ -422,33 +414,6 @@ export const CalendarView: React.FC = () => {
     addToast('Задача добавлена', 'success');
   };
 
-  // Toggle subtask in Task Details Popover
-  const handleToggleSubtask = (task: SlagItem, subtaskId: string) => {
-    const updatedSubtasks = (task.subtasks || []).map(st =>
-      st.id === subtaskId ? { ...st, completed: !st.completed } : st
-    );
-    const updated = { ...task, subtasks: updatedSubtasks };
-    updateItem(updated);
-    setInspectingTask(updated);
-  };
-
-  // Add new subtask in Task Details Popover
-  const handleAddSubtask = (task: SlagItem) => {
-    if (!newSubtaskTitle.trim()) return;
-    const newSt: SlagSubtask = {
-      id: `st_${Date.now()}`,
-      title: newSubtaskTitle.trim(),
-      completed: false,
-    };
-    const updated = {
-      ...task,
-      subtasks: [...(task.subtasks || []), newSt],
-    };
-    updateItem(updated);
-    setInspectingTask(updated);
-    setNewSubtaskTitle('');
-  };
-
   // Render a Compact All-Day Task Pill
   const renderAllDayTaskPill = (task: SlagItem) => {
     const isDone = task.status === 'done';
@@ -459,7 +424,10 @@ export const CalendarView: React.FC = () => {
         key={task.id}
         draggable
         onDragStart={e => handleDragStartTask(e, task.id)}
-        onClick={() => setInspectingTask(task)}
+        onClick={() => {
+          setSelectedItem(task);
+          setIsFullscreenEditorOpen(true);
+        }}
         onContextMenu={e => {
           e.preventDefault();
           e.stopPropagation();
@@ -521,7 +489,10 @@ export const CalendarView: React.FC = () => {
         key={task.id}
         draggable
         onDragStart={e => handleDragStartTask(e, task.id)}
-        onClick={() => setInspectingTask(task)}
+        onClick={() => {
+          setSelectedItem(task);
+          setIsFullscreenEditorOpen(true);
+        }}
         onContextMenu={e => {
           e.preventDefault();
           e.stopPropagation();
@@ -954,7 +925,8 @@ export const CalendarView: React.FC = () => {
                               key={task.id}
                               onClick={e => {
                                 e.stopPropagation();
-                                setInspectingTask(task);
+                                setSelectedItem(task);
+                                setIsFullscreenEditorOpen(true);
                               }}
                               className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors"
                             >
@@ -1073,7 +1045,10 @@ export const CalendarView: React.FC = () => {
                       key={task.id}
                       draggable
                       onDragStart={e => handleDragStartTask(e, task.id)}
-                      onClick={() => setInspectingTask(task)}
+                      onClick={() => {
+                        setSelectedItem(task);
+                        setIsFullscreenEditorOpen(true);
+                      }}
                       className="p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-pointer"
                     >
                       <div className="flex items-start gap-2">
@@ -1137,7 +1112,10 @@ export const CalendarView: React.FC = () => {
                     key={task.id}
                     draggable
                     onDragStart={e => handleDragStartTask(e, task.id)}
-                    onClick={() => setInspectingTask(task)}
+                    onClick={() => {
+                      setSelectedItem(task);
+                      setIsFullscreenEditorOpen(true);
+                    }}
                     className="p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-pointer"
                   >
                     <div className="flex items-start gap-2">
@@ -1239,7 +1217,10 @@ export const CalendarView: React.FC = () => {
                   return (
                     <div
                       key={task.id}
-                      onClick={() => setInspectingTask(task)}
+                      onClick={() => {
+                        setSelectedItem(task);
+                        setIsFullscreenEditorOpen(true);
+                      }}
                       className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-colors cursor-pointer ${styling.bg} ${styling.border}`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -1291,220 +1272,6 @@ export const CalendarView: React.FC = () => {
                   }}
                   className="w-full bg-transparent text-xs text-zinc-100 placeholder-zinc-500 outline-none"
                 />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* 5. Task Details Popover (Floating Card like Todoist Image 3)   */}
-      {/* ============================================================== */}
-      {inspectingTask && (
-        <div
-          onClick={() => setInspectingTask(null)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="w-full max-w-lg rounded-2xl bg-[#141417] border border-white/[0.1] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
-          >
-            {/* Header: Folder + Actions */}
-            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-[#18181c]">
-              <div className="flex items-center gap-2 text-xs text-zinc-400 truncate">
-                <FolderIcon className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span className="truncate">{inspectingTask.folder}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => {
-                    setSelectedItem(inspectingTask);
-                    setIsFullscreenEditorOpen(true);
-                    setInspectingTask(null);
-                  }}
-                  className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-                  title="Открыть в фокус-редакторе"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => setInspectingTask(null)}
-                  className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
-              {/* Title & Complete Checkbox */}
-              <div className="flex items-start gap-3">
-                <button
-                  onClick={() => {
-                    toggleTaskComplete(inspectingTask.id);
-                    setInspectingTask({
-                      ...inspectingTask,
-                      status: inspectingTask.status === 'done' ? 'todo' : 'done',
-                    });
-                  }}
-                  className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
-                    inspectingTask.status === 'done'
-                      ? 'border border-blue-500 bg-blue-500 text-white'
-                      : 'border border-zinc-500 hover:border-blue-400 text-transparent hover:text-blue-400'
-                  }`}
-                >
-                  <Check className="w-2.5 h-2.5 stroke-[3]" />
-                </button>
-                <h2
-                  className={`text-sm font-semibold leading-snug ${
-                    inspectingTask.status === 'done'
-                      ? 'line-through text-zinc-500'
-                      : 'text-zinc-100'
-                  }`}
-                >
-                  {inspectingTask.title}
-                </h2>
-              </div>
-
-              {/* Content / Notes */}
-              {inspectingTask.content && (
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">
-                  {inspectingTask.content}
-                </div>
-              )}
-
-              {/* Due date and fast reschedule */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
-                  Срок выполнения
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.06] text-xs font-mono text-zinc-200">
-                    {inspectingTask.dueDate || 'Без срока'}
-                  </span>
-                  <button
-                    onClick={() => {
-                      handleQuickSchedule(inspectingTask, getTodayString());
-                      setInspectingTask({ ...inspectingTask, dueDate: getTodayString() });
-                    }}
-                    className="px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.08] text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    Сегодня
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleQuickSchedule(inspectingTask, getTomorrowString());
-                      setInspectingTask({ ...inspectingTask, dueDate: getTomorrowString() });
-                    }}
-                    className="px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.08] text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    Завтра
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleQuickSchedule(inspectingTask, getNextWeekString());
-                      setInspectingTask({ ...inspectingTask, dueDate: getNextWeekString() });
-                    }}
-                    className="px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.08] text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    +1 Неделя
-                  </button>
-                </div>
-              </div>
-
-              {/* Subtasks checklist */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
-                    Подзадачи (
-                    {(inspectingTask.subtasks || []).filter(s => s.completed).length}/
-                    {(inspectingTask.subtasks || []).length}
-                    )
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  {(inspectingTask.subtasks || []).map(st => (
-                    <div
-                      key={st.id}
-                      onClick={() => handleToggleSubtask(inspectingTask, st.id)}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] text-xs text-zinc-300 transition-colors cursor-pointer"
-                    >
-                      <button
-                        className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
-                          st.completed
-                            ? 'bg-blue-500 border-blue-500 text-white'
-                            : 'border-zinc-600 hover:border-zinc-400'
-                        }`}
-                      >
-                        {st.completed && <Check className="w-2 h-2 stroke-[3]" />}
-                      </button>
-                      <span className={`truncate flex-1 ${st.completed ? 'line-through text-zinc-500' : ''}`}>
-                        {st.title}
-                      </span>
-                    </div>
-                  ))}
-
-                  {/* Add Subtask Input */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      type="text"
-                      placeholder="Добавить подзадачу..."
-                      value={newSubtaskTitle}
-                      onChange={e => setNewSubtaskTitle(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddSubtask(inspectingTask);
-                        }
-                      }}
-                      className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-lg px-2.5 py-1 text-xs text-zinc-200 placeholder-zinc-500 outline-none focus:border-white/20"
-                    />
-                    <button
-                      onClick={() => handleAddSubtask(inspectingTask)}
-                      className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs text-zinc-300 transition-colors cursor-pointer"
-                    >
-                      Добавить
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Priority and Tags */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-mono text-zinc-500">Приоритет:</span>
-                  <Select
-                    size="sm"
-                    value={inspectingTask.priority || 'none'}
-                    onChange={val => {
-                      const newPrio = val as any;
-                      const updated = { ...inspectingTask, priority: newPrio };
-                      updateItem(updated);
-                      setInspectingTask(updated);
-                    }}
-                    options={[
-                      { value: 'high', label: 'Высокий (P1)' },
-                      { value: 'medium', label: 'Средний (P2)' },
-                      { value: 'low', label: 'Низкий (P3)' },
-                      { value: 'none', label: 'Обычный (P4)' },
-                    ]}
-                  />
-                </div>
-
-                {inspectingTask.tags && inspectingTask.tags.length > 0 && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {inspectingTask.tags.map(t => (
-                      <span
-                        key={t}
-                        className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-zinc-400"
-                      >
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </div>

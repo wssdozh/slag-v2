@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
 import { AudioPlayer } from '../UI/AudioPlayer';
@@ -59,7 +59,25 @@ const formatDueDateLabel = (dateIso: string, rawMatchedText?: string): string =>
   }
 };
 
-export const Composer: React.FC = () => {
+export interface ComposerProps {
+  isModal?: boolean;
+  initialType?: SlagItemType;
+  initialStatus?: SlagItemStatus;
+  initialFolder?: string;
+  initialDueDate?: string;
+  onComplete?: () => void;
+  onCancel?: () => void;
+}
+
+export const Composer: React.FC<ComposerProps> = ({
+  isModal = false,
+  initialType,
+  initialStatus,
+  initialFolder,
+  initialDueDate,
+  onComplete,
+  onCancel,
+}) => {
   const {
     saveItem,
     updateItem,
@@ -76,11 +94,14 @@ export const Composer: React.FC = () => {
   } = useApp();
 
   const [content, setContent] = useState('');
-  const [itemType, setItemType] = useState<SlagItemType>('note');
+  const [itemType, setItemType] = useState<SlagItemType>(initialType || 'note');
+  const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
   const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>('none');
-  const [dueDate, setDueDate] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>(initialDueDate || '');
   const [tags, setTags] = useState<string[]>([]);
-  const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(null);
+  const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(
+    initialFolder ? { folder: initialFolder, forCurrent: currentFolder } : null
+  );
   const targetFolder = targetFolderOverride?.forCurrent === currentFolder ? targetFolderOverride.folder : null;
   const setTargetFolder = (folder: string | null) => {
     setTargetFolderOverride(folder ? { folder, forCurrent: currentFolder } : null);
@@ -170,12 +191,12 @@ export const Composer: React.FC = () => {
     }
   };
 
-  // Focus textarea when replying
+  // Focus textarea when replying or when mounted in modal
   useEffect(() => {
-    if (replyTarget && textareaRef.current) {
+    if ((replyTarget || isModal) && textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [replyTarget]);
+  }, [replyTarget, isModal]);
 
   // All unique tags in vault
   const allVaultTags = React.useMemo(() => {
@@ -751,6 +772,7 @@ export const Composer: React.FC = () => {
       tags: finalTags,
       attachments: attachmentsToSend,
       replyToId: replyTarget?.id,
+      status: itemType === 'task' ? taskStatus : undefined,
       priority: taskPriority,
       dueDate: taskDueDate,
       reminder: taskReminder,
@@ -772,6 +794,9 @@ export const Composer: React.FC = () => {
     }
 
     resetDraftState();
+    if (onComplete) {
+      onComplete();
+    }
   };
 
   const handleSend = () => {
@@ -952,6 +977,12 @@ export const Composer: React.FC = () => {
         setIsTagNavigated(false);
         return;
       }
+    }
+
+    if (isModal && e.key === 'Escape' && !wikiQuery && !slashQuery && !tagQuery) {
+      e.preventDefault();
+      onCancel?.();
+      return;
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1527,7 +1558,11 @@ export const Composer: React.FC = () => {
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={
-        isMobile
+        isModal
+          ? itemType === 'task'
+            ? 'Название задачи... (Enter)'
+            : 'Содержимое записи... (Enter)'
+          : isMobile
           ? itemType === 'task'
             ? 'Задача... ([[ для ссылки)'
             : itemType === 'article'

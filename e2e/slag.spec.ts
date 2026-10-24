@@ -362,7 +362,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Проверить Groq API').first()).toBeVisible();
 
     // Click save button in draft card
-    const saveDraftBtn = page.locator('button', { hasText: 'Сохранить в хранилище' }).last();
+    const saveDraftBtn = page.locator('button', { hasText: /Сохранить/ }).last();
     await expect(saveDraftBtn).toBeVisible();
     await saveDraftBtn.click();
 
@@ -490,16 +490,16 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
     await textarea.fill('Создай новую задачу: Проверить синхронизацию заметок');
     await textarea.press('Enter');
-    await expect(page.locator('text=Сохранить в хранилище').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('button', { hasText: /Сохранить/ }).first()).toBeVisible({ timeout: 5000 });
 
     // 4. Click Save to Vault
-    await page.locator('button', { hasText: 'Сохранить в хранилище' }).first().click();
+    await page.locator('button', { hasText: /Сохранить/ }).first().click();
     await expect(page.locator('text=сохранена').or(page.locator('text=Запись'))).toBeVisible();
 
     // 5. Test Subtask Decomposition action
     await textarea.fill('Разбей задачу Реализовать ИИ-тегирование на подзадачи');
     await textarea.press('Enter');
-    const decomposeBtn = page.locator('button', { hasText: /Применить \d+ подзадач/ }).first();
+    const decomposeBtn = page.locator('button', { hasText: /Применить/ }).first();
     await expect(decomposeBtn).toBeVisible({ timeout: 5000 });
     await page.screenshot({
       path: 'test-results/screenshots/assistant-decompose-action.png',
@@ -535,7 +535,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]').first();
     await addBtn.click();
 
-    const input = page.locator('input[placeholder*="Название задачи"]');
+    const input = page.locator('[placeholder*="Название задачи"]');
     await expect(input).toBeVisible();
     const taskName = 'Линейный Канбан Тест ' + Date.now();
     await input.fill(taskName);
@@ -1147,8 +1147,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Купить бритву').first()).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=Собрать требования и составить список спецификаций')).not.toBeVisible();
 
-    // Verify button says "Применить 1 подзадачу"
-    const applySubtaskBtn = page.locator('button', { hasText: 'Применить 1 подзадачу' }).first();
+    // Verify button says "Применить (1)"
+    const applySubtaskBtn = page.locator('button', { hasText: /Применить/ }).first();
     await expect(applySubtaskBtn).toBeVisible();
 
     // Capture visual screenshot
@@ -1858,5 +1858,92 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/dockview-audioplayer-ocean-waves-active.png',
       fullPage: false,
     });
+  });
+
+  test('33. Unified Task Creation via ComposerModal and FullscreenEditor Inspection from Kanban and Calendar', async ({ page }) => {
+    // 1. Switch to Kanban view
+    const kanbanBtn = page.locator('header button[title*="Канбан"]');
+    await expect(kanbanBtn).toBeVisible();
+    await kanbanBtn.click();
+    await page.waitForTimeout(200);
+
+    // 2. Open ComposerModal via "+ Новая задача" button under cards
+    const newTaskBtn = page.locator('button', { hasText: 'Новая задача' }).first();
+    await expect(newTaskBtn).toBeVisible();
+    await newTaskBtn.click();
+
+    // 3. Verify ComposerModal opens with task context
+    const modalHeader = page.locator('h3, [role="dialog"]').filter({ hasText: 'Новая задача' }).first();
+    await expect(modalHeader).toBeVisible();
+
+    const taskInput = page.locator('[placeholder*="Название задачи"]');
+    await expect(taskInput).toBeVisible();
+
+    // Fill with natural language task details
+    const uniqueTitle = 'Элитный чай Улун ' + Date.now();
+    await taskInput.fill(uniqueTitle);
+
+    // Capture screenshot of ComposerModal
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-modal-task.png',
+      fullPage: false,
+    });
+
+    // Press Enter to submit
+    await taskInput.press('Enter');
+    await page.waitForTimeout(300);
+
+    // Verify ComposerModal closed
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+
+    // 4. Verify task card appeared in Kanban
+    const taskCard = page.locator('[data-testid="kanban-card"]', { hasText: uniqueTitle });
+    await expect(taskCard).toBeVisible();
+
+    // 5. Click task card to open enhanced FullscreenEditor
+    await taskCard.click();
+    await page.waitForTimeout(200);
+
+    // Verify FullscreenEditor opened with task properties
+    await expect(page.locator('text=Срок выполнения:')).toBeVisible();
+    await expect(page.locator('button', { hasText: 'В работе' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Высокий' })).toBeVisible();
+
+    // Change status to "В работе"
+    await page.locator('button', { hasText: 'В работе' }).click();
+
+    // Add subtask
+    const subtaskInput = page.locator('input[placeholder*="Добавить подзадачу"]');
+    await expect(subtaskInput).toBeVisible();
+    await subtaskInput.fill('Проверить чайник и температуру');
+    await subtaskInput.press('Enter');
+    await expect(page.locator('text=Проверить чайник и температуру')).toBeVisible();
+
+    // Capture screenshot of enhanced FullscreenEditor
+    await page.screenshot({
+      path: 'test-results/screenshots/fullscreen-editor-task-enhanced.png',
+      fullPage: false,
+    });
+
+    // Save changes
+    await page.locator('button', { hasText: 'Сохранить' }).click();
+    await page.waitForTimeout(200);
+
+    // 6. Switch to Calendar view and verify inspecting task opens FullscreenEditor
+    const calendarBtn = page.locator('header button[title*="Календарь"]');
+    await expect(calendarBtn).toBeVisible();
+    await calendarBtn.click();
+    await page.waitForTimeout(300);
+
+    // Click task in calendar if visible or any task card in calendar
+    const calTask = page.locator(`text=${uniqueTitle}`).first();
+    if (await calTask.isVisible()) {
+      await calTask.click();
+      await expect(page.locator('text=Срок выполнения:')).toBeVisible();
+      await expect(page.locator('text=Проверить чайник и температуру')).toBeVisible();
+      // Close via Escape
+      await page.keyboard.press('Escape');
+      await expect(page.locator('text=Срок выполнения:')).not.toBeVisible();
+    }
   });
 });

@@ -1,5 +1,6 @@
 export type SlagItemType = 'note' | 'article' | 'task';
 export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'done';
+export type SlagItemStatus = TaskStatus;
 
 export interface SlagAttachment {
   id: string;

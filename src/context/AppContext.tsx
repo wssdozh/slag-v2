@@ -6,6 +6,7 @@ import type {
   VaultMeta,
   AiSettings,
   SlagItemType,
+  SlagItemStatus,
   InboxMode,
   LightboxImage,
   FeedViewMode,
@@ -119,6 +120,10 @@ interface AppContextType {
   openEditFolderModal: (folder: FolderMeta) => void;
   closeFolderModal: () => void;
   setIsTriageModalOpen: (open: boolean) => void;
+  isComposerModalOpen: boolean;
+  composerModalOptions: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string } | null;
+  openComposerModal: (options?: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string }) => void;
+  closeComposerModal: () => void;
   
   // Storage operations
   saveItem: (item: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }) => SlagItem;
@@ -252,6 +257,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [editingFolder, setEditingFolder] = useState<FolderMeta | null>(null);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState<boolean>(false);
+  const [isComposerModalOpen, setIsComposerModalOpen] = useState<boolean>(false);
+  const [composerModalOptions, setComposerModalOptions] = useState<{
+    type?: SlagItemType;
+    status?: SlagItemStatus;
+    folder?: string;
+    dueDate?: string;
+  } | null>(null);
+
+  const openComposerModal = useCallback((options?: {
+    type?: SlagItemType;
+    status?: SlagItemStatus;
+    folder?: string;
+    dueDate?: string;
+  }) => {
+    setComposerModalOptions(options || null);
+    setIsComposerModalOpen(true);
+  }, []);
+
+  const closeComposerModal = useCallback(() => {
+    setIsComposerModalOpen(false);
+    setComposerModalOptions(null);
+  }, []);
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
   const [replyTarget, setReplyTarget] = useState<SlagItem | null>(null);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
@@ -531,6 +558,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsTriageModalOpen(false);
       return true;
     }
+    if (isComposerModalOpen) {
+      setIsComposerModalOpen(false);
+      setComposerModalOptions(null);
+      return true;
+    }
     if (isSettingsOpen) {
       setIsSettingsOpen(false);
       return true;
@@ -574,6 +606,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isLogViewerOpen,
     isFolderModalOpen,
     isTriageModalOpen,
+    isComposerModalOpen,
     isSettingsOpen,
     isSearchOpen,
     replyTarget,
@@ -599,6 +632,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
+      if (
+        (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
+        const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+        const isEditable = document.activeElement?.getAttribute('contenteditable') === 'true';
+        if (
+          activeTag !== 'input' &&
+          activeTag !== 'textarea' &&
+          !isEditable &&
+          !isFullscreenEditorOpen &&
+          !isComposerModalOpen &&
+          !isSearchOpen &&
+          !isSettingsOpen
+        ) {
+          e.preventDefault();
+          openComposerModal({ type: 'task' });
+          return;
+        }
+      }
+
       if (e.key === 'Escape') {
         if (dismissTopLayer()) {
           e.preventDefault();
@@ -608,7 +664,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dismissTopLayer]);
+  }, [dismissTopLayer, openComposerModal, isFullscreenEditorOpen, isComposerModalOpen, isSearchOpen, isSettingsOpen]);
 
   // Android Back Gesture & PopState Handler
   useEffect(() => {
@@ -1242,6 +1298,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openEditFolderModal,
         closeFolderModal,
         setIsTriageModalOpen,
+        isComposerModalOpen,
+        composerModalOptions,
+        openComposerModal,
+        closeComposerModal,
         saveItem,
         updateItem,
         deleteItem,
