@@ -156,7 +156,47 @@ async function transcribeAudioGemini(
 }
 
 /**
- * Analyzes an image with Groq Vision (llama-3.2-11b-vision-preview).
+ * Downscales an image data URL to a maximum dimension to stay within token/payload budgets.
+ */
+export async function downscaleImageDataUrl(dataUrl: string, maxDim: number = 1024): Promise<string> {
+  if (typeof window === 'undefined' || !dataUrl.startsWith('data:image')) return dataUrl;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim && dataUrl.length < 400000) {
+        resolve(dataUrl);
+        return;
+      }
+      if (width > height) {
+        if (width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Analyzes an image with Groq Vision with automatic model failover.
  */
 async function analyzeImageGroq(
   attachment: SlagAttachment,
@@ -167,58 +207,76 @@ async function analyzeImageGroq(
     throw new Error('Image dataUrl is missing');
   }
 
-  const systemInstruction = `Ты — модуль мультимодального анализа заметок.
-Твоя задача:
-1. Извлечь весь читаемый текст на изображении (OCR), если он есть (чеки, код, скриншоты, надписи, кнопки).
-2. Сформулировать краткую выжимку (summary) в 1-2 предложения с учетом контекста заметки: "${focalContext}".
+  const optimizedDataUrl = await downscaleImageDataUrl(attachment.dataUrl);
+
+  const systemInstruction = `Ты — модуль анализа изображений и OCR.
+Задачи:
+1. Извлечь весь читаемый текст на изображении (OCR), если он есть (чеки, код, скриншоты, надписи, ценники).
+2. Сформулировать краткую выжимку в 1-2 предложения с учетом контекста заметки: "${focalContext}".
 Если текста на картинке нет, extractedText оставь пустым.
 Ответ верни СТРОГО в формате JSON без разметки:
-{"extractedText": "весь найденный текст или пусто", "summary": "краткое описание сути изображения"}`;
+{"extractedText": "весь найденный текст или пусто", "summary": "краткое описание"}`;
 
-  const res = await fetch(getGroqApiUrl('/chat/completions'), {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama-3.2-11b-vision-preview',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: systemInstruction },
+  const candidateModels = [
+    'qwen/qwen3.8-27b',
+    'qwen-3.8-27b',
+  ];
+
+  let lastError = '';
+  for (const model of candidateModels) {
+    try {
+      const res = await fetch(getGroqApiUrl('/chat/completions'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
             {
-              type: 'image_url',
-              image_url: { url: attachment.dataUrl },
+              role: 'user',
+              content: [
+                { type: 'text', text: systemInstruction },
+                {
+                  type: 'image_url',
+                  image_url: { url: optimizedDataUrl },
+                },
+              ],
             },
           ],
-        },
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-    }),
-  });
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        }),
+      });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Groq Vision failed (${res.status}): ${errText.slice(0, 150)}`);
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        lastError = `Model ${model} (${res.status}): ${errText.slice(0, 120)}`;
+        enrichLog.warn(`Groq Vision ${model} failed, trying next candidate:`, lastError);
+        continue;
+      }
+
+      const data = await res.json();
+      const rawContent = data.choices?.[0]?.message?.content || '{}';
+      try {
+        const parsed = JSON.parse(rawContent);
+        return {
+          extractedText: (parsed.extractedText || '').trim(),
+          summary: (parsed.summary || '').trim(),
+        };
+      } catch {
+        return {
+          extractedText: '',
+          summary: rawContent.slice(0, 150).trim(),
+        };
+      }
+    } catch (err: any) {
+      lastError = err?.message || String(err);
+    }
   }
 
-  const data = await res.json();
-  const rawContent = data.choices?.[0]?.message?.content || '{}';
-  try {
-    const parsed = JSON.parse(rawContent);
-    return {
-      extractedText: (parsed.extractedText || '').trim(),
-      summary: (parsed.summary || '').trim(),
-    };
-  } catch {
-    return {
-      extractedText: '',
-      summary: rawContent.slice(0, 150).trim(),
-    };
-  }
+  throw new Error(`Groq Vision failed: ${lastError}`);
 }
 
 /**
@@ -319,14 +377,14 @@ ${sample.slice(0, 2500)}
 Ответ верни СТРОГО в JSON:
 {"summary": "суть файла", "extractedText": "ключевые строки/ошибки/тезисы"}`;
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetch(getGroqApiUrl('/chat/completions'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
       response_format: { type: 'json_object' },

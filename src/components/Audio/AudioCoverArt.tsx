@@ -19,11 +19,11 @@ void main() {
 `;
 
 /**
- * Avatar Bioluminescent Fluid Orb (Domain-Warped Volumetric Liquid Shader)
- * - Continuous living core (NO black holes, NO fan petals, NO hard geometric cutoffs)
- * - Shimmering gelatinous caustics & organic fluid turbulence (Perlin/Simplex FBM)
- * - Two-color palette: Pure White core luminescence into Soft Azure Blue (#38bdf8)
- * - Soft ethereal bloom fading naturally into the player's dark background
+ * ChatGPT Voice Orb GLSL Shader
+ * - Fractal ink noise that drifts across a soft circular mask
+ * - Pure White luminous core blooming into Soft Azure Blue (#38bdf8 / #7dd3fc)
+ * - Continuous, living, organic volume (no center void, no fan petals, no harsh spokes)
+ * - Swells and swirls with voice/audio energy; gently breathes during silence
  */
 const fragmentShaderSource = `
 precision highp float;
@@ -33,23 +33,15 @@ uniform float uTime;
 uniform float uAudioVolume;
 varying vec2 vUv;
 
-// 2D Rotation
-mat2 rot(float a) {
-    float c = cos(a);
-    float s = sin(a);
-    return mat2(c, -s, s, c);
-}
-
-// Hash function
+// 2D Simplex / Gradient Noise
 vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
     return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
 }
 
-// Simplex / Gradient Noise
 float snoise(vec2 p) {
-    const float K1 = 0.366025404; // (sqrt(3)-1)/2;
-    const float K2 = 0.211324865; // (3-sqrt(3))/6;
+    const float K1 = 0.366025404; // (sqrt(3)-1)/2
+    const float K2 = 0.211324865; // (3-sqrt(3))/6
 
     vec2 i = floor(p + (p.x + p.y) * K1);
     vec2 a = p - i + (i.x + i.y) * K2;
@@ -63,7 +55,7 @@ float snoise(vec2 p) {
     return dot(n, vec3(70.0));
 }
 
-// Fractal Brownian Motion (Smooth volumetric liquid layers)
+// Fractal Brownian Motion (Simulating drifting smoke / ink in liquid)
 float fbm(vec2 p) {
     float f = 0.0;
     mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
@@ -75,78 +67,72 @@ float fbm(vec2 p) {
 }
 
 void main() {
-    // Aspect-ratio corrected coordinates centered at (0, 0)
+    // Coordinate space centered at (0, 0)
     vec2 p = vUv;
     float dist = length(p);
 
-    // Audio-reactive fluid dynamics
+    // Audio-reactive parameters
     float vol = uAudioVolume;
-    float t = uTime * 0.7;
+    float t = uTime * (0.8 + vol * 0.9);
 
-    // Organic domain warping (simulating zero-gravity liquid flow / jellyfish bell)
+    // Domain warping: simulates fluid ink curling and drifting inside the sphere
     vec2 q = vec2(
         fbm(p + vec2(0.0, t * 0.2)),
-        fbm(p + vec2(5.2, 1.3) + vec2(t * 0.15, 0.0))
+        fbm(p + vec2(4.3, 1.2) + vec2(t * 0.18, 0.0))
     );
 
     vec2 r = vec2(
-        fbm(p + 3.0 * q + vec2(1.7, 9.2) + vec2(0.0, t * 0.25)),
-        fbm(p + 3.0 * q + vec2(8.3, 2.8) - vec2(t * 0.2, 0.0))
+        fbm(p + 2.8 * q + vec2(1.7, 9.2) + vec2(0.0, t * 0.25)),
+        fbm(p + 2.8 * q + vec2(8.3, 2.8) - vec2(t * 0.22, 0.0))
     );
 
-    // Living turbulent field
-    float fluid = fbm(p + 2.4 * r + t * 0.3);
+    // Dynamic swirling fluid field
+    float fluid = fbm(p + 2.2 * r + t * 0.35);
 
-    // Soft organic jellyfish boundary with breathing pulsation
-    float breath = sin(uTime * 1.5) * 0.04 + vol * 0.12;
-    float baseRadius = 0.52 + breath;
-    float distortedRadius = baseRadius + fluid * (0.16 + vol * 0.14);
+    // Sphere radius with gentle organic breathing and voice swelling
+    float breath = sin(uTime * 1.6) * 0.02 + vol * 0.08;
+    float orbRadius = 0.68 + breath;
 
-    // Multi-layer gelatinous density
-    float innerCore = smoothstep(distortedRadius * 0.45, 0.0, dist);
-    float midBody   = smoothstep(distortedRadius, distortedRadius * 0.2, dist);
-    float outerAura = smoothstep(distortedRadius + 0.35 + vol * 0.25, distortedRadius * 0.3, dist);
+    // Edge softness for the circular mask (ChatGPT orb style)
+    float mask = smoothstep(orbRadius, orbRadius - 0.08, dist);
+    if (mask <= 0.001) {
+        discard;
+    }
 
-    // Caustics & bioluminescent veins inside the medusa
-    float caustics = pow(max(0.0, fluid + 0.25), 2.8) * midBody;
+    // Color definitions: Pure White into Soft Azure Blue (#38bdf8 / #7dd3fc)
+    vec3 colAzureDark  = vec3(0.06, 0.38, 0.72); // Deep velvety azure edge
+    vec3 colAzureMid   = vec3(0.22, 0.74, 0.97); // Soft radiant cyan/azure (#38bdf8)
+    vec3 colAzureLight = vec3(0.73, 0.90, 0.99); // Ice azure glow (#bae6fd)
+    vec3 colWhite      = vec3(1.0, 1.0, 1.0);    // Pure white blooming ink
 
-    // Palette: Pure White core -> Soft Luminous Azure Blue -> Deep Marine Void
-    vec3 colDeep    = vec3(0.03, 0.04, 0.06);     // Dark backdrop
-    vec3 colAzure   = vec3(0.05, 0.55, 0.95);     // Rich soft azure (#0ea5e9)
-    vec3 colCyan    = vec3(0.22, 0.74, 0.97);     // Radiant cyan (#38bdf8)
-    vec3 colLight   = vec3(0.73, 0.90, 0.99);     // Pale azure shimmer (#bae6fd)
-    vec3 colWhite   = vec3(1.0, 1.0, 1.0);        // Pure bioluminescent white
+    // Mix color based on distance and fluid swirl
+    float inkDensity = (fluid * 0.5 + 0.5); // 0 to 1
+    float radialFalloff = clamp(1.0 - (dist / orbRadius), 0.0, 1.0);
 
-    // Color synthesis across layers
-    vec3 finalColor = vec3(0.0);
+    // Ink distribution: white bursts in the active zones, azure in the body
+    float whiteMix = pow(inkDensity, 1.8) * pow(radialFalloff, 0.75) * (0.85 + vol * 0.4);
+    whiteMix = clamp(whiteMix, 0.0, 1.0);
 
-    // Ambient floating halo
-    finalColor += colAzure * outerAura * (0.45 + vol * 0.4);
+    // Ambient body gradient
+    vec3 bodyColor = mix(colAzureDark, colAzureMid, pow(radialFalloff, 0.8));
+    bodyColor = mix(bodyColor, colAzureLight, inkDensity * 0.6);
 
-    // Translucent gelatinous membrane
-    finalColor = mix(finalColor, colCyan, midBody * 0.85);
+    // Final color with blooming white ink
+    vec3 finalColor = mix(bodyColor, colWhite, whiteMix);
 
-    // Internal fluid veins & caustics
-    finalColor += colLight * caustics * (1.2 + vol * 0.8);
+    // Extra center luminescence so the heart is always softly glowing and living
+    float centerGlow = smoothstep(0.4, 0.0, dist) * (0.4 + vol * 0.3);
+    finalColor = mix(finalColor, colWhite, centerGlow);
 
-    // Radiant solid living nucleus (NO hole in the center!)
-    finalColor = mix(finalColor, colWhite, innerCore * (0.95 + vol * 0.05));
-
-    // Specular photon highlight at the very heart
-    float heartDot = smoothstep(0.12 + vol * 0.06, 0.0, dist);
-    finalColor = mix(finalColor, colWhite, heartDot);
-
-    // Soft feathered outer alpha for seamless floating without square bounds
-    float alpha = clamp(outerAura * 0.7 + midBody * 0.6 + innerCore * 0.5, 0.0, 1.0);
-
-    gl_FragColor = vec4(finalColor * alpha, alpha);
+    // Soft antialiased circular edge
+    gl_FragColor = vec4(finalColor * mask, mask);
 }
 `;
 
 /**
- * Avatar Fluid Orb Canvas Component
+ * ChatGPT Voice Orb Canvas Component
  */
-const AvatarFluidOrbCanvas: React.FC<{
+const ChatGPTOrbCanvas: React.FC<{
   isPlaying: boolean;
   audioRef?: React.RefObject<HTMLAudioElement | null>;
 }> = ({ isPlaying, audioRef }) => {
@@ -225,7 +211,7 @@ const AvatarFluidOrbCanvas: React.FC<{
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
     gl.useProgram(program);
 
-    // Quad geometry
+    // Quad geometry covering [-1, 1]
     const quadVertices = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
     const posBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
@@ -253,7 +239,7 @@ const AvatarFluidOrbCanvas: React.FC<{
         gl.viewport(0, 0, displayW, displayH);
       }
 
-      // Read audio energy
+      // Read audio energy from Web Audio API
       let currentEnergy = 0;
       if (isPlaying && analyserRef.current && dataArrayRef.current) {
         try {
@@ -268,13 +254,14 @@ const AvatarFluidOrbCanvas: React.FC<{
         }
       }
 
+      // Smooth volume interpolation
       const targetEnergy = isPlaying
         ? (currentEnergy > 0.05 ? currentEnergy : 0.45 + Math.sin(time * 2.2) * 0.22)
-        : 0.08;
+        : 0.06;
       curVol += (targetEnergy - curVol) * 0.1;
 
       // Time progression
-      const speed = isPlaying ? 0.02 + curVol * 0.025 : 0.009;
+      const speed = isPlaying ? 0.02 + curVol * 0.03 : 0.008;
       time += speed;
 
       gl.clearColor(0, 0, 0, 0);
@@ -301,7 +288,7 @@ const AvatarFluidOrbCanvas: React.FC<{
   return (
     <canvas
       ref={canvasRef}
-      data-testid="avatar-fluid-orb-canvas"
+      data-testid="chatgpt-orb-canvas"
       className="w-full h-full block"
     />
   );
@@ -333,13 +320,13 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({
     );
   }
 
-  // Avatar Bioluminescent Fluid Orb (Pure White into Soft Azure Blue)
-  // Continuous living core, organic gelatinous caustics, floating on dark player canvas
+  // ChatGPT Voice Orb (Pure White into Soft Azure Blue)
+  // Continuous living fluid ink, soft circular mask, floating on dark player canvas
   return (
     <div
       className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center select-none ${className}`}
     >
-      <AvatarFluidOrbCanvas isPlaying={isPlaying} audioRef={audioRef} />
+      <ChatGPTOrbCanvas isPlaying={isPlaying} audioRef={audioRef} />
     </div>
   );
 };
