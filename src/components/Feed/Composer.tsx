@@ -1169,10 +1169,12 @@ export const Composer: React.FC<ComposerProps> = ({
           query={slashQuery}
           selectedIndex={slashSelectedIndex}
           onSelect={executeSlashCommand}
+          placement="top"
+          isModal={isModal}
         />
       )}
       {wikiQuery !== null && matchingWikiItems.length > 0 && (
-        <div className="absolute left-0 bottom-full mb-1 w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
+        <div className={`absolute left-0 ${isModal ? 'bottom-full mb-[96px]' : 'bottom-full mb-1'} w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto`}>
           <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
             Связать заметку [[...]]
           </div>
@@ -1197,7 +1199,7 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       )}
       {tagQuery !== null && matchingAutocompleteTags.length > 0 && (
-        <div className="absolute left-0 bottom-full mb-1 w-56 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-30 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
+        <div className={`absolute left-0 ${isModal ? 'bottom-full mb-[96px]' : 'bottom-full mb-1'} w-56 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto`}>
           <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider flex items-center justify-between">
             <span>Теги</span>
             <span className="text-zinc-600">#{tagQuery}</span>

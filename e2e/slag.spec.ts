@@ -1879,6 +1879,16 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const taskInput = page.locator('[placeholder*="Название задачи"]');
     await expect(taskInput).toBeVisible();
 
+    // Test Slash Command menu in ComposerModal
+    await taskInput.fill('/');
+    await page.waitForTimeout(150);
+    const slashMenu = page.locator('text=Команды композера');
+    await expect(slashMenu).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-modal-slash-menu.png',
+      fullPage: false,
+    });
+
     // Fill with natural language task details
     const uniqueTitle = 'Элитный чай Улун ' + Date.now();
     await taskInput.fill(uniqueTitle);

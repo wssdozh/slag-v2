@@ -6,12 +6,16 @@ interface SlashCommandMenuProps {
   query: string;
   selectedIndex: number;
   onSelect: (command: SlashCommand) => void;
+  placement?: 'top' | 'bottom';
+  isModal?: boolean;
 }
 
 export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
   query,
   selectedIndex,
   onSelect,
+  placement = 'top',
+  isModal = false,
 }) => {
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -34,9 +38,17 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
     }
   }, [selectedIndex]);
 
+  const isBottom = placement === 'bottom';
+  const positionClasses = isBottom
+    ? 'top-full mt-2'
+    : isModal
+    ? 'bottom-full mb-[96px]'
+    : 'bottom-full mb-2';
+  const animationClasses = isBottom ? 'slide-in-from-top-2' : 'slide-in-from-bottom-2';
+
   if (filteredCommands.length === 0) {
     return (
-      <div className="absolute left-0 right-0 bottom-full mb-2 w-full rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-3 z-40 animate-in slide-in-from-bottom-2 fade-in duration-150 ease-out select-none">
+      <div className={`absolute left-0 right-0 ${positionClasses} w-full rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-3 z-50 animate-in ${animationClasses} fade-in duration-150 ease-out select-none`}>
         <div className="flex items-center gap-2 text-xs text-zinc-400">
           <Command className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
           <span>Команда «/{query}» не найдена</span>
@@ -48,7 +60,7 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
   return (
     <div
       ref={listRef}
-      className="absolute left-0 right-0 bottom-full mb-2 w-full max-h-72 overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-40 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 fade-in duration-150 ease-out select-none"
+      className={`absolute left-0 right-0 ${positionClasses} w-full ${isModal ? 'max-h-60' : 'max-h-72'} overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none`}
     >
       {/* Шапка формы команд */}
       <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider">

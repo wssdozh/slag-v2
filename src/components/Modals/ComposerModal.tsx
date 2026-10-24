@@ -25,7 +25,8 @@ export const ComposerModal: React.FC = () => {
       }
       maxWidth="max-w-2xl"
       className="bg-[#141417] border border-white/[0.08]"
-      contentClassName="px-4 pt-2 pb-3"
+      containerClassName="!overflow-visible"
+      contentClassName="px-4 pt-2 pb-3 !overflow-visible"
       closeOnBackdropClick={true}
       closeOnEsc={true}
     >
