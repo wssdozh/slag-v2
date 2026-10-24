@@ -173,6 +173,7 @@ export interface ChatMessage {
   reasoningTimeMs?: number;
   toolCalls?: ChatToolCall[];
   suggestedAction?: SuggestedAction;
+  suggestedActions?: SuggestedAction[];
 }
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';

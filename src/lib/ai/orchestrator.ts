@@ -28,6 +28,7 @@ export interface SendAssistantChatResult {
   reasoningTimeMs?: number;
   toolCalls?: ChatToolCall[];
   suggestedAction?: SuggestedAction;
+  suggestedActions?: SuggestedAction[];
   feedFilter?: { itemIds: string[]; queryLabel: string };
 }
 
@@ -261,7 +262,7 @@ export class AssistantOrchestrator {
     const folderMeta = folders.find((f) => f.path === currentFolder);
 
     const startTime = Date.now();
-    let capturedAction: SuggestedAction | undefined;
+    const capturedActions: SuggestedAction[] = [];
     let capturedFeedFilter: { itemIds: string[]; queryLabel: string } | undefined;
 
     const now = new Date();
@@ -382,7 +383,7 @@ export class AssistantOrchestrator {
 
       // Action tools for Read-Only Safety: prepare SuggestedAction cards for UI confirmation
       if (name === 'create_note') {
-        capturedAction = {
+        capturedActions.push({
           type: 'create_note',
           title: String(args.title || 'Новая запись').trim(),
           folder: args.folder || currentFolder,
@@ -390,7 +391,7 @@ export class AssistantOrchestrator {
           tags: Array.isArray(args.tags) ? args.tags : [],
           itemType: args.itemType || 'note',
           actionState: 'suggested',
-        };
+        });
         return {
           status: 'proposed',
           message: `Черновик ${args.itemType || 'записи'} «${args.title}» подготовлен к сохранению в хранилище. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
@@ -398,18 +399,22 @@ export class AssistantOrchestrator {
       }
 
       if (name === 'schedule_task') {
-        capturedAction = {
+        let reminder = args.reminder;
+        if (reminder && !reminder.includes('T') && args.dueDate) {
+          reminder = `${args.dueDate}T${reminder}:00`;
+        }
+        capturedActions.push({
           type: 'schedule_task',
           title: String(args.title || 'Новая задача').trim(),
           folder: args.folder || currentFolder,
           content: args.content || '',
           dueDate: args.dueDate,
-          reminder: args.reminder,
+          reminder,
           priority: args.priority || 'medium',
           tags: Array.isArray(args.tags) ? args.tags : [],
           itemType: 'task',
           actionState: 'suggested',
-        };
+        });
         return {
           status: 'proposed',
           message: `Задача «${args.title}» на дату ${args.dueDate} подготовлена к планированию. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
@@ -440,7 +445,11 @@ export class AssistantOrchestrator {
           if (parsed.priority) parsedPriority = parsed.priority;
         }
 
-        capturedAction = {
+        if (parsedReminder && !parsedReminder.includes('T') && parsedDueDate) {
+          parsedReminder = `${parsedDueDate}T${parsedReminder}:00`;
+        }
+
+        capturedActions.push({
           type: 'reschedule_task',
           targetItemId: found.id,
           title: found.title,
@@ -452,11 +461,11 @@ export class AssistantOrchestrator {
           reminder: parsedReminder,
           priority: parsedPriority || found.priority,
           actionState: 'suggested',
-        };
+        });
 
         return {
           status: 'proposed',
-          message: `Перенос задачи «${found.title}» на срок ${parsedDueDate || 'без срока'} подготовлен к подтверждению. В интерфейсе пользователю отображена интерактивная карточка. Завершите ответ подтверждением.`,
+          message: `Перенос задачи «${found.title}» на срок ${parsedDueDate || 'без срока'}${parsedReminder ? ` (${parsedReminder})` : ''} подготовлен к подтверждению. В интерфейсе пользователю отображена интерактивная карточка. Завершите ответ подтверждением.`,
         };
       }
 
@@ -492,6 +501,10 @@ export class AssistantOrchestrator {
             if (parsed.priority) priority = parsed.priority;
           }
 
+          if (reminder && !reminder.includes('T') && dueDate) {
+            reminder = `${dueDate}T${reminder}:00`;
+          }
+
           resolvedItems.push({
             targetItemId: target.id,
             title: target.title,
@@ -509,7 +522,7 @@ export class AssistantOrchestrator {
           };
         }
 
-        capturedAction = {
+        capturedActions.push({
           type: 'batch_reschedule',
           title: `Перенос задач (${resolvedItems.length})`,
           folder: currentFolder,
@@ -518,7 +531,7 @@ export class AssistantOrchestrator {
           itemType: 'task',
           batchItems: resolvedItems,
           actionState: 'suggested',
-        };
+        });
 
         return {
           status: 'proposed',
@@ -530,7 +543,7 @@ export class AssistantOrchestrator {
         const subtasks = Array.isArray(args.subtasks)
           ? args.subtasks.map((st: any, idx: number) => typeof st === 'string' ? { id: `st_${Date.now()}_${idx}`, title: st, completed: false } : st)
           : [];
-        capturedAction = {
+        capturedActions.push({
           type: 'decompose_task',
           title: String(args.title || 'Задача').trim(),
           folder: currentFolder,
@@ -539,7 +552,7 @@ export class AssistantOrchestrator {
           itemType: 'task',
           subtasks,
           actionState: 'suggested',
-        };
+        });
         return {
           status: 'proposed',
           message: `Декомпозиция задачи «${args.title}» на ${subtasks.length} подзадач подготовлена к применению. Завершите ответ кратким пояснением.`,
@@ -547,7 +560,7 @@ export class AssistantOrchestrator {
       }
 
       if (name === 'update_task_status') {
-        capturedAction = {
+        capturedActions.push({
           type: 'update_task_status',
           title: String(args.title || 'Задача').trim(),
           folder: currentFolder,
@@ -556,7 +569,7 @@ export class AssistantOrchestrator {
           itemType: 'task',
           status: args.status,
           actionState: 'suggested',
-        };
+        });
         return {
           status: 'proposed',
           message: `Смена статуса задачи «${args.title}» на «${args.status}» подготовлена к подтверждению.`,
@@ -577,7 +590,7 @@ export class AssistantOrchestrator {
           };
         }
 
-        capturedAction = {
+        capturedActions.push({
           type: 'append_to_note',
           targetItemId: found.id,
           title: found.title,
@@ -587,7 +600,7 @@ export class AssistantOrchestrator {
           tags: found.tags || [],
           itemType: found.type,
           actionState: 'suggested',
-        };
+        });
 
         return {
           status: 'proposed',
@@ -625,7 +638,7 @@ export class AssistantOrchestrator {
       }
 
       if (name === 'move_note') {
-        capturedAction = {
+        capturedActions.push({
           type: 'move_note',
           title: String(args.title || 'Запись').trim(),
           folder: args.folder || currentFolder,
@@ -633,7 +646,7 @@ export class AssistantOrchestrator {
           tags: [],
           itemType: 'note',
           actionState: 'suggested',
-        };
+        });
         return {
           status: 'proposed',
           message: `Перемещение «${args.title}» в папку «${args.folder}» подготовлено к подтверждению.`,
@@ -737,7 +750,7 @@ export class AssistantOrchestrator {
             targetItemId: { type: 'string', description: 'Идентификатор задачи' },
             dueDate: { type: 'string', description: 'Новая дата в формате YYYY-MM-DD' },
             dueDateText: { type: 'string', description: 'Естественное описание даты (например, "завтра в 10:00 p1")' },
-            reminder: { type: 'string', description: 'ISO 8601 время напоминания' },
+            reminder: { type: 'string', description: 'Время напоминания или слота дня (например, "10:00", "14:30" или ISO 8601)' },
             priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'] },
           },
           required: ['title'],
@@ -758,7 +771,7 @@ export class AssistantOrchestrator {
                   targetItemId: { type: 'string', description: 'Идентификатор задачи' },
                   dueDate: { type: 'string', description: 'Новая дата в формате YYYY-MM-DD' },
                   dueDateText: { type: 'string', description: 'Естественное описание даты (например "завтра", "в среду в 14:00")' },
-                  reminder: { type: 'string', description: 'ISO время' },
+                  reminder: { type: 'string', description: 'Время напоминания или слота дня (например, "10:00", "14:30" или ISO)' },
                   priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'] },
                   reason: { type: 'string', description: 'Обоснование распределения' },
                 },
@@ -932,14 +945,17 @@ ${isInbox
 ФИЛЬТРАЦИЯ ЛЕНТЫ:
 - Если пользователь пишет «а с фильтром», «покажи в ленте с фильтром», «отфильтруй по этим задачам» — вызови инструмент filter_feed!
 
-СОСТАВНЫЕ УСЛОВИЯ ПЕРЕНОСА:
-- Если запрос содержит разделение по датам («1. задачу на завтра, остальные две на послезавтра», «первую на завтра, остальные на пятницу»):
-  СТРОГО вызывай batch_reschedule_tasks, где каждому объекту в items назначается своя дата dueDate!
-
-ВНИМАНИЕ ПО ПЕРЕНОСУ ЗАДАЧ И КАЛЕНДАРЮ:
-- Если пользователь просит ПЕРЕНЕСТИ, сдвинуть, отложить или раскидать задачи («перенеси просроченные на завтра», «раскидай по дням», «отложи на понедельник») — КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО вызывать get_calendar_agenda!
-- Вместо этого вызови batch_reschedule_tasks (для нескольких задач) или reschedule_task (для одной).
-- При распределении задач на разные дни («раскидай на неделю»): распределяй задачи на последовательные свободные рабочие дни начиная с завтра (например, Задача 1 на завтра, Задача 2 на послезавтра). Задачи с высоким приоритетом (high) ставь раньше!
+ПЛАНИРОВАНИЕ И РАСПРЕДЕЛЕНИЕ ЗАДАЧ:
+- Ты обладаешь полной автономностью (ReAct-подход): ты можешь свободно вызывать get_calendar_agenda или search_notes для анализа текущего расписания, либо сразу опираться на блок «АКТУАЛЬНЫЙ СРЕЗ ЗАДАЧ».
+- Для планирования и переноса задач вызывай batch_reschedule_tasks (для группы задач) или reschedule_task (для одной).
+- РАСПРЕДЕЛЕНИЕ В ТЕЧЕНИЕ ДНЯ («разбросай в течении дня», «по часам»):
+  * Сохраняй целевую дату (например, дату завтрашнего дня в формате YYYY-MM-DD).
+  * Расставляй задачи по слотам рабочего дня в поле reminder: например "10:00", "12:00", "14:30", "16:30" (или ISO-время).
+  * Задачи с высоким приоритетом (high) ставь на первую половину дня!
+- РАСПРЕДЕЛЕНИЕ ПО ДНЯМ («раскидай по дням», «на неделю»):
+  * Распределяй задачи на последовательные свободные рабочие дни начиная с завтра (например, Задача 1 на завтра, Задача 2 на послезавтра). Задачи с высоким приоритетом (high) ставь раньше!
+- СОСТАВНЫЕ УСЛОВИЯ ПЕРЕНОСА («1. задачу на завтра, остальные две на послезавтра»):
+  * СТРОГО вызывай batch_reschedule_tasks, где каждому объекту в items назначается своя дата dueDate!
 
 4. РАБОТА С КОНТЕКСТОМ И ТРАНСФОРМАЦИЯ ЧЕРНОВИКОВ:
    - Если пользователь просит переделать, развить или преобразовать предыдущую запись («сделай из этого статью», «преврати в задачу», «добавь деталей», «добавь этой таске подробности»):
@@ -1134,13 +1150,60 @@ ${isInbox
         }
 
         const { cleanText, suggestedAction: blockAction } = extractActionBlock(finalContent);
-        const suggestedAction = capturedAction || blockAction;
+        if (blockAction) {
+          capturedActions.push(blockAction);
+        }
+
+        // Auto-coalesce multiple reschedule actions into a single batch_reschedule card
+        const rescheduleActions = capturedActions.filter((a) => a.type === 'reschedule_task' || a.type === 'batch_reschedule');
+        const otherActions = capturedActions.filter((a) => a.type !== 'reschedule_task' && a.type !== 'batch_reschedule');
+
+        const finalActions: SuggestedAction[] = [...otherActions];
+
+        if (rescheduleActions.length > 1) {
+          const combinedBatchItems: BatchRescheduleItem[] = [];
+          for (const act of rescheduleActions) {
+            if (act.type === 'reschedule_task') {
+              combinedBatchItems.push({
+                targetItemId: act.targetItemId || '',
+                title: act.title,
+                dueDate: act.dueDate,
+                reminder: act.reminder,
+                priority: act.priority,
+              });
+            } else if (act.type === 'batch_reschedule' && act.batchItems) {
+              combinedBatchItems.push(...act.batchItems);
+            }
+          }
+          const seenIds = new Set<string>();
+          const uniqueItems = combinedBatchItems.filter((item) => {
+            const key = item.targetItemId || item.title;
+            if (seenIds.has(key)) return false;
+            seenIds.add(key);
+            return true;
+          });
+
+          finalActions.push({
+            type: 'batch_reschedule',
+            title: `Перенос задач (${uniqueItems.length})`,
+            folder: currentFolder,
+            content: '',
+            tags: [],
+            itemType: 'task',
+            batchItems: uniqueItems,
+            actionState: 'suggested',
+          });
+        } else if (rescheduleActions.length === 1) {
+          finalActions.push(rescheduleActions[0]);
+        }
+
         return {
           content: cleanText,
           reasoning: accumulatedReasoning || undefined,
           reasoningTimeMs: Date.now() - startTime,
           toolCalls: executedToolCalls.length > 0 ? executedToolCalls : undefined,
-          suggestedAction,
+          suggestedAction: finalActions[0],
+          suggestedActions: finalActions.length > 0 ? finalActions : undefined,
           feedFilter: capturedFeedFilter,
         };
       } catch (err) {
@@ -1337,17 +1400,15 @@ ${isInbox
 
     // Check 2.5: Reschedule tasks (Single & Batch with Todoist parsing & multi-date distribution)
     const isRescheduleIntent =
-      lowerMsg.includes('перенес') ||
-      lowerMsg.includes('сдвинь') ||
-      lowerMsg.includes('раскида') ||
-      lowerMsg.includes('распредел') ||
-      lowerMsg.includes('отлож') ||
-      lowerMsg.includes('передвинь') ||
+      /перенес|сдвин|раскид|разброс|распредел|отлож|передвин/i.test(lowerMsg) ||
       (lowerMsg.includes('задач') && (lowerMsg.includes('на завтра') || lowerMsg.includes('на послезавтра')));
 
     if (isRescheduleIntent) {
       const today = new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
       const isOverdueTarget = lowerMsg.includes('просрочен') || lowerMsg.includes('долг');
+      const isTomorrowTarget = lowerMsg.includes('завтрашн') || (lowerMsg.includes('завтра') && (lowerMsg.includes('задач') || lowerMsg.includes('таск')));
+      const isTodayTarget = lowerMsg.includes('сегодняшн') || (lowerMsg.includes('сегодня') && (lowerMsg.includes('задач') || lowerMsg.includes('таск')));
       const allTasks = allItems.filter(i => i.type === 'task' && (isInbox || i.folder === currentFolder || i.folder.startsWith(currentFolder + '/')));
 
       let candidateTasks: SlagItem[] = [];
@@ -1355,6 +1416,16 @@ ${isInbox
         candidateTasks = allTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < today);
         if (candidateTasks.length === 0) {
           candidateTasks = allTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate <= today);
+        }
+      } else if (isTomorrowTarget) {
+        candidateTasks = allTasks.filter(t => t.status !== 'done' && t.dueDate === tomorrow);
+        if (candidateTasks.length === 0) {
+          candidateTasks = allTasks.filter(t => t.status !== 'done');
+        }
+      } else if (isTodayTarget) {
+        candidateTasks = allTasks.filter(t => t.status !== 'done' && t.dueDate === today);
+        if (candidateTasks.length === 0) {
+          candidateTasks = allTasks.filter(t => t.status !== 'done');
         }
       } else {
         candidateTasks = allTasks.filter(t => {
@@ -1402,10 +1473,18 @@ ${isInbox
 
         const isCompositeSplit = (hasNumberSplit || Boolean(namedTaskTarget)) && candidateTasks.length > 1;
 
+        const isIntraDay =
+          lowerMsg.includes('в течении дня') ||
+          lowerMsg.includes('в течение дня') ||
+          lowerMsg.includes('по часам') ||
+          lowerMsg.includes('в течении суток') ||
+          lowerMsg.includes('в течение суток') ||
+          (lowerMsg.includes('день') && /разброс|раскид|распредел/i.test(lowerMsg) && !lowerMsg.includes('по дням'));
+
         const isDistribute =
+          isIntraDay ||
           isCompositeSplit ||
-          lowerMsg.includes('раскида') ||
-          lowerMsg.includes('распредел') ||
+          /раскид|разброс|распредел/i.test(lowerMsg) ||
           lowerMsg.includes('на неделю') ||
           lowerMsg.includes('по дням');
 
@@ -1415,8 +1494,10 @@ ${isInbox
 
         if (lowerMsg.includes('послезавтра') && !isCompositeSplit) {
           baseDate = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
-        } else if (lowerMsg.includes('сегодня') && !isCompositeSplit) {
+        } else if (lowerMsg.includes('сегодня') && !lowerMsg.includes('завтра') && !isCompositeSplit) {
           baseDate = today;
+        } else if (isTomorrowTarget) {
+          baseDate = tomorrow;
         } else {
           const parsed = parseTodoistInput(lastUserMsg);
           if (parsed.dueDate) baseDate = parsed.dueDate;
@@ -1460,31 +1541,40 @@ ${isInbox
 
         const tomorrowIso = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
         const dayAfterTomorrowIso = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
+        const timeSlots = ['10:00', '12:00', '14:30', '16:30', '18:00', '19:30'];
 
         const batchItems: BatchRescheduleItem[] = sortedTasks.map((t, idx) => {
           let dueDate = baseDate;
-          if (isCompositeSplit) {
+          let reminder = baseReminder;
+          let reason: string | undefined = undefined;
+
+          if (isIntraDay) {
+            const slot = timeSlots[Math.min(idx, timeSlots.length - 1)];
+            dueDate = baseDate;
+            reminder = `${baseDate}T${slot}:00`;
+            reason = `Слот ${slot}`;
+          } else if (isCompositeSplit) {
             // Named or first task -> tomorrow; remaining tasks -> day after tomorrow
             const isLead = namedTaskTarget ? t.id === namedTaskTarget.id : idx === 0;
             dueDate = isLead ? tomorrowIso : dayAfterTomorrowIso;
+            reason = isLead ? 'Первая задача' : 'Остальные задачи';
           } else if (isDistribute) {
             dueDate = new Date(Date.now() + 86400000 * (idx + 1)).toISOString().slice(0, 10);
+            reason = `День ${idx + 1}`;
           }
           return {
             targetItemId: t.id,
             title: t.title,
             dueDate,
-            reminder: baseReminder,
+            reminder,
             priority: basePriority || t.priority,
-            reason: isCompositeSplit
-              ? (idx === 0 ? 'Первая задача' : 'Остальные задачи')
-              : (isDistribute ? `День ${idx + 1}` : undefined),
+            reason,
           };
         });
 
         const action: SuggestedAction = {
           type: 'batch_reschedule',
-          title: `Перенос задач (${batchItems.length})`,
+          title: isIntraDay ? `Распределение на день (${batchItems.length})` : `Перенос задач (${batchItems.length})`,
           folder: currentFolder,
           content: '',
           tags: [],
@@ -1494,7 +1584,9 @@ ${isInbox
         };
 
         let messageText = `Перенес ${batchItems.length} задач на ${baseDate}.`;
-        if (isCompositeSplit) {
+        if (isIntraDay) {
+          messageText = `Разбросал ${batchItems.length} задач на ${baseDate} в течение дня по слотам времени.`;
+        } else if (isCompositeSplit) {
           const leadTitle = namedTaskTarget ? namedTaskTarget.title : sortedTasks[0].title;
           messageText = `Задачу «${leadTitle}» перенес на завтра, остальные просроченные — на послезавтра.`;
         } else if (isDistribute) {
@@ -1503,7 +1595,9 @@ ${isInbox
 
         return {
           content: messageText,
-          reasoning: `Сформирован пакетный перенос ${batchItems.length} задач на ${isDistribute ? 'разные дни' : baseDate}`,
+          reasoning: isIntraDay
+            ? `Сформировано внутридневное распределение ${batchItems.length} задач по слотам времени на ${baseDate}`
+            : `Сформирован пакетный перенос ${batchItems.length} задач на ${isDistribute ? 'разные дни' : baseDate}`,
           reasoningTimeMs: Date.now() - startTime,
           suggestedAction: action,
         };

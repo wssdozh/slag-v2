@@ -1062,6 +1062,37 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
   });
 
+  test('25.3. Assistant Intra-day Task Rescheduling ("завтрашние задачи можешь разбросать в течении дня")', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Ask intra-day distribution: "завтрашние задачи можешь разбросать в течении дня"
+    await textarea.fill('завтрашние задачи можешь разбросать в течении дня');
+    await textarea.press('Enter');
+
+    // 3. Verify batch card appears and is NOT intercepted as a simple calendar agenda list
+    await expect(page.locator('text=/Распределение на день|Перенос задач/').first()).toBeVisible({ timeout: 5000 });
+    const applyBtn = page.locator('button', { hasText: /Применить/ }).first();
+    await expect(applyBtn).toBeVisible();
+
+    // Verify time slot is rendered (e.g. 10:00)
+    await expect(page.locator('text=10:00').first()).toBeVisible({ timeout: 5000 });
+
+    // 4. Capture screenshot for visual inspection
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-intraday-distribution.png',
+      fullPage: false,
+    });
+
+    // 5. Apply the intra-day distribution
+    await applyBtn.click();
+    await expect(page.locator('text=Перенесено').first()).toBeVisible({ timeout: 5000 });
+  });
+
   test('26. KIE.AI Provider with Gemini 4 Argon Endpoint and Structured Settings', async ({ page }) => {
     // 1. Open Settings
     await page.locator('button[title*="Настройки"]').first().click();

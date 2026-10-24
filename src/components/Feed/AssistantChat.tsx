@@ -88,6 +88,17 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     }));
   };
 
+  const formatReminderTime = (rem?: string) => {
+    if (!rem) return '';
+    if (/^\d{2}:\d{2}$/.test(rem)) return rem;
+    try {
+      const d = new Date(rem);
+      return isNaN(d.getTime()) ? rem : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return rem;
+    }
+  };
+
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === 'Входящие';
   const isSidebar = variant === 'sidebar';
@@ -525,296 +536,305 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   </div>
                 )}
 
-                {/* Standalone Action Card (matching Search Results pattern, separated from bubble) */}
-                {msg.suggestedAction && (() => {
-                  const action = msg.suggestedAction;
-                  const actionState = action.actionState || 'suggested';
-                  const isRejected = actionState === 'rejected';
-                  const isApplied = actionState === 'applied';
-                  const isExecuting = actionState === 'executing';
+                {/* Standalone Action Cards (supporting single or multiple actions) */}
+                {(() => {
+                  const actionsToRender = msg.suggestedActions && msg.suggestedActions.length > 0
+                    ? msg.suggestedActions
+                    : (msg.suggestedAction ? [msg.suggestedAction] : []);
+                  if (actionsToRender.length === 0) return null;
 
-                  return (
-                    <div className={`max-w-[92%] w-full rounded-xl bg-[#141416] border border-white/[0.08] overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
-                      isRejected ? 'opacity-50' : ''
-                    }`}>
-                      {/* Header bar: Monochrome Linear style */}
-                      <div className="flex items-center justify-between px-3.5 py-2.5 bg-white/[0.02] border-b border-white/[0.04] text-2xs font-mono text-zinc-400">
-                        <div className="flex items-center gap-1.5">
-                          {action.type === 'schedule_task' && <Calendar className="w-3.5 h-3.5 text-zinc-400" />}
-                          {action.type === 'decompose_task' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />}
-                          {action.type === 'update_task_status' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />}
-                          {(action.type === 'reschedule_task' || action.type === 'batch_reschedule') && <Clock className="w-3.5 h-3.5 text-zinc-400" />}
-                          {action.type === 'append_to_note' && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
-                          {action.type === 'move_note' && <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />}
-                          {(!action.type || action.type === 'create_note') && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
-                          <span className={isRejected ? 'text-zinc-500' : isApplied ? 'text-zinc-300 font-medium' : 'text-zinc-200 font-medium'}>
-                            {action.type === 'schedule_task' && 'Планирование в календарь'}
-                            {action.type === 'decompose_task' && 'Декомпозиция задачи'}
-                            {action.type === 'update_task_status' && 'Смена статуса канбан'}
-                            {action.type === 'reschedule_task' && 'Перенос срока'}
-                            {action.type === 'batch_reschedule' && (action.title || 'Перенос задач')}
-                            {action.type === 'append_to_note' && 'Дополнение заметки'}
-                            {action.type === 'move_note' && 'Перемещение по папкам'}
-                            {action.type === 'create_note' && (
-                              action.itemType === 'task'
-                                ? 'Черновик задачи'
-                                : action.itemType === 'article'
-                                ? 'Черновик статьи'
-                                : 'Черновик заметки'
-                            )}
+                  return actionsToRender.map((action, actIdx) => {
+                    const actionState = action.actionState || 'suggested';
+                    const isRejected = actionState === 'rejected';
+                    const isApplied = actionState === 'applied';
+                    const isExecuting = actionState === 'executing';
+
+                    return (
+                      <div
+                        key={`act-${actIdx}-${action.type}`}
+                        className={`max-w-[92%] w-full rounded-xl bg-[#141416] border border-white/[0.08] overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
+                          isRejected ? 'opacity-50' : ''
+                        }`}
+                      >
+                        {/* Header bar: Monochrome Linear style */}
+                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-white/[0.02] border-b border-white/[0.04] text-2xs font-mono text-zinc-400">
+                          <div className="flex items-center gap-1.5">
+                            {action.type === 'schedule_task' && <Calendar className="w-3.5 h-3.5 text-zinc-400" />}
+                            {action.type === 'decompose_task' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />}
+                            {action.type === 'update_task_status' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />}
+                            {(action.type === 'reschedule_task' || action.type === 'batch_reschedule') && <Clock className="w-3.5 h-3.5 text-zinc-400" />}
+                            {action.type === 'append_to_note' && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
+                            {action.type === 'move_note' && <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />}
+                            {(!action.type || action.type === 'create_note') && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
+                            <span className={isRejected ? 'text-zinc-500' : isApplied ? 'text-zinc-300 font-medium' : 'text-zinc-200 font-medium'}>
+                              {action.type === 'schedule_task' && 'Планирование в календарь'}
+                              {action.type === 'decompose_task' && 'Декомпозиция задачи'}
+                              {action.type === 'update_task_status' && 'Смена статуса канбан'}
+                              {action.type === 'reschedule_task' && 'Перенос срока'}
+                              {action.type === 'batch_reschedule' && (action.title || 'Перенос задач')}
+                              {action.type === 'append_to_note' && 'Дополнение заметки'}
+                              {action.type === 'move_note' && 'Перемещение по папкам'}
+                              {action.type === 'create_note' && (
+                                action.itemType === 'task'
+                                  ? 'Черновик задачи'
+                                  : action.itemType === 'article'
+                                  ? 'Черновик статьи'
+                                  : 'Черновик заметки'
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-zinc-500 truncate max-w-[130px]">
+                            {action.folder}
                           </span>
                         </div>
-                        <span className="text-zinc-500 truncate max-w-[130px]">
-                          {action.folder}
-                        </span>
-                      </div>
 
-                      <div className="p-3.5 flex flex-col gap-2.5">
-                        {/* Title & Priority (Only for single-item actions, omitted for batch_reschedule to prevent duplicate header) */}
-                        {action.type !== 'batch_reschedule' && (
-                          <div className="text-xs font-semibold flex items-center justify-between gap-2">
-                            <span className={isRejected ? 'line-through text-zinc-500' : isApplied ? 'text-zinc-300' : 'text-zinc-100'}>
-                              {action.title}
-                            </span>
-                            {action.priority && !isRejected && (
-                              <span className="flex items-center gap-1 shrink-0">
-                                <LinearSignalBars priority={action.priority} className="w-3 h-3" />
-                                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
-                                  action.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
-                                  action.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
-                                  'bg-blue-500/15 text-blue-300'
-                                }`}>
-                                  {action.priority.toUpperCase()}
+                        <div className="p-3.5 flex flex-col gap-2.5">
+                          {/* Title & Priority (Only for single-item actions, omitted for batch_reschedule to prevent duplicate header) */}
+                          {action.type !== 'batch_reschedule' && (
+                            <div className="text-xs font-semibold flex items-center justify-between gap-2">
+                              <span className={isRejected ? 'line-through text-zinc-500' : isApplied ? 'text-zinc-300' : 'text-zinc-100'}>
+                                {action.title}
+                              </span>
+                              {action.priority && !isRejected && (
+                                <span className="flex items-center gap-1 shrink-0">
+                                  <LinearSignalBars priority={action.priority} className="w-3 h-3" />
+                                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
+                                    action.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
+                                    action.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
+                                    'bg-blue-500/15 text-blue-300'
+                                  }`}>
+                                    {action.priority.toUpperCase()}
+                                  </span>
                                 </span>
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Single Schedule info */}
-                        {action.dueDate && (
-                          <div className="flex items-center gap-2 text-2xs font-mono text-zinc-400">
-                            <Calendar className="w-3 h-3 text-zinc-500" />
-                            <span>Срок: {action.dueDate}</span>
-                            {action.reminder && (
-                              <span className="text-zinc-500">
-                                ({new Date(action.reminder).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Subtasks checklist if decompose_task */}
-                        {action.subtasks && action.subtasks.length > 0 && (
-                          <div className="flex flex-col gap-1.5 py-0.5">
-                            {action.subtasks.map((st, sIdx) => (
-                              <div key={sIdx} className="flex items-center gap-2 text-xs text-zinc-300">
-                                <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
-                                <span className="leading-tight">{st.title}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Batch reschedule items list with selection checkboxes */}
-                        {action.type === 'batch_reschedule' && action.batchItems && action.batchItems.length > 0 && (
-                          <div className="flex flex-col divide-y divide-white/[0.04] border-t border-b border-white/[0.04] -mx-3.5 px-3.5 py-1">
-                            {action.batchItems.map((item, bIdx) => {
-                              const selected = isTaskSelected(msg.id, item.targetItemId);
-                              return (
-                                <div key={bIdx} className={`flex items-center justify-between text-xs py-1.5 gap-2 transition-opacity ${
-                                  !selected && !isApplied ? 'opacity-40' : ''
-                                }`}>
-                                  <div className="flex items-center gap-2 truncate flex-1">
-                                    {!isApplied && !isRejected && (
-                                      <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        onChange={() => toggleTaskSelection(msg.id, item.targetItemId)}
-                                        className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 accent-zinc-200 cursor-pointer shrink-0"
-                                      />
-                                    )}
-                                    <span className={`truncate leading-tight ${selected ? 'text-zinc-200' : 'text-zinc-500 line-through'}`}>
-                                      {item.title}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 shrink-0 text-2xs font-mono text-zinc-400">
-                                    <Calendar className="w-3 h-3 text-zinc-500" />
-                                    <span>{item.dueDate || 'без срока'}</span>
-                                    {item.reminder && (
-                                      <span className="text-zinc-500">
-                                        {new Date(item.reminder).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                      </span>
-                                    )}
-                                    {item.priority && item.priority !== 'none' && (
-                                      <span className={`px-1 py-0.5 rounded text-[9px] font-semibold ${
-                                        item.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
-                                        item.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
-                                        'bg-blue-500/15 text-blue-300'
-                                      }`}>
-                                        {item.priority.toUpperCase()}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Append to note diff preview: flat on first surface, no matryoshka container */}
-                        {action.type === 'append_to_note' && action.content && (
-                          <div className="border-l border-white/20 pl-2.5 py-0.5 text-xs text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed">
-                            + {action.content}
-                          </div>
-                        )}
-
-                        {/* Content snippet */}
-                        {action.type !== 'append_to_note' && action.content && (
-                          <p className="text-[11px] text-zinc-400 line-clamp-2">
-                            {action.content}
-                          </p>
-                        )}
-
-                        {/* Tags */}
-                        {action.tags && action.tags.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {action.tags.map((t, idx) => (
-                              <span key={idx} className="text-[10px] font-mono text-zinc-500">
-                                #{t}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Action Lifecycle Controls */}
-                        {isRejected ? (
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 py-0.5">
-                            <X className="w-3.5 h-3.5 text-zinc-600" />
-                            <span>Действие отклонено</span>
-                          </div>
-                        ) : isApplied ? (
-                          <div className="mt-1 flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
-                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-300 font-medium whitespace-nowrap shrink-0">
-                              <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                              <span>
-                                {action.type === 'schedule_task' ? `Запланировано на ${action.dueDate}` :
-                                 action.type === 'batch_reschedule' ? `Перенесено: ${action.batchItems?.length || 0}` :
-                                 action.type === 'reschedule_task' ? `Срок: ${action.dueDate || 'бэклог'}` :
-                                 action.type === 'append_to_note' ? 'Дополнено' :
-                                 'Сохранено'}
-                              </span>
+                              )}
                             </div>
-                            <button
-                              onClick={() => scrollToItem(action.appliedItemId || action.title)}
-                              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                              title="Показать запись в ленте"
-                            >
-                              <span>{action.type === 'append_to_note' ? 'Открыть' : 'Перейти к записи'}</span>
-                              <ArrowUpRight className="w-3 h-3 text-zinc-400" />
-                            </button>
-                          </div>
-                        ) : isExecuting ? (
-                          <button
-                            disabled
-                            className="mt-1 w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 font-semibold text-xs opacity-80 cursor-not-allowed shadow-sm"
-                          >
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
-                            <span>Применение...</span>
-                          </button>
-                        ) : (
-                          <div className="mt-1 flex items-center gap-2">
-                            {(() => {
-                              let finalAction = action;
-                              let count = action.batchItems?.length || 0;
-                              let isDisabled = false;
+                          )}
 
-                              if (action.type === 'batch_reschedule' && action.batchItems) {
-                                const activeItems = action.batchItems.filter(it => isTaskSelected(msg.id, it.targetItemId));
-                                count = activeItems.length;
-                                isDisabled = count === 0;
-                                finalAction = {
-                                  ...action,
-                                  batchItems: activeItems,
-                                };
-                              }
+                          {/* Single Schedule info */}
+                          {action.dueDate && (
+                            <div className="flex items-center gap-2 text-2xs font-mono text-zinc-400">
+                              <Calendar className="w-3 h-3 text-zinc-500" />
+                              <span>Срок: {action.dueDate}</span>
+                              {action.reminder && (
+                                <span className="text-zinc-500">
+                                  ({formatReminderTime(action.reminder)})
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-                              return (
-                                <button
-                                  disabled={isDisabled}
-                                  onClick={() => createNoteFromAction(finalAction, msg.id)}
-                                  className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-colors shadow-sm ${
-                                    isDisabled
-                                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/[0.04]'
-                                      : 'bg-white text-black hover:bg-zinc-200 cursor-pointer'
-                                  }`}
-                                >
-                                  {action.type === 'decompose_task' && (
-                                    <>
-                                      <ListTodo className="w-3.5 h-3.5 shrink-0" />
-                                      <span>
-                                        {action.subtasks?.length ? `Применить (${action.subtasks.length})` : 'Применить'}
+                          {/* Subtasks checklist if decompose_task */}
+                          {action.subtasks && action.subtasks.length > 0 && (
+                            <div className="flex flex-col gap-1.5 py-0.5">
+                              {action.subtasks.map((st, sIdx) => (
+                                <div key={sIdx} className="flex items-center gap-2 text-xs text-zinc-300">
+                                  <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                                  <span className="leading-tight">{st.title}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Batch reschedule items list with selection checkboxes */}
+                          {action.type === 'batch_reschedule' && action.batchItems && action.batchItems.length > 0 && (
+                            <div className="flex flex-col divide-y divide-white/[0.04] border-t border-b border-white/[0.04] -mx-3.5 px-3.5 py-1">
+                              {action.batchItems.map((item, bIdx) => {
+                                const selected = isTaskSelected(msg.id, item.targetItemId);
+                                return (
+                                  <div key={bIdx} className={`flex items-center justify-between text-xs py-1.5 gap-2 transition-opacity ${
+                                    !selected && !isApplied ? 'opacity-40' : ''
+                                  }`}>
+                                    <div className="flex items-center gap-2 truncate flex-1">
+                                      {!isApplied && !isRejected && (
+                                        <input
+                                          type="checkbox"
+                                          checked={selected}
+                                          onChange={() => toggleTaskSelection(msg.id, item.targetItemId)}
+                                          className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 accent-zinc-200 cursor-pointer shrink-0"
+                                        />
+                                      )}
+                                      <span className={`truncate leading-tight ${selected ? 'text-zinc-200' : 'text-zinc-500 line-through'}`}>
+                                        {item.title}
                                       </span>
-                                    </>
-                                  )}
-                                  {action.type === 'schedule_task' && (
-                                    <>
-                                      <Calendar className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Запланировать</span>
-                                    </>
-                                  )}
-                                  {action.type === 'reschedule_task' && (
-                                    <>
-                                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Перенести</span>
-                                    </>
-                                  )}
-                                  {action.type === 'batch_reschedule' && (
-                                    <>
-                                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Применить ({count})</span>
-                                    </>
-                                  )}
-                                  {action.type === 'append_to_note' && (
-                                    <>
-                                      <Plus className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Дописать</span>
-                                    </>
-                                  )}
-                                  {action.type === 'update_task_status' && (
-                                    <>
-                                      <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Сменить статус</span>
-                                    </>
-                                  )}
-                                  {action.type === 'move_note' && (
-                                    <>
-                                      <FolderOpen className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Переместить</span>
-                                    </>
-                                  )}
-                                  {(!action.type || action.type === 'create_note') && (
-                                    <>
-                                      <Plus className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Сохранить</span>
-                                    </>
-                                  )}
-                                </button>
-                              );
-                            })()}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0 text-2xs font-mono text-zinc-400">
+                                      <Calendar className="w-3 h-3 text-zinc-500" />
+                                      <span>{item.dueDate || 'без срока'}</span>
+                                      {item.reminder && (
+                                        <span className="text-zinc-400 font-medium">
+                                          {formatReminderTime(item.reminder)}
+                                        </span>
+                                      )}
+                                      {item.priority && item.priority !== 'none' && (
+                                        <span className={`px-1 py-0.5 rounded text-[9px] font-semibold ${
+                                          item.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
+                                          item.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
+                                          'bg-blue-500/15 text-blue-300'
+                                        }`}>
+                                          {item.priority.toUpperCase()}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Append to note diff preview: flat on first surface, no matryoshka container */}
+                          {action.type === 'append_to_note' && action.content && (
+                            <div className="border-l border-white/20 pl-2.5 py-0.5 text-xs text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed">
+                              + {action.content}
+                            </div>
+                          )}
+
+                          {/* Content snippet */}
+                          {action.type !== 'append_to_note' && action.content && (
+                            <p className="text-[11px] text-zinc-400 line-clamp-2">
+                              {action.content}
+                            </p>
+                          )}
+
+                          {/* Tags */}
+                          {action.tags && action.tags.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {action.tags.map((t, idx) => (
+                                <span key={idx} className="text-[10px] font-mono text-zinc-500">
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Action Lifecycle Controls */}
+                          {isRejected ? (
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 py-0.5">
+                              <X className="w-3.5 h-3.5 text-zinc-600" />
+                              <span>Действие отклонено</span>
+                            </div>
+                          ) : isApplied ? (
+                            <div className="mt-1 flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
+                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-300 font-medium whitespace-nowrap shrink-0">
+                                <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                <span>
+                                  {action.type === 'schedule_task' ? `Запланировано на ${action.dueDate}` :
+                                   action.type === 'batch_reschedule' ? `Перенесено: ${action.batchItems?.length || 0}` :
+                                   action.type === 'reschedule_task' ? `Срок: ${action.dueDate || 'бэклог'}` :
+                                   action.type === 'append_to_note' ? 'Дополнено' :
+                                   'Сохранено'}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => scrollToItem(action.appliedItemId || action.title)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                                title="Показать запись в ленте"
+                              >
+                                <span>{action.type === 'append_to_note' ? 'Открыть' : 'Перейти к записи'}</span>
+                                <ArrowUpRight className="w-3 h-3 text-zinc-400" />
+                              </button>
+                            </div>
+                          ) : isExecuting ? (
                             <button
-                              onClick={() => rejectAction(msg.id)}
-                              className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs font-medium border border-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
-                              title="Отклонить это действие"
+                              disabled
+                              className="mt-1 w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 font-semibold text-xs opacity-80 cursor-not-allowed shadow-sm"
                             >
-                              <X className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                              <span>Отклонить</span>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+                              <span>Применение...</span>
                             </button>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="mt-1 flex items-center gap-2">
+                              {(() => {
+                                let finalAction = action;
+                                let count = action.batchItems?.length || 0;
+                                let isDisabled = false;
+
+                                if (action.type === 'batch_reschedule' && action.batchItems) {
+                                  const activeItems = action.batchItems.filter(it => isTaskSelected(msg.id, it.targetItemId));
+                                  count = activeItems.length;
+                                  isDisabled = count === 0;
+                                  finalAction = {
+                                    ...action,
+                                    batchItems: activeItems,
+                                  };
+                                }
+
+                                return (
+                                  <button
+                                    disabled={isDisabled}
+                                    onClick={() => createNoteFromAction(finalAction, msg.id)}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-colors shadow-sm ${
+                                      isDisabled
+                                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/[0.04]'
+                                        : 'bg-white text-black hover:bg-zinc-200 cursor-pointer'
+                                    }`}
+                                  >
+                                    {action.type === 'decompose_task' && (
+                                      <>
+                                        <ListTodo className="w-3.5 h-3.5 shrink-0" />
+                                        <span>
+                                          {action.subtasks?.length ? `Применить (${action.subtasks.length})` : 'Применить'}
+                                        </span>
+                                      </>
+                                    )}
+                                    {action.type === 'schedule_task' && (
+                                      <>
+                                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Запланировать</span>
+                                      </>
+                                    )}
+                                    {action.type === 'reschedule_task' && (
+                                      <>
+                                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Перенести</span>
+                                      </>
+                                    )}
+                                    {action.type === 'batch_reschedule' && (
+                                      <>
+                                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Применить ({count})</span>
+                                      </>
+                                    )}
+                                    {action.type === 'append_to_note' && (
+                                      <>
+                                        <Plus className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Дописать</span>
+                                      </>
+                                    )}
+                                    {action.type === 'update_task_status' && (
+                                      <>
+                                        <CheckSquare className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Сменить статус</span>
+                                      </>
+                                    )}
+                                    {action.type === 'move_note' && (
+                                      <>
+                                        <FolderOpen className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Переместить</span>
+                                      </>
+                                    )}
+                                    {(!action.type || action.type === 'create_note') && (
+                                      <>
+                                        <Plus className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Сохранить</span>
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              })()}
+                              <button
+                                onClick={() => rejectAction(msg.id)}
+                                className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs font-medium border border-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
+                                title="Отклонить это действие"
+                              >
+                                <X className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                <span>Отклонить</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
+                    );
+                  });
                 })()}
 
                 {/* Expandable found notes list with instant navigation */}

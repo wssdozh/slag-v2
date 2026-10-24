@@ -835,10 +835,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (messageId) {
-      setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
-        ? { ...m, suggestedAction: { ...m.suggestedAction, actionState: 'executing' } }
-        : m
-      ));
+      setChatMessages(prev => prev.map(m => {
+        if (m.id !== messageId) return m;
+        const updatedSingle = m.suggestedAction
+          ? { ...m.suggestedAction, actionState: 'executing' as const }
+          : undefined;
+        const updatedList = m.suggestedActions
+          ? m.suggestedActions.map(act => act === action || act.title === action.title ? { ...act, actionState: 'executing' as const } : act)
+          : undefined;
+        return {
+          ...m,
+          suggestedAction: updatedSingle,
+          suggestedActions: updatedList,
+        };
+      }));
     }
 
     let savedItem: SlagItem | void = undefined;
@@ -1040,27 +1050,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (messageId && (savedItem || action.type === 'batch_reschedule')) {
       const finalSavedId = savedItem?.id;
-      setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
-        ? {
-            ...m,
-            suggestedAction: {
+      setChatMessages(prev => prev.map(m => {
+        if (m.id !== messageId) return m;
+        const updatedSingle = m.suggestedAction
+          ? {
               ...m.suggestedAction,
-              actionState: 'applied',
+              actionState: 'applied' as const,
               appliedItemId: finalSavedId,
-            },
-          }
-        : m
-      ));
+            }
+          : undefined;
+        const updatedList = m.suggestedActions
+          ? m.suggestedActions.map(act => act === action || act.title === action.title
+              ? { ...act, actionState: 'applied' as const, appliedItemId: finalSavedId }
+              : act)
+          : undefined;
+        return {
+          ...m,
+          suggestedAction: updatedSingle,
+          suggestedActions: updatedList,
+        };
+      }));
     }
 
     return savedItem;
   }, [currentFolder, saveItem, updateItem, moveItem, items, addToast, undoLastAction]);
 
   const rejectAction = useCallback((messageId: string) => {
-    setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
-      ? { ...m, suggestedAction: { ...m.suggestedAction, actionState: 'rejected' } }
-      : m
-    ));
+    setChatMessages(prev => prev.map(m => {
+      if (m.id !== messageId) return m;
+      return {
+        ...m,
+        suggestedAction: m.suggestedAction ? { ...m.suggestedAction, actionState: 'rejected' as const } : undefined,
+        suggestedActions: m.suggestedActions ? m.suggestedActions.map(a => ({ ...a, actionState: 'rejected' as const })) : undefined,
+      };
+    }));
     addToast('Действие отклонено', 'info');
   }, [addToast]);
 
@@ -1086,13 +1109,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await sendAssistantChat({
         messages: newHistory.map(m => {
           let content = m.content || '';
-          if (m.suggestedAction) {
-            const sa = m.suggestedAction;
-            const actionDesc = `Предложенное действие: «${sa.title}» (${sa.type}), статус: ${sa.actionState || 'suggested'}.`;
+          const actionItems = m.suggestedActions || (m.suggestedAction ? [m.suggestedAction] : []);
+          if (actionItems.length > 0) {
+            const actionDescs = actionItems.map(sa => `Предложенное действие: «${sa.title}» (${sa.type}), статус: ${sa.actionState || 'suggested'}.`).join('\n');
             if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
-              content = actionDesc;
+              content = actionDescs;
             } else {
-              content = `${content.trim()}\n${actionDesc}`;
+              content = `${content.trim()}\n${actionDescs}`;
             }
           }
           return { role: m.role, content: content.trim() || '[Сообщение]' };
@@ -1121,6 +1144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reasoningTimeMs: response.reasoningTimeMs,
         toolCalls: response.toolCalls,
         suggestedAction: response.suggestedAction,
+        suggestedActions: response.suggestedActions,
       };
 
       setChatMessages(prev => [...prev, assistantMsg]);

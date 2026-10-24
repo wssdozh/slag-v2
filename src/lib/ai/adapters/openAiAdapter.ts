@@ -51,6 +51,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
           formattedMessages.push({
             role: 'tool',
             tool_call_id: tr.toolCallId,
+            name: tr.name,
             content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result),
           });
         }
@@ -98,6 +99,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
