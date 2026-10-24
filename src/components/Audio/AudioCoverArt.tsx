@@ -56,7 +56,7 @@ void main() {
     float m1 = cos(angle - t * 0.5) * (0.02 + uVolume * 0.04);
 
     // Smooth elastic radius (base + breathing + audio swell + modes)
-    float baseR = 0.52 + sin(uTime * 1.5) * 0.015 + uBass * 0.12;
+    float baseR = 0.58 + sin(uTime * 1.5) * 0.015 + uBass * 0.12;
     float blobRadius = baseR + m1 + m2 + m3 + m4;
 
     // Outer soft edge mask with buttery antialiasing
@@ -372,10 +372,10 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({
   }
 
   // Smooth ChatGPT Voice Liquid Light Orb (Pure White into Soft Azure Blue)
-  // Perfectly smooth, zero ripple noise, fluid elastic droplet responding to live frequencies
+  // Scaled 1.3x for immersive presence in Now Playing view
   return (
     <div
-      className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center select-none ${className}`}
+      className={`relative aspect-square w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center select-none ${className}`}
     >
       <ChatGPTOrbCanvas isPlaying={isPlaying} audioRef={audioRef} />
     </div>
