@@ -20,10 +20,10 @@ void main() {
 
 /**
  * ChatGPT Voice Orb GLSL Shader
- * - Fractal ink noise that drifts across a soft circular mask
+ * - Smooth, meditative fractal ink drifting across a soft circular mask
  * - Pure White luminous core blooming into Soft Azure Blue (#38bdf8 / #7dd3fc)
- * - Continuous, living, organic volume (no center void, no fan petals, no harsh spokes)
- * - Swells and swirls with voice/audio energy; gently breathes during silence
+ * - Continuous, living, organic volume (no center void, no fan petals, no flickering blades)
+ * - Swells and swirls gently with voice/audio energy; calms down during silence
  */
 const fragmentShaderSource = `
 precision highp float;
@@ -73,7 +73,7 @@ void main() {
 
     // Audio-reactive parameters
     float vol = uAudioVolume;
-    float t = uTime * (0.8 + vol * 0.9);
+    float t = uTime * (0.6 + vol * 0.6);
 
     // Domain warping: simulates fluid ink curling and drifting inside the sphere
     vec2 q = vec2(
@@ -90,7 +90,7 @@ void main() {
     float fluid = fbm(p + 2.2 * r + t * 0.35);
 
     // Sphere radius with gentle organic breathing and voice swelling
-    float breath = sin(uTime * 1.6) * 0.02 + vol * 0.08;
+    float breath = sin(uTime * 1.4) * 0.02 + vol * 0.08;
     float orbRadius = 0.68 + breath;
 
     // Edge softness for the circular mask (ChatGPT orb style)
@@ -260,8 +260,8 @@ const ChatGPTOrbCanvas: React.FC<{
         : 0.06;
       curVol += (targetEnergy - curVol) * 0.1;
 
-      // Time progression
-      const speed = isPlaying ? 0.02 + curVol * 0.03 : 0.008;
+      // Time progression (calm and smooth)
+      const speed = isPlaying ? 0.016 + curVol * 0.02 : 0.007;
       time += speed;
 
       gl.clearColor(0, 0, 0, 0);

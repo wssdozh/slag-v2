@@ -1684,10 +1684,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // Verify Now Playing screen elements: track title, note link, clean Avatar fluid orb canvas
+    // Verify Now Playing screen elements: track title, note link, clean ChatGPT voice orb canvas
     await expect(page.locator('text=voice_16-12-53.webm')).toBeVisible();
     await expect(page.locator('text=Голосовая заметка разработчика')).toBeVisible();
-    await expect(page.locator('canvas[data-testid="avatar-fluid-orb-canvas"]')).toBeVisible();
+    await expect(page.locator('canvas[data-testid="chatgpt-orb-canvas"]')).toBeVisible();
 
     // Verify transport controls (5 buttons under timeline: -10s, Prev, Play/Pause, Next, +10s)
     const playPauseBtn = page.locator('button[title*="Воспроизведение"], button[title*="Пауза"]');
