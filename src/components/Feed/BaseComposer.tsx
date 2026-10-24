@@ -107,7 +107,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       <div
         className={
           isFlat
-            ? `p-1 flex flex-col gap-2 bg-transparent border-0 shadow-none ${className}`
+            ? `flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none ${className}`
             : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors ${className}`
         }
       >
@@ -125,7 +125,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             rows={1}
             placeholder={placeholder}
             disabled={disabled}
-            className="w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal py-0 px-1 outline-none border-none"
+            className={`w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal ${isFlat ? 'py-1 px-0.5' : 'py-0 px-1'} outline-none border-none`}
             style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
           />
         </div>

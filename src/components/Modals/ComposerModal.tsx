@@ -25,22 +25,20 @@ export const ComposerModal: React.FC = () => {
       }
       maxWidth="max-w-2xl"
       className="bg-[#141417] border border-white/[0.08]"
-      contentClassName="p-3"
+      contentClassName="px-4 pt-2 pb-3"
       closeOnBackdropClick={true}
       closeOnEsc={true}
     >
-      <div className="pt-0.5">
-        <Composer
-          isModal
-          initialType={composerModalOptions?.type}
-          initialStatus={composerModalOptions?.status}
-          initialFolder={composerModalOptions?.folder}
-          initialDueDate={composerModalOptions?.dueDate}
-          initialReminder={composerModalOptions?.reminder}
-          onComplete={closeComposerModal}
-          onCancel={closeComposerModal}
-        />
-      </div>
+      <Composer
+        isModal
+        initialType={composerModalOptions?.type}
+        initialStatus={composerModalOptions?.status}
+        initialFolder={composerModalOptions?.folder}
+        initialDueDate={composerModalOptions?.dueDate}
+        initialReminder={composerModalOptions?.reminder}
+        onComplete={closeComposerModal}
+        onCancel={closeComposerModal}
+      />
     </BaseModal>
   );
 };

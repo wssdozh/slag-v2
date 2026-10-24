@@ -1106,7 +1106,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Active Folder & Tags Preview */}
       {(targetFolder || allPreviewTags.length > 0) && (
-        <div className="flex items-center gap-1.5 px-1 py-0.5 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150">
+        <div className="flex items-center gap-1.5 px-0.5 pt-0.5 pb-2 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150">
           {targetFolder && (
             <span
               className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 text-[11px] font-medium"
