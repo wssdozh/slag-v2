@@ -491,132 +491,129 @@ export const AudioPanel: React.FC = () => {
                   <RotateCw className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* 6. Utility Controls Row: Queue, Loop | Speed, Volume */}
+              <div className="flex items-center justify-between w-full max-w-[240px] text-zinc-400 select-none mt-5">
+                {/* Queue Button */}
+                <button
+                  onClick={() => setIsPlaylistOpen(true)}
+                  className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  title="Очередь воспроизведения"
+                  aria-label="Очередь воспроизведения"
+                >
+                  <ListMusic className="w-4 h-4" />
+                </button>
+
+                {/* Loop Button */}
+                <button
+                  onClick={() => setIsLoop((prev) => !prev)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isLoop ? 'text-white bg-white/10' : 'hover:text-white hover:bg-white/[0.08]'
+                  }`}
+                  title={isLoop ? 'Повтор включен' : 'Повтор выключен'}
+                  aria-label="Повтор"
+                >
+                  {isLoop ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
+                </button>
+
+                {/* Subtle Vertical Divider */}
+                <div className="h-4 w-px bg-white/15 mx-0.5" />
+
+                {/* Playback Speed */}
+                <button
+                  onClick={toggleSpeed}
+                  className="px-2 py-1 rounded text-[11px] font-mono text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  title="Скорость воспроизведения"
+                  aria-label="Скорость"
+                >
+                  {PLAYBACK_SPEEDS[speedIndex]}x
+                </button>
+
+                {/* Volume / Mute Button */}
+                <button
+                  onClick={toggleMute}
+                  className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  title={isMuted ? 'Включить звук' : 'Выключить звук'}
+                  aria-label="Громкость"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="w-4 h-4 text-red-400" />
+                  ) : (
+                    <Volume2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </>
           )}
         </div>
       </main>
 
-      {/* 6. Bottom Controls Bar pinned strictly at the bottom ("прям внизу внизу") */}
-      <footer className="relative z-10 w-full flex items-center justify-between px-4 sm:px-6 py-2.5 border-t border-white/[0.06] bg-black/40 backdrop-blur-md text-xs select-none">
-        {/* Left: Queue + Folder Toggle */}
-        <div className="flex items-center gap-2">
-          {/* Queue Button */}
-          <button
-            onClick={() => setIsPlaylistOpen(true)}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-            title="Очередь воспроизведения"
-            aria-label="Очередь воспроизведения"
+      {/* 7. Bottom Pinned Folder Toggle strictly at the bottom ("прям внизу внизу") */}
+      <footer className="relative z-10 w-full flex items-center justify-center py-3 select-none">
+        <div className="relative" ref={folderPickerRef}>
+          <div
+            className={`flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-full text-xs border transition-colors ${
+              scopeMode === 'pinned'
+                ? 'bg-white/10 text-white border-white/20'
+                : 'bg-white/[0.04] text-zinc-400 border-white/[0.06] hover:text-zinc-200 hover:bg-white/[0.08]'
+            }`}
           >
-            <ListMusic className="w-4 h-4" />
-          </button>
-
-          {/* Folder Pin/Unpin Toggle Button */}
-          <div className="relative" ref={folderPickerRef}>
-            <div
-              className={`flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full text-xs border transition-colors ${
+            <button
+              onClick={toggleScopeMode}
+              className="flex items-center gap-1.5 cursor-pointer"
+              title={
                 scopeMode === 'pinned'
-                  ? 'bg-white/10 text-white border-white/20'
-                  : 'bg-white/[0.04] text-zinc-400 border-white/[0.06] hover:text-zinc-200 hover:bg-white/[0.08]'
-              }`}
+                  ? 'Закреплено: играет только эта папка (нажмите для открепления)'
+                  : 'Откреплено: следует за активной папкой (нажмите для закрепления)'
+              }
             >
+              <Pin
+                className={`w-3 h-3 transition-transform ${
+                  scopeMode === 'pinned' ? 'text-white fill-current' : 'text-zinc-500'
+                }`}
+              />
+              <span className="max-w-[120px] sm:max-w-[160px] truncate">
+                {effectiveFolder}
+              </span>
+            </button>
+
+            {/* Dropdown arrow when in pinned mode */}
+            {scopeMode === 'pinned' && (
               <button
-                onClick={toggleScopeMode}
-                className="flex items-center gap-1 cursor-pointer"
-                title={
-                  scopeMode === 'pinned'
-                    ? 'Закреплено: играет только эта папка (нажмите для открепления)'
-                    : 'Откреплено: следует за активной папкой (нажмите для закрепления)'
-                }
+                onClick={() => setIsFolderPickerOpen((prev) => !prev)}
+                className="p-0.5 text-zinc-400 hover:text-white rounded cursor-pointer transition-colors"
+                title="Выбрать другую папку для закрепления"
               >
-                <Pin
-                  className={`w-3 h-3 transition-transform ${
-                    scopeMode === 'pinned' ? 'text-white fill-current' : 'text-zinc-500'
-                  }`}
-                />
-                <span className="max-w-[100px] sm:max-w-[140px] truncate">
-                  {effectiveFolder}
-                </span>
+                <ChevronDown className="w-3 h-3" />
               </button>
-
-              {/* Dropdown arrow when in pinned mode */}
-              {scopeMode === 'pinned' && (
-                <button
-                  onClick={() => setIsFolderPickerOpen((prev) => !prev)}
-                  className="p-0.5 text-zinc-400 hover:text-white rounded cursor-pointer transition-colors"
-                  title="Выбрать другую папку для закрепления"
-                >
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Folder Picker Popover (opens upward from footer) */}
-            {isFolderPickerOpen && scopeMode === 'pinned' && (
-              <div className="absolute left-0 bottom-full mb-2 w-48 rounded-xl bg-[#18181c] border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-52 overflow-y-auto">
-                <div className="px-3 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04] mb-1">
-                  Закрепить папку
-                </div>
-                {availableFolders.map((folderPath) => (
-                  <button
-                    key={folderPath}
-                    onClick={() => {
-                      setPinnedFolder(folderPath);
-                      setIsFolderPickerOpen(false);
-                    }}
-                    className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
-                      pinnedFolder === folderPath
-                        ? 'text-white font-medium bg-white/[0.04]'
-                        : 'text-zinc-400'
-                    }`}
-                  >
-                    <Folder className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{folderPath}</span>
-                  </button>
-                ))}
-              </div>
             )}
           </div>
-        </div>
 
-        {/* Right: Loop, Speed, Volume */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Loop Button */}
-          <button
-            onClick={() => setIsLoop((prev) => !prev)}
-            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-              isLoop ? 'text-white bg-white/10' : 'hover:text-white hover:bg-white/[0.08]'
-            }`}
-            title={isLoop ? 'Повтор включен' : 'Повтор выключен'}
-            aria-label="Повтор"
-          >
-            {isLoop ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
-          </button>
-
-          <div className="h-3.5 w-px bg-white/10 mx-0.5" />
-
-          {/* Playback Speed */}
-          <button
-            onClick={toggleSpeed}
-            className="px-2 py-1 rounded text-[11px] font-mono text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-            title="Скорость воспроизведения"
-            aria-label="Скорость"
-          >
-            {PLAYBACK_SPEEDS[speedIndex]}x
-          </button>
-
-          {/* Volume / Mute Button */}
-          <button
-            onClick={toggleMute}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-            title={isMuted ? 'Включить звук' : 'Выключить звук'}
-            aria-label="Громкость"
-          >
-            {isMuted || volume === 0 ? (
-              <VolumeX className="w-4 h-4 text-red-400" />
-            ) : (
-              <Volume2 className="w-4 h-4" />
-            )}
-          </button>
+          {/* Folder Picker Popover */}
+          {isFolderPickerOpen && scopeMode === 'pinned' && (
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 rounded-xl bg-[#18181c] border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-52 overflow-y-auto">
+              <div className="px-3 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04] mb-1">
+                Закрепить папку
+              </div>
+              {availableFolders.map((folderPath) => (
+                <button
+                  key={folderPath}
+                  onClick={() => {
+                    setPinnedFolder(folderPath);
+                    setIsFolderPickerOpen(false);
+                  }}
+                  className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
+                    pinnedFolder === folderPath
+                      ? 'text-white font-medium bg-white/[0.04]'
+                      : 'text-zinc-400'
+                  }`}
+                >
+                  <Folder className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{folderPath}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </footer>
     </div>
