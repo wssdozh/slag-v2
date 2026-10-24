@@ -1093,6 +1093,47 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Перенесено').first()).toBeVisible({ timeout: 5000 });
   });
 
+  test('25.4. Assistant Follow-up Refinement ("порядок инвертировать задом на перёд")', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Initial intra-day schedule request
+    await textarea.fill('завтрашние задачи можешь разбросать в течении дня');
+    await textarea.press('Enter');
+    await expect(page.locator('text=/Распределение на день|Перенос задач/').first()).toBeVisible({ timeout: 5000 });
+
+    // 3. User follow-up refinement: "нене порядок инвертировать задом на перёд"
+    await textarea.fill('нене порядок инвертировать задом на перёд');
+    await textarea.press('Enter');
+
+    // 4. Verify that action card is refreshed with inverted order and NOT plain text or raw code block
+    await expect(page.locator('text=/Распределение на день|Перенос задач/').last()).toBeVisible({ timeout: 5000 });
+    const applyInvertedBtn = page.locator('button', { hasText: /Применить/ }).last();
+    await expect(applyInvertedBtn).toBeVisible();
+
+    // Verify first task in the inverted batch card is "Полить цветы в кабинете" (lowest priority first)
+    const lastCard = page.locator('.max-w-\\[92\\%\\]').last();
+    await expect(lastCard.locator('text=Полить цветы').first()).toBeVisible();
+
+    // Verify raw code block or leaked suggested status is NOT displayed in user-facing message text
+    await expect(page.locator('text=action:batch_reschedule_tasks')).not.toBeVisible();
+    await expect(page.locator('text=статус: suggested')).not.toBeVisible();
+
+    // 5. Capture visual screenshot of inverted action card
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-followup-invert.png',
+      fullPage: false,
+    });
+
+    // 6. Confirm application of inverted batch
+    await applyInvertedBtn.click();
+    await expect(page.locator('text=Перенесено').last()).toBeVisible({ timeout: 5000 });
+  });
+
   test('26. KIE.AI Provider with Gemini 4 Argon Endpoint and Structured Settings', async ({ page }) => {
     // 1. Open Settings
     await page.locator('button[title*="Настройки"]').first().click();
@@ -2021,6 +2062,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('34. Calendar Drag and Drop including Untimed and Unscheduled Tasks', async ({ page }) => {
+    page.on('console', msg => console.log('CALENDAR PAGE LOG:', msg.text()));
+
     // 1. Switch to Calendar view
     const calendarBtn = page.locator('header button[title*="Календарь"]');
     await expect(calendarBtn).toBeVisible();
@@ -2046,7 +2089,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
 
     // 3. Verify the untimed task is in "Весь день" row
-    const untimedPill = page.locator(`text=${uniqueUntimedTitle}`).first();
+    const untimedPill = page.locator('.min-h-\\[44px\\]').locator(`text=${uniqueUntimedTitle}`).first();
     await expect(untimedPill).toBeVisible();
 
     // 4. Drag untimed task into an hour slot in the time grid (assigns time)
@@ -2111,6 +2154,51 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     await page.screenshot({
       path: 'test-results/screenshots/calendar-month-drag-layout.png',
+      fullPage: false,
+    });
+  });
+
+  test('35. Kanban Drag and Drop without Dockview Tab Interference', async ({ page }) => {
+    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+
+    // 1. Switch to Kanban view
+    const kanbanBtn = page.locator('header button[title*="Канбан"]');
+    await expect(kanbanBtn).toBeVisible();
+    await kanbanBtn.click();
+    await page.waitForTimeout(300);
+
+    // 2. Locate or create a task in "К выполнению"
+    const uniqueKanbanTitle = `КанбанПеренос_${Date.now()}`;
+    const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]').first();
+    await addBtn.click();
+    await page.waitForTimeout(200);
+
+    const input = page.locator('[placeholder*="Название задачи"]');
+    await expect(input).toBeVisible();
+    await input.fill(uniqueKanbanTitle);
+    await input.press('Enter');
+    await page.waitForTimeout(400);
+
+    const taskCard = page.locator('[data-testid="kanban-card"]', { hasText: uniqueKanbanTitle }).first();
+    await expect(taskCard).toBeVisible();
+
+    // 3. Drag taskCard from "К выполнению" to "Бэклог" (immediately adjacent column)
+    const backlogColumn = page.locator('[data-testid="kanban-column-backlog"]');
+    await expect(backlogColumn).toBeVisible();
+    await taskCard.dragTo(backlogColumn);
+    await page.waitForTimeout(400);
+
+    // Verify task is now inside "Бэклог" column
+    const backlogTask = backlogColumn.locator('[data-testid="kanban-card"]', { hasText: uniqueKanbanTitle });
+    await expect(backlogTask).toBeVisible();
+
+    // 4. Verify Dockview tab bar did not trigger residual insertion beams or tab dragging classes
+    const residualTabBeam = await page.locator('.dv-tab--reorder-before, .dv-tab--reorder-after').count();
+    expect(residualTabBeam).toBe(0);
+
+    // 5. Screenshot Kanban Drag & Drop
+    await page.screenshot({
+      path: 'test-results/screenshots/kanban-drag-and-drop-verified.png',
       fullPage: false,
     });
   });

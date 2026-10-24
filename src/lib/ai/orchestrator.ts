@@ -36,24 +36,56 @@ export interface SendAssistantChatResult {
  * Parses embedded action block from assistant response (create_note, schedule_task, reschedule_task, update_task_status, decompose_task, move_note)
  */
 export function extractActionBlock(text: string): { cleanText: string; suggestedAction?: SuggestedAction } {
-  const actionRegex = /```(?:action:[\w_]+|json:[\w_]+)?\s*\n?(\{\s*"action"\s*:\s*"[\w_]+"[\s\S]*?\})\s*```/i;
+  // Matches ```action:name, ```json:name, ```action, ```json or ```\n{...}
+  const actionRegex = /```(?:action:?([\w_]+)|json:?([\w_]+)?|([\w_]+))?\s*\n?(\{[\s\S]*?\})\s*```/i;
   const match = text.match(actionRegex);
 
   if (match) {
     try {
-      const parsed = JSON.parse(match[1]);
+      const tagAction = (match[1] || match[2] || match[3] || '').trim();
+      const jsonStr = match[4] || (match[1]?.startsWith('{') ? match[1] : undefined);
+      if (!jsonStr) return { cleanText: text };
+      const parsed = JSON.parse(jsonStr);
       const cleanText = text.replace(match[0], '').trim();
+      const actionKind = parsed.action || tagAction;
 
-      if (parsed.action === 'create_note' || parsed.action === 'schedule_task') {
+      if (actionKind === 'batch_reschedule' || actionKind === 'batch_reschedule_tasks' || Array.isArray(parsed.items)) {
+        const batchItems: BatchRescheduleItem[] = Array.isArray(parsed.items)
+          ? parsed.items.map((it: any) => ({
+              targetItemId: it.targetItemId || it.id || '',
+              title: it.title || 'Задача',
+              dueDate: it.dueDate,
+              reminder: it.reminder,
+              priority: ['none', 'low', 'medium', 'high'].includes(it.priority) ? it.priority : undefined,
+              reason: it.reason,
+            }))
+          : [];
+        if (batchItems.length > 0) {
+          return {
+            cleanText,
+            suggestedAction: {
+              type: 'batch_reschedule',
+              title: parsed.title || `Перенос задач (${batchItems.length})`,
+              folder: parsed.folder || 'Входящие',
+              content: '',
+              tags: [],
+              itemType: 'task',
+              batchItems,
+            },
+          };
+        }
+      }
+
+      if (actionKind === 'create_note' || actionKind === 'schedule_task') {
         return {
           cleanText,
           suggestedAction: {
-            type: parsed.action === 'schedule_task' ? 'schedule_task' : 'create_note',
+            type: actionKind === 'schedule_task' ? 'schedule_task' : 'create_note',
             title: parsed.title || 'Новая запись',
             folder: parsed.folder || 'Входящие',
             content: parsed.content || '',
             tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-            itemType: ['note', 'task', 'article'].includes(parsed.itemType) ? parsed.itemType : (parsed.action === 'schedule_task' ? 'task' : 'note'),
+            itemType: ['note', 'task', 'article'].includes(parsed.itemType) ? parsed.itemType : (actionKind === 'schedule_task' ? 'task' : 'note'),
             dueDate: parsed.dueDate,
             reminder: parsed.reminder,
             priority: ['none', 'low', 'medium', 'high'].includes(parsed.priority) ? parsed.priority : undefined,
@@ -61,7 +93,7 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
         };
       }
 
-      if (parsed.action === 'reschedule_task') {
+      if (actionKind === 'reschedule_task') {
         return {
           cleanText,
           suggestedAction: {
@@ -75,31 +107,6 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
             dueDate: parsed.dueDate,
             reminder: parsed.reminder,
             priority: ['none', 'low', 'medium', 'high'].includes(parsed.priority) ? parsed.priority : undefined,
-          },
-        };
-      }
-
-      if (parsed.action === 'batch_reschedule') {
-        const batchItems: BatchRescheduleItem[] = Array.isArray(parsed.items)
-          ? parsed.items.map((it: any) => ({
-              targetItemId: it.targetItemId || it.id || '',
-              title: it.title || 'Задача',
-              dueDate: it.dueDate,
-              reminder: it.reminder,
-              priority: ['none', 'low', 'medium', 'high'].includes(it.priority) ? it.priority : undefined,
-              reason: it.reason,
-            }))
-          : [];
-        return {
-          cleanText,
-          suggestedAction: {
-            type: 'batch_reschedule',
-            title: parsed.title || `Перенос задач (${batchItems.length})`,
-            folder: parsed.folder || 'Входящие',
-            content: '',
-            tags: [],
-            itemType: 'task',
-            batchItems,
           },
         };
       }
@@ -905,42 +912,11 @@ ${isInbox
    - get_calendar_agenda: используй для повестки дня, расписания, задач на сегодня/завтра/дату (date: 'YYYY-MM-DD').
    - При вопросах общего характера («что?», «почему?», «не хочу», «поговори со мной», «кто ты?») — отвечай прямо текстом без бессмысленного вызова инструментов.
 
-3. ПРАВИЛО READ-ONLY SAFETY И ДЕЙСТВИЯ:
-   - Прямое удаление заметок запрещено политикой безопасности. Если пользователь просит удалить заметку («удали эту заметку»), прямо поясни, что удаление через чат недоступно, но можно предложить перенести её в архив/корзину через блок action:move_note или сменить статус.
-   - Любые другие мутации (создание, перенос, декомпозиция, расписание) оформляй ТОЛЬКО через блок action:
-- Создание заметки/задачи:
-\`\`\`action:create_note
-{ "action": "create_note", "title": "Название", "folder": "${currentFolder}", "content": "Текст...", "tags": ["тег"], "itemType": "note" }
-\`\`\`
-- Планирование задачи в календаре:
-\`\`\`action:schedule_task
-{ "action": "schedule_task", "title": "Название задачи", "folder": "${currentFolder}", "dueDate": "YYYY-MM-DD", "reminder": "ISO-время", "priority": "high", "itemType": "task" }
-\`\`\`
-- Декомпозиция задачи на чеклист:
-\`\`\`action:decompose_task
-{ "action": "decompose_task", "targetItemId": "id_задачи", "title": "Название задачи", "folder": "${currentFolder}", "subtasks": [{ "title": "Шаг 1", "completed": false }] }
-\`\`\`
-- Смена статуса канбан:
-\`\`\`action:update_task_status
-{ "action": "update_task_status", "targetItemId": "id_задачи", "title": "Название задачи", "status": "in_progress" }
-\`\`\`
-- Перемещение в папку:
-\`\`\`action:move_note
-{ "action": "move_note", "targetItemId": "id_записи", "title": "Название", "folder": "Целевая/Папка" }
-\`\`\`
-- Одиночный перенос срока задачи:
-\`\`\`action:reschedule_task
-{ "action": "reschedule_task", "targetItemId": "id_задачи", "title": "Название задачи", "dueDate": "YYYY-MM-DD", "reminder": "ISO-время", "priority": "high" }
-\`\`\`
-- Пакетный перенос нескольких задач (на одну дату или с распределением по дням):
-\`\`\`action:batch_reschedule
-{ "action": "batch_reschedule", "items": [{ "targetItemId": "id_задачи", "title": "Название", "dueDate": "YYYY-MM-DD", "reminder": "ISO-время", "priority": "high", "reason": "Свободный слот" }] }
-\`\`\`
-- Дополнение существующей заметки:
-\`\`\`action:append_to_note
-{ "action": "append_to_note", "targetItemId": "id_заметки", "title": "Название", "content": "Текст добавления..." }
-\`\`\`
-Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.
+3. ИНСТРУМЕНТЫ (TOOL CALLING) И ПРАВИЛО READ-ONLY SAFETY:
+   - Все действия в приложении (создание, перенос, изменение, декомпозиция) выполняются ИСКЛЮЧИТЕЛЬНО через нативные вызовы инструментов (tool_calls).
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать в текст ответа псевдокод вида action:... или сырой JSON! Вызывай соответствующие функции API (create_note, schedule_task, reschedule_task, batch_reschedule_tasks, decompose_task, update_task_status, move_note, append_to_note).
+   - Прямое удаление заметок запрещено политикой безопасности. Если пользователь просит удалить заметку («удали эту заметку»), прямо поясни, что удаление через чат недоступно, но можно предложить перенести её в архив/корзину через move_note или сменить статус.
+   - Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.
 
 ФИЛЬТРАЦИЯ ЛЕНТЫ:
 - Если пользователь пишет «а с фильтром», «покажи в ленте с фильтром», «отфильтруй по этим задачам» — вызови инструмент filter_feed!
@@ -957,10 +933,16 @@ ${isInbox
 - СОСТАВНЫЕ УСЛОВИЯ ПЕРЕНОСА («1. задачу на завтра, остальные две на послезавтра»):
   * СТРОГО вызывай batch_reschedule_tasks, где каждому объекту в items назначается своя дата dueDate!
 
-4. РАБОТА С КОНТЕКСТОМ И ТРАНСФОРМАЦИЯ ЧЕРНОВИКОВ:
+4. РЕАКТИВНОСТЬ НА КОРРЕКТИРОВКИ (FOLLOW-UP REFINEMENT):
+   - Если пользователь просит изменить, скорректировать, инвертировать порядок, сдвинуть время или состав ранее предложенных задач («нене порядок инвертировать задом на перёд», «сделай наоборот», «не в 10, а в 12», «поменяй местами», «убери одну», «добавь еще», «да теперь предложи»):
+     * ТЫ ОБЯЗАН СРАЗУ ЖЕ ВЫЗВАТЬ соответствующий инструмент (например, batch_reschedule_tasks или reschedule_task) с обновленными параметрами!
+     * НЕ ограничивайся просто текстовым описанием или списком! Всегда сопровождай ответ вызовом инструмента, чтобы в интерфейсе появилась обновленная карточка с кнопкой «Применить».
+     * При запросе «инвертировать задом наперед» — переверни список задач и распредели временные слоты (reminder) в обратном порядке (например, задачи с низким приоритетом на более раннее время).
+
+5. РАБОТА С КОНТЕКСТОМ И ТРАНСФОРМАЦИЯ ЧЕРНОВИКОВ:
    - Если пользователь просит переделать, развить или преобразовать предыдущую запись («сделай из этого статью», «преврати в задачу», «добавь деталей», «добавь этой таске подробности»):
    - Опирайся на тему и текст предыдущего черновика из истории диалога.
-   - Сформируй обновленный вызов инструмента create_note / schedule_task или блок действия action:create_note.
+   - Сформируй обновленный вызов инструмента create_note / schedule_task.
    - Если пользователь сообщает дополнительные подробности («требуемые инструменты бритва», «детали:...») — ОБНОВИ черновик задачи/заметки, включив этот текст в поле content.
    - НЕ вызывай search_notes на такие контекстные просьбы и уточнения!`;
 
@@ -1400,7 +1382,7 @@ ${isInbox
 
     // Check 2.5: Reschedule tasks (Single & Batch with Todoist parsing & multi-date distribution)
     const isRescheduleIntent =
-      /перенес|сдвин|раскид|разброс|распредел|отлож|передвин/i.test(lowerMsg) ||
+      /перенес|сдвин|раскид|разброс|распредел|отлож|передвин|инвертир|задом на пер/i.test(lowerMsg) ||
       (lowerMsg.includes('задач') && (lowerMsg.includes('на завтра') || lowerMsg.includes('на послезавтра')));
 
     if (isRescheduleIntent) {
@@ -1439,12 +1421,24 @@ ${isInbox
 
       if (candidateTasks.length === 0) {
         for (let i = messages.length - 1; i >= 0; i--) {
-          const text = messages[i].content;
+          const text = messages[i].content || '';
           const wikiMatches = Array.from(text.matchAll(/\[\[([^\]]+)\]\]/g)).map(m => m[1]);
           if (wikiMatches.length > 0) {
             candidateTasks = allTasks.filter(t => wikiMatches.some(w => w.toLowerCase() === t.title.toLowerCase()));
             if (candidateTasks.length > 0) break;
           }
+          const mentioned = allTasks.filter(t => t.title.length > 3 && text.toLowerCase().includes(t.title.toLowerCase()));
+          if (mentioned.length > 0) {
+            candidateTasks = mentioned;
+            break;
+          }
+        }
+      }
+
+      if (candidateTasks.length === 0) {
+        const hasTomorrowContext = messages.some(m => m.content && (m.content.includes('завтра') || m.content.includes(tomorrow)));
+        if (hasTomorrowContext) {
+          candidateTasks = allTasks.filter(t => t.status !== 'done' && (t.dueDate === tomorrow || !t.dueDate));
         }
       }
 
@@ -1472,6 +1466,7 @@ ${isInbox
         }
 
         const isCompositeSplit = (hasNumberSplit || Boolean(namedTaskTarget)) && candidateTasks.length > 1;
+        const isInverse = lowerMsg.includes('инверт') || lowerMsg.includes('задом на пер') || lowerMsg.includes('наоборот');
 
         const isIntraDay =
           lowerMsg.includes('в течении дня') ||
@@ -1479,6 +1474,7 @@ ${isInbox
           lowerMsg.includes('по часам') ||
           lowerMsg.includes('в течении суток') ||
           lowerMsg.includes('в течение суток') ||
+          isInverse ||
           (lowerMsg.includes('день') && /разброс|раскид|распредел/i.test(lowerMsg) && !lowerMsg.includes('по дням'));
 
         const isDistribute =
@@ -1536,7 +1532,7 @@ ${isInbox
           }
           const pA = priorityOrder[a.priority || 'none'] || 0;
           const pB = priorityOrder[b.priority || 'none'] || 0;
-          return pB - pA;
+          return isInverse ? pA - pB : pB - pA;
         });
 
         const tomorrowIso = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -1552,7 +1548,7 @@ ${isInbox
             const slot = timeSlots[Math.min(idx, timeSlots.length - 1)];
             dueDate = baseDate;
             reminder = `${baseDate}T${slot}:00`;
-            reason = `Слот ${slot}`;
+            reason = isInverse ? `Инвертированный слот ${slot}` : `Слот ${slot}`;
           } else if (isCompositeSplit) {
             // Named or first task -> tomorrow; remaining tasks -> day after tomorrow
             const isLead = namedTaskTarget ? t.id === namedTaskTarget.id : idx === 0;
@@ -1584,7 +1580,9 @@ ${isInbox
         };
 
         let messageText = `Перенес ${batchItems.length} задач на ${baseDate}.`;
-        if (isIntraDay) {
+        if (isInverse) {
+          messageText = `Инвертировал порядок ${batchItems.length} задач (задом наперед) на ${baseDate}.`;
+        } else if (isIntraDay) {
           messageText = `Разбросал ${batchItems.length} задач на ${baseDate} в течение дня по слотам времени.`;
         } else if (isCompositeSplit) {
           const leadTitle = namedTaskTarget ? namedTaskTarget.title : sortedTasks[0].title;

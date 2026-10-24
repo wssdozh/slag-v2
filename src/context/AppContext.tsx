@@ -1110,12 +1110,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         messages: newHistory.map(m => {
           let content = m.content || '';
           const actionItems = m.suggestedActions || (m.suggestedAction ? [m.suggestedAction] : []);
-          if (actionItems.length > 0) {
-            const actionDescs = actionItems.map(sa => `Предложенное действие: «${sa.title}» (${sa.type}), статус: ${sa.actionState || 'suggested'}.`).join('\n');
-            if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
-              content = actionDescs;
-            } else {
-              content = `${content.trim()}\n${actionDescs}`;
+          if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
+            if (actionItems.length > 0) {
+              content = actionItems.map(sa => `[Подготовлено действие: «${sa.title}»]`).join('\n');
             }
           }
           return { role: m.role, content: content.trim() || '[Сообщение]' };
