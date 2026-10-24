@@ -28,6 +28,7 @@ interface AudioPlayerProps {
   compact?: boolean;
   timeContext?: string;
   transcript?: string;
+  extractedText?: string;
   summary?: string;
   enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
   onEnrich?: () => void;
@@ -54,11 +55,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   waveform: customWaveform,
   compact = false,
   timeContext,
-  transcript,
+  transcript: propTranscript,
+  extractedText: propExtractedText,
   summary: _summary,
   enrichmentStatus = 'idle',
   onEnrich,
 }) => {
+  const transcript = propTranscript || propExtractedText;
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(initialDuration || 0);

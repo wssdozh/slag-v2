@@ -1,10 +1,27 @@
 import { useMemo } from 'react';
 import type { SlagItem } from '../../types';
+import type { LightboxImage } from '../UI/ImageLightbox';
 
 export interface FolderMediaData {
-  allImages: Array<{ id: string; name: string; url: string }>;
-  allAudio: Array<{ id: string; name: string; url: string }>;
-  allFiles: Array<{ id: string; name: string; url: string; size: number }>;
+  allImages: LightboxImage[];
+  allAudio: Array<{
+    id: string;
+    name: string;
+    url: string;
+    extractedText?: string;
+    summary?: string;
+    enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
+    enrichmentError?: string;
+    itemId?: string;
+  }>;
+  allFiles: Array<{
+    id: string;
+    name: string;
+    url: string;
+    size: number;
+    summary?: string;
+    extractedText?: string;
+  }>;
   allLinks: Array<{ text: string; url: string }>;
   folderTags: Set<string>;
   notesCount: number;
@@ -14,9 +31,9 @@ export interface FolderMediaData {
 
 export function useFolderMedia(items: SlagItem[]): FolderMediaData {
   return useMemo(() => {
-    const allImages: Array<{ id: string; name: string; url: string }> = [];
-    const allAudio: Array<{ id: string; name: string; url: string }> = [];
-    const allFiles: Array<{ id: string; name: string; url: string; size: number }> = [];
+    const allImages: LightboxImage[] = [];
+    const allAudio: FolderMediaData['allAudio'] = [];
+    const allFiles: FolderMediaData['allFiles'] = [];
     const allLinks: Array<{ text: string; url: string }> = [];
     const folderTags = new Set<string>();
 
@@ -33,11 +50,36 @@ export function useFolderMedia(items: SlagItem[]): FolderMediaData {
 
       (item.attachments || []).forEach(att => {
         if (att.type === 'image' && att.dataUrl) {
-          allImages.push({ id: att.id, name: att.name, url: att.dataUrl });
+          allImages.push({
+            id: att.id,
+            name: att.name,
+            url: att.dataUrl,
+            extractedText: att.extractedText,
+            summary: att.summary,
+            enrichmentStatus: att.enrichmentStatus,
+            enrichmentError: att.enrichmentError,
+            itemId: item.id,
+          });
         } else if (att.type === 'audio' && att.dataUrl) {
-          allAudio.push({ id: att.id, name: att.name, url: att.dataUrl });
+          allAudio.push({
+            id: att.id,
+            name: att.name,
+            url: att.dataUrl,
+            extractedText: att.extractedText,
+            summary: att.summary,
+            enrichmentStatus: att.enrichmentStatus,
+            enrichmentError: att.enrichmentError,
+            itemId: item.id,
+          });
         } else if (att.type === 'file' && att.dataUrl) {
-          allFiles.push({ id: att.id, name: att.name, url: att.dataUrl, size: att.size });
+          allFiles.push({
+            id: att.id,
+            name: att.name,
+            url: att.dataUrl,
+            size: att.size,
+            summary: att.summary,
+            extractedText: att.extractedText,
+          });
         }
       });
 

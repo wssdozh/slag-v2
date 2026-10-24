@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
@@ -14,6 +14,8 @@ import { ImageLightbox } from './components/UI/ImageLightbox';
 import { LogModal } from './components/Logs/LogModal';
 import { useVisualViewport } from './hooks/useVisualViewport';
 import { Monitor } from 'lucide-react';
+import { enrichAttachment, extractFocalContext } from './lib/attachmentEnrichment';
+import type { LightboxImage } from './components/UI/ImageLightbox';
 
 const AppContent: React.FC = () => {
   const {
@@ -24,7 +26,40 @@ const AppContent: React.FC = () => {
     activeLightboxIndex,
     closeLightbox,
     navigateLightbox,
+    updateLightboxImage,
+    items,
+    updateItem,
+    aiSettings,
   } = useApp();
+
+  const handleRetryEnrich = useCallback(async (image: LightboxImage) => {
+    if (!image.itemId || !image.id) return;
+    const parentItem = items.find(i => i.id === image.itemId);
+    if (!parentItem) return;
+    const targetAtt = parentItem.attachments?.find(a => a.id === image.id);
+    if (!targetAtt) return;
+
+    updateLightboxImage(image.id, { enrichmentStatus: 'processing', enrichmentError: undefined });
+
+    try {
+      const enriched = await enrichAttachment(targetAtt, extractFocalContext(parentItem), aiSettings);
+      updateLightboxImage(image.id, {
+        extractedText: enriched.extractedText,
+        summary: enriched.summary,
+        enrichmentStatus: enriched.enrichmentStatus,
+        enrichmentError: enriched.enrichmentError,
+      });
+
+      const updatedAttachments = parentItem.attachments?.map(a => a.id === targetAtt.id ? enriched : a);
+      const updatedItem = { ...parentItem, attachments: updatedAttachments };
+      await updateItem(updatedItem);
+    } catch (err: any) {
+      updateLightboxImage(image.id, {
+        enrichmentStatus: 'error',
+        enrichmentError: err?.message || 'Ошибка обработки',
+      });
+    }
+  }, [items, updateItem, aiSettings, updateLightboxImage]);
 
   useVisualViewport();
 
@@ -62,6 +97,7 @@ const AppContent: React.FC = () => {
           isOpen={activeLightboxIndex !== null}
           onClose={closeLightbox}
           onNavigate={navigateLightbox}
+          onRetryEnrich={handleRetryEnrich}
         />
       </div>
     );
@@ -89,6 +125,7 @@ const AppContent: React.FC = () => {
         isOpen={activeLightboxIndex !== null}
         onClose={closeLightbox}
         onNavigate={navigateLightbox}
+        onRetryEnrich={handleRetryEnrich}
       />
     </div>
   );

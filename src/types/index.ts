@@ -109,6 +109,11 @@ export interface LightboxImage {
   id?: string;
   name: string;
   url: string;
+  extractedText?: string;
+  summary?: string;
+  enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
+  enrichmentError?: string;
+  itemId?: string;
 }
 
 export type SuggestedActionType =

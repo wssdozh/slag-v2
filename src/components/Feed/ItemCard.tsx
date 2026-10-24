@@ -207,6 +207,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           id: att.id,
           name: att.name,
           url: att.dataUrl!,
+          extractedText: att.extractedText,
+          summary: att.summary,
+          enrichmentStatus: att.enrichmentStatus,
+          enrichmentError: att.enrichmentError,
+          itemId: it.id,
         }))
     );
     const targetIdx = folderImages.findIndex(fi => fi.url === img.dataUrl);

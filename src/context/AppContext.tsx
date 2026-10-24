@@ -80,6 +80,7 @@ interface AppContextType {
   openLightbox: (images: LightboxImage[], index?: number) => void;
   closeLightbox: () => void;
   navigateLightbox: (newIndex: number) => void;
+  updateLightboxImage: (id: string, updates: Partial<LightboxImage>) => void;
 
   // Layout & Resizing
   sidebarWidth: number;
@@ -226,6 +227,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const navigateLightbox = useCallback((newIndex: number) => {
     setActiveLightboxIndex(newIndex);
+  }, []);
+
+  const updateLightboxImage = useCallback((id: string, updates: Partial<LightboxImage>) => {
+    setLightboxImages(prev => prev.map(img => img.id === id ? { ...img, ...updates } : img));
   }, []);
   
   const [isFullscreenEditorOpen, setIsFullscreenEditorOpen] = useState<boolean>(false);
@@ -1089,6 +1094,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openLightbox,
         closeLightbox,
         navigateLightbox,
+        updateLightboxImage,
         sidebarWidth,
         rightPanelWidth,
         setSidebarWidth,

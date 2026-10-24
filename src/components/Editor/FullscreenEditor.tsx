@@ -519,6 +519,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                             duration={att.duration}
                             waveform={att.waveform}
                             size={att.size}
+                            extractedText={att.extractedText}
+                            enrichmentStatus={att.enrichmentStatus}
                           />
                         </div>
                       ) : att.type === 'video' ? (
@@ -538,7 +540,16 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                           <div
                             onClick={() => {
                               if (att.dataUrl) {
-                                openLightbox([{ id: att.id, name: att.name, url: att.dataUrl }], 0);
+                                openLightbox([{
+                                  id: att.id,
+                                  name: att.name,
+                                  url: att.dataUrl,
+                                  extractedText: att.extractedText,
+                                  summary: att.summary,
+                                  enrichmentStatus: att.enrichmentStatus,
+                                  enrichmentError: att.enrichmentError,
+                                  itemId: item.id,
+                                }], 0);
                               }
                             }}
                             className="w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"

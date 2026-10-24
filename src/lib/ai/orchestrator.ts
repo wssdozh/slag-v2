@@ -7,7 +7,7 @@ import type {
 import { OpenAiChatAdapter } from './adapters/openAiAdapter';
 import { AnthropicMessagesAdapter } from './adapters/anthropicAdapter';
 import { storage } from '../storage';
-import { querySearch } from '../searchService';
+import { querySearch, getSearchableAttachmentText } from '../searchService';
 import { serializeItemToMarkdown } from '../markdownSerializer';
 import { logger } from '../logger';
 
@@ -209,14 +209,22 @@ export class AssistantOrchestrator {
           ? results.filter((i) => i.folder === folderFilter)
           : results;
 
-        return filtered.slice(0, 5).map((item) => ({
-          id: item.id,
-          title: item.title,
-          type: item.type,
-          folder: item.folder,
-          tags: item.tags,
-          snippet: item.content.slice(0, 200),
-        }));
+        return filtered.slice(0, 5).map((item) => {
+          const bodySnippet = (item.content || '').slice(0, 200).trim();
+          const attachSnippet = getSearchableAttachmentText(item.attachments).slice(0, 200).trim();
+          let snippet = bodySnippet;
+          if (attachSnippet) {
+            snippet = snippet ? `${snippet} [Вложения: ${attachSnippet}]` : `[Вложения: ${attachSnippet}]`;
+          }
+          return {
+            id: item.id,
+            title: item.title,
+            type: item.type,
+            folder: item.folder,
+            tags: item.tags,
+            snippet: snippet || '(пусто)',
+          };
+        });
       }
 
       if (name === 'read_note') {
@@ -227,11 +235,30 @@ export class AssistantOrchestrator {
           note = allItems.find((i) => i.title.toLowerCase() === cleanTitle || i.title.toLowerCase().includes(cleanTitle));
         }
         if (!note) return { error: `Заметка с ID/названием "${args.id}" не найдена` };
+
+        let markdown = serializeItemToMarkdown(note);
+        const enriched = (note.attachments || []).filter(a => a.extractedText || a.summary);
+        if (enriched.length > 0) {
+          const attachBlock = enriched.map(att => {
+            const icon = att.type === 'audio' ? '🎙' : att.type === 'image' ? '🖼' : '📄';
+            const label = att.summary ? `**${att.name}** (Суть: ${att.summary})` : `**${att.name}**`;
+            const text = att.extractedText ? `\n> ${att.extractedText.replace(/\n/g, '\n> ')}` : '';
+            return `- ${icon} ${label}${text}`;
+          }).join('\n');
+          markdown = `${markdown}\n\n### Вложения и расшифровки\n${attachBlock}`;
+        }
+
         return {
           id: note.id,
           title: note.title,
           folder: note.folder,
-          markdown: serializeItemToMarkdown(note).slice(0, 4000),
+          markdown: markdown.slice(0, 4500),
+          attachments: (note.attachments || []).map(att => ({
+            name: att.name,
+            type: att.type,
+            summary: att.summary,
+            extractedText: att.extractedText ? att.extractedText.slice(0, 300) : undefined,
+          })),
         };
       }
 
@@ -372,13 +399,13 @@ export class AssistantOrchestrator {
     const canonicalTools: AssistantToolDefinition[] = [
       {
         name: 'search_notes',
-        description: 'Полнотекстовый нечеткий поиск по заметкам, таскам и статьям базы знаний с поддержкой опечаток и токенов.',
+        description: 'Полнотекстовый нечеткий поиск по заметкам, таскам, статьям, а также по расшифровкам аудиозаписей (Whisper), распознанному тексту изображений (OCR) и саммари файлов.',
         parameters: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
-              description: 'Поисковый запрос. Передавай ключевые существительные или основы слов (1-3 слова). Обязательно исправляй опечатки пользователя (например: "прафилам как жить" -> "правила") и удаляй разговорный шум.',
+              description: 'Поисковый запрос. Передавай ключевые существительные или основы слов (1-3 слова). Поддерживается поиск по голосовым заметкам и изображениям. Обязательно исправляй опечатки пользователя (например: "прафилам как жить" -> "правила") и удаляй разговорный шум.',
             },
           },
           required: ['query'],
@@ -535,7 +562,9 @@ ${isInbox
 
 2. МНОГОШАГОВЫЙ АГЕНТНЫЙ ПОИСК (MULTI-STEP AGENTIC WORKFLOW):
    - Ты поддерживаешь цепочки вызовов инструментов (до 4 раундов в одном диалоговом ходе).
-   - Если для ответа недостаточно сниппета из поиска — сначала вызови search_notes, а получив список заметок, в следующем шаге вызови read_note по названию или id нужной заметки.
+   - Заметки могут содержать голосовые аудиозаписи, скриншоты/фотографии и документы. Их расшифровки речи (Whisper), распознанный текст (OCR) и саммари автоматически индексируются в поиске и возвращаются в search_notes (сниппеты вида [Вложения: ...]) и в read_note.
+   - Когда пользователь спрашивает «что я говорил в голосовом про X?», «найди чек/скриншот с Y» или любые факты из базы — СНАЧАЛА вызови search_notes по ключевым словам.
+   - Если для ответа недостаточно сниппета из поиска — вызови read_note по названию или id нужной заметки.
    - НОРМАЛИЗАЦИЯ ЗАПРОСОВ: При вызове search_notes очищай запрос от стоп-слов («поищи», «как», «вообще», «что») и исправляй опечатки пользователя (например, «прафилам как жить вообще» -> search_notes("правила")). Не копируй опечатки и шум буквально.
    - get_calendar_agenda: используй для повестки дня, расписания, задач на сегодня/завтра/дату (date: 'YYYY-MM-DD').
    - При вопросах общего характера («что?», «почему?», «не хочу», «поговори со мной», «кто ты?») — отвечай прямо текстом без бессмысленного вызова инструментов.
@@ -1235,7 +1264,7 @@ ${isInbox
       const list = searchResults.map((r: any) => `- [[${r.title}]] (${r.folder}): ${r.snippet}`).join('\n');
       return {
         content: `По вашему запросу найдены следующие записи в контексте "${isInbox ? 'Все хранилище' : currentFolder}":\n\n${list}`,
-        reasoning: `Выполнен локальный BM25 поиск Orama по запросу: "${lastUserMsg}"`,
+        reasoning: `Выполнен поиск Orama по базе и вложениям по запросу: "${lastUserMsg}"`,
         reasoningTimeMs: Date.now() - startTime,
         toolCalls: executedToolCalls,
       };

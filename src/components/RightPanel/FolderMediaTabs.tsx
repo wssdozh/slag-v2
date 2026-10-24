@@ -9,12 +9,13 @@ import {
 } from 'lucide-react';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import type { FolderMediaData } from './useFolderMedia';
+import type { LightboxImage } from '../../types';
 
 export type FolderMediaTabId = 'media' | 'audio' | 'files' | 'links' | 'tags';
 
 export interface FolderMediaTabsProps {
   mediaData: FolderMediaData;
-  onOpenLightbox: (images: Array<{ id: string; name: string; url: string }>, index: number) => void;
+  onOpenLightbox: (images: LightboxImage[], index: number) => void;
   onSelectTag?: (tag: string) => void;
   variant?: 'desktop' | 'mobile';
   className?: string;
@@ -117,7 +118,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
             <div className={`grid grid-cols-3 ${isMobile ? 'gap-2' : 'gap-1.5'}`}>
               {allImages.map((img, idx) => (
                 <div
-                  key={img.id + idx}
+                  key={(img.id || img.url) + idx}
                   onClick={() => onOpenLightbox(allImages, idx)}
                   className={`aspect-square overflow-hidden bg-black/40 border border-white/[0.06] cursor-pointer hover:opacity-90 active:scale-95 transition-all ${
                     isMobile ? 'rounded-xl' : 'rounded'
@@ -144,7 +145,11 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                   className={isMobile ? 'p-3 rounded-xl bg-[#141417] border border-white/[0.06]' : 'p-1'}
                 >
                   {isMobile && <div className="text-xs text-zinc-300 font-medium mb-1.5">{aud.name}</div>}
-                  <AudioPlayer src={aud.url} />
+                  <AudioPlayer
+                    src={aud.url}
+                    extractedText={aud.extractedText}
+                    enrichmentStatus={aud.enrichmentStatus}
+                  />
                 </div>
               ))}
             </div>

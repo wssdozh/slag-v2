@@ -50,6 +50,9 @@ export function serializeItemToMarkdown(item: SlagItem): string {
       relativePath: att.relativePath,
       ...(att.duration !== undefined ? { duration: att.duration } : {}),
       ...(att.waveform ? { waveform: att.waveform } : {}),
+      ...(att.extractedText ? { extractedText: att.extractedText } : {}),
+      ...(att.summary ? { summary: att.summary } : {}),
+      ...(att.enrichmentStatus ? { enrichmentStatus: att.enrichmentStatus } : {}),
     }));
   }
 

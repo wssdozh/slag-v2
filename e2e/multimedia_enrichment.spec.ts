@@ -167,5 +167,135 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
       path: 'screenshots/multimedia-search.png',
       fullPage: true,
     });
+
+    // Close search dialog
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // --- Verify Lightbox Full View with OCR side panel ---
+    const imageThumb = imageCard.locator('img').first();
+    await expect(imageThumb).toBeVisible();
+    await imageThumb.click();
+
+    // Check lightbox opened
+    const textToggleBtn = page.locator('button[aria-label="Распознанный текст"]');
+    await expect(textToggleBtn).toBeVisible({ timeout: 5000 });
+
+    // Open text panel via button click
+    await textToggleBtn.click();
+
+    // Verify side panel elements
+    await expect(page.locator('text=Текст и описание')).toBeVisible();
+    await expect(page.locator('text=Чек за протеин 2400 руб')).toBeVisible();
+    await expect(page.locator('text=PROTEIN WHEY 1000g - 2400 RUB').last()).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Копировать' })).toBeVisible();
+
+    // Take screenshot of Lightbox with OCR side panel
+    await page.screenshot({
+      path: 'screenshots/lightbox-ocr-view.png',
+      fullPage: true,
+    });
+
+    // Test hotkey 'T' toggle
+    await page.keyboard.press('t');
+    await expect(page.locator('text=Текст и описание')).toBeHidden();
+
+    await page.keyboard.press('t');
+    await expect(page.locator('text=Текст и описание')).toBeVisible();
+
+    // Close panel by Escape, then close lightbox
+    await page.keyboard.press('Escape');
+    await expect(page.locator('text=Текст и описание')).toBeHidden();
+
+    await page.keyboard.press('Escape');
+    await expect(textToggleBtn).toBeHidden();
+  });
+
+  test('Assistant tools search_notes and read_note return enriched multimedia context', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const result = await page.evaluate(async () => {
+      // Dynamic import to test production orchestrator in the browser context
+      const { assistantOrchestrator } = await import('/src/lib/ai/orchestrator.ts');
+      const now = Date.now();
+
+      const items: any[] = [
+        {
+          id: 'test_voice_1',
+          type: 'note',
+          title: 'Голосовая заметка тренера',
+          content: '',
+          folder: 'Входящие',
+          tags: ['спорт'],
+          attachments: [{
+            id: 'att_v1',
+            name: 'coach_voice.webm',
+            type: 'audio',
+            mimeType: 'audio/webm',
+            size: 15000,
+            relativePath: '.attachments/coach_voice.webm',
+            extractedText: 'Принять креатин 5 грамм перед тренировкой груди',
+            enrichmentStatus: 'ready',
+          }],
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 'test_receipt_1',
+          type: 'note',
+          title: 'Счет за хостинг',
+          content: 'Оплата облака',
+          folder: 'Входящие',
+          tags: ['финансы'],
+          attachments: [{
+            id: 'att_r1',
+            name: 'cloud_bill.png',
+            type: 'image',
+            mimeType: 'image/png',
+            size: 24000,
+            relativePath: '.attachments/cloud_bill.png',
+            extractedText: 'INVOICE #9812 - HETZNER CLOUD 45.50 EUR PAID',
+            summary: 'Счет за облачный сервер Hetzner 45.50 EUR',
+            enrichmentStatus: 'ready',
+          }],
+          createdAt: now - 1000,
+          updatedAt: now - 1000,
+        },
+      ];
+
+      // Test local search_notes via runChat
+      const searchResVoice = await assistantOrchestrator.runChat({
+        messages: [{ role: 'user', content: 'креатин' }],
+        currentFolder: 'Входящие',
+        settings: { provider: 'local', groqApiKey: '', kieApiKey: '', model: 'auto', reasoningEffort: 'none', webSearchEnabled: false } as any,
+        folders: [{ id: 'inbox', name: 'Входящие', path: 'Входящие', order: 0, icon: 'Inbox' }],
+        allItems: items,
+      });
+
+      const searchResInvoice = await assistantOrchestrator.runChat({
+        messages: [{ role: 'user', content: 'Hetzner' }],
+        currentFolder: 'Входящие',
+        settings: { provider: 'local', groqApiKey: '', kieApiKey: '', model: 'auto', reasoningEffort: 'none', webSearchEnabled: false } as any,
+        folders: [{ id: 'inbox', name: 'Входящие', path: 'Входящие', order: 0, icon: 'Inbox' }],
+        allItems: items,
+      });
+
+      return {
+        voiceSearchContent: searchResVoice.content,
+        voiceSearchToolCalls: searchResVoice.toolCalls,
+        invoiceSearchContent: searchResInvoice.content,
+        invoiceSearchToolCalls: searchResInvoice.toolCalls,
+      };
+    });
+
+    // 1. Check Voice search found by transcript text
+    expect(result.voiceSearchContent).toContain('Голосовая заметка тренера');
+    expect(result.voiceSearchContent).toContain('Вложения');
+    expect(result.voiceSearchContent).toContain('Принять креатин 5 грамм');
+
+    // 2. Check Image search found by OCR text
+    expect(result.invoiceSearchContent).toContain('Счет за хостинг');
+    expect(result.invoiceSearchContent).toContain('HETZNER CLOUD');
   });
 });
