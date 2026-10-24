@@ -18,6 +18,17 @@ export const ToastContainer: React.FC = () => {
           {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
           {toast.type === 'info' && <Info className="w-4 h-4 text-zinc-400 shrink-0" />}
           <span className="font-medium tracking-tight text-xs">{toast.text}</span>
+          {toast.action && (
+            <button
+              onClick={() => {
+                toast.action!.onClick();
+                removeToast(toast.id);
+              }}
+              className="ml-1.5 px-2 py-0.5 rounded text-2xs font-mono font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            >
+              {toast.action.label}
+            </button>
+          )}
           <button
             onClick={() => removeToast(toast.id)}
             className="ml-1 p-0.5 rounded text-zinc-400 hover:text-zinc-200 transition-colors"

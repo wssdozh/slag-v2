@@ -1,4 +1,4 @@
-import type { SlagItem, FolderMeta, AiSettings, SuggestedAction, ChatToolCall } from '../../types';
+import type { SlagItem, FolderMeta, AiSettings, SuggestedAction, ChatToolCall, BatchRescheduleItem } from '../../types';
 import type {
   AssistantToolDefinition,
   AdapterTurnHistoryItem,
@@ -10,6 +10,7 @@ import { storage } from '../storage';
 import { querySearch, getSearchableAttachmentText } from '../searchService';
 import { serializeItemToMarkdown } from '../markdownSerializer';
 import { logger } from '../logger';
+import { parseTodoistInput } from '../todoistTaskParser';
 
 const aiLog = logger.scope('AI');
 
@@ -27,6 +28,7 @@ export interface SendAssistantChatResult {
   reasoningTimeMs?: number;
   toolCalls?: ChatToolCall[];
   suggestedAction?: SuggestedAction;
+  feedFilter?: { itemIds: string[]; queryLabel: string };
 }
 
 /**
@@ -71,6 +73,32 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
             itemType: 'task',
             dueDate: parsed.dueDate,
             reminder: parsed.reminder,
+            priority: ['none', 'low', 'medium', 'high'].includes(parsed.priority) ? parsed.priority : undefined,
+          },
+        };
+      }
+
+      if (parsed.action === 'batch_reschedule') {
+        const batchItems: BatchRescheduleItem[] = Array.isArray(parsed.items)
+          ? parsed.items.map((it: any) => ({
+              targetItemId: it.targetItemId || it.id || '',
+              title: it.title || 'Задача',
+              dueDate: it.dueDate,
+              reminder: it.reminder,
+              priority: ['none', 'low', 'medium', 'high'].includes(it.priority) ? it.priority : undefined,
+              reason: it.reason,
+            }))
+          : [];
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'batch_reschedule',
+            title: parsed.title || `Перенос задач (${batchItems.length})`,
+            folder: parsed.folder || 'Входящие',
+            content: '',
+            tags: [],
+            itemType: 'task',
+            batchItems,
           },
         };
       }
@@ -113,6 +141,22 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
         };
       }
 
+      if (parsed.action === 'append_to_note') {
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'append_to_note',
+            targetItemId: parsed.targetItemId,
+            title: parsed.title || 'Дополнение заметки',
+            folder: parsed.folder || 'Входящие',
+            content: parsed.content || '',
+            appendContent: parsed.content || '',
+            tags: [],
+            itemType: 'note',
+          },
+        };
+      }
+
       if (parsed.action === 'move_note') {
         return {
           cleanText,
@@ -129,6 +173,45 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
       }
     } catch {
       // JSON parse failed, return as is
+    }
+  }
+
+  // Safeguard against raw pseudo-protocol string leak:
+  // e.g. [Действие ассистента: batch_reschedule_tasks | ... | Параметры: {"items":[...]}]
+  const pseudoActionRegex = /\[Действие ассистента:\s*([\w_]+)\s*\|[^|]*\|[^|]*Параметры:\s*(\{[\s\S]*?\})\s*\]/i;
+  const pseudoMatch = text.match(pseudoActionRegex);
+  if (pseudoMatch) {
+    try {
+      const actionName = pseudoMatch[1].trim();
+      const params = JSON.parse(pseudoMatch[2]);
+      const cleanText = text.replace(pseudoMatch[0], '').trim();
+
+      if (actionName === 'batch_reschedule_tasks' || actionName === 'batch_reschedule') {
+        const batchItems: BatchRescheduleItem[] = Array.isArray(params.items)
+          ? params.items.map((it: any) => ({
+              targetItemId: it.targetItemId || it.id || '',
+              title: it.title || 'Задача',
+              dueDate: it.dueDate,
+              reminder: it.reminder,
+              priority: it.priority,
+              reason: it.reason,
+            }))
+          : [];
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'batch_reschedule',
+            title: `Перенос задач (${batchItems.length})`,
+            folder: 'Входящие',
+            content: '',
+            tags: [],
+            itemType: 'task',
+            batchItems,
+          },
+        };
+      }
+    } catch {
+      // Ignore fallback error
     }
   }
 
@@ -179,6 +262,7 @@ export class AssistantOrchestrator {
 
     const startTime = Date.now();
     let capturedAction: SuggestedAction | undefined;
+    let capturedFeedFilter: { itemIds: string[]; queryLabel: string } | undefined;
 
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
@@ -332,6 +416,116 @@ export class AssistantOrchestrator {
         };
       }
 
+      if (name === 'reschedule_task') {
+        const today = new Date().toISOString().slice(0, 10);
+        const titleQuery = String(args.title || '').trim().toLowerCase();
+        const targetId = String(args.targetItemId || '').trim();
+        const found = allItems.find((i) => i.type === 'task' && (i.id === targetId || (titleQuery && (i.title.toLowerCase().includes(titleQuery) || titleQuery.includes(i.title.toLowerCase())))));
+
+        if (!found) {
+          const availableOverdue = allItems.filter(i => i.type === 'task' && i.status !== 'done' && i.dueDate && i.dueDate < today).slice(0, 5).map(t => `«${t.title}» (id: ${t.id})`);
+          return {
+            error: `Задача не найдена по запросу "${args.title || args.targetItemId}". Доступные задачи в базе: ${availableOverdue.join(', ') || 'нет просроченных задач'}. Повторите вызов с точным title или targetItemId из этого списка.`,
+          };
+        }
+
+        let parsedDueDate = args.dueDate;
+        let parsedReminder = args.reminder;
+        let parsedPriority = args.priority;
+
+        if (args.dueDateText) {
+          const parsed = parseTodoistInput(args.dueDateText);
+          if (parsed.dueDate) parsedDueDate = parsed.dueDate;
+          if (parsed.reminder) parsedReminder = parsed.reminder;
+          if (parsed.priority) parsedPriority = parsed.priority;
+        }
+
+        capturedAction = {
+          type: 'reschedule_task',
+          targetItemId: found.id,
+          title: found.title,
+          folder: found.folder,
+          content: '',
+          tags: found.tags || [],
+          itemType: 'task',
+          dueDate: parsedDueDate,
+          reminder: parsedReminder,
+          priority: parsedPriority || found.priority,
+          actionState: 'suggested',
+        };
+
+        return {
+          status: 'proposed',
+          message: `Перенос задачи «${found.title}» на срок ${parsedDueDate || 'без срока'} подготовлен к подтверждению. В интерфейсе пользователю отображена интерактивная карточка. Завершите ответ подтверждением.`,
+        };
+      }
+
+      if (name === 'batch_reschedule_tasks') {
+        const rawItems = Array.isArray(args.items) ? args.items : [];
+        if (rawItems.length === 0) {
+          return {
+            error: 'Список задач для переноса пуст. Передайте массив items с объектами { title, dueDate }.',
+          };
+        }
+
+        const resolvedItems: BatchRescheduleItem[] = [];
+        const missing: string[] = [];
+
+        for (const item of rawItems) {
+          const tId = String(item.targetItemId || '').trim();
+          const tTitle = String(item.title || '').trim().toLowerCase();
+          const target = allItems.find((i) => i.type === 'task' && (i.id === tId || (tTitle && (i.title.toLowerCase().includes(tTitle) || tTitle.includes(i.title.toLowerCase())))));
+
+          if (!target) {
+            missing.push(item.title || item.targetItemId || 'неизвестная');
+            continue;
+          }
+
+          let dueDate = item.dueDate;
+          let reminder = item.reminder;
+          let priority = item.priority;
+
+          if (item.dueDateText) {
+            const parsed = parseTodoistInput(item.dueDateText);
+            if (parsed.dueDate) dueDate = parsed.dueDate;
+            if (parsed.reminder) reminder = parsed.reminder;
+            if (parsed.priority) priority = parsed.priority;
+          }
+
+          resolvedItems.push({
+            targetItemId: target.id,
+            title: target.title,
+            dueDate,
+            reminder,
+            priority: priority || target.priority,
+            reason: item.reason,
+          });
+        }
+
+        if (resolvedItems.length === 0) {
+          const available = allItems.filter(i => i.type === 'task' && i.status !== 'done').slice(0, 5).map(t => `«${t.title}» (id: ${t.id})`);
+          return {
+            error: `Ни одна из указанных задач не найдена (${missing.join(', ')}). Доступные задачи в базе: ${available.join(', ')}. Вызовите batch_reschedule_tasks с точными названиями или id из этого списка.`,
+          };
+        }
+
+        capturedAction = {
+          type: 'batch_reschedule',
+          title: `Перенос задач (${resolvedItems.length})`,
+          folder: currentFolder,
+          content: '',
+          tags: [],
+          itemType: 'task',
+          batchItems: resolvedItems,
+          actionState: 'suggested',
+        };
+
+        return {
+          status: 'proposed',
+          message: `Подготовлен пакетный перенос для ${resolvedItems.length} задач. В интерфейсе пользователю отображена карточка подтверждения со списком предложенных дат. Завершите ответ кратким резюме переноса.`,
+        };
+      }
+
       if (name === 'decompose_task') {
         const subtasks = Array.isArray(args.subtasks)
           ? args.subtasks.map((st: any, idx: number) => typeof st === 'string' ? { id: `st_${Date.now()}_${idx}`, title: st, completed: false } : st)
@@ -366,6 +560,67 @@ export class AssistantOrchestrator {
         return {
           status: 'proposed',
           message: `Смена статуса задачи «${args.title}» на «${args.status}» подготовлена к подтверждению.`,
+        };
+      }
+
+      if (name === 'append_to_note') {
+        const titleQuery = String(args.title || '').trim().toLowerCase();
+        const targetId = String(args.targetItemId || '').trim();
+        const found = allItems.find(
+          (i) => i.id === targetId || (titleQuery && (i.title.toLowerCase().includes(titleQuery) || titleQuery.includes(i.title.toLowerCase())))
+        );
+
+        if (!found) {
+          const available = allItems.slice(0, 5).map(t => `«${t.title}»`);
+          return {
+            error: `Заметка не найдена по запросу "${args.title || args.targetItemId}". Доступные заметки: ${available.join(', ')}. Уточните название.`,
+          };
+        }
+
+        capturedAction = {
+          type: 'append_to_note',
+          targetItemId: found.id,
+          title: found.title,
+          folder: found.folder,
+          content: String(args.content || '').trim(),
+          appendContent: String(args.content || '').trim(),
+          tags: found.tags || [],
+          itemType: found.type,
+          actionState: 'suggested',
+        };
+
+        return {
+          status: 'proposed',
+          message: `Дополнение для заметки «${found.title}» подготовлено. В интерфейсе пользователю отображена карточка с кнопкой «Дописать в заметку».`,
+        };
+      }
+
+      if (name === 'filter_feed') {
+        let matchedItems: SlagItem[] = [];
+        const rawIds = Array.isArray(args.itemIds) ? args.itemIds : [];
+        const rawTitles = Array.isArray(args.itemTitles) ? args.itemTitles : [];
+
+        if (rawIds.length > 0) {
+          matchedItems = allItems.filter(i => rawIds.includes(i.id));
+        } else if (rawTitles.length > 0) {
+          matchedItems = allItems.filter(i =>
+            rawTitles.some((t: string) => i.title.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(i.title.toLowerCase()))
+          );
+        } else {
+          // If no specific titles passed, filter by the active candidates or search results
+          matchedItems = allItems.slice(0, 5);
+        }
+
+        const queryLabel = args.queryLabel || 'Выборка ассистента';
+        capturedFeedFilter = {
+          itemIds: matchedItems.map(i => i.id),
+          queryLabel,
+        };
+
+        return {
+          status: 'applied',
+          count: matchedItems.length,
+          message: `В ленте активирован фильтр ИИ «${queryLabel}» (${matchedItems.length} записей).`,
         };
       }
 
@@ -470,6 +725,74 @@ export class AssistantOrchestrator {
             folder: { type: 'string', description: 'Папка' },
           },
           required: ['title', 'dueDate'],
+        },
+      },
+      {
+        name: 'reschedule_task',
+        description: 'Перенести срок существующей задачи на другую дату (YYYY-MM-DD) или время.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Заголовок существующей задачи' },
+            targetItemId: { type: 'string', description: 'Идентификатор задачи' },
+            dueDate: { type: 'string', description: 'Новая дата в формате YYYY-MM-DD' },
+            dueDateText: { type: 'string', description: 'Естественное описание даты (например, "завтра в 10:00 p1")' },
+            reminder: { type: 'string', description: 'ISO 8601 время напоминания' },
+            priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'] },
+          },
+          required: ['title'],
+        },
+      },
+      {
+        name: 'batch_reschedule_tasks',
+        description: 'Перенести несколько существующих задач на одну или разные даты с учетом распределения нагрузки и приоритетов.',
+        parameters: {
+          type: 'object',
+          properties: {
+            items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string', description: 'Заголовок задачи' },
+                  targetItemId: { type: 'string', description: 'Идентификатор задачи' },
+                  dueDate: { type: 'string', description: 'Новая дата в формате YYYY-MM-DD' },
+                  dueDateText: { type: 'string', description: 'Естественное описание даты (например "завтра", "в среду в 14:00")' },
+                  reminder: { type: 'string', description: 'ISO время' },
+                  priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'] },
+                  reason: { type: 'string', description: 'Обоснование распределения' },
+                },
+                required: ['title'],
+              },
+              description: 'Список задач с новыми сроками',
+            },
+          },
+          required: ['items'],
+        },
+      },
+      {
+        name: 'append_to_note',
+        description: 'Дописать текст или пункт в существующую заметку или задачу.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Заголовок существующей заметки' },
+            targetItemId: { type: 'string', description: 'Идентификатор заметки' },
+            content: { type: 'string', description: 'Текст или пункт для добавления' },
+          },
+          required: ['title', 'content'],
+        },
+      },
+      {
+        name: 'filter_feed',
+        description: 'Активировать ИИ-фильтр в стрим-ленте заметок, оставив на экране только выбранные записи.',
+        parameters: {
+          type: 'object',
+          properties: {
+            itemTitles: { type: 'array', items: { type: 'string' }, description: 'Названия заметок для фильтра' },
+            itemIds: { type: 'array', items: { type: 'string' }, description: 'ID заметок для фильтра' },
+            queryLabel: { type: 'string', description: 'Текстовая метка фильтра (например "Просроченные задачи" или "Чай")' },
+          },
         },
       },
       {
@@ -592,7 +915,31 @@ ${isInbox
 \`\`\`action:move_note
 { "action": "move_note", "targetItemId": "id_записи", "title": "Название", "folder": "Целевая/Папка" }
 \`\`\`
+- Одиночный перенос срока задачи:
+\`\`\`action:reschedule_task
+{ "action": "reschedule_task", "targetItemId": "id_задачи", "title": "Название задачи", "dueDate": "YYYY-MM-DD", "reminder": "ISO-время", "priority": "high" }
+\`\`\`
+- Пакетный перенос нескольких задач (на одну дату или с распределением по дням):
+\`\`\`action:batch_reschedule
+{ "action": "batch_reschedule", "items": [{ "targetItemId": "id_задачи", "title": "Название", "dueDate": "YYYY-MM-DD", "reminder": "ISO-время", "priority": "high", "reason": "Свободный слот" }] }
+\`\`\`
+- Дополнение существующей заметки:
+\`\`\`action:append_to_note
+{ "action": "append_to_note", "targetItemId": "id_заметки", "title": "Название", "content": "Текст добавления..." }
+\`\`\`
 Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.
+
+ФИЛЬТРАЦИЯ ЛЕНТЫ:
+- Если пользователь пишет «а с фильтром», «покажи в ленте с фильтром», «отфильтруй по этим задачам» — вызови инструмент filter_feed!
+
+СОСТАВНЫЕ УСЛОВИЯ ПЕРЕНОСА:
+- Если запрос содержит разделение по датам («1. задачу на завтра, остальные две на послезавтра», «первую на завтра, остальные на пятницу»):
+  СТРОГО вызывай batch_reschedule_tasks, где каждому объекту в items назначается своя дата dueDate!
+
+ВНИМАНИЕ ПО ПЕРЕНОСУ ЗАДАЧ И КАЛЕНДАРЮ:
+- Если пользователь просит ПЕРЕНЕСТИ, сдвинуть, отложить или раскидать задачи («перенеси просроченные на завтра», «раскидай по дням», «отложи на понедельник») — КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО вызывать get_calendar_agenda!
+- Вместо этого вызови batch_reschedule_tasks (для нескольких задач) или reschedule_task (для одной).
+- При распределении задач на разные дни («раскидай на неделю»): распределяй задачи на последовательные свободные рабочие дни начиная с завтра (например, Задача 1 на завтра, Задача 2 на послезавтра). Задачи с высоким приоритетом (high) ставь раньше!
 
 4. РАБОТА С КОНТЕКСТОМ И ТРАНСФОРМАЦИЯ ЧЕРНОВИКОВ:
    - Если пользователь просит переделать, развить или преобразовать предыдущую запись («сделай из этого статью», «преврати в задачу», «добавь деталей», «добавь этой таске подробности»):
@@ -794,6 +1141,7 @@ ${isInbox
           reasoningTimeMs: Date.now() - startTime,
           toolCalls: executedToolCalls.length > 0 ? executedToolCalls : undefined,
           suggestedAction,
+          feedFilter: capturedFeedFilter,
         };
       } catch (err) {
         aiLog.warn(`${providerName} Assistant API call failed, falling back to local agent`, err);
@@ -823,6 +1171,73 @@ ${isInbox
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
     const lowerMsg = lastUserMsg.toLowerCase().trim();
     const executedToolCalls: ChatToolCall[] = [];
+
+    // Check 0.5: Append to note intent ("добавь в заметку X", "допиши к задаче Y")
+    const isAppendIntent =
+      (lowerMsg.includes('добавь в заметку') ||
+       lowerMsg.includes('допиши в заметку') ||
+       lowerMsg.includes('добавь к заметке') ||
+       lowerMsg.includes('допиши к задаче') ||
+       lowerMsg.includes('добавь в конец')) &&
+      !lowerMsg.includes('создай') &&
+      !lowerMsg.includes('подзадач');
+
+    if (isAppendIntent) {
+      // Find target note
+      let targetNote: SlagItem | undefined;
+      for (const item of allItems) {
+        if (lowerMsg.includes(item.title.toLowerCase())) {
+          targetNote = item;
+          break;
+        }
+      }
+
+      if (!targetNote) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const text = messages[i].content;
+          const wikiMatches = Array.from(text.matchAll(/\[\[([^\]]+)\]\]/g)).map(m => m[1]);
+          if (wikiMatches.length > 0) {
+            targetNote = allItems.find(item => wikiMatches.some(w => w.toLowerCase() === item.title.toLowerCase()));
+            if (targetNote) break;
+          }
+        }
+      }
+
+      if (targetNote) {
+        // Extract content after quotes, colon or keywords
+        let appendText = lastUserMsg;
+        const colonIdx = lastUserMsg.indexOf(':');
+        if (colonIdx !== -1) {
+          appendText = lastUserMsg.slice(colonIdx + 1).trim();
+        } else {
+          const quoteMatch = lastUserMsg.match(/[«"]([^»"]+)[»"]/);
+          if (quoteMatch) {
+            appendText = quoteMatch[1];
+          } else {
+            appendText = lastUserMsg.replace(/^.*?(?:добавь|допиши)\s+(?:в\s+заметку|к\s+заметке|в\s+конец)?\s*/i, '').trim();
+          }
+        }
+
+        const action: SuggestedAction = {
+          type: 'append_to_note',
+          targetItemId: targetNote.id,
+          title: targetNote.title,
+          folder: targetNote.folder,
+          content: appendText,
+          appendContent: appendText,
+          tags: targetNote.tags || [],
+          itemType: targetNote.type,
+          actionState: 'suggested',
+        };
+
+        return {
+          content: `Добавил пункт в заметку «${targetNote.title}».`,
+          reasoning: `Локальное дополнение заметки [[${targetNote.title}]]`,
+          reasoningTimeMs: Date.now() - startTime,
+          suggestedAction: action,
+        };
+      }
+    }
 
     // Check 1: Contextual link / Anaphora resolution from recent chat history
     if (
@@ -855,6 +1270,51 @@ ${isInbox
       }
     }
 
+    // Check 1.5: Feed Filter Intent ("а с фильтром", "покажи с фильтром", "отфильтруй ленту")
+    if (
+      lowerMsg.includes('с фильтр') ||
+      lowerMsg.includes('включи фильтр') ||
+      lowerMsg.includes('отфильтруй')
+    ) {
+      // Find candidate tasks or notes from recent history
+      let candidateIds: string[] = [];
+      let label = 'Выборка ассистента';
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const text = messages[i].content;
+        const wikiMatches = Array.from(text.matchAll(/\[\[([^\]]+)\]\]/g)).map(m => m[1]);
+        if (wikiMatches.length > 0) {
+          const matched = allItems.filter(item => wikiMatches.some(w => w.toLowerCase() === item.title.toLowerCase()));
+          if (matched.length > 0) {
+            candidateIds = matched.map(m => m.id);
+            label = wikiMatches.slice(0, 2).join(', ');
+            break;
+          }
+        }
+      }
+
+      if (candidateIds.length === 0) {
+        // Fallback to overdue tasks if discussed
+        const today = new Date().toISOString().slice(0, 10);
+        const overdue = allItems.filter(i => i.type === 'task' && i.status !== 'done' && i.dueDate && i.dueDate < today);
+        if (overdue.length > 0) {
+          candidateIds = overdue.map(o => o.id);
+          label = 'Просроченные задачи';
+        } else {
+          candidateIds = allItems.slice(0, 4).map(i => i.id);
+        }
+      }
+
+      return {
+        content: `В ленте активирован фильтр ИИ «${label}» (показано записей: ${candidateIds.length}).`,
+        reasoning: `Активирован фильтр ленты по запросу пользователя: ${label}`,
+        reasoningTimeMs: Date.now() - startTime,
+        feedFilter: {
+          itemIds: candidateIds,
+          queryLabel: label,
+        },
+      };
+    }
+
     // Check 2: Vault stats / count
     if (lowerMsg.includes('сколько') || lowerMsg.includes('статистик') || lowerMsg.includes('всего') || lowerMsg.includes('сводка')) {
       const stats = await executeLocalTool('get_vault_stats', { target: 'all' });
@@ -873,6 +1333,187 @@ ${isInbox
         reasoningTimeMs: Date.now() - startTime,
         toolCalls: executedToolCalls,
       };
+    }
+
+    // Check 2.5: Reschedule tasks (Single & Batch with Todoist parsing & multi-date distribution)
+    const isRescheduleIntent =
+      lowerMsg.includes('перенес') ||
+      lowerMsg.includes('сдвинь') ||
+      lowerMsg.includes('раскида') ||
+      lowerMsg.includes('распредел') ||
+      lowerMsg.includes('отлож') ||
+      lowerMsg.includes('передвинь') ||
+      (lowerMsg.includes('задач') && (lowerMsg.includes('на завтра') || lowerMsg.includes('на послезавтра')));
+
+    if (isRescheduleIntent) {
+      const today = new Date().toISOString().slice(0, 10);
+      const isOverdueTarget = lowerMsg.includes('просрочен') || lowerMsg.includes('долг');
+      const allTasks = allItems.filter(i => i.type === 'task' && (isInbox || i.folder === currentFolder || i.folder.startsWith(currentFolder + '/')));
+
+      let candidateTasks: SlagItem[] = [];
+      if (isOverdueTarget) {
+        candidateTasks = allTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < today);
+        if (candidateTasks.length === 0) {
+          candidateTasks = allTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate <= today);
+        }
+      } else {
+        candidateTasks = allTasks.filter(t => {
+          const tLower = t.title.toLowerCase();
+          return lowerMsg.includes(tLower) || (tLower.length > 3 && lowerMsg.includes(tLower.slice(0, 4)));
+        });
+        if (candidateTasks.length === 0 && (lowerMsg.includes('все задачи') || lowerMsg.includes('все таски'))) {
+          candidateTasks = allTasks.filter(t => t.status !== 'done');
+        }
+      }
+
+      if (candidateTasks.length === 0) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const text = messages[i].content;
+          const wikiMatches = Array.from(text.matchAll(/\[\[([^\]]+)\]\]/g)).map(m => m[1]);
+          if (wikiMatches.length > 0) {
+            candidateTasks = allTasks.filter(t => wikiMatches.some(w => w.toLowerCase() === t.title.toLowerCase()));
+            if (candidateTasks.length > 0) break;
+          }
+        }
+      }
+
+      if (candidateTasks.length === 0) {
+        candidateTasks = allTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < today);
+        if (candidateTasks.length === 0) {
+          candidateTasks = allTasks.filter(t => t.status !== 'done');
+        }
+      }
+
+      if (candidateTasks.length > 0) {
+        // Detect composite split conditions, e.g.:
+        // 1. "1. задачу перенести на завтра, остальные две на послезавтра"
+        // 2. "можешь задачу про чай перенести на завтра остальные просроченные на послезавтра"
+        const hasRemainder = lowerMsg.includes('остальн') || lowerMsg.includes('друг');
+        const hasNumberSplit = (lowerMsg.includes('1.') || lowerMsg.includes('перв')) && hasRemainder;
+        
+        // Find if a specific task was named before the remainder clause
+        let namedTaskTarget: SlagItem | undefined;
+        if (hasRemainder && candidateTasks.length > 1) {
+          namedTaskTarget = candidateTasks.find(t => {
+            const words = t.title.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+            return words.some(w => lowerMsg.includes(w));
+          });
+        }
+
+        const isCompositeSplit = (hasNumberSplit || Boolean(namedTaskTarget)) && candidateTasks.length > 1;
+
+        const isDistribute =
+          isCompositeSplit ||
+          lowerMsg.includes('раскида') ||
+          lowerMsg.includes('распредел') ||
+          lowerMsg.includes('на неделю') ||
+          lowerMsg.includes('по дням');
+
+        let baseDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10); // tomorrow by default
+        let baseReminder: string | undefined = undefined;
+        let basePriority: 'none' | 'low' | 'medium' | 'high' | undefined = undefined;
+
+        if (lowerMsg.includes('послезавтра') && !isCompositeSplit) {
+          baseDate = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
+        } else if (lowerMsg.includes('сегодня') && !isCompositeSplit) {
+          baseDate = today;
+        } else {
+          const parsed = parseTodoistInput(lastUserMsg);
+          if (parsed.dueDate) baseDate = parsed.dueDate;
+          if (parsed.reminder) baseReminder = parsed.reminder;
+          if (parsed.priority) basePriority = parsed.priority;
+        }
+
+        if (candidateTasks.length === 1 && !isDistribute) {
+          const task = candidateTasks[0];
+          const action: SuggestedAction = {
+            type: 'reschedule_task',
+            targetItemId: task.id,
+            title: task.title,
+            folder: task.folder,
+            content: '',
+            tags: task.tags || [],
+            itemType: 'task',
+            dueDate: baseDate,
+            reminder: baseReminder,
+            priority: basePriority || task.priority,
+            actionState: 'suggested',
+          };
+          return {
+            content: `Перенес задачу «${task.title}» на ${baseDate}.`,
+            reasoning: `Локальный перенос задачи: ${task.title} ➔ ${baseDate}`,
+            reasoningTimeMs: Date.now() - startTime,
+            suggestedAction: action,
+          };
+        }
+
+        const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1, none: 0 };
+        const sortedTasks = [...candidateTasks].sort((a, b) => {
+          if (namedTaskTarget) {
+            if (a.id === namedTaskTarget.id) return -1;
+            if (b.id === namedTaskTarget.id) return 1;
+          }
+          const pA = priorityOrder[a.priority || 'none'] || 0;
+          const pB = priorityOrder[b.priority || 'none'] || 0;
+          return pB - pA;
+        });
+
+        const tomorrowIso = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+        const dayAfterTomorrowIso = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
+
+        const batchItems: BatchRescheduleItem[] = sortedTasks.map((t, idx) => {
+          let dueDate = baseDate;
+          if (isCompositeSplit) {
+            // Named or first task -> tomorrow; remaining tasks -> day after tomorrow
+            const isLead = namedTaskTarget ? t.id === namedTaskTarget.id : idx === 0;
+            dueDate = isLead ? tomorrowIso : dayAfterTomorrowIso;
+          } else if (isDistribute) {
+            dueDate = new Date(Date.now() + 86400000 * (idx + 1)).toISOString().slice(0, 10);
+          }
+          return {
+            targetItemId: t.id,
+            title: t.title,
+            dueDate,
+            reminder: baseReminder,
+            priority: basePriority || t.priority,
+            reason: isCompositeSplit
+              ? (idx === 0 ? 'Первая задача' : 'Остальные задачи')
+              : (isDistribute ? `День ${idx + 1}` : undefined),
+          };
+        });
+
+        const action: SuggestedAction = {
+          type: 'batch_reschedule',
+          title: `Перенос задач (${batchItems.length})`,
+          folder: currentFolder,
+          content: '',
+          tags: [],
+          itemType: 'task',
+          batchItems,
+          actionState: 'suggested',
+        };
+
+        let messageText = `Перенес ${batchItems.length} задач на ${baseDate}.`;
+        if (isCompositeSplit) {
+          const leadTitle = namedTaskTarget ? namedTaskTarget.title : sortedTasks[0].title;
+          messageText = `Задачу «${leadTitle}» перенес на завтра, остальные просроченные — на послезавтра.`;
+        } else if (isDistribute) {
+          messageText = `Раскидал ${batchItems.length} задач по свободным дням недели.`;
+        }
+
+        return {
+          content: messageText,
+          reasoning: `Сформирован пакетный перенос ${batchItems.length} задач на ${isDistribute ? 'разные дни' : baseDate}`,
+          reasoningTimeMs: Date.now() - startTime,
+          suggestedAction: action,
+        };
+      } else {
+        return {
+          content: 'В хранилище не найдено задач для переноса.',
+          reasoning: 'Задачи для переноса не обнаружены',
+          reasoningTimeMs: Date.now() - startTime,
+        };
+      }
     }
 
     // Check 3: Calendar / Agenda / Relative Dates
@@ -909,7 +1550,8 @@ ${isInbox
       (lowerMsg.includes('дела') && (lowerMsg.includes('день') || lowerMsg.includes('сегодня') || lowerMsg.includes('завтра'))) ||
       (lowerMsg.includes('задач') && (lowerMsg.includes('день') || lowerMsg.includes('сегодня') || lowerMsg.includes('завтра') || lowerMsg.includes('просроч')))) &&
       !lowerMsg.includes('сколько') &&
-      !lowerMsg.includes('статистик');
+      !lowerMsg.includes('статистик') &&
+      !isRescheduleIntent;
 
     if (isCalendarQuery && !isCreateIntent && !lowerMsg.includes('разбей')) {
       let targetDate = new Date().toISOString().slice(0, 10);

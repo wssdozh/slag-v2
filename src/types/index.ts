@@ -118,13 +118,24 @@ export interface LightboxImage {
 
 export type SuggestedActionType =
   | 'create_note'
+  | 'append_to_note'
   | 'schedule_task'
   | 'reschedule_task'
+  | 'batch_reschedule'
   | 'update_task_status'
   | 'decompose_task'
   | 'move_note';
 
 export type ActionState = 'suggested' | 'executing' | 'applied' | 'rejected';
+
+export interface BatchRescheduleItem {
+  targetItemId: string;
+  title: string;
+  dueDate?: string;
+  reminder?: string;
+  priority?: 'none' | 'low' | 'medium' | 'high';
+  reason?: string;
+}
 
 export interface SuggestedAction {
   type: SuggestedActionType;
@@ -134,11 +145,13 @@ export interface SuggestedAction {
   tags: string[];
   itemType: SlagItemType;
   targetItemId?: string;
+  appendContent?: string;
   dueDate?: string;
   reminder?: string;
   priority?: 'none' | 'low' | 'medium' | 'high';
   status?: 'backlog' | 'todo' | 'in_progress' | 'done';
   subtasks?: { id: string; title: string; completed: boolean }[];
+  batchItems?: BatchRescheduleItem[];
   actionState?: ActionState;
   appliedItemId?: string;
   error?: string;

@@ -28,6 +28,10 @@ interface ToastMessage {
   id: string;
   type: 'info' | 'success' | 'error';
   text: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 export interface ContextMenuTarget {
@@ -128,7 +132,8 @@ interface AppContextType {
   switchVault: (vaultId: string) => void;
   createVault: (name: string) => void;
   saveAiSettings: (settings: Partial<AiSettings>) => void;
-  addToast: (text: string, type?: 'info' | 'success' | 'error') => void;
+  addToast: (text: string, type?: 'info' | 'success' | 'error', action?: { label: string; onClick: () => void }) => void;
+  undoLastAction: () => boolean;
   removeToast: (id: string) => void;
   refreshData: () => void;
 
@@ -373,14 +378,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.documentElement.style.setProperty('--slag-font-scale', String(scaleNum));
   }, [isMobile, uiConfig]);
 
-  const addToast = useCallback((text: string, type: 'info' | 'success' | 'error' = 'info') => {
+  // Action History Stack for Undo capability (up to 20 snapshots)
+  interface ActionHistoryEntry {
+    id: string;
+    timestamp: number;
+    description: string;
+    itemSnapshots: SlagItem[];
+  }
+  const actionHistoryRef = useRef<ActionHistoryEntry[]>([]);
+
+  const addToast = useCallback((
+    text: string,
+    type: 'info' | 'success' | 'error' = 'info',
+    action?: { label: string; onClick: () => void }
+  ) => {
     const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
-    setToasts(prev => [...prev, { id, text, type }]);
+    setToasts(prev => [...prev, { id, text, type, action }]);
     logger.log(type === 'error' ? 'error' : 'info', 'UI', `Toast: ${text}`);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 2800);
+    }, action ? 4500 : 2800);
   }, []);
+
+  const undoLastAction = useCallback((): boolean => {
+    const last = actionHistoryRef.current.pop();
+    if (!last || last.itemSnapshots.length === 0) {
+      addToast('Нет действий для отмены', 'info');
+      return false;
+    }
+    for (const snap of last.itemSnapshots) {
+      storage.saveItem(snap);
+    }
+    setItems(storage.getItems());
+    addToast(`Действие «${last.description}» отменено`, 'info');
+    return true;
+  }, [addToast]);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -836,21 +868,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     else if (action.type === 'update_task_status') {
       const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
       if (target && action.status) {
+        actionHistoryRef.current.push({
+          id: 'hist_' + Date.now(),
+          timestamp: Date.now(),
+          description: `Смена статуса «${target.title}»`,
+          itemSnapshots: [{ ...target }],
+        });
         const updated = { ...target, status: action.status, updatedAt: Date.now() };
         updateItem(updated);
         savedItem = updated;
-        addToast(`Статус задачи изменен на «${action.status}»`, 'success');
+        addToast(`Статус задачи изменен на «${action.status}»`, 'success', {
+          label: 'Отменить',
+          onClick: () => undoLastAction(),
+        });
       }
     }
 
     // 4. Reschedule Task
     else if (action.type === 'reschedule_task') {
       const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
-      if (target && action.dueDate) {
-        const updated = { ...target, dueDate: action.dueDate, reminder: action.reminder, updatedAt: Date.now() };
+      if (target) {
+        actionHistoryRef.current.push({
+          id: 'hist_' + Date.now(),
+          timestamp: Date.now(),
+          description: `Перенос «${target.title}»`,
+          itemSnapshots: [{ ...target }],
+        });
+        const updated = {
+          ...target,
+          dueDate: action.dueDate,
+          reminder: action.reminder,
+          priority: action.priority || target.priority,
+          updatedAt: Date.now(),
+        };
         updateItem(updated);
         savedItem = updated;
-        addToast(`Задача перенесена на ${action.dueDate}`, 'success');
+        addToast(action.dueDate ? `Задача перенесена на ${action.dueDate}` : 'Срок задачи снят', 'success', {
+          label: 'Отменить',
+          onClick: () => undoLastAction(),
+        });
+      }
+    }
+
+    // 4b. Batch Reschedule Tasks
+    else if (action.type === 'batch_reschedule') {
+      const batch = action.batchItems || [];
+      const snapshots: SlagItem[] = [];
+      let updatedCount = 0;
+      for (const item of batch) {
+        const target = items.find(i => i.id === item.targetItemId || i.title.toLowerCase() === item.title.toLowerCase());
+        if (target) {
+          snapshots.push({ ...target });
+          const updated = {
+            ...target,
+            dueDate: item.dueDate,
+            reminder: item.reminder,
+            priority: item.priority || target.priority,
+            updatedAt: Date.now(),
+          };
+          updateItem(updated);
+          savedItem = updated;
+          updatedCount++;
+        }
+      }
+      if (updatedCount > 0) {
+        actionHistoryRef.current.push({
+          id: 'hist_' + Date.now(),
+          timestamp: Date.now(),
+          description: `Пакетный перенос ${updatedCount} задач`,
+          itemSnapshots: snapshots,
+        });
+        addToast(`Перенесено задач: ${updatedCount}`, 'success', {
+          label: 'Отменить',
+          onClick: () => undoLastAction(),
+        });
+      }
+    }
+
+    // 4c. Append Content to Note
+    else if (action.type === 'append_to_note') {
+      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
+      if (target && action.content) {
+        actionHistoryRef.current.push({
+          id: 'hist_' + Date.now(),
+          timestamp: Date.now(),
+          description: `Дополнение «${target.title}»`,
+          itemSnapshots: [{ ...target }],
+        });
+        const newContent = target.content ? `${target.content}\n\n${action.content}` : action.content;
+        const updated = {
+          ...target,
+          content: newContent,
+          updatedAt: Date.now(),
+        };
+        updateItem(updated);
+        savedItem = updated;
+        addToast(`Заметка «${target.title}» дополнена`, 'success', {
+          label: 'Отменить',
+          onClick: () => undoLastAction(),
+        });
       }
     }
 
@@ -864,8 +980,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    if (messageId && savedItem) {
-      const finalSavedId = savedItem.id;
+    if (messageId && (savedItem || action.type === 'batch_reschedule')) {
+      const finalSavedId = savedItem?.id;
       setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
         ? {
             ...m,
@@ -880,7 +996,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return savedItem;
-  }, [currentFolder, saveItem, updateItem, moveItem, items, addToast]);
+  }, [currentFolder, saveItem, updateItem, moveItem, items, addToast, undoLastAction]);
 
   const rejectAction = useCallback((messageId: string) => {
     setChatMessages(prev => prev.map(m => m.id === messageId && m.suggestedAction
@@ -914,20 +1030,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           let content = m.content || '';
           if (m.suggestedAction) {
             const sa = m.suggestedAction;
-            const actionDesc = `[Действие ассистента: ${sa.type} | Статус: ${sa.actionState || 'suggested'} | Заголовок: «${sa.title}» | Тип: ${sa.itemType || 'note'} | Папка: «${sa.folder}»${sa.dueDate ? ` | Срок: ${sa.dueDate}` : ''}${sa.content ? ` | Содержимое: ${sa.content}` : ''}${sa.appliedItemId ? ` | ID в базе: ${sa.appliedItemId}` : ''}]`;
+            const actionDesc = `Предложенное действие: «${sa.title}» (${sa.type}), статус: ${sa.actionState || 'suggested'}.`;
             if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
               content = actionDesc;
             } else {
               content = `${content.trim()}\n${actionDesc}`;
             }
           }
-          return { role: m.role, content: content.trim() || '[Действие]' };
+          return { role: m.role, content: content.trim() || '[Сообщение]' };
         }),
         currentFolder,
         settings: aiSettings,
         folders,
         allItems: items,
       });
+
+      if (response.feedFilter) {
+        applyAiFilter(response.feedFilter.itemIds, response.feedFilter.queryLabel);
+      }
 
       let resolvedContent = response.content;
       if (!resolvedContent.trim() && response.suggestedAction) {
@@ -957,7 +1077,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } finally {
       setIsChatLoading(false);
     }
-  }, [chatMessages, currentFolder, aiSettings, folders, items]);
+  }, [chatMessages, currentFolder, aiSettings, folders, items, applyAiFilter]);
 
   const clearChatMessages = useCallback(() => {
     setChatMessages([]);
@@ -1134,6 +1254,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createVault,
         saveAiSettings,
         addToast,
+        undoLastAction,
         removeToast,
         refreshData,
         isMobile,

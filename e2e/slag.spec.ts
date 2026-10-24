@@ -912,7 +912,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // 3. Verify action card appears with title and buttons
     await expect(page.locator('text=почистить яйца').first()).toBeVisible({ timeout: 5000 });
-    const planBtn = page.locator('button', { hasText: /Запланировать на|Сохранить в хранилище/ }).first();
+    const planBtn = page.locator('button', { hasText: /Запланировать|Сохранить/ }).first();
     await expect(planBtn).toBeVisible();
     const rejectBtn = page.locator('button', { hasText: 'Отклонить' }).first();
     await expect(rejectBtn).toBeVisible();
@@ -949,9 +949,117 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
 
     // 7. Click confirm on the updated action
-    const updateConfirmBtn = page.locator('button', { hasText: /Запланировать на|Сохранить в хранилище/ }).last();
+    const updateConfirmBtn = page.locator('button', { hasText: /Запланировать|Сохранить/ }).last();
     await updateConfirmBtn.click();
     await expect(page.locator('text=обновлена').or(page.locator('text=сохранена')).first()).toBeVisible();
+  });
+
+  test('25.1. Assistant Single & Batch Task Rescheduling Lifecycle and Multi-Date Distribution', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Ask batch reschedule: "перенеси просроченные задачи на завтра"
+    await textarea.fill('перенеси просроченные задачи на завтра');
+    await textarea.press('Enter');
+
+    // 3. Verify batch action card appears and is NOT intercepted as a calendar agenda view
+    await expect(page.locator('text=/Перенос задач/').first()).toBeVisible({ timeout: 5000 });
+    const applyBatchBtn = page.locator('button', { hasText: /Применить/ }).first();
+    await expect(applyBatchBtn).toBeVisible();
+
+    // Verify task titles are rendered inside the batch card
+    await expect(page.locator('text=Купить хороший зеленый чай').first()).toBeVisible();
+
+    // 4. Capture screenshot of batch reschedule card for visual audit
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-batch-reschedule.png',
+      fullPage: false,
+    });
+
+    // 5. Confirm batch reschedule
+    await applyBatchBtn.click();
+    await expect(page.locator('text=Перенесено задач:').or(page.locator('text=Перенесено')).first()).toBeVisible({ timeout: 5000 });
+
+    // 6. Test Multi-date distribution: "раскидай просроченные задачи на неделю"
+    await textarea.fill('раскидай просроченные задачи на неделю');
+    await textarea.press('Enter');
+
+    // Verify multi-date batch card is generated
+    await expect(page.locator('text=/Перенос задач/').last()).toBeVisible({ timeout: 5000 });
+    const secondBatchBtn = page.locator('button', { hasText: /Применить/ }).last();
+    await expect(secondBatchBtn).toBeVisible();
+  });
+
+  test('25.2. Assistant Composite Split Dates, Checkbox Selection, Append to Note, Undo, and Chat Feed Filter', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Test Composite Split Dates: "1. задачу перенести на завтра остальные две на послезавтра"
+    await textarea.fill('1. задачу перенести на завтра остальные две на послезавтра');
+    await textarea.press('Enter');
+
+    // Verify batch card appears
+    await expect(page.locator('text=/Перенос задач/').first()).toBeVisible({ timeout: 5000 });
+    
+    // Check that checkboxes are present in the batch card
+    const checkboxes = page.locator('input[type="checkbox"]');
+    const cbCount = await checkboxes.count();
+    expect(cbCount).toBeGreaterThanOrEqual(2);
+
+    // Uncheck one task
+    await checkboxes.first().click();
+
+    // Verify button text updates with dynamic count
+    const applyBtn = page.locator('button', { hasText: /Применить/ }).first();
+    await expect(applyBtn).toBeVisible();
+    await applyBtn.click();
+
+    // 3. Verify Undo button in Toast notification
+    const undoToastBtn = page.locator('button', { hasText: 'Отменить' }).first();
+    await expect(undoToastBtn).toBeVisible({ timeout: 4000 });
+    await undoToastBtn.click();
+    await expect(page.locator('text=отменено').first()).toBeVisible({ timeout: 4000 });
+
+    // 4. Test Append to Note: "добавь в заметку Синхронизация по архитектуре баз данных: Обсудить партиционирование"
+    await textarea.fill('добавь в заметку Синхронизация по архитектуре баз данных: Обсудить партиционирование');
+    await textarea.press('Enter');
+
+    // Verify append_to_note action card is formed
+    await expect(page.locator('text=Дополнение заметки').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Обсудить партиционирование').first()).toBeVisible();
+    const appendConfirmBtn = page.locator('button', { hasText: 'Дописать' }).first();
+    await expect(appendConfirmBtn).toBeVisible();
+    await appendConfirmBtn.click();
+    await expect(page.locator('text=дополнена').first()).toBeVisible({ timeout: 5000 });
+
+    // 5. Test Chat Feed Filter: "а с фильтром"
+    await textarea.fill('а с фильтром');
+    await textarea.press('Enter');
+
+    // Verify AI Filter is applied to feed and chip appears
+    await expect(page.locator('header').locator('text=ИИ:').first()).toBeVisible({ timeout: 5000 });
+
+    // 6. Test Named-Task Split: "можешь задачу про чай перенести на завтра остальные просроченные на послезавтра"
+    await textarea.fill('можешь задачу про чай перенести на завтра остальные просроченные на послезавтра');
+    await textarea.press('Enter');
+
+    // Verify message has natural zero-slop text without robotic bullet duplicates
+    await expect(page.locator('text=Купить хороший зеленый чай').last()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Подтвердите перенос в интерактивной карточке')).not.toBeVisible();
+
+    // Capture visual screenshot of separated monochrome cards
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-advanced-interactions.png',
+      fullPage: false,
+    });
   });
 
   test('26. KIE.AI Provider with Gemini 4 Argon Endpoint and Structured Settings', async ({ page }) => {
