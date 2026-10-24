@@ -1988,4 +1988,99 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       }
     }
   });
+
+  test('34. Calendar Drag and Drop including Untimed and Unscheduled Tasks', async ({ page }) => {
+    // 1. Switch to Calendar view
+    const calendarBtn = page.locator('header button[title*="Календарь"]');
+    await expect(calendarBtn).toBeVisible();
+    await calendarBtn.click();
+    await page.waitForTimeout(300);
+
+    // 2. Create an untimed task directly in All-Day ("Весь день") section via ComposerModal
+    const addAllDayBtn = page.locator('button[title="Добавить задачу на весь день"]').first();
+    await expect(addAllDayBtn).toBeVisible({ timeout: 5000 });
+    await addAllDayBtn.click();
+    await page.waitForTimeout(200);
+
+    const taskInput = page.locator('[placeholder*="Название задачи"]');
+    await expect(taskInput).toBeVisible();
+    const uniqueUntimedTitle = `БезВремени_${Date.now()}`;
+    await taskInput.fill(uniqueUntimedTitle);
+    await taskInput.press('Enter');
+    await page.waitForTimeout(500);
+
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-after-add-task.png',
+      fullPage: false,
+    });
+
+    // 3. Verify the untimed task is in "Весь день" row
+    const untimedPill = page.locator(`text=${uniqueUntimedTitle}`).first();
+    await expect(untimedPill).toBeVisible();
+
+    // 4. Drag untimed task into an hour slot in the time grid (assigns time)
+    const hourSlots = page.locator('.grid-cols-7 .h-\\[52px\\]');
+    const targetHourSlot = hourSlots.nth(14); // 14:00 slot
+    await untimedPill.dragTo(targetHourSlot);
+    await page.waitForTimeout(400);
+
+    // Verify task is now in the time grid at that hour
+    const timedCard = page.locator(`text=${uniqueUntimedTitle}`).first();
+    await expect(timedCard).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-drag-untimed-to-hour.png',
+      fullPage: false,
+    });
+
+    // 5. Open Drawer (Сроки) and check unscheduled tab & drop target
+    const drawerBtn = page.locator('button[title*="просроченных"]').first();
+    await drawerBtn.click();
+    await page.waitForTimeout(200);
+    const unscheduledTab = page.locator('button', { hasText: 'Без срока' });
+    await unscheduledTab.click();
+    await page.waitForTimeout(200);
+
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-drawer-drag-targets.png',
+      fullPage: false,
+    });
+
+    // 6. Drag the task from Calendar into the Drawer drop zone to remove date/time
+    const dropToUnscheduledZone = page.locator('text=Снять срок (перенести в «Без срока»)')
+      .or(unscheduledTab);
+    await timedCard.dragTo(dropToUnscheduledZone.first());
+    await page.waitForTimeout(400);
+
+    // Verify task is now in Unscheduled list
+    const unscheduledCard = page.locator(`text=${uniqueUntimedTitle}`).first();
+    await expect(unscheduledCard).toBeVisible();
+
+    // 7. Drag unscheduled task from Drawer into "Весь день" row (untimed task)
+    const allDayCells = page.locator('.min-h-\\[44px\\] .space-y-1');
+    const targetAllDayCell = allDayCells.nth(1); // Tuesday column
+    await unscheduledCard.dragTo(targetAllDayCell);
+    await page.waitForTimeout(400);
+
+    // Verify task is back in "Весь день" row
+    const reassignedUntimedPill = page.locator('.min-h-\\[44px\\]').locator(`text=${uniqueUntimedTitle}`).first();
+    await expect(reassignedUntimedPill).toBeVisible();
+
+    // 8. Switch to Month View and verify dragging works in Month view
+    await page.locator('button', { hasText: 'Месяц' }).click();
+    await page.waitForTimeout(200);
+
+    const monthTask = page.locator('.auto-rows-fr').locator(`text=${uniqueUntimedTitle}`).first();
+    await expect(monthTask).toBeVisible();
+
+    // Drag to another day cell in Month View
+    const targetMonthCell = page.locator('.auto-rows-fr > div').nth(22);
+    await monthTask.dragTo(targetMonthCell);
+    await page.waitForTimeout(400);
+
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-month-drag-layout.png',
+      fullPage: false,
+    });
+  });
 });

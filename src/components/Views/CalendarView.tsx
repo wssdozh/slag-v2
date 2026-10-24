@@ -151,8 +151,15 @@ export const CalendarView: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overdue' | 'unscheduled'>('overdue');
 
-  // Drag over target date
-  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  // Drag over target and dragging item state
+  type CalendarDragTarget =
+    | { type: 'hour'; dateStr: string; hour: number }
+    | { type: 'allday'; dateStr: string }
+    | { type: 'month'; dateStr: string }
+    | { type: 'unscheduled' };
+
+  const [dragTarget, setDragTarget] = useState<CalendarDragTarget | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
   // Expanded Day Card modal for Month view
   const [expandedDayDateStr, setExpandedDayDateStr] = useState<string | null>(null);
@@ -283,62 +290,185 @@ export const CalendarView: React.FC = () => {
     addToast(`Задача перенесена на ${newDate}`, 'info');
   };
 
-  // Drag and Drop
+  // Drag and Drop helpers & handlers
+  const cleanTimeFromTitle = (title: string): string => {
+    let clean = title;
+    clean = clean.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\s*[-—]\s*([01]?\d|2[0-3]):([0-5]\d)\b/g, '').trim();
+    clean = clean.replace(/(?:^|\s|[вВ@])\s*([01]?\d|2[0-3]):([0-5]\d)\b/g, '').trim();
+    clean = clean.replace(/\s+/g, ' ').trim();
+    return clean || title;
+  };
+
+  const extractTaskId = (e: React.DragEvent): string | null => {
+    const jsonRaw = e.dataTransfer.getData('application/json');
+    if (jsonRaw) {
+      try {
+        const parsed = JSON.parse(jsonRaw);
+        if (parsed && typeof parsed.id === 'string') return parsed.id;
+      } catch {
+        // ignore
+      }
+    }
+    const textRaw = e.dataTransfer.getData('text/plain');
+    if (textRaw) {
+      try {
+        const parsed = JSON.parse(textRaw);
+        if (parsed && typeof parsed.id === 'string') return parsed.id;
+      } catch {
+        if (textRaw.trim()) return textRaw.trim();
+      }
+    }
+    return draggingTaskId;
+  };
+
   const handleDragStartTask = (e: React.DragEvent, taskId: string) => {
+    setDraggingTaskId(taskId);
     e.dataTransfer.setData('text/plain', JSON.stringify({ id: taskId }));
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'task', id: taskId }));
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOverDate = (e: React.DragEvent, dateStr: string) => {
+  const handleDragEnd = () => {
+    setDraggingTaskId(null);
+    setDragTarget(null);
+  };
+
+  const handleDragOverHour = (e: React.DragEvent, dateStr: string, hour: number) => {
     e.preventDefault();
-    if (dragOverDate !== dateStr) {
-      setDragOverDate(dateStr);
+    e.dataTransfer.dropEffect = 'move';
+    if (dragTarget?.type !== 'hour' || dragTarget.dateStr !== dateStr || dragTarget.hour !== hour) {
+      setDragTarget({ type: 'hour', dateStr, hour });
     }
   };
 
-  const handleDragLeaveDate = (e: React.DragEvent) => {
+  const handleDragOverAllDay = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
-    setDragOverDate(null);
+    e.dataTransfer.dropEffect = 'move';
+    if (dragTarget?.type !== 'allday' || dragTarget.dateStr !== dateStr) {
+      setDragTarget({ type: 'allday', dateStr });
+    }
   };
 
-  const handleDropOnDate = (e: React.DragEvent, dateStr: string, specificHour?: number) => {
+  const handleDragOverMonth = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
-    setDragOverDate(null);
-    const raw = e.dataTransfer.getData('text/plain');
-    if (!raw) return;
+    e.dataTransfer.dropEffect = 'move';
+    if (dragTarget?.type !== 'month' || dragTarget.dateStr !== dateStr) {
+      setDragTarget({ type: 'month', dateStr });
+    }
+  };
 
-    try {
-      const payload = JSON.parse(raw);
-      if (payload.id) {
-        const task = items.find(i => i.id === payload.id);
-        if (task) {
-          const reminder = specificHour !== undefined
-            ? new Date(new Date(dateStr).setHours(specificHour, 0, 0, 0)).toISOString()
-            : task.reminder;
+  const handleDragOverUnscheduled = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragTarget?.type !== 'unscheduled') {
+      setDragTarget({ type: 'unscheduled' });
+    }
+  };
 
-          updateItem({
-            ...task,
-            dueDate: dateStr,
-            reminder,
-          });
-          addToast(`Задача перенесена на ${dateStr}`, 'info');
+  const handleDropHour = (e: React.DragEvent, dateStr: string, hour: number) => {
+    e.preventDefault();
+    const taskId = extractTaskId(e);
+    handleDragEnd();
+    if (!taskId) return;
+
+    const task = items.find(i => i.id === taskId);
+    if (!task) return;
+
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const targetDate = new Date(year, month - 1, day, hour, 0, 0, 0);
+    const reminder = targetDate.toISOString();
+
+    updateItem({
+      ...task,
+      dueDate: dateStr,
+      reminder,
+    });
+    addToast(`Задача перенесена на ${dateStr} в ${String(hour).padStart(2, '0')}:00`, 'info');
+  };
+
+  const handleDropAllDay = (e: React.DragEvent, dateStr: string) => {
+    e.preventDefault();
+    const taskId = extractTaskId(e);
+    handleDragEnd();
+    if (!taskId) return;
+
+    const task = items.find(i => i.id === taskId);
+    if (!task) return;
+
+    const updatedTitle = cleanTimeFromTitle(task.title);
+
+    updateItem({
+      ...task,
+      title: updatedTitle,
+      dueDate: dateStr,
+      reminder: undefined,
+    });
+    addToast(`Задача перенесена на ${dateStr} (весь день)`, 'info');
+  };
+
+  const handleDropMonth = (e: React.DragEvent, dateStr: string) => {
+    e.preventDefault();
+    const taskId = extractTaskId(e);
+    handleDragEnd();
+    if (!taskId) return;
+
+    const task = items.find(i => i.id === taskId);
+    if (!task) return;
+
+    let reminder: string | undefined = undefined;
+    if (task.reminder) {
+      try {
+        const oldDate = new Date(task.reminder);
+        if (!isNaN(oldDate.getTime())) {
+          const [year, month, day] = dateStr.split('-').map(Number);
+          const target = new Date(year, month - 1, day, oldDate.getHours(), oldDate.getMinutes(), 0, 0);
+          reminder = target.toISOString();
         }
+      } catch {
+        reminder = undefined;
       }
-    } catch {
-      // Ignored
     }
+
+    updateItem({
+      ...task,
+      dueDate: dateStr,
+      reminder,
+    });
+    addToast(`Задача перенесена на ${dateStr}`, 'info');
+  };
+
+  const handleDropUnscheduled = (e: React.DragEvent) => {
+    e.preventDefault();
+    const taskId = extractTaskId(e);
+    handleDragEnd();
+    if (!taskId) return;
+
+    const task = items.find(i => i.id === taskId);
+    if (!task) return;
+
+    const updatedTitle = cleanTimeFromTitle(task.title);
+
+    updateItem({
+      ...task,
+      title: updatedTitle,
+      dueDate: undefined,
+      reminder: undefined,
+    });
+    addToast('Срок задачи снят (перемещена в "Без срока")', 'info');
   };
 
   // Render a Compact All-Day Task Pill
   const renderAllDayTaskPill = (task: SlagItem) => {
     const isDone = task.status === 'done';
     const styling = getPriorityBadge(task.priority);
+    const isDragging = draggingTaskId === task.id;
 
     return (
       <div
         key={task.id}
         draggable
         onDragStart={e => handleDragStartTask(e, task.id)}
+        onDragEnd={handleDragEnd}
         onClick={() => {
           setSelectedItem(task);
           setIsFullscreenEditorOpen(true);
@@ -353,7 +483,10 @@ export const CalendarView: React.FC = () => {
             item: task,
           });
         }}
-        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all cursor-pointer ${styling.bg} ${styling.border} ${styling.text}`}
+        title={task.title}
+        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all cursor-grab active:cursor-grabbing min-w-0 ${styling.bg} ${styling.border} ${styling.text} ${
+          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+        }`}
       >
         <button
           onClick={e => {
@@ -371,7 +504,7 @@ export const CalendarView: React.FC = () => {
         </button>
 
         <span
-          className={`truncate font-medium text-[11px] leading-tight select-none flex-1 ${
+          className={`truncate font-medium text-[11px] leading-tight select-none flex-1 min-w-[20px] ${
             isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
           }`}
         >
@@ -379,7 +512,7 @@ export const CalendarView: React.FC = () => {
         </span>
 
         {task.tags && task.tags.length > 0 && (
-          <span className="text-[9px] font-mono text-zinc-500 shrink-0">
+          <span className="hidden xl:inline text-[9px] font-mono text-zinc-500 shrink-0">
             #{task.tags[0]}
           </span>
         )}
@@ -391,6 +524,7 @@ export const CalendarView: React.FC = () => {
   const renderTimedTaskBlock = (task: SlagItem, slot: ReturnType<typeof getTaskTimeSlot>) => {
     const isDone = task.status === 'done';
     const styling = getPriorityBadge(task.priority);
+    const isDragging = draggingTaskId === task.id;
 
     const startH = Math.max(0, Math.min(23, slot.startHour));
     const topPx = startH * 52 + (slot.startMinute / 60) * 52;
@@ -404,6 +538,7 @@ export const CalendarView: React.FC = () => {
         key={task.id}
         draggable
         onDragStart={e => handleDragStartTask(e, task.id)}
+        onDragEnd={handleDragEnd}
         onClick={() => {
           setSelectedItem(task);
           setIsFullscreenEditorOpen(true);
@@ -419,7 +554,9 @@ export const CalendarView: React.FC = () => {
           });
         }}
         style={{ top: `${topPx}px`, height: `${heightPx}px`, left: '3%', width: '94%' }}
-        className={`absolute rounded-lg p-2 border flex flex-col justify-between select-none cursor-pointer transition-all duration-150 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text}`}
+        className={`absolute rounded-lg p-2 border flex flex-col justify-between select-none cursor-grab active:cursor-grabbing transition-all duration-150 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
+          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+        }`}
       >
         <div className="flex items-start gap-1.5 min-w-0">
           <button
@@ -529,6 +666,11 @@ export const CalendarView: React.FC = () => {
           {/* Drawer Toggle */}
           <button
             onClick={() => setIsDrawerOpen(prev => !prev)}
+            onDragOver={e => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              if (!isDrawerOpen) setIsDrawerOpen(true);
+            }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors cursor-pointer ${
               isDrawerOpen
                 ? 'bg-white/10 border-white/[0.12] text-white'
@@ -603,19 +745,24 @@ export const CalendarView: React.FC = () => {
                     const dateStr = getISODateString(date);
                     const dayTasks = tasksByDueDate.get(dateStr) || [];
                     const allDayTasks = dayTasks.filter(t => getTaskTimeSlot(t).isAllDay);
-                    const isOver = dragOverDate === dateStr;
+                    const isOver = dragTarget?.type === 'allday' && dragTarget.dateStr === dateStr;
 
                     return (
                       <div
                         key={dateStr}
-                        onDragOver={e => handleDragOverDate(e, dateStr)}
-                        onDragLeave={handleDragLeaveDate}
-                        onDrop={e => handleDropOnDate(e, dateStr)}
+                        onDragOver={e => handleDragOverAllDay(e, dateStr)}
+                        onDrop={e => handleDropAllDay(e, dateStr)}
                         className={`p-1 border-r border-white/[0.04] last:border-r-0 space-y-1 transition-colors min-h-[44px] ${
-                          isOver ? 'bg-blue-500/10' : ''
+                          isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 rounded-sm' : ''
                         }`}
                       >
                         {allDayTasks.map(task => renderAllDayTaskPill(task))}
+
+                        {isOver && allDayTasks.length === 0 && (
+                          <div className="text-[10px] font-mono text-blue-300 py-1 text-center border border-dashed border-blue-500/40 rounded bg-blue-500/10 pointer-events-none">
+                            Весь день
+                          </div>
+                        )}
 
                         {/* Add Task Hover Trigger */}
                         <button
@@ -673,6 +820,7 @@ export const CalendarView: React.FC = () => {
                       >
                         {/* Hour slot background rows with 1-click add */}
                         {HOURS.map(hour => {
+                          const isOver = dragTarget?.type === 'hour' && dragTarget.dateStr === dateStr && dragTarget.hour === hour;
                           return (
                             <div
                               key={hour}
@@ -684,18 +832,30 @@ export const CalendarView: React.FC = () => {
                                   folder: currentFolder,
                                 });
                               }}
-                              onDragOver={e => handleDragOverDate(e, dateStr)}
-                              onDragLeave={handleDragLeaveDate}
-                              onDrop={e => handleDropOnDate(e, dateStr, hour)}
-                              className="h-[52px] border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors relative group cursor-pointer"
+                              onDragOver={e => handleDragOverHour(e, dateStr, hour)}
+                              onDrop={e => handleDropHour(e, dateStr, hour)}
+                              className={`h-[52px] border-b border-white/[0.04] transition-colors relative group cursor-pointer ${
+                                isOver
+                                  ? 'bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30'
+                                  : 'hover:bg-white/[0.02]'
+                              }`}
                             >
-                              {/* Hover indicator with time */}
-                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
-                                <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 bg-[#18181c] px-2 py-0.5 rounded border border-white/[0.06] shadow-sm">
-                                  <Plus className="w-2.5 h-2.5 text-zinc-400" />
-                                  <span>{String(hour).padStart(2, '0')}:00</span>
-                                </span>
-                              </div>
+                              {isOver ? (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                                  <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-blue-300 bg-[#141418] px-2 py-0.5 rounded border border-blue-500/40 shadow-sm">
+                                    <Clock className="w-2.5 h-2.5 text-blue-400" />
+                                    <span>{String(hour).padStart(2, '0')}:00</span>
+                                  </span>
+                                </div>
+                              ) : (
+                                /* Hover indicator with time */
+                                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
+                                  <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 bg-[#18181c] px-2 py-0.5 rounded border border-white/[0.06] shadow-sm">
+                                    <Plus className="w-2.5 h-2.5 text-zinc-400" />
+                                    <span>{String(hour).padStart(2, '0')}:00</span>
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -743,18 +903,17 @@ export const CalendarView: React.FC = () => {
                 {monthCells.map(cell => {
                   const dayTasks = tasksByDueDate.get(cell.dateStr) || [];
                   const isToday = cell.dateStr === todayStr;
-                  const isOver = dragOverDate === cell.dateStr;
+                  const isOver = dragTarget?.type === 'month' && dragTarget.dateStr === cell.dateStr;
 
                   return (
                     <div
                       key={cell.dateStr}
-                      onDragOver={e => handleDragOverDate(e, cell.dateStr)}
-                      onDragLeave={handleDragLeaveDate}
-                      onDrop={e => handleDropOnDate(e, cell.dateStr)}
+                      onDragOver={e => handleDragOverMonth(e, cell.dateStr)}
+                      onDrop={e => handleDropMonth(e, cell.dateStr)}
                       onClick={() => setExpandedDayDateStr(cell.dateStr)}
                       className={`min-h-[96px] p-1.5 border-b border-r border-white/[0.04] flex flex-col justify-between transition-colors cursor-pointer group ${
                         cell.isCurrentMonth ? 'bg-[#09090b] hover:bg-[#0c0c0e]' : 'bg-[#070709] text-zinc-600'
-                      } ${isOver ? 'bg-blue-500/10' : ''}`}
+                      } ${isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 border-blue-500/30' : ''}`}
                     >
                       {/* Cell Header: Day Number */}
                       <div className="flex items-center justify-between">
@@ -793,16 +952,22 @@ export const CalendarView: React.FC = () => {
                           const slot = getTaskTimeSlot(task);
                           const styling = getPriorityBadge(task.priority);
                           const isDone = task.status === 'done';
+                          const isDragging = draggingTaskId === task.id;
 
                           return (
                             <div
                               key={task.id}
+                              draggable
+                              onDragStart={e => handleDragStartTask(e, task.id)}
+                              onDragEnd={handleDragEnd}
                               onClick={e => {
                                 e.stopPropagation();
                                 setSelectedItem(task);
                                 setIsFullscreenEditorOpen(true);
                               }}
-                              className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors"
+                              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors cursor-grab active:cursor-grabbing ${
+                                isDragging ? 'opacity-40 ring-1 ring-blue-500/50' : ''
+                              }`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${styling.dot}`} />
                               <span className={`truncate flex-1 ${isDone ? 'line-through text-zinc-500' : ''}`}>
@@ -860,8 +1025,12 @@ export const CalendarView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setDrawerTab('unscheduled')}
+                  onDragOver={handleDragOverUnscheduled}
+                  onDrop={handleDropUnscheduled}
                   className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
-                    drawerTab === 'unscheduled'
+                    dragTarget?.type === 'unscheduled'
+                      ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40'
+                      : drawerTab === 'unscheduled'
                       ? 'bg-white/10 text-white font-medium'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
@@ -883,22 +1052,115 @@ export const CalendarView: React.FC = () => {
 
             {/* Drawer Tasks List */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin">
+              {draggingTaskId && (
+                <div
+                  onDragOver={handleDragOverUnscheduled}
+                  onDrop={handleDropUnscheduled}
+                  className={`p-3 rounded-lg border-2 border-dashed transition-all text-center text-xs font-mono flex items-center justify-center gap-2 cursor-pointer ${
+                    dragTarget?.type === 'unscheduled'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-200 scale-[1.01]'
+                      : 'bg-white/[0.02] border-white/[0.1] text-zinc-400 hover:border-zinc-500'
+                  }`}
+                >
+                  <Inbox className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Снять срок (перенести в «Без срока»)</span>
+                </div>
+              )}
+
               {drawerTab === 'overdue' ? (
                 overdueTasks.length === 0 ? (
                   <div className="py-12 text-center text-xs text-zinc-600 font-mono">
                     Нет просроченных задач
                   </div>
                 ) : (
-                  overdueTasks.map(task => (
+                  overdueTasks.map(task => {
+                    const isDragging = draggingTaskId === task.id;
+                    return (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={e => handleDragStartTask(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => {
+                          setSelectedItem(task);
+                          setIsFullscreenEditorOpen(true);
+                        }}
+                        className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing ${
+                          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              toggleTaskComplete(task.id);
+                            }}
+                            className="mt-0.5 w-3.5 h-3.5 rounded-full border border-zinc-600 hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
+                          >
+                            <Check className="w-2 h-2 text-blue-400 opacity-0 hover:opacity-100" />
+                          </button>
+                          <span className="text-xs font-medium text-zinc-200 leading-snug line-clamp-2">
+                            {task.title || 'Безымянная задача'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] font-mono text-rose-400 pt-1 border-t border-white/[0.04]">
+                          <span>Срок: {task.dueDate}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 pt-1 text-[10px] font-mono">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleQuickSchedule(task, getTodayString());
+                            }}
+                            className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 transition-colors cursor-pointer"
+                          >
+                            Сегодня
+                          </button>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleQuickSchedule(task, getTomorrowString());
+                            }}
+                            className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 transition-colors cursor-pointer"
+                          >
+                            Завтра
+                          </button>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleQuickSchedule(task, getNextWeekString());
+                            }}
+                            className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 transition-colors cursor-pointer"
+                          >
+                            +Неделя
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )
+              ) : unscheduledTasks.length === 0 ? (
+                <div className="py-12 text-center text-xs text-zinc-600 font-mono">
+                  Все задачи имеют срок выполнения
+                </div>
+              ) : (
+                unscheduledTasks.map(task => {
+                  const isDragging = draggingTaskId === task.id;
+                  return (
                     <div
                       key={task.id}
                       draggable
                       onDragStart={e => handleDragStartTask(e, task.id)}
+                      onDragEnd={handleDragEnd}
                       onClick={() => {
                         setSelectedItem(task);
                         setIsFullscreenEditorOpen(true);
                       }}
-                      className="p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-pointer"
+                      className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing ${
+                        isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+                      }`}
                     >
                       <div className="flex items-start gap-2">
                         <button
@@ -915,11 +1177,8 @@ export const CalendarView: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-[10px] font-mono text-rose-400 pt-1 border-t border-white/[0.04]">
-                        <span>Срок: {task.dueDate}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 pt-1 text-[10px] font-mono">
+                      <div className="flex items-center gap-1.5 pt-1 text-[10px] font-mono border-t border-white/[0.04]">
+                        <span className="text-zinc-500 mr-auto">Назначить:</span>
                         <button
                           onClick={e => {
                             e.stopPropagation();
@@ -949,71 +1208,8 @@ export const CalendarView: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  ))
-                )
-              ) : unscheduledTasks.length === 0 ? (
-                <div className="py-12 text-center text-xs text-zinc-600 font-mono">
-                  Все задачи имеют срок выполнения
-                </div>
-              ) : (
-                unscheduledTasks.map(task => (
-                  <div
-                    key={task.id}
-                    draggable
-                    onDragStart={e => handleDragStartTask(e, task.id)}
-                    onClick={() => {
-                      setSelectedItem(task);
-                      setIsFullscreenEditorOpen(true);
-                    }}
-                    className="p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-pointer"
-                  >
-                    <div className="flex items-start gap-2">
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          toggleTaskComplete(task.id);
-                        }}
-                        className="mt-0.5 w-3.5 h-3.5 rounded-full border border-zinc-600 hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
-                      >
-                        <Check className="w-2 h-2 text-blue-400 opacity-0 hover:opacity-100" />
-                      </button>
-                      <span className="text-xs font-medium text-zinc-200 leading-snug line-clamp-2">
-                        {task.title || 'Безымянная задача'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 pt-1 text-[10px] font-mono border-t border-white/[0.04]">
-                      <span className="text-zinc-500 mr-auto">Назначить:</span>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleQuickSchedule(task, getTodayString());
-                        }}
-                        className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 transition-colors cursor-pointer"
-                      >
-                        Сегодня
-                      </button>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleQuickSchedule(task, getTomorrowString());
-                        }}
-                        className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 transition-colors cursor-pointer"
-                      >
-                        Завтра
-                      </button>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleQuickSchedule(task, getNextWeekString());
-                        }}
-                        className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 transition-colors cursor-pointer"
-                      >
-                        +Неделя
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -1062,15 +1258,21 @@ export const CalendarView: React.FC = () => {
                   const slot = getTaskTimeSlot(task);
                   const styling = getPriorityBadge(task.priority);
                   const isDone = task.status === 'done';
+                  const isDragging = draggingTaskId === task.id;
 
                   return (
                     <div
                       key={task.id}
+                      draggable
+                      onDragStart={e => handleDragStartTask(e, task.id)}
+                      onDragEnd={handleDragEnd}
                       onClick={() => {
                         setSelectedItem(task);
                         setIsFullscreenEditorOpen(true);
                       }}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-colors cursor-pointer ${styling.bg} ${styling.border}`}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-colors cursor-grab active:cursor-grabbing ${styling.bg} ${styling.border} ${
+                        isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+                      }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <button
