@@ -80,6 +80,7 @@ export const KanbanBoard: React.FC = () => {
 
   // Column drag highlight
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
+  const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
 
   // Active status dropdown card ID
   const [statusMenuTaskId, setStatusMenuTaskId] = useState<string | null>(null);
@@ -154,17 +155,40 @@ export const KanbanBoard: React.FC = () => {
 
   // Drag and Drop handlers
   const handleDragStartTask = (e: React.DragEvent, taskId: string) => {
+    e.stopPropagation();
+    setDraggingCardId(taskId);
     e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'task', id: taskId }));
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'task', id: taskId }));
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragStartMaterial = (e: React.DragEvent, materialId: string) => {
+    e.stopPropagation();
+    setDraggingCardId(materialId);
     e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'material', id: materialId }));
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'material', id: materialId }));
     e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = (e?: React.DragEvent) => {
+    if (e) e.stopPropagation();
+    setDraggingCardId(null);
+    setDragOverColumn(null);
+  };
+
+  const handleDragEnter = (e: React.DragEvent, colId: TaskStatus) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverColumn !== colId) {
+      setDragOverColumn(colId);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent, colId: TaskStatus) => {
     e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
     if (dragOverColumn !== colId) {
       setDragOverColumn(colId);
     }
@@ -172,36 +196,56 @@ export const KanbanBoard: React.FC = () => {
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
     setDragOverColumn(null);
   };
 
   const handleDrop = (e: React.DragEvent, targetStatus: TaskStatus) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverColumn(null);
+    setDraggingCardId(null);
 
-    const raw = e.dataTransfer.getData('text/plain');
-    if (!raw) return;
-
-    try {
-      const payload = JSON.parse(raw);
-      if (payload.kind === 'task') {
-        const task = items.find(i => i.id === payload.id);
-        if (task && task.status !== targetStatus) {
-          updateItem({
-            ...task,
-            status: targetStatus,
-          });
-          const colName = COLUMNS.find(c => c.id === targetStatus)?.title || targetStatus;
-          addToast(`Задача перемещена в «${colName}»`, 'info');
-        }
-      } else if (payload.kind === 'material') {
-        const material = items.find(i => i.id === payload.id);
-        if (material) {
-          handleConvertToTask(material, targetStatus);
+    let payload: any = null;
+    const jsonRaw = e.dataTransfer.getData('application/json');
+    if (jsonRaw) {
+      try {
+        payload = JSON.parse(jsonRaw);
+      } catch {}
+    }
+    if (!payload) {
+      const raw = e.dataTransfer.getData('text/plain');
+      if (raw) {
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          payload = { id: raw.trim() };
         }
       }
-    } catch {
-      // Ignored non-json drops
+    }
+    if (!payload && draggingCardId) {
+      payload = { id: draggingCardId };
+    }
+    if (!payload || !payload.id) return;
+
+    if (payload.kind === 'material' || payload.type === 'note' || payload.type === 'article') {
+      const material = items.find(i => i.id === payload.id);
+      if (material) {
+        handleConvertToTask(material, targetStatus);
+      }
+    } else {
+      const task = items.find(i => i.id === payload.id);
+      if (task && task.status !== targetStatus) {
+        updateItem({
+          ...task,
+          status: targetStatus,
+        });
+        const colName = COLUMNS.find(c => c.id === targetStatus)?.title || targetStatus;
+        addToast(`Задача перемещена в «${colName}»`, 'info');
+      }
     }
   };
 
@@ -294,11 +338,16 @@ export const KanbanBoard: React.FC = () => {
                   key={mat.id}
                   draggable
                   onDragStart={e => handleDragStartMaterial(e, mat.id)}
+                  onDragEnd={handleDragEnd}
                   onClick={() => {
                     setSelectedItem(mat);
                     setIsFullscreenEditorOpen(true);
                   }}
-                  className="group p-2.5 rounded-lg bg-[#141417]/80 hover:bg-[#18181c] border border-white/[0.05] hover:border-white/[0.12] transition-all cursor-grab active:cursor-grabbing text-left space-y-1.5 shadow-sm"
+                  className={`group p-2.5 rounded-lg bg-[#141417]/80 hover:bg-[#18181c] border border-white/[0.05] hover:border-white/[0.12] transition-all text-left space-y-1.5 shadow-sm ${
+                    draggingCardId === mat.id
+                      ? 'opacity-40 scale-[0.98] ring-1 ring-blue-500/50 pointer-events-none'
+                      : 'cursor-grab active:cursor-grabbing'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-1.5">
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -355,6 +404,8 @@ export const KanbanBoard: React.FC = () => {
           return (
             <div
               key={column.id}
+              data-testid={`kanban-column-${column.id}`}
+              onDragEnter={e => handleDragEnter(e, column.id)}
               onDragOver={e => handleDragOver(e, column.id)}
               onDragLeave={handleDragLeave}
               onDrop={e => handleDrop(e, column.id)}
@@ -416,6 +467,7 @@ export const KanbanBoard: React.FC = () => {
                         key={task.id}
                         draggable
                         onDragStart={e => handleDragStartTask(e, task.id)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => {
                           setSelectedItem(task);
                           setIsFullscreenEditorOpen(true);
@@ -431,7 +483,11 @@ export const KanbanBoard: React.FC = () => {
                           });
                         }}
                         data-testid="kanban-card"
-                        className="group relative p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.14] transition-all cursor-grab active:cursor-grabbing text-left space-y-2 shadow-sm select-none"
+                        className={`group relative p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.14] transition-all text-left space-y-2 shadow-sm select-none ${
+                          draggingCardId === task.id
+                            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
+                            : 'cursor-grab active:cursor-grabbing'
+                        }`}
                       >
                         {/* Top bar: Task Key, Status Trigger, Linear Signal Bars Priority */}
                         <div className="flex items-center justify-between gap-1.5">

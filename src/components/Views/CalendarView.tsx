@@ -322,19 +322,22 @@ export const CalendarView: React.FC = () => {
   };
 
   const handleDragStartTask = (e: React.DragEvent, taskId: string) => {
+    e.stopPropagation();
     setDraggingTaskId(taskId);
-    e.dataTransfer.setData('text/plain', JSON.stringify({ id: taskId }));
+    e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'task', id: taskId }));
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'task', id: taskId }));
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (e?: React.DragEvent) => {
+    if (e) e.stopPropagation();
     setDraggingTaskId(null);
     setDragTarget(null);
   };
 
   const handleDragOverHour = (e: React.DragEvent, dateStr: string, hour: number) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     if (dragTarget?.type !== 'hour' || dragTarget.dateStr !== dateStr || dragTarget.hour !== hour) {
       setDragTarget({ type: 'hour', dateStr, hour });
@@ -343,6 +346,7 @@ export const CalendarView: React.FC = () => {
 
   const handleDragOverAllDay = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     if (dragTarget?.type !== 'allday' || dragTarget.dateStr !== dateStr) {
       setDragTarget({ type: 'allday', dateStr });
@@ -351,6 +355,7 @@ export const CalendarView: React.FC = () => {
 
   const handleDragOverMonth = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     if (dragTarget?.type !== 'month' || dragTarget.dateStr !== dateStr) {
       setDragTarget({ type: 'month', dateStr });
@@ -359,6 +364,7 @@ export const CalendarView: React.FC = () => {
 
   const handleDragOverUnscheduled = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     if (dragTarget?.type !== 'unscheduled') {
       setDragTarget({ type: 'unscheduled' });
@@ -367,8 +373,9 @@ export const CalendarView: React.FC = () => {
 
   const handleDropHour = (e: React.DragEvent, dateStr: string, hour: number) => {
     e.preventDefault();
+    e.stopPropagation();
     const taskId = extractTaskId(e);
-    handleDragEnd();
+    handleDragEnd(e);
     if (!taskId) return;
 
     const task = items.find(i => i.id === taskId);
@@ -388,8 +395,9 @@ export const CalendarView: React.FC = () => {
 
   const handleDropAllDay = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
+    e.stopPropagation();
     const taskId = extractTaskId(e);
-    handleDragEnd();
+    handleDragEnd(e);
     if (!taskId) return;
 
     const task = items.find(i => i.id === taskId);
@@ -408,8 +416,9 @@ export const CalendarView: React.FC = () => {
 
   const handleDropMonth = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
+    e.stopPropagation();
     const taskId = extractTaskId(e);
-    handleDragEnd();
+    handleDragEnd(e);
     if (!taskId) return;
 
     const task = items.find(i => i.id === taskId);
@@ -439,8 +448,9 @@ export const CalendarView: React.FC = () => {
 
   const handleDropUnscheduled = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     const taskId = extractTaskId(e);
-    handleDragEnd();
+    handleDragEnd(e);
     if (!taskId) return;
 
     const task = items.find(i => i.id === taskId);
@@ -484,8 +494,12 @@ export const CalendarView: React.FC = () => {
           });
         }}
         title={task.title}
-        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all cursor-grab active:cursor-grabbing min-w-0 ${styling.bg} ${styling.border} ${styling.text} ${
-          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all min-w-0 ${styling.bg} ${styling.border} ${styling.text} ${
+          isDragging
+            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
+            : draggingTaskId !== null
+            ? 'pointer-events-none'
+            : 'cursor-grab active:cursor-grabbing'
         }`}
       >
         <button
@@ -554,8 +568,12 @@ export const CalendarView: React.FC = () => {
           });
         }}
         style={{ top: `${topPx}px`, height: `${heightPx}px`, left: '3%', width: '94%' }}
-        className={`absolute rounded-lg p-2 border flex flex-col justify-between select-none cursor-grab active:cursor-grabbing transition-all duration-150 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
-          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+        className={`absolute rounded-lg p-2 border flex flex-col justify-between select-none transition-all duration-150 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
+          isDragging
+            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
+            : draggingTaskId !== null
+            ? 'pointer-events-none'
+            : 'cursor-grab active:cursor-grabbing'
         }`}
       >
         <div className="flex items-start gap-1.5 min-w-0">
@@ -750,6 +768,7 @@ export const CalendarView: React.FC = () => {
                     return (
                       <div
                         key={dateStr}
+                        onDragEnter={e => handleDragOverAllDay(e, dateStr)}
                         onDragOver={e => handleDragOverAllDay(e, dateStr)}
                         onDrop={e => handleDropAllDay(e, dateStr)}
                         className={`p-1 border-r border-white/[0.04] last:border-r-0 space-y-1 transition-colors min-h-[44px] ${
@@ -832,6 +851,7 @@ export const CalendarView: React.FC = () => {
                                   folder: currentFolder,
                                 });
                               }}
+                              onDragEnter={e => handleDragOverHour(e, dateStr, hour)}
                               onDragOver={e => handleDragOverHour(e, dateStr, hour)}
                               onDrop={e => handleDropHour(e, dateStr, hour)}
                               className={`h-[52px] border-b border-white/[0.04] transition-colors relative group cursor-pointer ${
@@ -908,6 +928,7 @@ export const CalendarView: React.FC = () => {
                   return (
                     <div
                       key={cell.dateStr}
+                      onDragEnter={e => handleDragOverMonth(e, cell.dateStr)}
                       onDragOver={e => handleDragOverMonth(e, cell.dateStr)}
                       onDrop={e => handleDropMonth(e, cell.dateStr)}
                       onClick={() => setExpandedDayDateStr(cell.dateStr)}
@@ -965,8 +986,12 @@ export const CalendarView: React.FC = () => {
                                 setSelectedItem(task);
                                 setIsFullscreenEditorOpen(true);
                               }}
-                              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors cursor-grab active:cursor-grabbing ${
-                                isDragging ? 'opacity-40 ring-1 ring-blue-500/50' : ''
+                              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors ${
+                                isDragging
+                                  ? 'opacity-40 ring-1 ring-blue-500/50 pointer-events-none'
+                                  : draggingTaskId !== null
+                                  ? 'pointer-events-none'
+                                  : 'cursor-grab active:cursor-grabbing'
                               }`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${styling.dot}`} />
@@ -1025,6 +1050,7 @@ export const CalendarView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setDrawerTab('unscheduled')}
+                  onDragEnter={handleDragOverUnscheduled}
                   onDragOver={handleDragOverUnscheduled}
                   onDrop={handleDropUnscheduled}
                   className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
@@ -1054,6 +1080,7 @@ export const CalendarView: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin">
               {draggingTaskId && (
                 <div
+                  onDragEnter={handleDragOverUnscheduled}
                   onDragOver={handleDragOverUnscheduled}
                   onDrop={handleDropUnscheduled}
                   className={`p-3 rounded-lg border-2 border-dashed transition-all text-center text-xs font-mono flex items-center justify-center gap-2 cursor-pointer ${
@@ -1086,7 +1113,7 @@ export const CalendarView: React.FC = () => {
                           setIsFullscreenEditorOpen(true);
                         }}
                         className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing ${
-                          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+                          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none' : ''
                         }`}
                       >
                         <div className="flex items-start gap-2">
@@ -1159,7 +1186,7 @@ export const CalendarView: React.FC = () => {
                         setIsFullscreenEditorOpen(true);
                       }}
                       className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing ${
-                        isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+                        isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none' : ''
                       }`}
                     >
                       <div className="flex items-start gap-2">

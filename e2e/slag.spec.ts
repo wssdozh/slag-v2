@@ -2062,8 +2062,6 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('34. Calendar Drag and Drop including Untimed and Unscheduled Tasks', async ({ page }) => {
-    page.on('console', msg => console.log('CALENDAR PAGE LOG:', msg.text()));
-
     // 1. Switch to Calendar view
     const calendarBtn = page.locator('header button[title*="Календарь"]');
     await expect(calendarBtn).toBeVisible();
@@ -2159,37 +2157,25 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('35. Kanban Drag and Drop without Dockview Tab Interference', async ({ page }) => {
-    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-
     // 1. Switch to Kanban view
     const kanbanBtn = page.locator('header button[title*="Канбан"]');
     await expect(kanbanBtn).toBeVisible();
     await kanbanBtn.click();
     await page.waitForTimeout(300);
 
-    // 2. Locate or create a task in "К выполнению"
-    const uniqueKanbanTitle = `КанбанПеренос_${Date.now()}`;
-    const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]').first();
-    await addBtn.click();
-    await page.waitForTimeout(200);
-
-    const input = page.locator('[placeholder*="Название задачи"]');
-    await expect(input).toBeVisible();
-    await input.fill(uniqueKanbanTitle);
-    await input.press('Enter');
-    await page.waitForTimeout(400);
-
-    const taskCard = page.locator('[data-testid="kanban-card"]', { hasText: uniqueKanbanTitle }).first();
+    // 2. Locate existing task "Купить хороший зеленый чай" in "К выполнению"
+    const taskCard = page.locator('[data-testid="kanban-card"]').filter({ hasText: 'Купить хороший зеленый чай' }).first();
     await expect(taskCard).toBeVisible();
 
-    // 3. Drag taskCard from "К выполнению" to "Бэклог" (immediately adjacent column)
+    // 3. Drag task to "Бэклог" column
+    const taskTitle = taskCard.locator('text=Купить хороший зеленый чай').first();
     const backlogColumn = page.locator('[data-testid="kanban-column-backlog"]');
     await expect(backlogColumn).toBeVisible();
-    await taskCard.dragTo(backlogColumn);
+    await taskTitle.dragTo(backlogColumn);
     await page.waitForTimeout(400);
 
     // Verify task is now inside "Бэклог" column
-    const backlogTask = backlogColumn.locator('[data-testid="kanban-card"]', { hasText: uniqueKanbanTitle });
+    const backlogTask = backlogColumn.locator('[data-testid="kanban-card"]', { hasText: 'Купить хороший зеленый чай' });
     await expect(backlogTask).toBeVisible();
 
     // 4. Verify Dockview tab bar did not trigger residual insertion beams or tab dragging classes
