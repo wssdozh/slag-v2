@@ -1713,7 +1713,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await closeQueueBtn.click();
     await expect(page.locator('text=Очередь воспроизведения')).not.toBeVisible();
 
-    // Verify bottom bar utilities (speed, repeat)
+    // Verify bottom bar utilities (speed, repeat, shuffle)
+    const shuffleBtn = page.locator('button[aria-label="Перемешать"]');
+    await expect(shuffleBtn).toBeVisible();
+    await shuffleBtn.click();
+    await expect(shuffleBtn).toHaveClass(/bg-white\/10/);
+
     const speedBtn = page.locator('button[aria-label="Скорость"]');
     await expect(speedBtn).toBeVisible();
     await speedBtn.click();

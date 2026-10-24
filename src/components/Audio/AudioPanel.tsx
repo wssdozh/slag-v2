@@ -8,6 +8,7 @@ import {
   RotateCw,
   Repeat,
   Repeat1,
+  Shuffle,
   Volume2,
   VolumeX,
   ListMusic,
@@ -46,6 +47,7 @@ export const AudioPanel: React.FC = () => {
   const [duration, setDuration] = useState<number>(0);
   const [speedIndex, setSpeedIndex] = useState<number>(0);
   const [isLoop, setIsLoop] = useState<boolean>(false);
+  const [isShuffle, setIsShuffle] = useState<boolean>(false);
   const [volume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
@@ -95,15 +97,17 @@ export const AudioPanel: React.FC = () => {
   // Refs for audio listeners to avoid stale closures
   const isPlayingRef = useRef(isPlaying);
   const isLoopRef = useRef(isLoop);
+  const isShuffleRef = useRef(isShuffle);
   const tracksLengthRef = useRef(tracks.length);
   const safeIndexRef = useRef(safeTrackIndex);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
     isLoopRef.current = isLoop;
+    isShuffleRef.current = isShuffle;
     tracksLengthRef.current = tracks.length;
     safeIndexRef.current = safeTrackIndex;
-  }, [isPlaying, isLoop, tracks.length, safeTrackIndex]);
+  }, [isPlaying, isLoop, isShuffle, tracks.length, safeTrackIndex]);
 
   // Sync playback rate and volume
   useEffect(() => {
@@ -154,6 +158,11 @@ export const AudioPanel: React.FC = () => {
       if (isLoopRef.current) {
         audio.currentTime = 0;
         audio.play().catch(() => {});
+      } else if (isShuffleRef.current && tracksLengthRef.current > 1) {
+        const rand = Math.floor(Math.random() * (tracksLengthRef.current - 1));
+        const nextIdx = rand >= safeIndexRef.current ? rand + 1 : rand;
+        setCurrentTrackIndex(nextIdx);
+        setIsPlaying(true);
       } else if (safeIndexRef.current < tracksLengthRef.current - 1) {
         // Auto-advance to next track in playlist
         setCurrentTrackIndex(safeIndexRef.current + 1);
@@ -197,6 +206,9 @@ export const AudioPanel: React.FC = () => {
     if (currentTime > 3) {
       if (audioRef.current) audioRef.current.currentTime = 0;
       setCurrentTime(0);
+    } else if (isShuffle && tracks.length > 1) {
+      const rand = Math.floor(Math.random() * (tracks.length - 1));
+      setCurrentTrackIndex(rand >= safeTrackIndex ? rand + 1 : rand);
     } else if (safeTrackIndex > 0) {
       setCurrentTrackIndex(safeTrackIndex - 1);
     } else {
@@ -205,7 +217,10 @@ export const AudioPanel: React.FC = () => {
   };
 
   const handleNextTrack = () => {
-    if (safeTrackIndex < tracks.length - 1) {
+    if (isShuffle && tracks.length > 1) {
+      const rand = Math.floor(Math.random() * (tracks.length - 1));
+      setCurrentTrackIndex(rand >= safeTrackIndex ? rand + 1 : rand);
+    } else if (safeTrackIndex < tracks.length - 1) {
       setCurrentTrackIndex(safeTrackIndex + 1);
     } else {
       setCurrentTrackIndex(0);
@@ -492,8 +507,8 @@ export const AudioPanel: React.FC = () => {
                 </button>
               </div>
 
-              {/* 6. Utility Controls Row: Queue, Loop | Speed, Volume */}
-              <div className="flex items-center justify-between w-full max-w-[240px] text-zinc-400 select-none mt-5">
+              {/* 6. Utility Controls Row: Queue, Shuffle, Loop | Speed, Volume */}
+              <div className="flex items-center justify-between w-full max-w-[270px] text-zinc-400 select-none mt-5">
                 {/* Queue Button */}
                 <button
                   onClick={() => setIsPlaylistOpen(true)}
@@ -502,6 +517,18 @@ export const AudioPanel: React.FC = () => {
                   aria-label="Очередь воспроизведения"
                 >
                   <ListMusic className="w-4 h-4" />
+                </button>
+
+                {/* Shuffle Button */}
+                <button
+                  onClick={() => setIsShuffle((prev) => !prev)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isShuffle ? 'text-white bg-white/10' : 'hover:text-white hover:bg-white/[0.08]'
+                  }`}
+                  title={isShuffle ? 'Перемешивание включено' : 'Перемешивание выключено'}
+                  aria-label="Перемешать"
+                >
+                  <Shuffle className="w-4 h-4" />
                 </button>
 
                 {/* Loop Button */}
