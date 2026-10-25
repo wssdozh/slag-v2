@@ -126,8 +126,12 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
           const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
           const audioCtx = audioContextRef.current || new AudioContextClass();
           audioContextRef.current = audioCtx;
+          if (audioCtx.state === 'suspended') {
+            await audioCtx.resume().catch(() => {});
+          }
           const analyser = audioCtx.createAnalyser();
           analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.75;
           analyserRef.current = analyser;
           setAnalyserNode(analyser);
           const source = audioCtx.createMediaStreamSource(stream);
@@ -223,33 +227,28 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
   };
 
   return (
-    <div className="flex flex-col items-center justify-between w-full pt-1 pb-1 px-1 select-none animate-in fade-in duration-200">
-      {/* Centerpiece: Glowing Azure Liquid Orb */}
-      <div className="relative my-0.5 flex flex-col items-center justify-center">
-        <VoiceOrb analyser={analyserNode} size={84} />
+    <div className="flex flex-col items-center justify-between w-full pt-1 pb-0.5 px-1 select-none animate-in fade-in duration-200">
+      {/* Centerpiece: Large Glowing Azure Liquid Orb */}
+      <div className="relative my-2 flex items-center justify-center">
+        <VoiceOrb analyser={analyserNode} size={116} />
       </div>
 
-      {/* Timer with subtle indicator */}
-      <div className="flex items-center gap-1.5 mt-0.5 font-mono text-xs font-medium tracking-wider text-zinc-300">
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50" />
-        <span>{formatTimer(elapsedMs)}</span>
-      </div>
-
-      {/* Bottom Row: Actions corner aligned */}
-      <div className="w-full flex items-center justify-between mt-2 pt-1.5 border-t border-white/[0.05]">
+      {/* Bottom Row: Actions corner aligned + Timer centered (NO red dot) */}
+      <div className="w-full flex items-center justify-between mt-2 pt-2 border-t border-white/[0.06]">
         <button
           type="button"
           onClick={handleDiscard}
-          className="h-ctrl-sm px-2 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 text-xs"
+          className="h-ctrl-sm px-2 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-mono"
           title="Отменить запись (Esc)"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline text-2xs font-mono">Отмена</span>
+          <span className="text-2xs">Отмена</span>
         </button>
 
-        <span className="text-[10px] text-zinc-600 font-mono hidden sm:inline select-none">
-          Esc отмена • Enter отправить
-        </span>
+        {/* Clean Monospace Timer centered in the bottom row (No red dot) */}
+        <div className="font-mono text-xs font-medium tracking-wider text-zinc-300 select-none">
+          {formatTimer(elapsedMs)}
+        </div>
 
         <button
           type="button"

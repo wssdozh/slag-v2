@@ -108,13 +108,13 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   const isFlat = variant === 'flat';
 
   return (
-    <div className="w-full select-none relative">
+    <div className="w-full select-none relative flex justify-center">
       {overlaySlot}
       <div
         className={
           isFlat
             ? `flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none ${className}`
-            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors ${className}`
+            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full ${className}`
         }
       >
         {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}

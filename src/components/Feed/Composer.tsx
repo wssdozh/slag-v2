@@ -1966,6 +1966,7 @@ export const Composer: React.FC<ComposerProps> = ({
       leftControls={leftControls}
       rightControls={rightControls}
       sendButton={sendButton}
+      className={isRecordingAudio ? 'max-w-[420px]' : 'max-w-2xl'}
     />
   );
 };

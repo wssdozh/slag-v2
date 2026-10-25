@@ -38,20 +38,20 @@ void main() {
     float t = uTime * 1.2;
     
     // Mode 2: Elliptical stretch
-    float m2 = sin(angle * 2.0 + t * 0.8) * (0.04 + uMid * 0.08);
+    float m2 = sin(angle * 2.0 + t * 0.9) * (0.04 + uMid * 0.16);
     // Mode 3: Triangular fluid sway
-    float m3 = cos(angle * 3.0 - t * 0.6) * (0.03 + uBass * 0.07);
+    float m3 = cos(angle * 3.0 - t * 0.7) * (0.03 + uBass * 0.20);
     // Mode 4: Soft quad pulsation
-    float m4 = sin(angle * 4.0 + t * 0.4) * (0.015 + uHigh * 0.04);
+    float m4 = sin(angle * 4.0 + t * 0.5) * (0.015 + uHigh * 0.12);
     // Mode 1: Floating dipole drift
-    float m1 = cos(angle - t * 0.5) * (0.02 + uVolume * 0.04);
+    float m1 = cos(angle - t * 0.6) * (0.02 + uVolume * 0.14);
 
     // Smooth elastic radius (base + breathing + audio swell + modes)
-    float baseR = 0.58 + sin(uTime * 1.5) * 0.015 + uBass * 0.12;
+    float baseR = 0.53 + sin(uTime * 1.5) * 0.015 + uBass * 0.18;
     float blobRadius = baseR + m1 + m2 + m3 + m4;
 
     // Outer soft edge mask with buttery antialiasing
-    float edgeSoftness = 0.06 + uVolume * 0.04;
+    float edgeSoftness = 0.06 + uVolume * 0.05;
     float alpha = smoothstep(blobRadius + edgeSoftness, blobRadius - 0.02, dist);
 
     if (alpha <= 0.001) {
@@ -84,7 +84,7 @@ void main() {
     }
 
     // Core energy ignition: high frequencies and speech intensity burst the white light outward
-    float coreGlow = smoothstep(0.45 + uHigh * 0.25, 0.0, dist) * (0.8 + uVolume * 0.4);
+    float coreGlow = smoothstep(0.42 + uHigh * 0.30, 0.0, dist) * (0.75 + uVolume * 0.7);
     liquidColor = mix(liquidColor, colWhite, clamp(coreGlow, 0.0, 1.0));
 
     // Delicate translucent surface sheen (liquid glass feel)
@@ -179,6 +179,16 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({ analyser, size = 72, classNa
       let targetHigh = 0;
       let targetVol = 0;
 
+      if (analyser) {
+        if (!dataArrayRef.current || dataArrayRef.current.length !== analyser.frequencyBinCount) {
+          dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+        }
+        const ctx = analyser.context as unknown as { state?: string; resume?: () => Promise<void> };
+        if (ctx && ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+          ctx.resume().catch(() => {});
+        }
+      }
+
       if (analyser && dataArrayRef.current) {
         try {
           analyser.getByteFrequencyData(dataArrayRef.current);
@@ -189,22 +199,22 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({ analyser, size = 72, classNa
           let sumBass = 0;
           const bassCount = Math.max(1, Math.min(4, len));
           for (let i = 0; i < bassCount; i++) sumBass += data[i];
-          targetBass = sumBass / (bassCount * 255);
+          targetBass = Math.min(1.0, (sumBass / (bassCount * 255)) * 2.2);
 
           // Mid bins (4..14): Voice formants and speech clarity
           let sumMid = 0;
           const midEnd = Math.min(15, len);
           const midCount = Math.max(1, midEnd - bassCount);
           for (let i = bassCount; i < midEnd; i++) sumMid += data[i];
-          targetMid = sumMid / (midCount * 255);
+          targetMid = Math.min(1.0, (sumMid / (midCount * 255)) * 2.4);
 
           // High bins (15..end): Consonants, breath, transients
           let sumHigh = 0;
           const highCount = Math.max(1, len - midEnd);
           for (let i = midEnd; i < len; i++) sumHigh += data[i];
-          targetHigh = sumHigh / (highCount * 255);
+          targetHigh = Math.min(1.0, (sumHigh / (highCount * 255)) * 2.5);
 
-          targetVol = targetBass * 0.5 + targetMid * 0.35 + targetHigh * 0.15;
+          targetVol = Math.min(1.0, (targetBass * 0.45 + targetMid * 0.35 + targetHigh * 0.20) * 1.5);
         } catch {
           targetVol = 0;
         }
@@ -218,11 +228,11 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({ analyser, size = 72, classNa
         targetVol = 0.05;
       }
 
-      // Smooth fluid inertia interpolation
-      curVol += (targetVol - curVol) * 0.16;
-      curBass += (targetBass - curBass) * 0.18;
-      curMid += (targetMid - curMid) * 0.16;
-      curHigh += (targetHigh - curHigh) * 0.20;
+      // Smooth fluid inertia interpolation (responsive yet buttery)
+      curVol += (targetVol - curVol) * 0.20;
+      curBass += (targetBass - curBass) * 0.22;
+      curMid += (targetMid - curMid) * 0.20;
+      curHigh += (targetHigh - curHigh) * 0.24;
 
       // Time progression
       const speed = 0.014 + curVol * 0.03;
