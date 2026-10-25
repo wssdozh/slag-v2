@@ -218,8 +218,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     openLightbox(folderImages, Math.max(0, targetIdx));
   };
 
-  const hasMetadata = isTask || isArticle || (item.folder !== 'Входящие') || Boolean(item.isPinned) || Boolean(item.priority && item.priority !== 'none') || Boolean(item.dueDate);
-
   const handleOpenArticle = () => {
     setSelectedItem(item);
     setIsFullscreenEditorOpen(true);
@@ -342,67 +340,65 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           </button>
         </div>
 
-      {/* Top Header / Metadata Bar (Rendered ONLY when metadata exists) */}
-      {hasMetadata && (
-        <div className="flex items-center justify-between text-xs text-zinc-500">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Item Type: Plain text, no nested chips */}
-            {isTask && (
-              <span className="text-2xs font-mono text-zinc-400 font-medium">
-                Таска
-              </span>
-            )}
-            {isArticle && (
-              <span className="text-2xs font-mono text-zinc-400 font-medium">
-                Статья {item.readingTimeMinutes ? `• ${item.readingTimeMinutes} мин` : ''}
-              </span>
-            )}
+      {/* Top Header / Metadata Bar: Always present with unified top-right timestamp */}
+      <div className="flex items-center justify-between text-xs text-zinc-500 min-h-[16px] pr-6 sm:pr-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          {/* Item Type: Plain text, no nested chips */}
+          {isTask && (
+            <span className="text-2xs font-mono text-zinc-400 font-medium">
+              Таска
+            </span>
+          )}
+          {isArticle && (
+            <span className="text-2xs font-mono text-zinc-400 font-medium">
+              Статья {item.readingTimeMinutes ? `• ${item.readingTimeMinutes} мин` : ''}
+            </span>
+          )}
 
-            {/* Folder name if not in inbox */}
-            {item.folder !== 'Входящие' && (
-              <span className="text-2xs text-zinc-500 font-mono">
-                {item.folder}
-              </span>
-            )}
+          {/* Folder name if not in inbox */}
+          {item.folder !== 'Входящие' && (
+            <span className="text-2xs text-zinc-500 font-mono">
+              {item.folder}
+            </span>
+          )}
 
-            {/* Task Priority */}
-            {isTask && item.priority && item.priority !== 'none' && (
-              <span className="flex items-center gap-1">
-                <LinearSignalBars priority={item.priority} className="w-3 h-3" />
-                <span
-                  className={`text-2xs uppercase font-mono font-medium ${
-                    item.priority === 'high'
-                      ? 'text-rose-400'
-                      : item.priority === 'medium'
-                      ? 'text-amber-400'
-                      : 'text-zinc-500'
-                  }`}
-                >
-                  {item.priority === 'high' ? 'Высокий' : item.priority === 'medium' ? 'Средний' : 'Низкий'}
-                </span>
+          {/* Task Priority */}
+          {isTask && item.priority && item.priority !== 'none' && (
+            <span className="flex items-center gap-1">
+              <LinearSignalBars priority={item.priority} className="w-3 h-3" />
+              <span
+                className={`text-2xs uppercase font-mono font-medium ${
+                  item.priority === 'high'
+                    ? 'text-rose-400'
+                    : item.priority === 'medium'
+                    ? 'text-amber-400'
+                    : 'text-zinc-500'
+                }`}
+              >
+                {item.priority === 'high' ? 'Высокий' : item.priority === 'medium' ? 'Средний' : 'Низкий'}
               </span>
-            )}
+            </span>
+          )}
 
-            {/* Pin indicator */}
-            {item.isPinned && (
-              <span className="flex items-center gap-1 text-2xs font-mono text-amber-400/90" title="Закрепленная запись">
-                <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
-                <span>Закреп</span>
-              </span>
-            )}
+          {/* Pin indicator */}
+          {item.isPinned && (
+            <span className="flex items-center gap-1 text-2xs font-mono text-amber-400/90" title="Закрепленная запись">
+              <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
+              <span>Закреп</span>
+            </span>
+          )}
 
-            {/* Task Due Date */}
-            {isTask && item.dueDate && (
-              <span className="flex items-center gap-1 text-2xs text-zinc-500 font-mono">
-                <Calendar className="w-3 h-3 text-zinc-600" />
-                {item.dueDate}
-              </span>
-            )}
-          </div>
-
-          <span className="text-2xs font-mono text-zinc-500 shrink-0">{formattedTime}</span>
+          {/* Task Due Date */}
+          {isTask && item.dueDate && (
+            <span className="flex items-center gap-1 text-2xs text-zinc-500 font-mono">
+              <Calendar className="w-3 h-3 text-zinc-600" />
+              {item.dueDate}
+            </span>
+          )}
         </div>
-      )}
+
+        <span className="text-2xs font-mono text-zinc-500 shrink-0 ml-auto">{formattedTime}</span>
+      </div>
 
       {/* Reply Parent Quote Banner */}
       {item.replyToId && (
@@ -588,7 +584,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             duration={att.duration}
             size={att.size}
             waveform={att.waveform}
-            timeContext={isPureVoice ? formattedTime : undefined}
             transcript={att.extractedText}
             summary={att.summary}
             enrichmentStatus={att.enrichmentStatus}
@@ -722,30 +717,18 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Bottom Bar: Tags + Timestamp (when no top metadata bar exists) */}
-      {!isPureVoice && (
-        <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
-          {item.tags && item.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 items-center">
-              {item.tags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => setActiveTagFilter(tag)}
-                  className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div />
-          )}
-
-          {!hasMetadata && (
-            <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
-              {formattedTime}
-            </span>
-          )}
+      {/* Bottom Bar: Tags */}
+      {item.tags && item.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
+          {item.tags.map(tag => (
+            <button
+              key={tag}
+              onClick={() => setActiveTagFilter(tag)}
+              className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              #{tag}
+            </button>
+          ))}
         </div>
       )}
 
