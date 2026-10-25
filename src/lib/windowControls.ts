@@ -30,9 +30,47 @@ export const closeWindow = async (): Promise<void> => {
   if (!isTauri()) return;
   try {
     const appWindow = getCurrentWindow();
-    await appWindow.close();
+    // Destroy popout windows completely, but keep main window alive in tray
+    if (appWindow.label !== 'main') {
+      await appWindow.destroy();
+    } else {
+      await appWindow.close();
+    }
   } catch (err) {
     console.error('Failed to close window:', err);
+  }
+};
+
+export const openDetachedWindow = async (panelId: string, title: string, box?: { left?: number; top?: number; width?: number; height?: number }): Promise<boolean> => {
+  if (!isTauri()) return false;
+  try {
+    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+    const label = `panel-${panelId}-${Date.now()}`;
+    const url = `index.html?panel=${encodeURIComponent(panelId)}&title=${encodeURIComponent(title)}`;
+    
+    const win = new WebviewWindow(label, {
+      url,
+      title: `${title} — SLAG`,
+      width: box?.width || 760,
+      height: box?.height || 580,
+      x: box?.left,
+      y: box?.top,
+      minWidth: 420,
+      minHeight: 320,
+      decorations: false,
+      transparent: false,
+      theme: 'dark',
+      dragDropEnabled: false,
+    });
+
+    win.once('tauri://error', (err) => {
+      console.error('Failed to create detached native window:', err);
+    });
+
+    return true;
+  } catch (err) {
+    console.error('Failed to open detached native window:', err);
+    return false;
   }
 };
 

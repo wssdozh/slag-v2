@@ -1,6 +1,7 @@
 import React, { useCallback, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
+import { StandalonePanelWindow } from './components/Workspace/StandalonePanelWindow';
 import { MobileShell } from './components/Mobile/MobileShell';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
 import { SearchModal } from './components/Search/SearchModal';
@@ -74,6 +75,15 @@ const AppContent: React.FC = () => {
   useVisualViewport();
 
   const isDesktopWidth = typeof window !== 'undefined' && window.innerWidth >= 768;
+
+  // Standalone Native Popout Window Router
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const standalonePanelId = urlParams?.get('panel');
+  const standalonePanelTitle = urlParams?.get('title') || 'SLAG';
+
+  if (standalonePanelId) {
+    return <StandalonePanelWindow panelId={standalonePanelId} title={standalonePanelTitle} />;
+  }
 
   if (isMobile && forceMobileMode && isDesktopWidth) {
     return (

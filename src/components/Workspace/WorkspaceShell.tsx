@@ -20,6 +20,7 @@ import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
 import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
+import { isDesktopApp, openDetachedWindow } from '../../lib/windowControls';
 import {
   Plus,
   Layers,
@@ -146,13 +147,34 @@ const PANELS_TO_ADD = [
   { id: 'logs', title: 'Логи & HUD', icon: Terminal },
 ];
 
-// Detach panel to external window or floating group
+// Detach panel to native OS window (in desktop mode) or browser popout / floating group
 const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left: number; top: number; width?: number; height?: number }) => {
-  const panelWidth = box?.width || 680;
-  const panelHeight = box?.height || 540;
+  const panelWidth = box?.width || 760;
+  const panelHeight = box?.height || 580;
   const left = box?.left ?? Math.max(40, window.screenX + 80);
   const top = box?.top ?? Math.max(40, window.screenY + 80);
 
+  // 1. In native Tauri desktop app, spawn a genuine independent OS window
+  if (isDesktopApp()) {
+    const rawComponentId = panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+    const title = panel.title || 'Окно SLAG';
+    const opened = await openDetachedWindow(rawComponentId, title, {
+      left,
+      top,
+      width: panelWidth,
+      height: panelHeight,
+    });
+    if (opened) {
+      try {
+        api.removePanel(panel);
+      } catch {
+        // Ignore if already unmounted
+      }
+      return;
+    }
+  }
+
+  // 2. Web browser fallback: try window.open / popout.html
   try {
     const success = await api.addPopoutGroup(panel, {
       popoutUrl: '/popout.html',
