@@ -61,6 +61,7 @@ export function usePointerDnd<TPayload extends DragItemPayload = DragItemPayload
       cleanupListenersRef.current = null;
     }
     dragSessionRef.current = null;
+    document.body.removeAttribute('data-dnd-active');
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
     setState({
@@ -108,6 +109,7 @@ export function usePointerDnd<TPayload extends DragItemPayload = DragItemPayload
         if (!session.isDragging) {
           if (Math.hypot(dx, dy) >= threshold) {
             session.isDragging = true;
+            document.body.setAttribute('data-dnd-active', 'true');
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'grabbing';
 

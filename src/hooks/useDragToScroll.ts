@@ -75,13 +75,16 @@ export function useDragToScroll<T extends HTMLElement = HTMLElement>(
     const handlePointerDown = (e: PointerEvent) => {
       const opts = optionsRef.current;
       if (opts.enabled === false) return;
+      if (document.body.hasAttribute('data-dnd-active')) return;
       // Only primary mouse button (left-click)
       if (e.pointerType !== 'mouse' || e.button !== 0) return;
 
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      const ignore = opts.ignoreSelector || DEFAULT_IGNORE;
+      const ignore = opts.ignoreSelector
+        ? `${DEFAULT_IGNORE}, ${opts.ignoreSelector}`
+        : DEFAULT_IGNORE;
       if (target.closest(ignore)) return;
 
       stopMomentum();
@@ -106,6 +109,11 @@ export function useDragToScroll<T extends HTMLElement = HTMLElement>(
 
     const handlePointerMove = (e: PointerEvent) => {
       if (!isPointerDown) return;
+      if (document.body.hasAttribute('data-dnd-active')) {
+        isPointerDown = false;
+        isDragging = false;
+        return;
+      }
       const opts = optionsRef.current;
       const threshold = opts.threshold ?? 5;
       const direction = opts.direction ?? 'both';

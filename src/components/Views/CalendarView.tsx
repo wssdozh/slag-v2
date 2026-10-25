@@ -226,7 +226,7 @@ export const CalendarView: React.FC = () => {
         return null;
       },
       ignoreSelector:
-        'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-no-pan], [data-testid="calendar-card"], [data-resize-handle], .cursor-ns-resize',
+        'button, a, input, textarea, select, [contenteditable="true"], [data-draggable="true"], [draggable="true"], [data-no-pan], [data-testid="calendar-card"], [data-resize-handle], .cursor-ns-resize',
     },
     weekHorizontalScrollRef
   );
@@ -238,7 +238,7 @@ export const CalendarView: React.FC = () => {
       getContainerX: (_target: HTMLElement, container: HTMLDivElement) => container,
       getContainerY: (target: HTMLElement) => target.closest('.overflow-y-auto') as HTMLElement | null,
       ignoreSelector:
-        'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-no-pan]',
+        'button, a, input, textarea, select, [contenteditable="true"], [data-draggable="true"], [draggable="true"], [data-no-pan]',
     },
     monthHorizontalScrollRef
   );
