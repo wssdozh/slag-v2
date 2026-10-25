@@ -293,18 +293,19 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
   if (isTask && item.recurrence) {
     const streak = item.streak ?? 0;
+    const isZero = streak === 0;
     metaElements.push(
       <span
         key="streak"
         className="flex items-center gap-1 text-2xs font-mono select-none"
-        title={streak === 0 ? 'Серия прервана (0)' : `Серия: ${streak}`}
+        title={isZero ? 'Серия прервана (0)' : `Серия: ${streak}`}
       >
         <Flame
           className={`w-3 h-3 shrink-0 ${
-            streak === 0 ? 'text-zinc-600' : 'text-amber-400/90'
+            isZero ? 'text-rose-400/80' : 'text-amber-400/90'
           }`}
         />
-        <span className={streak === 0 ? 'text-rose-400/80 font-medium' : 'text-zinc-400 font-medium'}>
+        <span className={isZero ? 'text-rose-400/80 font-medium' : 'text-zinc-400 font-medium'}>
           {streak}
         </span>
       </span>
