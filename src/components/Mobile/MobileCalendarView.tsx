@@ -2,6 +2,7 @@ import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect } fro
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
+import { computeAntiOverlapLayout } from '../../lib/calendarLayout';
 import { useSwipeGesture } from '../../hooks/useSwipeGesture';
 import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
 import {
@@ -52,11 +53,12 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
   onOpenActionSheet
 }) => {
   const isDone = task.status === 'done';
+  const slot = getTaskTimeSlot(task);
 
   return (
     <div
       onClick={onSelect}
-      className="w-full flex items-center justify-between p-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors cursor-pointer gap-2.5"
+      className="w-full flex items-center justify-between p-2.5 sm:p-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors cursor-pointer gap-2"
     >
       {/* Checkbox */}
       <button
@@ -77,14 +79,21 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
                 ? 'text-rose-400'
                 : task.priority === 'medium'
                 ? 'text-amber-400'
+                : task.priority === 'low'
+                ? 'text-blue-400'
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
           />
         )}
       </button>
 
-      {/* Title */}
-      <div className="flex-1 min-w-0">
+      {/* Title & Time */}
+      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+        {!slot.isAllDay && slot.hasTime && (
+          <span className="text-[11px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06] shrink-0">
+            {String(slot.startHour).padStart(2, '0')}:{String(slot.startMinute).padStart(2, '0')}
+          </span>
+        )}
         <div
           className={`text-xs font-medium leading-snug truncate ${
             isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
@@ -97,7 +106,7 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
       {/* Folder tag & More button */}
       <div className="flex items-center gap-1.5 shrink-0">
         {task.folder && (
-          <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[100px]">
+          <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[90px]">
             {task.folder}
           </span>
         )}
@@ -174,12 +183,17 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-scroll 3-day view to current hour - 1
+  // Auto-scroll 3-day view once on mount or layout switch to current hour - 1
+  const hasInitialScrolledRef = useRef(false);
   useEffect(() => {
-    if (calendarLayout === '3day' && timeGridScrollRef.current) {
+    if (calendarLayout === '3day' && timeGridScrollRef.current && !hasInitialScrolledRef.current) {
       const currentHour = Math.floor(nowMinute / 60);
       const scrollHour = Math.max(0, currentHour - 1);
       timeGridScrollRef.current.scrollTop = scrollHour * HOUR_HEIGHT;
+      hasInitialScrolledRef.current = true;
+    }
+    if (calendarLayout !== '3day') {
+      hasInitialScrolledRef.current = false;
     }
   }, [calendarLayout, nowMinute]);
 
@@ -267,12 +281,14 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     if (calendarLayout === '3day') {
       const parts = threeDayStartDate.split('-');
       const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      return `${RUSSIAN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      const monthName = headerRightExtra ? RUSSIAN_MONTHS[d.getMonth()].slice(0, 3) : RUSSIAN_MONTHS[d.getMonth()];
+      return `${monthName} ${d.getFullYear()}`;
     }
     const d = new Date(currentWeekMonday);
     d.setDate(currentWeekMonday.getDate() + 3);
-    return `${RUSSIAN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-  }, [calendarLayout, currentWeekMonday, threeDayStartDate]);
+    const monthName = headerRightExtra ? RUSSIAN_MONTHS[d.getMonth()].slice(0, 3) : RUSSIAN_MONTHS[d.getMonth()];
+    return `${monthName} ${d.getFullYear()}`;
+  }, [calendarLayout, currentWeekMonday, headerRightExtra, threeDayStartDate]);
 
   const isCurrentWeek = useMemo(() => {
     if (!todayStr) return false;
@@ -418,52 +434,50 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
 
   return (
     <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none relative">
-      {/* 1. Top Header Bar (Todoist Style: Month Dropdown + Mode Switcher) */}
+      {/* 1. Unified Mobile Calendar Header (Single Bar, 44px) */}
       <header
-        className="h-14 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-3.5 flex items-center justify-between shrink-0 z-20"
+        className="h-11 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
       >
-        {/* Month Dropdown Button */}
-        <button
-          type="button"
-          onClick={() => {
-            const parts = (calendarLayout === '3day' ? threeDayStartDate : getISODateString(currentWeekMonday)).split('-');
-            setPickerYear(Number(parts[0]));
-            setPickerMonth(Number(parts[1]) - 1);
-            setIsMonthPickerOpen(true);
-          }}
-          className="flex items-center gap-1.5 py-1 px-2 -ml-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-left shrink-0"
-        >
-          <span className="text-sm font-bold text-white tracking-tight">
-            {currentMonthLabel}
-          </span>
-          <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-        </button>
+        {/* Left: Month Dropdown Button & Today shortcut */}
+        <div className="flex items-center gap-1 min-w-0 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              const parts = (calendarLayout === '3day' ? threeDayStartDate : getISODateString(currentWeekMonday)).split('-');
+              setPickerYear(Number(parts[0]));
+              setPickerMonth(Number(parts[1]) - 1);
+              setIsMonthPickerOpen(true);
+            }}
+            className="flex items-center gap-1 py-1 px-1.5 -ml-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-left shrink-0"
+          >
+            <span className="text-xs font-bold text-white tracking-tight">
+              {currentMonthLabel}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+          </button>
 
-        {/* Right: Mode Switcher (e.g. [Задачи | Календарь]) */}
-        {headerRightExtra && (
-          <div className="flex items-center shrink-0">
-            {headerRightExtra}
-          </div>
-        )}
-      </header>
+          <button
+            type="button"
+            onClick={handleGoToToday}
+            className={`h-6 px-1.5 rounded-md text-[10px] font-medium transition-all cursor-pointer active:scale-95 flex items-center gap-0.5 shrink-0 ${
+              (calendarLayout === 'agenda' && isCurrentWeek && selectedDate === todayStr) ||
+              (calendarLayout === '3day' && isThreeDayToday)
+                ? 'text-zinc-500 hover:text-zinc-300'
+                : 'bg-white/10 text-white font-semibold'
+            }`}
+            title="Перейти к сегодняшнему дню"
+          >
+            <span>Сегодня</span>
+          </button>
+        </div>
 
-      {/* 2. Sub-Header Toolbar: Date range, [Повестка | 3 дня] layout switcher, Сегодня & Без даты */}
-      <div className="px-3 py-2 border-b border-white/[0.06] bg-[#0c0c0e]/80 flex items-center justify-between shrink-0 gap-2">
-        {/* Date range / indicator */}
-        <span className="text-[11px] font-mono text-zinc-500 shrink-0">
-          {calendarLayout === 'agenda'
-            ? `${weekDays[0].dayNum} — ${weekDays[6].dayNum} ${RUSSIAN_MONTHS[weekDays[6].date.getMonth()].slice(0, 3).toLowerCase()}`
-            : `${threeDays[0].dayNum} — ${threeDays[2].dayNum} ${RUSSIAN_MONTHS[threeDays[2].date.getMonth()].slice(0, 3).toLowerCase()}`
-          }
-        </span>
-
-        {/* Center: Layout toggle [Повестка | 3 дня] */}
+        {/* Center: Layout toggle [Список | 3 дня] */}
         <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
           <button
             type="button"
             onClick={() => setCalendarLayout('agenda')}
-            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
               calendarLayout === 'agenda'
                 ? 'bg-white/10 text-white shadow-xs font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -476,7 +490,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           <button
             type="button"
             onClick={() => setCalendarLayout('3day')}
-            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
               calendarLayout === '3day'
                 ? 'bg-white/10 text-white shadow-xs font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -488,37 +502,29 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           </button>
         </div>
 
-        {/* Right Shortcuts: Сегодня & Без даты */}
+        {/* Right: [Без даты] and ViewModeSwitcher / Extra */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            onClick={handleGoToToday}
-            className={`h-6 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer active:scale-95 flex items-center gap-1 ${
-              (calendarLayout === 'agenda' && isCurrentWeek && selectedDate === todayStr) ||
-              (calendarLayout === '3day' && isThreeDayToday)
-                ? 'text-zinc-500 hover:text-zinc-300'
-                : 'bg-white/10 text-white shadow-xs font-semibold'
-            }`}
-            title="Перейти к сегодняшнему дню"
-          >
-            <span>Сегодня</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setIsNoDateSheetOpen(true)}
-            className="h-6 px-2 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-[11px] font-medium text-zinc-400 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center gap-1"
+            className="h-6 px-1.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-[10px] font-medium text-zinc-400 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center gap-1 shrink-0"
             title="Задачи без даты"
           >
             <span>Без даты</span>
             {noDateTasks.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-white/10 text-[9px] font-mono text-zinc-300">
+              <span className="px-1 py-0.1 rounded-full bg-white/10 text-[9px] font-mono text-zinc-300">
                 {noDateTasks.length}
               </span>
             )}
           </button>
+
+          {headerRightExtra && (
+            <div className="flex items-center shrink-0">
+              {headerRightExtra}
+            </div>
+          )}
         </div>
-      </div>
+      </header>
 
       {/* ========================================================================= */}
       {/* 3. MODE A: AGENDA VIEW (Week Strip + Grouped Days Timeline)                */}
@@ -611,6 +617,24 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                 ? `Завтра · ${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3).toLowerCase()}., ${RUSSIAN_WEEKDAYS[day.weekdayIndex]}`
                 : `${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3).toLowerCase()}., ${RUSSIAN_WEEKDAYS[day.weekdayIndex]}`;
 
+              // Chronological sorting: all-day tasks first, then timed tasks by startMinutes ASC
+              const sortedDayTasks = [...dayTasks].sort((a, b) => {
+                const slotA = getTaskTimeSlot(a);
+                const slotB = getTaskTimeSlot(b);
+                if (slotA.isAllDay && !slotB.isAllDay) return -1;
+                if (!slotA.isAllDay && slotB.isAllDay) return 1;
+                if (!slotA.isAllDay && !slotB.isAllDay) {
+                  const minA = slotA.startHour * 60 + slotA.startMinute;
+                  const minB = slotB.startHour * 60 + slotB.startMinute;
+                  return minA - minB;
+                }
+                return 0;
+              });
+
+              const nowHour = Math.floor(nowMinute / 60);
+              const nowMin = nowMinute % 60;
+              const nowTimeLabel = `${String(nowHour).padStart(2, '0')}:${String(nowMin).padStart(2, '0')}`;
+
               return (
                 <div
                   key={day.dateStr}
@@ -629,32 +653,71 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                   </div>
 
                   <div className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] overflow-hidden">
-                    {dayTasks.length > 0 ? (
+                    {sortedDayTasks.length > 0 ? (
                       <div className="divide-y divide-white/[0.04]">
-                        {dayTasks.map(task => (
-                          <MobileCalendarTaskRow
-                            key={task.id}
-                            task={task}
-                            onSelect={() => {
-                              setSelectedItem(task);
-                              setIsFullscreenEditorOpen(true);
-                            }}
-                            onToggleComplete={() => toggleTaskComplete(task.id.replace(/_virtual_.*$/, ''))}
-                            onOpenActionSheet={() => setMobileActionSheetItem(task)}
-                          />
-                        ))}
+                        {(() => {
+                          const elements: React.ReactNode[] = [];
+                          let nowLineInserted = false;
+
+                          const renderNowLine = () => (
+                            <div key="now-timeline-indicator" className="flex items-center gap-2 py-1 px-3 select-none bg-rose-500/[0.03]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-xs shadow-rose-500/80 shrink-0" />
+                              <span className="text-[10px] font-mono font-medium text-rose-400 shrink-0">{nowTimeLabel} · Сейчас</span>
+                              <div className="h-px flex-1 bg-rose-500/25" />
+                            </div>
+                          );
+
+                          sortedDayTasks.forEach((task) => {
+                            if (isToday && !nowLineInserted) {
+                              const slot = getTaskTimeSlot(task);
+                              const taskMinutes = slot.isAllDay ? -1 : slot.startHour * 60 + slot.startMinute;
+                              if (taskMinutes > nowMinute) {
+                                elements.push(renderNowLine());
+                                nowLineInserted = true;
+                              }
+                            }
+
+                            elements.push(
+                              <MobileCalendarTaskRow
+                                key={task.id}
+                                task={task}
+                                onSelect={() => {
+                                  setSelectedItem(task);
+                                  setIsFullscreenEditorOpen(true);
+                                }}
+                                onToggleComplete={() => toggleTaskComplete(task.id.replace(/_virtual_.*$/, ''))}
+                                onOpenActionSheet={() => setMobileActionSheetItem(task)}
+                              />
+                            );
+                          });
+
+                          if (isToday && !nowLineInserted) {
+                            elements.push(renderNowLine());
+                          }
+
+                          return elements;
+                        })()}
                       </div>
                     ) : (
-                      <div className="p-3 text-xs text-zinc-500 flex items-center justify-between">
-                        <span>— нет задач</span>
-                        <button
-                          type="button"
-                          onClick={() => setAddingDate(day.dateStr)}
-                          className="text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer text-xs"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Добавить</span>
-                        </button>
+                      <div className="flex flex-col">
+                        {isToday && (
+                          <div className="flex items-center gap-2 py-1 px-3 select-none bg-rose-500/[0.03] border-b border-white/[0.04]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-xs shadow-rose-500/80 shrink-0" />
+                            <span className="text-[10px] font-mono font-medium text-rose-400 shrink-0">{nowTimeLabel} · Сейчас</span>
+                            <div className="h-px flex-1 bg-rose-500/25" />
+                          </div>
+                        )}
+                        <div className="p-3 text-xs text-zinc-500 flex items-center justify-between">
+                          <span>— нет задач</span>
+                          <button
+                            type="button"
+                            onClick={() => setAddingDate(day.dateStr)}
+                            className="text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer text-xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Добавить</span>
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -871,13 +934,13 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                       </div>
                     )}
 
-                    {/* Timed Task Blocks */}
-                    {timedTasks.map(task => {
-                      const slot = getTaskTimeSlot(task);
-                      const startH = Math.max(0, Math.min(23, slot.startHour));
-                      const topPx = startH * HOUR_HEIGHT + (slot.startMinute / 60) * HOUR_HEIGHT;
-                      const heightPx = Math.max(36, (slot.durationMinutes / 60) * HOUR_HEIGHT);
+                    {/* Timed Task Blocks with Anti-Overlap and Clean Monochrome Styling */}
+                    {computeAntiOverlapLayout(timedTasks, HOUR_HEIGHT).map(positioned => {
+                      const { task, slot, topPx, heightPx, colIndex, totalCols } = positioned;
                       const isDone = task.status === 'done';
+                      const colWidth = 94 / totalCols;
+                      const left = 3 + colIndex * colWidth;
+                      const width = totalCols > 1 ? colWidth - 1 : 94;
 
                       return (
                         <div
@@ -889,18 +952,23 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                           style={{
                             top: `${topPx}px`,
                             height: `${heightPx}px`,
-                            left: '3%',
-                            width: '94%'
+                            left: `${left}%`,
+                            width: `${width}%`
                           }}
-                          className={`absolute rounded-lg p-1.5 border border-white/[0.08] bg-[#141417]/95 hover:bg-[#18181c] flex flex-col justify-between select-none cursor-pointer transition-all z-10 shadow-sm active:scale-[0.98] ${
-                            task.priority === 'high'
-                              ? 'border-l-2 border-l-rose-500'
-                              : task.priority === 'medium'
-                              ? 'border-l-2 border-l-amber-500'
-                              : 'border-l-2 border-l-blue-400'
-                          }`}
+                          className="absolute rounded-lg p-1.5 border border-white/[0.08] bg-[#141417]/95 hover:bg-[#18181c] flex flex-col justify-between select-none cursor-pointer transition-all z-10 shadow-sm active:scale-[0.98]"
                         >
                           <div className="flex items-start gap-1 min-w-0">
+                            {task.priority && task.priority !== 'none' && (
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${
+                                  task.priority === 'high'
+                                    ? 'bg-rose-500'
+                                    : task.priority === 'medium'
+                                    ? 'bg-amber-400'
+                                    : 'bg-blue-400'
+                                }`}
+                              />
+                            )}
                             <span
                               className={`text-[11px] font-medium leading-tight truncate flex-1 ${
                                 isDone ? 'line-through text-zinc-500' : 'text-zinc-200'

@@ -381,6 +381,17 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const viewSwitcher = page.locator('nav[aria-label="Режимы представления"]');
     await expect(viewSwitcher).toBeVisible();
 
+    // 2.1 Switch to Calendar mode inside folder and verify unified header without empty filter strip
+    await viewSwitcher.locator('button[title*="Календарь"]').click();
+    await expect(inboxFilter).not.toBeVisible();
+    await expect(typeFilter).not.toBeVisible();
+    await page.screenshot({ path: 'test-results/screenshots/mobile_folder_calendar.png' });
+    // Switch back to Feed mode
+    const calSwitcher = page.locator('header nav[aria-label="Режимы представления"]');
+    await expect(calSwitcher).toBeVisible();
+    await calSwitcher.locator('button[title*="Лента"]').click();
+    await expect(inboxFilter).toBeVisible();
+
     // 3. Switch composer to Task mode
     const typeBtn = page.locator('button[aria-label="Сменить тип записи"]');
     await typeBtn.click();

@@ -239,40 +239,42 @@ export const MobileFoldersView: React.FC = () => {
         </div>
       )}
 
-      {/* 1-Row Horizontally Scrollable Filters Strip - Matching Desktop FeedHeader */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] bg-[#0c0c0e]/40 overflow-x-auto scrollbar-none shrink-0 z-10 text-xs">
-        {/* Kanban Materials Dock Toggle */}
-        {feedViewMode === 'kanban' && (
-          <button
-            onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
-            className={`h-ctrl-sm px-2 rounded-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
-              isKanbanMaterialsOpen
-                ? 'bg-white/10 text-white'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title={
-              isKanbanMaterialsOpen
-                ? `Скрыть материалы (${folderMaterialsCount})`
-                : `Показать материалы (${folderMaterialsCount})`
-            }
-            aria-label="Материалы папки"
-          >
-            <BookOpen className="w-3.5 h-3.5 shrink-0" />
-          </button>
-        )}
+      {/* 1-Row Horizontally Scrollable Filters Strip - Matching Desktop FeedHeader (Hidden in Calendar Mode) */}
+      {feedViewMode !== 'calendar' && (
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] bg-[#0c0c0e]/40 overflow-x-auto scrollbar-none shrink-0 z-10 text-xs">
+          {/* Kanban Materials Dock Toggle */}
+          {feedViewMode === 'kanban' && (
+            <button
+              onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
+              className={`h-ctrl-sm px-2 rounded-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
+                isKanbanMaterialsOpen
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+              }`}
+              title={
+                isKanbanMaterialsOpen
+                  ? `Скрыть материалы (${folderMaterialsCount})`
+                  : `Показать материалы (${folderMaterialsCount})`
+              }
+              aria-label="Материалы папки"
+            >
+              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            </button>
+          )}
 
-        <FeedFilters />
+          <FeedFilters />
 
-        {/* Unified View Mode Switcher matching Desktop */}
-        <ViewModeSwitcher className="ml-auto" />
-      </div>
+          {/* Unified View Mode Switcher matching Desktop */}
+          <ViewModeSwitcher className="ml-auto" />
+        </div>
+      )}
 
       {/* Main Content Area: Reacting to feedViewMode */}
       <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
         {feedViewMode === 'kanban' ? (
           <KanbanBoard />
         ) : feedViewMode === 'calendar' ? (
-          <MobileCalendarView />
+          <MobileCalendarView headerRightExtra={<ViewModeSwitcher />} />
         ) : (
           <>
             <FeedList />
