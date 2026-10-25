@@ -2127,7 +2127,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await untimedPill.dragTo(targetHourSlot);
     await page.waitForTimeout(400);
 
-    // Verify task is now in the time grid at that hour
+    // Scroll time grid so 14:00 is visible
+    const timeGrid = page.locator('[data-testid="calendar-time-grid"]');
+    await timeGrid.evaluate(el => {
+      el.scrollTop = 12 * 52;
+    });
+    await page.waitForTimeout(200);
+
+    // Verify task is now in the time grid
     const timedCard = page.locator(`text=${uniqueUntimedTitle}`).first();
     await expect(timedCard).toBeVisible();
 
@@ -2265,6 +2272,75 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
           const items = JSON.parse(localStorage.getItem(key) || '[]');
           items.unshift(
             {
+              id: 'task_dur_15_' + Date.now(),
+              type: 'task',
+              title: 'Стендап (15м)',
+              content: 'Быстрый синк',
+              folder: 'Входящие',
+              tags: ['синк'],
+              attachments: [],
+              status: 'todo',
+              priority: 'urgent',
+              dueDate: dateStr,
+              reminder: `${dateStr}T14:00:00.000`,
+              duration: 15,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            },
+            {
+              id: 'task_dur_30_' + Date.now(),
+              type: 'task',
+              title: 'Синхронизация (30м)',
+              content: 'Ревью задач',
+              folder: 'Входящие',
+              tags: ['работа'],
+              attachments: [],
+              status: 'todo',
+              priority: 'high',
+              dueDate: dateStr,
+              reminder: `${dateStr}T14:30:00.000`,
+              duration: 30,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            },
+            {
+              id: 'task_dur_45_' + Date.now(),
+              type: 'task',
+              title: 'Демо спринта (45м)',
+              content: 'Демонстрация фич',
+              folder: 'Входящие',
+              tags: ['демо'],
+              attachments: [],
+              status: 'todo',
+              priority: 'medium',
+              dueDate: dateStr,
+              reminder: `${dateStr}T15:15:00.000`,
+              duration: 45,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            },
+            {
+              id: 'task_dur_60_' + Date.now(),
+              type: 'task',
+              title: 'Реализовать Интерфейс',
+              content: 'Разработка компонентов',
+              folder: 'Входящие',
+              tags: ['код'],
+              attachments: [],
+              status: 'todo',
+              priority: 'urgent',
+              dueDate: dateStr,
+              reminder: `${dateStr}T16:00:00.000`,
+              duration: 60,
+              subtasks: [
+                { id: 'sub_1', title: 'Шаг 1', completed: true },
+                { id: 'sub_2', title: 'Шаг 2', completed: true },
+                { id: 'sub_3', title: 'Шаг 3', completed: false },
+              ],
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            },
+            {
               id: 'task_overlap_a_' + Date.now(),
               type: 'task',
               title: 'Стендап команды (А)',
@@ -2275,7 +2351,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
               status: 'todo',
               priority: 'high',
               dueDate: dateStr,
-              reminder: `${dateStr}T10:00:00.000Z`,
+              reminder: `${dateStr}T10:00:00.000`,
               duration: 90,
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -2291,7 +2367,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
               status: 'todo',
               priority: 'medium',
               dueDate: dateStr,
-              reminder: `${dateStr}T10:30:00.000Z`,
+              reminder: `${dateStr}T10:30:00.000`,
               duration: 60,
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -2337,13 +2413,67 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const toast = page.locator('text=Повтор выполнен').first();
     await expect(toast).toBeVisible({ timeout: 4000 });
 
-    // 7. Visual Screenshot Audit of Week View
+    // 7. Verify Discrete Duration Card States (15m, 30m, 45m, 60m)
+    const card60 = page.locator('[data-testid^="task-timed-card-task_dur_60_"]').first();
+    await card60.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+
+    const card15 = page.locator('[data-testid^="task-timed-card-task_dur_15_"]').first();
+    const card30 = page.locator('[data-testid^="task-timed-card-task_dur_30_"]').first();
+    const card45 = page.locator('[data-testid^="task-timed-card-task_dur_45_"]').first();
+
+    await expect(card15).toBeVisible({ timeout: 5000 });
+    await expect(card30).toBeVisible({ timeout: 5000 });
+    await expect(card45).toBeVisible({ timeout: 5000 });
+    await expect(card60).toBeVisible({ timeout: 5000 });
+
+    // Verify subtasks badge on 60m card
+    await expect(card60.locator('text=2/3')).toBeVisible();
+
+    // 8. Test Interactive Resizing with Live Tooltip and 15-min snapping
+    const handle60 = page.locator('[data-testid^="resize-handle-task_dur_60_"]').first();
+    await expect(handle60).toBeVisible();
+
+    // Hover over card60 to trigger hover handle appearance
+    await card60.hover();
+    await page.waitForTimeout(150);
+
+    // Drag handle up to resize from 60m to 30m (deltaY = -26px)
+    const box = await handle60.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      // Move up by 26px (snaps 60m -> 30m)
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 26, { steps: 5 });
+      await page.waitForTimeout(200);
+
+      // Verify live floating tooltip badge
+      const liveTooltip = page.locator('[data-testid="resize-live-tooltip"]');
+      await expect(liveTooltip).toBeVisible();
+      await expect(liveTooltip).toContainText('(30м)');
+
+      // Take screenshot of live dragging state with tooltip
+      await page.screenshot({
+        path: 'test-results/screenshots/calendar-resize-live-dragging.png',
+        fullPage: false,
+      });
+
+      // Release mouse to finalize resize
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+
+      // Verify success toast with new duration
+      const resizeToast = page.locator('text=Длительность: 30м').first();
+      await expect(resizeToast).toBeVisible({ timeout: 4000 });
+    }
+
+    // 9. Visual Screenshot Audit of Week View with all duration states
     await page.screenshot({
-      path: 'test-results/screenshots/calendar-duration-recurring-verified.png',
+      path: 'test-results/screenshots/calendar-duration-states-verified.png',
       fullPage: false,
     });
 
-    // 8. Switch to Month view and capture virtual recurrence projections
+    // 10. Switch to Month view and capture virtual recurrence projections
     const monthViewBtn = page.locator('button', { hasText: 'Месяц' }).first();
     if (await monthViewBtn.isVisible()) {
       await monthViewBtn.click();

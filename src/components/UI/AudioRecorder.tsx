@@ -254,7 +254,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
           type="button"
           onClick={() => handleFinish(true)}
           className="h-ctrl-sm px-3 rounded-md bg-white text-black hover:bg-zinc-200 active:scale-95 flex items-center gap-1.5 transition-all shadow-sm cursor-pointer text-xs font-medium"
-          title="Отправить голосовую заметку (Enter)"
+          title="Отправить войс"
         >
           <span>Отправить</span>
           <Send className="w-3 h-3 fill-current" />

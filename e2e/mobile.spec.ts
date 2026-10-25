@@ -157,6 +157,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Find any note card and tap its "..." (More) button
     const firstMoreBtn = page.locator('button[title="Действия"]').first();
+    await firstMoreBtn.scrollIntoViewIfNeeded();
     await expect(firstMoreBtn).toBeVisible();
     await firstMoreBtn.click();
 
