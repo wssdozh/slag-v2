@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Trash2 } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger';
 
@@ -204,58 +204,78 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
     };
   }, [onCancel]);
 
-  // Format mm:ss,t (Telegram format e.g. 0:05,8)
-  const formatTelegramTimer = (ms: number) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleDiscard();
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleFinish(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleDiscard, handleFinish]);
+
+  // Format mm:ss.t (clean mono format e.g. 0:05.8)
+  const formatTimer = (ms: number) => {
     const totalSecs = ms / 1000;
     const mins = Math.floor(totalSecs / 60);
     const secs = Math.floor(totalSecs % 60);
     const tenths = Math.floor((ms % 1000) / 100);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs},${tenths}`;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}.${tenths}`;
   };
 
   return (
-    <div className="flex items-center justify-between w-full px-1 py-0.5 select-none animate-in fade-in duration-150">
-      {/* Left: Red Pulse + Timer mm:ss,t */}
-      <div className="flex items-center gap-2.5 shrink-0">
-        <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50" />
-        <span className="font-mono text-sm font-semibold tracking-wider text-white">
-          {formatTelegramTimer(elapsedMs)}
+    <div className="flex items-center justify-between w-full h-8 px-1 select-none animate-in fade-in duration-150">
+      {/* Left: Red Pulse + Timer mm:ss.t */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50" />
+        <span className="font-mono text-xs font-medium tracking-wide text-zinc-300">
+          {formatTimer(elapsedMs)}
         </span>
       </div>
 
-      {/* Center: Live Waveform ("Полосочка") */}
-      <div className="flex-1 flex items-center justify-center px-3 max-w-xs mx-auto">
+      {/* Center: Live Waveform (Linear monochrome style) */}
+      <div className="flex-1 flex items-center justify-center px-4 max-w-sm mx-auto">
         <div className="flex items-center gap-[2.5px] h-6">
           {liveAmplitudes.map((amp, i) => {
-            const height = Math.round(4 + amp * 18);
+            const height = Math.round(3 + amp * 18);
+            const isSpike = amp > 0.22;
             return (
               <div
                 key={i}
                 style={{ height: `${height}px` }}
-                className="w-[2.5px] rounded-full bg-[#529ee8] transition-all duration-75"
+                className={`w-[2.5px] rounded-full transition-all duration-75 ${
+                  isSpike ? 'bg-zinc-200' : 'bg-zinc-600/70'
+                }`}
               />
             );
           })}
         </div>
       </div>
 
-      {/* Right Controls: CANCEL text button + Blue circular send button */}
-      <div className="flex items-center gap-3 shrink-0">
+      {/* Right Controls: Trash2 icon button + Linear white send button */}
+      <div className="flex items-center gap-1.5 shrink-0">
         <button
           type="button"
           onClick={handleDiscard}
-          className="text-xs font-semibold text-[#529ee8] hover:text-rose-400 transition-colors uppercase tracking-wider cursor-pointer px-1 py-1"
+          className="w-7 h-7 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center justify-center"
+          title="Отменить запись (Esc)"
         >
-          ОТМЕНА
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
 
         <button
           type="button"
           onClick={() => handleFinish(true)}
-          className="w-9 h-9 rounded-full bg-[#2a82e4] hover:bg-[#2473cb] active:scale-95 flex items-center justify-center text-white transition-all shadow-md shadow-[#2a82e4]/30 cursor-pointer"
-          title="Отправить войс"
+          className="w-7 h-7 rounded-lg bg-white text-black hover:bg-zinc-200 active:scale-95 flex items-center justify-center transition-all shadow-sm cursor-pointer"
+          title="Отправить голосовую заметку (Enter)"
         >
-          <Send className="w-4 h-4 ml-0.5 fill-current" />
+          <Send className="w-3.5 h-3.5 ml-0.5 fill-current" />
         </button>
       </div>
     </div>

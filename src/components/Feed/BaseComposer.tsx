@@ -42,6 +42,8 @@ export interface BaseComposerProps {
   maxHeight?: number;
   /** Вариант отображения: 'card' (со своей рамкой/фоном) или 'flat' (для модалок без матрёшки) */
   variant?: 'card' | 'flat';
+  /** Скрыть поле textarea (например, при активном монохромном режиме войс-записи) */
+  hideTextarea?: boolean;
   /** Дополнительные классы для контейнера-каркаса */
   className?: string;
 }
@@ -72,6 +74,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   minHeight = 22,
   maxHeight = 220,
   variant = 'card',
+  hideTextarea = false,
   className = '',
 }) => {
   const localRef = useRef<HTMLTextAreaElement | null>(null);
@@ -118,20 +121,22 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {topSlot}
 
         {/* Зона ввода */}
-        <div className="relative">
-          <textarea
-            ref={effectiveRef}
-            value={value}
-            onChange={onChange}
-            onKeyDown={handleKeyDownInternal}
-            onPaste={onPaste}
-            rows={1}
-            placeholder={placeholder}
-            disabled={disabled}
-            className={`w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal ${isFlat ? 'py-1 px-0.5' : 'py-0 px-1'} outline-none border-none`}
-            style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
-          />
-        </div>
+        {!hideTextarea && (
+          <div className="relative">
+            <textarea
+              ref={effectiveRef}
+              value={value}
+              onChange={onChange}
+              onKeyDown={handleKeyDownInternal}
+              onPaste={onPaste}
+              rows={1}
+              placeholder={placeholder}
+              disabled={disabled}
+              className={`w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal ${isFlat ? 'py-1 px-0.5' : 'py-0 px-1'} outline-none border-none`}
+              style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
+            />
+          </div>
+        )}
 
         {/* Слот свойств: активные свойства задачи, теги, папка под полем ввода */}
         {propertiesSlot}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, RefreshCw } from 'lucide-react';
+import { Send, RefreshCw, Trash2 } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger';
 
@@ -235,30 +235,31 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
         </button>
       </div>
 
-      {/* Bottom Bar: Red pulse timer, CANCEL, Send Blue Button */}
+      {/* Bottom Bar: Red pulse timer, Trash2, Linear White Send Button */}
       <div className="flex items-center justify-between w-full px-1 py-1">
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-          <span className="font-mono text-xs font-semibold text-white">
+          <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/40" />
+          <span className="font-mono text-xs font-medium text-zinc-300">
             {formatTelegramTimer(elapsedMs)}
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={handleDiscard}
-            className="text-xs font-semibold text-[#529ee8] hover:text-rose-400 transition-colors uppercase tracking-wider cursor-pointer"
+            className="w-7 h-7 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center justify-center"
+            title="Отменить запись (Esc)"
           >
-            ОТМЕНА
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
 
           <button
             type="button"
             onClick={() => handleFinish(true)}
             disabled={!isReady}
-            className="w-8 h-8 rounded-full bg-[#2a82e4] hover:bg-[#2473cb] active:scale-95 flex items-center justify-center text-white transition-all shadow-md shadow-[#2a82e4]/30 cursor-pointer disabled:opacity-50"
-            title="Отправить видео-кружок"
+            className="w-7 h-7 rounded-lg bg-white text-black hover:bg-zinc-200 active:scale-95 flex items-center justify-center transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            title="Отправить видео-сообщение (Enter)"
           >
             <Send className="w-3.5 h-3.5 ml-0.5 fill-current" />
           </button>

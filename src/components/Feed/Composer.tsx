@@ -1164,26 +1164,6 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  const isPureAudioRecording = isRecordingAudio && !content.trim() && attachments.length === 0 && !replyTarget;
-
-  if (isPureAudioRecording) {
-    return (
-      <div className="w-full select-none">
-        <div className="rounded-full bg-[#18181c]/95 backdrop-blur-xl border border-white/[0.12] px-3 py-1.5 shadow-2xl shadow-black/50 animate-in fade-in duration-150 flex items-center">
-          <AudioRecorder
-            finishTriggerRef={triggerFinishRef}
-            onRecorded={handleRecordedAudio}
-            onCancel={() => {
-              setIsRecordingAudio(false);
-              setRecordMode('idle');
-              setLockHint(null);
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   const topSlot = (
     <>
         {/* Reply Banner (Flat, Anti-Matryoshka) */}
@@ -1976,6 +1956,7 @@ export const Composer: React.FC<ComposerProps> = ({
           : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
       }
       textareaRef={textareaRef}
+      hideTextarea={isRecordingAudio && !content.trim()}
       isSubmitDisabled={!content.trim() && attachments.length === 0}
       submitTitle="Отправить (Enter)"
       topSlot={topSlot}

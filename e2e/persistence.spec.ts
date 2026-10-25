@@ -151,4 +151,26 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     // Take screenshot with hover
     await page.screenshot({ path: 'test-results/screenshots/card-hover-outside.png' });
   });
+
+  test('Monochrome Linear audio recording inline in composer', async ({ page }) => {
+    // 1. Click mic button in composer toolbar
+    const micBtn = page.locator('button[title*="Записать голосовое"]').or(page.locator('button:has(svg.lucide-mic)')).first();
+    await expect(micBtn).toBeVisible();
+    await micBtn.click();
+    await page.waitForTimeout(500);
+
+    // 2. Verify recording UI appeared inside composer (not floating pill)
+    const timer = page.locator('text=/^0:0[0-9]/');
+    await expect(timer).toBeVisible();
+
+    // Take screenshot of active recording
+    await page.screenshot({ path: 'test-results/screenshots/audio-recording-linear.png' });
+
+    // 3. Cancel with Esc
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Verify recording stopped and composer returned to normal input
+    await expect(page.locator('main textarea')).toBeVisible();
+  });
 });
