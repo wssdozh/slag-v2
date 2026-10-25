@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { querySearch } from '../../lib/searchService';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
+import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
 import {
   CircleDashed,
   Circle,
@@ -78,12 +79,49 @@ export const KanbanBoard: React.FC = () => {
   const [materialsSearchQuery, setMaterialsSearchQuery] = useState('');
   const [searchedMaterials, setSearchedMaterials] = useState<SlagItem[]>([]);
 
-  // Column drag highlight
-  const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
-  const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
-
   // Active status dropdown card ID
   const [statusMenuTaskId, setStatusMenuTaskId] = useState<string | null>(null);
+
+  // Quick Action: Convert Note/Article to Task
+  const handleConvertToTask = useCallback((material: SlagItem, targetStatus: TaskStatus = 'todo') => {
+    updateItem({
+      ...material,
+      type: 'task',
+      status: targetStatus,
+    });
+    addToast(`«${material.title || 'Заметка'}» преобразована в задачу`, 'success');
+  }, [updateItem, addToast]);
+
+  // Pointer Events Drag and Drop hook (desktop & mobile robust)
+  const {
+    isDragging,
+    draggingPayload,
+    dragPos,
+    activeZoneData,
+    handlePointerDown,
+  } = usePointerDnd<DragItemPayload>({
+    onDrop: (payload, _targetZone, targetData) => {
+      const targetStatus = targetData.dropColumn as TaskStatus | undefined;
+      if (!targetStatus) return;
+
+      if (payload.type === 'material') {
+        const material = items.find(i => i.id === payload.id);
+        if (material) {
+          handleConvertToTask(material, targetStatus);
+        }
+      } else {
+        const task = items.find(i => i.id === payload.id);
+        if (task && task.status !== targetStatus) {
+          updateItem({
+            ...task,
+            status: targetStatus,
+          });
+          const colName = COLUMNS.find(c => c.id === targetStatus)?.title || targetStatus;
+          addToast(`Задача перемещена в «${colName}»`, 'info');
+        }
+      }
+    },
+  });
 
   // Mouse drag-to-scroll for horizontal Kanban board and vertical column scrolling
   const kanbanBoardRef = useDragToScroll<HTMLDivElement>({
@@ -91,7 +129,7 @@ export const KanbanBoard: React.FC = () => {
     getContainerX: (_target, container) => container,
     getContainerY: (target) => target.closest('.overflow-y-auto') as HTMLElement | null,
     ignoreSelector:
-      'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-no-pan], [data-testid="kanban-card"]',
+      'button, a, input, textarea, select, [contenteditable="true"], [data-draggable="true"], [data-no-pan], [data-testid="kanban-card"]',
   });
 
   // Filter items scoped to current folder
@@ -151,112 +189,6 @@ export const KanbanBoard: React.FC = () => {
 
     return map;
   }, [tasks]);
-
-  // Quick Action: Convert Note/Article to Task
-  const handleConvertToTask = (material: SlagItem, targetStatus: TaskStatus = 'todo') => {
-    updateItem({
-      ...material,
-      type: 'task',
-      status: targetStatus,
-    });
-    addToast(`«${material.title || 'Заметка'}» преобразована в задачу`, 'success');
-  };
-
-  // Drag and Drop handlers
-  const handleDragStartTask = (e: React.DragEvent, taskId: string) => {
-    e.stopPropagation();
-    setDraggingCardId(taskId);
-    e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'task', id: taskId }));
-    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'task', id: taskId }));
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragStartMaterial = (e: React.DragEvent, materialId: string) => {
-    e.stopPropagation();
-    setDraggingCardId(materialId);
-    e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'material', id: materialId }));
-    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'material', id: materialId }));
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragEnd = (e?: React.DragEvent) => {
-    if (e) e.stopPropagation();
-    setDraggingCardId(null);
-    setDragOverColumn(null);
-  };
-
-  const handleDragEnter = (e: React.DragEvent, colId: TaskStatus) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverColumn !== colId) {
-      setDragOverColumn(colId);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent, colId: TaskStatus) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverColumn !== colId) {
-      setDragOverColumn(colId);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget as Node)) {
-      return;
-    }
-    setDragOverColumn(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetStatus: TaskStatus) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOverColumn(null);
-    setDraggingCardId(null);
-
-    let payload: any = null;
-    const jsonRaw = e.dataTransfer.getData('application/json');
-    if (jsonRaw) {
-      try {
-        payload = JSON.parse(jsonRaw);
-      } catch {}
-    }
-    if (!payload) {
-      const raw = e.dataTransfer.getData('text/plain');
-      if (raw) {
-        try {
-          payload = JSON.parse(raw);
-        } catch {
-          payload = { id: raw.trim() };
-        }
-      }
-    }
-    if (!payload && draggingCardId) {
-      payload = { id: draggingCardId };
-    }
-    if (!payload || !payload.id) return;
-
-    if (payload.kind === 'material' || payload.type === 'note' || payload.type === 'article') {
-      const material = items.find(i => i.id === payload.id);
-      if (material) {
-        handleConvertToTask(material, targetStatus);
-      }
-    } else {
-      const task = items.find(i => i.id === payload.id);
-      if (task && task.status !== targetStatus) {
-        updateItem({
-          ...task,
-          status: targetStatus,
-        });
-        const colName = COLUMNS.find(c => c.id === targetStatus)?.title || targetStatus;
-        addToast(`Задача перемещена в «${colName}»`, 'info');
-      }
-    }
-  };
 
   const renderColumnIcon = (type: ColumnConfig['iconType'], colorClass: string) => {
     switch (type) {
@@ -331,16 +263,21 @@ export const KanbanBoard: React.FC = () => {
               filteredMaterials.map(mat => (
                 <div
                   key={mat.id}
-                  draggable
-                  onDragStart={e => handleDragStartMaterial(e, mat.id)}
-                  onDragEnd={handleDragEnd}
+                  data-draggable="true"
+                  onPointerDown={e =>
+                    handlePointerDown(e, {
+                      type: 'material',
+                      id: mat.id,
+                      title: mat.title || 'Материал',
+                    })
+                  }
                   onClick={() => {
                     setSelectedItem(mat);
                     setIsFullscreenEditorOpen(true);
                   }}
-                  className={`group p-2.5 rounded-lg bg-[#141417]/80 hover:bg-[#18181c] border border-white/[0.05] hover:border-white/[0.12] transition-all text-left space-y-1.5 shadow-sm ${
-                    draggingCardId === mat.id
-                      ? 'opacity-40 scale-[0.98] ring-1 ring-blue-500/50 pointer-events-none'
+                  className={`group p-2.5 rounded-lg bg-[#141417]/80 hover:bg-[#18181c] border border-white/[0.05] hover:border-white/[0.12] transition-all text-left space-y-1.5 shadow-sm touch-none ${
+                    isDragging && draggingPayload?.id === mat.id
+                      ? 'opacity-40 scale-[0.98] ring-1 ring-blue-500/50'
                       : 'cursor-grab active:cursor-grabbing'
                   }`}
                 >
@@ -393,16 +330,14 @@ export const KanbanBoard: React.FC = () => {
       >
         {COLUMNS.map(column => {
           const colTasks = tasksByStatus[column.id] || [];
-          const isOver = dragOverColumn === column.id;
+          const isOver = isDragging && activeZoneData?.dropColumn === column.id;
 
           return (
             <div
               key={column.id}
               data-testid={`kanban-column-${column.id}`}
-              onDragEnter={e => handleDragEnter(e, column.id)}
-              onDragOver={e => handleDragOver(e, column.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={e => handleDrop(e, column.id)}
+              data-drop-zone="kanban-column"
+              data-drop-column={column.id}
               className={`w-64 sm:w-72 shrink-0 flex flex-col rounded-xl bg-[#0f0f12]/70 border transition-colors max-h-full overflow-hidden ${
                 isOver ? 'border-blue-500/50 bg-[#12141a]' : 'border-white/[0.06]'
               }`}
@@ -459,9 +394,14 @@ export const KanbanBoard: React.FC = () => {
                     return (
                       <div
                         key={task.id}
-                        draggable
-                        onDragStart={e => handleDragStartTask(e, task.id)}
-                        onDragEnd={handleDragEnd}
+                        data-draggable="true"
+                        onPointerDown={e =>
+                          handlePointerDown(e, {
+                            type: 'task',
+                            id: task.id,
+                            title: task.title || 'Задача',
+                          })
+                        }
                         onClick={() => {
                           setSelectedItem(task);
                           setIsFullscreenEditorOpen(true);
@@ -477,9 +417,9 @@ export const KanbanBoard: React.FC = () => {
                           });
                         }}
                         data-testid="kanban-card"
-                        className={`group relative p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.14] transition-all text-left space-y-2 shadow-sm select-none ${
-                          draggingCardId === task.id
-                            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
+                        className={`group relative p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.14] transition-all text-left space-y-2 shadow-sm select-none touch-none ${
+                          isDragging && draggingPayload?.id === task.id
+                            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
                             : 'cursor-grab active:cursor-grabbing'
                         }`}
                       >
@@ -637,6 +577,24 @@ export const KanbanBoard: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Floating Drag Ghost Overlay */}
+      {isDragging && dragPos && draggingPayload && (
+        <div
+          className="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-[#18181c] border border-blue-500/40 text-xs font-medium text-white shadow-2xl flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 opacity-90 scale-105"
+          style={{
+            left: `${dragPos.x}px`,
+            top: `${dragPos.y}px`,
+          }}
+        >
+          {draggingPayload.type === 'material' ? (
+            <StickyNote className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          ) : (
+            <CheckSquare className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          )}
+          <span className="truncate max-w-[180px]">{draggingPayload.title || 'Элемент'}</span>
+        </div>
+      )}
     </div>
   );
 };

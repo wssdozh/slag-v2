@@ -32,7 +32,7 @@ export interface DragToScrollOptions<T extends HTMLElement = HTMLElement> {
 }
 
 const DEFAULT_IGNORE =
-  'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-no-pan], [data-resize-handle], .cursor-ns-resize';
+  'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-draggable="true"], [data-no-pan], [data-resize-handle], .cursor-ns-resize';
 
 /**
  * Reusable hook for mouse grab-to-scroll (pan) with 1:1 direct tracking,

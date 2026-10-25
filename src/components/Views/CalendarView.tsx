@@ -5,6 +5,7 @@ import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
 import { computeAntiOverlapLayout, type LayoutPositionedTask } from '../../lib/calendarLayout';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
+import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
 import {
   getISODateString,
   getTodayString,
@@ -80,6 +81,14 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
   }
 }
 
+function cleanTimeFromTitle(title: string): string {
+  let clean = title;
+  clean = clean.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\s*[-—]\s*([01]?\d|2[0-3]):([0-5]\d)\b/g, '').trim();
+  clean = clean.replace(/(?:^|\s|[вВ@])\s*([01]?\d|2[0-3]):([0-5]\d)\b/g, '').trim();
+  clean = clean.replace(/\s+/g, ' ').trim();
+  return clean || title;
+}
+
 export const CalendarView: React.FC = () => {
   const {
     items,
@@ -103,15 +112,83 @@ export const CalendarView: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overdue' | 'unscheduled'>('overdue');
 
-  // Drag over target and dragging item state
-  type CalendarDragTarget =
-    | { type: 'hour'; dateStr: string; hour: number }
-    | { type: 'allday'; dateStr: string }
-    | { type: 'month'; dateStr: string }
-    | { type: 'unscheduled' };
+  // Pointer Events Drag and Drop hook (desktop & mobile robust)
+  const {
+    isDragging,
+    draggingPayload,
+    dragPos,
+    activeZoneData,
+    handlePointerDown,
+  } = usePointerDnd<DragItemPayload>({
+    onDrop: (payload, targetZone, targetData, dropPos) => {
+      const realTaskId = payload.id;
+      const task = items.find(i => i.id === realTaskId);
+      if (!task || !targetZone) return;
 
-  const [dragTarget, setDragTarget] = useState<CalendarDragTarget | null>(null);
-  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+      if (targetData.dropZone === 'calendar-hour') {
+        const dateStr = targetData.dropDate;
+        const hour = parseInt(targetData.dropHour, 10);
+        const rect = targetZone.getBoundingClientRect();
+        const offsetY = dropPos.y - rect.top;
+        const quarter = Math.min(3, Math.max(0, Math.floor((offsetY / 52) * 4)));
+        const minute = quarter * 15;
+
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const targetDate = new Date(year, month - 1, day, hour, minute, 0, 0);
+        const reminder = targetDate.toISOString();
+
+        updateItem({
+          ...task,
+          dueDate: dateStr,
+          reminder,
+        });
+        const timeFormatted = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        addToast(`Задача перенесена на ${dateStr} в ${timeFormatted}`, 'info');
+      } else if (targetData.dropZone === 'calendar-allday') {
+        const dateStr = targetData.dropDate;
+        const updatedTitle = cleanTimeFromTitle(task.title);
+        updateItem({
+          ...task,
+          title: updatedTitle,
+          dueDate: dateStr,
+          reminder: undefined,
+        });
+        addToast(`Задача перенесена на ${dateStr} (весь день)`, 'info');
+      } else if (targetData.dropZone === 'calendar-month') {
+        const dateStr = targetData.dropDate;
+        let reminder: string | undefined = undefined;
+        if (task.reminder) {
+          try {
+            const oldDate = new Date(task.reminder);
+            if (!isNaN(oldDate.getTime())) {
+              const [year, month, day] = dateStr.split('-').map(Number);
+              const target = new Date(year, month - 1, day, oldDate.getHours(), oldDate.getMinutes(), 0, 0);
+              reminder = target.toISOString();
+            }
+          } catch {
+            reminder = undefined;
+          }
+        }
+        updateItem({
+          ...task,
+          dueDate: dateStr,
+          reminder,
+        });
+        addToast(`Задача перенесена на ${dateStr}`, 'info');
+      } else if (targetData.dropZone === 'calendar-unscheduled') {
+        const updatedTitle = cleanTimeFromTitle(task.title);
+        updateItem({
+          ...task,
+          title: updatedTitle,
+          dueDate: undefined,
+          reminder: undefined,
+        });
+        addToast('Срок задачи снят (перемещена в "Без срока")', 'info');
+      }
+    },
+  });
+
+  const draggingTaskId = isDragging ? draggingPayload?.id ?? null : null;
 
   // Card bottom-edge resize state for time-blocking duration
   const [resizingTask, setResizingTask] = useState<{
@@ -284,189 +361,6 @@ export const CalendarView: React.FC = () => {
     addToast(`Задача перенесена на ${newDate}`, 'info');
   };
 
-  // Drag and Drop helpers & handlers
-  const cleanTimeFromTitle = (title: string): string => {
-    let clean = title;
-    clean = clean.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\s*[-—]\s*([01]?\d|2[0-3]):([0-5]\d)\b/g, '').trim();
-    clean = clean.replace(/(?:^|\s|[вВ@])\s*([01]?\d|2[0-3]):([0-5]\d)\b/g, '').trim();
-    clean = clean.replace(/\s+/g, ' ').trim();
-    return clean || title;
-  };
-
-  const extractTaskId = (e: React.DragEvent): string | null => {
-    const jsonRaw = e.dataTransfer.getData('application/json');
-    if (jsonRaw) {
-      try {
-        const parsed = JSON.parse(jsonRaw);
-        if (parsed && typeof parsed.id === 'string') return parsed.id;
-      } catch {
-        // ignore
-      }
-    }
-    const textRaw = e.dataTransfer.getData('text/plain');
-    if (textRaw) {
-      try {
-        const parsed = JSON.parse(textRaw);
-        if (parsed && typeof parsed.id === 'string') return parsed.id;
-      } catch {
-        if (textRaw.trim()) return textRaw.trim();
-      }
-    }
-    return draggingTaskId;
-  };
-
-  const handleDragStartTask = (e: React.DragEvent, taskId: string) => {
-    e.stopPropagation();
-    setDraggingTaskId(taskId);
-    e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'task', id: taskId }));
-    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'task', id: taskId }));
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragEnd = (e?: React.DragEvent) => {
-    if (e) e.stopPropagation();
-    setDraggingTaskId(null);
-    setDragTarget(null);
-  };
-
-  const handleDragOverHour = (e: React.DragEvent, dateStr: string, hour: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragTarget?.type !== 'hour' || dragTarget.dateStr !== dateStr || dragTarget.hour !== hour) {
-      setDragTarget({ type: 'hour', dateStr, hour });
-    }
-  };
-
-  const handleDragOverAllDay = (e: React.DragEvent, dateStr: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragTarget?.type !== 'allday' || dragTarget.dateStr !== dateStr) {
-      setDragTarget({ type: 'allday', dateStr });
-    }
-  };
-
-  const handleDragOverMonth = (e: React.DragEvent, dateStr: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragTarget?.type !== 'month' || dragTarget.dateStr !== dateStr) {
-      setDragTarget({ type: 'month', dateStr });
-    }
-  };
-
-  const handleDragOverUnscheduled = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragTarget?.type !== 'unscheduled') {
-      setDragTarget({ type: 'unscheduled' });
-    }
-  };
-
-  const handleDropHour = (e: React.DragEvent, dateStr: string, hour: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const taskId = extractTaskId(e);
-    handleDragEnd(e);
-    if (!taskId) return;
-
-    const task = items.find(i => i.id === taskId);
-    if (!task) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetY = e.clientY - rect.top;
-    const quarter = Math.min(3, Math.max(0, Math.floor((offsetY / 52) * 4)));
-    const minute = quarter * 15;
-
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const targetDate = new Date(year, month - 1, day, hour, minute, 0, 0);
-    const reminder = targetDate.toISOString();
-
-    updateItem({
-      ...task,
-      dueDate: dateStr,
-      reminder,
-    });
-    const timeFormatted = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    addToast(`Задача перенесена на ${dateStr} в ${timeFormatted}`, 'info');
-  };
-
-  const handleDropAllDay = (e: React.DragEvent, dateStr: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const taskId = extractTaskId(e);
-    handleDragEnd(e);
-    if (!taskId) return;
-
-    const task = items.find(i => i.id === taskId);
-    if (!task) return;
-
-    const updatedTitle = cleanTimeFromTitle(task.title);
-
-    updateItem({
-      ...task,
-      title: updatedTitle,
-      dueDate: dateStr,
-      reminder: undefined,
-    });
-    addToast(`Задача перенесена на ${dateStr} (весь день)`, 'info');
-  };
-
-  const handleDropMonth = (e: React.DragEvent, dateStr: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const taskId = extractTaskId(e);
-    handleDragEnd(e);
-    if (!taskId) return;
-
-    const task = items.find(i => i.id === taskId);
-    if (!task) return;
-
-    let reminder: string | undefined = undefined;
-    if (task.reminder) {
-      try {
-        const oldDate = new Date(task.reminder);
-        if (!isNaN(oldDate.getTime())) {
-          const [year, month, day] = dateStr.split('-').map(Number);
-          const target = new Date(year, month - 1, day, oldDate.getHours(), oldDate.getMinutes(), 0, 0);
-          reminder = target.toISOString();
-        }
-      } catch {
-        reminder = undefined;
-      }
-    }
-
-    updateItem({
-      ...task,
-      dueDate: dateStr,
-      reminder,
-    });
-    addToast(`Задача перенесена на ${dateStr}`, 'info');
-  };
-
-  const handleDropUnscheduled = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const taskId = extractTaskId(e);
-    handleDragEnd(e);
-    if (!taskId) return;
-
-    const task = items.find(i => i.id === taskId);
-    if (!task) return;
-
-    const updatedTitle = cleanTimeFromTitle(task.title);
-
-    updateItem({
-      ...task,
-      title: updatedTitle,
-      dueDate: undefined,
-      reminder: undefined,
-    });
-    addToast('Срок задачи снят (перемещена в "Без срока")', 'info');
-  };
-
   // Render a Compact All-Day Task Pill
   const renderAllDayTaskPill = (task: SlagItem & { isVirtual?: boolean }) => {
     const isDone = task.status === 'done';
@@ -477,9 +371,14 @@ export const CalendarView: React.FC = () => {
     return (
       <div
         key={task.id}
-        draggable
-        onDragStart={e => handleDragStartTask(e, realTaskId)}
-        onDragEnd={handleDragEnd}
+        data-draggable="true"
+        onPointerDown={e =>
+          handlePointerDown(e, {
+            type: 'task',
+            id: realTaskId,
+            title: task.title || 'Задача',
+          })
+        }
         onClick={() => {
           const target = items.find(i => i.id === realTaskId) || task;
           setSelectedItem(target);
@@ -497,13 +396,11 @@ export const CalendarView: React.FC = () => {
           });
         }}
         title={task.title}
-        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all min-w-0 ${styling.bg} ${styling.border} ${styling.text} ${
+        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all min-w-0 touch-none ${styling.bg} ${styling.border} ${styling.text} ${
           task.isVirtual ? 'border-dashed opacity-85' : ''
         } ${
-          isDragging
-            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
-            : draggingTaskId !== null
-            ? 'pointer-events-none'
+          isDragging && draggingTaskId === realTaskId
+            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
             : 'cursor-grab active:cursor-grabbing'
         }`}
       >
@@ -625,9 +522,16 @@ export const CalendarView: React.FC = () => {
     return (
       <div
         key={task.id}
-        draggable={!resizingTask}
-        onDragStart={e => handleDragStartTask(e, realTaskId)}
-        onDragEnd={handleDragEnd}
+        data-draggable="true"
+        onPointerDown={e => {
+          if (!resizingTask) {
+            handlePointerDown(e, {
+              type: 'task',
+              id: realTaskId,
+              title: task.title || 'Задача',
+            });
+          }
+        }}
         onClick={() => {
           if (isJustResizedRef.current) return;
           const target = items.find(i => i.id === realTaskId) || task;
@@ -653,7 +557,7 @@ export const CalendarView: React.FC = () => {
           left: `${left}%`,
           width: `${width}%`,
         }}
-        className={`group/card absolute rounded-lg border select-none transition-all duration-75 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
+        className={`group/card absolute rounded-lg border select-none transition-all duration-75 z-10 shadow-sm touch-none ${styling.bg} ${styling.border} ${styling.text} ${
           isCompact
             ? totalCols > 1
               ? 'px-1.5 py-0 flex items-center justify-between'
@@ -666,10 +570,8 @@ export const CalendarView: React.FC = () => {
             ? 'px-1.5 py-1.5 flex flex-col justify-between'
             : 'px-2.5 py-1.5 flex flex-col justify-between'
         } ${task.isVirtual ? 'border-dashed opacity-85' : ''} ${
-          isDragging
-            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
-            : draggingTaskId !== null
-            ? 'pointer-events-none'
+          isDragging && draggingTaskId === realTaskId
+            ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
             : isResizing
             ? 'ring-2 ring-blue-500 shadow-xl z-30'
             : 'cursor-grab active:cursor-grabbing hover:border-white/20 hover:z-20'
@@ -957,14 +859,13 @@ export const CalendarView: React.FC = () => {
                     const dateStr = getISODateString(date);
                     const dayTasks = tasksByDueDate.get(dateStr) || [];
                     const allDayTasks = dayTasks.filter(t => getTaskTimeSlot(t).isAllDay);
-                    const isOver = dragTarget?.type === 'allday' && dragTarget.dateStr === dateStr;
+                    const isOver = isDragging && activeZoneData?.dropZone === 'calendar-allday' && activeZoneData.dropDate === dateStr;
 
                     return (
                       <div
                         key={dateStr}
-                        onDragEnter={e => handleDragOverAllDay(e, dateStr)}
-                        onDragOver={e => handleDragOverAllDay(e, dateStr)}
-                        onDrop={e => handleDropAllDay(e, dateStr)}
+                        data-drop-zone="calendar-allday"
+                        data-drop-date={dateStr}
                         className={`p-1 border-r border-white/[0.04] last:border-r-0 space-y-1 transition-colors min-h-[44px] ${
                           isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 rounded-sm' : ''
                         }`}
@@ -1034,10 +935,13 @@ export const CalendarView: React.FC = () => {
                       >
                         {/* Hour slot background rows with 1-click add */}
                         {HOURS.map(hour => {
-                          const isOver = dragTarget?.type === 'hour' && dragTarget.dateStr === dateStr && dragTarget.hour === hour;
+                          const isOver = isDragging && activeZoneData?.dropZone === 'calendar-hour' && activeZoneData.dropDate === dateStr && activeZoneData.dropHour === String(hour);
                           return (
                             <div
                               key={hour}
+                              data-drop-zone="calendar-hour"
+                              data-drop-date={dateStr}
+                              data-drop-hour={hour}
                               onClick={e => {
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 const offsetY = e.clientY - rect.top;
@@ -1050,9 +954,6 @@ export const CalendarView: React.FC = () => {
                                   folder: currentFolder,
                                 });
                               }}
-                              onDragEnter={e => handleDragOverHour(e, dateStr, hour)}
-                              onDragOver={e => handleDragOverHour(e, dateStr, hour)}
-                              onDrop={e => handleDropHour(e, dateStr, hour)}
                               className={`h-[52px] border-b border-white/[0.04] transition-colors relative group cursor-pointer ${
                                 isOver
                                   ? 'bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30'
@@ -1131,14 +1032,13 @@ export const CalendarView: React.FC = () => {
                 {monthCells.map(cell => {
                   const dayTasks = tasksByDueDate.get(cell.dateStr) || [];
                   const isToday = cell.dateStr === todayStr;
-                  const isOver = dragTarget?.type === 'month' && dragTarget.dateStr === cell.dateStr;
+                  const isOver = isDragging && activeZoneData?.dropZone === 'calendar-month' && activeZoneData.dropDate === cell.dateStr;
 
                   return (
                     <div
                       key={cell.dateStr}
-                      onDragEnter={e => handleDragOverMonth(e, cell.dateStr)}
-                      onDragOver={e => handleDragOverMonth(e, cell.dateStr)}
-                      onDrop={e => handleDropMonth(e, cell.dateStr)}
+                      data-drop-zone="calendar-month"
+                      data-drop-date={cell.dateStr}
                       onClick={() => setExpandedDayDateStr(cell.dateStr)}
                       className={`min-h-[96px] p-1.5 border-b border-r border-white/[0.04] flex flex-col justify-between transition-colors cursor-pointer group ${
                         cell.isCurrentMonth ? 'bg-[#09090b] hover:bg-[#0c0c0e]' : 'bg-[#070709] text-zinc-600'
@@ -1181,28 +1081,30 @@ export const CalendarView: React.FC = () => {
                           const slot = getTaskTimeSlot(task);
                           const styling = getPriorityBadge(task.priority);
                           const isDone = task.status === 'done';
-                          const isDragging = draggingTaskId === task.id;
                           const realTaskId = task.id.replace(/_virtual_.*$/, '');
 
                           return (
                             <div
                               key={task.id}
-                              draggable
-                              onDragStart={e => handleDragStartTask(e, realTaskId)}
-                              onDragEnd={handleDragEnd}
+                              data-draggable="true"
+                              onPointerDown={e =>
+                                handlePointerDown(e, {
+                                  type: 'task',
+                                  id: realTaskId,
+                                  title: task.title || 'Задача',
+                                })
+                              }
                               onClick={e => {
                                 e.stopPropagation();
                                 const target = items.find(i => i.id === realTaskId) || task;
                                 setSelectedItem(target);
                                 setIsFullscreenEditorOpen(true);
                               }}
-                              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors ${
+                              className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors touch-none ${
                                 task.isVirtual ? 'border border-dashed border-white/20 opacity-80' : ''
                               } ${
-                                isDragging
-                                  ? 'opacity-40 ring-1 ring-blue-500/50 pointer-events-none'
-                                  : draggingTaskId !== null
-                                  ? 'pointer-events-none'
+                                isDragging && draggingTaskId === realTaskId
+                                  ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
                                   : 'cursor-grab active:cursor-grabbing'
                               }`}
                             >
@@ -1268,11 +1170,9 @@ export const CalendarView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setDrawerTab('unscheduled')}
-                  onDragEnter={handleDragOverUnscheduled}
-                  onDragOver={handleDragOverUnscheduled}
-                  onDrop={handleDropUnscheduled}
+                  data-drop-zone="calendar-unscheduled"
                   className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors cursor-pointer ${
-                    dragTarget?.type === 'unscheduled'
+                    isDragging && activeZoneData?.dropZone === 'calendar-unscheduled'
                       ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40'
                       : drawerTab === 'unscheduled'
                       ? 'bg-white/10 text-white font-medium'
@@ -1296,13 +1196,11 @@ export const CalendarView: React.FC = () => {
 
             {/* Drawer Tasks List */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin">
-              {draggingTaskId && (
+              {isDragging && (
                 <div
-                  onDragEnter={handleDragOverUnscheduled}
-                  onDragOver={handleDragOverUnscheduled}
-                  onDrop={handleDropUnscheduled}
+                  data-drop-zone="calendar-unscheduled"
                   className={`p-3 rounded-lg border-2 border-dashed transition-all text-center text-xs font-mono flex items-center justify-center gap-2 cursor-pointer ${
-                    dragTarget?.type === 'unscheduled'
+                    activeZoneData?.dropZone === 'calendar-unscheduled'
                       ? 'bg-amber-500/20 border-amber-500/60 text-amber-200 scale-[1.01]'
                       : 'bg-white/[0.02] border-white/[0.1] text-zinc-400 hover:border-zinc-500'
                   }`}
@@ -1319,19 +1217,23 @@ export const CalendarView: React.FC = () => {
                   </div>
                 ) : (
                   overdueTasks.map(task => {
-                    const isDragging = draggingTaskId === task.id;
                     return (
                       <div
                         key={task.id}
-                        draggable
-                        onDragStart={e => handleDragStartTask(e, task.id)}
-                        onDragEnd={handleDragEnd}
+                        data-draggable="true"
+                        onPointerDown={e =>
+                          handlePointerDown(e, {
+                            type: 'task',
+                            id: task.id,
+                            title: task.title || 'Задача',
+                          })
+                        }
                         onClick={() => {
                           setSelectedItem(task);
                           setIsFullscreenEditorOpen(true);
                         }}
-                        className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing ${
-                          isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none' : ''
+                        className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
+                          isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                         }`}
                       >
                         <div className="flex items-start gap-2">
@@ -1392,19 +1294,23 @@ export const CalendarView: React.FC = () => {
                 </div>
               ) : (
                 unscheduledTasks.map(task => {
-                  const isDragging = draggingTaskId === task.id;
                   return (
                     <div
                       key={task.id}
-                      draggable
-                      onDragStart={e => handleDragStartTask(e, task.id)}
-                      onDragEnd={handleDragEnd}
+                      data-draggable="true"
+                      onPointerDown={e =>
+                        handlePointerDown(e, {
+                          type: 'task',
+                          id: task.id,
+                          title: task.title || 'Задача',
+                        })
+                      }
                       onClick={() => {
                         setSelectedItem(task);
                         setIsFullscreenEditorOpen(true);
                       }}
-                      className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing ${
-                        isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none' : ''
+                      className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
+                        isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                       }`}
                     >
                       <div className="flex items-start gap-2">
@@ -1511,18 +1417,23 @@ export const CalendarView: React.FC = () => {
                   return (
                     <div
                       key={task.id}
-                      draggable
-                      onDragStart={e => handleDragStartTask(e, realTaskId)}
-                      onDragEnd={handleDragEnd}
+                      data-draggable="true"
+                      onPointerDown={e =>
+                        handlePointerDown(e, {
+                          type: 'task',
+                          id: realTaskId,
+                          title: task.title || 'Задача',
+                        })
+                      }
                       onClick={() => {
                         const target = items.find(i => i.id === realTaskId) || task;
                         setSelectedItem(target);
                         setIsFullscreenEditorOpen(true);
                       }}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-colors cursor-grab active:cursor-grabbing ${styling.bg} ${styling.border} ${
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-colors cursor-grab active:cursor-grabbing touch-none ${styling.bg} ${styling.border} ${
                         task.isVirtual ? 'border-dashed opacity-85' : ''
                       } ${
-                        isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
+                        isDragging && draggingTaskId === realTaskId ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -1580,6 +1491,19 @@ export const CalendarView: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Floating Drag Ghost Overlay */}
+      {isDragging && dragPos && draggingPayload && (
+        <div
+          className="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-[#18181c] border border-blue-500/40 text-xs font-medium text-white shadow-2xl flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 opacity-90 scale-105"
+          style={{
+            left: `${dragPos.x}px`,
+            top: `${dragPos.y}px`,
+          }}
+        >
+          <CalendarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          <span className="truncate max-w-[200px]">{draggingPayload.title || 'Задача'}</span>
         </div>
       )}
     </div>
