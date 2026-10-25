@@ -2526,4 +2526,140 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.waitForTimeout(200);
   });
+
+  test('37. Mouse Grab-to-Scroll (Pan) in Kanban and Calendar Week/Month Views', async ({ page }) => {
+    // Set a compact viewport so both Kanban and Calendar have horizontal overflow
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.goto('/');
+    await page.waitForTimeout(300);
+
+    // =========================================================================
+    // 1. KANBAN: Mouse grab-and-drag horizontal scrolling
+    // =========================================================================
+    const kanbanBtn = page.locator('header button[title*="Канбан"]');
+    await expect(kanbanBtn).toBeVisible();
+    await kanbanBtn.click();
+    await page.waitForTimeout(300);
+
+    const kanbanContainer = page.locator('[data-testid="kanban-columns-container"]');
+    await expect(kanbanContainer).toBeVisible();
+
+    const kanbanBox = await kanbanContainer.boundingBox();
+    expect(kanbanBox).not.toBeNull();
+
+    if (kanbanBox) {
+      // Start drag from an empty board area (top padding between columns)
+      const startX = kanbanBox.x + 350;
+      const startY = kanbanBox.y + 20;
+
+      const initialScrollLeft = await kanbanContainer.evaluate(el => el.scrollLeft);
+
+      // Drag to the left (content slides right)
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX - 200, startY, { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+
+      const scrolledLeft = await kanbanContainer.evaluate(el => el.scrollLeft);
+      expect(scrolledLeft).toBeGreaterThan(initialScrollLeft);
+
+      // Drag back to the right
+      await page.mouse.move(startX - 200, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX, startY, { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+
+      const restoredScrollLeft = await kanbanContainer.evaluate(el => el.scrollLeft);
+      expect(restoredScrollLeft).toBeLessThan(scrolledLeft);
+    }
+
+    await page.screenshot({
+      path: 'test-results/screenshots/kanban-grab-to-scroll.png',
+      fullPage: false,
+    });
+
+    // =========================================================================
+    // 2. CALENDAR WEEK VIEW: Mouse grab-and-drag horizontal & vertical panning
+    // =========================================================================
+    const calendarBtn = page.locator('header button[title*="Календарь"]');
+    await expect(calendarBtn).toBeVisible();
+    await calendarBtn.click();
+    await page.waitForTimeout(300);
+
+    const weekScrollContainer = page.locator('[data-testid="calendar-week-scroll-container"]');
+    await expect(weekScrollContainer).toBeVisible();
+
+    // Scroll to far left first
+    await weekScrollContainer.evaluate(el => {
+      el.scrollLeft = 0;
+    });
+    await page.waitForTimeout(150);
+
+    const weekBox = await weekScrollContainer.boundingBox();
+    expect(weekBox).not.toBeNull();
+
+    if (weekBox) {
+      // Start drag from the day header row
+      const startX = weekBox.x + 300;
+      const startY = weekBox.y + 15;
+
+      const calInitialScroll = await weekScrollContainer.evaluate(el => el.scrollLeft);
+
+      // Drag to the left
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX - 220, startY, { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+
+      const calScrolled = await weekScrollContainer.evaluate(el => el.scrollLeft);
+      expect(calScrolled).toBeGreaterThan(calInitialScroll);
+
+      // Drag back to the right
+      await page.mouse.move(startX - 220, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX, startY, { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+
+      const calRestored = await weekScrollContainer.evaluate(el => el.scrollLeft);
+      expect(calRestored).toBeLessThan(calScrolled);
+    }
+
+    // =========================================================================
+    // 3. DISAMBIGUATION: Dragging on hour slots suppresses accidental task modal
+    // =========================================================================
+    const timeGrid = page.locator('[data-testid="calendar-time-grid"]');
+    await expect(timeGrid).toBeVisible();
+    const timeGridBox = await timeGrid.boundingBox();
+    expect(timeGridBox).not.toBeNull();
+
+    if (timeGridBox) {
+      const slotX = timeGridBox.x + 200;
+      const slotY = timeGridBox.y + 100;
+
+      // Drag inside time grid
+      await page.mouse.move(slotX, slotY);
+      await page.mouse.down();
+      await page.mouse.move(slotX - 100, slotY - 50, { steps: 6 });
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+
+      // Verify task composer modal was NOT triggered by drag
+      const composerModal = page.locator('[placeholder*="Название задачи"]');
+      const isComposerVisible = await composerModal.isVisible();
+      expect(isComposerVisible).toBe(false);
+    }
+
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-grab-to-scroll.png',
+      fullPage: false,
+    });
+
+    // Reset viewport
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.waitForTimeout(200);
+  });
 });
