@@ -39,6 +39,39 @@ export type TriageProgressCallback = (
   progress: TriageProgress
 ) => void;
 
+const STOP_TAGS = new Set([
+  'заметка',
+  'заметки',
+  'note',
+  'notes',
+  'таска',
+  'таски',
+  'задача',
+  'задачи',
+  'task',
+  'tasks',
+  'статья',
+  'статьи',
+  'article',
+  'articles',
+  'аудио',
+  'audio',
+  'голос',
+  'голосовая-заметка',
+  'голосовая заметка',
+  'фото',
+  'изображение',
+  'картинка',
+  'image',
+  'файл',
+  'file',
+]);
+
+function isStopTag(tag: string): boolean {
+  const normalized = tag.toLowerCase().replace(/^#/, '').trim();
+  return STOP_TAGS.has(normalized);
+}
+
 function formatTag(tag: string, style: 'lowercase' | 'kebab-case'): string {
   let clean = tag.toLowerCase().replace(/^#/, '').trim();
   if (style === 'kebab-case') {
@@ -53,7 +86,7 @@ function extractExplicitHashtags(content: string, style: 'lowercase' | 'kebab-ca
   let match: RegExpExecArray | null;
   while ((match = inlineHashtagRegex.exec(content)) !== null) {
     const clean = formatTag(match[1], style);
-    if (clean && !explicit.includes(clean)) {
+    if (clean && !isStopTag(clean) && !explicit.includes(clean)) {
       explicit.push(clean);
     }
   }
@@ -70,12 +103,13 @@ function localHeuristicTags(
   const lower = content.toLowerCase();
   const matchedExisting = existingTags.filter((tag) => {
     const clean = tag.toLowerCase().trim();
-    if (clean.length < 3) return false;
+    if (clean.length < 3 || isStopTag(clean)) return false;
     const regex = new RegExp(`\\b${clean}\\b`, 'i');
     return regex.test(lower);
   });
 
   const keywords: Record<string, string[]> = {
+    разработка: ['разработ', 'код', 'code', 'программ', 'дев', 'dev', 'спецификац', 'архитектур'],
     геймдев: ['геймдев', 'game', 'игра', 'геймдизайн', 'unity', 'unreal', 'godot'],
     архитектура: ['архитектур', 'модул', 'рефактор', 'паттерн', 'solid'],
     frontend: ['фронтенд', 'frontend', 'react', 'vite', 'tailwind', 'css', 'ui'],
@@ -93,9 +127,11 @@ function localHeuristicTags(
 
   const result = Array.from(
     new Set([...explicit, ...matchedExisting.map((t) => formatTag(t, style)), ...detected])
-  ).slice(0, maxTags);
+  )
+    .filter((t) => !isStopTag(t))
+    .slice(0, maxTags);
 
-  return result.length > 0 ? result : [formatTag('заметка', style)];
+  return result;
 }
 
 function localMatchFolder(
@@ -351,7 +387,7 @@ export async function categorizeDraft(
   const systemPrompt = `Ты — экспертный диспетчер каталогизации и таксономист персональной базы знаний SLAG.
 Твоя задача — для текста заметки определить:
 1. Наиболее подходящую целевую папку (targetFolder).
-2. От 1 до ${maxTags} лучших тегов (tags).
+2. От 0 до ${maxTags} лучших тегов (tags).
 3. Краткую причину (reason, 5-8 слов на русском).
 
 СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
@@ -367,6 +403,8 @@ ${JSON.stringify(foldersContext, null, 2)}
    - Если текущая папка — "Входящие", обязательно выбери наиболее подходящую папку из доступных по их смыслу и описанию (targetFolder должен совпадать с полем path одной из папок). Если ни одна явно не подходит, верни "${currentFolder}".
 2. ТЕГИ:
    - Выдели суть темы, стек, ключевые сущности.
+   - От 0 до ${maxTags} точных тегов. Если в заметке нет выраженной темы или это бытовой фрагмент/тест/слишком короткий текст — верни пустой массив [].
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать в качестве тегов типы сущностей ("заметка", "таска", "задача", "статья", "файл", "аудио", "фото").
    - Используй существующие теги из словаря при точном совпадении, либо смело создавай новые точные теги.
    - Формат тегов: ${style === 'kebab-case' ? 'kebab-case без пробелов' : 'строчные буквы без знака #'}.
 3. ПРИЧИНА:
@@ -392,7 +430,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
     const rawTags: string[] = Array.isArray(parsed.tags) ? parsed.tags : [];
     const formatted = rawTags
       .map((t) => formatTag(String(t), style))
-      .filter(Boolean);
+      .filter((t) => Boolean(t) && !isStopTag(t));
     const combinedTags = Array.from(new Set([...explicit, ...formatted])).slice(0, maxTags);
 
     let targetFolder = parsed.targetFolder?.trim() || currentFolder;
@@ -403,7 +441,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
 
     const finalResult = {
       targetFolder,
-      tags: combinedTags.length > 0 ? combinedTags : localHeuristicTags(content, existingTags, style, maxTags),
+      tags: combinedTags,
       reason: parsed.reason?.trim() || 'По смыслу заметки',
     };
     aiLog.info(`Draft categorized: -> "${finalResult.targetFolder}" [${finalResult.tags.map(t => '#' + t).join(' ')}]`);
@@ -477,7 +515,7 @@ export async function triageInboxItems(
     const systemPrompt = `Ты — интеллектуальный диспетчер сортировки заметок (AI Triage) и таксономист базы знаний SLAG.
 Твоя задача — для каждой неразобранной заметки из папки "Входящие":
 1. Выбрать наиболее подходящую целевую папку (targetFolder) на основе описаний папок.
-2. Подобрать от 1 до ${maxTags} точных тегов (tags).
+2. Подобрать от 0 до ${maxTags} точных тегов (tags). Если тема не выражена или это бытовой фрагмент — верни пустой массив []. Запрещено использовать в качестве тегов слова "заметка", "таска", "задача", "статья", "файл", "аудио", "фото".
 3. Написать краткую причину на русском языке (reason, 5-8 слов).
 
 СПИСОК ДОСТУПНЫХ ПАПОК:
@@ -488,7 +526,7 @@ ${JSON.stringify(foldersContext, null, 2)}
 
 ПРАВИЛА:
 1. targetFolder должен в точности совпадать с полем path одной из папок.
-2. Теги должны отражать суть заметки (${style === 'kebab-case' ? 'kebab-case' : 'строчные буквы без #'}).
+2. Теги должны отражать суть заметки (${style === 'kebab-case' ? 'kebab-case' : 'строчные буквы без #'}). Если тема не выражена — верни пустой массив tags: [].
 3. reason — 5-8 слов на русском.
 4. Верни ТОЛЬКО JSON-массив объектов: [{ "itemId": "...", "targetFolder": "...", "tags": ["..."], "reason": "..." }]`;
 
@@ -505,8 +543,10 @@ ${JSON.stringify(foldersContext, null, 2)}
         chunkResult = chunk.map((item) => {
           const match = parsed.find((s) => s.itemId === item.id);
           const rawTags = Array.isArray(match?.tags) ? match!.tags : [];
-          const formatted = rawTags.map((t) => formatTag(String(t), style)).filter(Boolean);
-          const itemExisting = item.tags || [];
+          const formatted = rawTags
+            .map((t) => formatTag(String(t), style))
+            .filter((t) => Boolean(t) && !isStopTag(t));
+          const itemExisting = (item.tags || []).filter((t) => !isStopTag(t));
           const mergedTags = Array.from(new Set([...itemExisting, ...formatted])).slice(0, maxTags);
           const targetFolder = match?.targetFolder && eligibleFolders.some((f) => f.path === match.targetFolder)
             ? match.targetFolder
@@ -531,7 +571,8 @@ ${JSON.stringify(foldersContext, null, 2)}
         const textToMatch = `${item.title} ${item.content} ${item.tags.join(' ')}`;
         const matched = localMatchFolder(textToMatch, eligibleFolders, eligibleFolders[0].path);
         const tags = localHeuristicTags(textToMatch, existingTags, style, maxTags);
-        const mergedTags = Array.from(new Set([...item.tags, ...tags])).slice(0, maxTags);
+        const itemExisting = (item.tags || []).filter((t) => !isStopTag(t));
+        const mergedTags = Array.from(new Set([...itemExisting, ...tags])).slice(0, maxTags);
 
         return {
           itemId: item.id,
