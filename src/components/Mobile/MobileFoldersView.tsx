@@ -4,23 +4,16 @@ import { FeedList } from '../Feed/FeedList';
 import { Composer } from '../Feed/Composer';
 import { KanbanBoard } from '../Views/KanbanBoard';
 import { MobileCalendarView } from './MobileCalendarView';
+import { FeedFilters } from '../Feed/FeedFilters';
+import { ViewModeSwitcher } from '../Feed/ViewModeSwitcher';
 import {
   Folder,
   FolderPlus,
-  FolderCheck,
   ChevronRight,
   Info,
   Search,
   Inbox,
   Plus,
-  X,
-  StickyNote,
-  CheckSquare,
-  FileText,
-  Layers,
-  Kanban,
-  Calendar,
-  Filter,
   BookOpen
 } from 'lucide-react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
@@ -36,16 +29,7 @@ export const MobileFoldersView: React.FC = () => {
     setMobileFolderInfoOpen,
     setIsSearchOpen,
     openCreateFolderModal,
-    activeTypeFilter,
-    setActiveTypeFilter,
-    inboxMode,
-    setInboxMode,
-    activeTagFilter,
-    setActiveTagFilter,
     feedViewMode,
-    setFeedViewMode,
-    aiItemFilter,
-    clearAiFilter,
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
   } = useApp();
@@ -277,164 +261,10 @@ export const MobileFoldersView: React.FC = () => {
           </button>
         )}
 
-        {/* Inbox Sub-mode Filter (only in feed mode) */}
-        {isInbox && feedViewMode === 'feed' && (
-          <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
-            <button
-              onClick={() => setInboxMode('all')}
-              className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
-                inboxMode === 'all'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title="Все заметки хранилища сквозным списком"
-            >
-              Все
-            </button>
-            <button
-              onClick={() => setInboxMode('sorted')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
-                inboxMode === 'sorted'
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title="Только распределенные по папкам (Разобранные)"
-            >
-              <FolderCheck className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setInboxMode('unsorted')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
-                inboxMode === 'unsorted'
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title="Только неразобранные заметки во Входящих"
-            >
-              <Inbox className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+        <FeedFilters />
 
-        {/* Divider line between inbox filter and type filters */}
-        {isInbox && feedViewMode === 'feed' && (
-          <div className="h-4 w-px bg-white/[0.12] mx-0.5 shrink-0" />
-        )}
-
-        {/* Type filters (feed mode only) */}
-        {feedViewMode === 'feed' && (
-          <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
-            <button
-              onClick={() => setActiveTypeFilter('all')}
-              className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
-                activeTypeFilter === 'all'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title="Все типы записей"
-            >
-              Все
-            </button>
-            <button
-              onClick={() => setActiveTypeFilter('note')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
-                activeTypeFilter === 'note'
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title="Только заметки"
-            >
-              <StickyNote className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setActiveTypeFilter('task')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
-                activeTypeFilter === 'task'
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title="Только таски"
-            >
-              <CheckSquare className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setActiveTypeFilter('article')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
-                activeTypeFilter === 'article'
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title="Только статьи"
-            >
-              <FileText className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* AI Filter Chip when Assistant filtered the feed */}
-        {aiItemFilter && (
-          <div className="flex items-center gap-1.5 px-2 h-ctrl-sm rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 text-xs font-mono shrink-0">
-            <Filter className="w-3 h-3 text-zinc-400" />
-            <span className="truncate max-w-[100px]">{aiItemFilter.queryLabel}</span>
-            <button
-              onClick={clearAiFilter}
-              className="p-0.5 hover:text-white transition-colors cursor-pointer"
-              title="Сбросить фильтр ИИ"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Active Tag filter chip */}
-        {activeTagFilter && (
-          <div className="flex items-center gap-1.5 px-2 h-ctrl-sm rounded-md bg-white/10 text-white text-xs font-mono shrink-0 whitespace-nowrap">
-            <span>#{activeTagFilter}</span>
-            <button onClick={() => setActiveTagFilter(null)} className="p-0.5 text-zinc-400 hover:text-rose-400 cursor-pointer">
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {/* Unified View Mode Switcher: Icon-only Linear-grade segmented control matching Desktop */}
-        <nav aria-label="Режимы представления" className="flex items-center h-ctrl-sm bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0 ml-auto">
-          <button
-            onClick={() => setFeedViewMode('feed')}
-            className={`h-full px-2 rounded-md flex items-center justify-center transition-all cursor-pointer ${
-              feedViewMode === 'feed'
-                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-            }`}
-            title="Режим стрим-ленты (Лента)"
-            aria-label="Режим стрим-ленты"
-          >
-            <Layers className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setFeedViewMode('kanban')}
-            className={`h-full px-2 rounded-md flex items-center justify-center transition-all cursor-pointer ${
-              feedViewMode === 'kanban'
-                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-            }`}
-            title="Канбан-доска задач"
-            aria-label="Канбан-доска"
-          >
-            <Kanban className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setFeedViewMode('calendar')}
-            className={`h-full px-2 rounded-md flex items-center justify-center transition-all cursor-pointer ${
-              feedViewMode === 'calendar'
-                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-            }`}
-            title="Календарное расписание (Календарь)"
-            aria-label="Календарь"
-          >
-            <Calendar className="w-3.5 h-3.5" />
-          </button>
-        </nav>
+        {/* Unified View Mode Switcher matching Desktop */}
+        <ViewModeSwitcher className="ml-auto" />
       </div>
 
       {/* Main Content Area: Reacting to feedViewMode */}
