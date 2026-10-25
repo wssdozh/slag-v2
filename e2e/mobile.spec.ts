@@ -319,24 +319,11 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('text=ПН').first()).toBeVisible();
     await expect(page.locator('text=ВС').first()).toBeVisible();
 
-    // Verify "Сегодня" and "Без даты" buttons exist in header
+    // Verify "Сегодня" button exists in header
     await expect(page.locator('button', { hasText: 'Сегодня' }).first()).toBeVisible();
-    const noDateBtn = page.locator('button', { hasText: /Без даты/ }).first();
-    await expect(noDateBtn).toBeVisible();
 
     // Take screenshot of the Todoist-style Week Strip & Agenda
     await page.screenshot({ path: 'test-results/screenshots/mobile_calendar_week_strip.png' });
-
-    // Open "Без даты" Bottom Sheet
-    await noDateBtn.click();
-    const noDateSheet = page.locator('[data-testid="no-date-sheet"]');
-    await expect(noDateSheet).toBeVisible();
-
-    await page.screenshot({ path: 'test-results/screenshots/mobile_calendar_no_date_sheet.png' });
-
-    // Close "Без даты" sheet
-    await noDateSheet.locator('button', { hasText: 'Закрыть' }).click();
-    await expect(noDateSheet).not.toBeVisible();
 
     // Open Month Picker (Select a Date)
     const monthPickerBtn = page.locator('header button').filter({ hasText: /202/ }).first();

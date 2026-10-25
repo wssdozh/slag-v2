@@ -151,7 +151,6 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
 
   // Sheets
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const [isNoDateSheetOpen, setIsNoDateSheetOpen] = useState(false);
 
   // Picker Month offset
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
@@ -219,7 +218,6 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
 
   const {
     overdueTasks,
-    unscheduledTasks: noDateTasks,
     tasksByDate: tasksByDateMap,
   } = useCalendarSchedule({
     items,
@@ -281,14 +279,12 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     if (calendarLayout === '3day') {
       const parts = threeDayStartDate.split('-');
       const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      const monthName = headerRightExtra ? RUSSIAN_MONTHS[d.getMonth()].slice(0, 3) : RUSSIAN_MONTHS[d.getMonth()];
-      return `${monthName} ${d.getFullYear()}`;
+      return `${RUSSIAN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
     }
     const d = new Date(currentWeekMonday);
     d.setDate(currentWeekMonday.getDate() + 3);
-    const monthName = headerRightExtra ? RUSSIAN_MONTHS[d.getMonth()].slice(0, 3) : RUSSIAN_MONTHS[d.getMonth()];
-    return `${monthName} ${d.getFullYear()}`;
-  }, [calendarLayout, currentWeekMonday, headerRightExtra, threeDayStartDate]);
+    return `${RUSSIAN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  }, [calendarLayout, currentWeekMonday, threeDayStartDate]);
 
   const isCurrentWeek = useMemo(() => {
     if (!todayStr) return false;
@@ -418,14 +414,6 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     setAddingTimeSlot(null);
   };
 
-  // Quick schedule task from No Date sheet
-  const handleScheduleTask = (task: SlagItem, targetDate: string) => {
-    saveItem({
-      ...task,
-      dueDate: targetDate,
-    });
-  };
-
   // Swipe gesture handling
   const { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } = useSwipeGesture({
     onSwipeLeft: handleNext,
@@ -502,28 +490,12 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           </button>
         </div>
 
-        {/* Right: [Без даты] and ViewModeSwitcher / Extra */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsNoDateSheetOpen(true)}
-            className="h-6 px-1.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-[10px] font-medium text-zinc-400 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center gap-1 shrink-0"
-            title="Задачи без даты"
-          >
-            <span>Без даты</span>
-            {noDateTasks.length > 0 && (
-              <span className="px-1 py-0.1 rounded-full bg-white/10 text-[9px] font-mono text-zinc-300">
-                {noDateTasks.length}
-              </span>
-            )}
-          </button>
-
-          {headerRightExtra && (
-            <div className="flex items-center shrink-0">
-              {headerRightExtra}
-            </div>
-          )}
-        </div>
+        {/* Right: ViewModeSwitcher / Extra slot */}
+        {headerRightExtra && (
+          <div className="flex items-center shrink-0">
+            {headerRightExtra}
+          </div>
+        )}
       </header>
 
       {/* ========================================================================= */}
@@ -999,87 +971,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
       )}
 
       {/* ========================================================================= */}
-      {/* 5. SHEET: Tasks with No Date (Bottom Sheet)                              */}
-      {/* ========================================================================= */}
-      {isNoDateSheetOpen && (
-        <div data-testid="no-date-sheet" className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs animate-in fade-in select-none">
-          <div
-            className="w-full max-h-[80vh] bg-[#141417] border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200"
-            style={{ paddingBottom: 'max(var(--sab), 1rem)' }}
-          >
-            {/* Sheet Handle & Header */}
-            <div className="flex flex-col items-center pt-2 px-4 border-b border-white/[0.06] shrink-0">
-              <div className="w-10 h-1 rounded-full bg-white/20 mb-3" />
-              <div className="w-full flex items-center justify-between pb-3">
-                <button
-                  type="button"
-                  onClick={() => setIsNoDateSheetOpen(false)}
-                  className="text-xs text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  Закрыть
-                </button>
-                <span className="text-sm font-semibold text-white">
-                  Без даты ({noDateTasks.length})
-                </span>
-                <span className="w-10" />
-              </div>
-            </div>
-
-            {/* Sheet Content: List of unscheduled tasks */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
-              {noDateTasks.length === 0 ? (
-                <div className="py-12 text-center text-zinc-500 text-xs">
-                  Все задачи запланированы по датам.
-                </div>
-              ) : (
-                noDateTasks.map(task => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] gap-2.5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleTaskComplete(task.id)}
-                      className="p-1 rounded text-zinc-400 hover:text-white cursor-pointer"
-                    >
-                      <Circle className="w-4 h-4 text-zinc-500" />
-                    </button>
-                    <span
-                      onClick={() => {
-                        setSelectedItem(task);
-                        setIsFullscreenEditorOpen(true);
-                        setIsNoDateSheetOpen(false);
-                      }}
-                      className="flex-1 text-xs font-medium text-zinc-200 truncate cursor-pointer"
-                    >
-                      {task.title || 'Без названия'}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleScheduleTask(task, todayStr)}
-                        className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-medium text-white transition-colors cursor-pointer"
-                      >
-                        Сегодня
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleScheduleTask(task, tomorrowStr)}
-                        className="px-2 py-1 rounded-lg bg-white/[0.05] hover:bg-white/10 text-[11px] font-medium text-zinc-300 transition-colors cursor-pointer"
-                      >
-                        Завтра
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 6. SHEET: Month Date Picker (Select a Date)                              */}
+      {/* 5. SHEET: Month Date Picker (Select a Date)                              */}
       {/* ========================================================================= */}
       {isMonthPickerOpen && (
         <div data-testid="month-picker-sheet" className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs animate-in fade-in select-none">
