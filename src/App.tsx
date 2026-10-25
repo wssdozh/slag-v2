@@ -1,7 +1,6 @@
 import React, { useCallback, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
-import { StandalonePanelWindow } from './components/Workspace/StandalonePanelWindow';
 import { MobileShell } from './components/Mobile/MobileShell';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
 import { SearchModal } from './components/Search/SearchModal';
@@ -81,10 +80,6 @@ const AppContent: React.FC = () => {
   const standalonePanelId = urlParams?.get('panel');
   const standalonePanelTitle = urlParams?.get('title') || 'SLAG';
 
-  if (standalonePanelId) {
-    return <StandalonePanelWindow panelId={standalonePanelId} title={standalonePanelTitle} />;
-  }
-
   if (isMobile && forceMobileMode && isDesktopWidth) {
     return (
       <div className="w-screen h-screen overflow-hidden bg-[#050507] flex flex-col items-center justify-center p-4 relative select-none">
@@ -126,7 +121,15 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative">
-      {isMobile ? <MobileShell /> : <WorkspaceShell />}
+      {isMobile ? (
+        <MobileShell />
+      ) : (
+        <WorkspaceShell
+          initialPanel={
+            standalonePanelId ? { id: standalonePanelId, title: standalonePanelTitle } : undefined
+          }
+        />
+      )}
 
       {/* Global Right-Click Context Menu (Desktop) & Mobile Action Sheet (Touch) */}
       {!isMobile && <ContextMenu />}

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FeedViewMode } from '../../types';
 import {
@@ -20,7 +20,7 @@ import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
 import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
-import { isDesktopApp, openDetachedWindow } from '../../lib/windowControls';
+import { isDesktopApp, openDetachedWindow, closeWindow } from '../../lib/windowControls';
 import {
   Plus,
   Layers,
@@ -154,6 +154,35 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
   const left = box?.left ?? Math.max(40, window.screenX + 80);
   const top = box?.top ?? Math.max(40, window.screenY + 80);
 
+  // Capture existing group widths to preserve proportions when panel/group is removed
+  const panelGroup = panel.group;
+  const remainingGroups = api.groups.filter(g => g !== panelGroup);
+  const capturedWidths = new Map<string, number>();
+  remainingGroups.forEach(g => {
+    capturedWidths.set(g.id, g.api.width);
+  });
+
+  const restoreProportions = () => {
+    requestAnimationFrame(() => {
+      // If 2 groups remain (Center workspace + 1 side panel), keep side panel compact (~320px)
+      if (api.groups.length === 2) {
+        const centerGroup = api.groups.find(g =>
+          g.panels.some(p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_'))
+        );
+        const sideGroup = api.groups.find(g => g !== centerGroup);
+        if (sideGroup) {
+          const prevWidth = capturedWidths.get(sideGroup.id) || 320;
+          const targetWidth = Math.min(Math.max(prevWidth, 240), 380);
+          try {
+            sideGroup.api.setSize({ width: targetWidth });
+          } catch {
+            // Group might be disposing
+          }
+        }
+      }
+    });
+  };
+
   // 1. In native Tauri desktop app, spawn a genuine independent OS window
   if (isDesktopApp()) {
     const rawComponentId = panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
@@ -167,6 +196,7 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
     if (opened) {
       try {
         api.removePanel(panel);
+        restoreProportions();
       } catch {
         // Ignore if already unmounted
       }
@@ -187,6 +217,8 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
         width: panelWidth,
         height: panelHeight,
       });
+    } else {
+      restoreProportions();
     }
   } catch {
     api.addFloatingGroup(panel, {
@@ -299,9 +331,25 @@ const GroupHeaderActions: React.FC<any> = (props) => {
   );
 };
 
-export const WorkspaceShell: React.FC = () => {
+export interface WorkspaceShellProps {
+  initialPanel?: { id: string; title: string };
+}
+
+export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) => {
   const { currentFolder } = useApp();
   const apiRef = useRef<DockviewApi | null>(null);
+
+  const effectiveInitialPanel = useMemo(() => {
+    if (initialPanel) return initialPanel;
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const panel = sp.get('panel');
+      if (panel) {
+        return { id: panel, title: sp.get('title') || 'SLAG' };
+      }
+    }
+    return undefined;
+  }, [initialPanel]);
 
   // Dynamically update feed panel tab title to match currentFolder
   useEffect(() => {
@@ -426,6 +474,7 @@ export const WorkspaceShell: React.FC = () => {
     apiRef.current = event.api;
 
     const saveLayout = () => {
+      if (effectiveInitialPanel) return;
       try {
         const json = event.api.toJSON();
         localStorage.setItem(WORKSPACE_LAYOUT_KEY, JSON.stringify(json));
@@ -454,20 +503,51 @@ export const WorkspaceShell: React.FC = () => {
       saveLayout();
     });
 
-    // Try restoring saved layout
-    let restored = false;
-    try {
-      const savedLayout = localStorage.getItem(WORKSPACE_LAYOUT_KEY);
-      if (savedLayout) {
-        event.api.fromJSON(JSON.parse(savedLayout));
-        restored = true;
+    // Guard on panel removal: proportional resize and auto-destroy empty secondary windows
+    event.api.onDidRemovePanel(() => {
+      if (effectiveInitialPanel && event.api.totalPanels === 0) {
+        closeWindow();
+        return;
       }
-    } catch {
-      restored = false;
-    }
+      requestAnimationFrame(() => {
+        if (event.api.groups.length === 2) {
+          const centerGroup = event.api.groups.find(g =>
+            g.panels.some(p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_'))
+          );
+          const sideGroup = event.api.groups.find(g => g !== centerGroup);
+          if (centerGroup && sideGroup && sideGroup.api.width > 400) {
+            try {
+              sideGroup.api.setSize({ width: 320 });
+            } catch {}
+          }
+        }
+      });
+      saveLayout();
+    });
 
-    if (!restored) {
-      applyDefaultLayout(event.api);
+    if (effectiveInitialPanel) {
+      event.api.clear();
+      event.api.addPanel({
+        id: `panel_${effectiveInitialPanel.id}`,
+        component: effectiveInitialPanel.id,
+        title: effectiveInitialPanel.title,
+      });
+    } else {
+      // Try restoring saved layout
+      let restored = false;
+      try {
+        const savedLayout = localStorage.getItem(WORKSPACE_LAYOUT_KEY);
+        if (savedLayout) {
+          event.api.fromJSON(JSON.parse(savedLayout));
+          restored = true;
+        }
+      } catch {
+        restored = false;
+      }
+
+      if (!restored) {
+        applyDefaultLayout(event.api);
+      }
     }
 
     // Ensure feed panel tab reflects current folder

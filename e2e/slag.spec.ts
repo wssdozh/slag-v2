@@ -1183,6 +1183,34 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Перенесено').last()).toBeVisible({ timeout: 5000 });
   });
 
+  test('25.5. Assistant Universal update_item priority & status modification', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Ask priority change: "поменяй приоритет задачи про чай на высокий"
+    await textarea.fill('поменяй приоритет задачи про чай на высокий');
+    await textarea.press('Enter');
+
+    // 3. Verify update_item action card appears with HIGH badge
+    await expect(page.locator('text=HIGH').first()).toBeVisible({ timeout: 5000 });
+    const applyBtn = page.locator('button', { hasText: /Применить/ }).last();
+    await expect(applyBtn).toBeVisible();
+
+    // Capture screenshot of universal update card
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-universal-update.png',
+      fullPage: false,
+    });
+
+    // 4. Click Apply
+    await applyBtn.click();
+    await expect(page.locator('text=обновлена').or(page.locator('text=Обновлено')).first()).toBeVisible({ timeout: 5000 });
+  });
+
   test('26. KIE.AI Provider with Gemini 4 Argon Endpoint and Structured Settings', async ({ page }) => {
     // 1. Open Settings
     await page.locator('button[title*="Настройки"]').first().click();
@@ -2743,6 +2771,42 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 5. Capture screenshot of floating panel
     await page.screenshot({
       path: 'test-results/screenshots/dockview-floating-group-active.png',
+      fullPage: false,
+    });
+  });
+
+  test('40. Detached Popout Window: Full Dockview Workspace and Functional Controls', async ({ page }) => {
+    // Mock Tauri environment so desktop WindowControls are active
+    await page.addInitScript(() => {
+      (window as any).isTauri = true;
+      (window as any).__TAURI_INTERNALS__ = {
+        ipc: () => Promise.resolve(),
+      };
+    });
+
+    // Navigate directly with query params as a spawned detached window would
+    await page.goto('/?panel=sidebar&title=%D0%9D%D0%B0%D0%B2%D0%B8%D0%B3%D0%B0%D1%86%D0%B8%D1%8F');
+
+    // 1. Verify Dockview is mounted
+    const dockviewContainer = page.locator('.dockview-theme-slag');
+    await expect(dockviewContainer).toBeVisible();
+
+    // 2. Verify the detached panel is present as a tab
+    const sidebarTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Навигация' }).first();
+    await expect(sidebarTab).toBeVisible();
+
+    // 3. Verify the [+] button to add panels is present in the detached window
+    const addPanelBtn = page.locator('button[title*="Добавить вкладку"]').first();
+    await expect(addPanelBtn).toBeVisible();
+
+    // 4. Verify WindowControls are rendered with pointer-events-auto and without drag-region blocking
+    const closeBtn = page.locator('button[title="Закрыть"]').first();
+    await expect(closeBtn).toBeVisible();
+    await expect(closeBtn).toBeEnabled();
+
+    // 5. Capture screenshot of the detached window
+    await page.screenshot({
+      path: 'test-results/screenshots/detached-dockview-window.png',
       fullPage: false,
     });
   });

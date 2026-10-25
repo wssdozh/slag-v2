@@ -34,7 +34,11 @@ export const closeWindow = async (): Promise<void> => {
     if (appWindow.label !== 'main') {
       await appWindow.destroy();
     } else {
-      await appWindow.close();
+      try {
+        await appWindow.hide();
+      } catch {
+        await appWindow.close();
+      }
     }
   } catch (err) {
     console.error('Failed to close window:', err);
