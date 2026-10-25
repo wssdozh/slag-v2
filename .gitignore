@@ -10,11 +10,22 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Local data
+notes/
+.trash/
+.attachments/
 *.local
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # Rust / Tauri target
 src-tauri/target/
+src-tauri/gen/
 target/
+*.pdb
 
 # Editor directories and files
 .vscode/*
@@ -26,7 +37,10 @@ target/
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
+[Dd]esktop.ini
 
-# Playwright
+# Playwright & Coverage
 test-results/
 playwright-report/
+coverage/
