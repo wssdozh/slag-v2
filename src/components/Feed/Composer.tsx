@@ -837,10 +837,16 @@ export const Composer: React.FC<ComposerProps> = ({
           : priority)
       : undefined;
 
+    const taskRecurrence = itemType === 'task'
+      ? (!isRecurrenceDismissed && currentParsed.recurrence
+          ? currentParsed.recurrence
+          : recurrence)
+      : undefined;
+
     const taskDueDate = itemType === 'task'
       ? (!isDateDismissed && currentParsed.dueDate
           ? currentParsed.dueDate
-          : (dueDate || undefined))
+          : (dueDate || (taskRecurrence ? getTodayIso() : undefined)))
       : undefined;
 
     const taskReminder = itemType === 'task'
@@ -853,12 +859,6 @@ export const Composer: React.FC<ComposerProps> = ({
       ? (!isDurationDismissed && currentParsed.duration !== undefined
           ? currentParsed.duration
           : duration)
-      : undefined;
-
-    const taskRecurrence = itemType === 'task'
-      ? (!isRecurrenceDismissed && currentParsed.recurrence
-          ? currentParsed.recurrence
-          : recurrence)
       : undefined;
 
     const destinationFolder = targetFolder || currentFolder;
@@ -953,10 +953,16 @@ export const Composer: React.FC<ComposerProps> = ({
           : priority)
       : undefined;
 
+    const taskRecurrence = itemType === 'task'
+      ? (!isRecurrenceDismissed && currentParsed.recurrence
+          ? currentParsed.recurrence
+          : recurrence)
+      : undefined;
+
     const taskDueDate = itemType === 'task'
       ? (!isDateDismissed && currentParsed.dueDate
           ? currentParsed.dueDate
-          : (dueDate || undefined))
+          : (dueDate || (taskRecurrence ? getTodayIso() : undefined)))
       : undefined;
 
     const taskReminder = itemType === 'task'
@@ -969,12 +975,6 @@ export const Composer: React.FC<ComposerProps> = ({
       ? (!isDurationDismissed && currentParsed.duration !== undefined
           ? currentParsed.duration
           : duration)
-      : undefined;
-
-    const taskRecurrence = itemType === 'task'
-      ? (!isRecurrenceDismissed && currentParsed.recurrence
-          ? currentParsed.recurrence
-          : recurrence)
       : undefined;
 
     // Create a temporary draft object in memory WITHOUT saving to vault storage yet

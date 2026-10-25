@@ -21,7 +21,10 @@ import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { computeNextOccurrence } from '../lib/recurrenceHelper';
+import {
+  evaluateRecurringTasks,
+  getISODateString,
+} from '../lib/recurrenceHelper';
 import {
   parseSubtasksFromContent,
   toggleCheckboxInContent,
@@ -227,7 +230,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [items, setItems] = useState<SlagItem[]>(() => storage.getItems());
+  const [items, setItems] = useState<SlagItem[]>(() => {
+    const rawItems = storage.getItems();
+    const { updatedItems, changedCount } = evaluateRecurringTasks(rawItems);
+    if (changedCount > 0) {
+      storage.saveItems(updatedItems);
+      return updatedItems;
+    }
+    return rawItems;
+  });
   const [selectedItem, setSelectedItem] = useState<SlagItem | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>(() => initialWorkspace.activeTypeFilter || 'all');
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(() => initialWorkspace.activeTagFilter ?? null);
@@ -473,6 +484,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFolders(storage.getFolders());
     setItems(storage.getItems());
   }, []);
+
+  const runRecurringEvaluation = useCallback(() => {
+    const currentItems = storage.getItems();
+    const { updatedItems, changedCount } = evaluateRecurringTasks(currentItems);
+    if (changedCount > 0) {
+      storage.saveItems(updatedItems);
+      refreshData();
+      appLog.info(`Recurring tasks evaluated: ${changedCount} tasks rolled over/respawned`);
+    }
+  }, [refreshData]);
+
+  // Midnight transition and tab visibility wakeup listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let timerId: number | undefined;
+
+    const scheduleMidnightCheck = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      const delayMs = Math.max(1000, nextMidnight.getTime() - now.getTime());
+
+      timerId = window.setTimeout(() => {
+        runRecurringEvaluation();
+        scheduleMidnightCheck();
+      }, delayMs);
+    };
+
+    scheduleMidnightCheck();
+
+    let lastCheckedDate = getISODateString(new Date());
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const currentDate = getISODateString(new Date());
+        if (currentDate !== lastCheckedDate) {
+          lastCheckedDate = currentDate;
+          runRecurringEvaluation();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (timerId !== undefined) clearTimeout(timerId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [runRecurringEvaluation]);
 
   // Application Startup Log (guarded against React StrictMode double invocation)
   const hasLoggedInitRef = useRef(false);
@@ -860,42 +918,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         : currentSubtasks.map(st => (st.id === subtaskId ? { ...st, completed: !st.completed } : st));
 
       const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every(st => st.completed);
+      const newStatus = allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status;
+
+      let streak = item.streak;
+      let history = item.history;
+      let lastCompletedDate = item.lastCompletedDate;
+
+      if (item.recurrence && allDone && item.status !== 'done') {
+        const todayStr = getISODateString(new Date());
+        streak = (streak ?? 0) + 1;
+        history = Array.from(new Set([...(history || []), todayStr]));
+        lastCompletedDate = todayStr;
+      }
+
       updateItem({
         ...item,
         content: updatedContent,
         subtasks: updatedSubtasks,
-        status: allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status,
+        status: newStatus,
+        streak,
+        history,
+        lastCompletedDate,
       });
     } else {
-      // If task has recurrence and is currently not done, advance to next recurrence cycle
-      if (item.status !== 'done' && item.recurrence && item.dueDate) {
-        const { nextDueDate, nextReminder } = computeNextOccurrence(item.dueDate, item.recurrence, item.reminder);
-        const shouldResetSubtasks = item.recurrence.resetSubtasks !== false;
-
-        const updatedContent = shouldResetSubtasks
-          ? setAllCheckboxesInContent(item.content, false)
-          : item.content;
-        const parsed = parseSubtasksFromContent(updatedContent);
-        const updatedSubtasks = parsed.length > 0
-          ? parsed
-          : item.subtasks?.map(st => ({
-              ...st,
-              completed: shouldResetSubtasks ? false : st.completed,
-            }));
-
-        updateItem({
-          ...item,
-          content: updatedContent,
-          dueDate: nextDueDate,
-          reminder: nextReminder,
-          subtasks: updatedSubtasks,
-          status: 'todo',
-        });
-        addToast(`Повтор выполнен ➔ след.: ${nextDueDate}`, 'success');
-        return;
-      }
-
-      const newStatus = item.status === 'done' ? 'todo' : 'done';
+      const isCurrentlyDone = item.status === 'done';
+      const newStatus = isCurrentlyDone ? 'todo' : 'done';
       const updatedContent = setAllCheckboxesInContent(item.content, newStatus === 'done');
       const parsed = parseSubtasksFromContent(updatedContent);
       const updatedSubtasks = parsed.length > 0
@@ -905,13 +952,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             completed: newStatus === 'done',
           }));
 
+      let streak = item.streak;
+      let history = item.history;
+      let lastCompletedDate = item.lastCompletedDate;
+
+      if (item.recurrence) {
+        const todayStr = getISODateString(new Date());
+        if (newStatus === 'done') {
+          streak = (streak ?? 0) + 1;
+          history = Array.from(new Set([...(history || []), todayStr]));
+          lastCompletedDate = todayStr;
+        } else {
+          // Unchecking task on the same day reverts completion & streak increment
+          if (lastCompletedDate === todayStr) {
+            streak = Math.max(0, (streak ?? 1) - 1);
+            history = (history || []).filter(d => d !== todayStr);
+            lastCompletedDate = history.length > 0 ? history[history.length - 1] : undefined;
+          }
+        }
+      }
+
       updateItem({
         ...item,
         content: updatedContent,
         status: newStatus,
         subtasks: updatedSubtasks,
+        streak,
+        history,
+        lastCompletedDate,
       });
-      addToast(newStatus === 'done' ? 'Задача выполнена' : 'Задача возобновлена', 'success');
+
+      if (newStatus === 'done') {
+        const toastText = item.recurrence && streak !== undefined
+          ? `Задача выполнена (🔥 ${streak})`
+          : 'Задача выполнена';
+        addToast(toastText, 'success');
+      } else {
+        addToast('Задача возобновлена', 'info');
+      }
     }
   }, [items, updateItem, addToast]);
 
@@ -933,6 +1011,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       content: updatedContent,
       subtasks: updatedSubtasks,
       status: 'done',
+      recurrence: undefined,
     });
     addToast('Задача навсегда завершена', 'success');
   }, [items, updateItem, addToast]);

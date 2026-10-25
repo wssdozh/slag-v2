@@ -27,6 +27,9 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     if (item.reminder) frontmatterData.reminder = item.reminder;
     if (item.duration !== undefined) frontmatterData.duration = item.duration;
     if (item.recurrence) frontmatterData.recurrence = item.recurrence;
+    if (typeof item.streak === 'number') frontmatterData.streak = item.streak;
+    if (item.lastCompletedDate) frontmatterData.lastCompletedDate = item.lastCompletedDate;
+    if (Array.isArray(item.history) && item.history.length > 0) frontmatterData.history = item.history;
     if (item.subtasks && item.subtasks.length > 0) {
       if (!/^\s*[-*+]\s*\[[ xX]\]/m.test(item.content || '')) {
         frontmatterData.subtasks = item.subtasks;
@@ -156,6 +159,18 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
           resetSubtasks: frontmatter.recurrence.resetSubtasks !== false,
         };
       }
+    }
+    if (frontmatter.streak !== undefined) {
+      const parsedStreak = Number(frontmatter.streak);
+      if (!isNaN(parsedStreak) && parsedStreak >= 0) {
+        item.streak = parsedStreak;
+      }
+    }
+    if (typeof frontmatter.lastCompletedDate === 'string') {
+      item.lastCompletedDate = frontmatter.lastCompletedDate;
+    }
+    if (Array.isArray(frontmatter.history)) {
+      item.history = frontmatter.history.filter((d: unknown): d is string => typeof d === 'string');
     }
     const parsedSubtasks = parseSubtasksFromContent(body);
     item.subtasks = parsedSubtasks.length > 0

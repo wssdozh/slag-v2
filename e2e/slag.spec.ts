@@ -2431,8 +2431,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await completeBtn.click();
     await page.waitForTimeout(400);
 
-    // Verify toast about recurrence advancement
-    const toast = page.locator('text=Повтор выполнен').first();
+    // Verify toast about recurrence completion
+    const toast = page.locator('text=/Задача выполнена|Повтор выполнен/').first();
     await expect(toast).toBeVisible({ timeout: 4000 });
 
     // 7. Verify Discrete Duration Card States (15m, 30m, 45m, 60m)

@@ -290,6 +290,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     );
   }
 
+  if (isTask && item.recurrence) {
+    const streak = item.streak ?? 0;
+    metaElements.push(
+      <span
+        key="streak"
+        className="flex items-center gap-0.5 text-2xs font-mono select-none"
+        title={streak === 0 ? 'Серия прервана (0)' : `Серия: ${streak}`}
+      >
+        <span className="text-[11px] leading-none">🔥</span>
+        <span className={streak === 0 ? 'text-rose-400/80 font-medium' : 'text-zinc-400 font-medium'}>
+          {streak}
+        </span>
+      </span>
+    );
+  }
+
   if (item.isPinned) {
     metaElements.push(
       <span

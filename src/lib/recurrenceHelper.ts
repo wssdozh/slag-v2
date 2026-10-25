@@ -1,5 +1,6 @@
 import type { RecurrenceRule, SlagItem } from '../types';
 import { getISODateString } from './dateUtils';
+import { setAllCheckboxesInContent, parseSubtasksFromContent } from './taskUtils';
 
 export { getISODateString };
 
@@ -61,19 +62,14 @@ export function formatRecurrenceLabel(recurrence?: RecurrenceRule): string {
 }
 
 /**
- * Computes the next occurrence date for a recurring task when completed or rescheduled.
- * If the task is overdue (currentDueDate < today), advances to the next future occurrence.
+ * Strictly advances baseDueDate by the recurrence rule without clamping to today.
  */
-export function computeNextOccurrence(
-  currentDueDate: string,
-  recurrence: RecurrenceRule,
-  currentTimeIso?: string,
-  referenceDate: Date = new Date()
-): { nextDueDate: string; nextReminder?: string } {
-  const todayStr = getISODateString(referenceDate);
-  const baseDate = parseISODateString(currentDueDate < todayStr ? todayStr : currentDueDate);
+export function computeNextStrictOccurrenceDate(
+  baseDueDate: string,
+  recurrence: RecurrenceRule
+): string {
+  const baseDate = parseISODateString(baseDueDate);
   const interval = Math.max(1, recurrence.interval || 1);
-
   let nextDate = new Date(baseDate);
 
   switch (recurrence.freq) {
@@ -133,12 +129,28 @@ export function computeNextOccurrence(
     }
   }
 
-  const nextDueDate = getISODateString(nextDate);
+  return getISODateString(nextDate);
+}
+
+/**
+ * Computes the next occurrence date for a recurring task when completed or rescheduled.
+ * If the task is overdue (currentDueDate < today), advances to the next future occurrence.
+ */
+export function computeNextOccurrence(
+  currentDueDate: string,
+  recurrence: RecurrenceRule,
+  currentTimeIso?: string,
+  referenceDate: Date = new Date()
+): { nextDueDate: string; nextReminder?: string } {
+  const todayStr = getISODateString(referenceDate);
+  const baseDueDate = currentDueDate < todayStr ? todayStr : currentDueDate;
+  const nextDueDate = computeNextStrictOccurrenceDate(baseDueDate, recurrence);
   let nextReminder: string | undefined = undefined;
 
   if (currentTimeIso) {
     try {
       const orig = new Date(currentTimeIso);
+      const nextDate = parseISODateString(nextDueDate);
       if (!isNaN(orig.getTime())) {
         const nextDt = new Date(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate(), orig.getHours(), orig.getMinutes(), 0, 0);
         nextReminder = nextDt.toISOString();
@@ -180,4 +192,89 @@ export function getRecurringOccurrencesInRange(
   }
 
   return occurrences;
+}
+
+/**
+ * Evaluates recurring tasks upon app startup, date changes, or at midnight.
+ * Automatically handles:
+ * 1. Advancing completed recurring tasks to their next cycle once nextDueDate arrives,
+ *    resetting status to 'todo', resetting subtasks (if resetSubtasks is true),
+ *    bumping createdAt to now so it drops as a fresh message into today's feed,
+ *    and maintaining streak.
+ * 2. Rolling over overdue uncompleted tasks (dueDate < today) to today,
+ *    bumping createdAt to now, and resetting streak to 0 with red-tint indicator.
+ *
+ * ponytail: in-memory scan across items array on date change, upgrade to indexed cursor if vault items exceed 10,000
+ */
+export function evaluateRecurringTasks(
+  items: SlagItem[],
+  referenceDate: Date = new Date()
+): { updatedItems: SlagItem[]; changedCount: number } {
+  const todayStr = getISODateString(referenceDate);
+  const nowTs = referenceDate.getTime();
+  let changedCount = 0;
+
+  const updatedItems = items.map(item => {
+    if (item.type !== 'task' || !item.recurrence || !item.dueDate) {
+      return item;
+    }
+
+    const shouldResetSubtasks = item.recurrence.resetSubtasks !== false;
+
+    // Case 1: Completed recurring task
+    if (item.status === 'done') {
+      const nextDue = computeNextStrictOccurrenceDate(item.dueDate, item.recurrence);
+
+      // If next recurrence date hasn't arrived yet, keep it done where it is
+      if (todayStr < nextDue) {
+        return item;
+      }
+
+      // Next due date has arrived
+      changedCount++;
+      const isExactOrNextCycle = todayStr === nextDue;
+      const targetDueDate = isExactOrNextCycle ? nextDue : todayStr;
+      // If user was absent for multiple cycles, streak resets to 0; otherwise kept
+      const newStreak = isExactOrNextCycle ? (item.streak ?? 1) : 0;
+
+      const updatedContent = shouldResetSubtasks
+        ? setAllCheckboxesInContent(item.content, false)
+        : item.content;
+      const parsedSubtasks = parseSubtasksFromContent(updatedContent);
+      const updatedSubtasks = parsedSubtasks.length > 0
+        ? parsedSubtasks
+        : item.subtasks?.map(st => ({
+            ...st,
+            completed: shouldResetSubtasks ? false : st.completed,
+          }));
+
+      return {
+        ...item,
+        status: 'todo' as const,
+        dueDate: targetDueDate,
+        streak: newStreak,
+        content: updatedContent,
+        subtasks: updatedSubtasks,
+        createdAt: nowTs,
+        updatedAt: nowTs,
+      };
+    }
+
+    // Case 2: Overdue uncompleted task -> Rollover to today & reset streak
+    if (item.dueDate < todayStr) {
+      changedCount++;
+      return {
+        ...item,
+        status: 'todo' as const,
+        dueDate: todayStr,
+        streak: 0,
+        createdAt: nowTs,
+        updatedAt: nowTs,
+      };
+    }
+
+    return item;
+  });
+
+  return { updatedItems, changedCount };
 }

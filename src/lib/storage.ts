@@ -442,6 +442,24 @@ export class StorageService {
     return updatedItem;
   }
 
+  public saveItems(itemsToSave: SlagItem[]): void {
+    if (itemsToSave.length === 0) return;
+    const items = this.getItems();
+    const saveMap = new Map(itemsToSave.map(i => [i.id, i]));
+    const updated = items.map(i => saveMap.get(i.id) || i);
+    for (const [id, item] of saveMap) {
+      if (!items.some(i => i.id === id)) {
+        updated.unshift(item);
+      }
+    }
+    try {
+      localStorage.setItem(this.getItemsKey(), JSON.stringify(updated));
+    } catch (err) {
+      fsLog.error('Failed to bulk save items to localStorage', { error: err });
+      throw err;
+    }
+  }
+
   private getTrashKey(): string {
     return `${TRASH_STORAGE_PREFIX}${this.currentVault.id}`;
   }

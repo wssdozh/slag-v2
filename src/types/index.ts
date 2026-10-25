@@ -53,6 +53,9 @@ export interface SlagItem {
   reminder?: string; // ISO DateTime
   duration?: number; // Duration in minutes (e.g. 15, 30, 45, 60, 90)
   recurrence?: RecurrenceRule;
+  streak?: number; // Current completion streak count (>= 0)
+  history?: string[]; // ISO-dates of past completions, e.g. ["2026-03-27", "2026-03-28"]
+  lastCompletedDate?: string; // YYYY-MM-DD of last completion
   subtasks?: SlagSubtask[];
   kanbanColumn?: string;
 
