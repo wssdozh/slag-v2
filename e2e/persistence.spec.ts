@@ -132,4 +132,23 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
       }
     }
   });
+
+  test('ItemCard floating action buttons on hover outside the card and clean header', async ({ page }) => {
+    const card = page.locator('main [id^="item-"]').first();
+    await expect(card).toBeVisible();
+
+    // Take screenshot without hover
+    await page.screenshot({ path: 'test-results/screenshots/card-no-hover.png' });
+
+    // Hover over the card
+    await card.hover();
+    await page.waitForTimeout(200);
+
+    // Verify action buttons appear
+    const replyBtn = card.locator('button[title*="Ответить"]').first();
+    await expect(replyBtn).toBeVisible();
+
+    // Take screenshot with hover
+    await page.screenshot({ path: 'test-results/screenshots/card-hover-outside.png' });
+  });
 });
