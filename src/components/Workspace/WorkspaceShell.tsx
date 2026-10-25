@@ -6,6 +6,8 @@ import {
   type DockviewReadyEvent,
   type IDockviewPanelProps,
   type DockviewApi,
+  type IDockviewPanel,
+  type GetTabContextMenuItemsParams,
 } from 'dockview-react';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { FeedHeader } from '../Feed/FeedHeader';
@@ -28,6 +30,7 @@ import {
   Info,
   Terminal,
   Music,
+  ExternalLink,
 } from 'lucide-react';
 
 const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
@@ -143,7 +146,37 @@ const PANELS_TO_ADD = [
   { id: 'logs', title: 'Логи & HUD', icon: Terminal },
 ];
 
-// Header action [+] button with floating context menu on each tab group
+// Detach panel to external window or floating group
+const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left: number; top: number; width?: number; height?: number }) => {
+  const panelWidth = box?.width || 680;
+  const panelHeight = box?.height || 540;
+  const left = box?.left ?? Math.max(40, window.screenX + 80);
+  const top = box?.top ?? Math.max(40, window.screenY + 80);
+
+  try {
+    const success = await api.addPopoutGroup(panel, {
+      popoutUrl: '/popout.html',
+      position: { left, top, width: panelWidth, height: panelHeight },
+    });
+    if (!success) {
+      api.addFloatingGroup(panel, {
+        x: Math.max(20, (window.innerWidth - panelWidth) / 2),
+        y: Math.max(20, (window.innerHeight - panelHeight) / 2),
+        width: panelWidth,
+        height: panelHeight,
+      });
+    }
+  } catch {
+    api.addFloatingGroup(panel, {
+      x: Math.max(20, (window.innerWidth - panelWidth) / 2),
+      y: Math.max(20, (window.innerHeight - panelHeight) / 2),
+      width: panelWidth,
+      height: panelHeight,
+    });
+  }
+};
+
+// Header action [+] and popout buttons on each tab group
 const GroupHeaderActions: React.FC<any> = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -191,8 +224,24 @@ const GroupHeaderActions: React.FC<any> = (props) => {
     }
   };
 
+  const handlePopout = () => {
+    const containerApi = props.containerApi as DockviewApi | undefined;
+    const activePanel = props.activePanel as IDockviewPanel | undefined;
+    if (containerApi && activePanel) {
+      detachPanel(containerApi, activePanel);
+    }
+  };
+
   return (
-    <div className="relative flex items-center h-full px-0.5">
+    <div className="relative flex items-center h-full px-0.5 gap-0.5">
+      <button
+        onClick={handlePopout}
+        className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
+        title="Вынести вкладку в отдельное окно"
+      >
+        <ExternalLink className="w-3.5 h-3.5" />
+      </button>
+
       <button
         onClick={() => setIsOpen(prev => !prev)}
         className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
@@ -404,7 +453,64 @@ export const WorkspaceShell: React.FC = () => {
       p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_')
     );
     feedPanels.forEach(p => p.api.setTitle(currentFolder || 'Входящие'));
+
+    // Tab tear-off: drag tab out of application window to create an external/floating popout
+    event.api.onWillDragPanel((dragEvent) => {
+      const panel = dragEvent.panel;
+      if (!panel) return;
+
+      const handleDragEnd = (e: DragEvent) => {
+        window.removeEventListener('dragend', handleDragEnd);
+
+        // Check if cursor released outside main window bounds
+        const isOutside =
+          e.clientX < 10 ||
+          e.clientX > window.innerWidth - 10 ||
+          e.clientY < 10 ||
+          e.clientY > window.innerHeight - 10 ||
+          e.screenX < window.screenX ||
+          e.screenX > window.screenX + window.outerWidth ||
+          e.screenY < window.screenY ||
+          e.screenY > window.screenY + window.outerHeight;
+
+        if (isOutside) {
+          detachPanel(event.api, panel, {
+            left: e.screenX - 100,
+            top: e.screenY - 30,
+            width: 720,
+            height: 540,
+          });
+        }
+      };
+
+      window.addEventListener('dragend', handleDragEnd, { once: true });
+    });
   };
+
+  const getTabContextMenuItems = useCallback((params: GetTabContextMenuItemsParams) => {
+    const { panel, api } = params;
+    return [
+      {
+        label: 'Вынести в отдельное окно',
+        action: () => detachPanel(api, panel),
+      },
+      {
+        label: 'Сделать плавающим',
+        action: () => {
+          api.addFloatingGroup(panel, {
+            x: Math.max(20, (window.innerWidth - 680) / 2),
+            y: Math.max(20, (window.innerHeight - 520) / 2),
+            width: 680,
+            height: 520,
+          });
+        },
+      },
+      'separator' as const,
+      'close' as const,
+      'closeOthers' as const,
+      'closeAll' as const,
+    ];
+  }, []);
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
@@ -412,6 +518,7 @@ export const WorkspaceShell: React.FC = () => {
       <DockviewReact
         components={components}
         rightHeaderActionsComponent={GroupHeaderActions}
+        getTabContextMenuItems={getTabContextMenuItems}
         onReady={onReady}
         className="dockview-theme-slag w-full h-full"
         popoutUrl="/popout.html"

@@ -498,4 +498,73 @@
   border-radius: 2px !important;
 }
 
+/*
+ * Linear 95% Minimal Dark: Floating Groups & Popouts
+ */
+.dockview-theme-slag .dv-resize-container,
+.dv-resize-container {
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background-color: #09090b !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  overflow: hidden;
+}
+
+.dockview-theme-slag .dv-resize-container-with-titlebar > .dv-floating-titlebar,
+.dv-resize-container-with-titlebar > .dv-floating-titlebar {
+  background-color: #0c0c0e !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  height: 28px !important;
+}
+
+/*
+ * Linear 95% Minimal Dark: Tab & Group Context Menu
+ */
+.dockview-theme-slag .dv-context-menu,
+.dv-context-menu {
+  background-color: #18181c !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.7) !important;
+  padding: 4px !important;
+  color: #e4e4e7 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  min-width: 170px !important;
+  z-index: 99999 !important;
+}
+
+.dockview-theme-slag .dv-context-menu-item,
+.dv-context-menu-item {
+  padding: 6px 10px !important;
+  border-radius: 5px !important;
+  cursor: pointer !important;
+  color: #d4d4d8 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  transition: background-color 0.1s ease, color 0.1s ease !important;
+  user-select: none !important;
+}
+
+.dockview-theme-slag .dv-context-menu-item:hover,
+.dv-context-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.dockview-theme-slag .dv-context-menu-item.dv-context-menu-item--disabled,
+.dv-context-menu-item.dv-context-menu-item--disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+
+.dockview-theme-slag .dv-context-menu-separator,
+.dv-context-menu-separator {
+  height: 1px !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  margin: 4px 0 !important;
+}
+
+
 

@@ -2713,4 +2713,37 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/markdown-rendered-feed-card.png',
     });
   });
+
+  test('39. Composite Workspace: Tab Right-Click Context Menu and Floating Group Detachment', async ({ page }) => {
+    const dockviewContainer = page.locator('.dockview-theme-slag');
+    await expect(dockviewContainer).toBeVisible();
+
+    // 1. Locate Assistant tab and right click to open context menu
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await expect(assistantTab).toBeVisible();
+
+    await assistantTab.click({ button: 'right' });
+
+    // 2. Verify custom context menu items
+    const contextMenu = page.locator('.dv-context-menu');
+    await expect(contextMenu).toBeVisible();
+    await expect(contextMenu.locator('.dv-context-menu-item', { hasText: 'Вынести в отдельное окно' })).toBeVisible();
+    await expect(contextMenu.locator('.dv-context-menu-item', { hasText: 'Сделать плавающим' })).toBeVisible();
+
+    // 3. Click "Сделать плавающим" and verify floating container appears
+    await contextMenu.locator('.dv-context-menu-item', { hasText: 'Сделать плавающим' }).click();
+
+    const floatingContainer = page.locator('.dv-resize-container');
+    await expect(floatingContainer).toBeVisible();
+
+    // 4. Verify popout icon button in header actions
+    const popoutBtn = page.locator('button[title*="Вынести вкладку в отдельное окно"]').first();
+    await expect(popoutBtn).toBeVisible();
+
+    // 5. Capture screenshot of floating panel
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-floating-group-active.png',
+      fullPage: false,
+    });
+  });
 });
