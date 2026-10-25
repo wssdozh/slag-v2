@@ -40,7 +40,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Find task card
     const taskCard = page.locator('.group', { hasText: taskTitle });
     await expect(taskCard).toBeVisible();
-    await expect(taskCard.locator('span', { hasText: 'Таска' })).toBeVisible();
+    await expect(taskCard.locator('button[aria-label="Изменить статус задачи"]')).toBeVisible();
 
     // Toggle completion directly in feed
     const checkbox = taskCard.locator('button[aria-label="Изменить статус задачи"]');
@@ -93,8 +93,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const articleCard = page.locator('#item-demo_article_1');
     await expect(articleCard).toBeVisible();
 
-    // Verify metadata shows reading time
-    await expect(articleCard.locator('text=/Статья • \\d+ мин/')).toBeVisible();
+    // Verify metadata shows clean Article badge without reading minutes
+    await expect(articleCard.locator('span', { hasText: 'Статья' })).toBeVisible();
+    await expect(articleCard.locator('text=/\\d+ мин/')).toHaveCount(0);
 
     // Verify teaser text is displayed and "Читать полностью" is removed
     await expect(articleCard.locator('button', { hasText: /Читать полностью/ })).toHaveCount(0);
@@ -732,11 +733,11 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Verify tag is present
     await expect(createdCard.getByRole('button', { name: '#culture' })).toBeVisible();
 
-    // Verify task type badge is present
-    await expect(createdCard.locator('span', { hasText: 'Таска' })).toBeVisible();
+    // Verify task checkbox is present
+    await expect(createdCard.locator('button[aria-label="Изменить статус задачи"]')).toBeVisible();
 
     // Verify task priority badge is present
-    await expect(createdCard.getByText('Средний', { exact: true })).toBeVisible();
+    await expect(createdCard.locator('[aria-label*="Средний"]')).toBeVisible();
 
     // Verify title does NOT contain raw syntax (p2, #culture, tomorrow)
     const cardText = await createdCard.innerText();

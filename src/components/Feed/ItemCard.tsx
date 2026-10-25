@@ -27,6 +27,25 @@ interface ItemCardProps {
   item: SlagItem;
 }
 
+const formatDueDate = (rawDate?: string): string => {
+  if (!rawDate) return '';
+  const parts = rawDate.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    if (!isNaN(year) && !isNaN(monthIdx) && !isNaN(day) && monthIdx >= 0 && monthIdx < 12) {
+      const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+      const currentYear = new Date().getFullYear();
+      if (year === currentYear) {
+        return `${day} ${months[monthIdx]}`;
+      }
+      return `${day} ${months[monthIdx]} ${year}`;
+    }
+  }
+  return rawDate;
+};
+
 export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const {
     items,
@@ -220,13 +239,74 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     openLightbox(folderImages, Math.max(0, targetIdx));
   };
 
-  const hasMetadata =
-    isTask ||
-    isArticle ||
-    item.folder !== 'Входящие' ||
-    Boolean(item.isPinned) ||
-    Boolean(item.priority && item.priority !== 'none') ||
-    Boolean(item.dueDate);
+  const folderDisplayName =
+    item.folder !== 'Входящие'
+      ? item.folder.split('/').filter(Boolean).pop() || item.folder
+      : '';
+
+  const metaElements: React.ReactNode[] = [];
+
+  if (folderDisplayName) {
+    metaElements.push(
+      <span key="folder" className="text-2xs text-zinc-500 font-mono" title={item.folder}>
+        {folderDisplayName}
+      </span>
+    );
+  }
+
+  if (isArticle) {
+    metaElements.push(
+      <span key="article" className="text-2xs font-mono text-zinc-400 font-medium">
+        Статья
+      </span>
+    );
+  }
+
+  if (isTask && item.priority && item.priority !== 'none') {
+    const priorityLabel =
+      item.priority === 'high' ? 'Высокий' : item.priority === 'medium' ? 'Средний' : 'Низкий';
+    metaElements.push(
+      <span
+        key="priority"
+        className="flex items-center"
+        title={`Приоритет: ${priorityLabel}`}
+        aria-label={`Приоритет: ${priorityLabel}`}
+      >
+        <LinearSignalBars priority={item.priority} className="w-3.5 h-3.5" />
+      </span>
+    );
+  }
+
+  if (isTask && item.dueDate) {
+    metaElements.push(
+      <span
+        key="due"
+        className="flex items-center gap-1 text-2xs text-zinc-500 font-mono"
+        title={`Срок: ${item.dueDate}`}
+      >
+        <Calendar className="w-3 h-3 text-zinc-600" />
+        <span>{formatDueDate(item.dueDate)}</span>
+      </span>
+    );
+  }
+
+  if (item.isPinned) {
+    metaElements.push(
+      <span
+        key="pin"
+        className="flex items-center gap-1 text-2xs font-mono text-amber-400/90"
+        title="Закрепленная запись"
+      >
+        <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
+        <span>Закреп</span>
+      </span>
+    );
+  }
+
+  const hasBottomMeta =
+    metaElements.length > 0 || Boolean(item.tags && item.tags.length > 0);
+
+  const shouldRenderBottomBar = !isPureVoice || hasBottomMeta;
 
   const handleOpenArticle = () => {
     setSelectedItem(item);
@@ -348,64 +428,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             <Maximize2 className="w-4 h-4" />
           </button>
         )}
-
-      {/* Top Header / Metadata Bar: Rendered ONLY when metadata exists */}
-      {hasMetadata && (
-        <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-500 pr-16 sm:pr-10">
-          {/* Item Type: Plain text, no nested chips */}
-          {isTask && (
-            <span className="text-2xs font-mono text-zinc-400 font-medium">
-              Таска
-            </span>
-          )}
-          {isArticle && (
-            <span className="text-2xs font-mono text-zinc-400 font-medium">
-              Статья • {item.readingTimeMinutes || Math.max(1, Math.round((item.content?.split(/\s+/).length || 0) / 200))} мин
-            </span>
-          )}
-
-          {/* Folder name if not in inbox */}
-          {item.folder !== 'Входящие' && (
-            <span className="text-2xs text-zinc-500 font-mono">
-              {item.folder}
-            </span>
-          )}
-
-          {/* Task Priority */}
-          {isTask && item.priority && item.priority !== 'none' && (
-            <span className="flex items-center gap-1">
-              <LinearSignalBars priority={item.priority} className="w-3 h-3" />
-              <span
-                className={`text-2xs uppercase font-mono font-medium ${
-                  item.priority === 'high'
-                    ? 'text-rose-400'
-                    : item.priority === 'medium'
-                    ? 'text-amber-400'
-                    : 'text-zinc-500'
-                }`}
-              >
-                {item.priority === 'high' ? 'Высокий' : item.priority === 'medium' ? 'Средний' : 'Низкий'}
-              </span>
-            </span>
-          )}
-
-          {/* Pin indicator */}
-          {item.isPinned && (
-            <span className="flex items-center gap-1 text-2xs font-mono text-amber-400/90" title="Закрепленная запись">
-              <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
-              <span>Закреп</span>
-            </span>
-          )}
-
-          {/* Task Due Date */}
-          {isTask && item.dueDate && (
-            <span className="flex items-center gap-1 text-2xs text-zinc-500 font-mono">
-              <Calendar className="w-3 h-3 text-zinc-600" />
-              {item.dueDate}
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Reply Parent Quote Banner */}
       {item.replyToId && (
@@ -705,19 +727,36 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Bottom Bar: Tags on left + Timestamp on right (identical typography, exact same line) */}
-      {(!isPureVoice || (item.tags && item.tags.length > 0)) && (
-        <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px] w-full select-none">
-          {item.tags && item.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-2 items-center min-w-0">
-              {item.tags.map(tag => (
-                <TagChip
-                  key={tag}
-                  tag={tag}
-                  variant="flat"
-                  onClick={() => setActiveTagFilter(tag)}
-                />
+      {/* Bottom Bar: Metadata & Tags on left + Timestamp on right */}
+      {shouldRenderBottomBar && (
+        <div className="flex items-center justify-between gap-2 pt-1 min-h-[16px] w-full select-none">
+          {hasBottomMeta ? (
+            <div className="flex flex-wrap gap-x-2 gap-y-1 items-center min-w-0">
+              {metaElements.map((el, idx) => (
+                <React.Fragment key={idx}>
+                  {idx > 0 && <span className="w-1 h-1 rounded-full bg-zinc-600/80 inline-block shrink-0" />}
+                  {el}
+                </React.Fragment>
               ))}
+
+              {/* Separator between metadata and tags */}
+              {metaElements.length > 0 && item.tags && item.tags.length > 0 && (
+                <span className="w-1 h-1 rounded-full bg-zinc-600/80 inline-block shrink-0" />
+              )}
+
+              {/* Tags */}
+              {item.tags && item.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {item.tags.map(tag => (
+                    <TagChip
+                      key={tag}
+                      tag={tag}
+                      variant="flat"
+                      onClick={() => setActiveTagFilter(tag)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div />
