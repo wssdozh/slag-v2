@@ -1675,6 +1675,8 @@ export const CalendarView: React.FC = () => {
                 </span>
               </div>
               <button
+                data-testid="close-expanded-day-modal"
+                title="Закрыть (Esc)"
                 onClick={() => setExpandedDayDateStr(null)}
                 className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
               >

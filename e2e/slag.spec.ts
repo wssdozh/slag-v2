@@ -645,8 +645,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
         path: 'test-results/screenshots/calendar-month-expanded-day.png',
         fullPage: false,
       });
-      // Close modal via Escape
-      await page.keyboard.press('Escape');
+      // Close modal via button or Escape
+      const modalCloseBtn = page.locator('[data-testid="close-expanded-day-modal"]').first();
+      if (await modalCloseBtn.isVisible()) {
+        await modalCloseBtn.click();
+      } else {
+        await page.keyboard.press('Escape');
+      }
+      await page.waitForTimeout(200);
     }
 
     // Capture Month View screenshot
