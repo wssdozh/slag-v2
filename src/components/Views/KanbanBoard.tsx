@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { querySearch } from '../../lib/searchService';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
 import {
   CircleDashed,
   Circle,
@@ -82,6 +83,15 @@ export const KanbanBoard: React.FC = () => {
 
   // Active status dropdown card ID
   const [statusMenuTaskId, setStatusMenuTaskId] = useState<string | null>(null);
+
+  // Mouse drag-to-scroll for horizontal Kanban board and vertical column scrolling
+  const kanbanBoardRef = useDragToScroll<HTMLDivElement>({
+    direction: 'both',
+    getContainerX: (_target, container) => container,
+    getContainerY: (target) => target.closest('.overflow-y-auto') as HTMLElement | null,
+    ignoreSelector:
+      'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-no-pan], [data-testid="kanban-card"]',
+  });
 
   // Filter items scoped to current folder
   const folderItems = useMemo(() => {
@@ -379,7 +389,11 @@ export const KanbanBoard: React.FC = () => {
       {/* ============================================================== */}
       {/* Linear Kanban Columns Area                                     */}
       {/* ============================================================== */}
-      <div className="flex-1 flex overflow-x-auto gap-3.5 p-4 bg-[#09090b] min-w-0 h-full">
+      <div
+        ref={kanbanBoardRef}
+        data-testid="kanban-columns-container"
+        className="flex-1 flex overflow-x-auto gap-3.5 p-4 bg-[#09090b] min-w-0 h-full cursor-grab"
+      >
         {COLUMNS.map(column => {
           const colTasks = tasksByStatus[column.id] || [];
           const isOver = dragOverColumn === column.id;
@@ -397,7 +411,7 @@ export const KanbanBoard: React.FC = () => {
               }`}
             >
               {/* Column Header */}
-              <div className="h-10 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]/60">
+              <div className="h-10 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]/60 cursor-grab">
                 <div className="flex items-center gap-2 min-w-0">
                   {renderColumnIcon(column.iconType, column.iconColor)}
                   <h3 className="text-xs font-semibold text-zinc-200 tracking-tight truncate">

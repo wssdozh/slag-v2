@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
 import { getTaskTimeSlot, type TaskTimeSlot } from '../../lib/todoistTaskParser';
 import { getRecurringOccurrencesInRange } from '../../lib/recurrenceHelper';
+import { useDragToScroll } from '../../hooks/useDragToScroll';
 import {
   ChevronLeft,
   ChevronRight,
@@ -190,6 +191,36 @@ export const CalendarView: React.FC = () => {
 
   const timeGridRef = useRef<HTMLDivElement | null>(null);
   const weekHorizontalScrollRef = useRef<HTMLDivElement | null>(null);
+  const monthHorizontalScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Mouse drag-to-scroll for Week View (horizontal week days + vertical time grid)
+  useDragToScroll<HTMLDivElement>(
+    {
+      direction: 'both',
+      getContainerX: () => weekHorizontalScrollRef.current,
+      getContainerY: (target: HTMLElement) => {
+        if (target.closest('[data-testid="calendar-time-grid"]')) {
+          return timeGridRef.current;
+        }
+        return null;
+      },
+      ignoreSelector:
+        'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-no-pan], [data-testid="calendar-card"], [data-resize-handle], .cursor-ns-resize',
+    },
+    weekHorizontalScrollRef
+  );
+
+  // Mouse drag-to-scroll for Month View
+  useDragToScroll<HTMLDivElement>(
+    {
+      direction: 'both',
+      getContainerX: (_target: HTMLElement, container: HTMLDivElement) => container,
+      getContainerY: (target: HTMLElement) => target.closest('.overflow-y-auto') as HTMLElement | null,
+      ignoreSelector:
+        'button, a, input, textarea, select, [contenteditable="true"], [draggable="true"], [data-no-pan]',
+    },
+    monthHorizontalScrollRef
+  );
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1103,12 +1134,12 @@ export const CalendarView: React.FC = () => {
             <div
               ref={weekHorizontalScrollRef}
               data-testid="calendar-week-scroll-container"
-              className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin select-none"
+              className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin select-none cursor-grab"
             >
               <div className="flex-1 flex flex-col min-w-[896px] h-full">
                 {/* Day Headers (ПН 10, ВТ 11...) */}
-                <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/90 shrink-0">
-                  <div className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-[#0c0c0e]">
+                <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/90 shrink-0 cursor-grab">
+                  <div className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-[#0c0c0e] cursor-grab">
                     UTC
                   </div>
                   <div className="flex-1 grid grid-cols-7">
@@ -1198,7 +1229,7 @@ export const CalendarView: React.FC = () => {
                 className="flex-1 overflow-y-auto scrollbar-thin relative bg-[#09090b] flex"
               >
                 {/* Time markers column */}
-                <div className="w-14 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e] select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)]">
+                <div className="w-14 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e] select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-grab">
                   {HOURS.map(hour => (
                     <div
                       key={hour}
@@ -1302,10 +1333,13 @@ export const CalendarView: React.FC = () => {
             /* ========================================================== */
             /* MONTH VIEW (with compact task rows & day expansion)       */
             /* ========================================================== */
-            <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin bg-[#09090b]">
+            <div
+              ref={monthHorizontalScrollRef}
+              className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin bg-[#09090b] cursor-grab"
+            >
               <div className="flex-1 flex flex-col min-w-[700px] h-full">
                 {/* Day Header Row */}
-                <div className="grid grid-cols-7 border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0">
+                <div className="grid grid-cols-7 border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0 cursor-grab">
                 {RUSSIAN_WEEKDAYS.map(day => (
                   <div
                     key={day}

@@ -18,23 +18,28 @@ export const FolderInfoPanel: React.FC = () => {
     currentFolder,
     folders,
     filteredItems,
-    items,
     saveFolder,
     setActiveTagFilter,
     addToast,
-    openLightbox,
-    setIsTriageModalOpen
+    openLightbox
   } = useApp();
 
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
 
   const currentFolderMeta = folders.find(f => f.path === currentFolder);
-  const isInbox = currentFolder === 'Входящие';
-  const inboxUnsortedCount = items.filter(i => i.folder === 'Входящие').length;
 
   const mediaData = useFolderMedia(filteredItems);
   const { allImages, allAudio, allLinks, notesCount, tasksCount, articlesCount } = mediaData;
+
+  const metrics = [
+    { label: 'Заметки', count: notesCount, icon: StickyNote },
+    { label: 'Таски', count: tasksCount, icon: CheckSquare },
+    { label: 'Статьи', count: articlesCount, icon: FileText },
+    { label: 'Фото / Медиа', count: allImages.length, icon: ImageIcon },
+    { label: 'Голосовые', count: allAudio.length, icon: Mic },
+    { label: 'Ссылки', count: allLinks.length, icon: LinkIcon },
+  ];
 
   const handleSaveDescription = () => {
     if (!currentFolderMeta) return;
@@ -51,7 +56,7 @@ export const FolderInfoPanel: React.FC = () => {
       className="w-full h-full flex flex-col bg-[#0c0c0e] select-none text-[#a1a1aa] overflow-hidden"
     >
       {/* Top Header: Folder info */}
-      <div className="h-12 px-3 flex items-center justify-between border-b border-white/[0.04] gap-2">
+      <div className="h-12 px-3 flex items-center justify-between border-b border-white/[0.04] gap-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span className="text-xs font-semibold text-zinc-200 truncate">
@@ -61,32 +66,11 @@ export const FolderInfoPanel: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-        {/* Compact AI Triage card for Inbox */}
-        {isInbox && inboxUnsortedCount > 0 && (
-          <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-between gap-2 shadow-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-lg bg-amber-400/10 flex items-center justify-center shrink-0">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              </div>
-              <span className="font-semibold text-xs text-zinc-100 truncate">ИИ-Сортировка</span>
-              <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-mono text-zinc-300 shrink-0">
-                {inboxUnsortedCount}
-              </span>
-            </div>
-            <button
-              onClick={() => setIsTriageModalOpen(true)}
-              className="px-2.5 py-1 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors shadow-sm shrink-0 cursor-pointer"
-            >
-              Запустить
-            </button>
-          </div>
-        )}
-
-        {/* Folder Description for AI & User */}
-        <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-          <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400">
+        {/* Folder Description for AI & User (Flat, zero-box) */}
+        <div className="group flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-[11px] font-medium text-zinc-500">
             <span className="flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-zinc-400" />
+              <Sparkles className="w-3 h-3 text-zinc-500" />
               Описание для ИИ
             </span>
             {!isEditingDescription && (
@@ -95,7 +79,7 @@ export const FolderInfoPanel: React.FC = () => {
                   setDescriptionDraft(currentFolderMeta?.description || '');
                   setIsEditingDescription(true);
                 }}
-                className="hover:text-white text-[10px] text-zinc-500 transition-colors cursor-pointer"
+                className="text-[10px] text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 Изменить
               </button>
@@ -110,7 +94,7 @@ export const FolderInfoPanel: React.FC = () => {
                 placeholder="Опишите, какие заметки и темы должны попадать в эту папку..."
                 rows={3}
                 autoFocus
-                className="w-full bg-black/40 border border-white/[0.08] rounded p-2 text-xs text-white placeholder-zinc-500 resize-none leading-relaxed"
+                className="w-full bg-white/[0.03] border border-white/[0.08] focus:border-white/20 rounded-md p-2 text-xs text-white placeholder-zinc-500 resize-none leading-relaxed outline-none ring-0"
               />
               <div className="flex justify-end gap-1.5">
                 <button
@@ -130,7 +114,7 @@ export const FolderInfoPanel: React.FC = () => {
           ) : (
             <p className="text-xs text-zinc-300 leading-relaxed font-normal">
               {currentFolderMeta?.description || (
-                <span className="italic text-zinc-500">
+                <span className="italic text-zinc-600">
                   Описание не задано. Добавьте его, чтобы ИИ понимал, что сортировать сюда.
                 </span>
               )}
@@ -138,44 +122,37 @@ export const FolderInfoPanel: React.FC = () => {
           )}
         </div>
 
-        {/* Metrics Table */}
-        <div className="flex flex-col gap-1 text-xs">
-          <div className="flex justify-between py-1 border-b border-white/[0.03]">
-            <span className="text-zinc-500 flex items-center gap-1.5">
-              <StickyNote className="w-3.5 h-3.5 text-zinc-500" /> Заметки
-            </span>
-            <span className="font-mono text-zinc-300">{notesCount}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-white/[0.03]">
-            <span className="text-zinc-500 flex items-center gap-1.5">
-              <CheckSquare className="w-3.5 h-3.5 text-zinc-500" /> Таски
-            </span>
-            <span className="font-mono text-zinc-300">{tasksCount}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-white/[0.03]">
-            <span className="text-zinc-500 flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-zinc-500" /> Статьи
-            </span>
-            <span className="font-mono text-zinc-300">{articlesCount}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-white/[0.03]">
-            <span className="text-zinc-500 flex items-center gap-1.5">
-              <ImageIcon className="w-3.5 h-3.5 text-zinc-500" /> Фото / Медиа
-            </span>
-            <span className="font-mono text-zinc-300">{allImages.length}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-white/[0.03]">
-            <span className="text-zinc-500 flex items-center gap-1.5">
-              <Mic className="w-3.5 h-3.5 text-zinc-500" /> Голосовые
-            </span>
-            <span className="font-mono text-zinc-300">{allAudio.length}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-white/[0.03]">
-            <span className="text-zinc-500 flex items-center gap-1.5">
-              <LinkIcon className="w-3.5 h-3.5 text-zinc-500" /> Ссылки
-            </span>
-            <span className="font-mono text-zinc-300">{allLinks.length}</span>
-          </div>
+        {/* Metrics List (Functional contrast) */}
+        <div className="flex flex-col text-xs">
+          {metrics.map(({ label, count, icon: Icon }) => {
+            const hasItems = count > 0;
+            return (
+              <div
+                key={label}
+                className="flex items-center justify-between py-1.5 border-b border-white/[0.03]"
+              >
+                <span
+                  className={`flex items-center gap-2 transition-colors ${
+                    hasItems ? 'text-zinc-300' : 'text-zinc-600'
+                  }`}
+                >
+                  <Icon
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      hasItems ? 'text-zinc-400' : 'text-zinc-600'
+                    }`}
+                  />
+                  <span>{label}</span>
+                </span>
+                <span
+                  className={`font-mono text-xs ${
+                    hasItems ? 'text-zinc-200 font-medium' : 'text-zinc-600'
+                  }`}
+                >
+                  {count}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Media / Files / Links Tabs */}

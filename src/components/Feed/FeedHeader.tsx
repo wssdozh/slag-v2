@@ -12,7 +12,8 @@ import {
   Calendar,
   Layers,
   Filter,
-  BookOpen
+  BookOpen,
+  Sparkles
 } from 'lucide-react';
 
 export const FeedHeader: React.FC = () => {
@@ -33,6 +34,7 @@ export const FeedHeader: React.FC = () => {
     clearAiFilter,
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
+    setIsTriageModalOpen,
   } = useApp();
 
   const folderMeta = folders.find(f => f.path === currentFolder);
@@ -47,6 +49,10 @@ export const FeedHeader: React.FC = () => {
       return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
     }).length;
   }, [items, currentFolder]);
+
+  const inboxUnsortedCount = useMemo(() => {
+    return isInbox ? items.filter(i => i.folder === 'Входящие').length : 0;
+  }, [items, isInbox]);
 
   return (
     <header className="h-12 px-4 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-3 select-none shrink-0 relative">
@@ -249,6 +255,23 @@ export const FeedHeader: React.FC = () => {
             <Calendar className="w-3.5 h-3.5 shrink-0" />
           </button>
         </nav>
+
+        {/* AI Triage button in Inbox right next to switcher with divider */}
+        {isInbox && inboxUnsortedCount > 0 && (
+          <div className="flex items-center h-ctrl-sm gap-1.5 shrink-0">
+            <div className="h-4 w-px bg-white/[0.12] mx-0.5 shrink-0" />
+            <button
+              onClick={() => setIsTriageModalOpen(true)}
+              title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
+              aria-label="Запустить ИИ-Сортировку"
+              className="h-full px-2 rounded-md flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
+              <span className="sr-only">Запустить ИИ-Сортировку</span>
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
