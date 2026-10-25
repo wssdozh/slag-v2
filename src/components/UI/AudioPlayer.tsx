@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, ChevronUp, Loader2 } from 'lucide-react';
+import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 
 const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
   <svg
@@ -299,7 +299,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             type="button"
             onClick={handleTranscriptToggle}
             disabled={enrichmentStatus === 'processing'}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+            className="w-8 h-8 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             title={
               enrichmentStatus === 'processing'
                 ? 'Идет расшифровка...'
@@ -312,11 +312,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             aria-label="Расшифровка"
           >
             {enrichmentStatus === 'processing' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+              <Loader2 className="w-4.5 h-4.5 animate-spin text-zinc-400" />
             ) : transcript && isExpanded ? (
-              <ChevronUp className="w-4 h-4 text-zinc-300" />
+              <ChevronUp className="w-6 h-6 text-zinc-200" strokeWidth={2.25} />
+            ) : transcript ? (
+              <ChevronDown className="w-6 h-6 text-zinc-400 hover:text-zinc-200" strokeWidth={2.25} />
             ) : (
-              <TelegramTranscribeIcon className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
+              <TelegramTranscribeIcon className="w-4.5 h-4.5 text-zinc-400 hover:text-zinc-200" />
             )}
           </button>
         )}

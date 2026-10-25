@@ -171,6 +171,9 @@ export const CalendarView: React.FC = () => {
     currentDuration: number;
   } | null>(null);
 
+  // Guard to prevent card onClick from firing immediately after a resize drag
+  const isJustResizedRef = useRef(false);
+
   // Expanded Day Card modal for Month view
   const [expandedDayDateStr, setExpandedDayDateStr] = useState<string | null>(null);
 
@@ -438,8 +441,13 @@ export const CalendarView: React.FC = () => {
     const task = items.find(i => i.id === taskId);
     if (!task) return;
 
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const quarter = Math.min(3, Math.max(0, Math.floor((offsetY / 52) * 4)));
+    const minute = quarter * 15;
+
     const [year, month, day] = dateStr.split('-').map(Number);
-    const targetDate = new Date(year, month - 1, day, hour, 0, 0, 0);
+    const targetDate = new Date(year, month - 1, day, hour, minute, 0, 0);
     const reminder = targetDate.toISOString();
 
     updateItem({
@@ -447,7 +455,8 @@ export const CalendarView: React.FC = () => {
       dueDate: dateStr,
       reminder,
     });
-    addToast(`Задача перенесена на ${dateStr} в ${String(hour).padStart(2, '0')}:00`, 'info');
+    const timeFormatted = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    addToast(`Задача перенесена на ${dateStr} в ${timeFormatted}`, 'info');
   };
 
   const handleDropAllDay = (e: React.DragEvent, dateStr: string) => {
@@ -602,7 +611,14 @@ export const CalendarView: React.FC = () => {
     );
   };
 
-  // Handle dragging bottom edge to resize task duration (time-blocking)
+  function formatDurationBadge(mins: number): string {
+    if (mins < 60) return `${mins}м`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h}ч ${m}м` : `${h}ч`;
+  }
+
+  // Handle dragging bottom edge to resize task duration (time-blocking with 15-min snapping)
   const handleResizeStart = (e: React.MouseEvent, taskId: string, initialDuration: number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -617,6 +633,7 @@ export const CalendarView: React.FC = () => {
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaY = moveEvent.clientY - startY;
+      // 52px per 60 min -> 13px per 15 min quantum
       const deltaMinutes = Math.round(((deltaY / 52) * 60) / 15) * 15;
       const nextDuration = Math.max(15, Math.min(1440, initialDuration + deltaMinutes));
       setResizingTask(prev => (prev ? { ...prev, currentDuration: nextDuration } : null));
@@ -631,6 +648,10 @@ export const CalendarView: React.FC = () => {
       const finalDuration = Math.max(15, Math.min(1440, initialDuration + deltaMinutes));
 
       setResizingTask(null);
+      isJustResizedRef.current = true;
+      setTimeout(() => {
+        isJustResizedRef.current = false;
+      }, 200);
 
       const realId = taskId.replace(/_virtual_.*$/, '');
       const target = items.find(i => i.id === realId);
@@ -640,11 +661,7 @@ export const CalendarView: React.FC = () => {
           duration: finalDuration,
         });
         addToast(
-          `Длительность: ${
-            finalDuration >= 60
-              ? `${Math.floor(finalDuration / 60)}ч ${finalDuration % 60 ? `${finalDuration % 60}м` : ''}`.trim()
-              : `${finalDuration}м`
-          }`,
+          `Длительность: ${formatDurationBadge(finalDuration)}`,
           'success'
         );
       }
@@ -676,16 +693,27 @@ export const CalendarView: React.FC = () => {
       const isBeingResized = resizingTaskId && (task.id === resizingTaskId || task.id.startsWith(resizingTaskId + '_virtual_'));
       const durationMinutes = isBeingResized && resizingDuration ? resizingDuration : rawSlot.durationMinutes;
 
+      // Dynamically recompute end time and timeLabel so the card displays the updated time during resize
+      const endTotal = rawSlot.startHour * 60 + rawSlot.startMinute + durationMinutes;
+      const endH = Math.floor(endTotal / 60) % 24;
+      const endM = endTotal % 60;
+      const timeLabel = `${String(rawSlot.startHour).padStart(2, '0')}:${String(rawSlot.startMinute).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
       const slot: TaskTimeSlot = {
         ...rawSlot,
         durationMinutes,
+        timeLabel,
       };
 
       const startMinutes = slot.startHour * 60 + slot.startMinute;
       const endMinutes = startMinutes + slot.durationMinutes;
       const startH = Math.max(0, Math.min(23, slot.startHour));
       const topPx = startH * 52 + (slot.startMinute / 60) * 52;
-      const heightPx = Math.max(26, (slot.durationMinutes / 60) * 52);
+      // Grid step: 13px per 15 min.
+      // 15m has min display height of 20px for clean single-line vertical centering.
+      // 30m+ snaps to exact grid multiples (30m = 26px, 45m = 39px, 60m = 52px, etc.)
+      const gridHeightPx = (slot.durationMinutes / 60) * 52;
+      const heightPx = Math.max(20, Math.round(gridHeightPx));
 
       return {
         task,
@@ -756,7 +784,7 @@ export const CalendarView: React.FC = () => {
     return result;
   }
 
-  // Render a Time-Blocked Card in Week View with Anti-Overlap
+  // Render a Time-Blocked Card in Week View with Anti-Overlap and Duration States
   const renderTimedTaskBlock = (positioned: LayoutPositionedTask) => {
     const { task, slot, topPx, heightPx, colIndex, totalCols } = positioned;
     const isDone = task.status === 'done';
@@ -771,7 +799,13 @@ export const CalendarView: React.FC = () => {
 
     const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
     const totalSubtasks = task.subtasks?.length || 0;
-    const isShort = heightPx < 38;
+
+    // Distinct card states based on height
+    // - Compact (15m: 20px, 30m: 26px): single-line centered pill, no vertical crowding
+    // - Medium (45m: 39px): 2 compact rows
+    // - Full (60m+: 52px+): 2 comfortable rows with badges
+    const isCompact = heightPx < 36;
+    const isMedium = heightPx >= 36 && heightPx < 48;
 
     return (
       <div
@@ -780,6 +814,7 @@ export const CalendarView: React.FC = () => {
         onDragStart={e => handleDragStartTask(e, realTaskId)}
         onDragEnd={handleDragEnd}
         onClick={() => {
+          if (isJustResizedRef.current) return;
           const target = items.find(i => i.id === realTaskId) || task;
           setSelectedItem(target);
           setIsFullscreenEditorOpen(true);
@@ -803,70 +838,162 @@ export const CalendarView: React.FC = () => {
           left: `${left}%`,
           width: `${width}%`,
         }}
-        className={`absolute rounded-lg ${totalCols > 1 ? 'p-1' : 'p-2'} border flex flex-col justify-between select-none transition-all duration-75 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
-          task.isVirtual ? 'border-dashed opacity-85' : ''
-        } ${
+        className={`group/card absolute rounded-lg border select-none transition-all duration-75 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
+          isCompact
+            ? totalCols > 1
+              ? 'px-1.5 py-0 flex items-center justify-between'
+              : 'px-2 py-0 flex items-center justify-between'
+            : isMedium
+            ? totalCols > 1
+              ? 'px-1.5 py-1 flex flex-col justify-between'
+              : 'px-2 py-1 flex flex-col justify-between'
+            : totalCols > 1
+            ? 'px-1.5 py-1.5 flex flex-col justify-between'
+            : 'px-2.5 py-1.5 flex flex-col justify-between'
+        } ${task.isVirtual ? 'border-dashed opacity-85' : ''} ${
           isDragging
             ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
             : draggingTaskId !== null
             ? 'pointer-events-none'
             : isResizing
-            ? 'ring-1 ring-blue-500 shadow-md z-30'
+            ? 'ring-2 ring-blue-500 shadow-xl z-30'
             : 'cursor-grab active:cursor-grabbing hover:border-white/20 hover:z-20'
         }`}
       >
-        <div className={`flex items-start ${totalCols > 1 ? 'gap-1' : 'gap-1.5'} min-w-0`}>
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              toggleTaskComplete(realTaskId);
-            }}
-            className={`mt-0.5 ${totalCols > 1 ? 'w-3 h-3' : 'w-3.5 h-3.5'} rounded-full flex items-center justify-center transition-colors shrink-0 ${
-              isDone
-                ? 'border border-blue-500 bg-blue-500 text-white'
-                : `border border-zinc-500 ${styling.checkboxHover}`
-            }`}
-            title={isDone ? 'Возобновить' : 'Выполнить'}
-          >
-            <Check className="w-2 h-2 stroke-[3]" />
-          </button>
+        {isCompact ? (
+          /* ========================================================== */
+          /* 1. COMPACT STATE (15m - 30m): Single-Line Centered Row     */
+          /* ========================================================== */
+          <div className="flex items-center justify-between w-full min-w-0 h-full gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  toggleTaskComplete(realTaskId);
+                }}
+                className={`w-3 h-3 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                  isDone
+                    ? 'border border-blue-500 bg-blue-500 text-white'
+                    : `border border-zinc-500 ${styling.checkboxHover}`
+                }`}
+                title={isDone ? 'Возобновить' : 'Выполнить'}
+              >
+                <Check className="w-2 h-2 stroke-[3]" />
+              </button>
 
-          <span
-            className={`font-semibold text-xs leading-snug truncate flex-1 min-w-0 ${
-              isDone ? 'line-through text-zinc-500' : 'text-zinc-100'
-            }`}
-          >
-            {task.title || 'Безымянная задача'}
-          </span>
-
-          {task.recurrence && (
-            <span title="Повторяющаяся задача" className="shrink-0 flex items-center mt-0.5">
-              <Repeat className="w-3 h-3 text-amber-400" />
-            </span>
-          )}
-        </div>
-
-        {!isShort && totalCols < 3 && (
-          <div className="flex items-center justify-between text-[10px] font-mono opacity-80 pt-0.5">
-            <span className="truncate">{slot.timeLabel}</span>
-            {totalSubtasks > 0 && (
-              <span className="flex items-center gap-0.5 shrink-0">
-                <ListTodo className="w-2.5 h-2.5" />
-                <span>{completedSubtasks}/{totalSubtasks}</span>
+              <span
+                className={`font-medium text-[11px] leading-tight truncate min-w-0 ${
+                  isDone ? 'line-through text-zinc-500' : 'text-zinc-100'
+                }`}
+              >
+                {task.title || 'Безымянная задача'}
               </span>
+
+              {task.recurrence && (
+                <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
+                  <Repeat className="w-2.5 h-2.5 text-amber-400" />
+                </span>
+              )}
+            </div>
+
+            {/* Time label and optional subtask counter on right (shown when single column) */}
+            {totalCols === 1 && (
+              <div className="flex items-center gap-1.5 text-[10px] font-mono opacity-70 shrink-0">
+                <span className="truncate">
+                  {slot.durationMinutes <= 15
+                    ? `${String(slot.startHour).padStart(2, '0')}:${String(slot.startMinute).padStart(2, '0')}`
+                    : slot.timeLabel}
+                </span>
+                {totalSubtasks > 0 && (
+                  <span className="flex items-center gap-0.5 text-[9px]">
+                    <ListTodo className="w-2.5 h-2.5" />
+                    <span>{completedSubtasks}/{totalSubtasks}</span>
+                  </span>
+                )}
+              </div>
             )}
+          </div>
+        ) : (
+          /* ========================================================== */
+          /* 2. MEDIUM & FULL STATES (45m+): 2-Row Layout               */
+          /* ========================================================== */
+          <>
+            <div className={`flex items-start ${totalCols > 1 ? 'gap-1' : 'gap-1.5'} w-full min-w-0`}>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  toggleTaskComplete(realTaskId);
+                }}
+                className={`mt-0.5 ${totalCols > 1 ? 'w-3 h-3' : 'w-3.5 h-3.5'} rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                  isDone
+                    ? 'border border-blue-500 bg-blue-500 text-white'
+                    : `border border-zinc-500 ${styling.checkboxHover}`
+                }`}
+                title={isDone ? 'Возобновить' : 'Выполнить'}
+              >
+                <Check className="w-2 h-2 stroke-[3]" />
+              </button>
+
+              <span
+                className={`font-semibold text-xs leading-snug truncate flex-1 min-w-0 ${
+                  isDone ? 'line-through text-zinc-500' : 'text-zinc-100'
+                }`}
+              >
+                {task.title || 'Безымянная задача'}
+              </span>
+
+              {task.recurrence && (
+                <span title="Повторяющаяся задача" className="shrink-0 flex items-center mt-0.5">
+                  <Repeat className="w-3 h-3 text-amber-400" />
+                </span>
+              )}
+            </div>
+
+            {totalCols === 1 && (
+              <div className="flex items-center justify-between w-full text-[10px] font-mono opacity-80 pt-0.5">
+                <span className="truncate">{slot.timeLabel}</span>
+                {totalSubtasks > 0 && (
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <ListTodo className="w-2.5 h-2.5" />
+                    <span>{completedSubtasks}/{totalSubtasks}</span>
+                  </span>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Live floating tooltip badge during interactive resize */}
+        {isResizing && (
+          <div
+            data-testid="resize-live-tooltip"
+            className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-50 px-2.5 py-1 rounded-md bg-zinc-950/95 border border-blue-500/80 text-[11px] font-mono text-zinc-100 shadow-2xl whitespace-nowrap pointer-events-none flex items-center gap-1.5 backdrop-blur-sm"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+            <span>{slot.timeLabel}</span>
+            <span className="text-blue-400 font-semibold">({formatDurationBadge(slot.durationMinutes)})</span>
           </div>
         )}
 
-        {/* Bottom edge resize handle for interactive time-blocking duration */}
+        {/* Bottom edge resize handle (hidden by default, revealed on card hover) */}
         {!task.isVirtual && (
           <div
             data-testid={`resize-handle-${task.id}`}
             onMouseDown={e => handleResizeStart(e, task.id, slot.durationMinutes)}
-            className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize hover:bg-blue-400/20 rounded-b-lg transition-colors z-20 flex items-center justify-center group/resize"
-            title="Потяните для изменения длительности"
+            onClick={e => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className="absolute inset-x-0 bottom-0 h-2.5 cursor-ns-resize z-20 flex items-end justify-center pb-0.5 group/handle"
+            title="Потяните для изменения длительности (шаг 15 мин)"
           >
-            <div className="w-6 h-0.5 bg-white/20 rounded-full group-hover/resize:bg-white/50" />
+            <div
+              className={`w-8 h-0.5 rounded-full transition-all duration-150 ${
+                isResizing
+                  ? 'bg-blue-400 opacity-100 shadow-sm'
+                  : 'bg-white/40 opacity-0 group-hover/card:opacity-100 group-hover/handle:opacity-100'
+              }`}
+            />
           </div>
         )}
       </div>
@@ -1065,6 +1192,7 @@ export const CalendarView: React.FC = () => {
               {/* Hourly Time Grid (08:00 - 22:00) with Time-Blocked Cards & Red Ribbon */}
               <div
                 ref={timeGridRef}
+                data-testid="calendar-time-grid"
                 className="flex-1 overflow-y-auto scrollbar-thin relative bg-[#09090b] flex"
               >
                 {/* Time markers column */}
@@ -1102,11 +1230,15 @@ export const CalendarView: React.FC = () => {
                           return (
                             <div
                               key={hour}
-                              onClick={() => {
+                              onClick={e => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const offsetY = e.clientY - rect.top;
+                                const quarter = Math.min(3, Math.max(0, Math.floor((offsetY / 52) * 4)));
+                                const minute = quarter * 15;
                                 openComposerModal({
                                   type: 'task',
                                   dueDate: dateStr,
-                                  reminder: `${dateStr}T${String(hour).padStart(2, '0')}:00:00`,
+                                  reminder: `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
                                   folder: currentFolder,
                                 });
                               }}
@@ -1119,6 +1251,8 @@ export const CalendarView: React.FC = () => {
                                   : 'hover:bg-white/[0.02]'
                               }`}
                             >
+                              {/* Subtle 30-min dashed line */}
+                              <div className="absolute inset-x-0 top-[26px] border-b border-white/[0.02] pointer-events-none" />
                               {isOver ? (
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                                   <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-blue-300 bg-[#141418] px-2 py-0.5 rounded border border-blue-500/40 shadow-sm">
