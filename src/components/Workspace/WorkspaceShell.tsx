@@ -32,7 +32,7 @@ const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
 
 // Dynamic Feed Component reacting to feedViewMode
 const DynamicFeedPanel: React.FC = () => {
-  const { feedViewMode } = useApp();
+  const { feedViewMode, currentFolder } = useApp();
   return (
     <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
       <FeedHeader />
@@ -46,7 +46,7 @@ const DynamicFeedPanel: React.FC = () => {
           {/* Floating Composer Island */}
           <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 px-3 flex justify-center">
             <div className="pointer-events-auto max-w-2xl w-full">
-              <Composer />
+              <Composer key={currentFolder} />
             </div>
           </div>
         </div>
@@ -319,6 +319,15 @@ export const WorkspaceShell: React.FC = () => {
   const onReady = (event: DockviewReadyEvent) => {
     apiRef.current = event.api;
 
+    const saveLayout = () => {
+      try {
+        const json = event.api.toJSON();
+        localStorage.setItem(WORKSPACE_LAYOUT_KEY, JSON.stringify(json));
+      } catch {
+        // Ignore
+      }
+    };
+
     // Save layout on changes and clear lingering drop overlays
     event.api.onDidLayoutChange(() => {
       const dropzones = document.querySelectorAll(
@@ -331,12 +340,12 @@ export const WorkspaceShell: React.FC = () => {
         el.classList.remove('dv-drop-target');
       });
 
-      try {
-        const json = event.api.toJSON();
-        localStorage.setItem(WORKSPACE_LAYOUT_KEY, JSON.stringify(json));
-      } catch {
-        // Ignore
-      }
+      saveLayout();
+    });
+
+    // Save active tab selection across reloads
+    event.api.onDidActivePanelChange(() => {
+      saveLayout();
     });
 
     // Try restoring saved layout

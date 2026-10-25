@@ -10,6 +10,7 @@ import {
 import { AudioPlayer } from '../UI/AudioPlayer';
 import type { FolderMediaData } from './useFolderMedia';
 import type { LightboxImage } from '../../types';
+import { storage } from '../../lib/storage';
 
 export type FolderMediaTabId = 'media' | 'audio' | 'files' | 'links' | 'tags';
 
@@ -28,7 +29,15 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
   variant = 'desktop',
   className = '',
 }) => {
-  const [activeTab, setActiveTab] = useState<FolderMediaTabId>('media');
+  const [activeTab, setActiveTabState] = useState<FolderMediaTabId>(() => {
+    return storage.getWorkspaceState().folderMediaTab || 'media';
+  });
+
+  const setActiveTab = (tabId: FolderMediaTabId) => {
+    setActiveTabState(tabId);
+    storage.saveWorkspaceState({ folderMediaTab: tabId });
+  };
+
   const { allImages, allAudio, allFiles, allLinks, folderTags } = mediaData;
 
   const isMobile = variant === 'mobile';

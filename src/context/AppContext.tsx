@@ -201,18 +201,22 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
 export const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [initialWorkspace] = useState(() => storage.getWorkspaceState());
   const [vault, setVault] = useState<VaultMeta>(storage.getCurrentVault());
   const [vaults, setVaults] = useState<VaultMeta[]>(storage.getVaults());
-  const [folders, setFolders] = useState<FolderMeta[]>(storage.getFolders());
-  const [currentFolder, setCurrentFolder] = useState<string>('Входящие');
-  const [inboxMode, setInboxMode] = useState<InboxMode>('all');
-  const [feedViewMode, setFeedViewMode] = useState<FeedViewMode>('feed');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [folders, setFolders] = useState<FolderMeta[]>(() => storage.getFolders());
+  const [currentFolder, setCurrentFolder] = useState<string>(() => {
+    const valid = storage.getFolders().some(f => f.path === initialWorkspace.currentFolder);
+    return valid ? initialWorkspace.currentFolder : 'Входящие';
+  });
+  const [inboxMode, setInboxMode] = useState<InboxMode>(() => initialWorkspace.inboxMode || 'all');
+  const [feedViewMode, setFeedViewMode] = useState<FeedViewMode>(() => initialWorkspace.feedViewMode || 'feed');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [items, setItems] = useState<SlagItem[]>(() => storage.getItems());
   const [selectedItem, setSelectedItem] = useState<SlagItem | null>(null);
-  const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>('all');
-  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>(() => initialWorkspace.activeTypeFilter || 'all');
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(() => initialWorkspace.activeTagFilter ?? null);
   const [aiItemFilter, setAiItemFilter] = useState<AiItemFilter | null>(null);
 
   const applyAiFilter = useCallback((itemIds: string[], queryLabel: string) => {
@@ -322,7 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [isMobileScreen]);
 
-  const [activeMobileTab, setActiveMobileTab] = useState<MobileTabId>('folders');
+  const [activeMobileTab, setActiveMobileTab] = useState<MobileTabId>(() => initialWorkspace.activeMobileTab || 'folders');
   const [mobileActiveFolder, setMobileActiveFolderState] = useState<string | null>(null);
   const [mobileFolderInfoOpen, setMobileFolderInfoOpen] = useState<boolean>(false);
   const [mobileActionSheetItem, setMobileActionSheetItem] = useState<SlagItem | null>(null);
@@ -494,6 +498,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prevFolderRef.current = currentFolder;
     }
   }, [currentFolder]);
+
+  // Workspace state persistence (per-vault)
+  useEffect(() => {
+    storage.saveWorkspaceState({
+      currentFolder,
+      feedViewMode,
+      inboxMode,
+      activeTypeFilter,
+      activeTagFilter,
+      activeMobileTab,
+    });
+  }, [currentFolder, feedViewMode, inboxMode, activeTypeFilter, activeTagFilter, activeMobileTab]);
+
+  // Assistant history persistence in Vault
+  useEffect(() => {
+    storage.saveAssistantHistory(chatMessages);
+  }, [chatMessages]);
 
   const prevViewRef = useRef(feedViewMode);
   useEffect(() => {
@@ -1199,6 +1220,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [chatMessages, currentFolder, aiSettings, folders, items, applyAiFilter]);
 
   const clearChatMessages = useCallback(() => {
+    storage.clearAssistantHistory();
     setChatMessages([]);
   }, []);
 
@@ -1225,7 +1247,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const switchVault = (vaultId: string) => {
     storage.switchVault(vaultId);
-    setCurrentFolder('Входящие');
+    const newWs = storage.getWorkspaceState();
+    setCurrentFolder(newWs.currentFolder || 'Входящие');
+    setFeedViewMode(newWs.feedViewMode || 'feed');
+    setInboxMode(newWs.inboxMode || 'all');
+    setActiveTypeFilter(newWs.activeTypeFilter || 'all');
+    setActiveTagFilter(newWs.activeTagFilter || null);
+    setActiveMobileTab(newWs.activeMobileTab || 'folders');
+    setChatMessages(storage.getAssistantHistory());
     setSelectedItem(null);
     refreshData();
     addToast('Хранилище переключено', 'info');
