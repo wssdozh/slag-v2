@@ -213,3 +213,26 @@ export interface AppUiConfig {
   mobile: DeviceUiConfig;
 }
 
+export type FolderMediaTabId = 'media' | 'audio' | 'files' | 'links' | 'tags';
+
+export interface ComposerDraft {
+  content: string;
+  itemType: SlagItemType;
+  priority: 'none' | 'low' | 'medium' | 'high';
+  dueDate: string;
+  tags: string[];
+  attachments: SlagAttachment[];
+  replyTarget: { id: string; title: string } | null;
+  updatedAt: number;
+}
+
+export interface WorkspaceState {
+  currentFolder: string;
+  feedViewMode: FeedViewMode;
+  inboxMode: InboxMode;
+  activeTypeFilter: SlagItemType | 'all';
+  activeTagFilter: string | null;
+  activeMobileTab: MobileTabId;
+  folderMediaTab?: FolderMediaTabId;
+}
+
