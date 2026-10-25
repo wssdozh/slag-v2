@@ -20,6 +20,7 @@ import type {
 import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
+import { listenDesktopEvents } from '../lib/windowControls';
 import { useIsMobile } from '../hooks/useIsMobile';
 import {
   evaluateRecurringTasks,
@@ -550,7 +551,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshData();
       }
     });
-  }, [refreshData]);
+
+    const cleanupDesktop = listenDesktopEvents({
+      onOpenComposer: () => {
+        openComposerModal();
+      },
+    });
+
+    return () => {
+      cleanupDesktop();
+    };
+  }, [refreshData, openComposerModal]);
 
   // Network online/offline diagnostics
   useEffect(() => {

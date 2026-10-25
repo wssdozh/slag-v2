@@ -17,6 +17,7 @@ import { CalendarView } from '../Views/CalendarView';
 import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
 import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
+import { WindowControls } from '../UI/WindowControls';
 import {
   Plus,
   Layers,
@@ -407,6 +408,7 @@ export const WorkspaceShell: React.FC = () => {
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
+      <WindowControls />
       <DockviewReact
         components={components}
         rightHeaderActionsComponent={GroupHeaderActions}

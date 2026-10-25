@@ -103,7 +103,7 @@
   box-shadow: 0 0 6px rgba(59, 130, 246, 0.4) !important;
 }
 
-/* Ensure empty space (void-container) accepts tab drops and fills entire remaining header width */
+/* Ensure empty space (void-container) accepts tab drops, fills entire remaining header width, and acts as tauri drag region */
 .dockview-theme-slag .dv-tabs-and-actions-container .dv-void-container,
 .dockview-theme-slag .dockview-tabs-and-actions-container .dv-void-container {
   order: 3 !important;
@@ -112,6 +112,7 @@
   height: 100% !important;
   align-self: stretch !important;
   pointer-events: auto !important;
+  -webkit-app-region: drag;
 }
 
 /* Ensure tab container doesn't block drop events */
@@ -128,6 +129,10 @@
 }
 
 /* Tabs Row: gaps and clean alignment */
+.dockview-theme-slag .dv-right-actions-container {
+  -webkit-app-region: no-drag;
+}
+
 .dockview-theme-slag .dv-tabs-container,
 .dockview-theme-slag .dockview-tabs-container {
   display: flex !important;
@@ -135,6 +140,7 @@
   gap: 3px !important;
   padding: 0 2px !important;
   height: 100% !important;
+  -webkit-app-region: no-drag;
 }
 
 /* Borderless Rounded Tabs */
