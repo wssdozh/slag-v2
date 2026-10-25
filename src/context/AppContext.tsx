@@ -545,7 +545,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       itemsCount: currentItems.length,
       foldersCount: currentFolders.length,
     });
-  }, []);
+    void storage.initTauriFs().then((loadedNew) => {
+      if (loadedNew) {
+        refreshData();
+      }
+    });
+  }, [refreshData]);
 
   // Network online/offline diagnostics
   useEffect(() => {

@@ -7,8 +7,18 @@ import type {
   WorkspaceState,
   ChatMessage,
 } from '../types';
-import { serializeItemToMarkdown } from './markdownSerializer';
+import { serializeItemToMarkdown, parseMarkdownToItem } from './markdownSerializer';
 import { logger } from './logger';
+import { isTauri } from '@tauri-apps/api/core';
+import {
+  writeTextFile,
+  readTextFile,
+  readDir,
+  mkdir,
+  remove,
+  exists,
+  BaseDirectory,
+} from '@tauri-apps/plugin-fs';
 
 import { idbSaveAttachment } from './indexedDbStorage';
 
@@ -215,10 +225,155 @@ export const DEFAULT_ITEMS: SlagItem[] = [
 
 export class StorageService {
   private currentVault: VaultMeta;
+  private tauriInitialized = false;
 
   constructor() {
     this.currentVault = this.initCurrentVault();
     this.initDefaultsIfNeeded();
+    if (isTauri()) {
+      void this.initTauriFs();
+    }
+  }
+
+  // ponytail: in-memory sync cache with async fs flush. ceiling: 5,000 notes. upgrade: worker-thread batch indexing if disk io throttles
+  public async initTauriFs(): Promise<boolean> {
+    if (!isTauri() || this.tauriInitialized) return false;
+    this.tauriInitialized = true;
+
+    try {
+      await mkdir('notes/Входящие', { baseDir: BaseDirectory.AppData, recursive: true });
+      await mkdir('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+
+      const loadedItems = await this.scanNotesDir('notes');
+      if (loadedItems.length > 0) {
+        const currentItems = this.getItems();
+        const map = new Map(currentItems.map(i => [i.id, i]));
+        for (const item of loadedItems) {
+          map.set(item.id, item);
+        }
+        const merged = Array.from(map.values());
+        localStorage.setItem(this.getItemsKey(), JSON.stringify(merged));
+        fsLog.info(`Loaded ${loadedItems.length} notes from Tauri native AppData`);
+        return true;
+      } else {
+        const current = this.getItems();
+        for (const item of current) {
+          await this.flushItemToDisk(item);
+        }
+      }
+
+      const hasState = await exists('state.json', { baseDir: BaseDirectory.AppData });
+      if (hasState) {
+        const stateStr = await readTextFile('state.json', { baseDir: BaseDirectory.AppData });
+        try {
+          const parsed = JSON.parse(stateStr);
+          if (Array.isArray(parsed.folders)) {
+            localStorage.setItem(this.getFoldersKey(), JSON.stringify(parsed.folders));
+          }
+        } catch {
+          // ignore
+        }
+      } else {
+        await this.flushStateToDisk();
+      }
+    } catch (err) {
+      fsLog.error('Failed to initialize Tauri native storage in AppData:', err);
+    }
+    return false;
+  }
+
+  private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {
+    const items: SlagItem[] = [];
+    try {
+      const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
+      for (const entry of entries) {
+        const subPath = `${dirPath}/${entry.name}`;
+        if (entry.isDirectory) {
+          const nested = await this.scanNotesDir(subPath);
+          items.push(...nested);
+        } else if (entry.name.endsWith('.md')) {
+          try {
+            const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
+            const normalized = dirPath.replace(/\\/g, '/');
+            const folderPart = normalized.startsWith('notes/')
+              ? normalized.slice('notes/'.length)
+              : (normalized === 'notes' ? 'Входящие' : normalized);
+            const fallbackId = entry.name.replace(/\.md$/, '');
+            const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
+            items.push(parsed);
+          } catch (e) {
+            fsLog.warn(`Failed to read note file ${subPath}:`, e);
+          }
+        }
+      }
+    } catch (err) {
+      fsLog.warn(`Failed reading dir ${dirPath}:`, err);
+    }
+    return items;
+  }
+
+  private async flushItemToDisk(item: SlagItem, oldFolder?: string): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      const folder = item.folder || 'Входящие';
+      const targetDir = `notes/${folder}`;
+      await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
+
+      if (oldFolder && oldFolder !== folder) {
+        const oldPath = `notes/${oldFolder}/${item.id}.md`;
+        if (await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
+          await remove(oldPath, { baseDir: BaseDirectory.AppData });
+        }
+      }
+
+      const content = serializeItemToMarkdown(item);
+      await writeTextFile(`${targetDir}/${item.id}.md`, content, { baseDir: BaseDirectory.AppData });
+    } catch (err) {
+      fsLog.error(`Failed to flush note ${item.id} to disk:`, err);
+    }
+  }
+
+  private async removeItemFromDisk(id: string, folder?: string): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      const targetFolder = folder || 'Входящие';
+      const path = `notes/${targetFolder}/${id}.md`;
+      if (await exists(path, { baseDir: BaseDirectory.AppData })) {
+        await mkdir('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+        const content = await readTextFile(path, { baseDir: BaseDirectory.AppData });
+        await writeTextFile(`.trash/${id}.md`, content, { baseDir: BaseDirectory.AppData });
+        await remove(path, { baseDir: BaseDirectory.AppData });
+      }
+    } catch (err) {
+      fsLog.error(`Failed to remove note ${id} from disk:`, err);
+    }
+  }
+
+  private async restoreItemOnDisk(item: SlagItem): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      const trashPath = `.trash/${item.id}.md`;
+      if (await exists(trashPath, { baseDir: BaseDirectory.AppData })) {
+        await remove(trashPath, { baseDir: BaseDirectory.AppData });
+      }
+      await this.flushItemToDisk(item);
+    } catch (err) {
+      fsLog.error(`Failed to restore note ${item.id} on disk:`, err);
+    }
+  }
+
+  private async flushStateToDisk(): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      const state = {
+        folders: this.getFolders(),
+        workspace: this.getWorkspaceState(),
+        updatedAt: Date.now(),
+      };
+      await writeTextFile('state.json', JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+    } catch (err) {
+      fsLog.warn('Failed to flush state.json to disk:', err);
+    }
   }
 
   private initCurrentVault(): VaultMeta {
@@ -345,6 +500,9 @@ export class StorageService {
     folders.push(folder);
     localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
     fsLog.info(`Saved folder "${folder.name}" (${folder.path})`);
+    if (isTauri()) {
+      void this.flushStateToDisk();
+    }
   }
 
   public updateFolderDescription(path: string, description: string): void {
@@ -356,6 +514,9 @@ export class StorageService {
     });
     localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
     fsLog.debug(`Updated description for folder "${path}"`);
+    if (isTauri()) {
+      void this.flushStateToDisk();
+    }
   }
 
   public deleteFolder(path: string): void {
@@ -390,6 +551,15 @@ export class StorageService {
       }
     }
 
+    if (isTauri()) {
+      void this.flushStateToDisk();
+      for (const it of updatedItems) {
+        if (it.folder === 'Входящие') {
+          void this.flushItemToDisk(it);
+        }
+      }
+    }
+
     fsLog.info(`Deleted folder "${path}", items re-routed to Inbox`);
   }
 
@@ -417,6 +587,7 @@ export class StorageService {
   public saveItem(item: SlagItem): SlagItem {
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
+    const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
     const updatedItem = {
       ...item,
       updatedAt: Date.now(),
@@ -439,6 +610,11 @@ export class StorageService {
       });
       throw err;
     }
+
+    if (isTauri()) {
+      void this.flushItemToDisk(updatedItem, oldItem?.folder);
+    }
+
     return updatedItem;
   }
 
@@ -457,6 +633,12 @@ export class StorageService {
     } catch (err) {
       fsLog.error('Failed to bulk save items to localStorage', { error: err });
       throw err;
+    }
+
+    if (isTauri()) {
+      for (const it of itemsToSave) {
+        void this.flushItemToDisk(it);
+      }
     }
   }
 
@@ -488,6 +670,10 @@ export class StorageService {
     trash.unshift({ ...item, updatedAt: Date.now() });
     localStorage.setItem(this.getTrashKey(), JSON.stringify(trash));
     fsLog.info(`Moved "${item.title || item.id}" to .trash`);
+
+    if (isTauri()) {
+      void this.removeItemFromDisk(id, item.folder);
+    }
   }
 
   public restoreFromTrash(id: string): SlagItem | null {
@@ -502,12 +688,29 @@ export class StorageService {
     // Restore to active items
     this.saveItem(item);
     fsLog.info(`Restored "${item.title || item.id}" from .trash to "${item.folder}"`);
+
+    if (isTauri()) {
+      void this.restoreItemOnDisk(item);
+    }
     return item;
   }
 
   public emptyTrash(): void {
     localStorage.removeItem(this.getTrashKey());
     fsLog.info('Emptied .trash folder');
+
+    if (isTauri()) {
+      void (async () => {
+        try {
+          if (await exists('.trash', { baseDir: BaseDirectory.AppData })) {
+            await remove('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+            await mkdir('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+          }
+        } catch (e) {
+          fsLog.warn('Failed to empty .trash on disk:', e);
+        }
+      })();
+    }
   }
 
   public deleteItem(id: string): void {
