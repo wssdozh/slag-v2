@@ -152,19 +152,22 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     await page.screenshot({ path: 'test-results/screenshots/card-hover-outside.png' });
   });
 
-  test('Monochrome Linear audio recording inline in composer', async ({ page }) => {
+  test('Voice Studio Liquid Orb audio recording inline in composer', async ({ page }) => {
     // 1. Click mic button in composer toolbar
     const micBtn = page.locator('button[title*="Записать голосовое"]').or(page.locator('button:has(svg.lucide-mic)')).first();
     await expect(micBtn).toBeVisible();
     await micBtn.click();
     await page.waitForTimeout(500);
 
-    // 2. Verify recording UI appeared inside composer (not floating pill)
+    // 2. Verify Liquid Orb canvas and recording UI appeared inside composer
+    const orbCanvas = page.locator('canvas[data-testid="voice-orb-canvas"]');
+    await expect(orbCanvas).toBeVisible();
+
     const timer = page.locator('text=/^0:0[0-9]/');
     await expect(timer).toBeVisible();
 
-    // Take screenshot of active recording
-    await page.screenshot({ path: 'test-results/screenshots/audio-recording-linear.png' });
+    // Take screenshot of active recording with Liquid Orb
+    await page.screenshot({ path: 'test-results/screenshots/voice-studio-orb.png' });
 
     // 3. Cancel with Esc
     await page.keyboard.press('Escape');

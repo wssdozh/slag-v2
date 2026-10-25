@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Trash2 } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger';
+import { VoiceOrb } from './VoiceOrb';
 
 const mediaLog = logger.scope('MEDIA');
 
@@ -13,7 +14,7 @@ interface AudioRecorderProps {
 
 export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCancel, finishTriggerRef }) => {
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [liveAmplitudes, setLiveAmplitudes] = useState<number[]>(() => new Array(24).fill(0.1));
+  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -128,6 +129,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
           const analyser = audioCtx.createAnalyser();
           analyser.fftSize = 64;
           analyserRef.current = analyser;
+          setAnalyserNode(analyser);
           const source = audioCtx.createMediaStreamSource(stream);
           source.connect(analyser);
           sourceRef.current = source;
@@ -138,21 +140,12 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
             if (!active) return;
             analyser.getByteFrequencyData(dataArray);
 
-            // Compute normalized amplitudes for 24 visual bars
-            const barsCount = 24;
-            const newBars: number[] = [];
             let sum = 0;
-
-            for (let i = 0; i < barsCount; i++) {
-              const binIdx = Math.floor((i / barsCount) * dataArray.length);
-              const val = (dataArray[binIdx] || 0) / 255;
-              sum += val;
-              newBars.push(Math.max(0.12, Math.min(1, val * 1.5)));
+            for (let i = 0; i < dataArray.length; i++) {
+              sum += dataArray[i] / 255;
             }
-
-            const currentAverage = sum / barsCount;
+            const currentAverage = sum / dataArray.length;
             collectedPeaksRef.current.push(currentAverage);
-            setLiveAmplitudes(newBars);
 
             animFrameRef.current = requestAnimationFrame(updateLiveWave);
           };
@@ -230,52 +223,42 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
   };
 
   return (
-    <div className="flex items-center justify-between w-full h-8 px-1 select-none animate-in fade-in duration-150">
-      {/* Left: Red Pulse + Timer mm:ss.t */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50" />
-        <span className="font-mono text-xs font-medium tracking-wide text-zinc-300">
-          {formatTimer(elapsedMs)}
-        </span>
+    <div className="flex flex-col items-center justify-between w-full pt-1 pb-1 px-1 select-none animate-in fade-in duration-200">
+      {/* Centerpiece: Glowing Azure Liquid Orb */}
+      <div className="relative my-0.5 flex flex-col items-center justify-center">
+        <VoiceOrb analyser={analyserNode} size={84} />
       </div>
 
-      {/* Center: Live Waveform (Linear monochrome style) */}
-      <div className="flex-1 flex items-center justify-center px-4 max-w-sm mx-auto">
-        <div className="flex items-center gap-[2.5px] h-6">
-          {liveAmplitudes.map((amp, i) => {
-            const height = Math.round(3 + amp * 18);
-            const isSpike = amp > 0.22;
-            return (
-              <div
-                key={i}
-                style={{ height: `${height}px` }}
-                className={`w-[2.5px] rounded-full transition-all duration-75 ${
-                  isSpike ? 'bg-zinc-200' : 'bg-zinc-600/70'
-                }`}
-              />
-            );
-          })}
-        </div>
+      {/* Timer with subtle indicator */}
+      <div className="flex items-center gap-1.5 mt-0.5 font-mono text-xs font-medium tracking-wider text-zinc-300">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50" />
+        <span>{formatTimer(elapsedMs)}</span>
       </div>
 
-      {/* Right Controls: Trash2 icon button + Linear white send button */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Bottom Row: Actions corner aligned */}
+      <div className="w-full flex items-center justify-between mt-2 pt-1.5 border-t border-white/[0.05]">
         <button
           type="button"
           onClick={handleDiscard}
-          className="w-7 h-7 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center justify-center"
+          className="h-ctrl-sm px-2 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 text-xs"
           title="Отменить запись (Esc)"
         >
           <Trash2 className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline text-2xs font-mono">Отмена</span>
         </button>
+
+        <span className="text-[10px] text-zinc-600 font-mono hidden sm:inline select-none">
+          Esc отмена • Enter отправить
+        </span>
 
         <button
           type="button"
           onClick={() => handleFinish(true)}
-          className="w-7 h-7 rounded-lg bg-white text-black hover:bg-zinc-200 active:scale-95 flex items-center justify-center transition-all shadow-sm cursor-pointer"
+          className="h-ctrl-sm px-3 rounded-md bg-white text-black hover:bg-zinc-200 active:scale-95 flex items-center gap-1.5 transition-all shadow-sm cursor-pointer text-xs font-medium"
           title="Отправить голосовую заметку (Enter)"
         >
-          <Send className="w-3.5 h-3.5 ml-0.5 fill-current" />
+          <span>Отправить</span>
+          <Send className="w-3 h-3 fill-current" />
         </button>
       </div>
     </div>
