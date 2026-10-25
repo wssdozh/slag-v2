@@ -211,8 +211,11 @@ export const CalendarView: React.FC = () => {
   });
 
   const timeGridRef = useRef<HTMLDivElement | null>(null);
+  const monthGridRef = useRef<HTMLDivElement | null>(null);
   const weekHorizontalScrollRef = useRef<HTMLDivElement | null>(null);
   const monthHorizontalScrollRef = useRef<HTMLDivElement | null>(null);
+  const [gridScrollbarWidth, setGridScrollbarWidth] = useState(0);
+  const [monthGridScrollbarWidth, setMonthGridScrollbarWidth] = useState(0);
 
   // Mouse drag-to-scroll for Week View (horizontal week days + vertical time grid)
   useDragToScroll<HTMLDivElement>(
@@ -250,6 +253,33 @@ export const CalendarView: React.FC = () => {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Measure vertical scrollbar widths so header columns align with grid columns with 0px displacement
+  useEffect(() => {
+    const el = timeGridRef.current;
+    if (!el) return;
+    const update = () => {
+      const sw = el.offsetWidth - el.clientWidth;
+      setGridScrollbarWidth(sw > 0 ? sw : 0);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode, items]);
+
+  useEffect(() => {
+    const el = monthGridRef.current;
+    if (!el) return;
+    const update = () => {
+      const sw = el.offsetWidth - el.clientWidth;
+      setMonthGridScrollbarWidth(sw > 0 ? sw : 0);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode, items]);
 
   // Current Week Days (Monday to Sunday)
   const weekDays = useMemo(() => {
@@ -846,8 +876,11 @@ export const CalendarView: React.FC = () => {
                       </div>
                     );
                   })}
+                  </div>
+                  {gridScrollbarWidth > 0 && (
+                    <div style={{ width: gridScrollbarWidth }} className="shrink-0 bg-[#0c0c0e]" />
+                  )}
                 </div>
-              </div>
 
               {/* All-Day (Весь день) Section */}
               <div className="flex border-b border-white/[0.06] bg-[#09090b] shrink-0 max-h-36 overflow-y-auto scrollbar-thin">
@@ -896,6 +929,9 @@ export const CalendarView: React.FC = () => {
                     );
                   })}
                 </div>
+                {gridScrollbarWidth > 0 && (
+                  <div style={{ width: gridScrollbarWidth }} className="shrink-0 bg-[#09090b]" />
+                )}
               </div>
 
               {/* Hourly Time Grid (08:00 - 22:00) with Time-Blocked Cards & Red Ribbon */}
@@ -1016,19 +1052,27 @@ export const CalendarView: React.FC = () => {
             >
               <div className="flex-1 flex flex-col min-w-[700px] h-full">
                 {/* Day Header Row */}
-                <div className="grid grid-cols-7 border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0 cursor-grab">
-                {RUSSIAN_WEEKDAYS.map(day => (
-                  <div
-                    key={day}
-                    className="py-1.5 text-center text-[10px] font-mono text-zinc-500 tracking-wider border-r border-white/[0.04] last:border-r-0"
-                  >
-                    {day}
+                <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0 cursor-grab">
+                  <div className="flex-1 grid grid-cols-7">
+                    {RUSSIAN_WEEKDAYS.map(day => (
+                      <div
+                        key={day}
+                        className="py-1.5 text-center text-[10px] font-mono text-zinc-500 tracking-wider border-r border-white/[0.04] last:border-r-0"
+                      >
+                        {day}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                  {monthGridScrollbarWidth > 0 && (
+                    <div style={{ width: monthGridScrollbarWidth }} className="shrink-0 bg-[#0c0c0e]" />
+                  )}
+                </div>
 
-              {/* Month Calendar Cells Grid */}
-              <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-y-auto scrollbar-thin">
+                {/* Month Calendar Cells Grid */}
+                <div
+                  ref={monthGridRef}
+                  className="flex-1 grid grid-cols-7 auto-rows-fr overflow-y-auto scrollbar-thin"
+                >
                 {monthCells.map(cell => {
                   const dayTasks = tasksByDueDate.get(cell.dateStr) || [];
                   const isToday = cell.dateStr === todayStr;
