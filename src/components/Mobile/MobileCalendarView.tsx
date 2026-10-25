@@ -58,7 +58,7 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
   return (
     <div
       onClick={onSelect}
-      className="w-full flex items-center justify-between px-2.5 sm:px-3 py-2 hover:bg-white/[0.04] active:bg-white/[0.06] rounded-lg transition-colors cursor-pointer gap-2"
+      className="w-full flex items-center justify-between p-2.5 sm:p-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors cursor-pointer gap-2"
     >
       {/* Checkbox column (fixed 24px width for exact vertical alignment) */}
       <div className="w-6 flex items-center justify-center shrink-0">
@@ -92,7 +92,7 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
       {/* Title & Time */}
       <div className="flex-1 min-w-0 flex items-center gap-2">
         {!slot.isAllDay && slot.hasTime && (
-          <span className="text-[11px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.06] shrink-0">
+          <span className="text-[11px] font-mono text-zinc-400 shrink-0 select-none">
             {String(slot.startHour).padStart(2, '0')}:{String(slot.startMinute).padStart(2, '0')}
           </span>
         )}
@@ -552,17 +552,17 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           </div>
 
           {/* Agenda Feed */}
-          <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2 pb-28">
+          <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4 pb-28">
             {/* Overdue Section */}
             {overdueTasks.length > 0 && (
-              <div className="flex flex-col gap-1 border-b border-rose-500/20 pb-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 px-2.5">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 px-1">
                   <AlertCircle className="w-3.5 h-3.5" />
                   <span>Просрочено</span>
                   <span className="text-[10px] font-mono opacity-80">({overdueTasks.length})</span>
                 </div>
 
-                <div className="flex flex-col">
+                <div className="rounded-2xl bg-[#141417]/80 border border-rose-500/20 overflow-hidden divide-y divide-white/[0.04]">
                   {overdueTasks.map(task => (
                     <MobileCalendarTaskRow
                       key={task.id}
@@ -613,9 +613,9 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                 <div
                   key={day.dateStr}
                   ref={el => { dateSectionRefs.current[day.dateStr] = el; }}
-                  className="flex flex-col gap-0.5 scroll-mt-2 pt-1.5 pb-2.5 border-b border-white/[0.04] last:border-b-0"
+                  className="flex flex-col gap-1.5 scroll-mt-2"
                 >
-                  <div className="flex items-center justify-between px-2.5 py-1">
+                  <div className="flex items-center justify-between px-1">
                     <span className={`text-xs font-semibold tracking-tight ${isToday ? 'text-white' : 'text-zinc-400'}`}>
                       {dayTitle}
                     </span>
@@ -626,9 +626,9 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                     )}
                   </div>
 
-                  <div className="flex flex-col">
+                  <div className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] overflow-hidden">
                     {sortedDayTasks.length > 0 ? (
-                      <div className="flex flex-col">
+                      <div className="divide-y divide-white/[0.04]">
                         {(() => {
                           const elements: React.ReactNode[] = [];
                           let nowLineInserted = false;
@@ -636,7 +636,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                           const renderNowLine = () => (
                             <div
                               key="now-timeline-indicator"
-                              className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 select-none"
+                              className="w-full flex items-center gap-2 p-2.5 sm:p-3 select-none"
                             >
                               <div className="w-6 flex items-center justify-center shrink-0">
                                 <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs shadow-rose-500/80" />
@@ -682,7 +682,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                     ) : (
                       <div className="flex flex-col">
                         {isToday && (
-                          <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 select-none">
+                          <div className="w-full flex items-center gap-2 p-2.5 sm:p-3 select-none border-b border-white/[0.04]">
                             <div className="w-6 flex items-center justify-center shrink-0">
                               <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs shadow-rose-500/80" />
                             </div>
@@ -692,7 +692,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                             <div className="h-px flex-1 bg-rose-500/40" />
                           </div>
                         )}
-                        <div className="py-2 px-2.5 text-xs text-zinc-500 flex items-center justify-between">
+                        <div className="p-3 text-xs text-zinc-500 flex items-center justify-between">
                           <span>— нет задач</span>
                           <button
                             type="button"
@@ -709,7 +709,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                     {addingDate === day.dateStr ? (
                       <form
                         onSubmit={e => handleCreateTaskOnDate(day.dateStr, e)}
-                        className="p-2 bg-white/[0.03] border border-white/[0.06] flex items-center gap-2 animate-in fade-in rounded-xl mt-1"
+                        className="p-2.5 bg-black/40 border-t border-white/[0.06] flex items-center gap-2 animate-in fade-in"
                       >
                         <input
                           type="text"
@@ -717,11 +717,11 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                           onChange={e => setInlineTitle(e.target.value)}
                           placeholder={`Новая задача на ${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3)}...`}
                           autoFocus
-                          className="flex-1 bg-black/50 border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 outline-none"
+                          className="flex-1 bg-black/50 border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none"
                         />
                         <button
                           type="submit"
-                          className="px-2.5 py-1.5 rounded-lg bg-white text-black text-xs font-semibold cursor-pointer active:scale-95 transition-all shrink-0"
+                          className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-semibold cursor-pointer active:scale-95 transition-all shrink-0"
                         >
                           OK
                         </button>
@@ -737,7 +737,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                       <button
                         type="button"
                         onClick={() => setAddingDate(day.dateStr)}
-                        className="w-full py-1.5 px-2.5 flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] rounded-lg transition-colors cursor-pointer"
+                        className="w-full py-2 px-3 flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] border-t border-white/[0.04] transition-colors cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Добавить задачу</span>
