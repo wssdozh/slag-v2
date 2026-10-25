@@ -42,21 +42,13 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
 
   const isMobile = variant === 'mobile';
 
-  const tabDefs = isMobile
-    ? [
-        { id: 'media' as const, label: 'Фото', icon: ImageIcon, count: allImages.length },
-        { id: 'audio' as const, label: 'Аудио', icon: Mic, count: allAudio.length },
-        { id: 'files' as const, label: 'Файлы', icon: File, count: allFiles.length },
-        { id: 'links' as const, label: 'Ссылки', icon: LinkIcon, count: allLinks.length },
-        { id: 'tags' as const, label: 'Теги', icon: TagIcon, count: folderTags.size },
-      ]
-    : [
-        { id: 'media' as const, label: 'Медиа', icon: ImageIcon, count: allImages.length },
-        { id: 'audio' as const, label: 'Аудио', icon: Mic, count: allAudio.length },
-        { id: 'files' as const, label: 'Файлы', icon: File, count: allFiles.length },
-        { id: 'links' as const, label: 'Ссылки', icon: LinkIcon, count: allLinks.length },
-        { id: 'tags' as const, label: 'Теги', icon: TagIcon, count: folderTags.size },
-      ];
+  const tabDefs = [
+    { id: 'media' as const, label: isMobile ? 'Фото' : 'Медиа', icon: ImageIcon, count: allImages.length },
+    { id: 'audio' as const, label: 'Аудио', icon: Mic, count: allAudio.length },
+    { id: 'files' as const, label: 'Файлы', icon: File, count: allFiles.length },
+    { id: 'links' as const, label: 'Ссылки', icon: LinkIcon, count: allLinks.length },
+    { id: 'tags' as const, label: 'Теги', icon: TagIcon, count: folderTags.size },
+  ];
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>

@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { MobileCalendarView } from './MobileCalendarView';
 import { MobileScreenHeader } from './MobileScreenHeader';
+import { useSwipeGesture } from '../../hooks/useSwipeGesture';
+import { EmptyState } from '../UI/EmptyState';
 
 interface ColumnDef {
   id: TaskStatus;
@@ -44,9 +46,20 @@ export const MobileTasksView: React.FC = () => {
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  // Swipe gesture coordinates
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } = useSwipeGesture({
+    onSwipeLeft: () => {
+      const idx = COLUMN_ORDER.indexOf(activeStatusTab);
+      if (idx < COLUMN_ORDER.length - 1) {
+        setActiveStatusTab(COLUMN_ORDER[idx + 1]);
+      }
+    },
+    onSwipeRight: () => {
+      const idx = COLUMN_ORDER.indexOf(activeStatusTab);
+      if (idx > 0) {
+        setActiveStatusTab(COLUMN_ORDER[idx - 1]);
+      }
+    },
+  });
 
   // Filter only task items
   const allTasks = useMemo(() => {
@@ -93,29 +106,6 @@ export const MobileTasksView: React.FC = () => {
 
     setQuickTaskTitle('');
     setIsAdding(false);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
-    setTouchStartY(e.touches[0].clientY);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null || touchStartY === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartX;
-    const deltaY = e.changedTouches[0].clientY - touchStartY;
-    setTouchStartX(null);
-    setTouchStartY(null);
-
-    // Threshold 40px, more horizontal than vertical
-    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
-      const idx = COLUMN_ORDER.indexOf(activeStatusTab);
-      if (deltaX < 0 && idx < COLUMN_ORDER.length - 1) {
-        setActiveStatusTab(COLUMN_ORDER[idx + 1]);
-      } else if (deltaX > 0 && idx > 0) {
-        setActiveStatusTab(COLUMN_ORDER[idx - 1]);
-      }
-    }
   };
 
   const switcher = (
@@ -203,15 +193,11 @@ export const MobileTasksView: React.FC = () => {
         className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5 pb-24"
       >
         {currentColumnTasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center p-6 text-zinc-500">
-            <div className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center mb-3 text-zinc-600">
-              <Inbox className="w-5 h-5" />
-            </div>
-            <p className="text-sm font-medium text-zinc-400">В этом статусе нет задач</p>
-            <p className="text-xs text-zinc-600 mt-1 mb-4">
-              Свайпните для переключения статуса или добавьте задачу ниже.
-            </p>
-          </div>
+          <EmptyState
+            icon={<Inbox className="w-5 h-5" />}
+            title="В этом статусе нет задач"
+            description="Свайпните для переключения статуса или добавьте задачу ниже."
+          />
         ) : (
           currentColumnTasks.map(task => {
             const isDone = task.status === 'done';

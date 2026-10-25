@@ -5,7 +5,7 @@ import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { LinearSignalBars } from '../UI/PriorityBadge';
-import { formatRecurrenceLabel } from '../../lib/recurrenceHelper';
+import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
 import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/taskUtils';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
@@ -36,28 +36,8 @@ import {
   Repeat,
 } from 'lucide-react';
 import { Select } from '../UI/Select';
-
-const getTodayIso = (): string => new Date().toISOString().split('T')[0];
-const getTomorrowIso = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
-};
-
-const formatDueDateLabel = (dateIso: string): string => {
-  const today = getTodayIso();
-  const tomorrow = getTomorrowIso();
-  if (dateIso === today) return 'Сегодня';
-  if (dateIso === tomorrow) return 'Завтра';
-
-  try {
-    const [y, m, d] = dateIso.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-  } catch {
-    return dateIso;
-  }
-};
+import { TagChip } from '../UI/TagChip';
+import { formatDueDateLabel } from '../../lib/dateUtils';
 
 let activeEditorView: EditorView | null = null;
 
@@ -874,12 +854,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
                   {isRecurrenceDropdownOpen && (
                     <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                      {[
-                        { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                        { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                        { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                        { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                      ].map(opt => (
+                      {RECURRENCE_PRESETS.map(opt => (
                         <button
                           key={opt.label}
                           type="button"
@@ -955,18 +930,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           <div className="flex flex-wrap items-center gap-1.5 pt-4 border-t border-white/[0.06]">
             <Tag className="w-3.5 h-3.5 text-zinc-500" />
             {tags.map(t => (
-              <span
+              <TagChip
                 key={t}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.06] text-xs font-mono text-zinc-300"
-              >
-                #{t}
-                <button
-                  onClick={() => setTags(tags.filter(tag => tag !== t))}
-                  className="hover:text-rose-400 transition-colors cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
+                tag={t}
+                variant="pill"
+                onRemove={() => setTags(tags.filter(tag => tag !== t))}
+              />
             ))}
             <input
               type="text"

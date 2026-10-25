@@ -31,8 +31,18 @@ export default defineConfig({
           if (id.includes('node_modules/@orama/orama')) {
             return 'orama';
           }
-          if (id.includes('node_modules/@tiptap')) {
-            return 'tiptap';
+          if (
+            id.includes('node_modules/@codemirror') ||
+            id.includes('node_modules/@lezer') ||
+            id.includes('node_modules/@atomic-editor')
+          ) {
+            return 'codemirror';
+          }
+          if (id.includes('node_modules/dockview') || id.includes('node_modules/dockview-core')) {
+            return 'dockview';
+          }
+          if (id.includes('node_modules/chrono-node')) {
+            return 'chrono';
           }
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor';

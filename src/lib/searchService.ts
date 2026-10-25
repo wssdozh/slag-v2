@@ -4,6 +4,7 @@ import { logger } from './logger';
 
 const searchLog = logger.scope('SEARCH');
 let dbInstance: Orama<any> | null = null;
+let lastIndexSignature = '';
 
 // Stop words for Russian and English to clean noisy conversational queries
 const STOP_WORDS = new Set([
@@ -113,6 +114,11 @@ export function getSearchableAttachmentText(attachments?: SlagItem['attachments'
 }
 
 export async function initSearchIndex(items: SlagItem[]) {
+  const signature = items.map(i => `${i.id}:${i.updatedAt}`).join('|');
+  if (dbInstance && signature === lastIndexSignature) {
+    return dbInstance;
+  }
+
   const endTimer = searchLog.time(`Indexing ${items.length} items in Orama`);
   try {
     const db = await create({
@@ -140,6 +146,7 @@ export async function initSearchIndex(items: SlagItem[]) {
     }
 
     dbInstance = db;
+    lastIndexSignature = signature;
     endTimer(`Orama index initialized successfully with ${items.length} items`);
     return db;
   } catch (err) {

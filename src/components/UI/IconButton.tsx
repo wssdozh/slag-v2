@@ -1,0 +1,49 @@
+import React from 'react';
+
+export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'ghost' | 'danger' | 'secondary';
+  icon?: React.ReactNode;
+}
+
+export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
+  (
+    {
+      children,
+      icon,
+      size = 'md',
+      variant = 'ghost',
+      className = '',
+      type = 'button',
+      disabled,
+      ...props
+    },
+    ref
+  ) => {
+    const sizeClasses = {
+      sm: 'w-6 h-6 rounded-md',
+      md: 'w-7 h-7 rounded-lg',
+      lg: 'w-8 h-8 rounded-lg',
+    }[size];
+
+    const variantClasses = {
+      ghost: 'text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95',
+      danger: 'text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] active:scale-95',
+      secondary: 'text-zinc-300 bg-white/[0.06] hover:bg-white/10 active:scale-95',
+    }[variant];
+
+    return (
+      <button
+        ref={ref}
+        type={type}
+        disabled={disabled}
+        className={`flex items-center justify-center shrink-0 select-none cursor-pointer transition-all outline-none focus:ring-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none ${sizeClasses} ${variantClasses} ${className}`}
+        {...props}
+      >
+        {icon || children}
+      </button>
+    );
+  }
+);
+
+IconButton.displayName = 'IconButton';

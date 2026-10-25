@@ -11,12 +11,14 @@ import { Select } from '../UI/Select';
 import { categorizeDraft } from '../../lib/aiService';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
-import { formatRecurrenceLabel } from '../../lib/recurrenceHelper';
+import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
 import { LinearSignalBars } from '../UI/PriorityBadge';
+import { TagChip } from '../UI/TagChip';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
+import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
 import {
   Trash2,
   Paperclip,
@@ -38,31 +40,6 @@ import {
   Repeat,
   Hash
 } from 'lucide-react';
-
-const getTodayIso = (): string => new Date().toISOString().split('T')[0];
-const getTomorrowIso = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
-};
-
-const formatDueDateLabel = (dateIso: string, rawMatchedText?: string): string => {
-  if (rawMatchedText && rawMatchedText.length <= 16) {
-    return rawMatchedText.charAt(0).toUpperCase() + rawMatchedText.slice(1);
-  }
-  const today = getTodayIso();
-  const tomorrow = getTomorrowIso();
-  if (dateIso === today) return 'Сегодня';
-  if (dateIso === tomorrow) return 'Завтра';
-
-  try {
-    const [y, m, d] = dateIso.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-  } catch {
-    return dateIso;
-  }
-};
 
 export interface ComposerProps {
   isModal?: boolean;
@@ -1382,19 +1359,12 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Tags */}
       {allPreviewTags.map(tag => (
-        <span
+        <TagChip
           key={tag}
-          className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-[10px] font-mono"
-        >
-          #{tag}
-          <button
-            onClick={() => removeTag(tag)}
-            className="hover:text-rose-400 transition-colors cursor-pointer"
-            aria-label={`Удалить тег ${tag}`}
-          >
-            <X className="w-2.5 h-2.5" />
-          </button>
-        </span>
+          tag={tag}
+          variant="pill"
+          onRemove={() => removeTag(tag)}
+        />
       ))}
 
       {/* Due Date Chip */}
@@ -1504,12 +1474,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
           {isRecurrenceDropdownOpen && (
             <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-              {[
-                { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-              ].map(opt => (
+              {RECURRENCE_PRESETS.map(opt => (
                 <button
                   key={opt.label}
                   type="button"
@@ -1723,12 +1688,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
                     {isRecurrenceDropdownOpen && (
                       <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                        {[
-                          { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                          { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                          { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                          { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                        ].map(opt => (
+                        {RECURRENCE_PRESETS.map(opt => (
                           <button
                             key={opt.label}
                             type="button"

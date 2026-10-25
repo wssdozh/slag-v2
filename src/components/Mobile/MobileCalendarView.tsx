@@ -2,7 +2,16 @@ import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect } fro
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
-import { getRecurringOccurrencesInRange } from '../../lib/recurrenceHelper';
+import { useSwipeGesture } from '../../hooks/useSwipeGesture';
+import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
+import {
+  getISODateString,
+  getTodayString,
+  getTomorrowString,
+  getMondayOfWeek,
+  RUSSIAN_MONTHS,
+  RUSSIAN_WEEKDAYS,
+} from '../../lib/dateUtils';
 import {
   Circle,
   CheckCircle2,
@@ -22,38 +31,6 @@ function subscribeToNow() {
   return () => {};
 }
 
-function getTodayString(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getTomorrowString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function getMondayOfWeek(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  date.setDate(diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function getISODateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-const RUSSIAN_MONTHS = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
-];
-
-const RUSSIAN_WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 const HOURS_24 = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 54; // px per hour
 
@@ -179,10 +156,6 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
   const [addingTimeSlot, setAddingTimeSlot] = useState<{ dateStr: string; hour: number } | null>(null);
   const [slotTaskTitle, setSlotTaskTitle] = useState('');
 
-  // Swipe gesture detection
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
-
   // Time grid scroll ref
   const timeGridScrollRef = useRef<HTMLDivElement | null>(null);
   const dateSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -210,11 +183,6 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     }
   }, [calendarLayout, nowMinute]);
 
-  // All task items
-  const allTasks = useMemo(() => {
-    return items.filter(i => i.type === 'task' || (i.subtasks && i.subtasks.length > 0));
-  }, [items]);
-
   // Generate 7 days for the current week strip
   const weekDays = useMemo(() => {
     const days: { date: Date; dateStr: string; dayNum: number; weekdayIndex: number }[] = [];
@@ -231,52 +199,27 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     return days;
   }, [currentWeekMonday]);
 
-  // Tasks grouped by dueDate
-  const { tasksByDate, overdueTasks, noDateTasks } = useMemo(() => {
-    const map: Record<string, (SlagItem & { isVirtual?: boolean })[]> = {};
-    const overdue: SlagItem[] = [];
-    const noDate: SlagItem[] = [];
+  // Tasks grouped by dueDate using unified schedule hook
+  const rangeStart = weekDays[0]?.dateStr || todayStr;
+  const rangeEnd = weekDays[6]?.dateStr || todayStr;
 
-    allTasks.forEach(task => {
-      const isDone = task.status === 'done';
-      if (!task.dueDate) {
-        if (!isDone) noDate.push(task);
-      } else {
-        if (task.dueDate < todayStr && !isDone) {
-          overdue.push(task);
-        }
-        if (!map[task.dueDate]) map[task.dueDate] = [];
-        map[task.dueDate].push(task);
-      }
+  const {
+    overdueTasks,
+    unscheduledTasks: noDateTasks,
+    tasksByDate: tasksByDateMap,
+  } = useCalendarSchedule({
+    items,
+    rangeStart,
+    rangeEnd,
+  });
+
+  const tasksByDate = useMemo(() => {
+    const obj: Record<string, (SlagItem & { isVirtual?: boolean })[]> = {};
+    tasksByDateMap.forEach((tasks, dateStr) => {
+      obj[dateStr] = tasks;
     });
-
-    // Project virtual occurrences of recurring tasks in week view range
-    const startRangeStr = weekDays[0]?.dateStr || todayStr;
-    const endRangeStr = weekDays[6]?.dateStr || todayStr;
-
-    allTasks.forEach(task => {
-      if (task.recurrence && task.dueDate && task.status !== 'done') {
-        const occurrences = getRecurringOccurrencesInRange(task, startRangeStr, endRangeStr);
-        occurrences.forEach(occDate => {
-          if (occDate !== task.dueDate) {
-            if (!map[occDate]) map[occDate] = [];
-            if (!map[occDate].some(it => it.id.startsWith(task.id + '_virtual_'))) {
-              map[occDate].push({
-                ...task,
-                id: `${task.id}_virtual_${occDate}`,
-                dueDate: occDate,
-                isVirtual: true,
-              });
-            }
-          }
-        });
-      }
-    });
-
-    overdue.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
-
-    return { tasksByDate: map, overdueTasks: overdue, noDateTasks: noDate };
-  }, [allTasks, todayStr, weekDays]);
+    return obj;
+  }, [tasksByDateMap]);
 
   // Generate 3 consecutive days for 3-Day View
   const threeDays = useMemo(() => {
@@ -468,26 +411,10 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
   };
 
   // Swipe gesture handling
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
-    setTouchStartY(e.touches[0].clientY);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null || touchStartY === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartX;
-    const deltaY = e.changedTouches[0].clientY - touchStartY;
-    setTouchStartX(null);
-    setTouchStartY(null);
-
-    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
-      if (deltaX < 0) {
-        handleNext();
-      } else {
-        handlePrev();
-      }
-    }
-  };
+  const { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } = useSwipeGesture({
+    onSwipeLeft: handleNext,
+    onSwipeRight: handlePrev,
+  });
 
   return (
     <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none relative">

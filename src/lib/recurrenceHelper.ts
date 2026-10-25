@@ -1,11 +1,14 @@
 import type { RecurrenceRule, SlagItem } from '../types';
+import { getISODateString } from './dateUtils';
 
-export function getISODateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+export { getISODateString };
+
+export const RECURRENCE_PRESETS: Array<{ label: string; rule: RecurrenceRule }> = [
+  { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } },
+  { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } },
+  { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } },
+  { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } },
+];
 
 export function parseISODateString(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);

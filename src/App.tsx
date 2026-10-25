@@ -1,22 +1,31 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
-import { FullscreenEditor } from './components/Editor/FullscreenEditor';
 import { SearchModal } from './components/Search/SearchModal';
-import { SettingsModal } from './components/Modals/SettingsModal';
 import { FolderModal } from './components/Modals/FolderModal';
-import { TriageModal } from './components/Modals/TriageModal';
 import { ComposerModal } from './components/Modals/ComposerModal';
 import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
-import { LogModal } from './components/Logs/LogModal';
 import { useVisualViewport } from './hooks/useVisualViewport';
 import { Monitor } from 'lucide-react';
 import { enrichAttachment, extractFocalContext } from './lib/attachmentEnrichment';
 import type { LightboxImage } from './components/UI/ImageLightbox';
+
+const FullscreenEditor = lazy(() =>
+  import('./components/Editor/FullscreenEditor').then((m) => ({ default: m.FullscreenEditor }))
+);
+const SettingsModal = lazy(() =>
+  import('./components/Modals/SettingsModal').then((m) => ({ default: m.SettingsModal }))
+);
+const TriageModal = lazy(() =>
+  import('./components/Modals/TriageModal').then((m) => ({ default: m.TriageModal }))
+);
+const LogModal = lazy(() =>
+  import('./components/Logs/LogModal').then((m) => ({ default: m.LogModal }))
+);
 
 const AppContent: React.FC = () => {
   const {
@@ -114,13 +123,15 @@ const AppContent: React.FC = () => {
       <MobileActionSheet />
 
       {/* Global Modals & Overlays */}
-      <FullscreenEditor />
+      <Suspense fallback={null}>
+        <FullscreenEditor />
+        <SettingsModal />
+        <TriageModal />
+        <LogModal />
+      </Suspense>
       <SearchModal />
-      <SettingsModal />
       <FolderModal />
-      <TriageModal />
       <ComposerModal />
-      <LogModal />
       <ToastContainer />
       <ImageLightbox
         images={lightboxImages}

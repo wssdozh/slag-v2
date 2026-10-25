@@ -3,6 +3,7 @@ import { X, Search, Mic, Music, Play, Pause, ExternalLink, Folder } from 'lucide
 import type { AudioTrack, AudioTypeFilter } from '../../lib/audioHelper';
 import { formatAudioDuration } from '../../lib/audioHelper';
 import type { FolderMeta } from '../../types';
+import { IconButton } from '../UI/IconButton';
 
 interface AudioPlaylistDrawerProps {
   isOpen: boolean;
@@ -64,13 +65,14 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
             {tracks.length}
           </span>
         </div>
-        <button
+        <IconButton
+          size="md"
+          variant="ghost"
           onClick={onClose}
-          className="w-7 h-7 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
           title="Закрыть список"
         >
           <X className="w-4 h-4" />
-        </button>
+        </IconButton>
       </div>
 
       {/* Filter toolbar inside drawer */}

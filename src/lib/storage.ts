@@ -10,6 +10,8 @@ import type {
 import { serializeItemToMarkdown } from './markdownSerializer';
 import { logger } from './logger';
 
+import { idbSaveAttachment } from './indexedDbStorage';
+
 const fsLog = logger.scope('FS');
 
 const VAULTS_KEY = 'slag_vaults_v2';
@@ -505,11 +507,12 @@ export class StorageService {
   // Attachments
   public saveAttachment(attachment: SlagAttachment): void {
     const key = `${ATTACHMENTS_STORAGE_PREFIX}${attachment.id}`;
+    idbSaveAttachment(attachment);
     try {
       localStorage.setItem(key, JSON.stringify(attachment));
       fsLog.info(`Saved attachment "${attachment.name}" (${attachment.type}, ${Math.round(attachment.size / 1024)} KB)`);
     } catch (err) {
-      fsLog.error(`Failed to save attachment "${attachment.name}" (storage quota exceeded)`, {
+      fsLog.warn(`localStorage quota exceeded for attachment "${attachment.name}", persisted in IndexedDB`, {
         attachmentId: attachment.id,
         sizeBytes: attachment.size,
         error: err,

@@ -2,8 +2,19 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
 import { getTaskTimeSlot, type TaskTimeSlot } from '../../lib/todoistTaskParser';
-import { getRecurringOccurrencesInRange } from '../../lib/recurrenceHelper';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
+import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
+import {
+  getISODateString,
+  getTodayString,
+  getTomorrowString,
+  getNextWeekString,
+  getMondayOfWeek,
+  getWeekDays,
+  getMonthCalendarDays,
+  RUSSIAN_MONTHS,
+  RUSSIAN_WEEKDAYS,
+} from '../../lib/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,74 +29,6 @@ import {
   Repeat
 } from 'lucide-react';
 
-function getISODateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function getTodayString(): string {
-  return getISODateString(new Date());
-}
-
-function getTomorrowString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return getISODateString(d);
-}
-
-function getNextWeekString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 7);
-  return getISODateString(d);
-}
-
-function getMondayOfWeek(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  date.setDate(diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function getWeekDays(monday: Date): Date[] {
-  const days: Date[] = [];
-  for (let i = 0; i < 7; i++) {
-    const next = new Date(monday);
-    next.setDate(monday.getDate() + i);
-    days.push(next);
-  }
-  return days;
-}
-
-function getMonthCalendarDays(year: number, month: number): { date: Date; isCurrentMonth: boolean; dateStr: string }[] {
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const startMonday = getMondayOfWeek(firstDay);
-
-  const cells: { date: Date; isCurrentMonth: boolean; dateStr: string }[] = [];
-  const current = new Date(startMonday);
-
-  while (current <= lastDay || cells.length % 7 !== 0) {
-    cells.push({
-      date: new Date(current),
-      isCurrentMonth: current.getMonth() === month,
-      dateStr: getISODateString(current),
-    });
-    current.setDate(current.getDate() + 1);
-  }
-
-  return cells;
-}
-
-const RUSSIAN_MONTHS = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
-];
-
-const RUSSIAN_WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
@@ -230,32 +173,41 @@ export const CalendarView: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Scoped tasks in current folder
-  const folderTasks = useMemo(() => {
-    return items.filter(item => {
-      if (item.type !== 'task') return false;
-      if (currentFolder === 'Входящие') return true;
-      return item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
-    });
-  }, [items, currentFolder]);
-
-  const todayStr = useMemo(() => getTodayString(), []);
-
-  // Overdue tasks: dueDate < today and not done
-  const overdueTasks = useMemo(() => {
-    return folderTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < todayStr);
-  }, [folderTasks, todayStr]);
-
-  // Unscheduled tasks: no dueDate and not done
-  const unscheduledTasks = useMemo(() => {
-    return folderTasks.filter(t => t.status !== 'done' && !t.dueDate);
-  }, [folderTasks]);
-
   // Current Week Days (Monday to Sunday)
   const weekDays = useMemo(() => {
     const monday = getMondayOfWeek(currentDate);
     return getWeekDays(monday);
   }, [currentDate]);
+
+  // Month Calendar Grid Cells
+  const monthCells = useMemo(() => {
+    return getMonthCalendarDays(currentDate.getFullYear(), currentDate.getMonth());
+  }, [currentDate]);
+
+  const rangeStart = useMemo(() => {
+    if (viewMode === 'week' && weekDays.length > 0) return getISODateString(weekDays[0]);
+    if (viewMode === 'month' && monthCells.length > 0) return monthCells[0].dateStr;
+    return undefined;
+  }, [viewMode, weekDays, monthCells]);
+
+  const rangeEnd = useMemo(() => {
+    if (viewMode === 'week' && weekDays.length > 0) return getISODateString(weekDays[6]);
+    if (viewMode === 'month' && monthCells.length > 0) return monthCells[monthCells.length - 1].dateStr;
+    return undefined;
+  }, [viewMode, weekDays, monthCells]);
+
+  const {
+    overdueTasks,
+    unscheduledTasks,
+    tasksByDate: tasksByDueDate,
+    todayStr,
+  } = useCalendarSchedule({
+    items,
+    currentFolder,
+    filterByFolder: true,
+    rangeStart,
+    rangeEnd,
+  });
 
   // Auto-scroll time grid to current hour - 1 and scroll week horizontally to today if overflowed
   useEffect(() => {
@@ -276,71 +228,6 @@ export const CalendarView: React.FC = () => {
       }
     }
   }, [viewMode, currentDate, weekDays, todayStr, nowMinute]);
-
-  // Month Calendar Grid Cells
-  const monthCells = useMemo(() => {
-    return getMonthCalendarDays(currentDate.getFullYear(), currentDate.getMonth());
-  }, [currentDate]);
-
-  // Group tasks by dueDate and project future occurrences of recurring tasks
-  const tasksByDueDate = useMemo(() => {
-    const map = new Map<string, (SlagItem & { isVirtual?: boolean })[]>();
-
-    // 1. Place real tasks
-    folderTasks.forEach(task => {
-      if (task.dueDate) {
-        const list = map.get(task.dueDate) || [];
-        list.push(task);
-        map.set(task.dueDate, list);
-      }
-    });
-
-    // 2. Project virtual occurrences of recurring tasks in visible range
-    let startRangeStr = todayStr;
-    let endRangeStr = todayStr;
-    if (viewMode === 'week' && weekDays.length > 0) {
-      startRangeStr = getISODateString(weekDays[0]);
-      endRangeStr = getISODateString(weekDays[6]);
-    } else if (viewMode === 'month' && monthCells.length > 0) {
-      startRangeStr = monthCells[0].dateStr;
-      endRangeStr = monthCells[monthCells.length - 1].dateStr;
-    }
-
-    folderTasks.forEach(task => {
-      if (task.recurrence && task.dueDate && task.status !== 'done') {
-        const occurrences = getRecurringOccurrencesInRange(task, startRangeStr, endRangeStr);
-        occurrences.forEach(occDate => {
-          if (occDate !== task.dueDate) {
-            const list = map.get(occDate) || [];
-            if (!list.some(it => it.id.startsWith(task.id + '_virtual_'))) {
-              let nextReminder: string | undefined = undefined;
-              if (task.reminder) {
-                try {
-                  const orig = new Date(task.reminder);
-                  const [y, m, d] = occDate.split('-').map(Number);
-                  nextReminder = new Date(y, m - 1, d, orig.getHours(), orig.getMinutes(), 0, 0).toISOString();
-                } catch {
-                  // ignore
-                }
-              }
-
-              const virtualItem: SlagItem & { isVirtual?: boolean } = {
-                ...task,
-                id: `${task.id}_virtual_${occDate}`,
-                dueDate: occDate,
-                reminder: nextReminder,
-                isVirtual: true,
-              };
-              list.push(virtualItem);
-              map.set(occDate, list);
-            }
-          }
-        });
-      }
-    });
-
-    return map;
-  }, [folderTasks, viewMode, weekDays, monthCells, todayStr]);
 
   // Navigation handlers
   const handlePrev = () => {

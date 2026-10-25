@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
+import { formatBytes } from '../../lib/formatUtils';
+import { formatAudioDuration } from '../../lib/audioHelper';
 
 const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
   <svg
@@ -32,20 +34,6 @@ interface AudioPlayerProps {
   summary?: string;
   enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
   onEnrich?: () => void;
-}
-
-function formatBytes(bytes?: number): string {
-  if (!bytes || bytes <= 0) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatTime(secs: number): string {
-  if (isNaN(secs) || secs < 0) return '0:00';
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
@@ -221,7 +209,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         </div>
 
         <span className="text-[11px] font-sans tabular-nums text-zinc-400 shrink-0">
-          {isPlaying ? formatTime(currentTime) : formatTime(currentDur)}
+          {isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}
         </span>
       </div>
     );
@@ -309,7 +297,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           {/* Row 2: Duration on left and Timestamp on right on the exact same horizontal line */}
           <div className="flex justify-between items-center text-[11px] font-sans tabular-nums text-zinc-400">
             <div className="flex items-center gap-1 truncate">
-              <span>{isPlaying ? formatTime(currentTime) : formatTime(currentDur)}</span>
+              <span>{isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}</span>
               {formattedSize && (
                 <>
                   <span className="text-zinc-600 font-normal">,</span>

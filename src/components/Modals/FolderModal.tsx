@@ -5,6 +5,7 @@ import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { Folder, Trash2 } from 'lucide-react';
 import { Select } from '../UI/Select';
 import { BaseModal } from './BaseModal';
+import { Button } from '../UI/Button';
 
 const FolderModalDialog: React.FC = () => {
   const {
@@ -70,21 +71,23 @@ const FolderModalDialog: React.FC = () => {
       )}
 
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={closeFolderModal}
-          className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
         >
           Отмена
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           form="folder-modal-form"
+          variant="primary"
+          size="sm"
           disabled={!name.trim()}
-          className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           Сохранить
-        </button>
+        </Button>
       </div>
     </div>
   );

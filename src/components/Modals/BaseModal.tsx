@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { IconButton } from '../UI/IconButton';
 
 export interface BaseModalProps {
   isOpen: boolean;
@@ -116,15 +117,15 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                 <div className="flex items-center gap-1.5 shrink-0">
                   {headerRightSlot}
                   {showCloseButton && (
-                    <button
-                      type="button"
+                    <IconButton
+                      size="md"
+                      variant="ghost"
                       onClick={onClose}
-                      className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                       title="Закрыть (Esc)"
                       aria-label="Закрыть"
                     >
                       <X className="w-4 h-4" />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               </div>

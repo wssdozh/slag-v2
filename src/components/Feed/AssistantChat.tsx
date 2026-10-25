@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Select } from '../UI/Select';
 import { LinearSignalBars } from '../UI/PriorityBadge';
+import { TagChip } from '../UI/TagChip';
 
 interface AssistantChatProps {
   variant?: 'center' | 'sidebar';
@@ -699,9 +700,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                           {action.tags && action.tags.length > 0 && (
                             <div className="flex items-center gap-1 flex-wrap">
                               {action.tags.map((t, idx) => (
-                                <span key={idx} className="text-[10px] font-mono text-zinc-500">
-                                  #{t}
-                                </span>
+                                <TagChip key={idx} tag={t} variant="flat" />
                               ))}
                             </div>
                           )}

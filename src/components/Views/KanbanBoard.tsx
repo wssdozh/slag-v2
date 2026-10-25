@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
+import { TagChip } from '../UI/TagChip';
 
 function isOverdue(dueDate?: string): boolean {
   if (!dueDate) return false;
@@ -366,16 +367,12 @@ export const KanbanBoard: React.FC = () => {
                   {mat.tags && mat.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
                       {mat.tags.map(tag => (
-                        <button
+                        <TagChip
                           key={tag}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setActiveTagFilter(activeTagFilter === tag ? null : tag);
-                          }}
-                          className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-                        >
-                          #{tag}
-                        </button>
+                          tag={tag}
+                          variant="flat"
+                          onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                        />
                       ))}
                     </div>
                   )}
@@ -558,16 +555,12 @@ export const KanbanBoard: React.FC = () => {
                         {task.tags && task.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
                             {task.tags.map(tag => (
-                              <button
+                              <TagChip
                                 key={tag}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setActiveTagFilter(activeTagFilter === tag ? null : tag);
-                                }}
-                                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-                              >
-                                #{tag}
-                              </button>
+                                tag={tag}
+                                variant="flat"
+                                onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                              />
                             ))}
                           </div>
                         )}

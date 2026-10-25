@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
 import type { SlagItem } from '../../types';
 import { Inbox, UploadCloud } from 'lucide-react';
+import { EmptyState } from '../UI/EmptyState';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 
@@ -141,15 +142,12 @@ export const FeedList: React.FC = () => {
       )}
 
       {filteredItems.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-zinc-500 select-none">
-          <div className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center mb-3 text-zinc-600">
-            <Inbox className="w-5 h-5" />
-          </div>
-          <p className="text-sm font-medium text-zinc-400">В этой папке пусто</p>
-          <p className="text-xs text-zinc-600 mt-1 max-w-xs">
-            Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.
-          </p>
-        </div>
+        <EmptyState
+          icon={<Inbox className="w-5 h-5" />}
+          title="В этой папке пусто"
+          description="Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл."
+          className="flex-1"
+        />
       ) : (
         grouped.map(group => (
           <div key={group.dateLabel} className="flex flex-col gap-2">

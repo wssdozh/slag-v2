@@ -21,6 +21,7 @@ import {
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
+import { TagChip } from '../UI/TagChip';
 
 interface ItemCardProps {
   item: SlagItem;
@@ -710,13 +711,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           {item.tags && item.tags.length > 0 ? (
             <div className="flex flex-wrap gap-2 items-center min-w-0">
               {item.tags.map(tag => (
-                <button
+                <TagChip
                   key={tag}
+                  tag={tag}
+                  variant="flat"
                   onClick={() => setActiveTagFilter(tag)}
-                  className="text-[11px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer leading-none p-0 bg-transparent border-0"
-                >
-                  #{tag}
-                </button>
+                />
               ))}
             </div>
           ) : (

@@ -1,0 +1,101 @@
+/**
+ * dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2.
+ */
+
+export const RUSSIAN_MONTHS = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+] as const;
+
+export const RUSSIAN_WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'] as const;
+
+export function getISODateString(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function getTodayIso(): string {
+  return getISODateString(new Date());
+}
+
+export function getTomorrowIso(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return getISODateString(d);
+}
+
+export function getNextWeekIso(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return getISODateString(d);
+}
+
+// Алиасы для обратной совместимости
+export const getTodayString = getTodayIso;
+export const getTomorrowString = getTomorrowIso;
+export const getNextWeekString = getNextWeekIso;
+
+export function getMondayOfWeek(d: Date): Date {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+export function getWeekDays(monday: Date): Date[] {
+  const days: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    const next = new Date(monday);
+    next.setDate(monday.getDate() + i);
+    days.push(next);
+  }
+  return days;
+}
+
+export interface MonthCalendarCell {
+  date: Date;
+  isCurrentMonth: boolean;
+  dateStr: string;
+}
+
+export function getMonthCalendarDays(year: number, month: number): MonthCalendarCell[] {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startMonday = getMondayOfWeek(firstDay);
+
+  const cells: MonthCalendarCell[] = [];
+  const current = new Date(startMonday);
+
+  while (current <= lastDay || cells.length % 7 !== 0) {
+    cells.push({
+      date: new Date(current),
+      isCurrentMonth: current.getMonth() === month,
+      dateStr: getISODateString(current),
+    });
+    current.setDate(current.getDate() + 1);
+  }
+
+  return cells;
+}
+
+export function formatDueDateLabel(dateIso: string, rawMatchedText?: string): string {
+  if (rawMatchedText && rawMatchedText.length <= 16) {
+    return rawMatchedText.charAt(0).toUpperCase() + rawMatchedText.slice(1);
+  }
+  const today = getTodayIso();
+  const tomorrow = getTomorrowIso();
+  if (dateIso === today) return 'Сегодня';
+  if (dateIso === tomorrow) return 'Завтра';
+
+  try {
+    const [y, m, d] = dateIso.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  } catch {
+    return dateIso;
+  }
+}
