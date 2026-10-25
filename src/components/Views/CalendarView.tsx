@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
-import { getTaskTimeSlot, type TaskTimeSlot } from '../../lib/todoistTaskParser';
+import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
+import { computeAntiOverlapLayout, type LayoutPositionedTask } from '../../lib/calendarLayout';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
 import {
@@ -598,119 +599,6 @@ export const CalendarView: React.FC = () => {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  interface LayoutPositionedTask {
-    task: SlagItem & { isVirtual?: boolean };
-    slot: TaskTimeSlot;
-    topPx: number;
-    heightPx: number;
-    colIndex: number;
-    totalCols: number;
-  }
-
-  function computeAntiOverlapLayout(
-    tasks: (SlagItem & { isVirtual?: boolean })[],
-    resizingTaskId: string | null,
-    resizingDuration: number | null
-  ): LayoutPositionedTask[] {
-    if (tasks.length === 0) return [];
-
-    // 1. Calculate slot & interval for each task
-    const layoutItems = tasks.map(task => {
-      const rawSlot = getTaskTimeSlot(task);
-      const isBeingResized = resizingTaskId && (task.id === resizingTaskId || task.id.startsWith(resizingTaskId + '_virtual_'));
-      const durationMinutes = isBeingResized && resizingDuration ? resizingDuration : rawSlot.durationMinutes;
-
-      // Dynamically recompute end time and timeLabel so the card displays the updated time during resize
-      const endTotal = rawSlot.startHour * 60 + rawSlot.startMinute + durationMinutes;
-      const endH = Math.floor(endTotal / 60) % 24;
-      const endM = endTotal % 60;
-      const timeLabel = `${String(rawSlot.startHour).padStart(2, '0')}:${String(rawSlot.startMinute).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-
-      const slot: TaskTimeSlot = {
-        ...rawSlot,
-        durationMinutes,
-        timeLabel,
-      };
-
-      const startMinutes = slot.startHour * 60 + slot.startMinute;
-      const endMinutes = startMinutes + slot.durationMinutes;
-      const startH = Math.max(0, Math.min(23, slot.startHour));
-      const topPx = startH * 52 + (slot.startMinute / 60) * 52;
-      // Grid step: 13px per 15 min.
-      // 15m has min display height of 20px for clean single-line vertical centering.
-      // 30m+ snaps to exact grid multiples (30m = 26px, 45m = 39px, 60m = 52px, etc.)
-      const gridHeightPx = (slot.durationMinutes / 60) * 52;
-      const heightPx = Math.max(20, Math.round(gridHeightPx));
-
-      return {
-        task,
-        slot,
-        startMinutes,
-        endMinutes,
-        topPx,
-        heightPx,
-        colIndex: 0,
-        totalCols: 1,
-      };
-    });
-
-    // 2. Sort by startMinutes ASC, then durationMinutes DESC
-    layoutItems.sort((a, b) => a.startMinutes - b.startMinutes || (b.endMinutes - b.startMinutes) - (a.endMinutes - a.startMinutes));
-
-    // 3. Cluster overlapping tasks
-    const clusters: typeof layoutItems[] = [];
-    let currentCluster: typeof layoutItems = [];
-    let clusterEnd = -1;
-
-    for (const item of layoutItems) {
-      if (currentCluster.length === 0) {
-        currentCluster.push(item);
-        clusterEnd = item.endMinutes;
-      } else if (item.startMinutes < clusterEnd) {
-        currentCluster.push(item);
-        clusterEnd = Math.max(clusterEnd, item.endMinutes);
-      } else {
-        clusters.push(currentCluster);
-        currentCluster = [item];
-        clusterEnd = item.endMinutes;
-      }
-    }
-    if (currentCluster.length > 0) {
-      clusters.push(currentCluster);
-    }
-
-    // 4. Assign columns within each cluster
-    const result: LayoutPositionedTask[] = [];
-
-    for (const cluster of clusters) {
-      const columns: number[] = [];
-
-      for (const item of cluster) {
-        let placedCol = -1;
-        for (let c = 0; c < columns.length; c++) {
-          if (columns[c] <= item.startMinutes) {
-            placedCol = c;
-            columns[c] = item.endMinutes;
-            break;
-          }
-        }
-        if (placedCol === -1) {
-          placedCol = columns.length;
-          columns.push(item.endMinutes);
-        }
-        item.colIndex = placedCol;
-      }
-
-      const totalCols = Math.max(1, columns.length);
-      for (const item of cluster) {
-        item.totalCols = totalCols;
-        result.push(item);
-      }
-    }
-
-    return result;
-  }
-
   // Render a Time-Blocked Card in Week View with Anti-Overlap and Duration States
   const renderTimedTaskBlock = (positioned: LayoutPositionedTask) => {
     const { task, slot, topPx, heightPx, colIndex, totalCols } = positioned;
@@ -1206,6 +1094,7 @@ export const CalendarView: React.FC = () => {
                         {/* Render Timed Task Cards with Anti-Overlap Layout */}
                         {computeAntiOverlapLayout(
                           timedTasks,
+                          52,
                           resizingTask?.taskId || null,
                           resizingTask?.currentDuration || null
                         ).map(positioned => renderTimedTaskBlock(positioned))}
