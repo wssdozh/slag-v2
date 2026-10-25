@@ -26,7 +26,6 @@ interface AudioPlayerProps {
   size?: number;
   waveform?: number[];
   compact?: boolean;
-  timeContext?: string;
   transcript?: string;
   extractedText?: string;
   summary?: string;
@@ -54,7 +53,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   size,
   waveform: customWaveform,
   compact = false,
-  timeContext,
   transcript: propTranscript,
   extractedText: propExtractedText,
   summary: _summary,
@@ -284,12 +282,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 </>
               )}
             </div>
-
-            {timeContext && (
-              <span className="text-zinc-500 text-[11px] font-sans ml-auto shrink-0 select-none">
-                {timeContext}
-              </span>
-            )}
           </div>
         </div>
 

@@ -218,6 +218,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     openLightbox(folderImages, Math.max(0, targetIdx));
   };
 
+  const hasMetadata =
+    isTask ||
+    isArticle ||
+    item.folder !== 'Входящие' ||
+    Boolean(item.isPinned) ||
+    Boolean(item.priority && item.priority !== 'none') ||
+    Boolean(item.dueDate);
+
   const handleOpenArticle = () => {
     setSelectedItem(item);
     setIsFullscreenEditorOpen(true);
@@ -340,9 +348,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           </button>
         </div>
 
-      {/* Top Header / Metadata Bar: Always present with unified top-right timestamp */}
-      <div className="flex items-center justify-between text-xs text-zinc-500 min-h-[16px] pr-6 sm:pr-0">
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
+      {/* Top Header / Metadata Bar: Rendered ONLY when metadata exists */}
+      {hasMetadata && (
+        <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-500 pr-6 sm:pr-0">
           {/* Item Type: Plain text, no nested chips */}
           {isTask && (
             <span className="text-2xs font-mono text-zinc-400 font-medium">
@@ -396,9 +404,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             </span>
           )}
         </div>
-
-        <span className="text-2xs font-mono text-zinc-500 shrink-0 ml-auto">{formattedTime}</span>
-      </div>
+      )}
 
       {/* Reply Parent Quote Banner */}
       {item.replyToId && (
@@ -717,20 +723,28 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Bottom Bar: Tags */}
-      {item.tags && item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
-          {item.tags.map(tag => (
-            <button
-              key={tag}
-              onClick={() => setActiveTagFilter(tag)}
-              className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              #{tag}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Bottom Bar: Tags on left + Unified Timestamp on right */}
+      <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
+        {item.tags && item.tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {item.tags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => setActiveTagFilter(tag)}
+                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div />
+        )}
+
+        <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
+          {formattedTime}
+        </span>
+      </div>
 
       {/* Replies Count Link */}
       {repliesCount > 0 && (

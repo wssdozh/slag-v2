@@ -189,6 +189,7 @@ export const CalendarView: React.FC = () => {
   });
 
   const timeGridRef = useRef<HTMLDivElement | null>(null);
+  const weekHorizontalScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -197,26 +198,6 @@ export const CalendarView: React.FC = () => {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  // Auto-scroll time grid to current hour - 1 on mount/view change
-  useEffect(() => {
-    if (viewMode === 'week' && timeGridRef.current) {
-      const currentHour = Math.floor(nowMinute / 60);
-      const scrollHour = Math.max(0, currentHour - 1);
-      timeGridRef.current.scrollTop = scrollHour * 52;
-    }
-  }, [viewMode, nowMinute]);
-
-  // Keyboard shortcut for closing modals
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (expandedDayDateStr) setExpandedDayDateStr(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [expandedDayDateStr]);
 
   // Scoped tasks in current folder
   const folderTasks = useMemo(() => {
@@ -244,6 +225,26 @@ export const CalendarView: React.FC = () => {
     const monday = getMondayOfWeek(currentDate);
     return getWeekDays(monday);
   }, [currentDate]);
+
+  // Auto-scroll time grid to current hour - 1 and scroll week horizontally to today if overflowed
+  useEffect(() => {
+    if (viewMode === 'week') {
+      if (timeGridRef.current) {
+        const currentHour = Math.floor(nowMinute / 60);
+        const scrollHour = Math.max(0, currentHour - 1);
+        timeGridRef.current.scrollTop = scrollHour * 52;
+      }
+      if (weekHorizontalScrollRef.current) {
+        const container = weekHorizontalScrollRef.current;
+        const todayIndex = weekDays.findIndex(d => getISODateString(d) === todayStr);
+        if (todayIndex > 1 && container.scrollWidth > container.clientWidth) {
+          const colWidth = (container.scrollWidth - 56) / 7;
+          const targetScrollLeft = Math.max(0, 56 + todayIndex * colWidth - container.clientWidth / 2);
+          container.scrollLeft = targetScrollLeft;
+        }
+      }
+    }
+  }, [viewMode, currentDate, weekDays, todayStr, nowMinute]);
 
   // Month Calendar Grid Cells
   const monthCells = useMemo(() => {
@@ -337,6 +338,15 @@ export const CalendarView: React.FC = () => {
 
   const handleToday = () => {
     setCurrentDate(new Date());
+    if (weekHorizontalScrollRef.current) {
+      const container = weekHorizontalScrollRef.current;
+      const todayIndex = weekDays.findIndex(d => getISODateString(d) === todayStr);
+      if (todayIndex >= 0 && container.scrollWidth > container.clientWidth) {
+        const colWidth = (container.scrollWidth - 56) / 7;
+        const targetScrollLeft = Math.max(0, 56 + todayIndex * colWidth - container.clientWidth / 2);
+        container.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+      }
+    }
   };
 
   // Month and Year label
@@ -1090,13 +1100,18 @@ export const CalendarView: React.FC = () => {
             /* ========================================================== */
             /* WEEK TIME-BLOCKING VIEW                                    */
             /* ========================================================== */
-            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-              {/* Day Headers (ПН 10, ВТ 11...) */}
-              <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/90 shrink-0">
-                <div className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600">
-                  UTC
-                </div>
-                <div className="flex-1 grid grid-cols-7">
+            <div
+              ref={weekHorizontalScrollRef}
+              data-testid="calendar-week-scroll-container"
+              className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin select-none"
+            >
+              <div className="flex-1 flex flex-col min-w-[896px] h-full">
+                {/* Day Headers (ПН 10, ВТ 11...) */}
+                <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/90 shrink-0">
+                  <div className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-[#0c0c0e]">
+                    UTC
+                  </div>
+                  <div className="flex-1 grid grid-cols-7">
                   {weekDays.map((date, idx) => {
                     const dateStr = getISODateString(date);
                     const isToday = dateStr === todayStr;
@@ -1128,7 +1143,7 @@ export const CalendarView: React.FC = () => {
 
               {/* All-Day (Весь день) Section */}
               <div className="flex border-b border-white/[0.06] bg-[#09090b] shrink-0 max-h-36 overflow-y-auto scrollbar-thin">
-                <div className="w-14 shrink-0 border-r border-white/[0.04] px-1.5 py-2 flex items-start justify-end text-[10px] font-mono text-zinc-500 select-none">
+                <div className="w-14 shrink-0 border-r border-white/[0.04] px-1.5 py-2 flex items-start justify-end text-[10px] font-mono text-zinc-500 select-none sticky left-0 z-20 bg-[#09090b]">
                   Весь день
                 </div>
                 <div className="flex-1 grid grid-cols-7 min-h-[44px]">
@@ -1183,7 +1198,7 @@ export const CalendarView: React.FC = () => {
                 className="flex-1 overflow-y-auto scrollbar-thin relative bg-[#09090b] flex"
               >
                 {/* Time markers column */}
-                <div className="w-14 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e]/50 select-none">
+                <div className="w-14 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e] select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)]">
                   {HOURS.map(hour => (
                     <div
                       key={hour}
@@ -1282,13 +1297,15 @@ export const CalendarView: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
           ) : (
             /* ========================================================== */
             /* MONTH VIEW (with compact task rows & day expansion)       */
             /* ========================================================== */
-            <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[#09090b]">
-              {/* Day Header Row */}
-              <div className="grid grid-cols-7 border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0">
+            <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin bg-[#09090b]">
+              <div className="flex-1 flex flex-col min-w-[700px] h-full">
+                {/* Day Header Row */}
+                <div className="grid grid-cols-7 border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0">
                 {RUSSIAN_WEEKDAYS.map(day => (
                   <div
                     key={day}
@@ -1415,6 +1432,7 @@ export const CalendarView: React.FC = () => {
                 })}
               </div>
             </div>
+          </div>
           )}
         </div>
 

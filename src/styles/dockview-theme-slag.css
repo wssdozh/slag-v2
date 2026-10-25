@@ -22,7 +22,9 @@
 
   --dv-separator-border: 1px solid rgba(255, 255, 255, 0.06);
   --dv-sash-color: rgba(255, 255, 255, 0.06);
-  --dv-active-sash-color: rgba(59, 130, 246, 0.6);
+  --dv-active-sash-color: rgba(59, 130, 246, 0.75);
+  --dv-active-sash-transition-duration: 0.1s;
+  --dv-active-sash-transition-delay: 0s;
   --dv-tab-divider-color: transparent;
   --dv-tabs-and-actions-container-height: 34px;
   --dv-tabs-and-actions-container-font-size: 11px;
@@ -41,6 +43,30 @@
 /* Confine splitview sashes to Dockview's local layer so they never leak above modals */
 .dockview-theme-slag .dv-split-view-container .dv-sash-container .dv-sash {
   z-index: 10 !important;
+}
+
+/* Expand sash interactive hitbox to 12px for effortless resizing without pixel-hunting */
+.dockview-theme-slag .dv-split-view-container .dv-sash-container > .dv-sash:not(.dv-disabled):not(.disabled)::before {
+  content: "" !important;
+  position: absolute !important;
+  background: transparent !important;
+  pointer-events: auto !important;
+  cursor: inherit !important;
+  z-index: 1 !important;
+}
+
+.dockview-theme-slag .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled):not(.disabled)::before {
+  top: 0 !important;
+  bottom: 0 !important;
+  left: -4px !important;
+  right: -4px !important;
+}
+
+.dockview-theme-slag .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash:not(.dv-disabled):not(.disabled)::before {
+  left: 0 !important;
+  right: 0 !important;
+  top: -4px !important;
+  bottom: -4px !important;
 }
 
 /* Ensure empty space (void-container) accepts tab drops and fills entire remaining header width */
