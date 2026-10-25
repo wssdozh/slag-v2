@@ -1,4 +1,12 @@
-import type { SlagItem, FolderMeta, VaultMeta, SlagAttachment } from '../types';
+import type {
+  SlagItem,
+  FolderMeta,
+  VaultMeta,
+  SlagAttachment,
+  ComposerDraft,
+  WorkspaceState,
+  ChatMessage,
+} from '../types';
 import { serializeItemToMarkdown } from './markdownSerializer';
 import { logger } from './logger';
 
@@ -10,6 +18,19 @@ const ITEMS_STORAGE_PREFIX = 'slag_items_';
 const FOLDERS_STORAGE_PREFIX = 'slag_folders_';
 const ATTACHMENTS_STORAGE_PREFIX = 'slag_attachments_';
 const TRASH_STORAGE_PREFIX = 'slag_trash_';
+const DRAFTS_STORAGE_PREFIX = 'slag_drafts_';
+const ASSISTANT_STORAGE_PREFIX = 'slag_assistant_';
+const WORKSPACE_STATE_PREFIX = 'slag_workspace_state_';
+
+export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
+  currentFolder: 'Входящие',
+  feedViewMode: 'feed',
+  inboxMode: 'all',
+  activeTypeFilter: 'all',
+  activeTagFilter: null,
+  activeMobileTab: 'folders',
+  folderMediaTab: 'media',
+};
 
 // Initial default folders
 export const DEFAULT_FOLDERS: FolderMeta[] = [
@@ -276,6 +297,18 @@ export class StorageService {
     return `${FOLDERS_STORAGE_PREFIX}${this.currentVault.id}`;
   }
 
+  private getDraftsKey(): string {
+    return `${DRAFTS_STORAGE_PREFIX}${this.currentVault.id}`;
+  }
+
+  private getAssistantKey(): string {
+    return `${ASSISTANT_STORAGE_PREFIX}${this.currentVault.id}`;
+  }
+
+  private getWorkspaceStateKey(): string {
+    return `${WORKSPACE_STATE_PREFIX}${this.currentVault.id}`;
+  }
+
   private initDefaultsIfNeeded(): void {
     const foldersKey = this.getFoldersKey();
     if (!localStorage.getItem(foldersKey)) {
@@ -336,6 +369,24 @@ export class StorageService {
       return it;
     });
     localStorage.setItem(this.getItemsKey(), JSON.stringify(updatedItems));
+
+    // Clean up drafts for deleted folder and any subfolders
+    const drafts = this.getAllComposerDrafts();
+    let draftsChanged = false;
+    for (const key of Object.keys(drafts)) {
+      if (key === path || key.startsWith(path + '/')) {
+        delete drafts[key];
+        draftsChanged = true;
+      }
+    }
+    if (draftsChanged) {
+      try {
+        localStorage.setItem(this.getDraftsKey(), JSON.stringify(drafts));
+      } catch {
+        // ignore
+      }
+    }
+
     fsLog.info(`Deleted folder "${path}", items re-routed to Inbox`);
   }
 
@@ -530,12 +581,104 @@ export class StorageService {
     };
   }
 
+  // Composer Drafts (per-folder, silent Telegram-style)
+  public getAllComposerDrafts(): Record<string, ComposerDraft> {
+    const raw = localStorage.getItem(this.getDraftsKey());
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  public getComposerDraft(folderPath: string): ComposerDraft | null {
+    const all = this.getAllComposerDrafts();
+    return all[folderPath] || null;
+  }
+
+  public saveComposerDraft(folderPath: string, draft: ComposerDraft): void {
+    try {
+      const all = this.getAllComposerDrafts();
+      all[folderPath] = draft;
+      localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
+    } catch (err) {
+      fsLog.warn('Failed to save composer draft to localStorage', { folderPath, err });
+    }
+  }
+
+  public deleteComposerDraft(folderPath: string): void {
+    try {
+      const all = this.getAllComposerDrafts();
+      if (folderPath in all) {
+        delete all[folderPath];
+        localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
+      }
+    } catch (err) {
+      fsLog.warn('Failed to delete composer draft from localStorage', { folderPath, err });
+    }
+  }
+
+  // Assistant History (Vault-scoped, Obsidian Local-First)
+  public getAssistantHistory(): ChatMessage[] {
+    const raw = localStorage.getItem(this.getAssistantKey());
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public saveAssistantHistory(messages: ChatMessage[]): void {
+    try {
+      localStorage.setItem(this.getAssistantKey(), JSON.stringify(messages));
+    } catch (err) {
+      fsLog.error('Failed to save assistant history to localStorage', { count: messages.length, err });
+    }
+  }
+
+  public clearAssistantHistory(): void {
+    localStorage.removeItem(this.getAssistantKey());
+    fsLog.info('Cleared assistant chat history');
+  }
+
+  // Workspace State (per-vault active folder, view modes, and filter settings)
+  public getWorkspaceState(): WorkspaceState {
+    const raw = localStorage.getItem(this.getWorkspaceStateKey());
+    if (!raw) return { ...DEFAULT_WORKSPACE_STATE };
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        ...DEFAULT_WORKSPACE_STATE,
+        ...(parsed && typeof parsed === 'object' ? parsed : {}),
+      };
+    } catch {
+      return { ...DEFAULT_WORKSPACE_STATE };
+    }
+  }
+
+  public saveWorkspaceState(partialState: Partial<WorkspaceState>): void {
+    try {
+      const current = this.getWorkspaceState();
+      const updated = { ...current, ...partialState };
+      localStorage.setItem(this.getWorkspaceStateKey(), JSON.stringify(updated));
+    } catch (err) {
+      fsLog.warn('Failed to save workspace state to localStorage', err);
+    }
+  }
+
   // Export current vault as Markdown files (ZIP or downloadable Blob)
   public exportVaultAsJson(): string {
     return JSON.stringify({
       vault: this.currentVault,
       folders: this.getFolders(),
       items: this.getItems(),
+      assistantHistory: this.getAssistantHistory(),
+      workspaceState: this.getWorkspaceState(),
+      composerDrafts: this.getAllComposerDrafts(),
       exportedAt: new Date().toISOString(),
     }, null, 2);
   }
@@ -548,6 +691,19 @@ export class StorageService {
       }
       if (Array.isArray(data.items)) {
         localStorage.setItem(this.getItemsKey(), JSON.stringify(data.items));
+      }
+      if (Array.isArray(data.assistantHistory)) {
+        this.saveAssistantHistory(data.assistantHistory);
+      }
+      if (data.workspaceState && typeof data.workspaceState === 'object') {
+        this.saveWorkspaceState(data.workspaceState);
+      }
+      if (data.composerDrafts && typeof data.composerDrafts === 'object') {
+        try {
+          localStorage.setItem(this.getDraftsKey(), JSON.stringify(data.composerDrafts));
+        } catch {
+          // ignore
+        }
       }
       fsLog.info(`Imported vault backup: ${data.items?.length || 0} items, ${data.folders?.length || 0} folders`);
       return true;
