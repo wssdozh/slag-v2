@@ -390,13 +390,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             />
 
             {/* Item Type Switcher */}
-            <div className="flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/[0.06]">
+            <div className="flex items-center gap-0.5">
               {(['note', 'task', 'article'] as SlagItemType[]).map(t => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
                   className={`px-2 md:px-2.5 py-1 rounded-md text-[11px] capitalize transition-colors cursor-pointer ${
-                    type === t ? 'bg-white/10 text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
+                    type === t ? 'bg-white/10 text-white font-medium' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
                   }`}
                 >
                   {t === 'note' ? 'Заметка' : t === 'task' ? 'Таска' : 'Статья'}
@@ -690,12 +690,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
           {/* Task-Specific Metadata Options */}
           {type === 'task' && (
-            <div className="flex flex-col gap-3.5 p-4 rounded-xl bg-[#141417] border border-white/[0.08]">
+            <div className="flex flex-col gap-3 pt-1 pb-3 border-b border-white/[0.06]">
               {/* Row 1: Status & Linear Priority */}
-              <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-4 text-xs">
                 {/* Status toggle buttons */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider mr-1">Статус:</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500 mr-1.5">Статус:</span>
                   {(
                     [
                       { id: 'todo', label: 'К выполнению', icon: Circle, color: 'text-zinc-400' },
@@ -712,7 +712,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                         onClick={() => setStatus(s.id)}
                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer ${
                           isActive
-                            ? 'bg-white/10 text-white font-medium border border-white/10'
+                            ? 'bg-white/10 text-white font-medium'
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
                         }`}
                       >
@@ -724,8 +724,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 </div>
 
                 {/* Priority with Linear Signal Bars */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider mr-1">Приоритет:</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500 mr-1.5">Приоритет:</span>
                   {(
                     [
                       { id: 'none', label: 'Без' },
@@ -742,7 +742,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                         onClick={() => setPriority(p.id)}
                         className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors cursor-pointer ${
                           isActive
-                            ? 'bg-white/10 text-white font-medium border border-white/10'
+                            ? 'bg-white/10 text-white font-medium'
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
                         }`}
                       >
@@ -755,29 +755,29 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               </div>
 
               {/* Row 2: Due Date, Quick Reschedule & Time */}
-              <div className="flex flex-wrap items-center gap-3 pt-2.5 border-t border-white/[0.06] text-xs">
-                <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Срок выполнения:</span>
+              <div className="flex flex-wrap items-center gap-y-2 gap-x-3 text-xs">
+                <span className="text-[11px] font-mono text-zinc-500">Срок выполнения:</span>
 
                 {/* Quick reschedule buttons */}
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setDueDate(getTodayIso())}
-                    className="px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                    className="px-2 py-0.5 rounded text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors cursor-pointer"
                   >
                     Сегодня
                   </button>
                   <button
                     type="button"
                     onClick={() => setDueDate(getTomorrowIso())}
-                    className="px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                    className="px-2 py-0.5 rounded text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors cursor-pointer"
                   >
                     Завтра
                   </button>
                   <button
                     type="button"
                     onClick={() => setDueDate(getNextWeekIso())}
-                    className="px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                    className="px-2 py-0.5 rounded text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors cursor-pointer"
                   >
                     +1 Неделя
                   </button>
@@ -788,7 +788,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                         setDueDate('');
                         setReminderTime('');
                       }}
-                      className="px-2 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                      className="px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
                     >
                       Сбросить
                     </button>
@@ -800,28 +800,28 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="bg-black/50 border border-white/[0.08] rounded-md px-2.5 py-1 text-xs text-zinc-200 focus:border-white/20 outline-none font-mono"
+                    className="bg-transparent border border-white/[0.08] hover:border-white/20 rounded-md px-2 py-0.5 text-xs text-zinc-200 focus:border-white/30 outline-none font-mono"
                   />
                   <input
                     type="time"
                     value={reminderTime}
                     onChange={(e) => setReminderTime(e.target.value)}
                     title="Время напоминания"
-                    className="bg-black/50 border border-white/[0.08] rounded-md px-2 py-1 text-xs text-zinc-200 focus:border-white/20 outline-none font-mono"
+                    className="bg-transparent border border-white/[0.08] hover:border-white/20 rounded-md px-2 py-0.5 text-xs text-zinc-200 focus:border-white/30 outline-none font-mono"
                   />
                 </div>
               </div>
 
               {/* Row 3: Subtasks List & Add */}
-              <div className="flex flex-col gap-2 pt-2.5 border-t border-white/[0.06]">
+              <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.04]">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
+                  <span className="text-[11px] font-mono text-zinc-500">
                     Подзадачи ({subtasks.filter(s => s.completed).length}/{subtasks.length})
                   </span>
                 </div>
 
                 {subtasks.length > 0 && (
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-0.5">
                     {subtasks.map(st => (
                       <div
                         key={st.id}
@@ -834,7 +834,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                           {st.completed ? (
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                           ) : (
-                            <Circle className="w-3.5 h-3.5 text-zinc-600 hover:text-zinc-400 shrink-0" />
+                            <Circle className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300 shrink-0" />
                           )}
                           <span className={`truncate ${st.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
                             {st.title}
@@ -843,7 +843,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                         <button
                           type="button"
                           onClick={() => deleteSubtask(st.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-rose-400 transition-opacity cursor-pointer"
+                          className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-500 hover:text-rose-400 transition-opacity cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -852,17 +852,17 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   </div>
                 )}
 
-                <form onSubmit={handleAddSubtask} className="flex gap-2 pt-0.5">
+                <form onSubmit={handleAddSubtask} className="flex gap-2">
                   <input
                     type="text"
                     value={newSubtaskInput}
                     onChange={(e) => setNewSubtaskInput(e.target.value)}
                     placeholder="Добавить подзадачу (Enter)..."
-                    className="flex-1 bg-black/40 border border-white/[0.08] rounded-md px-2.5 py-1 text-xs text-white placeholder-zinc-600 focus:border-white/20 outline-none"
+                    className="flex-1 bg-white/[0.02] border border-white/[0.08] focus:border-white/20 rounded-md px-2.5 py-1 text-xs text-white placeholder-zinc-600 outline-none"
                   />
                   <button
                     type="submit"
-                    className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white text-xs font-medium cursor-pointer transition-colors"
+                    className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/15 text-zinc-200 hover:text-white text-xs font-medium cursor-pointer transition-colors"
                   >
                     Добавить
                   </button>

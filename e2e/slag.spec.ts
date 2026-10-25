@@ -2188,4 +2188,139 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('36. Task Duration Time-Blocking, Anti-Overlap, and Recurring Tasks in Calendar', async ({ page }) => {
+    // 1. Switch to Feed view to use Composer
+    const feedBtn = page.locator('header button[title*="Лента"]').or(page.locator('header button[title*="Все"]')).first();
+    if (await feedBtn.isVisible()) {
+      await feedBtn.click();
+      await page.waitForTimeout(300);
+    }
+
+    // 2. Type task with natural language: time range (duration), recurring day, tag, and priority
+    const composerTextarea = page.locator('main textarea').first();
+    await expect(composerTextarea).toBeVisible();
+    await composerTextarea.fill('Стратегический созвон 10:00-11:30 каждый вторник #план p1');
+    await page.waitForTimeout(300);
+
+    // Verify task controls in Composer toolbar appear dynamically
+    const durationBadge = page.locator('button[title*="длительность"]').first();
+    await expect(durationBadge).toBeVisible();
+
+    const recurrenceBadge = page.locator('button[title*="повторение"]').first();
+    await expect(recurrenceBadge).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/composer-duration-recurrence.png',
+      fullPage: false,
+    });
+
+    // Submit task via Enter
+    await composerTextarea.press('Enter');
+    await page.waitForTimeout(400);
+
+    // 3. Switch to Calendar view
+    const calendarBtn = page.locator('header button[title*="Календарь"]');
+    await expect(calendarBtn).toBeVisible();
+    await calendarBtn.click();
+    await page.waitForTimeout(400);
+
+    // 4. Inject an overlapping task on today's date to test Anti-Overlap column partitioning
+    const todayStr = new Date().toISOString().slice(0, 10);
+    await page.evaluate((dateStr) => {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('slag_items_')) {
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          items.unshift(
+            {
+              id: 'task_overlap_a_' + Date.now(),
+              type: 'task',
+              title: 'Стендап команды (А)',
+              content: 'Обсуждение задач',
+              folder: 'Входящие',
+              tags: ['работа'],
+              attachments: [],
+              status: 'todo',
+              priority: 'high',
+              dueDate: dateStr,
+              reminder: `${dateStr}T10:00:00.000Z`,
+              duration: 90,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            },
+            {
+              id: 'task_overlap_b_' + Date.now(),
+              type: 'task',
+              title: 'Синхронизация по дизайну (Б)',
+              content: 'Ревью макетов',
+              folder: 'Входящие',
+              tags: ['дизайн'],
+              attachments: [],
+              status: 'todo',
+              priority: 'medium',
+              dueDate: dateStr,
+              reminder: `${dateStr}T10:30:00.000Z`,
+              duration: 60,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            }
+          );
+          localStorage.setItem(key, JSON.stringify(items));
+        }
+      }
+    }, todayStr);
+
+    // Reload page to reflect injected tasks in Calendar
+    await page.reload();
+    await page.waitForTimeout(500);
+
+    // Switch to Calendar view after reload
+    await page.locator('header button[title*="Календарь"]').click();
+    await page.waitForTimeout(400);
+
+    // 5. Verify Anti-Overlap: both overlapping tasks are rendered side-by-side
+    const cardA = page.locator('[data-testid^="task-timed-card-task_overlap_a_"]').first();
+    const cardB = page.locator('[data-testid^="task-timed-card-task_overlap_b_"]').first();
+    await expect(cardA).toBeVisible({ timeout: 5000 });
+    await expect(cardB).toBeVisible({ timeout: 5000 });
+
+    // Verify task A card has resize handle for duration time-blocking
+    const resizeHandle = page.locator('[data-testid^="resize-handle-task_overlap_a_"]').first();
+    await expect(resizeHandle).toBeVisible();
+
+    // 6. Verify Recurring Task with Repeat icon is visible and advances on complete
+    const recurringCard = page.locator('.absolute, .group').filter({ hasText: 'Стратегический созвон' }).first();
+    await expect(recurringCard).toBeVisible({ timeout: 5000 });
+
+    const repeatIcon = recurringCard.locator('[title="Повторяющаяся задача"]').first();
+    await expect(repeatIcon).toBeVisible();
+
+    // Click complete checkbox on the recurring task
+    const completeBtn = recurringCard.locator('button[title*="Выполнить"]').first();
+    await expect(completeBtn).toBeVisible();
+    await completeBtn.click();
+    await page.waitForTimeout(400);
+
+    // Verify toast about recurrence advancement
+    const toast = page.locator('text=Повтор выполнен').first();
+    await expect(toast).toBeVisible({ timeout: 4000 });
+
+    // 7. Visual Screenshot Audit of Week View
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-duration-recurring-verified.png',
+      fullPage: false,
+    });
+
+    // 8. Switch to Month view and capture virtual recurrence projections
+    const monthViewBtn = page.locator('button', { hasText: 'Месяц' }).first();
+    if (await monthViewBtn.isVisible()) {
+      await monthViewBtn.click();
+      await page.waitForTimeout(300);
+      await page.screenshot({
+        path: 'test-results/screenshots/calendar-month-recurrence-projections.png',
+        fullPage: false,
+      });
+    }
+  });
 });

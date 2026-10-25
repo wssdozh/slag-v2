@@ -24,6 +24,8 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     if (item.priority && item.priority !== 'none') frontmatterData.priority = item.priority;
     if (item.dueDate) frontmatterData.dueDate = item.dueDate;
     if (item.reminder) frontmatterData.reminder = item.reminder;
+    if (item.duration !== undefined) frontmatterData.duration = item.duration;
+    if (item.recurrence) frontmatterData.recurrence = item.recurrence;
     if (item.subtasks && item.subtasks.length > 0) frontmatterData.subtasks = item.subtasks;
   }
 
@@ -129,6 +131,27 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
     item.priority = frontmatter.priority || 'none';
     item.dueDate = frontmatter.dueDate;
     item.reminder = frontmatter.reminder;
+    if (frontmatter.duration !== undefined) {
+      const parsedDuration = Number(frontmatter.duration);
+      if (!isNaN(parsedDuration) && parsedDuration > 0) {
+        item.duration = parsedDuration;
+      }
+    }
+    if (frontmatter.recurrence) {
+      if (typeof frontmatter.recurrence === 'string') {
+        const freq = frontmatter.recurrence.toLowerCase();
+        if (['daily', 'weekdays', 'weekly', 'monthly', 'yearly'].includes(freq)) {
+          item.recurrence = { freq: freq as any, interval: 1 };
+        }
+      } else if (typeof frontmatter.recurrence === 'object' && frontmatter.recurrence.freq) {
+        item.recurrence = {
+          freq: frontmatter.recurrence.freq,
+          interval: Number(frontmatter.recurrence.interval) || 1,
+          weekdays: Array.isArray(frontmatter.recurrence.weekdays) ? frontmatter.recurrence.weekdays : undefined,
+          resetSubtasks: frontmatter.recurrence.resetSubtasks !== false,
+        };
+      }
+    }
     item.subtasks = Array.isArray(frontmatter.subtasks) ? frontmatter.subtasks : [];
   }
 

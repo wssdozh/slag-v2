@@ -245,13 +245,13 @@ export const MobileFoldersView: React.FC = () => {
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] bg-[#0c0c0e]/40 overflow-x-auto scrollbar-none shrink-0 z-10 text-xs">
         {/* Inbox Sub-mode Filter (only in feed mode) */}
         {isInbox && feedViewMode === 'feed' && (
-          <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
+          <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
             <button
               onClick={() => setInboxMode('all')}
-              className={`h-full px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+              className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
                 inboxMode === 'all'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Все заметки хранилища сквозным списком"
             >
@@ -259,38 +259,38 @@ export const MobileFoldersView: React.FC = () => {
             </button>
             <button
               onClick={() => setInboxMode('sorted')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
                 inboxMode === 'sorted'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только распределенные по папкам (Разобранные)"
             >
-              <FolderCheck className="w-3.5 h-3.5 text-zinc-300" />
+              <FolderCheck className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setInboxMode('unsorted')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
                 inboxMode === 'unsorted'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только неразобранные заметки во Входящих"
             >
-              <Inbox className="w-3.5 h-3.5 text-zinc-300" />
+              <Inbox className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
 
         {/* Type filters (feed mode only) */}
         {feedViewMode === 'feed' && (
-          <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
+          <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
             <button
               onClick={() => setActiveTypeFilter('all')}
-              className={`h-full px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+              className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
                 activeTypeFilter === 'all'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Все типы записей"
             >
@@ -298,36 +298,36 @@ export const MobileFoldersView: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTypeFilter('note')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
                 activeTypeFilter === 'note'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только заметки"
             >
-              <StickyNote className="w-3.5 h-3.5 text-zinc-300" />
+              <StickyNote className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setActiveTypeFilter('task')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
                 activeTypeFilter === 'task'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только таски"
             >
-              <CheckSquare className="w-3.5 h-3.5 text-zinc-300" />
+              <CheckSquare className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setActiveTypeFilter('article')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
                 activeTypeFilter === 'article'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только статьи"
             >
-              <FileText className="w-3.5 h-3.5 text-zinc-300" />
+              <FileText className="w-3.5 h-3.5" />
             </button>
           </div>
         )}

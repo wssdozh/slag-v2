@@ -2,6 +2,7 @@ import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect } fro
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
+import { getRecurringOccurrencesInRange } from '../../lib/recurrenceHelper';
 import {
   Circle,
   CheckCircle2,
@@ -13,7 +14,8 @@ import {
   MoreVertical,
   AlertCircle,
   ListTodo,
-  Columns
+  Columns,
+  Repeat
 } from 'lucide-react';
 
 function subscribeToNow() {
@@ -213,9 +215,25 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     return items.filter(i => i.type === 'task' || (i.subtasks && i.subtasks.length > 0));
   }, [items]);
 
+  // Generate 7 days for the current week strip
+  const weekDays = useMemo(() => {
+    const days: { date: Date; dateStr: string; dayNum: number; weekdayIndex: number }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(currentWeekMonday);
+      d.setDate(currentWeekMonday.getDate() + i);
+      days.push({
+        date: d,
+        dateStr: getISODateString(d),
+        dayNum: d.getDate(),
+        weekdayIndex: i
+      });
+    }
+    return days;
+  }, [currentWeekMonday]);
+
   // Tasks grouped by dueDate
   const { tasksByDate, overdueTasks, noDateTasks } = useMemo(() => {
-    const map: Record<string, SlagItem[]> = {};
+    const map: Record<string, (SlagItem & { isVirtual?: boolean })[]> = {};
     const overdue: SlagItem[] = [];
     const noDate: SlagItem[] = [];
 
@@ -232,26 +250,33 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
       }
     });
 
+    // Project virtual occurrences of recurring tasks in week view range
+    const startRangeStr = weekDays[0]?.dateStr || todayStr;
+    const endRangeStr = weekDays[6]?.dateStr || todayStr;
+
+    allTasks.forEach(task => {
+      if (task.recurrence && task.dueDate && task.status !== 'done') {
+        const occurrences = getRecurringOccurrencesInRange(task, startRangeStr, endRangeStr);
+        occurrences.forEach(occDate => {
+          if (occDate !== task.dueDate) {
+            if (!map[occDate]) map[occDate] = [];
+            if (!map[occDate].some(it => it.id.startsWith(task.id + '_virtual_'))) {
+              map[occDate].push({
+                ...task,
+                id: `${task.id}_virtual_${occDate}`,
+                dueDate: occDate,
+                isVirtual: true,
+              });
+            }
+          }
+        });
+      }
+    });
+
     overdue.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
 
     return { tasksByDate: map, overdueTasks: overdue, noDateTasks: noDate };
-  }, [allTasks, todayStr]);
-
-  // Generate 7 days for the current week strip
-  const weekDays = useMemo(() => {
-    const days: { date: Date; dateStr: string; dayNum: number; weekdayIndex: number }[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(currentWeekMonday);
-      d.setDate(currentWeekMonday.getDate() + i);
-      days.push({
-        date: d,
-        dateStr: getISODateString(d),
-        dayNum: d.getDate(),
-        weekdayIndex: i
-      });
-    }
-    return days;
-  }, [currentWeekMonday]);
+  }, [allTasks, todayStr, weekDays]);
 
   // Generate 3 consecutive days for 3-Day View
   const threeDays = useMemo(() => {
@@ -639,7 +664,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                         setSelectedItem(task);
                         setIsFullscreenEditorOpen(true);
                       }}
-                      onToggleComplete={() => toggleTaskComplete(task.id)}
+                      onToggleComplete={() => toggleTaskComplete(task.id.replace(/_virtual_.*$/, ''))}
                       onOpenActionSheet={() => setMobileActionSheetItem(task)}
                     />
                   ))}
@@ -687,7 +712,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                               setSelectedItem(task);
                               setIsFullscreenEditorOpen(true);
                             }}
-                            onToggleComplete={() => toggleTaskComplete(task.id)}
+                            onToggleComplete={() => toggleTaskComplete(task.id.replace(/_virtual_.*$/, ''))}
                             onOpenActionSheet={() => setMobileActionSheetItem(task)}
                           />
                         ))}
@@ -805,13 +830,20 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                       <div
                         key={task.id}
                         onClick={() => {
-                          setSelectedItem(task);
+                          const realId = task.id.replace(/_virtual_.*$/, '');
+                          const target = items.find(i => i.id === realId) || task;
+                          setSelectedItem(target);
                           setIsFullscreenEditorOpen(true);
                         }}
-                        className="px-1.5 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-[10px] text-zinc-300 truncate cursor-pointer active:scale-95 transition-all"
+                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-[10px] text-zinc-300 truncate cursor-pointer active:scale-95 transition-all ${
+                          task.isVirtual ? 'border-dashed opacity-85' : ''
+                        }`}
                         title={task.title}
                       >
-                        {task.title || 'Без названия'}
+                        <span className="truncate flex-1">{task.title || 'Без названия'}</span>
+                        {task.recurrence && (
+                          <Repeat className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -943,12 +975,15 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                         >
                           <div className="flex items-start gap-1 min-w-0">
                             <span
-                              className={`text-[11px] font-medium leading-tight truncate ${
+                              className={`text-[11px] font-medium leading-tight truncate flex-1 ${
                                 isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
                               }`}
                             >
                               {task.title || 'Без названия'}
                             </span>
+                            {task.recurrence && (
+                              <Repeat className="w-2.5 h-2.5 text-amber-400 shrink-0 mt-0.5" />
+                            )}
                           </div>
 
                           <div className="flex items-center justify-between text-[9px] font-mono text-zinc-500 mt-0.5">

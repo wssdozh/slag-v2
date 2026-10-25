@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
-import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
+import { getTaskTimeSlot, type TaskTimeSlot } from '../../lib/todoistTaskParser';
+import { getRecurringOccurrencesInRange } from '../../lib/recurrenceHelper';
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,7 +13,8 @@ import {
   Clock,
   Inbox,
   X,
-  ListTodo
+  ListTodo,
+  Repeat
 } from 'lucide-react';
 
 function getISODateString(d: Date): string {
@@ -161,6 +163,14 @@ export const CalendarView: React.FC = () => {
   const [dragTarget, setDragTarget] = useState<CalendarDragTarget | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
+  // Card bottom-edge resize state for time-blocking duration
+  const [resizingTask, setResizingTask] = useState<{
+    taskId: string;
+    initialY: number;
+    initialDuration: number;
+    currentDuration: number;
+  } | null>(null);
+
   // Expanded Day Card modal for Month view
   const [expandedDayDateStr, setExpandedDayDateStr] = useState<string | null>(null);
 
@@ -221,9 +231,22 @@ export const CalendarView: React.FC = () => {
     return folderTasks.filter(t => t.status !== 'done' && !t.dueDate);
   }, [folderTasks]);
 
-  // Group tasks by dueDate
+  // Current Week Days (Monday to Sunday)
+  const weekDays = useMemo(() => {
+    const monday = getMondayOfWeek(currentDate);
+    return getWeekDays(monday);
+  }, [currentDate]);
+
+  // Month Calendar Grid Cells
+  const monthCells = useMemo(() => {
+    return getMonthCalendarDays(currentDate.getFullYear(), currentDate.getMonth());
+  }, [currentDate]);
+
+  // Group tasks by dueDate and project future occurrences of recurring tasks
   const tasksByDueDate = useMemo(() => {
-    const map = new Map<string, SlagItem[]>();
+    const map = new Map<string, (SlagItem & { isVirtual?: boolean })[]>();
+
+    // 1. Place real tasks
     folderTasks.forEach(task => {
       if (task.dueDate) {
         const list = map.get(task.dueDate) || [];
@@ -231,8 +254,53 @@ export const CalendarView: React.FC = () => {
         map.set(task.dueDate, list);
       }
     });
+
+    // 2. Project virtual occurrences of recurring tasks in visible range
+    let startRangeStr = todayStr;
+    let endRangeStr = todayStr;
+    if (viewMode === 'week' && weekDays.length > 0) {
+      startRangeStr = getISODateString(weekDays[0]);
+      endRangeStr = getISODateString(weekDays[6]);
+    } else if (viewMode === 'month' && monthCells.length > 0) {
+      startRangeStr = monthCells[0].dateStr;
+      endRangeStr = monthCells[monthCells.length - 1].dateStr;
+    }
+
+    folderTasks.forEach(task => {
+      if (task.recurrence && task.dueDate && task.status !== 'done') {
+        const occurrences = getRecurringOccurrencesInRange(task, startRangeStr, endRangeStr);
+        occurrences.forEach(occDate => {
+          if (occDate !== task.dueDate) {
+            const list = map.get(occDate) || [];
+            if (!list.some(it => it.id.startsWith(task.id + '_virtual_'))) {
+              let nextReminder: string | undefined = undefined;
+              if (task.reminder) {
+                try {
+                  const orig = new Date(task.reminder);
+                  const [y, m, d] = occDate.split('-').map(Number);
+                  nextReminder = new Date(y, m - 1, d, orig.getHours(), orig.getMinutes(), 0, 0).toISOString();
+                } catch {
+                  // ignore
+                }
+              }
+
+              const virtualItem: SlagItem & { isVirtual?: boolean } = {
+                ...task,
+                id: `${task.id}_virtual_${occDate}`,
+                dueDate: occDate,
+                reminder: nextReminder,
+                isVirtual: true,
+              };
+              list.push(virtualItem);
+              map.set(occDate, list);
+            }
+          }
+        });
+      }
+    });
+
     return map;
-  }, [folderTasks]);
+  }, [folderTasks, viewMode, weekDays, monthCells, todayStr]);
 
   // Navigation handlers
   const handlePrev = () => {
@@ -268,17 +336,6 @@ export const CalendarView: React.FC = () => {
     const month = RUSSIAN_MONTHS[currentDate.getMonth()];
     const year = currentDate.getFullYear();
     return `${month} ${year}`;
-  }, [currentDate]);
-
-  // Current Week Days (Monday to Sunday)
-  const weekDays = useMemo(() => {
-    const monday = getMondayOfWeek(currentDate);
-    return getWeekDays(monday);
-  }, [currentDate]);
-
-  // Month Calendar Grid Cells
-  const monthCells = useMemo(() => {
-    return getMonthCalendarDays(currentDate.getFullYear(), currentDate.getMonth());
   }, [currentDate]);
 
   // 1-Click reschedule helper
@@ -468,33 +525,38 @@ export const CalendarView: React.FC = () => {
   };
 
   // Render a Compact All-Day Task Pill
-  const renderAllDayTaskPill = (task: SlagItem) => {
+  const renderAllDayTaskPill = (task: SlagItem & { isVirtual?: boolean }) => {
     const isDone = task.status === 'done';
     const styling = getPriorityBadge(task.priority);
     const isDragging = draggingTaskId === task.id;
+    const realTaskId = task.id.replace(/_virtual_.*$/, '');
 
     return (
       <div
         key={task.id}
         draggable
-        onDragStart={e => handleDragStartTask(e, task.id)}
+        onDragStart={e => handleDragStartTask(e, realTaskId)}
         onDragEnd={handleDragEnd}
         onClick={() => {
-          setSelectedItem(task);
+          const target = items.find(i => i.id === realTaskId) || task;
+          setSelectedItem(target);
           setIsFullscreenEditorOpen(true);
         }}
         onContextMenu={e => {
           e.preventDefault();
           e.stopPropagation();
+          const target = items.find(i => i.id === realTaskId) || task;
           openContextMenu({
             x: e.clientX,
             y: e.clientY,
             type: 'item',
-            item: task,
+            item: target,
           });
         }}
         title={task.title}
         className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all min-w-0 ${styling.bg} ${styling.border} ${styling.text} ${
+          task.isVirtual ? 'border-dashed opacity-85' : ''
+        } ${
           isDragging
             ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
             : draggingTaskId !== null
@@ -505,7 +567,7 @@ export const CalendarView: React.FC = () => {
         <button
           onClick={e => {
             e.stopPropagation();
-            toggleTaskComplete(task.id);
+            toggleTaskComplete(realTaskId);
           }}
           className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
             isDone
@@ -525,6 +587,12 @@ export const CalendarView: React.FC = () => {
           {task.title || 'Безымянная задача'}
         </span>
 
+        {task.recurrence && (
+          <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
+            <Repeat className="w-2.5 h-2.5 text-amber-400" />
+          </span>
+        )}
+
         {task.tags && task.tags.length > 0 && (
           <span className="hidden xl:inline text-[9px] font-mono text-zinc-500 shrink-0">
             #{task.tags[0]}
@@ -534,55 +602,226 @@ export const CalendarView: React.FC = () => {
     );
   };
 
-  // Render a Time-Blocked Card in Week View
-  const renderTimedTaskBlock = (task: SlagItem, slot: ReturnType<typeof getTaskTimeSlot>) => {
+  // Handle dragging bottom edge to resize task duration (time-blocking)
+  const handleResizeStart = (e: React.MouseEvent, taskId: string, initialDuration: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startY = e.clientY;
+    setResizingTask({
+      taskId,
+      initialY: startY,
+      initialDuration,
+      currentDuration: initialDuration,
+    });
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const deltaMinutes = Math.round(((deltaY / 52) * 60) / 15) * 15;
+      const nextDuration = Math.max(15, Math.min(1440, initialDuration + deltaMinutes));
+      setResizingTask(prev => (prev ? { ...prev, currentDuration: nextDuration } : null));
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      const deltaY = upEvent.clientY - startY;
+      const deltaMinutes = Math.round(((deltaY / 52) * 60) / 15) * 15;
+      const finalDuration = Math.max(15, Math.min(1440, initialDuration + deltaMinutes));
+
+      setResizingTask(null);
+
+      const realId = taskId.replace(/_virtual_.*$/, '');
+      const target = items.find(i => i.id === realId);
+      if (target) {
+        updateItem({
+          ...target,
+          duration: finalDuration,
+        });
+        addToast(
+          `Длительность: ${
+            finalDuration >= 60
+              ? `${Math.floor(finalDuration / 60)}ч ${finalDuration % 60 ? `${finalDuration % 60}м` : ''}`.trim()
+              : `${finalDuration}м`
+          }`,
+          'success'
+        );
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  interface LayoutPositionedTask {
+    task: SlagItem & { isVirtual?: boolean };
+    slot: TaskTimeSlot;
+    topPx: number;
+    heightPx: number;
+    colIndex: number;
+    totalCols: number;
+  }
+
+  function computeAntiOverlapLayout(
+    tasks: (SlagItem & { isVirtual?: boolean })[],
+    resizingTaskId: string | null,
+    resizingDuration: number | null
+  ): LayoutPositionedTask[] {
+    if (tasks.length === 0) return [];
+
+    // 1. Calculate slot & interval for each task
+    const layoutItems = tasks.map(task => {
+      const rawSlot = getTaskTimeSlot(task);
+      const isBeingResized = resizingTaskId && (task.id === resizingTaskId || task.id.startsWith(resizingTaskId + '_virtual_'));
+      const durationMinutes = isBeingResized && resizingDuration ? resizingDuration : rawSlot.durationMinutes;
+
+      const slot: TaskTimeSlot = {
+        ...rawSlot,
+        durationMinutes,
+      };
+
+      const startMinutes = slot.startHour * 60 + slot.startMinute;
+      const endMinutes = startMinutes + slot.durationMinutes;
+      const startH = Math.max(0, Math.min(23, slot.startHour));
+      const topPx = startH * 52 + (slot.startMinute / 60) * 52;
+      const heightPx = Math.max(26, (slot.durationMinutes / 60) * 52);
+
+      return {
+        task,
+        slot,
+        startMinutes,
+        endMinutes,
+        topPx,
+        heightPx,
+        colIndex: 0,
+        totalCols: 1,
+      };
+    });
+
+    // 2. Sort by startMinutes ASC, then durationMinutes DESC
+    layoutItems.sort((a, b) => a.startMinutes - b.startMinutes || (b.endMinutes - b.startMinutes) - (a.endMinutes - a.startMinutes));
+
+    // 3. Cluster overlapping tasks
+    const clusters: typeof layoutItems[] = [];
+    let currentCluster: typeof layoutItems = [];
+    let clusterEnd = -1;
+
+    for (const item of layoutItems) {
+      if (currentCluster.length === 0) {
+        currentCluster.push(item);
+        clusterEnd = item.endMinutes;
+      } else if (item.startMinutes < clusterEnd) {
+        currentCluster.push(item);
+        clusterEnd = Math.max(clusterEnd, item.endMinutes);
+      } else {
+        clusters.push(currentCluster);
+        currentCluster = [item];
+        clusterEnd = item.endMinutes;
+      }
+    }
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster);
+    }
+
+    // 4. Assign columns within each cluster
+    const result: LayoutPositionedTask[] = [];
+
+    for (const cluster of clusters) {
+      const columns: number[] = [];
+
+      for (const item of cluster) {
+        let placedCol = -1;
+        for (let c = 0; c < columns.length; c++) {
+          if (columns[c] <= item.startMinutes) {
+            placedCol = c;
+            columns[c] = item.endMinutes;
+            break;
+          }
+        }
+        if (placedCol === -1) {
+          placedCol = columns.length;
+          columns.push(item.endMinutes);
+        }
+        item.colIndex = placedCol;
+      }
+
+      const totalCols = Math.max(1, columns.length);
+      for (const item of cluster) {
+        item.totalCols = totalCols;
+        result.push(item);
+      }
+    }
+
+    return result;
+  }
+
+  // Render a Time-Blocked Card in Week View with Anti-Overlap
+  const renderTimedTaskBlock = (positioned: LayoutPositionedTask) => {
+    const { task, slot, topPx, heightPx, colIndex, totalCols } = positioned;
     const isDone = task.status === 'done';
     const styling = getPriorityBadge(task.priority);
     const isDragging = draggingTaskId === task.id;
+    const isResizing = resizingTask?.taskId === task.id;
+    const realTaskId = task.id.replace(/_virtual_.*$/, '');
 
-    const startH = Math.max(0, Math.min(23, slot.startHour));
-    const topPx = startH * 52 + (slot.startMinute / 60) * 52;
-    const heightPx = Math.max(44, (slot.durationMinutes / 60) * 52);
+    const colWidth = 94 / totalCols;
+    const left = 3 + colIndex * colWidth;
+    const width = totalCols > 1 ? colWidth - 1 : 94;
 
     const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
     const totalSubtasks = task.subtasks?.length || 0;
+    const isShort = heightPx < 38;
 
     return (
       <div
         key={task.id}
-        draggable
-        onDragStart={e => handleDragStartTask(e, task.id)}
+        draggable={!resizingTask}
+        onDragStart={e => handleDragStartTask(e, realTaskId)}
         onDragEnd={handleDragEnd}
         onClick={() => {
-          setSelectedItem(task);
+          const target = items.find(i => i.id === realTaskId) || task;
+          setSelectedItem(target);
           setIsFullscreenEditorOpen(true);
         }}
         onContextMenu={e => {
           e.preventDefault();
           e.stopPropagation();
+          const target = items.find(i => i.id === realTaskId) || task;
           openContextMenu({
             x: e.clientX,
             y: e.clientY,
             type: 'item',
-            item: task,
+            item: target,
           });
         }}
-        style={{ top: `${topPx}px`, height: `${heightPx}px`, left: '3%', width: '94%' }}
-        className={`absolute rounded-lg p-2 border flex flex-col justify-between select-none transition-all duration-150 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
+        title={`${task.title || 'Безымянная задача'} (${slot.timeLabel})`}
+        data-testid={`task-timed-card-${task.id}`}
+        style={{
+          top: `${topPx}px`,
+          height: `${heightPx}px`,
+          left: `${left}%`,
+          width: `${width}%`,
+        }}
+        className={`absolute rounded-lg ${totalCols > 1 ? 'p-1' : 'p-2'} border flex flex-col justify-between select-none transition-all duration-75 z-10 shadow-sm ${styling.bg} ${styling.border} ${styling.text} ${
+          task.isVirtual ? 'border-dashed opacity-85' : ''
+        } ${
           isDragging
             ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98] pointer-events-none'
             : draggingTaskId !== null
             ? 'pointer-events-none'
-            : 'cursor-grab active:cursor-grabbing'
+            : isResizing
+            ? 'ring-1 ring-blue-500 shadow-md z-30'
+            : 'cursor-grab active:cursor-grabbing hover:border-white/20 hover:z-20'
         }`}
       >
-        <div className="flex items-start gap-1.5 min-w-0">
+        <div className={`flex items-start ${totalCols > 1 ? 'gap-1' : 'gap-1.5'} min-w-0`}>
           <button
             onClick={e => {
               e.stopPropagation();
-              toggleTaskComplete(task.id);
+              toggleTaskComplete(realTaskId);
             }}
-            className={`mt-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+            className={`mt-0.5 ${totalCols > 1 ? 'w-3 h-3' : 'w-3.5 h-3.5'} rounded-full flex items-center justify-center transition-colors shrink-0 ${
               isDone
                 ? 'border border-blue-500 bg-blue-500 text-white'
                 : `border border-zinc-500 ${styling.checkboxHover}`
@@ -593,23 +832,43 @@ export const CalendarView: React.FC = () => {
           </button>
 
           <span
-            className={`font-semibold text-xs leading-snug truncate flex-1 ${
+            className={`font-semibold text-xs leading-snug truncate flex-1 min-w-0 ${
               isDone ? 'line-through text-zinc-500' : 'text-zinc-100'
             }`}
           >
             {task.title || 'Безымянная задача'}
           </span>
-        </div>
 
-        <div className="flex items-center justify-between text-[10px] font-mono opacity-80 pt-0.5">
-          <span className="truncate">{slot.timeLabel}</span>
-          {totalSubtasks > 0 && (
-            <span className="flex items-center gap-0.5 shrink-0">
-              <ListTodo className="w-2.5 h-2.5" />
-              <span>{completedSubtasks}/{totalSubtasks}</span>
+          {task.recurrence && (
+            <span title="Повторяющаяся задача" className="shrink-0 flex items-center mt-0.5">
+              <Repeat className="w-3 h-3 text-amber-400" />
             </span>
           )}
         </div>
+
+        {!isShort && totalCols < 3 && (
+          <div className="flex items-center justify-between text-[10px] font-mono opacity-80 pt-0.5">
+            <span className="truncate">{slot.timeLabel}</span>
+            {totalSubtasks > 0 && (
+              <span className="flex items-center gap-0.5 shrink-0">
+                <ListTodo className="w-2.5 h-2.5" />
+                <span>{completedSubtasks}/{totalSubtasks}</span>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Bottom edge resize handle for interactive time-blocking duration */}
+        {!task.isVirtual && (
+          <div
+            data-testid={`resize-handle-${task.id}`}
+            onMouseDown={e => handleResizeStart(e, task.id, slot.durationMinutes)}
+            className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize hover:bg-blue-400/20 rounded-b-lg transition-colors z-20 flex items-center justify-center group/resize"
+            title="Потяните для изменения длительности"
+          >
+            <div className="w-6 h-0.5 bg-white/20 rounded-full group-hover/resize:bg-white/50" />
+          </div>
+        )}
       </div>
     );
   };
@@ -890,11 +1149,12 @@ export const CalendarView: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Render Timed Task Cards */}
-                        {timedTasks.map(task => {
-                          const slot = getTaskTimeSlot(task);
-                          return renderTimedTaskBlock(task, slot);
-                        })}
+                        {/* Render Timed Task Cards with Anti-Overlap Layout */}
+                        {computeAntiOverlapLayout(
+                          timedTasks,
+                          resizingTask?.taskId || null,
+                          resizingTask?.currentDuration || null
+                        ).map(positioned => renderTimedTaskBlock(positioned))}
                       </div>
                     );
                   })}
@@ -974,19 +1234,23 @@ export const CalendarView: React.FC = () => {
                           const styling = getPriorityBadge(task.priority);
                           const isDone = task.status === 'done';
                           const isDragging = draggingTaskId === task.id;
+                          const realTaskId = task.id.replace(/_virtual_.*$/, '');
 
                           return (
                             <div
                               key={task.id}
                               draggable
-                              onDragStart={e => handleDragStartTask(e, task.id)}
+                              onDragStart={e => handleDragStartTask(e, realTaskId)}
                               onDragEnd={handleDragEnd}
                               onClick={e => {
                                 e.stopPropagation();
-                                setSelectedItem(task);
+                                const target = items.find(i => i.id === realTaskId) || task;
+                                setSelectedItem(target);
                                 setIsFullscreenEditorOpen(true);
                               }}
                               className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.08] text-[10px] text-zinc-300 truncate transition-colors ${
+                                task.isVirtual ? 'border border-dashed border-white/20 opacity-80' : ''
+                              } ${
                                 isDragging
                                   ? 'opacity-40 ring-1 ring-blue-500/50 pointer-events-none'
                                   : draggingTaskId !== null
@@ -998,6 +1262,11 @@ export const CalendarView: React.FC = () => {
                               <span className={`truncate flex-1 ${isDone ? 'line-through text-zinc-500' : ''}`}>
                                 {task.title}
                               </span>
+                              {task.recurrence && (
+                                <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
+                                  <Repeat className="w-2.5 h-2.5 text-amber-400" />
+                                </span>
+                              )}
                               {!slot.isAllDay && (
                                 <span className="text-[9px] font-mono text-zinc-500 shrink-0">
                                   {String(slot.startHour).padStart(2, '0')}:{String(slot.startMinute).padStart(2, '0')}
@@ -1286,18 +1555,22 @@ export const CalendarView: React.FC = () => {
                   const styling = getPriorityBadge(task.priority);
                   const isDone = task.status === 'done';
                   const isDragging = draggingTaskId === task.id;
+                  const realTaskId = task.id.replace(/_virtual_.*$/, '');
 
                   return (
                     <div
                       key={task.id}
                       draggable
-                      onDragStart={e => handleDragStartTask(e, task.id)}
+                      onDragStart={e => handleDragStartTask(e, realTaskId)}
                       onDragEnd={handleDragEnd}
                       onClick={() => {
-                        setSelectedItem(task);
+                        const target = items.find(i => i.id === realTaskId) || task;
+                        setSelectedItem(target);
                         setIsFullscreenEditorOpen(true);
                       }}
                       className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 transition-colors cursor-grab active:cursor-grabbing ${styling.bg} ${styling.border} ${
+                        task.isVirtual ? 'border-dashed opacity-85' : ''
+                      } ${
                         isDragging ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                       }`}
                     >
@@ -1305,7 +1578,7 @@ export const CalendarView: React.FC = () => {
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            toggleTaskComplete(task.id);
+                            toggleTaskComplete(realTaskId);
                           }}
                           className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors shrink-0 ${
                             isDone
@@ -1322,6 +1595,11 @@ export const CalendarView: React.FC = () => {
                         >
                           {task.title}
                         </span>
+                        {task.recurrence && (
+                          <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
+                            <Repeat className="w-3 h-3 text-amber-400" />
+                          </span>
+                        )}
                       </div>
 
                       <span className="text-[10px] font-mono text-zinc-400 shrink-0">

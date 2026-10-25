@@ -1,5 +1,6 @@
 import * as chronoRu from 'chrono-node/ru';
 import * as chronoEn from 'chrono-node/en';
+import type { RecurrenceRule } from '../types';
 
 export interface ParsedTodoistTask {
   cleanTitle: string;
@@ -9,7 +10,43 @@ export interface ParsedTodoistTask {
   priority?: 'none' | 'low' | 'medium' | 'high';
   tags: string[];
   rawMatchedDateText?: string;
+  duration?: number; // in minutes (e.g. 15, 30, 45, 60, 90)
+  recurrence?: RecurrenceRule;
 }
+
+const WEEKDAY_MAP: Record<string, number> = {
+  пн: 1,
+  понедельник: 1,
+  mon: 1,
+  monday: 1,
+  вт: 2,
+  вторник: 2,
+  tue: 2,
+  tuesday: 2,
+  ср: 3,
+  среду: 3,
+  среда: 3,
+  wed: 3,
+  wednesday: 3,
+  чт: 4,
+  четверг: 4,
+  thu: 4,
+  thursday: 4,
+  пт: 5,
+  пятницу: 5,
+  пятница: 5,
+  fri: 5,
+  friday: 5,
+  сб: 6,
+  субботу: 6,
+  суббота: 6,
+  sat: 6,
+  saturday: 6,
+  вс: 7,
+  воскресенье: 7,
+  sun: 7,
+  sunday: 7,
+};
 
 export function parseTodoistInput(text: string, referenceDate: Date = new Date()): ParsedTodoistTask {
   const lines = text.split('\n');
@@ -42,7 +79,80 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
   }
   workingText = workingText.replace(/(?:^|\s)#([a-zA-Zа-яА-Я0-9_-]+)/g, ' ');
 
-  // c) Dates / Times (chrono-node)
+  // c) Recurrence parsing
+  let recurrence: RecurrenceRule | undefined = undefined;
+
+  // Daily
+  if (/(?:^|\s)(?:каждый\s*день|ежедневно|every\s*day|daily)(?:\b|\s|$)/i.test(workingText)) {
+    recurrence = { freq: 'daily', interval: 1, resetSubtasks: true };
+    workingText = workingText.replace(/(?:^|\s)(?:каждый\s*день|ежедневно|every\s*day|daily)(?:\b|\s|$)/gi, ' ');
+  }
+  // Weekdays (Пн-Пт)
+  else if (/(?:^|\s)(?:по\s*будням|каждый\s*будний\s*день|every\s*weekday|weekdays)(?:\b|\s|$)/i.test(workingText)) {
+    recurrence = { freq: 'weekdays', interval: 1, resetSubtasks: true };
+    workingText = workingText.replace(/(?:^|\s)(?:по\s*будням|каждый\s*будний\s*день|every\s*weekday|weekdays)(?:\b|\s|$)/gi, ' ');
+  }
+  // Specific day of week (e.g. каждый вторник / every tuesday)
+  else {
+    const specificDayMatch = workingText.match(/(?:^|\s)(?:кажд(?:ый|ую|ое|ые)|every)\s*([а-яa-z]+)(?:\b|\s|$)/i);
+    if (specificDayMatch) {
+      const rawDay = specificDayMatch[1].toLowerCase();
+      const mappedWeekday = WEEKDAY_MAP[rawDay];
+      if (mappedWeekday) {
+        recurrence = { freq: 'weekly', interval: 1, weekdays: [mappedWeekday], resetSubtasks: true };
+        workingText = workingText.replace(/(?:^|\s)(?:кажд(?:ый|ую|ое|ые)|every)\s*[а-яa-z]+(?:\b|\s|$)/gi, ' ');
+      }
+    }
+  }
+
+  // Weekly general
+  if (!recurrence && /(?:^|\s)(?:каждую\s*неделю|еженедельно|every\s*week|weekly)(?:\b|\s|$)/i.test(workingText)) {
+    recurrence = { freq: 'weekly', interval: 1, resetSubtasks: true };
+    workingText = workingText.replace(/(?:^|\s)(?:каждую\s*неделю|еженедельно|every\s*week|weekly)(?:\b|\s|$)/gi, ' ');
+  }
+
+  // Monthly
+  if (!recurrence && /(?:^|\s)(?:каждый\s*месяц|ежемесячно|every\s*month|monthly)(?:\b|\s|$)/i.test(workingText)) {
+    recurrence = { freq: 'monthly', interval: 1, resetSubtasks: true };
+    workingText = workingText.replace(/(?:^|\s)(?:каждый\s*месяц|ежемесячно|every\s*month|monthly)(?:\b|\s|$)/gi, ' ');
+  }
+
+  // d) Duration parsing (e.g. "на 45 мин", "for 1h", "10:00-11:30")
+  let duration: number | undefined = undefined;
+  let rangeStartHour: number | undefined = undefined;
+  let rangeStartMinute: number | undefined = undefined;
+
+  // 1. Time range in text: 10:00-11:30 or 10:00 - 11:30
+  const rangeMatch = workingText.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*[-—]\s*([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (rangeMatch) {
+    const startH = parseInt(rangeMatch[1], 10);
+    const startM = parseInt(rangeMatch[2], 10);
+    const endH = parseInt(rangeMatch[3], 10);
+    const endM = parseInt(rangeMatch[4], 10);
+    const startTotal = startH * 60 + startM;
+    const endTotal = endH * 60 + endM;
+    duration = endTotal > startTotal ? endTotal - startTotal : 60;
+    rangeStartHour = startH;
+    rangeStartMinute = startM;
+    workingText = workingText.replace(rangeMatch[0], ' ');
+  }
+
+  // 2. Explicit duration phrases: "на 45 мин", "for 30m", "на 1.5 часа", "for 2h"
+  if (duration === undefined) {
+    const minsMatch = workingText.match(/(?:^|\s)(?:на|for)\s*(\d+(?:[.,]\d+)?)\s*(м|мин|минут[а-я]*|m|min|mins|minutes)\b/i);
+    if (minsMatch) {
+      duration = Math.round(parseFloat(minsMatch[1].replace(',', '.')));
+      workingText = workingText.replace(minsMatch[0], ' ');
+    } else {
+      const hoursMatch = workingText.match(/(?:^|\s)(?:на|for)\s*(\d+(?:[.,]\d+)?)\s*(ч|час[а-я]*|h|hr|hrs|hour|hours)\b/i);
+      if (hoursMatch) {
+        duration = Math.round(parseFloat(hoursMatch[1].replace(',', '.')) * 60);
+        workingText = workingText.replace(hoursMatch[0], ' ');
+      }
+    }
+  }
+
+  // e) Dates / Times (chrono-node)
   let dueDate: string | undefined = undefined;
   let reminder: string | undefined = undefined;
   let hasTime = false;
@@ -75,7 +185,18 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     workingText = '';
   }
 
-  // d) Clean Title
+  // If time range was given without explicit chrono time (e.g. "План 10:00-11:30" or "Синхронизация завтра 10:00-11:30")
+  if (rangeStartHour !== undefined && rangeStartMinute !== undefined) {
+    hasTime = true;
+    const baseDate = dueDate ? new Date(dueDate) : new Date(referenceDate);
+    const d = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), rangeStartHour, rangeStartMinute, 0, 0);
+    reminder = d.toISOString();
+    if (!dueDate) {
+      dueDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+  }
+
+  // f) Clean Title
   let cleanTitle = workingText.replace(/\s+/g, ' ').trim();
   if (cleanTitle) {
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
@@ -91,6 +212,8 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     priority,
     tags: Array.from(new Set(tags)),
     rawMatchedDateText,
+    duration,
+    recurrence,
   };
 }
 
@@ -103,7 +226,14 @@ export interface TaskTimeSlot {
   timeLabel: string;
 }
 
-export function getTaskTimeSlot(task: { reminder?: string; title?: string; content?: string }): TaskTimeSlot {
+export function getTaskTimeSlot(task: {
+  reminder?: string;
+  title?: string;
+  content?: string;
+  duration?: number;
+}): TaskTimeSlot {
+  const customDuration = task.duration && task.duration > 0 ? task.duration : undefined;
+
   // 1. Check reminder ISO string first
   if (task.reminder) {
     try {
@@ -111,14 +241,17 @@ export function getTaskTimeSlot(task: { reminder?: string; title?: string; conte
       if (!isNaN(d.getTime())) {
         const h = d.getHours();
         const m = d.getMinutes();
-        const endH = (h + 1) % 24;
-        const timeLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        const durationMinutes = customDuration || 60;
+        const endTotal = h * 60 + m + durationMinutes;
+        const endH = Math.floor(endTotal / 60) % 24;
+        const endM = endTotal % 60;
+        const timeLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
         return {
           hasTime: true,
           isAllDay: false,
           startHour: h,
           startMinute: m,
-          durationMinutes: 60,
+          durationMinutes,
           timeLabel,
         };
       }
@@ -138,7 +271,8 @@ export function getTaskTimeSlot(task: { reminder?: string; title?: string; conte
 
     const startTotal = startH * 60 + startM;
     const endTotal = endH * 60 + endM;
-    const duration = endTotal > startTotal ? endTotal - startTotal : 60;
+    const computedDuration = endTotal > startTotal ? endTotal - startTotal : 60;
+    const durationMinutes = customDuration || Math.max(15, Math.min(computedDuration, 1440));
     const timeLabel = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 
     return {
@@ -146,7 +280,7 @@ export function getTaskTimeSlot(task: { reminder?: string; title?: string; conte
       isAllDay: false,
       startHour: startH,
       startMinute: startM,
-      durationMinutes: Math.max(30, Math.min(duration, 360)),
+      durationMinutes,
       timeLabel,
     };
   }
@@ -156,26 +290,29 @@ export function getTaskTimeSlot(task: { reminder?: string; title?: string; conte
   if (singleMatch) {
     const startH = parseInt(singleMatch[1], 10);
     const startM = parseInt(singleMatch[2], 10);
-    const endH = (startH + 1) % 24;
-    const timeLabel = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+    const durationMinutes = customDuration || 60;
+    const endTotal = startH * 60 + startM + durationMinutes;
+    const endH = Math.floor(endTotal / 60) % 24;
+    const endM = endTotal % 60;
+    const timeLabel = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 
     return {
       hasTime: true,
       isAllDay: false,
       startHour: startH,
       startMinute: startM,
-      durationMinutes: 60,
+      durationMinutes,
       timeLabel,
     };
   }
 
-// 4. Default: All-day task
+  // 4. Default: All-day task
   return {
     hasTime: false,
     isAllDay: true,
     startHour: 9,
     startMinute: 0,
-    durationMinutes: 60,
+    durationMinutes: customDuration || 60,
     timeLabel: 'Весь день',
   };
 }
@@ -215,4 +352,3 @@ export function extractAndStripTags(text: string): { cleanContent: string; tags:
     tags,
   };
 }
-

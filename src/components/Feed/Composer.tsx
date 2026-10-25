@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
 import { AudioPlayer } from '../UI/AudioPlayer';
@@ -10,6 +10,7 @@ import { Select } from '../UI/Select';
 import { categorizeDraft } from '../../lib/aiService';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
+import { formatRecurrenceLabel } from '../../lib/recurrenceHelper';
 import { BaseComposer } from './BaseComposer';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { SlashCommandMenu } from './SlashCommandMenu';
@@ -31,6 +32,8 @@ import {
   StickyNote,
   Lock,
   Calendar,
+  Clock,
+  Repeat,
   Hash
 } from 'lucide-react';
 
@@ -149,6 +152,12 @@ export const Composer: React.FC<ComposerProps> = ({
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
   const [isDateDismissed, setIsDateDismissed] = useState(false);
   const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
+  const [duration, setDuration] = useState<number | undefined>(undefined);
+  const [isDurationDismissed, setIsDurationDismissed] = useState(false);
+  const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
+  const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(undefined);
+  const [isRecurrenceDismissed, setIsRecurrenceDismissed] = useState(false);
+  const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
   const [dismissedTags, setDismissedTags] = useState<Set<string>>(new Set());
 
   // 150ms debounced Todoist parsing when content changes
@@ -158,7 +167,7 @@ export const Composer: React.FC<ComposerProps> = ({
     const timer = setTimeout(() => {
       const parsed = parseTodoistInput(content);
       setParsedTask(parsed);
-      if (itemType === 'note' && (parsed.dueDate || (parsed.priority && parsed.priority !== 'none'))) {
+      if (itemType === 'note' && (parsed.dueDate || (parsed.priority && parsed.priority !== 'none') || parsed.duration !== undefined || parsed.recurrence)) {
         setItemType('task');
       }
     }, 150);
@@ -178,6 +187,12 @@ export const Composer: React.FC<ComposerProps> = ({
     setAttachments([]);
     setPriority('none');
     setDueDate('');
+    setDuration(undefined);
+    setIsDurationDismissed(false);
+    setIsDurationDropdownOpen(false);
+    setRecurrence(undefined);
+    setIsRecurrenceDismissed(false);
+    setIsRecurrenceDropdownOpen(false);
     setReplyTarget(null);
     setWikiQuery(null);
     setSlashQuery(null);
@@ -513,6 +528,18 @@ export const Composer: React.FC<ComposerProps> = ({
         : '')
     : '';
 
+  const effectiveDuration = itemType === 'task'
+    ? (!isDurationDismissed && parsedTask?.duration !== undefined
+        ? parsedTask.duration
+        : duration)
+    : undefined;
+
+  const effectiveRecurrence = itemType === 'task'
+    ? (!isRecurrenceDismissed && parsedTask?.recurrence
+        ? parsedTask.recurrence
+        : recurrence)
+    : undefined;
+
   const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardFiles: File[] = [];
     if (e.clipboardData.items) {
@@ -766,6 +793,18 @@ export const Composer: React.FC<ComposerProps> = ({
           : (reminder || undefined))
       : undefined;
 
+    const taskDuration = itemType === 'task'
+      ? (!isDurationDismissed && currentParsed.duration !== undefined
+          ? currentParsed.duration
+          : duration)
+      : undefined;
+
+    const taskRecurrence = itemType === 'task'
+      ? (!isRecurrenceDismissed && currentParsed.recurrence
+          ? currentParsed.recurrence
+          : recurrence)
+      : undefined;
+
     const destinationFolder = targetFolder || currentFolder;
     const saved = saveItem({
       type: itemType,
@@ -779,6 +818,8 @@ export const Composer: React.FC<ComposerProps> = ({
       priority: taskPriority,
       dueDate: taskDueDate,
       reminder: taskReminder,
+      duration: taskDuration,
+      recurrence: taskRecurrence,
       subtasks: subtasks.length > 0 ? subtasks : undefined,
     });
 
@@ -866,6 +907,18 @@ export const Composer: React.FC<ComposerProps> = ({
           : (reminder || undefined))
       : undefined;
 
+    const taskDuration = itemType === 'task'
+      ? (!isDurationDismissed && currentParsed.duration !== undefined
+          ? currentParsed.duration
+          : duration)
+      : undefined;
+
+    const taskRecurrence = itemType === 'task'
+      ? (!isRecurrenceDismissed && currentParsed.recurrence
+          ? currentParsed.recurrence
+          : recurrence)
+      : undefined;
+
     // Create a temporary draft object in memory WITHOUT saving to vault storage yet
     const draftItem: SlagItem = {
       id: 'draft_' + Date.now(),
@@ -879,6 +932,8 @@ export const Composer: React.FC<ComposerProps> = ({
       priority: taskPriority,
       dueDate: taskDueDate,
       reminder: taskReminder,
+      duration: taskDuration,
+      recurrence: taskRecurrence,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -914,8 +969,30 @@ export const Composer: React.FC<ComposerProps> = ({
       }
     }
 
-    // Dismiss active date / priority on Escape if not in popup
+    // Close dropdowns or dismiss active date / duration / recurrence / priority on Escape
     if (e.key === 'Escape') {
+      if (isDurationDropdownOpen) {
+        e.preventDefault();
+        setIsDurationDropdownOpen(false);
+        return;
+      }
+      if (isRecurrenceDropdownOpen) {
+        e.preventDefault();
+        setIsRecurrenceDropdownOpen(false);
+        return;
+      }
+      if (!isDurationDismissed && (parsedTask?.duration !== undefined || duration !== undefined)) {
+        e.preventDefault();
+        setIsDurationDismissed(true);
+        setDuration(undefined);
+        return;
+      }
+      if (!isRecurrenceDismissed && (parsedTask?.recurrence || recurrence)) {
+        e.preventDefault();
+        setIsRecurrenceDismissed(true);
+        setRecurrence(undefined);
+        return;
+      }
       if (!isDateDismissed && (parsedTask?.dueDate || dueDate)) {
         e.preventDefault();
         setIsDateDismissed(true);
@@ -1388,6 +1465,133 @@ export const Composer: React.FC<ComposerProps> = ({
                     <span className="hidden sm:inline">Срок</span>
                   </button>
                 )}
+
+                {/* Duration Selector */}
+                <div className="relative shrink-0">
+                  {effectiveDuration !== undefined ? (
+                    <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
+                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                        title="Изменить длительность"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="font-medium max-w-[70px] truncate">
+                          {effectiveDuration >= 60
+                            ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
+                            : `${effectiveDuration}м`}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDurationDismissed(true);
+                          setDuration(undefined);
+                        }}
+                        className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                        title="Снять длительность"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
+                      className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="Установить длительность задачи"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                      <span className="hidden xl:inline">Длительность</span>
+                    </button>
+                  )}
+
+                  {isDurationDropdownOpen && (
+                    <div className="absolute left-0 bottom-full mb-1.5 w-32 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                      {[15, 30, 45, 60, 90, 120].map(mins => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => {
+                            setDuration(mins);
+                            setIsDurationDismissed(false);
+                            setIsDurationDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                            effectiveDuration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recurrence Selector */}
+                <div className="relative shrink-0">
+                  {effectiveRecurrence ? (
+                    <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
+                        className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                        title="Изменить повторение"
+                      >
+                        <Repeat className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="font-medium max-w-[85px] truncate">
+                          {formatRecurrenceLabel(effectiveRecurrence)}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsRecurrenceDismissed(true);
+                          setRecurrence(undefined);
+                        }}
+                        className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                        title="Снять повторение"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
+                      className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="Повторяющаяся задача"
+                    >
+                      <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                      <span className="hidden xl:inline">Повтор</span>
+                    </button>
+                  )}
+
+                  {isRecurrenceDropdownOpen && (
+                    <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                      {[
+                        { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                        { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                        { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                        { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                      ].map(opt => (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          onClick={() => {
+                            setRecurrence(opt.rule);
+                            setIsRecurrenceDismissed(false);
+                            setIsRecurrenceDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                        >
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* Priority Selector */}
                 <div className="flex items-center shrink-0">

@@ -40,13 +40,13 @@ export const FeedHeader: React.FC = () => {
       <div className="flex items-center gap-2 shrink-0 z-10 min-w-0">
         {/* Inbox Sub-mode Filter (SPEC §8.2) - only in feed mode */}
         {isInbox && feedViewMode === 'feed' && (
-          <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
+          <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
             <button
               onClick={() => setInboxMode('all')}
-              className={`h-full px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+              className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
                 inboxMode === 'all'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Все заметки хранилища сквозным списком"
             >
@@ -54,38 +54,38 @@ export const FeedHeader: React.FC = () => {
             </button>
             <button
               onClick={() => setInboxMode('sorted')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
                 inboxMode === 'sorted'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только распределенные по папкам (Разобранные)"
             >
-              <FolderCheck className="w-3.5 h-3.5 text-zinc-300" />
+              <FolderCheck className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setInboxMode('unsorted')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
                 inboxMode === 'unsorted'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только неразобранные заметки во Входящих"
             >
-              <Inbox className="w-3.5 h-3.5 text-zinc-300" />
+              <Inbox className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
 
         {/* Type filters (feed mode only) */}
         {feedViewMode === 'feed' && (
-          <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
+          <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
             <button
               onClick={() => setActiveTypeFilter('all')}
-              className={`h-full px-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+              className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
                 activeTypeFilter === 'all'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white font-medium'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Все типы записей"
             >
@@ -93,36 +93,36 @@ export const FeedHeader: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTypeFilter('note')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
                 activeTypeFilter === 'note'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только заметки"
             >
-              <StickyNote className="w-3.5 h-3.5 text-zinc-300" />
+              <StickyNote className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setActiveTypeFilter('task')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
                 activeTypeFilter === 'task'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только таски"
             >
-              <CheckSquare className="w-3.5 h-3.5 text-zinc-300" />
+              <CheckSquare className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setActiveTypeFilter('article')}
-              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-all cursor-pointer ${
+              className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
                 activeTypeFilter === 'article'
-                  ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-white/10 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
               }`}
               title="Только статьи"
             >
-              <FileText className="w-3.5 h-3.5 text-zinc-300" />
+              <FileText className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -175,14 +175,14 @@ export const FeedHeader: React.FC = () => {
 
       {/* Center / Right Controls */}
       <div className="flex items-center gap-1.5 shrink-0 ml-auto z-10">
-        {/* Unified View Mode Switcher: Icon-only Linear-grade segmented control */}
-        <nav aria-label="Режимы представления" className="flex items-center h-ctrl-sm bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
+        {/* Unified View Mode Switcher: Icon-only Linear-grade ghost segmented control */}
+        <nav aria-label="Режимы представления" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
           <button
             onClick={() => setFeedViewMode('feed')}
-            className={`h-full px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+            className={`h-full px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
               feedViewMode === 'feed'
-                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                ? 'bg-white/10 text-white'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
             }`}
             title="Лента записей"
           >
@@ -190,10 +190,10 @@ export const FeedHeader: React.FC = () => {
           </button>
           <button
             onClick={() => setFeedViewMode('kanban')}
-            className={`h-full px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+            className={`h-full px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
               feedViewMode === 'kanban'
-                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                ? 'bg-white/10 text-white'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
             }`}
             title="Канбан-доска задач"
           >
@@ -201,10 +201,10 @@ export const FeedHeader: React.FC = () => {
           </button>
           <button
             onClick={() => setFeedViewMode('calendar')}
-            className={`h-full px-2.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+            className={`h-full px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
               feedViewMode === 'calendar'
-                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
+                ? 'bg-white/10 text-white'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
             }`}
             title="Календарь дедлайнов"
           >

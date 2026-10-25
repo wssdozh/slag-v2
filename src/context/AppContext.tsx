@@ -21,6 +21,7 @@ import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { computeNextOccurrence } from '../lib/recurrenceHelper';
 
 const uiLog = logger.scope('UI');
 const appLog = logger.scope('APP');
@@ -131,6 +132,7 @@ interface AppContextType {
   deleteItem: (id: string) => void;
   restoreFromTrash: (id: string) => void;
   toggleTaskComplete: (itemId: string, subtaskId?: string) => void;
+  completeTaskForever: (itemId: string) => void;
   moveItem: (itemId: string, targetFolder: string) => void;
   saveFolder: (folder: FolderMeta) => void;
   deleteFolder: (path: string) => void;
@@ -757,6 +759,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       priority: itemData.priority || (itemData.type === 'task' ? 'none' : undefined),
       dueDate: itemData.dueDate,
       reminder: itemData.reminder,
+      duration: itemData.duration,
+      recurrence: itemData.recurrence,
       subtasks: itemData.subtasks || [],
       readingTimeMinutes: itemData.readingTimeMinutes || (itemData.type === 'article' ? Math.max(1, Math.round(itemData.content.split(/\s+/).length / 200)) : undefined),
       summary: itemData.summary,
@@ -815,6 +819,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status,
       });
     } else {
+      // If task has recurrence and is currently not done, advance to next recurrence cycle
+      if (item.status !== 'done' && item.recurrence && item.dueDate) {
+        const { nextDueDate, nextReminder } = computeNextOccurrence(item.dueDate, item.recurrence, item.reminder);
+        const shouldResetSubtasks = item.recurrence.resetSubtasks !== false;
+        const updatedSubtasks = item.subtasks?.map(st => ({
+          ...st,
+          completed: shouldResetSubtasks ? false : st.completed,
+        }));
+
+        updateItem({
+          ...item,
+          dueDate: nextDueDate,
+          reminder: nextReminder,
+          subtasks: updatedSubtasks,
+          status: 'todo',
+        });
+        addToast(`Повтор выполнен ➔ след.: ${nextDueDate}`, 'success');
+        return;
+      }
+
       const newStatus = item.status === 'done' ? 'todo' : 'done';
       const updatedSubtasks = item.subtasks?.map(st => ({
         ...st,
@@ -827,6 +851,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       addToast(newStatus === 'done' ? 'Задача выполнена' : 'Задача возобновлена', 'success');
     }
+  }, [items, updateItem, addToast]);
+
+  const completeTaskForever = useCallback((itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const updatedSubtasks = item.subtasks?.map(st => ({
+      ...st,
+      completed: true,
+    }));
+    updateItem({
+      ...item,
+      status: 'done',
+      subtasks: updatedSubtasks,
+    });
+    addToast('Повторяющаяся задача завершена навсегда', 'success');
   }, [items, updateItem, addToast]);
 
   const executeSuggestedAction = useCallback((action: SuggestedAction, messageId?: string): SlagItem | void => {
@@ -1330,6 +1370,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteItem,
         restoreFromTrash,
         toggleTaskComplete,
+        completeTaskForever,
         moveItem,
         saveFolder,
         deleteFolder,

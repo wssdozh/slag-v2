@@ -38,6 +38,7 @@ export const ContextMenu: React.FC = () => {
     folders,
     moveItem,
     setReplyTarget,
+    completeTaskForever,
     addToast
   } = useApp();
 
@@ -138,6 +139,21 @@ export const ContextMenu: React.FC = () => {
             </div>
             <span className="text-[10px] text-zinc-500 font-mono">P</span>
           </button>
+
+          {item.type === 'task' && item.recurrence && item.status !== 'done' && (
+            <button
+              onClick={() => {
+                completeTaskForever(item.id);
+                closeContextMenu();
+              }}
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-amber-300 text-amber-400/90 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>Завершить навсегда</span>
+              </div>
+            </button>
+          )}
 
           <div className="my-0.5 border-t border-white/[0.06]" />
 

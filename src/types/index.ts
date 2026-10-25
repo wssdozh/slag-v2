@@ -24,6 +24,15 @@ export interface SlagSubtask {
   completed: boolean;
 }
 
+export type RecurrenceFrequency = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurrenceRule {
+  freq: RecurrenceFrequency;
+  interval?: number; // default 1
+  weekdays?: number[]; // [1..7] for Monday..Sunday
+  resetSubtasks?: boolean; // default true
+}
+
 export interface SlagItem {
   id: string;
   type: SlagItemType;
@@ -42,6 +51,8 @@ export interface SlagItem {
   priority?: 'none' | 'low' | 'medium' | 'high';
   dueDate?: string; // YYYY-MM-DD
   reminder?: string; // ISO DateTime
+  duration?: number; // Duration in minutes (e.g. 15, 30, 45, 60, 90)
+  recurrence?: RecurrenceRule;
   subtasks?: SlagSubtask[];
   kanbanColumn?: string;
 
