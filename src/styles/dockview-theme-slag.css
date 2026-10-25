@@ -43,9 +43,10 @@
 /* Confine splitview sashes to Dockview's local layer so they never leak above modals */
 .dockview-theme-slag .dv-split-view-container .dv-sash-container .dv-sash {
   z-index: 10 !important;
+  background-color: transparent !important;
 }
 
-/* Expand sash interactive hitbox to 12px for effortless resizing without pixel-hunting */
+/* Expand sash interactive hitbox to 12px for effortless grabbing without pixel-hunting */
 .dockview-theme-slag .dv-split-view-container .dv-sash-container > .dv-sash:not(.dv-disabled):not(.disabled)::before {
   content: "" !important;
   position: absolute !important;
@@ -67,6 +68,38 @@
   right: 0 !important;
   top: -4px !important;
   bottom: -4px !important;
+}
+
+/* Sleek 2px laser-sharp active/hover indicator centered on the 1px seam */
+.dockview-theme-slag .dv-split-view-container .dv-sash-container > .dv-sash::after {
+  content: "" !important;
+  position: absolute !important;
+  background-color: transparent !important;
+  pointer-events: none !important;
+  transition: background-color 100ms ease, opacity 100ms ease !important;
+  opacity: 0 !important;
+  z-index: 2 !important;
+}
+
+.dockview-theme-slag .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash::after {
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 1px !important;
+  width: 2px !important;
+}
+
+.dockview-theme-slag .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash::after {
+  left: 0 !important;
+  right: 0 !important;
+  top: 1px !important;
+  height: 2px !important;
+}
+
+.dockview-theme-slag .dv-split-view-container .dv-sash-container .dv-sash:not(.disabled):hover::after,
+.dockview-theme-slag .dv-split-view-container .dv-sash-container .dv-sash:not(.disabled):active::after {
+  background-color: rgba(59, 130, 246, 0.9) !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.4) !important;
 }
 
 /* Ensure empty space (void-container) accepts tab drops and fills entire remaining header width */
