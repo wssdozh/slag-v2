@@ -724,16 +724,16 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Bottom Bar: Tags on left + Timestamp on right (omitted for pure voice without tags since time is inside the player) */}
+      {/* Bottom Bar: Tags on left + Timestamp on right (identical typography, exact same line) */}
       {(!isPureVoice || (item.tags && item.tags.length > 0)) && (
-        <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
+        <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px] w-full select-none">
           {item.tags && item.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 items-center">
+            <div className="flex flex-wrap gap-2 items-center min-w-0">
               {item.tags.map(tag => (
                 <button
                   key={tag}
                   onClick={() => setActiveTagFilter(tag)}
-                  className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                  className="text-[11px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer leading-none p-0 bg-transparent border-0"
                 >
                   #{tag}
                 </button>
@@ -744,7 +744,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           )}
 
           {!isPureVoice && (
-            <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
+            <span className="text-[11px] font-mono text-zinc-500 select-none ml-auto shrink-0 leading-none">
               {formattedTime}
             </span>
           )}

@@ -319,7 +319,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             </div>
 
             {timeContext && (
-              <span className="text-[10px] font-mono text-zinc-500 select-none ml-auto shrink-0">
+              <span className="text-[11px] font-mono text-zinc-500 select-none ml-auto shrink-0 leading-none">
                 {timeContext}
               </span>
             )}
