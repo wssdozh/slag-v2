@@ -169,7 +169,13 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     if (initialBox) {
       const splitterBox = await splitter.boundingBox();
       if (splitterBox) {
+        // Hover over the splitter hit area to verify visual affordance
         await page.mouse.move(splitterBox.x + splitterBox.width / 2, splitterBox.y + 100);
+        await page.screenshot({
+          path: 'test-results/screenshots/dockview-sash-hover.png',
+          fullPage: true,
+        });
+
         await page.mouse.down();
         await page.mouse.move(splitterBox.x + 80, splitterBox.y + 100);
         await page.mouse.up();
@@ -2480,5 +2486,38 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
         fullPage: false,
       });
     }
+
+    // 11. Verify Narrow Viewport Horizontal Scrolling (Kanban-style week columns)
+    const weekViewBtn = page.locator('button', { hasText: 'Неделя' }).first();
+    if (await weekViewBtn.isVisible()) {
+      await weekViewBtn.click();
+      await page.waitForTimeout(300);
+    }
+
+    // Resize viewport to 800px (desktop mode with sidebar open, so calendar width is ~550px < 896px)
+    await page.setViewportSize({ width: 800, height: 720 });
+    await page.waitForTimeout(300);
+
+    // Verify inner week container retains min-w-[896px] and does NOT crush day columns
+    const weekScrollContainer = page.locator('[data-testid="calendar-week-scroll-container"]');
+    await expect(weekScrollContainer).toBeVisible();
+
+    const scrollMetrics = await weekScrollContainer.evaluate(el => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+      isScrollable: el.scrollWidth > el.clientWidth,
+    }));
+    expect(scrollMetrics.scrollWidth).toBeGreaterThanOrEqual(840);
+    expect(scrollMetrics.isScrollable).toBe(true);
+
+    // Capture screenshot of narrow viewport with Kanban-style horizontal scrolling
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-week-narrow-scrollable.png',
+      fullPage: false,
+    });
+
+    // Reset viewport size to default
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.waitForTimeout(200);
   });
 });
