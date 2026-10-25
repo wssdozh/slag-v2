@@ -30,6 +30,7 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   activeTagFilter: null,
   activeMobileTab: 'folders',
   folderMediaTab: 'media',
+  isKanbanMaterialsOpen: true,
 };
 
 // Initial default folders

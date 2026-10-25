@@ -234,5 +234,6 @@ export interface WorkspaceState {
   activeTagFilter: string | null;
   activeMobileTab: MobileTabId;
   folderMediaTab?: FolderMediaTabId;
+  isKanbanMaterialsOpen?: boolean;
 }
 

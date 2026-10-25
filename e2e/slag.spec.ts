@@ -548,7 +548,38 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Verify Linear Task key (e.g. TSK-...)
     await expect(taskCard.locator('text=TSK-')).toBeVisible();
 
-    // 5. Screenshot Kanban layout for visual inspection
+    // 5. Verify Materials toggle button on top header (FeedHeader) and clean collapse to 0px
+    const headerMaterialsBtn = page.locator('header button[aria-label="Материалы папки"]');
+    await expect(headerMaterialsBtn).toBeVisible();
+
+    // Collapse via header button
+    await headerMaterialsBtn.click();
+    await page.waitForTimeout(250); // allow transition
+    await expect(page.locator('text=Материалы папки')).not.toBeInViewport();
+
+    // Screenshot collapsed state: verify 40px strip is completely gone
+    await page.screenshot({
+      path: 'test-results/screenshots/kanban-materials-collapsed.png',
+      fullPage: false,
+    });
+
+    // Expand via header button (never jumps around)
+    await headerMaterialsBtn.click();
+    await page.waitForTimeout(250);
+    await expect(page.locator('text=Материалы папки')).toBeVisible();
+
+    // Collapse via Chevron inside dock header
+    const dockCollapseBtn = page.locator('button[title*="Свернуть"]').first();
+    await dockCollapseBtn.click();
+    await page.waitForTimeout(250);
+    await expect(page.locator('text=Материалы папки')).not.toBeInViewport();
+
+    // Expand again via header button
+    await headerMaterialsBtn.click();
+    await page.waitForTimeout(250);
+    await expect(page.locator('text=Материалы папки')).toBeVisible();
+
+    // 6. Screenshot Kanban layout for visual inspection
     await page.screenshot({
       path: 'test-results/screenshots/kanban-board-layout.png',
       fullPage: false,

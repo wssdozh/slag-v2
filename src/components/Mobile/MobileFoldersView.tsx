@@ -20,7 +20,8 @@ import {
   Layers,
   Kanban,
   Calendar,
-  Filter
+  Filter,
+  BookOpen
 } from 'lucide-react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { MobileScreenHeader } from './MobileScreenHeader';
@@ -44,8 +45,20 @@ export const MobileFoldersView: React.FC = () => {
     feedViewMode,
     setFeedViewMode,
     aiItemFilter,
-    clearAiFilter
+    clearAiFilter,
+    isKanbanMaterialsOpen,
+    setIsKanbanMaterialsOpen,
   } = useApp();
+
+  const folderMaterialsCount = useMemo(() => {
+    return items.filter(item => {
+      const inFolder =
+        currentFolder === 'Входящие'
+          ? true
+          : item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
+      return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
+    }).length;
+  }, [items, currentFolder]);
 
   // Root folders vs Direct subfolders of mobileActiveFolder
   const directSubfolders = useMemo(() => {
@@ -244,6 +257,26 @@ export const MobileFoldersView: React.FC = () => {
 
       {/* 1-Row Horizontally Scrollable Filters Strip - Matching Desktop FeedHeader */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] bg-[#0c0c0e]/40 overflow-x-auto scrollbar-none shrink-0 z-10 text-xs">
+        {/* Kanban Materials Dock Toggle */}
+        {feedViewMode === 'kanban' && (
+          <button
+            onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
+            className={`h-ctrl-sm flex items-center gap-1.5 px-2.5 rounded-md text-xs transition-colors shrink-0 cursor-pointer ${
+              isKanbanMaterialsOpen
+                ? 'bg-white/10 text-white font-medium'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+            }`}
+            title={isKanbanMaterialsOpen ? 'Скрыть материалы папки' : 'Показать материалы папки'}
+            aria-label="Материалы папки"
+          >
+            <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            <span>Материалы</span>
+            <span className="text-[11px] font-mono text-zinc-500">
+              ({folderMaterialsCount})
+            </span>
+          </button>
+        )}
+
         {/* Inbox Sub-mode Filter (only in feed mode) */}
         {isInbox && feedViewMode === 'feed' && (
           <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">

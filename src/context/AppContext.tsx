@@ -53,6 +53,8 @@ interface AppContextType {
   setInboxMode: (mode: InboxMode) => void;
   feedViewMode: FeedViewMode;
   setFeedViewMode: (mode: FeedViewMode | ((prev: FeedViewMode) => FeedViewMode)) => void;
+  isKanbanMaterialsOpen: boolean;
+  setIsKanbanMaterialsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   items: SlagItem[];
   filteredItems: SlagItem[];
   selectedItem: SlagItem | null;
@@ -211,6 +213,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [inboxMode, setInboxMode] = useState<InboxMode>(() => initialWorkspace.inboxMode || 'all');
   const [feedViewMode, setFeedViewMode] = useState<FeedViewMode>(() => initialWorkspace.feedViewMode || 'feed');
+  const [isKanbanMaterialsOpen, setIsKanbanMaterialsOpen] = useState<boolean>(() => {
+    if (typeof initialWorkspace.isKanbanMaterialsOpen === 'boolean') {
+      return initialWorkspace.isKanbanMaterialsOpen;
+    }
+    return true;
+  });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [items, setItems] = useState<SlagItem[]>(() => storage.getItems());
@@ -508,8 +516,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activeTypeFilter,
       activeTagFilter,
       activeMobileTab,
+      isKanbanMaterialsOpen,
     });
-  }, [currentFolder, feedViewMode, inboxMode, activeTypeFilter, activeTagFilter, activeMobileTab]);
+  }, [currentFolder, feedViewMode, inboxMode, activeTypeFilter, activeTagFilter, activeMobileTab, isKanbanMaterialsOpen]);
 
   // Assistant history persistence in Vault
   useEffect(() => {
@@ -1254,6 +1263,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveTypeFilter(newWs.activeTypeFilter || 'all');
     setActiveTagFilter(newWs.activeTagFilter || null);
     setActiveMobileTab(newWs.activeMobileTab || 'folders');
+    setIsKanbanMaterialsOpen(typeof newWs.isKanbanMaterialsOpen === 'boolean' ? newWs.isKanbanMaterialsOpen : true);
     setChatMessages(storage.getAssistantHistory());
     setSelectedItem(null);
     refreshData();
@@ -1334,6 +1344,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setInboxMode,
         feedViewMode,
         setFeedViewMode,
+        isKanbanMaterialsOpen,
+        setIsKanbanMaterialsOpen,
         items,
         filteredItems,
         selectedItem,

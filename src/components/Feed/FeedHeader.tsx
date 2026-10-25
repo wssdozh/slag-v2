@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Folder,
@@ -11,7 +11,8 @@ import {
   Kanban,
   Calendar,
   Layers,
-  Filter
+  Filter,
+  BookOpen
 } from 'lucide-react';
 
 export const FeedHeader: React.FC = () => {
@@ -22,22 +23,54 @@ export const FeedHeader: React.FC = () => {
     feedViewMode,
     setFeedViewMode,
     folders,
+    items,
     filteredItems,
     activeTypeFilter,
     setActiveTypeFilter,
     activeTagFilter,
     setActiveTagFilter,
     aiItemFilter,
-    clearAiFilter
+    clearAiFilter,
+    isKanbanMaterialsOpen,
+    setIsKanbanMaterialsOpen,
   } = useApp();
 
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === 'Входящие';
 
+  const folderMaterialsCount = useMemo(() => {
+    return items.filter(item => {
+      const inFolder =
+        currentFolder === 'Входящие'
+          ? true
+          : item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
+      return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
+    }).length;
+  }, [items, currentFolder]);
+
   return (
     <header className="h-12 px-4 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-3 select-none shrink-0 relative">
       {/* Left: Filter Controls & Chips */}
       <div className="flex items-center gap-2 shrink-0 z-10 min-w-0">
+        {/* Kanban Materials Dock Toggle */}
+        {feedViewMode === 'kanban' && (
+          <button
+            onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
+            className={`h-ctrl-sm flex items-center gap-1.5 px-2.5 rounded-md text-xs transition-colors cursor-pointer ${
+              isKanbanMaterialsOpen
+                ? 'bg-white/10 text-white font-medium'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+            }`}
+            title={isKanbanMaterialsOpen ? 'Скрыть материалы папки' : 'Показать материалы папки'}
+            aria-label="Материалы папки"
+          >
+            <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            <span>Материалы</span>
+            <span className="text-[11px] font-mono text-zinc-500">
+              ({folderMaterialsCount})
+            </span>
+          </button>
+        )}
         {/* Inbox Sub-mode Filter (SPEC §8.2) - only in feed mode */}
         {isInbox && feedViewMode === 'feed' && (
           <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
