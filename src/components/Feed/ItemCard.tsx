@@ -590,6 +590,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             duration={att.duration}
             size={att.size}
             waveform={att.waveform}
+            timeContext={isPureVoice ? formattedTime : undefined}
             transcript={att.extractedText}
             summary={att.summary}
             enrichmentStatus={att.enrichmentStatus}
@@ -723,28 +724,32 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         </div>
       )}
 
-      {/* Bottom Bar: Tags on left + Unified Timestamp on right */}
-      <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
-        {item.tags && item.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {item.tags.map(tag => (
-              <button
-                key={tag}
-                onClick={() => setActiveTagFilter(tag)}
-                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
-              >
-                #{tag}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div />
-        )}
+      {/* Bottom Bar: Tags on left + Timestamp on right (omitted for pure voice without tags since time is inside the player) */}
+      {(!isPureVoice || (item.tags && item.tags.length > 0)) && (
+        <div className="flex items-center justify-between gap-2 pt-0.5 min-h-[16px]">
+          {item.tags && item.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {item.tags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setActiveTagFilter(tag)}
+                  className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div />
+          )}
 
-        <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
-          {formattedTime}
-        </span>
-      </div>
+          {!isPureVoice && (
+            <span className="text-[10px] font-mono text-zinc-600 select-none ml-auto shrink-0">
+              {formattedTime}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Replies Count Link */}
       {repliesCount > 0 && (
