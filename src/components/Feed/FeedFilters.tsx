@@ -9,12 +9,17 @@ import {
   Filter,
   X,
 } from 'lucide-react';
+import type { FeedViewMode } from '../../types';
 
 export interface FeedFiltersProps {
   className?: string;
+  viewMode?: FeedViewMode;
 }
 
-export const FeedFilters: React.FC<FeedFiltersProps> = ({ className = '' }) => {
+export const FeedFilters: React.FC<FeedFiltersProps> = ({
+  className = '',
+  viewMode: controlledViewMode,
+}) => {
   const {
     inboxMode,
     setInboxMode,
@@ -25,15 +30,16 @@ export const FeedFilters: React.FC<FeedFiltersProps> = ({ className = '' }) => {
     aiItemFilter,
     clearAiFilter,
     currentFolder,
-    feedViewMode,
+    feedViewMode: contextViewMode,
   } = useApp();
 
   const isInbox = currentFolder === 'Входящие';
+  const activeViewMode = controlledViewMode ?? contextViewMode;
 
   return (
     <div className={`flex items-center gap-2 shrink-0 z-10 min-w-0 ${className}`}>
       {/* Inbox Sub-mode Filter - only in feed mode */}
-      {isInbox && feedViewMode === 'feed' && (
+      {isInbox && activeViewMode === 'feed' && (
         <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
           <button
             type="button"
@@ -75,12 +81,12 @@ export const FeedFilters: React.FC<FeedFiltersProps> = ({ className = '' }) => {
       )}
 
       {/* Divider line between inbox filter and type filters */}
-      {isInbox && feedViewMode === 'feed' && (
+      {isInbox && activeViewMode === 'feed' && (
         <div className="h-4 w-px bg-white/[0.12] mx-0.5 shrink-0" />
       )}
 
       {/* Type filters (feed mode only) */}
-      {feedViewMode === 'feed' && (
+      {activeViewMode === 'feed' && (
         <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
           <button
             type="button"

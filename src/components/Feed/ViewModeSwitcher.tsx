@@ -1,13 +1,22 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Layers, Kanban, Calendar } from 'lucide-react';
+import type { FeedViewMode } from '../../types';
 
 export interface ViewModeSwitcherProps {
   className?: string;
+  viewMode?: FeedViewMode;
+  onViewModeChange?: (mode: FeedViewMode) => void;
 }
 
-export const ViewModeSwitcher: React.FC<ViewModeSwitcherProps> = ({ className = '' }) => {
-  const { feedViewMode, setFeedViewMode } = useApp();
+export const ViewModeSwitcher: React.FC<ViewModeSwitcherProps> = ({
+  className = '',
+  viewMode: controlledViewMode,
+  onViewModeChange,
+}) => {
+  const { feedViewMode: contextViewMode, setFeedViewMode } = useApp();
+  const activeViewMode = controlledViewMode ?? contextViewMode;
+  const handleViewModeChange = onViewModeChange ?? setFeedViewMode;
 
   return (
     <nav
@@ -16,9 +25,9 @@ export const ViewModeSwitcher: React.FC<ViewModeSwitcherProps> = ({ className = 
     >
       <button
         type="button"
-        onClick={() => setFeedViewMode('feed')}
+        onClick={() => handleViewModeChange('feed')}
         className={`h-full px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
-          feedViewMode === 'feed'
+          activeViewMode === 'feed'
             ? 'bg-white/10 text-white'
             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
         }`}
@@ -29,9 +38,9 @@ export const ViewModeSwitcher: React.FC<ViewModeSwitcherProps> = ({ className = 
       </button>
       <button
         type="button"
-        onClick={() => setFeedViewMode('kanban')}
+        onClick={() => handleViewModeChange('kanban')}
         className={`h-full px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
-          feedViewMode === 'kanban'
+          activeViewMode === 'kanban'
             ? 'bg-white/10 text-white'
             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
         }`}
@@ -42,9 +51,9 @@ export const ViewModeSwitcher: React.FC<ViewModeSwitcherProps> = ({ className = 
       </button>
       <button
         type="button"
-        onClick={() => setFeedViewMode('calendar')}
+        onClick={() => handleViewModeChange('calendar')}
         className={`h-full px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
-          feedViewMode === 'calendar'
+          activeViewMode === 'calendar'
             ? 'bg-white/10 text-white'
             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
         }`}

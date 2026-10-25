@@ -8,11 +8,21 @@ import {
   BookOpen,
   ArrowUpDown
 } from 'lucide-react';
+import type { FeedViewMode } from '../../types';
 
-export const FeedHeader: React.FC = () => {
+export interface FeedHeaderProps {
+  viewMode?: FeedViewMode;
+  onViewModeChange?: (mode: FeedViewMode) => void;
+}
+
+export const FeedHeader: React.FC<FeedHeaderProps> = ({
+  viewMode: controlledViewMode,
+  onViewModeChange,
+}) => {
   const {
     currentFolder,
-    feedViewMode,
+    feedViewMode: contextViewMode,
+    setFeedViewMode,
     folders,
     items,
     filteredItems,
@@ -20,6 +30,9 @@ export const FeedHeader: React.FC = () => {
     setIsKanbanMaterialsOpen,
     setIsTriageModalOpen,
   } = useApp();
+
+  const activeViewMode = controlledViewMode ?? contextViewMode;
+  const handleViewModeChange = onViewModeChange ?? setFeedViewMode;
 
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === 'Входящие';
@@ -43,7 +56,7 @@ export const FeedHeader: React.FC = () => {
       {/* Left: Filter Controls & Chips */}
       <div className="flex items-center gap-2 shrink-0 z-10 min-w-0">
         {/* Kanban Materials Dock Toggle */}
-        {feedViewMode === 'kanban' && (
+        {activeViewMode === 'kanban' && (
           <button
             onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
             className={`h-ctrl-sm px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
@@ -62,7 +75,7 @@ export const FeedHeader: React.FC = () => {
           </button>
         )}
 
-        <FeedFilters />
+        <FeedFilters viewMode={activeViewMode} />
       </div>
 
       {/* Center: Large prominent folder title in the center of the bar */}
@@ -101,7 +114,7 @@ export const FeedHeader: React.FC = () => {
           </div>
         )}
 
-        <ViewModeSwitcher />
+        <ViewModeSwitcher viewMode={activeViewMode} onViewModeChange={handleViewModeChange} />
       </div>
     </header>
   );

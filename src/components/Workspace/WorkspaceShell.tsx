@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
+import type { FeedViewMode } from '../../types';
 import {
   DockviewReact,
   type DockviewReadyEvent,
@@ -30,15 +31,42 @@ import {
 
 const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
 
-// Dynamic Feed Component reacting to feedViewMode
-const DynamicFeedPanel: React.FC = () => {
-  const { feedViewMode, currentFolder } = useApp();
+// Dynamic Workspace Content Panel supporting Feed, Kanban, and Calendar
+const WorkspaceContentPanel: React.FC<{
+  panelProps: IDockviewPanelProps;
+  defaultMode?: FeedViewMode;
+  syncWithGlobal?: boolean;
+}> = ({ panelProps, defaultMode, syncWithGlobal = false }) => {
+  const { feedViewMode, setFeedViewMode, currentFolder } = useApp();
+  const [localMode, setLocalMode] = useState<FeedViewMode>(() => defaultMode || feedViewMode);
+
+  // If syncWithGlobal is true (e.g. for the primary panel_feed), mirror global feedViewMode
+  const activeMode = syncWithGlobal ? feedViewMode : localMode;
+
+  const handleModeChange = useCallback(
+    (mode: FeedViewMode) => {
+      if (syncWithGlobal) {
+        setFeedViewMode(mode);
+      } else {
+        setLocalMode(mode);
+        const title =
+          mode === 'kanban'
+            ? 'Канбан'
+            : mode === 'calendar'
+              ? 'Календарь'
+              : currentFolder || 'Входящие';
+        panelProps.api.setTitle(title);
+      }
+    },
+    [syncWithGlobal, setFeedViewMode, currentFolder, panelProps.api]
+  );
+
   return (
     <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
-      <FeedHeader />
-      {feedViewMode === 'kanban' ? (
+      <FeedHeader viewMode={activeMode} onViewModeChange={handleModeChange} />
+      {activeMode === 'kanban' ? (
         <KanbanBoard />
-      ) : feedViewMode === 'calendar' ? (
+      ) : activeMode === 'calendar' ? (
         <CalendarView />
       ) : (
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
@@ -62,18 +90,24 @@ const components: Record<string, React.FC<IDockviewPanelProps>> = {
       <Sidebar />
     </aside>
   ),
-  feed: () => <DynamicFeedPanel />,
-  kanban: () => (
-    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
-      <FeedHeader />
-      <KanbanBoard />
-    </main>
+  feed: (props) => (
+    <WorkspaceContentPanel
+      panelProps={props}
+      syncWithGlobal={props.api.id === 'panel_feed'}
+      defaultMode="feed"
+    />
   ),
-  calendar: () => (
-    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
-      <FeedHeader />
-      <CalendarView />
-    </main>
+  kanban: (props) => (
+    <WorkspaceContentPanel
+      panelProps={props}
+      defaultMode="kanban"
+    />
+  ),
+  calendar: (props) => (
+    <WorkspaceContentPanel
+      panelProps={props}
+      defaultMode="calendar"
+    />
   ),
   assistant: () => (
     <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
