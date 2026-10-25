@@ -2037,12 +2037,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.locator('button', { hasText: 'В работе' }).click();
     await expect(page.locator('button', { hasText: 'В работе' })).toBeVisible();
 
-    // Add subtask
-    const subtaskInput = page.locator('input[placeholder*="Добавить подзадачу"]');
-    await expect(subtaskInput).toBeVisible();
-    await subtaskInput.fill('Проверить чайник и температуру');
-    await subtaskInput.press('Enter');
-    await expect(page.locator('text=Проверить чайник и температуру')).toBeVisible();
+    // Add subtask via native Markdown in textarea and test auto-continuation
+    const textarea = page.locator('#fullscreen-textarea');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('- [ ] Шаг первый');
+    await textarea.press('Enter');
+    await expect(textarea).toHaveValue(/- \[ \] Шаг первый\n- \[ \] /);
+    await textarea.fill('- [ ] Проверить чайник и температуру');
+    await expect(textarea).toHaveValue(/- \[ \] Проверить чайник и температуру/);
 
     // Capture screenshot of enhanced FullscreenEditor
     await page.screenshot({
@@ -2065,7 +2067,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     if (await calTask.isVisible()) {
       await calTask.click();
       await expect(page.locator('#fullscreen-textarea')).toBeVisible();
-      await expect(page.locator('text=Проверить чайник и температуру')).toBeVisible();
+      await expect(page.locator('#fullscreen-textarea')).toHaveValue(/- \[ \] Проверить чайник и температуру/);
       // Close via Escape
       await page.keyboard.press('Escape');
       await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();

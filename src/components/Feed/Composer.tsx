@@ -12,6 +12,7 @@ import { categorizeDraft } from '../../lib/aiService';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import { formatRecurrenceLabel } from '../../lib/recurrenceHelper';
+import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { SlashCommandMenu } from './SlashCommandMenu';
@@ -851,20 +852,7 @@ export const Composer: React.FC<ComposerProps> = ({
     const activeExtractedTags = extractedTags.filter(t => !dismissedTags.has(t));
     const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...activeExtractedTags]));
 
-    let subtasks: Array<{ id: string; title: string; completed: boolean }> = [];
-    if (itemType === 'task') {
-      const checkboxLines = lines.filter(l => /^\s*-\s*\[([ xX])\]\s+(.+)$/.test(l));
-      if (checkboxLines.length > 0) {
-        subtasks = checkboxLines.map((l, idx) => {
-          const match = l.match(/^\s*-\s*\[([ xX])\]\s+(.+)$/);
-          return {
-            id: 'st_' + idx,
-            title: match ? match[2].trim() : l,
-            completed: match ? match[1].toLowerCase() === 'x' : false,
-          };
-        });
-      }
-    }
+    const subtasks = itemType === 'task' ? parseSubtasksFromContent(finalContent) : [];
 
     const taskPriority = itemType === 'task'
       ? (!isPriorityDismissed && currentParsed.priority

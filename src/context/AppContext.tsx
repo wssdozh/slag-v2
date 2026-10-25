@@ -22,6 +22,12 @@ import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { computeNextOccurrence } from '../lib/recurrenceHelper';
+import {
+  parseSubtasksFromContent,
+  toggleCheckboxInContent,
+  setAllCheckboxesInContent,
+  migrateLegacySubtasksToContent,
+} from '../lib/taskUtils';
 
 const uiLog = logger.scope('UI');
 const appLog = logger.scope('APP');
@@ -838,13 +844,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const item = items.find(i => i.id === itemId);
     if (!item) return;
 
-    if (subtaskId && item.subtasks) {
-      const updatedSubtasks = item.subtasks.map(st => 
-        st.id === subtaskId ? { ...st, completed: !st.completed } : st
-      );
-      const allDone = updatedSubtasks.every(st => st.completed);
+    if (subtaskId && (item.subtasks || item.content)) {
+      const currentSubtasks = item.subtasks && item.subtasks.length > 0
+        ? item.subtasks
+        : parseSubtasksFromContent(item.content);
+
+      let updatedContent = item.content;
+      if (updatedContent && /^\s*[-*+]\s*\[[ xX]\]/m.test(updatedContent)) {
+        updatedContent = toggleCheckboxInContent(updatedContent, subtaskId, currentSubtasks);
+      }
+
+      const parsed = parseSubtasksFromContent(updatedContent);
+      const updatedSubtasks = parsed.length > 0
+        ? parsed
+        : currentSubtasks.map(st => (st.id === subtaskId ? { ...st, completed: !st.completed } : st));
+
+      const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every(st => st.completed);
       updateItem({
         ...item,
+        content: updatedContent,
         subtasks: updatedSubtasks,
         status: allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status,
       });
@@ -853,13 +871,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (item.status !== 'done' && item.recurrence && item.dueDate) {
         const { nextDueDate, nextReminder } = computeNextOccurrence(item.dueDate, item.recurrence, item.reminder);
         const shouldResetSubtasks = item.recurrence.resetSubtasks !== false;
-        const updatedSubtasks = item.subtasks?.map(st => ({
-          ...st,
-          completed: shouldResetSubtasks ? false : st.completed,
-        }));
+
+        const updatedContent = shouldResetSubtasks
+          ? setAllCheckboxesInContent(item.content, false)
+          : item.content;
+        const parsed = parseSubtasksFromContent(updatedContent);
+        const updatedSubtasks = parsed.length > 0
+          ? parsed
+          : item.subtasks?.map(st => ({
+              ...st,
+              completed: shouldResetSubtasks ? false : st.completed,
+            }));
 
         updateItem({
           ...item,
+          content: updatedContent,
           dueDate: nextDueDate,
           reminder: nextReminder,
           subtasks: updatedSubtasks,
@@ -870,12 +896,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const newStatus = item.status === 'done' ? 'todo' : 'done';
-      const updatedSubtasks = item.subtasks?.map(st => ({
-        ...st,
-        completed: newStatus === 'done',
-      }));
+      const updatedContent = setAllCheckboxesInContent(item.content, newStatus === 'done');
+      const parsed = parseSubtasksFromContent(updatedContent);
+      const updatedSubtasks = parsed.length > 0
+        ? parsed
+        : item.subtasks?.map(st => ({
+            ...st,
+            completed: newStatus === 'done',
+          }));
+
       updateItem({
         ...item,
+        content: updatedContent,
         status: newStatus,
         subtasks: updatedSubtasks,
       });
@@ -887,16 +919,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const item = items.find(i => i.id === itemId);
     if (!item) return;
 
-    const updatedSubtasks = item.subtasks?.map(st => ({
-      ...st,
-      completed: true,
-    }));
+    const updatedContent = setAllCheckboxesInContent(item.content, true);
+    const parsed = parseSubtasksFromContent(updatedContent);
+    const updatedSubtasks = parsed.length > 0
+      ? parsed
+      : item.subtasks?.map(st => ({
+          ...st,
+          completed: true,
+        }));
+
     updateItem({
       ...item,
-      status: 'done',
+      content: updatedContent,
       subtasks: updatedSubtasks,
+      status: 'done',
     });
-    addToast('Повторяющаяся задача завершена навсегда', 'success');
+    addToast('Задача навсегда завершена', 'success');
   }, [items, updateItem, addToast]);
 
   const executeSuggestedAction = useCallback((action: SuggestedAction, messageId?: string): SlagItem | void => {
@@ -936,33 +974,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
 
       if (existing) {
+        const rawContent = action.content !== undefined && action.content !== '' ? action.content : existing.content;
+        const mergedContent = action.subtasks && action.subtasks.length > 0
+          ? migrateLegacySubtasksToContent(rawContent, action.subtasks)
+          : rawContent;
+        const parsedSubtasks = parseSubtasksFromContent(mergedContent);
+
         const updated: SlagItem = {
           ...existing,
           title: action.title.trim() || existing.title,
-          content: action.content !== undefined && action.content !== '' ? action.content : existing.content,
+          content: mergedContent,
           tags: action.tags && action.tags.length > 0 ? Array.from(new Set([...existing.tags, ...action.tags])) : existing.tags,
           dueDate: action.dueDate !== undefined ? action.dueDate : existing.dueDate,
           reminder: action.reminder !== undefined ? action.reminder : existing.reminder,
           priority: action.priority !== undefined ? action.priority : existing.priority,
           status: action.status !== undefined ? action.status : existing.status,
-          subtasks: action.subtasks && action.subtasks.length > 0 ? [...(existing.subtasks || []), ...action.subtasks] : existing.subtasks,
+          subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : existing.subtasks,
           updatedAt: Date.now(),
         };
         updateItem(updated);
         savedItem = updated;
         addToast(`Запись «${updated.title}» обновлена`, 'success');
       } else {
+        const rawContent = action.content || '';
+        const mergedContent = action.subtasks && action.subtasks.length > 0
+          ? migrateLegacySubtasksToContent(rawContent, action.subtasks)
+          : rawContent;
+        const parsedSubtasks = parseSubtasksFromContent(mergedContent);
+
         const saved = saveItem({
           type: targetType,
           title: action.title.trim(),
-          content: action.content || '',
+          content: mergedContent,
           folder: targetFolder,
           tags: action.tags || [],
           dueDate: action.dueDate,
           reminder: action.reminder,
           priority: action.priority,
           status: action.status,
-          subtasks: action.subtasks,
+          subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : action.subtasks,
         });
         savedItem = saved;
         addToast(`Запись «${saved.title}» сохранена`, 'success');
@@ -981,21 +1031,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         )
       );
       if (target) {
-        const existingSubtasks = target.subtasks || [];
         const newSubtasks = action.subtasks || [];
-        const merged = [...existingSubtasks, ...newSubtasks];
-        const updated = { ...target, subtasks: merged, updatedAt: Date.now() };
+        const newChecklines = newSubtasks.map(st => `- [${st.completed ? 'x' : ' '}] ${st.title}`);
+        const existingContent = target.content ? target.content.trim() : '';
+        const updatedContent = existingContent
+          ? `${existingContent}\n\n${newChecklines.join('\n')}`
+          : newChecklines.join('\n');
+        const parsed = parseSubtasksFromContent(updatedContent);
+
+        const updated = {
+          ...target,
+          content: updatedContent,
+          subtasks: parsed.length > 0 ? parsed : [...(target.subtasks || []), ...newSubtasks],
+          updatedAt: Date.now(),
+        };
         updateItem(updated);
         savedItem = updated;
         addToast(`К задаче «${target.title}» добавлено ${newSubtasks.length} подзадач`, 'success');
       } else {
+        const newSubtasks = action.subtasks || [];
+        const newChecklines = newSubtasks.map(st => `- [${st.completed ? 'x' : ' '}] ${st.title}`);
+        const baseContent = (action.content || '').trim();
+        const fullContent = baseContent
+          ? `${baseContent}\n\n${newChecklines.join('\n')}`
+          : newChecklines.join('\n');
+        const parsed = parseSubtasksFromContent(fullContent);
+
         const created = saveItem({
           type: 'task',
           title: action.title.trim(),
-          content: action.content || '',
+          content: fullContent,
           folder: action.folder || currentFolder,
           tags: ['задачи'],
-          subtasks: action.subtasks || [],
+          subtasks: parsed.length > 0 ? parsed : action.subtasks || [],
         });
         savedItem = created;
         addToast(`Создана задача «${created.title}» с ${action.subtasks?.length || 0} подзадачами`, 'success');

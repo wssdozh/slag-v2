@@ -1,5 +1,6 @@
 import YAML from 'yaml';
 import type { SlagItem, SlagItemType } from '../types';
+import { parseSubtasksFromContent } from './taskUtils';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
@@ -26,7 +27,11 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     if (item.reminder) frontmatterData.reminder = item.reminder;
     if (item.duration !== undefined) frontmatterData.duration = item.duration;
     if (item.recurrence) frontmatterData.recurrence = item.recurrence;
-    if (item.subtasks && item.subtasks.length > 0) frontmatterData.subtasks = item.subtasks;
+    if (item.subtasks && item.subtasks.length > 0) {
+      if (!/^\s*[-*+]\s*\[[ xX]\]/m.test(item.content || '')) {
+        frontmatterData.subtasks = item.subtasks;
+      }
+    }
   }
 
   if (item.type === 'article') {
@@ -152,7 +157,10 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
         };
       }
     }
-    item.subtasks = Array.isArray(frontmatter.subtasks) ? frontmatter.subtasks : [];
+    const parsedSubtasks = parseSubtasksFromContent(body);
+    item.subtasks = parsedSubtasks.length > 0
+      ? parsedSubtasks
+      : (Array.isArray(frontmatter.subtasks) ? frontmatter.subtasks : []);
   }
 
   if (type === 'article') {

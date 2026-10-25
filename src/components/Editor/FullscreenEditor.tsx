@@ -6,6 +6,7 @@ import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { formatRecurrenceLabel } from '../../lib/recurrenceHelper';
+import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/taskUtils';
 import {
   ArrowLeft,
   Save,
@@ -73,7 +74,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   } = useApp();
 
   const [title, setTitle] = useState(item.title || '');
-  const [content, setContent] = useState(item.content || '');
+  const [content, setContent] = useState(() =>
+    item.type === 'task'
+      ? migrateLegacySubtasksToContent(item.content || '', item.subtasks)
+      : item.content || ''
+  );
   const [type, setType] = useState<SlagItemType>(item.type || 'article');
   const [folder, setFolder] = useState(item.folder || 'Входящие');
   const [tags, setTags] = useState<string[]>(item.tags || []);
@@ -85,8 +90,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
   const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(item.recurrence);
   const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
-  const [subtasks, setSubtasks] = useState<Array<{ id: string; title: string; completed: boolean }>>(item.subtasks || []);
-  const [newSubtaskInput, setNewSubtaskInput] = useState('');
   const [attachments, setAttachments] = useState<SlagAttachment[]>(item.attachments || []);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -107,6 +110,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   const handleSave = useCallback(() => {
     const isNewDraft = item.id.startsWith('draft_');
+    const parsedSubtasks = type === 'task' ? parseSubtasksFromContent(content) : undefined;
     const updated: SlagItem = {
       ...item,
       id: isNewDraft ? 'item_' + Date.now() : item.id,
@@ -122,7 +126,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       reminder: type === 'task' ? item.reminder : undefined,
       duration: type === 'task' ? duration : undefined,
       recurrence: type === 'task' ? recurrence : undefined,
-      subtasks: type === 'task' ? subtasks : undefined,
+      subtasks: parsedSubtasks && parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
       readingTimeMinutes: type === 'article' ? readTime : undefined,
       updatedAt: Date.now(),
     };
@@ -136,7 +140,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     }
     setIsFullscreenEditorOpen(false);
     setSelectedItem(null);
-  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, subtasks, readTime, saveItem, updateItem, addToast, setIsFullscreenEditorOpen, setSelectedItem]);
+  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, readTime, saveItem, updateItem, addToast, setIsFullscreenEditorOpen, setSelectedItem]);
 
   const handleClose = useCallback(() => {
     // Pure back / cancel: DO NOT save or publish note to feed
@@ -170,22 +174,71 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     }
   };
 
-  const handleAddSubtask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSubtaskInput.trim()) return;
-    setSubtasks([
-      ...subtasks,
-      { id: 'st_' + Date.now(), title: newSubtaskInput.trim(), completed: false },
-    ]);
-    setNewSubtaskInput('');
-  };
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
 
-  const toggleSubtask = (id: string) => {
-    setSubtasks(subtasks.map(s => (s.id === id ? { ...s, completed: !s.completed } : s)));
-  };
+      const { selectionStart, selectionEnd, value } = textarea;
+      if (selectionStart !== selectionEnd) return;
 
-  const deleteSubtask = (id: string) => {
-    setSubtasks(subtasks.filter(s => s.id !== id));
+      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+      const lineEnd = value.indexOf('\n', selectionStart);
+      const currentLine = value.slice(lineStart, lineEnd === -1 ? value.length : lineEnd);
+
+      const checkboxMatch = currentLine.match(/^(\s*[-*+]\s*\[[ xX]\]\s*)(.*)$/);
+      if (checkboxMatch) {
+        e.preventDefault();
+        const prefix = checkboxMatch[1];
+        const itemText = checkboxMatch[2];
+
+        // Empty checkbox line: pressing Enter clears it (exit checklist)
+        if (!itemText.trim()) {
+          const nextVal = value.slice(0, lineStart) + value.slice(selectionStart);
+          setContent(nextVal);
+          setTimeout(() => {
+            textarea.setSelectionRange(lineStart, lineStart);
+          }, 0);
+          return;
+        }
+
+        const indentMatch = prefix.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[1] : '';
+        const newPrefix = `\n${indent}- [ ] `;
+
+        const nextVal = value.slice(0, selectionStart) + newPrefix + value.slice(selectionStart);
+        setContent(nextVal);
+        const newCursor = selectionStart + newPrefix.length;
+        setTimeout(() => {
+          textarea.setSelectionRange(newCursor, newCursor);
+        }, 0);
+        return;
+      }
+
+      const bulletMatch = currentLine.match(/^(\s*[-*+]\s+)(.*)$/);
+      if (bulletMatch && !currentLine.includes('[')) {
+        e.preventDefault();
+        const prefix = bulletMatch[1];
+        const itemText = bulletMatch[2];
+
+        if (!itemText.trim()) {
+          const nextVal = value.slice(0, lineStart) + value.slice(selectionStart);
+          setContent(nextVal);
+          setTimeout(() => {
+            textarea.setSelectionRange(lineStart, lineStart);
+          }, 0);
+          return;
+        }
+
+        const nextVal = value.slice(0, selectionStart) + `\n${prefix}` + value.slice(selectionStart);
+        setContent(nextVal);
+        const newCursor = selectionStart + prefix.length + 1;
+        setTimeout(() => {
+          textarea.setSelectionRange(newCursor, newCursor);
+        }, 0);
+        return;
+      }
+    }
   };
 
   const insertMarkdown = (prefix: string, suffix: string = '') => {
@@ -925,63 +978,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   />
                 </div>
               </div>
-
-              {/* Subtasks Section */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.04]">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[11px] font-mono text-zinc-500">
-                    Подзадачи ({subtasks.filter(s => s.completed).length}/{subtasks.length})
-                  </span>
-                </div>
-
-                {subtasks.length > 0 && (
-                  <div className="flex flex-col gap-0.5">
-                    {subtasks.map(st => (
-                      <div
-                        key={st.id}
-                        className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-white/[0.03] text-xs group transition-colors"
-                      >
-                        <div
-                          onClick={() => toggleSubtask(st.id)}
-                          className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
-                        >
-                          {st.completed ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          ) : (
-                            <Circle className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300 shrink-0" />
-                          )}
-                          <span className={`truncate ${st.completed ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
-                            {st.title}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => deleteSubtask(st.id)}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-500 hover:text-rose-400 transition-opacity cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <form onSubmit={handleAddSubtask} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newSubtaskInput}
-                    onChange={(e) => setNewSubtaskInput(e.target.value)}
-                    placeholder="Добавить подзадачу (Enter)..."
-                    className="flex-1 bg-white/[0.02] border border-white/[0.08] focus:border-white/20 rounded-md px-2.5 py-1 text-xs text-white placeholder-zinc-600 outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/15 text-zinc-200 hover:text-white text-xs font-medium cursor-pointer transition-colors"
-                  >
-                    Добавить
-                  </button>
-                </form>
-              </div>
             </div>
           )}
 
@@ -991,6 +987,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             id="fullscreen-textarea"
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            onKeyDown={handleTextareaKeyDown}
             onPaste={handlePaste}
             placeholder="Пишите здесь... Поддерживается полный синтаксис Markdown (#, **, -, [ ], таблицы, ссылки)"
             className="w-full bg-transparent font-mono text-[13px] text-[#f4f4f5] placeholder-zinc-600 resize-none leading-relaxed border-none focus:outline-none overflow-hidden"
