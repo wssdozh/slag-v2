@@ -2396,12 +2396,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const resizeHandle = page.locator('[data-testid^="resize-handle-task_overlap_a_"]').first();
     await expect(resizeHandle).toBeVisible();
 
-    // 6. Verify Recurring Task with Repeat icon is visible and advances on complete
+    // 6. Verify Recurring Task is visible and advances on complete
     const recurringCard = page.locator('.absolute, .group').filter({ hasText: 'Стратегический созвон' }).first();
     await expect(recurringCard).toBeVisible({ timeout: 5000 });
-
-    const repeatIcon = recurringCard.locator('[title="Повторяющаяся задача"]').first();
-    await expect(repeatIcon).toBeVisible();
 
     // Click complete checkbox on the recurring task
     const completeBtn = recurringCard.locator('button[title*="Выполнить"]').first();

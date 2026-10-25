@@ -92,6 +92,7 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
   border: string;
   text: string;
   dot: string;
+  checkboxBorder: string;
   checkboxHover: string;
 } {
   switch (priority) {
@@ -101,7 +102,8 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
         border: 'border-rose-500/35',
         text: 'text-rose-200',
         dot: 'bg-rose-500',
-        checkboxHover: 'hover:border-rose-500 hover:bg-rose-500/20 text-rose-400',
+        checkboxBorder: 'border-rose-500',
+        checkboxHover: 'hover:border-rose-400 hover:bg-rose-500/25 text-rose-300',
       };
     case 'medium':
       return {
@@ -109,7 +111,8 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
         border: 'border-amber-500/35',
         text: 'text-amber-200',
         dot: 'bg-amber-500',
-        checkboxHover: 'hover:border-amber-400 hover:bg-amber-400/20 text-amber-400',
+        checkboxBorder: 'border-amber-400',
+        checkboxHover: 'hover:border-amber-300 hover:bg-amber-400/25 text-amber-300',
       };
     case 'low':
       return {
@@ -117,7 +120,8 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
         border: 'border-blue-500/35',
         text: 'text-blue-200',
         dot: 'bg-blue-400',
-        checkboxHover: 'hover:border-blue-400 hover:bg-blue-400/20 text-blue-400',
+        checkboxBorder: 'border-blue-400',
+        checkboxHover: 'hover:border-blue-300 hover:bg-blue-400/25 text-blue-300',
       };
     default:
       return {
@@ -125,7 +129,8 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
         border: 'border-white/[0.08]',
         text: 'text-zinc-200',
         dot: 'bg-zinc-500',
-        checkboxHover: 'hover:border-zinc-300 hover:bg-white/[0.08] text-zinc-300',
+        checkboxBorder: 'border-zinc-400',
+        checkboxHover: 'hover:border-zinc-200 hover:bg-white/[0.12] text-zinc-200',
       };
   }
 }
@@ -578,14 +583,14 @@ export const CalendarView: React.FC = () => {
             e.stopPropagation();
             toggleTaskComplete(realTaskId);
           }}
-          className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+          className={`group/chk w-3.5 h-3.5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
             isDone
-              ? 'border border-blue-500 bg-blue-500 text-white'
-              : `border border-zinc-500 ${styling.checkboxHover}`
+              ? 'border-2 border-blue-500 bg-blue-500 text-white'
+              : `border-2 ${styling.checkboxBorder} ${styling.checkboxHover} bg-transparent`
           }`}
           title={isDone ? 'Возобновить' : 'Выполнить'}
         >
-          <Check className="w-2 h-2 stroke-[3]" />
+          <Check className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
         </button>
 
         <span
@@ -595,12 +600,6 @@ export const CalendarView: React.FC = () => {
         >
           {task.title || 'Безымянная задача'}
         </span>
-
-        {task.recurrence && (
-          <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
-            <Repeat className="w-2.5 h-2.5 text-amber-400" />
-          </span>
-        )}
 
         {task.tags && task.tags.length > 0 && (
           <span className="hidden xl:inline text-[9px] font-mono text-zinc-500 shrink-0">
@@ -871,14 +870,14 @@ export const CalendarView: React.FC = () => {
                   e.stopPropagation();
                   toggleTaskComplete(realTaskId);
                 }}
-                className={`w-3 h-3 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                className={`group/chk ${totalCols > 1 ? 'w-3 h-3' : 'w-3.5 h-3.5'} rounded-full flex items-center justify-center transition-colors shrink-0 ${
                   isDone
-                    ? 'border border-blue-500 bg-blue-500 text-white'
-                    : `border border-zinc-500 ${styling.checkboxHover}`
+                    ? 'border-2 border-blue-500 bg-blue-500 text-white'
+                    : `border-2 ${styling.checkboxBorder} ${styling.checkboxHover} bg-transparent`
                 }`}
                 title={isDone ? 'Возобновить' : 'Выполнить'}
               >
-                <Check className="w-2 h-2 stroke-[3]" />
+                <Check className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
               </button>
 
               <span
@@ -888,12 +887,6 @@ export const CalendarView: React.FC = () => {
               >
                 {task.title || 'Безымянная задача'}
               </span>
-
-              {task.recurrence && (
-                <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
-                  <Repeat className="w-2.5 h-2.5 text-amber-400" />
-                </span>
-              )}
             </div>
 
             {/* Time label and optional subtask counter on right (shown when single column) */}
@@ -924,14 +917,14 @@ export const CalendarView: React.FC = () => {
                   e.stopPropagation();
                   toggleTaskComplete(realTaskId);
                 }}
-                className={`mt-0.5 ${totalCols > 1 ? 'w-3 h-3' : 'w-3.5 h-3.5'} rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                className={`group/chk mt-0.5 ${totalCols > 1 ? 'w-3 h-3' : 'w-3.5 h-3.5'} rounded-full flex items-center justify-center transition-colors shrink-0 ${
                   isDone
-                    ? 'border border-blue-500 bg-blue-500 text-white'
-                    : `border border-zinc-500 ${styling.checkboxHover}`
+                    ? 'border-2 border-blue-500 bg-blue-500 text-white'
+                    : `border-2 ${styling.checkboxBorder} ${styling.checkboxHover} bg-transparent`
                 }`}
                 title={isDone ? 'Возобновить' : 'Выполнить'}
               >
-                <Check className="w-2 h-2 stroke-[3]" />
+                <Check className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
               </button>
 
               <span
@@ -941,12 +934,6 @@ export const CalendarView: React.FC = () => {
               >
                 {task.title || 'Безымянная задача'}
               </span>
-
-              {task.recurrence && (
-                <span title="Повторяющаяся задача" className="shrink-0 flex items-center mt-0.5">
-                  <Repeat className="w-3 h-3 text-amber-400" />
-                </span>
-              )}
             </div>
 
             {totalCols === 1 && (
@@ -1714,13 +1701,13 @@ export const CalendarView: React.FC = () => {
                             e.stopPropagation();
                             toggleTaskComplete(realTaskId);
                           }}
-                          className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                          className={`group/chk w-4 h-4 rounded-full flex items-center justify-center transition-colors shrink-0 ${
                             isDone
-                              ? 'border border-blue-500 bg-blue-500 text-white'
-                              : `border border-zinc-500 ${styling.checkboxHover}`
+                              ? 'border-2 border-blue-500 bg-blue-500 text-white'
+                              : `border-2 ${styling.checkboxBorder} ${styling.checkboxHover} bg-transparent`
                           }`}
                         >
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          <Check className={`w-2.5 h-2.5 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
                         </button>
                         <span
                           className={`text-xs font-medium leading-snug truncate ${
