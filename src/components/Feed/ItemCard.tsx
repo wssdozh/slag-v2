@@ -15,7 +15,8 @@ import {
   FileText,
   CornerUpLeft,
   Pin,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
@@ -45,7 +46,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   } = useApp();
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
-  const [isArticleExpanded, setIsArticleExpanded] = useState(false);
   const [expandedOcrIds, setExpandedOcrIds] = useState<Set<string>>(new Set());
   const [swipeOffset, setSwipeOffset] = useState(0);
 
@@ -308,8 +308,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           transition: swipeOffset ? 'none' : 'transform 150ms ease-out',
         }}
         className={`group relative flex flex-col ${
-          isPureVoice ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-2 w-full'
-        } p-3 rounded-xl transition-all cursor-default select-none ${
+          isPureVoice ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'
+        } p-2.5 sm:p-3 rounded-xl transition-all cursor-default select-none ${
           isHighlighted
             ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
             : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
@@ -348,9 +348,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           </button>
         </div>
 
+        {/* Article Focus Editor Button in top-right corner */}
+        {isArticle && (
+          <button
+            type="button"
+            onClick={handleOpenArticle}
+            className="absolute top-2 right-9 sm:top-2.5 sm:right-2.5 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer z-10"
+            title="Открыть в фокус-редакторе (⌘E)"
+            aria-label="Открыть в фокус-редакторе"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        )}
+
       {/* Top Header / Metadata Bar: Rendered ONLY when metadata exists */}
       {hasMetadata && (
-        <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-500 pr-6 sm:pr-0">
+        <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-500 pr-16 sm:pr-10">
           {/* Item Type: Plain text, no nested chips */}
           {isTask && (
             <span className="text-2xs font-mono text-zinc-400 font-medium">
@@ -359,7 +372,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           )}
           {isArticle && (
             <span className="text-2xs font-mono text-zinc-400 font-medium">
-              Статья {item.readingTimeMinutes ? `• ${item.readingTimeMinutes} мин` : ''}
+              Статья • {item.readingTimeMinutes || Math.max(1, Math.round((item.content?.split(/\s+/).length || 0) / 200))} мин
             </span>
           )}
 
@@ -513,48 +526,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           )}
         </div>
       ) : isArticle ? (
-        /* Article Variant - Flat Linear Style, no nested card in card */
-        <div className="flex flex-col gap-2 pt-0.5">
-          <div className="flex items-start justify-between gap-3">
-            <h3
-              onClick={() => setIsArticleExpanded(!isArticleExpanded)}
-              className="text-sm font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
-            >
-              <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
-              <span>{item.title}</span>
-            </h3>
+        /* Article Variant - Clean Teaser, opens Focus Editor on click */
+        <div className="flex flex-col gap-1.5 pt-0.5">
+          <h3
+            onClick={handleOpenArticle}
+            className="text-sm font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-10 sm:pr-12"
+          >
+            <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
+            <span>{item.title}</span>
+          </h3>
 
-            <button
-              onClick={handleOpenArticle}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors shrink-0 font-mono"
-              title="Открыть в полноэкранном фокус-редакторе (⌘E)"
-            >
-              <span>Фокус-редактор</span>
-              <Maximize2 className="w-3 h-3" />
-            </button>
-          </div>
-
-          {isArticleExpanded ? (
-            <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap font-normal pt-0.5">
-              {renderContentWithWikiLinks(item.content)}
-            </div>
-          ) : (
-            <p
-              onClick={() => setIsArticleExpanded(true)}
-              className="text-xs text-zinc-400 line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-zinc-300 transition-colors"
-            >
-              {item.summary || item.content.slice(0, 180)}
-            </p>
-          )}
-
-          <div className="flex items-center pt-0.5 text-2xs">
-            <button
-              onClick={() => setIsArticleExpanded(!isArticleExpanded)}
-              className="text-zinc-400 hover:text-zinc-200 transition-colors font-mono"
-            >
-              {isArticleExpanded ? 'Свернуть ↑' : `Читать полностью (${item.readingTimeMinutes || 2} мин) ↓`}
-            </button>
-          </div>
+          <p
+            onClick={handleOpenArticle}
+            className="text-xs text-zinc-400 line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-zinc-300 transition-colors"
+          >
+            {item.summary || item.content.slice(0, 200)}
+          </p>
         </div>
       ) : (
         /* Note Variant */
@@ -605,7 +592,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           {imageAttachments.length === 1 ? (
             <div className="flex flex-col items-start max-w-full">
               <div
-                className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 cursor-pointer hover:opacity-95 transition-opacity max-h-[420px] max-w-full"
+                className="relative rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 min-w-[140px] min-h-[72px] max-h-[420px] max-w-full group/img flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
                 onClick={() => handleImageClick(imageAttachments[0])}
               >
                 <img
@@ -613,44 +600,50 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                   alt={imageAttachments[0].name}
                   className="w-auto h-auto max-h-[420px] max-w-full object-contain rounded-lg"
                 />
-              </div>
-              {/* OCR text display for single image */}
-              {imageAttachments[0].extractedText ? (
-                <div className="w-full mt-1.5">
+
+                {/* Text action badge anchored in the bottom-right corner of the image */}
+                {imageAttachments[0].extractedText ? (
                   <button
                     type="button"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       toggleOcr(imageAttachments[0].id);
                     }}
-                    className="text-[10px] text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1 cursor-pointer select-none font-mono"
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-mono shadow-md active:scale-95 z-10"
+                    title={expandedOcrIds.has(imageAttachments[0].id) ? 'Скрыть текст' : 'Показать текст с фото'}
                   >
-                    <span>{expandedOcrIds.has(imageAttachments[0].id) ? 'Скрыть текст с фото' : 'Текст с фото (OCR)'}</span>
-                    <ChevronDown className={`w-3 h-3 transition-transform ${expandedOcrIds.has(imageAttachments[0].id) ? 'rotate-180' : ''}`} />
+                    <FileText className="w-3.5 h-3.5 text-zinc-300" />
+                    <span>Текст</span>
+                    <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${expandedOcrIds.has(imageAttachments[0].id) ? 'rotate-180' : ''}`} />
                   </button>
-                  {expandedOcrIds.has(imageAttachments[0].id) && (
-                    <div className="mt-1 pt-1 pl-2.5 border-l border-white/10 text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
-                      {imageAttachments[0].extractedText}
-                    </div>
-                  )}
+                ) : imageAttachments[0].enrichmentStatus === 'processing' ? (
+                  <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md border border-white/15 text-zinc-300 text-[11px] font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+                    <span>Анализ...</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleEnrichAttachment(imageAttachments[0]);
+                    }}
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-mono shadow-md active:scale-95 z-10"
+                    title="Распознать текст на изображении"
+                  >
+                    <Sparkles className="w-3 h-3 text-zinc-400" />
+                    <span>{imageAttachments[0].enrichmentStatus === 'error' ? 'Повторить' : 'Текст'}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Extracted text accordion directly under the image */}
+              {imageAttachments[0].extractedText && expandedOcrIds.has(imageAttachments[0].id) && (
+                <div className="w-full mt-1.5 pt-1.5 border-t border-white/[0.08] text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+                  {imageAttachments[0].extractedText}
                 </div>
-              ) : imageAttachments[0].enrichmentStatus === 'processing' ? (
-                <div className="text-[10px] text-zinc-400 animate-pulse font-mono mt-1 flex items-center gap-1">
-                  <Sparkles className="w-2.5 h-2.5" />
-                  Анализ изображения...
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEnrichAttachment(imageAttachments[0]);
-                  }}
-                  className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 cursor-pointer select-none font-mono mt-1"
-                >
-                  <Sparkles className="w-2.5 h-2.5 text-zinc-400" />
-                  <span>{imageAttachments[0].enrichmentStatus === 'error' ? 'Повторить OCR' : 'Распознать текст'}</span>
-                </button>
               )}
             </div>
           ) : (
@@ -681,7 +674,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                         }}
                         className="text-[9px] text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-0.5 cursor-pointer select-none font-mono"
                       >
-                        <span>{expandedOcrIds.has(img.id) ? 'Скрыть OCR' : 'OCR'}</span>
+                        <span>{expandedOcrIds.has(img.id) ? 'Скрыть текст' : 'Текст'}</span>
                         <ChevronDown className={`w-2.5 h-2.5 transition-transform ${expandedOcrIds.has(img.id) ? 'rotate-180' : ''}`} />
                       </button>
                       {expandedOcrIds.has(img.id) && (

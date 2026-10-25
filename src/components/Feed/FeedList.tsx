@@ -152,7 +152,7 @@ export const FeedList: React.FC = () => {
         </div>
       ) : (
         grouped.map(group => (
-          <div key={group.dateLabel} className="flex flex-col gap-3">
+          <div key={group.dateLabel} className="flex flex-col gap-2">
             {/* Telegram-style date bubble */}
             <div className="flex justify-center py-1 select-none">
               <span className="px-3 py-0.5 rounded-full bg-[#18181b] border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
@@ -161,7 +161,7 @@ export const FeedList: React.FC = () => {
             </div>
 
             {/* List of cards */}
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-1.5">
               {group.items.map(item => (
                 <ItemCard key={item.id} item={item} />
               ))}

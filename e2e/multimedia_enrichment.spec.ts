@@ -126,9 +126,10 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
     // --- Verify Image Note (with OCR toggle) ---
     const imageCard = page.locator('.group', { hasText: 'Чек за спортивное питание' });
     await expect(imageCard).toBeVisible();
-    const ocrBtn = imageCard.locator('button', { hasText: 'Текст с фото (OCR)' });
+    await imageCard.scrollIntoViewIfNeeded();
+    const ocrBtn = imageCard.locator('button', { hasText: 'Текст' });
     await expect(ocrBtn).toBeVisible();
-    await ocrBtn.click();
+    await ocrBtn.click({ force: true });
     await expect(imageCard.locator('text=PROTEIN WHEY 1000g - 2400 RUB')).toBeVisible();
 
     // --- Verify File Note (with Summary) ---
@@ -144,14 +145,11 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
     });
 
     // --- Test Orama Search by audio transcript text ---
-    const searchBtn = page.locator('button[title*="Поиск"], button[aria-label*="Поиск"]').first();
-    if (await searchBtn.isVisible()) {
-      await searchBtn.click();
-    } else {
-      await page.keyboard.press('Control+k');
-    }
+    await page.locator('body').click();
+    await page.keyboard.press('Control+k');
 
-    const searchInput = page.locator('input[placeholder*="Поиск"], input[type="text"]').last();
+    const searchModal = page.locator('.fixed.z-50');
+    const searchInput = searchModal.locator('input[placeholder*="Поиск по заметкам"]');
     await expect(searchInput).toBeVisible();
     await searchInput.fill('протеин');
 
@@ -175,7 +173,7 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
     // --- Verify Lightbox Full View with OCR side panel ---
     const imageThumb = imageCard.locator('img').first();
     await expect(imageThumb).toBeVisible();
-    await imageThumb.click();
+    await imageThumb.click({ force: true });
 
     // Check lightbox opened
     const textToggleBtn = page.locator('button[aria-label="Распознанный текст"]');

@@ -79,7 +79,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(allBtn).toHaveClass(/bg-white\/10/);
   });
 
-  test('4. Article inline accordion expansion & collapse', async ({ page }) => {
+  test('4. Article teaser card and opening in Focus Editor', async ({ page }) => {
     // Switch to "Все" to see all demo articles or navigate to design
     await page.locator('header button[title*="Все заметки хранилища"]').click();
 
@@ -93,29 +93,29 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const articleCard = page.locator('#item-demo_article_1');
     await expect(articleCard).toBeVisible();
 
+    // Verify metadata shows reading time
+    await expect(articleCard.locator('text=/Статья • \\d+ мин/')).toBeVisible();
+
+    // Verify teaser text is displayed and "Читать полностью" is removed
+    await expect(articleCard.locator('button', { hasText: /Читать полностью/ })).toHaveCount(0);
+
+    // Save screenshot of the clean article card
     await articleCard.screenshot({
-      path: 'test-results/screenshots/article-card-collapsed.png',
+      path: 'test-results/screenshots/article-card-teaser.png',
     });
 
-    // Check expand button
-    const readFullBtn = articleCard.locator('button', { hasText: /Читать полностью/ });
-    await expect(readFullBtn).toBeVisible();
-    await readFullBtn.click();
+    // Open via corner Focus Editor button
+    const focusEditorBtn = articleCard.locator('button[aria-label="Открыть в фокус-редакторе"]');
+    await expect(focusEditorBtn).toBeVisible();
+    await focusEditorBtn.click();
 
-    // Verify expanded text is visible
-    await expect(articleCard.locator('text=Три ключевых принципа SLAG')).toBeVisible();
+    // Verify fullscreen editor opened with article content
+    await expect(page.locator('#fullscreen-textarea')).toBeVisible();
+    await expect(page.locator('#fullscreen-textarea')).toHaveValue(/Три ключевых принципа SLAG/);
 
-    await articleCard.screenshot({
-      path: 'test-results/screenshots/article-card-expanded.png',
-    });
-
-    // Check collapse button
-    const collapseBtn = articleCard.locator('button', { hasText: 'Свернуть ↑' });
-    await expect(collapseBtn).toBeVisible();
-    await collapseBtn.click();
-
-    // Verify it collapsed back
-    await expect(articleCard.locator('button', { hasText: /Читать полностью/ })).toBeVisible();
+    // Return back to feed
+    await page.locator('header button', { hasText: 'Назад' }).click();
+    await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();
   });
 
   test('5. Unified Context Menu and Pinning via Right Click', async ({ page }) => {
@@ -285,7 +285,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
 
     // 4. Capture Fullscreen Editor layout for visual audit
-    const focusEditorBtn = page.locator('button', { hasText: 'Фокус-редактор' }).first();
+    const focusEditorBtn = page.locator('button[aria-label="Открыть в фокус-редакторе"]').first();
     if (await focusEditorBtn.isVisible()) {
       await focusEditorBtn.click();
       await expect(page.locator('#fullscreen-textarea')).toBeVisible();
