@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/dockview-theme-slag.css";
+@import "@atomic-editor/editor/styles.css";
 
 @theme {
   --text-2xs: calc(0.6875rem * var(--slag-font-scale, 1));
@@ -227,4 +228,40 @@
   align-items: center;
   justify-content: center;
 }
+
+/* SLAG v2 Linear/Obsidian Dark Theme overrides for @atomic-editor/editor */
+.atomic-cm-editor {
+  --atomic-editor-bg: transparent;
+  --atomic-editor-bg-panel: #141417;
+  --atomic-editor-bg-surface: #1e1e24;
+  --atomic-editor-fg: #f4f4f5;
+  --atomic-editor-fg-muted: #a1a1aa;
+  --atomic-editor-fg-faint: #71717a;
+  --atomic-editor-border: rgba(255, 255, 255, 0.08);
+  --atomic-editor-accent: #3b82f6;
+  --atomic-editor-accent-bright: #60a5fa;
+  --atomic-editor-accent-soft: rgba(59, 130, 246, 0.2);
+  --atomic-editor-link: #60a5fa;
+  --atomic-editor-link-hover: #93c5fd;
+  --atomic-editor-code-bg: rgba(255, 255, 255, 0.04);
+  --atomic-editor-selection-bg: rgba(59, 130, 246, 0.25);
+  --atomic-editor-measure: 100%;
+  --atomic-editor-body-size: 14px;
+  --atomic-editor-body-leading: 1.65;
+}
+
+.atomic-cm-editor .cm-editor {
+  background: transparent !important;
+}
+
+.atomic-cm-editor .cm-editor.cm-focused {
+  outline: none !important;
+}
+
+.atomic-cm-editor .cm-content {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  min-height: 420px;
+}
+
 

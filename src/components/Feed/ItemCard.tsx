@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
+import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 
 interface ItemCardProps {
   item: SlagItem;
@@ -247,39 +248,25 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const renderContentWithWikiLinks = (text: string) => {
-    if (!text) return null;
-    const parts = text.split(/(\[\[[^\]]+\]\])/g);
-    return parts.map((part, idx) => {
-      const match = part.match(/^\[\[([^\]]+)\]\]$/);
-      if (match) {
-        const linkTarget = match[1];
-        return (
-          <span
-            key={idx}
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              scrollToItem(linkTarget);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                e.stopPropagation();
-                scrollToItem(linkTarget);
-              }
-            }}
-            className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
-            title={`Перейти к «${linkTarget}»`}
-          >
-            {linkTarget}
-          </span>
-        );
+  const taskBodyContent = (() => {
+    let text = item.content || '';
+    if (item.subtasks && item.subtasks.length > 0) {
+      text = text
+        .split('\n')
+        .filter(line => !/^\s*[-*+]\s*\[[ xX]\]\s*/.test(line))
+        .join('\n')
+        .trim();
+    }
+    if (item.title && text) {
+      const normalizedTitle = item.title.trim().toLowerCase();
+      const lines = text.split('\n');
+      const firstLineClean = lines[0].replace(/^#+\s*/, '').trim().toLowerCase();
+      if (firstLineClean === normalizedTitle) {
+        text = lines.slice(1).join('\n').trim();
       }
-      return part;
-    });
-  };
+    }
+    return text;
+  })();
 
   const isHighlighted = highlightedItemId === item.id;
 
@@ -470,9 +457,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                 {item.title}
               </h3>
 
-              {item.content && (
+              {taskBodyContent && (
                 <div className="mt-1 text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-normal">
-                  {renderContentWithWikiLinks(item.content)}
+                  <MarkdownRenderer content={taskBodyContent} onWikiLinkClick={scrollToItem} />
                 </div>
               )}
             </div>
@@ -555,7 +542,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
 
             {item.content && (
               <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap font-normal">
-                {renderContentWithWikiLinks(item.content)}
+                <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
               </div>
             )}
           </div>

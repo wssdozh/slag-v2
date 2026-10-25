@@ -7,6 +7,8 @@ import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { formatRecurrenceLabel } from '../../lib/recurrenceHelper';
 import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/taskUtils';
+import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
+import { EditorView, ViewPlugin } from '@codemirror/view';
 import {
   ArrowLeft,
   Save,
@@ -57,6 +59,23 @@ const formatDueDateLabel = (dateIso: string): string => {
   }
 };
 
+let activeEditorView: EditorView | null = null;
+
+const editorExtensions = [
+  ViewPlugin.define((view) => {
+    console.log('[DEBUG] ViewPlugin MOUNTED');
+    activeEditorView = view;
+    return {
+      destroy() {
+        console.log('[DEBUG] ViewPlugin DESTROYED');
+        if (activeEditorView === view) {
+          activeEditorView = null;
+        }
+      },
+    };
+  }),
+];
+
 interface FullscreenEditorContentProps {
   item: SlagItem;
 }
@@ -93,20 +112,22 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const [attachments, setAttachments] = useState<SlagAttachment[]>(item.attachments || []);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const readTime = Math.max(1, Math.round(wordCount / 200));
 
-  // Auto-resize textarea to prevent nested scrollbars cutting through content
+  const getEditorView = useCallback((): EditorView | null => activeEditorView, []);
+
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.max(450, textareaRef.current.scrollHeight)}px`;
-    }
-  }, [content]);
+    (window as any).__slagGetEditorMarkdown = () => editorHandleRef.current?.getMarkdown() ?? '';
+    return () => {
+      activeEditorView = null;
+      delete (window as any).__slagGetEditorMarkdown;
+    };
+  }, []);
 
   const handleSave = useCallback(() => {
     const isNewDraft = item.id.startsWith('draft_');
@@ -174,129 +195,63 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     }
   };
 
-  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const { selectionStart, selectionEnd, value } = textarea;
-      if (selectionStart !== selectionEnd) return;
-
-      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
-      const lineEnd = value.indexOf('\n', selectionStart);
-      const currentLine = value.slice(lineStart, lineEnd === -1 ? value.length : lineEnd);
-
-      const checkboxMatch = currentLine.match(/^(\s*[-*+]\s*\[[ xX]\]\s*)(.*)$/);
-      if (checkboxMatch) {
-        e.preventDefault();
-        const prefix = checkboxMatch[1];
-        const itemText = checkboxMatch[2];
-
-        // Empty checkbox line: pressing Enter clears it (exit checklist)
-        if (!itemText.trim()) {
-          const nextVal = value.slice(0, lineStart) + value.slice(selectionStart);
-          setContent(nextVal);
-          setTimeout(() => {
-            textarea.setSelectionRange(lineStart, lineStart);
-          }, 0);
-          return;
-        }
-
-        const indentMatch = prefix.match(/^(\s*)/);
-        const indent = indentMatch ? indentMatch[1] : '';
-        const newPrefix = `\n${indent}- [ ] `;
-
-        const nextVal = value.slice(0, selectionStart) + newPrefix + value.slice(selectionStart);
-        setContent(nextVal);
-        const newCursor = selectionStart + newPrefix.length;
-        setTimeout(() => {
-          textarea.setSelectionRange(newCursor, newCursor);
-        }, 0);
-        return;
-      }
-
-      const bulletMatch = currentLine.match(/^(\s*[-*+]\s+)(.*)$/);
-      if (bulletMatch && !currentLine.includes('[')) {
-        e.preventDefault();
-        const prefix = bulletMatch[1];
-        const itemText = bulletMatch[2];
-
-        if (!itemText.trim()) {
-          const nextVal = value.slice(0, lineStart) + value.slice(selectionStart);
-          setContent(nextVal);
-          setTimeout(() => {
-            textarea.setSelectionRange(lineStart, lineStart);
-          }, 0);
-          return;
-        }
-
-        const nextVal = value.slice(0, selectionStart) + `\n${prefix}` + value.slice(selectionStart);
-        setContent(nextVal);
-        const newCursor = selectionStart + prefix.length + 1;
-        setTimeout(() => {
-          textarea.setSelectionRange(newCursor, newCursor);
-        }, 0);
-        return;
-      }
-    }
-  };
-
-  const insertMarkdown = (prefix: string, suffix: string = '') => {
-    const textarea = document.getElementById('fullscreen-textarea') as HTMLTextAreaElement;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const sel = content.slice(start, end);
-    const rep = `${prefix}${sel || 'текст'}${suffix}`;
-    const nextContent = content.slice(0, start) + rep + content.slice(end);
-    setContent(nextContent);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + prefix.length + (sel ? sel.length : 5));
-    }, 10);
-  };
-
-  const insertAttachmentMarkdown = (attName: string) => {
-    const textarea = textareaRef.current;
-    const link = `![[${attName}]]\n`;
-    if (!textarea) {
-      setContent(prev => (prev.trim() ? prev + '\n\n' + link : link));
-      addToast(`Ссылка ![[${attName}]] добавлена в текст`, 'info');
+  const insertMarkdown = useCallback((prefix: string, suffix: string = '') => {
+    const view = getEditorView();
+    if (!view) {
+      setContent(prev => prev + prefix + suffix);
       return;
     }
-    const start = textarea.selectionStart ?? content.length;
-    const end = textarea.selectionEnd ?? content.length;
-    const next = content.slice(0, start) + link + content.slice(end);
-    setContent(next);
-    addToast(`Ссылка ![[${attName}]] добавлена в позицию курсора`, 'info');
-    setTimeout(() => {
-      textarea.focus();
-      const pos = start + link.length;
-      textarea.setSelectionRange(pos, pos);
-    }, 10);
-  };
+    const selection = view.state.selection.main;
+    const selectedText = view.state.sliceDoc(selection.from, selection.to);
+    const replacement = `${prefix}${selectedText || 'текст'}${suffix}`;
+    const insertPos = selection.from + prefix.length;
+    const endPos = insertPos + (selectedText ? selectedText.length : 5);
 
-  const handleAttachmentsAdded = (newAtts: SlagAttachment[]) => {
-    setAttachments(prev => [...prev, ...newAtts]);
-    const textarea = textareaRef.current;
-    const links = newAtts.map(a => `![[${a.name}]]`).join('\n') + '\n';
-    if (!textarea) {
-      setContent(prev => (prev.trim() ? prev + '\n\n' + links : links));
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert: replacement },
+      selection: { anchor: insertPos, head: endPos },
+    });
+    view.focus();
+  }, [getEditorView]);
+
+  const insertAttachmentMarkdown = useCallback((attName: string) => {
+    const link = `![[${attName}]]\n`;
+    const view = getEditorView();
+    if (view) {
+      const pos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: pos, insert: link },
+        selection: { anchor: pos + link.length },
+      });
+      view.focus();
+      addToast(`Ссылка ![[${attName}]] добавлена в позицию курсора`, 'info');
     } else {
-      const start = textarea.selectionStart ?? content.length;
-      const end = textarea.selectionEnd ?? content.length;
-      const next = content.slice(0, start) + links + content.slice(end);
-      setContent(next);
-      setTimeout(() => {
-        textarea.focus();
-        const pos = start + links.length;
-        textarea.setSelectionRange(pos, pos);
-      }, 10);
+      setContent(prev => (prev.trim() ? prev + '\n\n' + link : link));
+      addToast(`Ссылка ![[${attName}]] добавлена в текст`, 'info');
+    }
+  }, [getEditorView, addToast]);
+
+  const handleAttachmentsAdded = useCallback((newAtts: SlagAttachment[]) => {
+    setAttachments(prev => [...prev, ...newAtts]);
+    const links = newAtts.map(a => `![[${a.name}]]`).join('\n') + '\n';
+    const view = getEditorView();
+    console.log('[DEBUG] handleAttachmentsAdded called, view is:', Boolean(view), 'links:', links);
+    if (view) {
+      const pos = view.state.selection.main.head;
+      console.log('[DEBUG] pos is', pos, 'doc length is', view.state.doc.length);
+      view.dispatch({
+        changes: { from: pos, insert: links },
+        selection: { anchor: pos + links.length },
+      });
+      console.log('[DEBUG] doc after dispatch is:', view.state.doc.toString());
+      view.focus();
+    } else {
+      setContent(prev => (prev.trim() ? prev + '\n\n' + links : links));
     }
     addToast(`Добавлено медиа: ${newAtts.length} ${newAtts.length === 1 ? 'файл' : 'файла'}`, 'success');
-  };
+  }, [getEditorView, addToast]);
 
-  const handlePaste = async (e: React.ClipboardEvent) => {
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const files: File[] = [];
     if (e.clipboardData.items) {
       for (let i = 0; i < e.clipboardData.items.length; i++) {
@@ -319,7 +274,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
         addToast('Не удалось вставить медиа из буфера', 'error');
       }
     }
-  };
+  }, [handleAttachmentsAdded, addToast]);
 
   const handleDragOver = (e: React.DragEvent) => {
     if (e.dataTransfer.types.includes('Files')) {
@@ -981,17 +936,20 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             </div>
           )}
 
-          {/* Main Markdown Textarea - Auto-resizing font-mono, no double scrollbar */}
-          <textarea
-            ref={textareaRef}
-            id="fullscreen-textarea"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={handleTextareaKeyDown}
+          {/* Main Markdown Editor with Obsidian-style Live Preview */}
+          <div
+            id="fullscreen-editor-root"
             onPaste={handlePaste}
-            placeholder="Пишите здесь... Поддерживается полный синтаксис Markdown (#, **, -, [ ], таблицы, ссылки)"
-            className="w-full bg-transparent font-mono text-[13px] text-[#f4f4f5] placeholder-zinc-600 resize-none leading-relaxed border-none focus:outline-none overflow-hidden"
-          />
+            className="w-full relative min-h-[420px]"
+          >
+            <AtomicCodeMirrorEditor
+              documentId={item.id}
+              markdownSource={content}
+              onMarkdownChange={setContent}
+              editorHandleRef={editorHandleRef}
+              extensions={editorExtensions}
+            />
+          </div>
 
           {/* Tags Section */}
           <div className="flex flex-wrap items-center gap-1.5 pt-4 border-t border-white/[0.06]">

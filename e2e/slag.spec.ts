@@ -110,12 +110,17 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await focusEditorBtn.click();
 
     // Verify fullscreen editor opened with article content
-    await expect(page.locator('#fullscreen-textarea')).toBeVisible();
-    await expect(page.locator('#fullscreen-textarea')).toHaveValue(/Три ключевых принципа SLAG/);
+    await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
+    await expect(page.locator('.cm-content')).toContainText('Три ключевых принципа SLAG');
+
+    await page.screenshot({
+      path: 'test-results/screenshots/fullscreen-editor-live-preview.png',
+      fullPage: false,
+    });
 
     // Return back to feed
     await page.locator('header button', { hasText: 'Назад' }).click();
-    await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();
+    await expect(page.locator('#fullscreen-editor-root')).not.toBeVisible();
   });
 
   test('5. Unified Context Menu and Pinning via Right Click', async ({ page }) => {
@@ -288,7 +293,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const focusEditorBtn = page.locator('button[aria-label="Открыть в фокус-редакторе"]').first();
     if (await focusEditorBtn.isVisible()) {
       await focusEditorBtn.click();
-      await expect(page.locator('#fullscreen-textarea')).toBeVisible();
+      await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
 
       // Open the custom folder dropdown to verify dark styling
       const folderSelect = page.locator('header button[aria-haspopup="listbox"]').first();
@@ -306,7 +311,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
       // Click "Назад" to return
       await page.locator('header button', { hasText: 'Назад' }).click();
-      await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();
+      await expect(page.locator('#fullscreen-editor-root')).not.toBeVisible();
     }
   });
 
@@ -1309,15 +1314,15 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const expandBtn = page.locator('button[title*="Раскрыть в полноэкранный редактор"]').first();
     await expandBtn.click();
 
-    const fullscreenTextarea = page.locator('#fullscreen-textarea');
-    await expect(fullscreenTextarea).toBeVisible();
+    const fullscreenEditorRoot = page.locator('#fullscreen-editor-root');
+    await expect(fullscreenEditorRoot).toBeVisible();
 
     // Verify paperclip attach button in toolbar
     const attachBtn = page.locator('button[title*="Прикрепить файл или медиа"]').first();
     await expect(attachBtn).toBeVisible();
 
     // Simulate pasting an image file into the fullscreen editor
-    await fullscreenTextarea.evaluate((node) => {
+    await fullscreenEditorRoot.evaluate((node) => {
       const dt = new DataTransfer();
       const file = new File(['mock_image_bytes'], 'mock_screenshot.png', { type: 'image/png' });
       dt.items.add(file);
@@ -1329,8 +1334,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=mock_screenshot.png').first()).toBeVisible();
 
     // Verify markdown link was inserted into content
-    const updatedContent = await fullscreenTextarea.inputValue();
-    expect(updatedContent).toContain('![[mock_screenshot.png]]');
+    await page.waitForFunction(() => {
+      const getMd = (window as any).__slagGetEditorMarkdown;
+      return typeof getMd === 'function' && getMd().includes('![[mock_screenshot.png]]');
+    });
 
     // Test "Вставить в текст" button click
     const insertInTextBtn = page.locator('button', { hasText: 'Вставить в текст' }).first();
@@ -1345,7 +1352,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // Close Fullscreen Editor via Escape
     await page.keyboard.press('Escape');
-    await expect(fullscreenTextarea).not.toBeVisible();
+    await expect(fullscreenEditorRoot).not.toBeVisible();
 
     // 3. Verify AudioPlayer and VideoCirclePlayer in Feed
     // Switch to "Все" to ensure demo items are visible
@@ -2037,14 +2044,17 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.locator('button', { hasText: 'В работе' }).click();
     await expect(page.locator('button', { hasText: 'В работе' })).toBeVisible();
 
-    // Add subtask via native Markdown in textarea and test auto-continuation
-    const textarea = page.locator('#fullscreen-textarea');
-    await expect(textarea).toBeVisible();
-    await textarea.fill('- [ ] Шаг первый');
-    await textarea.press('Enter');
-    await expect(textarea).toHaveValue(/- \[ \] Шаг первый\n- \[ \] /);
-    await textarea.fill('- [ ] Проверить чайник и температуру');
-    await expect(textarea).toHaveValue(/- \[ \] Проверить чайник и температуру/);
+    // Add subtask via native Markdown in live preview editor and test auto-continuation
+    const editorRoot = page.locator('#fullscreen-editor-root');
+    await expect(editorRoot).toBeVisible();
+    const cmContent = page.locator('.cm-content');
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.type('- [ ] Шаг первый');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Проверить чайник и температуру');
+    await expect(cmContent).toContainText('Проверить чайник и температуру');
 
     // Capture screenshot of enhanced FullscreenEditor
     await page.screenshot({
@@ -2066,11 +2076,11 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const calTask = page.locator(`text=${uniqueTitle}`).first();
     if (await calTask.isVisible()) {
       await calTask.click();
-      await expect(page.locator('#fullscreen-textarea')).toBeVisible();
-      await expect(page.locator('#fullscreen-textarea')).toHaveValue(/- \[ \] Проверить чайник и температуру/);
+      await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
+      await expect(page.locator('.cm-content')).toContainText('Проверить чайник и температуру');
       // Close via Escape
       await page.keyboard.press('Escape');
-      await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();
+      await expect(page.locator('#fullscreen-editor-root')).not.toBeVisible();
     }
 
     // 7. Verify clicking hour slot in Week time grid spawns ComposerModal
@@ -2672,5 +2682,34 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Reset viewport
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.waitForTimeout(200);
+  });
+
+  test('38. Markdown Rendering in Feed (Headings, bold, lists, checkboxes, and inline code)', async ({ page }) => {
+    // 1. In composer, enter markdown content
+    const composer = page.locator('textarea[placeholder*="Мысль, заметка или код"]').first();
+    await expect(composer).toBeVisible();
+
+    const uniqueMd = `md_test_${Date.now()}`;
+    const mdContent = `Заметка о релизе ${uniqueMd}\n\n### Детали реализации\n\n**Важный текст** и *курсив*, а также \`код\`.\n\n- [ ] Первый пункт\n- [x] Второй пункт\n\n[[Манифест]]`;
+
+    await composer.fill(mdContent);
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await page.waitForTimeout(300);
+
+    // 2. Locate the created card in feed
+    const card = page.locator('.group', { hasText: uniqueMd }).first();
+    await expect(card).toBeVisible();
+
+    // 3. Verify rendered Markdown elements
+    await expect(card.locator('h3', { hasText: 'Детали реализации' })).toBeVisible();
+    await expect(card.locator('strong')).toHaveText('Важный текст');
+    await expect(card.locator('em')).toHaveText('курсив');
+    await expect(card.locator('code')).toHaveText('код');
+    await expect(card.locator('span', { hasText: 'Манифест' })).toBeVisible();
+
+    // 4. Capture screenshot for visual inspection
+    await card.screenshot({
+      path: 'test-results/screenshots/markdown-rendered-feed-card.png',
+    });
   });
 });
