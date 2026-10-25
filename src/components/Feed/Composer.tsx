@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule } from '../../types';
+import { storage } from '../../lib/storage';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
 import { AudioPlayer } from '../UI/AudioPlayer';
@@ -98,13 +99,16 @@ export const Composer: React.FC<ComposerProps> = ({
     isMobile
   } = useApp();
 
-  const [content, setContent] = useState('');
-  const [itemType, setItemType] = useState<SlagItemType>(initialType || 'note');
+  const activeFolder = initialFolder || currentFolder;
+  const [initialDraft] = useState(() => storage.getComposerDraft(activeFolder));
+
+  const [content, setContent] = useState(() => initialDraft?.content || '');
+  const [itemType, setItemType] = useState<SlagItemType>(() => initialDraft?.itemType || initialType || 'note');
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
-  const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>('none');
-  const [dueDate, setDueDate] = useState<string>(initialDueDate || '');
+  const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(() => initialDraft?.priority || 'none');
+  const [dueDate, setDueDate] = useState<string>(() => initialDraft?.dueDate || initialDueDate || '');
   const [reminder] = useState<string | undefined>(initialReminder);
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(() => initialDraft?.tags || []);
   const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(
     initialFolder ? { folder: initialFolder, forCurrent: currentFolder } : null
   );
@@ -112,7 +116,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const setTargetFolder = (folder: string | null) => {
     setTargetFolderOverride(folder ? { folder, forCurrent: currentFolder } : null);
   };
-  const [attachments, setAttachments] = useState<SlagAttachment[]>([]);
+  const [attachments, setAttachments] = useState<SlagAttachment[]>(() => initialDraft?.attachments || []);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
@@ -180,7 +184,22 @@ export const Composer: React.FC<ComposerProps> = ({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
 
+  const draftRef = useRef({ content, itemType, priority, dueDate, tags, attachments, replyTarget });
+
+  useEffect(() => {
+    draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget };
+  }, [content, itemType, priority, dueDate, tags, attachments, replyTarget]);
+
   const resetDraftState = () => {
+    draftRef.current = {
+      content: '',
+      itemType: 'note',
+      priority: 'none',
+      dueDate: '',
+      tags: [],
+      attachments: [],
+      replyTarget: null,
+    };
     setContent('');
     setTags([]);
     setTargetFolderOverride(null);
@@ -215,6 +234,77 @@ export const Composer: React.FC<ComposerProps> = ({
       textareaRef.current.focus();
     }
   }, [replyTarget, isModal]);
+
+  // Initialize replyTarget from draft on initial mount if available
+  useEffect(() => {
+    if (initialDraft?.replyTarget && !replyTarget) {
+      setReplyTarget(initialDraft.replyTarget as any);
+    }
+  }, [initialDraft?.replyTarget, replyTarget, setReplyTarget]);
+
+  // Autosave when unmounting (e.g. folder switch or page navigation)
+  useEffect(() => {
+    return () => {
+      const d = draftRef.current;
+      if (d.content.trim() || d.attachments.length > 0) {
+        storage.saveComposerDraft(activeFolder, {
+          content: d.content,
+          itemType: d.itemType,
+          priority: d.priority,
+          dueDate: d.dueDate,
+          tags: d.tags,
+          attachments: d.attachments,
+          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title } : null,
+          updatedAt: Date.now(),
+        });
+      } else {
+        storage.deleteComposerDraft(activeFolder);
+      }
+    };
+  }, [activeFolder]);
+
+  // Debounced autosave while typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (content.trim() || attachments.length > 0) {
+        storage.saveComposerDraft(activeFolder, {
+          content,
+          itemType,
+          priority,
+          dueDate,
+          tags,
+          attachments,
+          replyTarget: replyTarget ? { id: replyTarget.id, title: replyTarget.title } : null,
+          updatedAt: Date.now(),
+        });
+      } else {
+        storage.deleteComposerDraft(activeFolder);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget]);
+
+  // Handle beforeunload to avoid lost text on immediate tab close/refresh
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const d = draftRef.current;
+      if (d.content.trim() || d.attachments.length > 0) {
+        storage.saveComposerDraft(activeFolder, {
+          content: d.content,
+          itemType: d.itemType,
+          priority: d.priority,
+          dueDate: d.dueDate,
+          tags: d.tags,
+          attachments: d.attachments,
+          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title } : null,
+          updatedAt: Date.now(),
+        });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [activeFolder]);
 
   // All unique tags in vault
   const allVaultTags = React.useMemo(() => {
@@ -487,6 +577,7 @@ export const Composer: React.FC<ComposerProps> = ({
         setIsRecordingVideo(true);
         break;
       case 'clear':
+        storage.deleteComposerDraft(activeFolder);
         resetDraftState();
         addToast('Черновик очищен', 'info');
         return;
@@ -837,6 +928,8 @@ export const Composer: React.FC<ComposerProps> = ({
       });
     }
 
+    storage.deleteComposerDraft(destinationFolder);
+    storage.deleteComposerDraft(activeFolder);
     resetDraftState();
     if (onComplete) {
       onComplete();

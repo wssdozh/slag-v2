@@ -29,6 +29,7 @@ export const MobileFoldersView: React.FC = () => {
   const {
     folders,
     items,
+    currentFolder,
     mobileActiveFolder,
     setMobileActiveFolder,
     setMobileFolderInfoOpen,
@@ -421,7 +422,7 @@ export const MobileFoldersView: React.FC = () => {
               }}
             >
               <div className="pointer-events-auto w-full max-w-lg">
-                <Composer />
+                <Composer key={currentFolder} />
               </div>
             </div>
           </>

@@ -5,7 +5,7 @@ import { Composer } from '../Feed/Composer';
 import { CheckSquare, StickyNote, FileText } from 'lucide-react';
 
 export const ComposerModal: React.FC = () => {
-  const { isComposerModalOpen, closeComposerModal, composerModalOptions } = useApp();
+  const { isComposerModalOpen, closeComposerModal, composerModalOptions, currentFolder } = useApp();
 
   if (!isComposerModalOpen) return null;
 
@@ -30,6 +30,7 @@ export const ComposerModal: React.FC = () => {
       closeOnEsc={true}
     >
       <Composer
+        key={composerModalOptions?.folder || currentFolder}
         isModal
         initialType={composerModalOptions?.type}
         initialStatus={composerModalOptions?.status}
