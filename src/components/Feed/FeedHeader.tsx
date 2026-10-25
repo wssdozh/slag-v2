@@ -13,7 +13,7 @@ import {
   Layers,
   Filter,
   BookOpen,
-  Sparkles
+  ArrowUpDown
 } from 'lucide-react';
 
 export const FeedHeader: React.FC = () => {
@@ -219,6 +219,23 @@ export const FeedHeader: React.FC = () => {
 
       {/* Center / Right Controls */}
       <div className="flex items-center gap-1.5 shrink-0 ml-auto z-10">
+        {/* AI Triage button in Inbox (Left of switcher with divider) */}
+        {isInbox && inboxUnsortedCount > 0 && (
+          <div className="flex items-center h-ctrl-sm gap-1.5 shrink-0">
+            <button
+              onClick={() => setIsTriageModalOpen(true)}
+              title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
+              aria-label="Запустить ИИ-Сортировку"
+              className="h-full px-2 rounded-md flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer active:scale-95"
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
+              <span className="sr-only">Запустить ИИ-Сортировку</span>
+            </button>
+            <div className="h-4 w-px bg-white/[0.12] mx-0.5 shrink-0" />
+          </div>
+        )}
+
         {/* Unified View Mode Switcher: Icon-only Linear-grade ghost segmented control */}
         <nav aria-label="Режимы представления" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
           <button
@@ -255,23 +272,6 @@ export const FeedHeader: React.FC = () => {
             <Calendar className="w-3.5 h-3.5 shrink-0" />
           </button>
         </nav>
-
-        {/* AI Triage button in Inbox right next to switcher with divider */}
-        {isInbox && inboxUnsortedCount > 0 && (
-          <div className="flex items-center h-ctrl-sm gap-1.5 shrink-0">
-            <div className="h-4 w-px bg-white/[0.12] mx-0.5 shrink-0" />
-            <button
-              onClick={() => setIsTriageModalOpen(true)}
-              title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
-              aria-label="Запустить ИИ-Сортировку"
-              className="h-full px-2 rounded-md flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer active:scale-95"
-            >
-              <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
-              <span className="sr-only">Запустить ИИ-Сортировку</span>
-            </button>
-          </div>
-        )}
       </div>
     </header>
   );

@@ -2544,20 +2544,28 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const kanbanContainer = page.locator('[data-testid="kanban-columns-container"]');
     await expect(kanbanContainer).toBeVisible();
 
+    // Collapse materials dock to give Kanban board wide dragging area
+    const collapseDockBtn = page.locator('button[title*="Свернуть док материалов"]');
+    if (await collapseDockBtn.isVisible()) {
+      await collapseDockBtn.click();
+      await page.waitForTimeout(200);
+    }
+
     const kanbanBox = await kanbanContainer.boundingBox();
     expect(kanbanBox).not.toBeNull();
 
     if (kanbanBox) {
-      // Start drag from an empty board area (top padding between columns)
-      const startX = kanbanBox.x + 350;
-      const startY = kanbanBox.y + 20;
+      // Center of kanban visible container
+      const startX = Math.floor(kanbanBox.x + kanbanBox.width * 0.5);
+      const startY = Math.floor(kanbanBox.y + 25);
+      const dragDist = 120;
 
       const initialScrollLeft = await kanbanContainer.evaluate(el => el.scrollLeft);
 
-      // Drag to the left (content slides right)
+      // Drag to the left (scrolls container to the right)
       await page.mouse.move(startX, startY);
       await page.mouse.down();
-      await page.mouse.move(startX - 200, startY, { steps: 8 });
+      await page.mouse.move(startX - dragDist, startY, { steps: 8 });
       await page.mouse.up();
       await page.waitForTimeout(250);
 
@@ -2565,7 +2573,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       expect(scrolledLeft).toBeGreaterThan(initialScrollLeft);
 
       // Drag back to the right
-      await page.mouse.move(startX - 200, startY);
+      await page.mouse.move(startX - dragDist, startY);
       await page.mouse.down();
       await page.mouse.move(startX, startY, { steps: 8 });
       await page.mouse.up();
@@ -2602,15 +2610,16 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     if (weekBox) {
       // Start drag from the day header row
-      const startX = weekBox.x + 300;
+      const startX = weekBox.x + Math.floor(weekBox.width * 0.6);
       const startY = weekBox.y + 15;
+      const dragDistance = Math.min(150, Math.floor(weekBox.width * 0.3));
 
       const calInitialScroll = await weekScrollContainer.evaluate(el => el.scrollLeft);
 
       // Drag to the left
       await page.mouse.move(startX, startY);
       await page.mouse.down();
-      await page.mouse.move(startX - 220, startY, { steps: 8 });
+      await page.mouse.move(startX - dragDistance, startY, { steps: 8 });
       await page.mouse.up();
       await page.waitForTimeout(250);
 
@@ -2618,7 +2627,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       expect(calScrolled).toBeGreaterThan(calInitialScroll);
 
       // Drag back to the right
-      await page.mouse.move(startX - 220, startY);
+      await page.mouse.move(startX - dragDistance, startY);
       await page.mouse.down();
       await page.mouse.move(startX, startY, { steps: 8 });
       await page.mouse.up();

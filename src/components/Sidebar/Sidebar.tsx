@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
 import {
-  Search,
   Inbox,
   FolderPlus,
   Settings,
@@ -21,7 +20,6 @@ export const Sidebar: React.FC = () => {
     currentFolder,
     setCurrentFolder,
     items,
-    setIsSearchOpen,
     setIsSettingsOpen,
     setIsLogViewerOpen,
     openCreateFolderModal,
@@ -66,29 +64,6 @@ export const Sidebar: React.FC = () => {
     <aside
       className="w-full h-full flex flex-col bg-[#0c0c0e] select-none text-[#a1a1aa] overflow-hidden"
     >
-      {/* Top Header / App Title */}
-      <div className="h-12 px-3.5 flex items-center justify-between border-b border-white/[0.04]">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-white/[0.08] flex items-center justify-center font-mono font-bold text-xs text-zinc-100">
-            S
-          </div>
-          <span className="font-semibold tracking-tight text-xs text-zinc-200">SLAG</span>
-          <span className="text-[10px] text-zinc-500 font-mono">v2.0</span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {/* Global Quick Search Button */}
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="h-ctrl-sm flex items-center gap-1.5 px-2.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs transition-colors cursor-pointer"
-            title="Поиск (Ctrl+K / Cmd+K)"
-          >
-            <Search className="w-3.5 h-3.5" />
-            <span className="text-2xs font-mono text-zinc-500">⌘K</span>
-          </button>
-        </div>
-      </div>
-
       {/* Main Folder Navigation */}
       <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-3">
         {/* Pinned "Входящие" (Inbox) */}
