@@ -261,19 +261,19 @@ export const MobileFoldersView: React.FC = () => {
         {feedViewMode === 'kanban' && (
           <button
             onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
-            className={`h-ctrl-sm flex items-center gap-1.5 px-2.5 rounded-md text-xs transition-colors shrink-0 cursor-pointer ${
+            className={`h-ctrl-sm px-2 rounded-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
               isKanbanMaterialsOpen
-                ? 'bg-white/10 text-white font-medium'
+                ? 'bg-white/10 text-white'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
             }`}
-            title={isKanbanMaterialsOpen ? 'Скрыть материалы папки' : 'Показать материалы папки'}
+            title={
+              isKanbanMaterialsOpen
+                ? `Скрыть материалы (${folderMaterialsCount})`
+                : `Показать материалы (${folderMaterialsCount})`
+            }
             aria-label="Материалы папки"
           >
             <BookOpen className="w-3.5 h-3.5 shrink-0" />
-            <span>Материалы</span>
-            <span className="text-[11px] font-mono text-zinc-500">
-              ({folderMaterialsCount})
-            </span>
           </button>
         )}
 
