@@ -28,8 +28,10 @@ export interface BaseComposerProps {
   leftControls?: React.ReactNode;
   /** Тулбар: утилиты справа (перед кнопкой Send) */
   rightControls?: React.ReactNode;
-  /** Верхний слот над textarea (Reply, чипсы, файлы) */
+  /** Верхний слот над textarea (Reply, файлы) */
   topSlot?: React.ReactNode;
+  /** Слот метаданных/чипсов под textarea (активные свойства задачи, теги, папка) */
+  propertiesSlot?: React.ReactNode;
   /** Оверлейный слот в зоне textarea (выпадающий список автокомплита) */
   overlaySlot?: React.ReactNode;
   /** Полное замещение панели управления (например, при активной записи войса/видео) */
@@ -64,6 +66,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   leftControls,
   rightControls,
   topSlot,
+  propertiesSlot,
   overlaySlot,
   customControls,
   minHeight = 22,
@@ -129,6 +132,9 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
           />
         </div>
+
+        {/* Слот свойств: активные свойства задачи, теги, папка под полем ввода */}
+        {propertiesSlot}
 
         {/* Нижняя панель действий (Toolbar) — без внутренней линии-разделителя */}
         {customControls ? (

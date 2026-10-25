@@ -77,6 +77,11 @@ export const FeedHeader: React.FC = () => {
           </div>
         )}
 
+        {/* Divider line between inbox filter and type filters */}
+        {isInbox && feedViewMode === 'feed' && (
+          <div className="h-4 w-px bg-white/[0.12] mx-0.5 shrink-0" />
+        )}
+
         {/* Type filters (feed mode only) */}
         {feedViewMode === 'feed' && (
           <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">

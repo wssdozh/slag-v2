@@ -1987,12 +1987,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(200);
 
     // Verify FullscreenEditor opened with task properties
-    await expect(page.locator('text=Срок выполнения:')).toBeVisible();
-    await expect(page.locator('button', { hasText: 'В работе' })).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Высокий' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Бэклог' })).toBeVisible();
 
-    // Change status to "В работе"
+    // Change status to "В работе" via status Select
+    await page.locator('button', { hasText: 'Бэклог' }).click();
     await page.locator('button', { hasText: 'В работе' }).click();
+    await expect(page.locator('button', { hasText: 'В работе' })).toBeVisible();
 
     // Add subtask
     const subtaskInput = page.locator('input[placeholder*="Добавить подзадачу"]');
@@ -2021,11 +2021,11 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const calTask = page.locator(`text=${uniqueTitle}`).first();
     if (await calTask.isVisible()) {
       await calTask.click();
-      await expect(page.locator('text=Срок выполнения:')).toBeVisible();
+      await expect(page.locator('#fullscreen-textarea')).toBeVisible();
       await expect(page.locator('text=Проверить чайник и температуру')).toBeVisible();
       // Close via Escape
       await page.keyboard.press('Escape');
-      await expect(page.locator('text=Срок выполнения:')).not.toBeVisible();
+      await expect(page.locator('#fullscreen-textarea')).not.toBeVisible();
     }
 
     // 7. Verify clicking hour slot in Week time grid spawns ComposerModal

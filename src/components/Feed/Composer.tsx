@@ -1181,45 +1181,6 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       )}
 
-      {/* Active Folder & Tags Preview */}
-      {(targetFolder || allPreviewTags.length > 0) && (
-        <div className="flex items-center gap-1.5 px-0.5 pt-0.5 pb-2 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150">
-          {targetFolder && (
-            <span
-              className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 text-[11px] font-medium"
-              title={`Целевая папка для сохранения: «${targetFolder}»`}
-            >
-              <Folder className="w-3 h-3 text-amber-400" />
-              <span>{targetFolder}</span>
-              <button
-                type="button"
-                onClick={() => setTargetFolder(null)}
-                className="hover:text-rose-400 transition-colors cursor-pointer"
-                title="Сбросить в текущую папку"
-                aria-label="Сбросить целевую папку"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </span>
-          )}
-          {allPreviewTags.map(tag => (
-            <span
-              key={tag}
-              className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] text-zinc-300 text-[10px] font-mono"
-            >
-              #{tag}
-              <button
-                onClick={() => removeTag(tag)}
-                className="hover:text-rose-400 transition-colors cursor-pointer"
-                aria-label={`Удалить тег ${tag}`}
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
       {/* Hidden File / Image inputs */}
       <input
         ref={fileInputRef}
@@ -1328,6 +1289,221 @@ export const Composer: React.FC<ComposerProps> = ({
     </div>
   ) : undefined;
 
+  const hasActiveProperties =
+    Boolean(targetFolder) ||
+    allPreviewTags.length > 0 ||
+    (itemType === 'task' &&
+      (Boolean(effectiveDueDate) ||
+        effectiveDuration !== undefined ||
+        Boolean(effectiveRecurrence) ||
+        effectivePriority !== 'none'));
+
+  const propertiesSlot = hasActiveProperties ? (
+    <div className="flex items-center gap-1.5 px-1 py-1 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150 text-xs">
+      {/* Target Folder */}
+      {targetFolder && (
+        <span
+          className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.1] text-zinc-200 text-[11px] font-medium"
+          title={`Целевая папка для сохранения: «${targetFolder}»`}
+        >
+          <Folder className="w-3 h-3 text-amber-400 shrink-0" />
+          <span>{targetFolder}</span>
+          <button
+            type="button"
+            onClick={() => setTargetFolder(null)}
+            className="hover:text-rose-400 transition-colors cursor-pointer"
+            title="Сбросить целевую папку"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      )}
+
+      {/* Tags */}
+      {allPreviewTags.map(tag => (
+        <span
+          key={tag}
+          className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-[10px] font-mono"
+        >
+          #{tag}
+          <button
+            onClick={() => removeTag(tag)}
+            className="hover:text-rose-400 transition-colors cursor-pointer"
+            aria-label={`Удалить тег ${tag}`}
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      ))}
+
+      {/* Due Date Chip */}
+      {itemType === 'task' && effectiveDueDate && (
+        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-300 text-[11px] font-medium">
+          <button
+            type="button"
+            onClick={() => dateInputRef.current?.showPicker?.()}
+            className="flex items-center gap-1 hover:text-blue-200 cursor-pointer"
+            title="Изменить срок"
+          >
+            <Calendar className="w-3 h-3 text-blue-400 shrink-0" />
+            <span>{effectiveDateLabel}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsDateDismissed(true);
+              setDueDate('');
+            }}
+            className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
+            title="Снять срок"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      )}
+
+      {/* Duration Chip */}
+      {itemType === 'task' && effectiveDuration !== undefined && (
+        <div className="relative shrink-0">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-300 text-[11px] font-medium">
+            <button
+              type="button"
+              onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
+              className="flex items-center gap-1 hover:text-blue-200 cursor-pointer"
+              title="Изменить длительность"
+            >
+              <Clock className="w-3 h-3 text-blue-400 shrink-0" />
+              <span>
+                {effectiveDuration >= 60
+                  ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
+                  : `${effectiveDuration}м`}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDurationDismissed(true);
+                setDuration(undefined);
+              }}
+              className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
+              title="Снять длительность"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </span>
+
+          {isDurationDropdownOpen && (
+            <div className="absolute left-0 bottom-full mb-1.5 w-32 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+              {[15, 30, 45, 60, 90, 120].map(mins => (
+                <button
+                  key={mins}
+                  type="button"
+                  onClick={() => {
+                    setDuration(mins);
+                    setIsDurationDismissed(false);
+                    setIsDurationDropdownOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                    effectiveDuration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recurrence Chip */}
+      {itemType === 'task' && effectiveRecurrence && (
+        <div className="relative shrink-0">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] font-medium">
+            <button
+              type="button"
+              onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
+              className="flex items-center gap-1 hover:text-amber-200 cursor-pointer"
+              title="Изменить повторение"
+            >
+              <Repeat className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>{formatRecurrenceLabel(effectiveRecurrence)}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRecurrenceDismissed(true);
+                setRecurrence(undefined);
+              }}
+              className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
+              title="Снять повторение"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </span>
+
+          {isRecurrenceDropdownOpen && (
+            <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+              {[
+                { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } as RecurrenceRule },
+              ].map(opt => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => {
+                    setRecurrence(opt.rule);
+                    setIsRecurrenceDismissed(false);
+                    setIsRecurrenceDropdownOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                >
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Priority Chip */}
+      {itemType === 'task' && effectivePriority !== 'none' && (
+        <span
+          className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
+            effectivePriority === 'high'
+              ? 'bg-rose-500/10 border border-rose-500/25 text-rose-300'
+              : effectivePriority === 'medium'
+              ? 'bg-amber-500/10 border border-amber-500/25 text-amber-300'
+              : 'bg-blue-500/10 border border-blue-500/25 text-blue-300'
+          }`}
+        >
+          <button
+            type="button"
+            className="flex items-center gap-1 cursor-pointer hover:opacity-80"
+            title="Приоритет задачи"
+          >
+            <LinearSignalBars priority={effectivePriority} className="w-3 h-3" />
+            <span>
+              {effectivePriority === 'high' ? 'Высокий' : effectivePriority === 'medium' ? 'Средний' : 'Низкий'}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsPriorityDismissed(true);
+              setPriority('none');
+            }}
+            className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
+            title="Снять приоритет"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      )}
+    </div>
+  ) : null;
+
   const leftControls = (
     <div className="flex items-center gap-1 shrink-0 relative">
       {/* Lock Hint Banner when holding mic/video button */}
@@ -1414,9 +1590,9 @@ export const Composer: React.FC<ComposerProps> = ({
               )}
             </div>
 
-            {/* Task Controls: Due Date & Priority directly in toolbar */}
+            {/* Task Controls: Quiet un-set property triggers (when active, displayed in propertiesSlot) */}
             {itemType === 'task' && (
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-0.5 shrink-0">
                 <input
                   ref={dateInputRef}
                   type="date"
@@ -1430,274 +1606,129 @@ export const Composer: React.FC<ComposerProps> = ({
                   aria-hidden="true"
                 />
 
-                {/* Due Date Trigger */}
-                {effectiveDueDate ? (
-                  <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => dateInputRef.current?.showPicker?.()}
-                      className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
-                      title="Изменить срок"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="font-medium max-w-[85px] truncate">{effectiveDateLabel}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsDateDismissed(true);
-                        setDueDate('');
-                      }}
-                      className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                      title="Снять срок"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
+                {!effectiveDueDate && (
                   <button
                     type="button"
                     onClick={() => dateInputRef.current?.showPicker?.()}
-                    className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                    className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
                     title="Установить срок задачи"
                   >
-                    <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                    <span className="hidden sm:inline">Срок</span>
+                    <Calendar className="w-3.5 h-3.5" />
                   </button>
                 )}
 
-                {/* Duration Selector */}
-                <div className="relative shrink-0">
-                  {effectiveDuration !== undefined ? (
-                    <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
-                        title="Изменить длительность"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        <span className="font-medium max-w-[70px] truncate">
-                          {effectiveDuration >= 60
-                            ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
-                            : `${effectiveDuration}м`}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsDurationDismissed(true);
-                          setDuration(undefined);
-                        }}
-                        className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                        title="Снять длительность"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
+                {effectiveDuration === undefined && (
+                  <div className="relative shrink-0">
                     <button
                       type="button"
                       onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                      className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                      className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
                       title="Установить длительность задачи"
                     >
-                      <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                      <span className="hidden xl:inline">Длительность</span>
+                      <Clock className="w-3.5 h-3.5" />
                     </button>
-                  )}
 
-                  {isDurationDropdownOpen && (
-                    <div className="absolute left-0 bottom-full mb-1.5 w-32 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                      {[15, 30, 45, 60, 90, 120].map(mins => (
-                        <button
-                          key={mins}
-                          type="button"
-                          onClick={() => {
-                            setDuration(mins);
-                            setIsDurationDismissed(false);
-                            setIsDurationDropdownOpen(false);
-                          }}
-                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                            effectiveDuration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                          }`}
-                        >
-                          <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    {isDurationDropdownOpen && (
+                      <div className="absolute left-0 bottom-full mb-1.5 w-32 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                        {[15, 30, 45, 60, 90, 120].map(mins => (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => {
+                              setDuration(mins);
+                              setIsDurationDismissed(false);
+                              setIsDurationDropdownOpen(false);
+                            }}
+                            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                          >
+                            <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* Recurrence Selector */}
-                <div className="relative shrink-0">
-                  {effectiveRecurrence ? (
-                    <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                        className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-                        title="Изменить повторение"
-                      >
-                        <Repeat className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span className="font-medium max-w-[85px] truncate">
-                          {formatRecurrenceLabel(effectiveRecurrence)}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsRecurrenceDismissed(true);
-                          setRecurrence(undefined);
-                        }}
-                        className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                        title="Снять повторение"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
+                {!effectiveRecurrence && (
+                  <div className="relative shrink-0">
                     <button
                       type="button"
                       onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                      className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                      className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
                       title="Повторяющаяся задача"
                     >
-                      <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                      <span className="hidden xl:inline">Повтор</span>
+                      <Repeat className="w-3.5 h-3.5" />
                     </button>
-                  )}
 
-                  {isRecurrenceDropdownOpen && (
-                    <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                      {[
-                        { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                        { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                        { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                        { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } as RecurrenceRule },
-                      ].map(opt => (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          onClick={() => {
-                            setRecurrence(opt.rule);
-                            setIsRecurrenceDismissed(false);
-                            setIsRecurrenceDropdownOpen(false);
-                          }}
-                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                        >
-                          <span>{opt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    {isRecurrenceDropdownOpen && (
+                      <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                        {[
+                          { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                          { label: 'По будням (Пн-Пт)', rule: { freq: 'weekdays', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                          { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                          { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } as RecurrenceRule },
+                        ].map(opt => (
+                          <button
+                            key={opt.label}
+                            type="button"
+                            onClick={() => {
+                              setRecurrence(opt.rule);
+                              setIsRecurrenceDismissed(false);
+                              setIsRecurrenceDropdownOpen(false);
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                          >
+                            <span>{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* Priority Selector */}
-                <div className="flex items-center shrink-0">
-                  <Select
-                    size="md"
-                    variant="ghost"
-                    direction="up"
-                    value={effectivePriority}
-                    onChange={(val) => {
-                      setPriority(val as any);
-                      setIsPriorityDismissed(false);
-                    }}
-                    options={[
-                      {
-                        value: 'none',
-                        label: 'Обычный',
-                        icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
-                        color: 'text-zinc-400',
-                      },
-                      {
-                        value: 'low',
-                        label: 'Низкий',
-                        icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
-                        color: 'text-zinc-300',
-                      },
-                      {
-                        value: 'medium',
-                        label: 'Средний',
-                        icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
-                        color: 'text-amber-400',
-                      },
-                      {
-                        value: 'high',
-                        label: 'Высокий',
-                        icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
-                        color: 'text-rose-400',
-                      },
-                    ]}
-                  />
-                </div>
+                {effectivePriority === 'none' && (
+                  <div className="flex items-center shrink-0">
+                    <Select
+                      size="md"
+                      variant="ghost"
+                      direction="up"
+                      value={effectivePriority}
+                      onChange={(val) => {
+                        setPriority(val as any);
+                        setIsPriorityDismissed(false);
+                      }}
+                      options={[
+                        {
+                          value: 'none',
+                          label: 'Обычный',
+                          icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
+                          color: 'text-zinc-400',
+                        },
+                        {
+                          value: 'low',
+                          label: 'Низкий',
+                          icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
+                          color: 'text-zinc-300',
+                        },
+                        {
+                          value: 'medium',
+                          label: 'Средний',
+                          icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
+                          color: 'text-amber-400',
+                        },
+                        {
+                          value: 'high',
+                          label: 'Высокий',
+                          icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
+                          color: 'text-rose-400',
+                        },
+                      ]}
+                    />
+                  </div>
+                )}
               </div>
             )}
-
-            {/* Desktop Dedicated Mic & Video Buttons (Hidden on mobile where they merge into Send/Media button) */}
-            {!isMobile && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!isRecordingAudio) {
-                      setIsRecordingVideo(false);
-                      setIsRecordingAudio(true);
-                      setRecordMode('locked');
-                      setLockHint(null);
-                    }
-                  }}
-                  onPointerDown={(e) => handlePointerDown(e, 'audio')}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
-                    isRecordingAudio
-                      ? 'bg-rose-500/20 text-rose-400'
-                      : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-                  }`}
-                  title="Записать голосовую заметку (кликните или удерживайте)"
-                  aria-label="Записать голосовую заметку"
-                >
-                  <Mic className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!isRecordingVideo) {
-                      setIsRecordingAudio(false);
-                      setIsRecordingVideo(true);
-                      setRecordMode('locked');
-                      setLockHint(null);
-                    }
-                  }}
-                  onPointerDown={(e) => handlePointerDown(e, 'video')}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
-                    isRecordingVideo
-                      ? 'bg-rose-500/20 text-rose-400'
-                      : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-                  }`}
-                  title="Записать видео-кружок (кликните или удерживайте)"
-                  aria-label="Записать видео-кружок"
-                >
-                  <Video className="w-4 h-4" />
-                </button>
-              </>
-            )}
-
-            {/* File Attach Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
-              title="Прикрепить файл"
-            >
-              <Paperclip className="w-4 h-4" />
-            </button>
-          </div>
+    </div>
   );
 
   const rightControls = (
@@ -1711,17 +1742,84 @@ export const Composer: React.FC<ComposerProps> = ({
             setTags([]);
             setPriority('none');
             setDueDate('');
+            setDuration(undefined);
+            setIsDurationDismissed(false);
+            setRecurrence(undefined);
+            setIsRecurrenceDismissed(false);
             setParsedTask(null);
             setIsDateDismissed(false);
             setIsPriorityDismissed(false);
             setDismissedTags(new Set());
           }}
-          className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer"
+          className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer shrink-0"
           title="Очистить"
         >
           <Trash2 className="w-4 h-4" />
         </button>
       )}
+
+      {/* Desktop Dedicated Mic & Video Buttons */}
+      {!isMobile && (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              if (!isRecordingAudio) {
+                setIsRecordingVideo(false);
+                setIsRecordingAudio(true);
+                setRecordMode('locked');
+                setLockHint(null);
+              }
+            }}
+            onPointerDown={(e) => handlePointerDown(e, 'audio')}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
+              isRecordingAudio
+                ? 'bg-rose-500/20 text-rose-400'
+                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+            }`}
+            title="Записать голос (кликните или удерживайте)"
+            aria-label="Записать голосовую заметку"
+          >
+            <Mic className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!isRecordingVideo) {
+                setIsRecordingAudio(false);
+                setIsRecordingVideo(true);
+                setRecordMode('locked');
+                setLockHint(null);
+              }
+            }}
+            onPointerDown={(e) => handlePointerDown(e, 'video')}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
+              isRecordingVideo
+                ? 'bg-rose-500/20 text-rose-400'
+                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+            }`}
+            title="Записать видео-кружок (кликните или удерживайте)"
+            aria-label="Записать видео-кружок"
+          >
+            <Video className="w-4 h-4" />
+          </button>
+        </>
+      )}
+
+      {/* File Attach Button */}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
+        title="Прикрепить файл"
+      >
+        <Paperclip className="w-4 h-4" />
+      </button>
 
       {/* Expand to Fullscreen Editor Icon Button */}
       <button
@@ -1788,6 +1886,7 @@ export const Composer: React.FC<ComposerProps> = ({
       isSubmitDisabled={!content.trim() && attachments.length === 0}
       submitTitle="Отправить (Enter)"
       topSlot={topSlot}
+      propertiesSlot={propertiesSlot}
       overlaySlot={overlaySlot}
       customControls={customControls}
       leftControls={leftControls}
