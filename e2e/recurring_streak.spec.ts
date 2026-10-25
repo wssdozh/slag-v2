@@ -26,7 +26,7 @@ test.describe('Recurring Tasks & Streak Engine E2E Verification', () => {
     // Verify flame streak badge is visible and starts at 0 with rose accent
     const streakBadge = taskCard.locator('span[title*="Серия"]');
     await expect(streakBadge).toBeVisible();
-    await expect(streakBadge).toContainText('🔥');
+    await expect(streakBadge.locator('svg')).toBeVisible();
     await expect(streakBadge).toContainText('0');
 
     // Screenshot of initial 🔥 0 state
