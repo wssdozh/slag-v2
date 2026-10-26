@@ -3090,4 +3090,34 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.locator('header button', { hasText: 'Назад' }).first().click();
     await expect(editorRoot).not.toBeVisible();
   });
+
+  test('47. Custom Dark DatePickerPopover in Composer without native ugly picker', async ({ page }) => {
+    // 1. Switch composer to Task mode
+    const typeBtn = page.locator('button', { hasText: /Заметка|Таска|Статья/ }).first();
+    await typeBtn.click();
+    await page.locator('button', { hasText: 'Таска' }).click();
+
+    // 2. Click the Calendar icon button in toolbar
+    const calendarBtn = page.locator('button[title*="Установить срок задачи"]').first();
+    await expect(calendarBtn).toBeVisible();
+    await calendarBtn.click();
+
+    // 3. Verify custom DatePickerPopover appeared
+    const popover = page.locator('.w-64.rounded-2xl', { hasText: 'Сегодня' });
+    await expect(popover).toBeVisible();
+    await expect(popover.locator('button', { hasText: 'Завтра' })).toBeVisible();
+    await expect(popover.locator('button', { hasText: 'След. нед' })).toBeVisible();
+
+    // 4. Take screenshot of custom dark date picker
+    await page.screenshot({ path: 'test-results/screenshots/custom-date-picker.png' });
+
+    // 5. Select "Завтра"
+    await popover.locator('button', { hasText: 'Завтра' }).click();
+
+    // 6. Verify popover closed and calendar button is active blue
+    await expect(popover).not.toBeVisible();
+    const activeDateBtn = page.locator('button[title*="Срок: Завтра"]').first();
+    await expect(activeDateBtn).toBeVisible();
+    await expect(activeDateBtn).toHaveClass(/bg-blue-500/);
+  });
 });

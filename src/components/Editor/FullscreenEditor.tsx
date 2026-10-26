@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { Select } from '../UI/Select';
 import { TagChip } from '../UI/TagChip';
+import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../lib/dateUtils';
 import { decomposeItemWithAi, generateSmartTags } from '../../lib/aiService';
 
@@ -95,6 +96,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(item.priority || 'none');
   const [status, setStatus] = useState<SlagItemStatus>(item.status || 'todo');
   const [dueDate, setDueDate] = useState(item.dueDate || '');
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [duration, setDuration] = useState<number | undefined>(item.duration);
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
   const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(item.recurrence);
@@ -104,7 +106,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const readTime = Math.max(1, Math.round(wordCount / 200));
@@ -532,17 +533,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <div className="flex flex-col gap-2.5 pb-2 border-b border-white/[0.06]">
               {/* Task Controls Row */}
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
-                {/* Hidden Date Input */}
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="sr-only"
-                  tabIndex={-1}
-                  aria-hidden="true"
-                />
-
                 {/* Status Selector */}
                 <div className="flex items-center shrink-0">
                   <Select
@@ -582,37 +572,55 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
                 {/* Due Date Trigger */}
                 <span className="text-[11px] font-mono text-zinc-500 mr-1 hidden sm:inline">Срок:</span>
-                {dueDate ? (
-                  <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
+                <div className="relative shrink-0">
+                  {dueDate ? (
+                    <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsDatePickerOpen(prev => !prev)}
+                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                        title="Изменить срок"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDueDate('')}
+                        className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                        title="Снять срок"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => dateInputRef.current?.showPicker?.()}
-                      className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
-                      title="Изменить срок"
+                      onClick={() => setIsDatePickerOpen(prev => !prev)}
+                      className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                      title="Установить срок задачи"
                     >
-                      <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
+                      <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                      <span>Срок</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDueDate('')}
-                      className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                      title="Снять срок"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => dateInputRef.current?.showPicker?.()}
-                    className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                    title="Установить срок задачи"
-                  >
-                    <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                    <span>Срок</span>
-                  </button>
-                )}
+                  )}
+
+                  {isDatePickerOpen && (
+                    <DatePickerPopover
+                      value={dueDate}
+                      onChange={(newDate) => {
+                        setDueDate(newDate);
+                        setIsDatePickerOpen(false);
+                      }}
+                      onClear={() => {
+                        setDueDate('');
+                        setIsDatePickerOpen(false);
+                      }}
+                      onClose={() => setIsDatePickerOpen(false)}
+                      direction="down"
+                    />
+                  )}
+                </div>
 
                 {/* Duration Selector */}
                 <div className="relative shrink-0">

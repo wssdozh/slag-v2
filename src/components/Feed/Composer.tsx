@@ -14,6 +14,7 @@ import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '
 import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
+import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { TagChip } from '../UI/TagChip';
 import { SlashCommandMenu } from './SlashCommandMenu';
@@ -133,6 +134,7 @@ export const Composer: React.FC<ComposerProps> = ({
   // Todoist parser & Ghost-chips state
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
   const [isDateDismissed, setIsDateDismissed] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
   const [duration, setDuration] = useState<number | undefined>(undefined);
   const [isDurationDismissed, setIsDurationDismissed] = useState(false);
@@ -160,7 +162,6 @@ export const Composer: React.FC<ComposerProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   const draftRef = useRef({ content, itemType, priority, dueDate, tags, attachments, replyTarget });
 
@@ -199,6 +200,7 @@ export const Composer: React.FC<ComposerProps> = ({
     setIsTagNavigated(false);
     setParsedTask(null);
     setIsDateDismissed(false);
+    setIsDatePickerOpen(false);
     setIsPriorityDismissed(false);
     setDismissedTags(new Set());
     if (textareaRef.current) {
@@ -1455,44 +1457,51 @@ export const Composer: React.FC<ComposerProps> = ({
             {/* Task Controls: Always visible in toolbar, lights up blue when active */}
             {itemType === 'task' && (
               <div className="flex items-center gap-0.5 shrink-0">
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={effectiveDueDate}
-                  onChange={(e) => {
-                    setDueDate(e.target.value);
-                    setIsDateDismissed(false);
-                  }}
-                  className="sr-only"
-                  tabIndex={-1}
-                  aria-hidden="true"
-                />
-
                 {/* Due Date Icon Button */}
-                <button
-                  type="button"
-                  onClick={() => dateInputRef.current?.showPicker?.()}
-                  onContextMenu={(e) => {
-                    if (effectiveDueDate) {
-                      e.preventDefault();
-                      setIsDateDismissed(true);
-                      setDueDate('');
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsDatePickerOpen(prev => !prev)}
+                    onContextMenu={(e) => {
+                      if (effectiveDueDate) {
+                        e.preventDefault();
+                        setIsDateDismissed(true);
+                        setDueDate('');
+                      }
+                    }}
+                    className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                      effectiveDueDate
+                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
+                    }`}
+                    title={
+                      effectiveDueDate
+                        ? `Срок: ${effectiveDateLabel} (клик для изменения, ПКМ для сброса)`
+                        : 'Установить срок задачи'
                     }
-                  }}
-                  className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
-                    effectiveDueDate
-                      ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
-                      : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
-                  }`}
-                  title={
-                    effectiveDueDate
-                      ? `Срок: ${effectiveDateLabel} (клик для изменения, ПКМ для сброса)`
-                      : 'Установить срок задачи'
-                  }
-                  aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок задачи'}
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                </button>
+                    aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок задачи'}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                  </button>
+
+                  {isDatePickerOpen && (
+                    <DatePickerPopover
+                      value={effectiveDueDate}
+                      onChange={(newDate) => {
+                        setDueDate(newDate);
+                        setIsDateDismissed(false);
+                        setIsDatePickerOpen(false);
+                      }}
+                      onClear={() => {
+                        setIsDateDismissed(true);
+                        setDueDate('');
+                        setIsDatePickerOpen(false);
+                      }}
+                      onClose={() => setIsDatePickerOpen(false)}
+                      direction="up"
+                    />
+                  )}
+                </div>
 
                 {/* Duration Icon Button */}
                 <div className="relative shrink-0">
