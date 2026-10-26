@@ -660,10 +660,17 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0 text-2xs font-mono text-zinc-400">
-                                      {up.dueDate !== undefined && (
+                                      {(up.dueDate !== undefined || up.reminder) && (
                                         <>
                                           <Calendar className="w-3 h-3 text-zinc-500" />
-                                          <span>{up.dueDate || 'без срока'}</span>
+                                          <span>{(() => {
+                                            const today = new Date().toISOString().slice(0, 10);
+                                            const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+                                            const d = up.dueDate || (up.reminder?.includes('T') ? up.reminder.split('T')[0] : undefined);
+                                            if (d === today) return 'сегодня';
+                                            if (d === tomorrow) return 'завтра';
+                                            return d || 'без срока';
+                                          })()}</span>
                                         </>
                                       )}
                                       {up.reminder && (

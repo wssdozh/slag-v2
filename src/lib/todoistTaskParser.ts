@@ -234,29 +234,42 @@ export function getTaskTimeSlot(task: {
 }): TaskTimeSlot {
   const customDuration = task.duration && task.duration > 0 ? task.duration : undefined;
 
-  // 1. Check reminder ISO string first
+  // 1. Check reminder ISO string or bare HH:MM string first
   if (task.reminder) {
-    try {
-      const d = new Date(task.reminder);
-      if (!isNaN(d.getTime())) {
-        const h = d.getHours();
-        const m = d.getMinutes();
-        const durationMinutes = customDuration || 60;
-        const endTotal = h * 60 + m + durationMinutes;
-        const endH = Math.floor(endTotal / 60) % 24;
-        const endM = endTotal % 60;
-        const timeLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-        return {
-          hasTime: true,
-          isAllDay: false,
-          startHour: h,
-          startMinute: m,
-          durationMinutes,
-          timeLabel,
-        };
+    const rawRem = task.reminder.trim();
+    const bareMatch = rawRem.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
+    let h: number | undefined;
+    let m: number | undefined;
+
+    if (bareMatch) {
+      h = parseInt(bareMatch[1], 10);
+      m = parseInt(bareMatch[2], 10);
+    } else {
+      try {
+        const d = new Date(rawRem);
+        if (!isNaN(d.getTime())) {
+          h = d.getHours();
+          m = d.getMinutes();
+        }
+      } catch {
+        // fallback
       }
-    } catch {
-      // fallback
+    }
+
+    if (h !== undefined && m !== undefined) {
+      const durationMinutes = customDuration || 60;
+      const endTotal = h * 60 + m + durationMinutes;
+      const endH = Math.floor(endTotal / 60) % 24;
+      const endM = endTotal % 60;
+      const timeLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} - ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+      return {
+        hasTime: true,
+        isAllDay: false,
+        startHour: h,
+        startMinute: m,
+        durationMinutes,
+        timeLabel,
+      };
     }
   }
 

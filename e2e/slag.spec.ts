@@ -1242,6 +1242,42 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Приоритет ➔ LOW').or(page.locator('text=Применено')).first()).toBeVisible({ timeout: 5000 });
   });
 
+  test('25.7. Assistant Hourly slot scheduling and Calendar grid positioning', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Ask intra-day distribution for tomorrow
+    await textarea.fill('завтрашние задачи можешь разбросать в течении дня');
+    await textarea.press('Enter');
+
+    // 3. Verify batch update card shows date and time slots
+    const batchCard = page.locator('[data-testid="action-card"], .max-w-xl').last();
+    await expect(batchCard).toContainText(/завтра/);
+    await expect(batchCard).toContainText(/10:00|12:00/);
+
+    const applyBtn = page.locator('button', { hasText: /Применить/ }).last();
+    await expect(applyBtn).toBeVisible();
+    await applyBtn.click();
+    await expect(page.locator('text=Перенесено задач:').or(page.locator('text=Перенесено')).last()).toBeVisible({ timeout: 5000 });
+
+    // 4. Switch to Calendar view
+    const calendarBtn = page.locator('header button[title*="Календарь"]').first();
+    await calendarBtn.click();
+
+    // 5. Verify week view
+    await expect(page.locator('text=Неделя')).toBeVisible();
+
+    // Capture screenshot of calendar grid with scheduled tasks
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-scheduled-lunch-slots.png',
+      fullPage: false,
+    });
+  });
+
   test('26. KIE.AI Provider with Gemini 4 Argon Endpoint and Structured Settings', async ({ page }) => {
     // 1. Open Settings
     await page.locator('button[title*="Настройки"]').first().click();

@@ -418,8 +418,11 @@ export class AssistantOrchestrator {
           if (parsed.priority) rawUpdates.priority = parsed.priority;
         }
 
-        if (rawUpdates.reminder && !rawUpdates.reminder.includes('T') && rawUpdates.dueDate) {
-          rawUpdates.reminder = `${rawUpdates.dueDate}T${rawUpdates.reminder}:00`;
+        if (rawUpdates.reminder && !rawUpdates.reminder.includes('T')) {
+          const effectiveDate = rawUpdates.dueDate || found.dueDate || new Date().toISOString().slice(0, 10);
+          rawUpdates.dueDate = effectiveDate;
+          const time = rawUpdates.reminder.trim();
+          rawUpdates.reminder = `${effectiveDate}T${time.length === 5 ? time : time.slice(0, 5)}:00`;
         }
 
         let actionLabel = args.actionLabel || (rawUpdates as any).actionLabel;
@@ -491,8 +494,11 @@ export class AssistantOrchestrator {
             if (parsed.priority) rawUpdates.priority = parsed.priority;
           }
 
-          if (rawUpdates.reminder && !rawUpdates.reminder.includes('T') && rawUpdates.dueDate) {
-            rawUpdates.reminder = `${rawUpdates.dueDate}T${rawUpdates.reminder}:00`;
+          if (rawUpdates.reminder && !rawUpdates.reminder.includes('T')) {
+            const effectiveDate = rawUpdates.dueDate || target.dueDate || new Date().toISOString().slice(0, 10);
+            rawUpdates.dueDate = effectiveDate;
+            const time = rawUpdates.reminder.trim();
+            rawUpdates.reminder = `${effectiveDate}T${time.length === 5 ? time : time.slice(0, 5)}:00`;
           }
 
           resolvedItems.push({
@@ -777,8 +783,9 @@ ${isInbox
 ПЛАНИРОВАНИЕ И РАСПРЕДЕЛЕНИЕ ЗАДАЧ:
 - Ты обладаешь полной автономностью (ReAct-подход): ты можешь свободно вызывать get_calendar_agenda или search_notes для анализа текущего расписания, либо сразу опираться на блок «АКТУАЛЬНЫЙ СРЕЗ ЗАДАЧ».
 - Для планирования и переноса задач вызывай batch_update_items (для группы задач) или update_item (для одной).
-- РАСПРЕДЕЛЕНИЕ В ТЕЧЕНИЕ ДНЯ («разбросай в течении дня», «по часам»):
-  * Сохраняй целевую дату (например, дату завтрашнего дня в формате YYYY-MM-DD).
+- РАСПРЕДЕЛЕНИЕ В ТЕЧЕНИЕ ДНЯ («разбросай в течении дня», «по часам», «в обед»):
+  * Сохраняй целевую дату (например, дату сегодняшнего дня, если пользователь пишет «в обед», или завтрашнего дня в формате YYYY-MM-DD).
+  * В updates ОБЯЗАТЕЛЬНО передавай и dueDate (целевую дату), и reminder (время слота, например "12:00", "12:30", "13:00")!
   * Расставляй задачи по слотам рабочего дня в поле reminder: например "10:00", "12:00", "14:30", "16:30" (или ISO-время).
   * Задачи с высоким приоритетом (high) ставь на первую половину дня!
 - РАСПРЕДЕЛЕНИЕ ПО ДНЯМ («раскидай по дням», «на неделю»):
