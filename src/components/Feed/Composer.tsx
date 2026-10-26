@@ -1037,30 +1037,32 @@ export const Composer: React.FC<ComposerProps> = ({
     }
 
     // Tag autocomplete keyboard controls
-    if (tagQuery !== null && matchingAutocompleteTags.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setIsTagNavigated(true);
-        setTagSelectedIndex(prev => (prev < matchingAutocompleteTags.length - 1 ? prev + 1 : prev));
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setIsTagNavigated(true);
-        setTagSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
-        return;
-      }
-      if (e.key === 'Tab' || (e.key === 'Enter' && isTagNavigated)) {
-        e.preventDefault();
-        insertTag(matchingAutocompleteTags[tagSelectedIndex]);
-        setIsTagNavigated(false);
-        return;
-      }
+    if (tagQuery !== null) {
       if (e.key === 'Escape') {
         e.preventDefault();
         setTagQuery(null);
         setIsTagNavigated(false);
         return;
+      }
+      if (matchingAutocompleteTags.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setIsTagNavigated(true);
+          setTagSelectedIndex(prev => (prev < matchingAutocompleteTags.length - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setIsTagNavigated(true);
+          setTagSelectedIndex(prev => (prev > 0 ? prev - 1 : matchingAutocompleteTags.length - 1));
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          insertTag(matchingAutocompleteTags[tagSelectedIndex].tag);
+          setIsTagNavigated(false);
+          return;
+        }
       }
     }
 
@@ -1233,29 +1235,15 @@ export const Composer: React.FC<ComposerProps> = ({
           })}
         </div>
       )}
-      {tagQuery !== null && matchingAutocompleteTags.length > 0 && (
-        <div className={`absolute left-0 ${isModal ? 'bottom-full mb-[96px]' : 'bottom-full mb-1'} w-56 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto`}>
-          <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider flex items-center justify-between">
-            <span>Теги</span>
-            <span className="text-zinc-600">#{tagQuery}</span>
-          </div>
-          {matchingAutocompleteTags.map((tagItem, idx) => {
-            const isSelected = idx === tagSelectedIndex;
-            return (
-              <button
-                key={tagItem}
-                type="button"
-                onClick={() => insertTag(tagItem)}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-mono text-left transition-colors truncate cursor-pointer ${
-                  isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
-                }`}
-              >
-                <Hash className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span className="truncate">#{tagItem}</span>
-              </button>
-            );
-          })}
-        </div>
+      {tagQuery !== null && (
+        <TagSuggestionMenu
+          query={tagQuery}
+          tags={matchingAutocompleteTags}
+          selectedIndex={tagSelectedIndex}
+          onSelect={insertTag}
+          placement="top"
+          isModal={isModal}
+        />
       )}
     </>
   );
