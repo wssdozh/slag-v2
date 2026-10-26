@@ -33,6 +33,10 @@ import {
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
+const DEFAULT_HOUR_HEIGHT = 52;
+const MIN_HOUR_HEIGHT = 44;
+const MAX_HOUR_HEIGHT = 160;
+
 function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
   bg: string;
   border: string;
@@ -112,6 +116,38 @@ export const CalendarView: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<'overdue' | 'unscheduled'>('overdue');
 
+  // Dynamic Hour Height for Week View Timeline (36px .. 140px, default 52px)
+  const [hourHeight, setHourHeight] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('slag_calendar_hour_height');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= MIN_HOUR_HEIGHT && parsed <= MAX_HOUR_HEIGHT) {
+          return parsed;
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_HOUR_HEIGHT;
+  });
+  const hourHeightRef = useRef(hourHeight);
+  useEffect(() => {
+    hourHeightRef.current = hourHeight;
+  }, [hourHeight]);
+
+  // Timeline Hour Height Interactive Zoom State ("опоп чутка" snap & sub-divisions)
+  const [timelineResizing, setTimelineResizing] = useState<{
+    startY: number;
+    initialHeight: number;
+    anchorHour: number;
+    offsetInViewport: number;
+    currentHeight: number;
+    slotStep: 15 | 30 | 60;
+    isSnapped: boolean;
+  } | null>(null);
+  const isTimelineResizingActiveRef = useRef(false);
+
   // Pointer Events Drag and Drop hook (desktop & mobile robust)
   const {
     isDragging,
@@ -128,10 +164,16 @@ export const CalendarView: React.FC = () => {
       if (targetData.dropZone === 'calendar-hour') {
         const dateStr = targetData.dropDate;
         const hour = parseInt(targetData.dropHour, 10);
-        const rect = targetZone.getBoundingClientRect();
-        const offsetY = dropPos.y - rect.top;
-        const quarter = Math.min(3, Math.max(0, Math.floor((offsetY / 52) * 4)));
-        const minute = quarter * 15;
+        let minute = 0;
+        if (targetData.dropMinute !== undefined) {
+          minute = parseInt(targetData.dropMinute, 10);
+        } else {
+          const rect = targetZone.getBoundingClientRect();
+          const offsetY = dropPos.y - rect.top;
+          const currentH = hourHeightRef.current;
+          const quarter = Math.min(3, Math.max(0, Math.floor((offsetY / currentH) * 4)));
+          minute = quarter * 15;
+        }
 
         const [year, month, day] = dateStr.split('-').map(Number);
         const targetDate = new Date(year, month - 1, day, hour, minute, 0, 0);
@@ -323,7 +365,7 @@ export const CalendarView: React.FC = () => {
       if (timeGridRef.current) {
         const currentHour = Math.floor(nowMinute / 60);
         const scrollHour = Math.max(0, currentHour - 1);
-        timeGridRef.current.scrollTop = scrollHour * 52;
+        timeGridRef.current.scrollTop = scrollHour * hourHeightRef.current;
       }
       if (weekHorizontalScrollRef.current) {
         const container = weekHorizontalScrollRef.current;
@@ -381,6 +423,13 @@ export const CalendarView: React.FC = () => {
     const year = currentDate.getFullYear();
     return `${month} ${year}`;
   }, [currentDate]);
+
+  // Timeline sub-divisions scale (60m -> 30m -> 15m as timeline is zoomed in like After Effects)
+  const slotStepMinutes: 15 | 30 | 60 = hourHeight >= 112 ? 15 : hourHeight >= 68 ? 30 : 60;
+  const subMinutes = useMemo(() => {
+    return slotStepMinutes === 15 ? [0, 15, 30, 45] : slotStepMinutes === 30 ? [0, 30] : [0];
+  }, [slotStepMinutes]);
+  const subSlotHeight = hourHeight / subMinutes.length;
 
   // 1-Click reschedule helper
   const handleQuickSchedule = (task: SlagItem, newDate: string) => {
@@ -473,6 +522,143 @@ export const CalendarView: React.FC = () => {
     return m ? `${h}ч ${m}м` : `${h}ч`;
   }
 
+  // Handle zooming timeline ruler in Week View ("приблизить линию" как в After Effects: 60м → 30м → 15м)
+  const handleTimelineRulerMouseDown = (e: React.MouseEvent | React.PointerEvent) => {
+    if (e.button !== 0) return;
+    if (isTimelineResizingActiveRef.current) return;
+    isTimelineResizingActiveRef.current = true;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const timeGrid = timeGridRef.current;
+    if (!timeGrid) return;
+
+    const rect = timeGrid.getBoundingClientRect();
+    const startY = e.clientY;
+    const offsetInViewport = startY - rect.top;
+    const initialScrollTop = timeGrid.scrollTop;
+    const initialGridY = initialScrollTop + offsetInViewport;
+    const currentH = hourHeightRef.current;
+    const anchorHour = initialGridY / currentH;
+    const initialHeight = currentH;
+
+    let hasMoved = false;
+    const initialStep = currentH >= 112 ? 15 : currentH >= 68 ? 30 : 60;
+
+    setTimelineResizing({
+      startY,
+      initialHeight,
+      anchorHour,
+      offsetInViewport,
+      currentHeight: initialHeight,
+      slotStep: initialStep,
+      isSnapped: true,
+    });
+
+    const handleMove = (moveEvent: MouseEvent | PointerEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      if (!hasMoved && Math.abs(deltaY) < 3) return;
+      hasMoved = true;
+
+      const rawHeight = Math.max(
+        MIN_HOUR_HEIGHT,
+        Math.min(MAX_HOUR_HEIGHT, Math.round(initialHeight + deltaY * 0.85))
+      );
+
+      // Magnetic snap milestones for clean division scales ("опоп чутка")
+      let snappedHeight = rawHeight;
+      let isSnapped = false;
+      for (const snap of [52, 84, 136]) {
+        if (Math.abs(rawHeight - snap) <= 4) {
+          snappedHeight = snap;
+          isSnapped = true;
+          break;
+        }
+      }
+
+      const nextStep = snappedHeight >= 112 ? 15 : snappedHeight >= 68 ? 30 : 60;
+
+      setHourHeight(snappedHeight);
+      setTimelineResizing(prev =>
+        prev
+          ? {
+              ...prev,
+              currentHeight: snappedHeight,
+              slotStep: nextStep,
+              isSnapped,
+            }
+          : null
+      );
+
+      // Keep clicked anchor hour pinned under cursor
+      if (timeGridRef.current) {
+        const newScrollTop = Math.max(
+          0,
+          anchorHour * snappedHeight - offsetInViewport - deltaY
+        );
+        timeGridRef.current.scrollTop = newScrollTop;
+      }
+    };
+
+    const handleUp = () => {
+      isTimelineResizingActiveRef.current = false;
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+
+      setTimelineResizing(current => {
+        if (current && hasMoved) {
+          try {
+            localStorage.setItem('slag_calendar_hour_height', String(current.currentHeight));
+          } catch {
+            // ignore
+          }
+        }
+        return null;
+      });
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
+  };
+
+  const handleTimelineRulerWheel = (e: React.WheelEvent) => {
+    // Zoom in/out via wheel over ruler (like After Effects timeline)
+    if (e.deltaY !== 0) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const delta = e.deltaY > 0 ? -10 : 10;
+      setHourHeight(prev => {
+        const next = Math.max(MIN_HOUR_HEIGHT, Math.min(MAX_HOUR_HEIGHT, prev + delta));
+        try {
+          localStorage.setItem('slag_calendar_hour_height', String(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }
+  };
+
+  const handleTimelineDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setHourHeight(DEFAULT_HOUR_HEIGHT);
+    try {
+      localStorage.setItem('slag_calendar_hour_height', String(DEFAULT_HOUR_HEIGHT));
+    } catch {
+      // ignore
+    }
+    addToast('Масштаб таймлайна сброшен: деления 1 час (52px)', 'info');
+  };
+
   // Handle dragging bottom edge to resize task duration (time-blocking with 15-min snapping)
   const handleResizeStart = (e: React.MouseEvent, taskId: string, initialDuration: number) => {
     e.preventDefault();
@@ -488,8 +674,8 @@ export const CalendarView: React.FC = () => {
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaY = moveEvent.clientY - startY;
-      // 52px per 60 min -> 13px per 15 min quantum
-      const deltaMinutes = Math.round(((deltaY / 52) * 60) / 15) * 15;
+      const currentH = hourHeightRef.current;
+      const deltaMinutes = Math.round(((deltaY / currentH) * 60) / 15) * 15;
       const nextDuration = Math.max(15, Math.min(1440, initialDuration + deltaMinutes));
       setResizingTask(prev => (prev ? { ...prev, currentDuration: nextDuration } : null));
     };
@@ -499,7 +685,8 @@ export const CalendarView: React.FC = () => {
       window.removeEventListener('mouseup', handleMouseUp);
 
       const deltaY = upEvent.clientY - startY;
-      const deltaMinutes = Math.round(((deltaY / 52) * 60) / 15) * 15;
+      const currentH = hourHeightRef.current;
+      const deltaMinutes = Math.round(((deltaY / currentH) * 60) / 15) * 15;
       const finalDuration = Math.max(15, Math.min(1440, initialDuration + deltaMinutes));
 
       setResizingTask(null);
@@ -846,8 +1033,13 @@ export const CalendarView: React.FC = () => {
               <div className="flex-1 flex flex-col min-w-[896px] h-full">
                 {/* Day Headers (ПН 10, ВТ 11...) */}
                 <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/90 shrink-0 cursor-grab">
-                  <div className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-[#0c0c0e] cursor-grab">
-                    UTC
+                  <div
+                    data-resize-handle="timeline"
+                    title="Масштаб времени (двойной клик — сброс к 52px)"
+                    onDoubleClick={handleTimelineDoubleClick}
+                    className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-[#0c0c0e] select-none hover:text-zinc-400 transition-colors cursor-pointer"
+                  >
+                    {hourHeight !== DEFAULT_HOUR_HEIGHT ? `${hourHeight}px` : 'UTC'}
                   </div>
                   <div className="flex-1 grid grid-cols-7">
                   {weekDays.map((date, idx) => {
@@ -940,14 +1132,54 @@ export const CalendarView: React.FC = () => {
                 data-testid="calendar-time-grid"
                 className="flex-1 overflow-y-auto scrollbar-thin relative bg-[#09090b] flex"
               >
-                {/* Time markers column */}
-                <div className="w-14 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e] select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-grab">
+                {/* Time markers column (After Effects style time ruler) */}
+                <div
+                  data-resize-handle="timeline"
+                  data-testid="timeline-hour-ruler"
+                  onMouseDown={handleTimelineRulerMouseDown}
+                  onDoubleClick={handleTimelineDoubleClick}
+                  onWheel={handleTimelineRulerWheel}
+                  title={`Шкала времени: зажмите и тяните для приближения делений (сейчас шаг ${slotStepMinutes}м). Двойной клик — сброс.`}
+                  className="w-14 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e] select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-ns-resize hover:bg-[#101014] transition-colors"
+                >
                   {HOURS.map(hour => (
                     <div
                       key={hour}
-                      className="h-[52px] border-b border-white/[0.04] pr-2 text-right text-[10px] font-mono text-zinc-500 pt-1"
+                      data-hour={hour}
+                      style={{ height: `${hourHeight}px` }}
+                      className="flex flex-col cursor-ns-resize"
                     >
-                      {String(hour).padStart(2, '0')}:00
+                      {subMinutes.map((minute, mIdx) => {
+                        const isTop = minute === 0;
+                        const isHalf = minute === 30;
+                        const isLastSub = mIdx === subMinutes.length - 1;
+
+                        return (
+                          <div
+                            key={minute}
+                            data-minute={minute}
+                            data-resize-handle="timeline"
+                            style={{ height: `${subSlotHeight}px` }}
+                            className={`border-b ${
+                              isLastSub ? 'border-white/[0.04]' : 'border-white/[0.025] border-dashed'
+                            } pr-2 text-right font-mono pt-0.5 select-none flex items-start justify-end transition-colors cursor-ns-resize ${
+                              isTop
+                                ? 'text-[10px] text-zinc-400 font-medium'
+                                : isHalf
+                                ? 'text-[9px] text-zinc-500 font-normal'
+                                : 'text-[8px] text-zinc-600 font-normal'
+                            }`}
+                          >
+                            <span className="hover:text-blue-300 transition-colors pointer-events-none">
+                              {isTop
+                                ? `${String(hour).padStart(2, '0')}:00`
+                                : slotStepMinutes === 15 && !isHalf
+                                ? `:${String(minute).padStart(2, '0')}`
+                                : `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
@@ -962,61 +1194,82 @@ export const CalendarView: React.FC = () => {
 
                     // Red time ribbon position
                     const showRedRibbon = isToday;
-                    const redRibbonTopPx = (nowMinute / 60) * 52;
+                    const redRibbonTopPx = (nowMinute / 60) * hourHeight;
 
                     return (
                       <div
                         key={dateStr}
                         className="relative border-r border-white/[0.04] last:border-r-0 h-full"
                       >
-                        {/* Hour slot background rows with 1-click add */}
-                        {HOURS.map(hour => {
-                          const isOver = isDragging && activeZoneData?.dropZone === 'calendar-hour' && activeZoneData.dropDate === dateStr && activeZoneData.dropHour === String(hour);
-                          return (
-                            <div
-                              key={hour}
-                              data-drop-zone="calendar-hour"
-                              data-drop-date={dateStr}
-                              data-drop-hour={hour}
-                              onClick={e => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const offsetY = e.clientY - rect.top;
-                                const quarter = Math.min(3, Math.max(0, Math.floor((offsetY / 52) * 4)));
-                                const minute = quarter * 15;
-                                openComposerModal({
-                                  type: 'task',
-                                  dueDate: dateStr,
-                                  reminder: `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
-                                  folder: currentFolder,
-                                });
-                              }}
-                              className={`h-[52px] border-b border-white/[0.04] transition-colors relative group cursor-pointer ${
-                                isOver
-                                  ? 'bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30'
-                                  : 'hover:bg-white/[0.02]'
-                              }`}
-                            >
-                              {/* Subtle 30-min dashed line */}
-                              <div className="absolute inset-x-0 top-[26px] border-b border-white/[0.02] pointer-events-none" />
-                              {isOver ? (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                                  <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-blue-300 bg-[#141418] px-2 py-0.5 rounded border border-blue-500/40 shadow-sm">
-                                    <Clock className="w-2.5 h-2.5 text-blue-400" />
-                                    <span>{String(hour).padStart(2, '0')}:00</span>
-                                  </span>
+                        {/* Hour slot background rows with sub-slot divisions & 1-click add */}
+                        {HOURS.map(hour => (
+                          <div
+                            key={hour}
+                            data-hour={hour}
+                            style={{ height: `${hourHeight}px` }}
+                            className="flex flex-col"
+                          >
+                            {subMinutes.map((minute, mIdx) => {
+                              const isLastSub = mIdx === subMinutes.length - 1;
+                              const isOver =
+                                isDragging &&
+                                activeZoneData?.dropZone === 'calendar-hour' &&
+                                activeZoneData.dropDate === dateStr &&
+                                activeZoneData.dropHour === String(hour) &&
+                                (activeZoneData.dropMinute === String(minute) || subMinutes.length === 1);
+
+                              return (
+                                <div
+                                  key={minute}
+                                  data-drop-zone="calendar-hour"
+                                  data-drop-date={dateStr}
+                                  data-drop-hour={hour}
+                                  data-drop-minute={minute}
+                                  style={{ height: `${subSlotHeight}px` }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    openComposerModal({
+                                      type: 'task',
+                                      dueDate: dateStr,
+                                      reminder: `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+                                      folder: currentFolder,
+                                    });
+                                  }}
+                                  className={`h-[52px] transition-colors relative group cursor-pointer ${
+                                    isLastSub
+                                      ? 'border-b border-white/[0.04]'
+                                      : 'border-b border-white/[0.025] border-dashed'
+                                  } ${
+                                    isOver
+                                      ? 'bg-blue-500/15 border-blue-500/40 ring-1 ring-blue-500/30'
+                                      : 'hover:bg-white/[0.025]'
+                                  }`}
+                                >
+                                  {isOver ? (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                                      <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-blue-300 bg-[#141418] px-2 py-0.5 rounded border border-blue-500/40 shadow-sm">
+                                        <Clock className="w-2.5 h-2.5 text-blue-400" />
+                                        <span>
+                                          {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
+                                        </span>
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    /* Hover indicator with time */
+                                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
+                                      <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 bg-[#18181c] px-2 py-0.5 rounded border border-white/[0.06] shadow-sm">
+                                        <Plus className="w-2.5 h-2.5 text-zinc-400" />
+                                        <span>
+                                          {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
+                                        </span>
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
-                              ) : (
-                                /* Hover indicator with time */
-                                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
-                                  <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 bg-[#18181c] px-2 py-0.5 rounded border border-white/[0.06] shadow-sm">
-                                    <Plus className="w-2.5 h-2.5 text-zinc-400" />
-                                    <span>{String(hour).padStart(2, '0')}:00</span>
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                              );
+                            })}
+                          </div>
+                        ))}
 
                         {/* Blue Time Ribbon for Today */}
                         {showRedRibbon && (
@@ -1031,7 +1284,7 @@ export const CalendarView: React.FC = () => {
                         {/* Render Timed Task Cards with Anti-Overlap Layout */}
                         {computeAntiOverlapLayout(
                           timedTasks,
-                          52,
+                          hourHeight,
                           resizingTask?.taskId || null,
                           resizingTask?.currentDuration || null
                         ).map(positioned => renderTimedTaskBlock(positioned))}
@@ -1083,7 +1336,13 @@ export const CalendarView: React.FC = () => {
                       key={cell.dateStr}
                       data-drop-zone="calendar-month"
                       data-drop-date={cell.dateStr}
-                      onClick={() => setExpandedDayDateStr(cell.dateStr)}
+                      onClick={() => {
+                        openComposerModal({
+                          type: 'task',
+                          dueDate: cell.dateStr,
+                          folder: currentFolder,
+                        });
+                      }}
                       className={`min-h-[96px] p-1.5 border-b border-r border-white/[0.04] flex flex-col justify-between transition-colors cursor-pointer group ${
                         cell.isCurrentMonth ? 'bg-[#09090b] hover:bg-[#0c0c0e]' : 'bg-[#070709] text-zinc-600'
                       } ${isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 border-blue-500/30' : ''}`}
@@ -1191,6 +1450,34 @@ export const CalendarView: React.FC = () => {
           </div>
           )}
         </div>
+
+        {/* Live floating tooltip during timeline zoom ("приблизил линию") */}
+        {timelineResizing && (
+          <div
+            data-testid="timeline-resize-tooltip"
+            className={`fixed z-50 pointer-events-none px-3.5 py-2 rounded-xl bg-[#141418]/95 border text-xs font-mono text-zinc-100 shadow-2xl backdrop-blur-md flex items-center gap-2.5 transition-all duration-75 select-none ${
+              timelineResizing.isSnapped
+                ? 'border-blue-400 shadow-blue-500/30 scale-105'
+                : 'border-white/15'
+            }`}
+            style={{
+              left: 72,
+              top: Math.max(70, Math.min(window.innerHeight - 60, timelineResizing.startY)),
+            }}
+          >
+            <div className={`w-2 h-2 rounded-full ${timelineResizing.isSnapped ? 'bg-blue-400 animate-ping' : 'bg-blue-500'}`} />
+            <span className="font-semibold text-zinc-100">{timelineResizing.currentHeight}px</span>
+            <span className="text-zinc-500">•</span>
+            <span className="text-blue-400 font-medium">
+              Деления: {timelineResizing.slotStep} мин
+            </span>
+            {timelineResizing.currentHeight === DEFAULT_HOUR_HEIGHT && (
+              <span className="text-[10px] text-zinc-400 font-sans bg-white/[0.06] px-1.5 py-0.5 rounded">
+                по умолчанию
+              </span>
+            )}
+          </div>
+        )}
 
         {/* ============================================================== */}
         {/* 3. Side Drawer: Overdue and Unscheduled Tasks                 */}

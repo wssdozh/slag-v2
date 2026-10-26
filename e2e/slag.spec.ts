@@ -665,22 +665,18 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.locator('button', { hasText: 'Месяц' }).click();
     await expect(page.locator('button', { hasText: 'Месяц' })).toHaveClass(/bg-white\/10/);
 
-    // Test Expanded Day Card modal by clicking on a month day cell number
+    // Test Month day click directly opens ComposerModal
     const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
     if (await monthTodayBadge.isVisible()) {
       await monthTodayBadge.click();
       await page.waitForTimeout(100);
+      await expect(page.locator('[role="dialog"]').filter({ hasText: 'Новая задача' })).toBeVisible();
       await page.screenshot({
         path: 'test-results/screenshots/calendar-month-expanded-day.png',
         fullPage: false,
       });
-      // Close modal via button or Escape
-      const modalCloseBtn = page.locator('[data-testid="close-expanded-day-modal"]').first();
-      if (await modalCloseBtn.isVisible()) {
-        await modalCloseBtn.click();
-      } else {
-        await page.keyboard.press('Escape');
-      }
+      // Close modal via Escape
+      await page.keyboard.press('Escape');
       await page.waitForTimeout(200);
     }
 
@@ -2276,24 +2272,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('[role="dialog"]')).not.toBeVisible();
 
-    // 8. Verify Month View day card "Добавить задачу..." spawns ComposerModal
+    // 8. Verify Month View day card directly spawns ComposerModal on click
     await page.locator('button', { hasText: 'Месяц' }).click();
     await page.waitForTimeout(200);
     const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
     if (await monthTodayBadge.isVisible()) {
       await monthTodayBadge.click();
       await page.waitForTimeout(200);
-      const addDayTaskBtn = page.locator('button', { hasText: 'Добавить задачу...' });
-      if (await addDayTaskBtn.isVisible()) {
-        await addDayTaskBtn.click();
-        await page.waitForTimeout(200);
-        await expect(page.locator('[role="dialog"]').filter({ hasText: 'Новая задача' })).toBeVisible();
-        await page.screenshot({
-          path: 'test-results/screenshots/calendar-month-composer-modal.png',
-          fullPage: false,
-        });
-        await page.keyboard.press('Escape');
-      }
+      await expect(page.locator('[role="dialog"]').filter({ hasText: 'Новая задача' })).toBeVisible();
+      await page.screenshot({
+        path: 'test-results/screenshots/calendar-month-composer-modal.png',
+        fullPage: false,
+      });
+      await page.keyboard.press('Escape');
     }
   });
 
@@ -2721,18 +2712,21 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('37. Mouse Grab-to-Scroll (Pan) in Kanban and Calendar Week/Month Views', async ({ page }) => {
-    // Set a compact viewport so both Kanban and Calendar have horizontal overflow
-    await page.setViewportSize({ width: 800, height: 600 });
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/');
     await page.waitForTimeout(300);
 
     // =========================================================================
     // 1. KANBAN: Mouse grab-and-drag horizontal scrolling
     // =========================================================================
-    const kanbanBtn = page.locator('header button[title*="Канбан"]');
+    const kanbanBtn = page.locator('button[title*="Канбан"]').first();
     await expect(kanbanBtn).toBeVisible();
     await kanbanBtn.click();
     await page.waitForTimeout(300);
+
+    // Set a compact viewport so both Kanban and Calendar have horizontal overflow
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.waitForTimeout(200);
 
     const kanbanContainer = page.locator('[data-testid="kanban-columns-container"]');
     await expect(kanbanContainer).toBeVisible();
@@ -2784,10 +2778,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // =========================================================================
     // 2. CALENDAR WEEK VIEW: Mouse grab-and-drag horizontal & vertical panning
     // =========================================================================
-    const calendarBtn = page.locator('header button[title*="Календарь"]');
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const calendarBtn = page.locator('button[title*="Календарь"]').first();
     await expect(calendarBtn).toBeVisible();
     await calendarBtn.click();
     await page.waitForTimeout(300);
+    await page.setViewportSize({ width: 800, height: 600 });
 
     const weekScrollContainer = page.locator('[data-testid="calendar-week-scroll-container"]');
     await expect(weekScrollContainer).toBeVisible();
@@ -3572,5 +3568,116 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/dockview-audioplayer-inbox-all-sync.png',
       fullPage: false,
     });
+  });
+
+  test('49. Calendar Week View timeline hour height resize ("опоп чутка") and Month View direct composer', async ({ page }) => {
+    // 1. Switch to Calendar view
+    const calendarBtn = page.locator('header button[title*="Календарь"]').first();
+    await expect(calendarBtn).toBeVisible();
+    await calendarBtn.click();
+    await page.waitForTimeout(300);
+
+    // 2. Ensure Week view is active
+    const weekBtn = page.locator('button', { hasText: 'Неделя' }).first();
+    await weekBtn.click();
+    await page.waitForTimeout(200);
+
+    // 3. Locate the time ruler column
+    const timeRuler = page.locator('[data-testid="timeline-hour-ruler"]');
+    await expect(timeRuler).toBeVisible();
+
+    // 4. Check an hour marker (e.g. 10:00) has cursor-ns-resize and data-resize-handle
+    const marker10 = page.locator('[data-testid="timeline-hour-ruler"] [data-hour="10"]');
+    await marker10.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(100);
+    await expect(marker10).toBeVisible();
+    await expect(marker10).toHaveClass(/cursor-ns-resize/);
+
+    // Initial height of the marker should be 52px
+    const initialBox = await marker10.boundingBox();
+    expect(initialBox).not.toBeNull();
+    expect(Math.round(initialBox!.height)).toBe(52);
+
+    // 5. Drag the marker down to resize the timeline
+    const markerBox = (await marker10.boundingBox())!;
+    await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
+    await page.mouse.down();
+
+    // Move down by 45px to trigger live tooltip and resize
+    await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2 + 45, { steps: 5 });
+    await page.waitForTimeout(150);
+
+    // Verify live floating tooltip ("опоп чутка") appears
+    const liveTooltip = page.locator('[data-testid="timeline-resize-tooltip"]');
+    await expect(liveTooltip).toBeVisible();
+
+    // Capture screenshot of interactive timeline resize with live tooltip badge
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-timeline-resize-live.png',
+      fullPage: false,
+    });
+
+    // Release mouse
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    // Verify that the hour marker is now taller
+    const resizedBox = await marker10.boundingBox();
+    expect(resizedBox!.height).toBeGreaterThan(52);
+
+    // Capture screenshot of expanded timeline in Week view
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-timeline-expanded-week.png',
+      fullPage: false,
+    });
+
+    // Drag further down to test 15-minute division level ("приближение линии")
+    const currentBox = (await marker10.boundingBox())!;
+    await page.mouse.move(currentBox.x + currentBox.width / 2, currentBox.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(currentBox.x + currentBox.width / 2, currentBox.y + 110, { steps: 8 });
+    await page.waitForTimeout(200);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    // Verify 15-minute sub-divisions appear
+    const min15Slot = page.locator('[data-testid="timeline-hour-ruler"] [data-minute="15"]').first();
+    await expect(min15Slot).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-timeline-15m-divisions.png',
+      fullPage: false,
+    });
+
+    // 6. Double click marker to reset back to 52px
+    await marker10.dblclick();
+    await page.waitForTimeout(200);
+
+    const resetBox = await marker10.boundingBox();
+    expect(Math.round(resetBox!.height)).toBe(52);
+
+    // 7. Switch to Month View and verify direct composer opening
+    const monthBtn = page.locator('button', { hasText: 'Месяц' }).first();
+    await monthBtn.click();
+    await page.waitForTimeout(200);
+
+    // Click on a month day cell
+    const monthCell = page.locator('[data-drop-zone="calendar-month"]').nth(15);
+    await expect(monthCell).toBeVisible();
+    await monthCell.click();
+    await page.waitForTimeout(200);
+
+    // Verify that ComposerModal opened directly (no empty intermediate modal!)
+    const composerDialog = page.locator('[role="dialog"]').filter({ hasText: 'Новая задача' });
+    await expect(composerDialog).toBeVisible();
+
+    // Capture screenshot of directly opened composer in Month view
+    await page.screenshot({
+      path: 'test-results/screenshots/calendar-month-direct-composer.png',
+      fullPage: false,
+    });
+
+    await page.keyboard.press('Escape');
+    await expect(composerDialog).not.toBeVisible();
   });
 });
