@@ -1331,14 +1331,7 @@ export const Composer: React.FC<ComposerProps> = ({
     </div>
   ) : undefined;
 
-  const hasActiveProperties =
-    Boolean(targetFolder) ||
-    allPreviewTags.length > 0 ||
-    (itemType === 'task' &&
-      (Boolean(effectiveDueDate) ||
-        effectiveDuration !== undefined ||
-        Boolean(effectiveRecurrence) ||
-        effectivePriority !== 'none'));
+  const hasActiveProperties = Boolean(targetFolder) || allPreviewTags.length > 0;
 
   const propertiesSlot = hasActiveProperties ? (
     <div className="flex items-center gap-1.5 px-1 py-1 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150 text-xs">
@@ -1370,167 +1363,6 @@ export const Composer: React.FC<ComposerProps> = ({
           onRemove={() => removeTag(tag)}
         />
       ))}
-
-      {/* Due Date Chip */}
-      {itemType === 'task' && effectiveDueDate && (
-        <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-300 text-[11px] font-medium">
-          <button
-            type="button"
-            onClick={() => dateInputRef.current?.showPicker?.()}
-            className="flex items-center gap-1 hover:text-blue-200 cursor-pointer"
-            title="Изменить срок"
-          >
-            <Calendar className="w-3 h-3 text-blue-400 shrink-0" />
-            <span>{effectiveDateLabel}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsDateDismissed(true);
-              setDueDate('');
-            }}
-            className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
-            title="Снять срок"
-          >
-            <X className="w-2.5 h-2.5" />
-          </button>
-        </span>
-      )}
-
-      {/* Duration Chip */}
-      {itemType === 'task' && effectiveDuration !== undefined && (
-        <div className="relative shrink-0">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-blue-300 text-[11px] font-medium">
-            <button
-              type="button"
-              onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-              className="flex items-center gap-1 hover:text-blue-200 cursor-pointer"
-              title="Изменить длительность"
-            >
-              <Clock className="w-3 h-3 text-blue-400 shrink-0" />
-              <span>
-                {effectiveDuration >= 60
-                  ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
-                  : `${effectiveDuration}м`}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsDurationDismissed(true);
-                setDuration(undefined);
-              }}
-              className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
-              title="Снять длительность"
-            >
-              <X className="w-2.5 h-2.5" />
-            </button>
-          </span>
-
-          {isDurationDropdownOpen && (
-            <div className="absolute left-0 bottom-full mb-1.5 w-32 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-              {[15, 30, 45, 60, 90, 120].map(mins => (
-                <button
-                  key={mins}
-                  type="button"
-                  onClick={() => {
-                    setDuration(mins);
-                    setIsDurationDismissed(false);
-                    setIsDurationDropdownOpen(false);
-                  }}
-                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                    effectiveDuration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                  }`}
-                >
-                  <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Recurrence Chip */}
-      {itemType === 'task' && effectiveRecurrence && (
-        <div className="relative shrink-0">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] font-medium">
-            <button
-              type="button"
-              onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-              className="flex items-center gap-1 hover:text-amber-200 cursor-pointer"
-              title="Изменить повторение"
-            >
-              <Repeat className="w-3 h-3 text-amber-400 shrink-0" />
-              <span>{formatRecurrenceLabel(effectiveRecurrence)}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsRecurrenceDismissed(true);
-                setRecurrence(undefined);
-              }}
-              className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
-              title="Снять повторение"
-            >
-              <X className="w-2.5 h-2.5" />
-            </button>
-          </span>
-
-          {isRecurrenceDropdownOpen && (
-            <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-              {RECURRENCE_PRESETS.map(opt => (
-                <button
-                  key={opt.label}
-                  type="button"
-                  onClick={() => {
-                    setRecurrence(opt.rule);
-                    setIsRecurrenceDismissed(false);
-                    setIsRecurrenceDropdownOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                >
-                  <span>{opt.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Priority Chip */}
-      {itemType === 'task' && effectivePriority !== 'none' && (
-        <span
-          className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
-            effectivePriority === 'high'
-              ? 'bg-rose-500/10 border border-rose-500/25 text-rose-300'
-              : effectivePriority === 'medium'
-              ? 'bg-amber-500/10 border border-amber-500/25 text-amber-300'
-              : 'bg-blue-500/10 border border-blue-500/25 text-blue-300'
-          }`}
-        >
-          <button
-            type="button"
-            className="flex items-center gap-1 cursor-pointer hover:opacity-80"
-            title="Приоритет задачи"
-          >
-            <LinearSignalBars priority={effectivePriority} className="w-3 h-3" />
-            <span>
-              {effectivePriority === 'high' ? 'Высокий' : effectivePriority === 'medium' ? 'Средний' : 'Низкий'}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsPriorityDismissed(true);
-              setPriority('none');
-            }}
-            className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
-            title="Снять приоритет"
-          >
-            <X className="w-2.5 h-2.5" />
-          </button>
-        </span>
-      )}
     </div>
   ) : null;
 
@@ -1620,7 +1452,7 @@ export const Composer: React.FC<ComposerProps> = ({
               )}
             </div>
 
-            {/* Task Controls: Quiet un-set property triggers (when active, displayed in propertiesSlot) */}
+            {/* Task Controls: Always visible in toolbar, lights up blue when active */}
             {itemType === 'task' && (
               <div className="flex items-center gap-0.5 shrink-0">
                 <input
@@ -1636,121 +1468,202 @@ export const Composer: React.FC<ComposerProps> = ({
                   aria-hidden="true"
                 />
 
-                {!effectiveDueDate && (
+                {/* Due Date Icon Button */}
+                <button
+                  type="button"
+                  onClick={() => dateInputRef.current?.showPicker?.()}
+                  onContextMenu={(e) => {
+                    if (effectiveDueDate) {
+                      e.preventDefault();
+                      setIsDateDismissed(true);
+                      setDueDate('');
+                    }
+                  }}
+                  className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                    effectiveDueDate
+                      ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                      : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
+                  }`}
+                  title={
+                    effectiveDueDate
+                      ? `Срок: ${effectiveDateLabel} (клик для изменения, ПКМ для сброса)`
+                      : 'Установить срок задачи'
+                  }
+                  aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок задачи'}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Duration Icon Button */}
+                <div className="relative shrink-0">
                   <button
                     type="button"
-                    onClick={() => dateInputRef.current?.showPicker?.()}
-                    className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
-                    title="Установить срок задачи"
+                    onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
+                    onContextMenu={(e) => {
+                      if (effectiveDuration !== undefined) {
+                        e.preventDefault();
+                        setIsDurationDismissed(true);
+                        setDuration(undefined);
+                      }
+                    }}
+                    className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                      effectiveDuration !== undefined
+                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
+                    }`}
+                    title={
+                      effectiveDuration !== undefined
+                        ? `Длительность: ${
+                            effectiveDuration >= 60
+                              ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
+                              : `${effectiveDuration}м`
+                          } (клик для изменения, ПКМ для сброса)`
+                        : 'Установить длительность задачи'
+                    }
+                    aria-label="Установить длительность задачи"
                   >
-                    <Calendar className="w-3.5 h-3.5" />
+                    <Clock className="w-3.5 h-3.5" />
                   </button>
-                )}
 
-                {effectiveDuration === undefined && (
-                  <div className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                      className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
-                      title="Установить длительность задачи"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                    </button>
+                  {isDurationDropdownOpen && (
+                    <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                      {effectiveDuration !== undefined && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDurationDismissed(true);
+                            setDuration(undefined);
+                            setIsDurationDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-white/[0.06] mb-0.5"
+                        >
+                          <span>Без длительности</span>
+                        </button>
+                      )}
+                      {[15, 30, 45, 60, 90, 120].map(mins => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => {
+                            setDuration(mins);
+                            setIsDurationDismissed(false);
+                            setIsDurationDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                            effectiveDuration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                    {isDurationDropdownOpen && (
-                      <div className="absolute left-0 bottom-full mb-1.5 w-32 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                        {[15, 30, 45, 60, 90, 120].map(mins => (
-                          <button
-                            key={mins}
-                            type="button"
-                            onClick={() => {
-                              setDuration(mins);
-                              setIsDurationDismissed(false);
-                              setIsDurationDropdownOpen(false);
-                            }}
-                            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                          >
-                            <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Recurrence Icon Button */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
+                    onContextMenu={(e) => {
+                      if (effectiveRecurrence) {
+                        e.preventDefault();
+                        setIsRecurrenceDismissed(true);
+                        setRecurrence(undefined);
+                      }
+                    }}
+                    className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
+                      effectiveRecurrence
+                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
+                    }`}
+                    title={
+                      effectiveRecurrence
+                        ? `Повтор: ${formatRecurrenceLabel(effectiveRecurrence)} (клик для изменения, ПКМ для сброса)`
+                        : 'Повторяющаяся задача'
+                    }
+                    aria-label="Повторяющаяся задача"
+                  >
+                    <Repeat className="w-3.5 h-3.5" />
+                  </button>
 
-                {!effectiveRecurrence && (
-                  <div className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                      className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
-                      title="Повторяющаяся задача"
-                    >
-                      <Repeat className="w-3.5 h-3.5" />
-                    </button>
+                  {isRecurrenceDropdownOpen && (
+                    <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                      {effectiveRecurrence && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsRecurrenceDismissed(true);
+                            setRecurrence(undefined);
+                            setIsRecurrenceDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-white/[0.06] mb-0.5"
+                        >
+                          <span>Без повторения</span>
+                        </button>
+                      )}
+                      {RECURRENCE_PRESETS.map(opt => (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          onClick={() => {
+                            setRecurrence(opt.rule);
+                            setIsRecurrenceDismissed(false);
+                            setIsRecurrenceDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                        >
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                    {isRecurrenceDropdownOpen && (
-                      <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                        {RECURRENCE_PRESETS.map(opt => (
-                          <button
-                            key={opt.label}
-                            type="button"
-                            onClick={() => {
-                              setRecurrence(opt.rule);
-                              setIsRecurrenceDismissed(false);
-                              setIsRecurrenceDropdownOpen(false);
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                          >
-                            <span>{opt.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {effectivePriority === 'none' && (
-                  <div className="flex items-center shrink-0">
-                    <Select
-                      size="md"
-                      variant="ghost"
-                      direction="up"
-                      value={effectivePriority}
-                      onChange={(val) => {
-                        setPriority(val as any);
-                        setIsPriorityDismissed(false);
-                      }}
-                      options={[
-                        {
-                          value: 'none',
-                          label: 'Обычный',
-                          icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
-                          color: 'text-zinc-400',
-                        },
-                        {
-                          value: 'low',
-                          label: 'Низкий',
-                          icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
-                          color: 'text-zinc-300',
-                        },
-                        {
-                          value: 'medium',
-                          label: 'Средний',
-                          icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
-                          color: 'text-amber-400',
-                        },
-                        {
-                          value: 'high',
-                          label: 'Высокий',
-                          icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
-                          color: 'text-rose-400',
-                        },
-                      ]}
-                    />
-                  </div>
-                )}
+                {/* Priority Selector */}
+                <div className="flex items-center shrink-0">
+                  <Select
+                    size="md"
+                    variant="ghost"
+                    direction="up"
+                    value={effectivePriority}
+                    onChange={(val) => {
+                      setPriority(val as any);
+                      setIsPriorityDismissed(false);
+                    }}
+                    className={
+                      effectivePriority !== 'none'
+                        ? 'bg-blue-500/20 text-blue-400 rounded-md font-medium'
+                        : ''
+                    }
+                    options={[
+                      {
+                        value: 'none',
+                        label: 'Обычный',
+                        icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
+                        color: 'text-zinc-400',
+                      },
+                      {
+                        value: 'low',
+                        label: 'Низкий',
+                        icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
+                        color: 'text-zinc-300',
+                      },
+                      {
+                        value: 'medium',
+                        label: 'Средний',
+                        icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
+                        color: 'text-amber-400',
+                      },
+                      {
+                        value: 'high',
+                        label: 'Высокий',
+                        icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
+                        color: 'text-rose-400',
+                      },
+                    ]}
+                  />
+                </div>
               </div>
             )}
     </div>

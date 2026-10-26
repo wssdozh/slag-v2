@@ -704,10 +704,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const oldPriorityChip = page.locator('span.font-mono', { hasText: 'p1 (High)' });
     await expect(oldPriorityChip).not.toBeVisible();
 
-    // 4. Verify toolbar controls are filled directly on the bottom bar
-    const dueDateBtn = page.locator('button[title="Изменить срок"]');
+    // 4. Verify toolbar controls light up in blue directly on the bottom bar
+    const dueDateBtn = page.locator('button[title*="Срок: Завтра"]').first();
     await expect(dueDateBtn).toBeVisible();
-    await expect(dueDateBtn).toContainText('Завтра');
+    await expect(dueDateBtn).toHaveClass(/bg-blue-500/);
 
     const prioBtn = page.locator('button', { hasText: 'Высокий' });
     await expect(prioBtn).toBeVisible();
@@ -718,10 +718,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
 
-    // 6. Test removing date via its X button in toolbar
-    const dateClearBtn = page.locator('button[title="Снять срок"]');
-    await expect(dateClearBtn).toBeVisible();
-    await dateClearBtn.click();
+    // 6. Test removing date via right click on toolbar button
+    await dueDateBtn.click({ button: 'right' });
     await expect(page.locator('button[title="Установить срок задачи"]')).toBeVisible();
 
     // 7. Retype and send task via Enter
