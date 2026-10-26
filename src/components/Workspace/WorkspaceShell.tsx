@@ -27,7 +27,8 @@ import {
   closeWindow,
   restoreDetachedWindows,
   updateDetachedWindowBounds,
-  getTabCrossWindowChannel,
+  sendCrossWindowTab,
+  listenCrossWindowTab,
   type CrossWindowTabMessage,
 } from '../../lib/windowControls';
 import {
@@ -265,7 +266,7 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
 const GroupHeaderActions: React.FC<any> = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const panelSeqRef = useRef(0);
+  const seqRef = useRef(0);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -290,21 +291,8 @@ const GroupHeaderActions: React.FC<any> = (props) => {
     const containerApi = props.containerApi as DockviewApi | undefined;
     if (!containerApi) return;
 
-    // Deduplication check: if panel already exists anywhere in workspace, move or focus it
-    const existingPanel = containerApi.panels.find(p => getPanelComponent(p) === panelId);
-    if (existingPanel) {
-      if (existingPanel.group === props.group) {
-        existingPanel.api.setActive();
-      } else {
-        existingPanel.api.moveTo({ group: props.group });
-        existingPanel.api.setActive();
-      }
-      wsLog.info(`Moved existing panel [${panelId}] "${title}" to target group instead of duplicating`);
-      return;
-    }
-
-    panelSeqRef.current += 1;
-    const uniqueId = `panel_${panelId}_${panelSeqRef.current}`;
+    seqRef.current += 1;
+    const uniqueId = `panel_${panelId}_g${seqRef.current}_${props.group?.id || 'main'}`;
     wsLog.info(`Added panel tab to group: [${panelId}] "${title}"`, { uniqueId });
 
     try {
@@ -367,6 +355,7 @@ export interface WorkspaceShellProps {
 export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) => {
   const { currentFolder } = useApp();
   const apiRef = useRef<DockviewApi | null>(null);
+  const dockSeqRef = useRef(0);
   const [dropPreview, setDropPreview] = useState<{
     left: number;
     top: number;
@@ -390,15 +379,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
   // Cross-window tab docking listener: handles dragging tabs across OS windows
   useEffect(() => {
-    const channel = getTabCrossWindowChannel();
-    if (!channel) return;
-
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const myLabel = urlParams?.get('label') || 'main';
     const isPrimary = !effectiveInitialPanel;
 
-    channel.onmessage = (event: MessageEvent<CrossWindowTabMessage>) => {
-      const msg = event.data;
+    const unlisten = listenCrossWindowTab((msg: CrossWindowTabMessage) => {
       if (!msg || typeof msg !== 'object') return;
       // Guard: Never process messages originating from this exact window
       if (msg.sourceLabel === myLabel) return;
@@ -468,7 +453,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
       }
 
-      // 2. Primary window accepts tab, handles deduplication, and docks with spatial split
+      // 2. Primary window accepts tab, docks it with spatial split, and sends confirmation
       if (isPrimary && msg.type === 'TAB_DRAG_RELEASE') {
         setDropPreview(null);
         const isInside =
@@ -525,7 +510,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             existingPanel.api.setActive();
             wsLog.info(`Cross-window tab already open in workspace; moved/focused [${msg.panelId}] "${msg.title}"`);
           } else {
-            const uniqueId = `panel_${msg.panelId}`;
+            dockSeqRef.current += 1;
+            const uniqueId = `panel_${msg.panelId}_dock${dockSeqRef.current}`;
             wsLog.info(`Cross-window tab accepted and docked into workspace: [${msg.panelId}] "${msg.title}"`, {
               from: msg.sourceLabel,
               direction,
@@ -550,7 +536,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             }
           }
 
-          channel.postMessage({
+          void sendCrossWindowTab({
             type: 'TAB_DRAG_ACCEPTED',
             sourceLabel: myLabel,
             targetLabel: msg.sourceLabel,
@@ -564,7 +550,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
       }
 
-      // 2. Secondary window: close once primary accepts the panel
+      // 3. Secondary window: close once primary accepts the panel
       if (
         !isPrimary &&
         msg.type === 'TAB_DRAG_ACCEPTED' &&
@@ -581,10 +567,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
         void closeWindow();
       }
-    };
+    });
 
     return () => {
-      channel.close();
+      unlisten();
     };
   }, [effectiveInitialPanel]);
 
@@ -848,7 +834,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           ? new URLSearchParams(window.location.search).get('label') || 'main'
           : 'main';
       const isSecondary = Boolean(effectiveInitialPanel);
-      const channel = isSecondary ? getTabCrossWindowChannel() : null;
 
       wsLog.debug(`Tab drag gesture started: [${rawComponentId}] "${title}"`, {
         isSecondary,
@@ -857,12 +842,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
       let lastMoveTime = 0;
       const handlePointerMove = (e: MouseEvent | DragEvent) => {
-        if (!isSecondary || !channel) return;
+        if (!isSecondary) return;
         const now = Date.now();
         if (now - lastMoveTime < 25) return;
         lastMoveTime = now;
         if (e.screenX && e.screenY) {
-          channel.postMessage({
+          void sendCrossWindowTab({
             type: 'TAB_DRAG_MOVE',
             sourceLabel: winLabel,
             panelId: rawComponentId,
@@ -883,12 +868,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         window.removeEventListener('pointerup', handleDragEnd as EventListener);
 
         // If dragging in secondary window, broadcast drop release to main window
-        if (isSecondary && channel && e.screenX && e.screenY) {
+        if (isSecondary && e.screenX && e.screenY) {
           wsLog.debug(`Broadcasting cross-window TAB_DRAG_RELEASE for [${rawComponentId}] "${title}"`, {
             screenPos: { x: e.screenX, y: e.screenY },
             sourceLabel: winLabel,
           });
-          channel.postMessage({
+          void sendCrossWindowTab({
             type: 'TAB_DRAG_RELEASE',
             sourceLabel: winLabel,
             panelId: rawComponentId,
@@ -940,20 +925,17 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             label: 'Вернуть в главное окно',
             action: () => {
               wsLog.info(`Tab context menu: returning [${rawComponentId}] "${panel.title}" to primary window`);
-              const channel = getTabCrossWindowChannel();
-              if (channel) {
-                const winLabel =
-                  typeof window !== 'undefined'
-                    ? new URLSearchParams(window.location.search).get('label') || ''
-                    : '';
-                channel.postMessage({
-                  type: 'TAB_DRAG_RELEASE',
-                  sourceLabel: winLabel,
-                  panelId: rawComponentId,
-                  title: panel.title || 'SLAG',
-                  forceDock: true,
-                });
-              }
+              const winLabel =
+                typeof window !== 'undefined'
+                  ? new URLSearchParams(window.location.search).get('label') || ''
+                  : '';
+              void sendCrossWindowTab({
+                type: 'TAB_DRAG_RELEASE',
+                sourceLabel: winLabel,
+                panelId: rawComponentId,
+                title: panel.title || 'SLAG',
+                forceDock: true,
+              });
             },
           }
         : {

@@ -273,3 +273,70 @@ export const getTabCrossWindowChannel = (): BroadcastChannel | null => {
   if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
   return new BroadcastChannel('slag_cross_window_tabs_v2');
 };
+
+export const sendCrossWindowTab = async (msg: CrossWindowTabMessage): Promise<void> => {
+  // 1. BroadcastChannel (standard Web API, works across same-origin tabs and WebViews)
+  const channel = getTabCrossWindowChannel();
+  if (channel) {
+    try {
+      channel.postMessage(msg);
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Tauri native global event emitter (bulletproof IPC between native OS windows)
+  if (isTauri()) {
+    try {
+      const { emit } = await import('@tauri-apps/api/event');
+      await emit('slag://cross-window-tab', msg);
+    } catch {
+      // ignore
+    }
+  }
+};
+
+export const listenCrossWindowTab = (handler: (msg: CrossWindowTabMessage) => void): (() => void) => {
+  let disposed = false;
+  let unlistenTauri: (() => void) | null = null;
+
+  // 1. Listen via BroadcastChannel
+  const channel = getTabCrossWindowChannel();
+  if (channel) {
+    channel.onmessage = (e: MessageEvent<CrossWindowTabMessage>) => {
+      if (disposed || !e.data) return;
+      handler(e.data);
+    };
+  }
+
+  // 2. Listen via Tauri native global event bus
+  if (isTauri()) {
+    void import('@tauri-apps/api/event').then(({ listen }) => {
+      if (disposed) return;
+      void listen<CrossWindowTabMessage>('slag://cross-window-tab', (event) => {
+        if (disposed || !event.payload) return;
+        handler(event.payload);
+      }).then((unlisten) => {
+        if (disposed) {
+          unlisten();
+        } else {
+          unlistenTauri = unlisten;
+        }
+      });
+    });
+  }
+
+  return () => {
+    disposed = true;
+    if (channel) {
+      try {
+        channel.close();
+      } catch {
+        // ignore
+      }
+    }
+    if (unlistenTauri) {
+      unlistenTauri();
+    }
+  };
+};
