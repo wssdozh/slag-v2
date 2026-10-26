@@ -133,6 +133,11 @@ interface AppContextType {
   openCreateFolderModal: (parentPath?: string) => void;
   openEditFolderModal: (folder: FolderMeta) => void;
   closeFolderModal: () => void;
+  isFolderInfoModalOpen: boolean;
+  folderInfoTarget: string | null;
+  openFolderInfoModal: (folderPath?: string) => void;
+  closeFolderInfoModal: () => void;
+  renameFolder: (oldPath: string, updatedFolder: FolderMeta) => void;
   setIsTriageModalOpen: (open: boolean) => void;
   isComposerModalOpen: boolean;
   composerModalOptions: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string } | null;
@@ -352,6 +357,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLogViewerOpen, setIsLogViewerOpen] = useState<boolean>(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [editingFolder, setEditingFolder] = useState<FolderMeta | null>(null);
+  const [isFolderInfoModalOpen, setIsFolderInfoModalOpen] = useState<boolean>(false);
+  const [folderInfoTarget, setFolderInfoTarget] = useState<string | null>(null);
+
+  const openFolderInfoModal = useCallback((folderPath?: string) => {
+    setFolderInfoTarget(folderPath || currentFolder);
+    setIsFolderInfoModalOpen(true);
+  }, [currentFolder]);
+
+  const closeFolderInfoModal = useCallback(() => {
+    setIsFolderInfoModalOpen(false);
+    setFolderInfoTarget(null);
+  }, []);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState<boolean>(false);
   const [isComposerModalOpen, setIsComposerModalOpen] = useState<boolean>(false);
   const [composerModalOptions, setComposerModalOptions] = useState<{
@@ -734,6 +751,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setEditingFolder(null);
       return true;
     }
+    if (isFolderInfoModalOpen) {
+      setIsFolderInfoModalOpen(false);
+      setFolderInfoTarget(null);
+      return true;
+    }
     if (isTriageModalOpen) {
       setIsTriageModalOpen(false);
       return true;
@@ -785,6 +807,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     closeContextMenu,
     isLogViewerOpen,
     isFolderModalOpen,
+    isFolderInfoModalOpen,
     isTriageModalOpen,
     isComposerModalOpen,
     isSettingsOpen,
@@ -1393,6 +1416,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast(`Папка «${folder.name}» сохранена`, 'success');
   };
 
+  const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
+    storage.renameFolder(oldPath, updatedFolder);
+    if (currentFolder === oldPath || currentFolder.startsWith(oldPath + '/')) {
+      const newCurrent = updatedFolder.path + currentFolder.slice(oldPath.length);
+      setCurrentFolder(newCurrent);
+    }
+    refreshData();
+    addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
+  }, [currentFolder, refreshData, addToast]);
+
   const deleteFolder = (path: string) => {
     if (path === 'Входящие') {
       addToast('Папку «Входящие» нельзя удалить', 'error');
@@ -1511,6 +1544,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSettingsOpen,
         isFolderModalOpen,
         editingFolder,
+        isFolderInfoModalOpen,
+        folderInfoTarget,
+        openFolderInfoModal,
+        closeFolderInfoModal,
+        renameFolder,
         isTriageModalOpen,
         aiSettings,
         toasts,

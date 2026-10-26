@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FeedFilters } from './FeedFilters';
 import { ViewModeSwitcher } from './ViewModeSwitcher';
+import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import {
   Folder,
   Inbox,
@@ -29,6 +30,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
     setIsTriageModalOpen,
+    openFolderInfoModal,
   } = useApp();
 
   const activeViewMode = controlledViewMode ?? contextViewMode;
@@ -50,6 +52,15 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   const inboxUnsortedCount = useMemo(() => {
     return isInbox ? items.filter(i => i.folder === 'Входящие').length : 0;
   }, [items, isInbox]);
+
+  const CustomIcon = folderMeta?.icon ? FOLDER_ICONS[folderMeta.icon] : null;
+  const folderIconComp = CustomIcon ? (
+    <CustomIcon className="w-4.5 h-4.5 text-zinc-400 group-hover:text-zinc-200 transition-colors shrink-0" />
+  ) : isInbox ? (
+    <Inbox className="w-4.5 h-4.5 text-zinc-300 group-hover:text-white transition-colors shrink-0" />
+  ) : (
+    <Folder className="w-4.5 h-4.5 text-zinc-400 group-hover:text-zinc-200 transition-colors shrink-0" />
+  );
 
   return (
     <header className="h-12 px-4 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-3 select-none shrink-0 relative">
@@ -80,19 +91,20 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
 
       {/* Center: Large prominent folder title in the center of the bar */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto px-2">
-          {isInbox ? (
-            <Inbox className="w-4.5 h-4.5 text-zinc-300 shrink-0" />
-          ) : (
-            <Folder className="w-4.5 h-4.5 text-zinc-400 shrink-0" />
-          )}
-          <h2 className="text-sm font-bold text-zinc-100 tracking-tight">
+        <button
+          type="button"
+          onClick={() => openFolderInfoModal(currentFolder)}
+          className="flex items-center gap-2 pointer-events-auto px-2.5 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none"
+          title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
+        >
+          {folderIconComp}
+          <h2 className="text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors">
             {folderMeta?.name || currentFolder}
           </h2>
-          <span className="text-xs font-mono text-zinc-500">
+          <span className="text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors">
             ({filteredItems.length})
           </span>
-        </div>
+        </button>
       </div>
 
       {/* Center / Right Controls */}

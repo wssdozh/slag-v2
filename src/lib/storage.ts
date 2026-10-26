@@ -505,6 +505,42 @@ export class StorageService {
     }
   }
 
+  public renameFolder(oldPath: string, updatedFolder: FolderMeta): void {
+    if (oldPath === 'Входящие') return; // Cannot rename system inbox
+
+    // 1. Update folders list
+    const folders = this.getFolders().map(f => {
+      if (f.path === oldPath) {
+        return updatedFolder;
+      }
+      if (f.path.startsWith(oldPath + '/')) {
+        const subPath = updatedFolder.path + f.path.slice(oldPath.length);
+        const subName = subPath.split('/').pop() || f.name;
+        return { ...f, path: subPath, name: subName };
+      }
+      return f;
+    });
+    localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
+
+    // 2. Update items belonging to this folder and its subfolders
+    const items = this.getItems().map(it => {
+      if (it.folder === oldPath) {
+        return { ...it, folder: updatedFolder.path, updatedAt: Date.now() };
+      }
+      if (it.folder.startsWith(oldPath + '/')) {
+        const subFolder = updatedFolder.path + it.folder.slice(oldPath.length);
+        return { ...it, folder: subFolder, updatedAt: Date.now() };
+      }
+      return it;
+    });
+    localStorage.setItem(this.getItemsKey(), JSON.stringify(items));
+
+    fsLog.info(`Renamed folder "${oldPath}" to "${updatedFolder.path}"`);
+    if (isTauri()) {
+      void this.flushStateToDisk();
+    }
+  }
+
   public updateFolderDescription(path: string, description: string): void {
     const folders = this.getFolders().map(f => {
       if (f.path === path) {

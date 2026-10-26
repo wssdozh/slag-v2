@@ -2945,4 +2945,40 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('43. Folder Info Modal: Header Click, Dashboard Metrics, Media Tabs, and Edit Mode', async ({ page }) => {
+    // 1. Click folder header button in feed
+    const folderHeaderBtn = page.locator('header button[title*="Информация и медиа папки"]').first();
+    await expect(folderHeaderBtn).toBeVisible();
+    await folderHeaderBtn.click();
+
+    // 2. Verify modal opened
+    const modal = page.locator('div[role="dialog"]');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('h3').first()).toContainText('Входящие');
+
+    // 3. Verify AI description block and dashboard metrics
+    await expect(modal.locator('text=Описание для ИИ')).toBeVisible();
+    await expect(modal.getByText('Заметки', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Таски', { exact: true })).toBeVisible();
+
+    // 4. Screenshot View Mode
+    await page.screenshot({ path: 'test-results/screenshots/folder-info-modal-view.png' });
+
+    // 5. Toggle Edit Mode
+    const editBtn = modal.locator('button[title*="Редактировать параметры"]').or(modal.locator('button:has-text("Изменить")')).first();
+    await editBtn.click();
+
+    // 6. Verify Edit Mode controls
+    await expect(modal.locator('label', { hasText: 'Название папки' })).toBeVisible();
+    await expect(modal.locator('label', { hasText: 'Иконка папки' })).toBeVisible();
+    await expect(modal.locator('label', { hasText: 'Описание для ИИ-сортировки' })).toBeVisible();
+
+    // 7. Screenshot Edit Mode
+    await page.screenshot({ path: 'test-results/screenshots/folder-info-modal-edit.png' });
+
+    // 8. Close modal via Escape
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
+  });
 });
