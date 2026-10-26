@@ -269,6 +269,13 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Wait for the app to settle
     await expect(page.locator('main')).toBeVisible();
 
+    // Verify feed list has no horizontal scroll (no horizontal overflow)
+    const feedContainer = page.locator('main .overflow-y-auto').first();
+    const hasHorizontalOverflow = await feedContainer.evaluate(
+      (el) => el.scrollWidth > el.clientWidth
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+
     // 1. Capture full page viewport
     await page.screenshot({
       path: 'test-results/screenshots/main-layout.png',

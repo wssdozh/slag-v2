@@ -405,8 +405,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
         }`}
       >
-        {/* Action Buttons: desktop floating right on hover; mobile top-right inside card */}
-        <div className="absolute top-2 right-2 sm:right-auto sm:left-full sm:pl-1.5 flex flex-col items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 z-20 pointer-events-auto">
+        {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice bubbles */}
+        <div
+          className={`absolute top-2 right-2 ${
+            isPureVoice
+              ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
+              : 'sm:top-2.5 sm:right-2.5 flex items-center'
+          } gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 z-20 pointer-events-auto`}
+        >
           <button
             onClick={() => setReplyTarget(item)}
             className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer hidden sm:flex items-center justify-center"
@@ -443,7 +449,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           <button
             type="button"
             onClick={handleOpenArticle}
-            className="absolute top-2 right-9 sm:top-2.5 sm:right-2.5 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer z-10"
+            className="absolute top-2 right-9 sm:top-2.5 sm:right-16 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer z-10"
             title="Открыть в фокус-редакторе (⌘E)"
             aria-label="Открыть в фокус-редакторе"
           >
@@ -491,7 +497,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               )}
             </button>
 
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-14 sm:pr-16">
               <h3
                 className={`text-sm font-medium leading-snug tracking-tight ${
                   item.status === 'done'
@@ -562,7 +568,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         <div className="flex flex-col gap-1.5 pt-0.5">
           <h3
             onClick={handleOpenArticle}
-            className="text-sm font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-10 sm:pr-12"
+            className="text-sm font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-18 sm:pr-24"
           >
             <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>{item.title}</span>
@@ -578,7 +584,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
       ) : (
         /* Note Variant */
         (shouldRenderNoteTitle || item.content) && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
             {shouldRenderNoteTitle && (
               <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
                 {item.title}
