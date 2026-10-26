@@ -290,6 +290,19 @@ const GroupHeaderActions: React.FC<any> = (props) => {
     const containerApi = props.containerApi as DockviewApi | undefined;
     if (!containerApi) return;
 
+    // Deduplication check: if panel already exists anywhere in workspace, move or focus it
+    const existingPanel = containerApi.panels.find(p => getPanelComponent(p) === panelId);
+    if (existingPanel) {
+      if (existingPanel.group === props.group) {
+        existingPanel.api.setActive();
+      } else {
+        existingPanel.api.moveTo({ group: props.group });
+        existingPanel.api.setActive();
+      }
+      wsLog.info(`Moved existing panel [${panelId}] "${title}" to target group instead of duplicating`);
+      return;
+    }
+
     panelSeqRef.current += 1;
     const uniqueId = `panel_${panelId}_${panelSeqRef.current}`;
     wsLog.info(`Added panel tab to group: [${panelId}] "${title}"`, { uniqueId });
@@ -354,6 +367,14 @@ export interface WorkspaceShellProps {
 export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) => {
   const { currentFolder } = useApp();
   const apiRef = useRef<DockviewApi | null>(null);
+  const [dropPreview, setDropPreview] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    title: string;
+    direction?: string;
+  } | null>(null);
 
   const effectiveInitialPanel = useMemo(() => {
     if (initialPanel) return initialPanel;
@@ -382,53 +403,129 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       // Guard: Never process messages originating from this exact window
       if (msg.sourceLabel === myLabel) return;
 
-      // 1. Primary window accepts tab, handles deduplication, and docks with spatial split
+      // 1. Live drop target preview indicator on primary window
+      if (isPrimary && msg.type === 'TAB_DRAG_MOVE') {
+        if (msg.screenX === undefined || msg.screenY === undefined) {
+          setDropPreview(null);
+          return;
+        }
+
+        const clientX = msg.screenX - window.screenX;
+        const clientY = msg.screenY - window.screenY;
+        const isInside =
+          clientX >= -10 &&
+          clientX <= window.innerWidth + 10 &&
+          clientY >= -10 &&
+          clientY <= window.innerHeight + 10;
+
+        if (!isInside) {
+          setDropPreview(null);
+          return;
+        }
+
+        const dropEl = document.elementFromPoint(
+          Math.max(0, Math.min(clientX, window.innerWidth - 1)),
+          Math.max(0, Math.min(clientY, window.innerHeight - 1))
+        );
+        const targetGroupEl = dropEl?.closest<HTMLElement>('.dv-groupview');
+        if (targetGroupEl) {
+          const rect = targetGroupEl.getBoundingClientRect();
+          const relX = (clientX - rect.left) / Math.max(1, rect.width);
+          const relY = (clientY - rect.top) / Math.max(1, rect.height);
+
+          let direction: 'left' | 'right' | 'above' | 'below' | undefined;
+          let previewLeft = rect.left;
+          let previewTop = rect.top;
+          let previewWidth = rect.width;
+          let previewHeight = rect.height;
+
+          if (relX < 0.25) {
+            direction = 'left';
+            previewWidth = rect.width / 2;
+          } else if (relX > 0.75) {
+            direction = 'right';
+            previewLeft = rect.left + rect.width / 2;
+            previewWidth = rect.width / 2;
+          } else if (relY < 0.25) {
+            direction = 'above';
+            previewHeight = rect.height / 2;
+          } else if (relY > 0.75) {
+            direction = 'below';
+            previewTop = rect.top + rect.height / 2;
+            previewHeight = rect.height / 2;
+          }
+
+          setDropPreview({
+            left: Math.round(previewLeft),
+            top: Math.round(previewTop),
+            width: Math.round(previewWidth),
+            height: Math.round(previewHeight),
+            title: msg.title,
+            direction,
+          });
+        } else {
+          setDropPreview(null);
+        }
+      }
+
+      // 2. Primary window accepts tab, handles deduplication, and docks with spatial split
       if (isPrimary && msg.type === 'TAB_DRAG_RELEASE') {
+        setDropPreview(null);
         const isInside =
           msg.forceDock ||
           (msg.screenX !== undefined &&
             msg.screenY !== undefined &&
-            msg.screenX >= window.screenX &&
-            msg.screenX <= window.screenX + window.outerWidth &&
-            msg.screenY >= window.screenY &&
-            msg.screenY <= window.screenY + window.outerHeight);
+            msg.screenX >= window.screenX - 40 &&
+            msg.screenX <= window.screenX + window.outerWidth + 40 &&
+            msg.screenY >= window.screenY - 40 &&
+            msg.screenY <= window.screenY + window.outerHeight + 40);
 
         if (isInside && apiRef.current) {
           const api = apiRef.current;
           const existingPanel = api.panels.find(p => getPanelComponent(p) === msg.panelId);
 
-          if (existingPanel) {
-            existingPanel.api.setActive();
-            wsLog.info(`Cross-window tab already open in workspace; focused [${msg.panelId}] "${msg.title}"`);
-          } else {
-            // Determine spatial drop target group and split direction
-            let targetGroup = api.activeGroup || api.groups[0];
-            let direction: 'left' | 'right' | 'above' | 'below' | undefined;
+          // Determine spatial drop target group and split direction
+          let targetGroup = api.activeGroup || api.groups[0];
+          let direction: 'left' | 'right' | 'above' | 'below' | undefined;
 
-            if (!msg.forceDock && msg.screenX !== undefined && msg.screenY !== undefined) {
-              const clientX = msg.screenX - window.screenX;
-              const clientY = msg.screenY - window.screenY;
-              const dropEl = document.elementFromPoint(clientX, clientY);
-              const targetGroupEl = dropEl?.closest<HTMLElement>('.dv-groupview');
+          if (!msg.forceDock && msg.screenX !== undefined && msg.screenY !== undefined) {
+            const clientX = msg.screenX - window.screenX;
+            const clientY = msg.screenY - window.screenY;
+            const dropEl = document.elementFromPoint(
+              Math.max(0, Math.min(clientX, window.innerWidth - 1)),
+              Math.max(0, Math.min(clientY, window.innerHeight - 1))
+            );
+            const targetGroupEl = dropEl?.closest<HTMLElement>('.dv-groupview');
 
-              if (targetGroupEl) {
-                const matched = api.groups.find(g => (g as any)?.element === targetGroupEl);
-                if (matched) {
-                  targetGroup = matched;
-                  const rect = targetGroupEl.getBoundingClientRect();
-                  const relX = (clientX - rect.left) / Math.max(1, rect.width);
-                  const relY = (clientY - rect.top) / Math.max(1, rect.height);
+            if (targetGroupEl) {
+              const matched = api.groups.find(g => (g as any)?.element === targetGroupEl);
+              if (matched) {
+                targetGroup = matched;
+                const rect = targetGroupEl.getBoundingClientRect();
+                const relX = (clientX - rect.left) / Math.max(1, rect.width);
+                const relY = (clientY - rect.top) / Math.max(1, rect.height);
 
-                  // Edge proximity (25%) -> split into a resizable pane with sash
-                  if (relX < 0.25) direction = 'left';
-                  else if (relX > 0.75) direction = 'right';
-                  else if (relY < 0.25) direction = 'above';
-                  else if (relY > 0.75) direction = 'below';
-                }
+                // Edge proximity (25%) -> split into a resizable pane with sash
+                if (relX < 0.25) direction = 'left';
+                else if (relX > 0.75) direction = 'right';
+                else if (relY < 0.25) direction = 'above';
+                else if (relY > 0.75) direction = 'below';
               }
             }
+          }
 
-            const uniqueId = `panel_${msg.panelId}_${Date.now()}`;
+          if (existingPanel) {
+            if (targetGroup && existingPanel.group !== targetGroup) {
+              existingPanel.api.moveTo(
+                direction
+                  ? { group: targetGroup, position: direction as any }
+                  : { group: targetGroup }
+              );
+            }
+            existingPanel.api.setActive();
+            wsLog.info(`Cross-window tab already open in workspace; moved/focused [${msg.panelId}] "${msg.title}"`);
+          } else {
+            const uniqueId = `panel_${msg.panelId}`;
             wsLog.info(`Cross-window tab accepted and docked into workspace: [${msg.panelId}] "${msg.title}"`, {
               from: msg.sourceLabel,
               direction,
@@ -758,7 +855,30 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         winLabel,
       });
 
+      let lastMoveTime = 0;
+      const handlePointerMove = (e: MouseEvent | DragEvent) => {
+        if (!isSecondary || !channel) return;
+        const now = Date.now();
+        if (now - lastMoveTime < 25) return;
+        lastMoveTime = now;
+        if (e.screenX && e.screenY) {
+          channel.postMessage({
+            type: 'TAB_DRAG_MOVE',
+            sourceLabel: winLabel,
+            panelId: rawComponentId,
+            title,
+            screenX: e.screenX,
+            screenY: e.screenY,
+          });
+        }
+      };
+
+      window.addEventListener('drag', handlePointerMove as EventListener);
+      window.addEventListener('pointermove', handlePointerMove as EventListener);
+
       const handleDragEnd = (e: DragEvent | MouseEvent) => {
+        window.removeEventListener('drag', handlePointerMove as EventListener);
+        window.removeEventListener('pointermove', handlePointerMove as EventListener);
         window.removeEventListener('dragend', handleDragEnd as EventListener);
         window.removeEventListener('pointerup', handleDragEnd as EventListener);
 
@@ -865,6 +985,26 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
       <WindowControls />
+
+      {/* Visual Drop Target Highlight & Insertion Indicator */}
+      {dropPreview && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${dropPreview.left}px`,
+            top: `${dropPreview.top}px`,
+            width: `${dropPreview.width}px`,
+            height: `${dropPreview.height}px`,
+          }}
+          className="pointer-events-none z-[9999] rounded-xl border-2 border-blue-500/80 bg-blue-500/15 shadow-[0_0_30px_rgba(59,130,246,0.3)] backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-75"
+        >
+          <div className="px-3 py-1.5 rounded-lg bg-[#141417]/95 border border-white/20 text-xs font-medium text-white flex items-center gap-2 shadow-2xl">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span>Вставить «{dropPreview.title}»</span>
+          </div>
+        </div>
+      )}
+
       <DockviewReact
         components={components}
         rightHeaderActionsComponent={GroupHeaderActions}

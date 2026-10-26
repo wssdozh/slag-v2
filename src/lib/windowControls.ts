@@ -99,7 +99,7 @@ export const removeDetachedWindow = (label: string): void => {
 
 export const closeWindow = async (): Promise<void> => {
   if (!isTauri()) {
-    if (typeof window !== 'undefined' && window.opener) {
+    if (typeof window !== 'undefined') {
       window.close();
     }
     return;
@@ -110,7 +110,11 @@ export const closeWindow = async (): Promise<void> => {
     // Destroy popout windows completely, but keep main window alive in tray
     if (appWindow.label !== 'main') {
       removeDetachedWindow(appWindow.label);
-      await appWindow.destroy();
+      try {
+        await appWindow.destroy();
+      } catch {
+        await appWindow.close();
+      }
       wsLog.info(`Destroyed detached window [${appWindow.label}]`);
     } else {
       try {
@@ -123,6 +127,11 @@ export const closeWindow = async (): Promise<void> => {
     }
   } catch (err) {
     wsLog.error('Failed to close window', err);
+    try {
+      if (typeof window !== 'undefined') {
+        window.close();
+      }
+    } catch {}
   }
 };
 
@@ -250,7 +259,7 @@ export const listenDesktopEvents = (handlers: {
 };
 
 export interface CrossWindowTabMessage {
-  type: 'TAB_DRAG_RELEASE' | 'TAB_DRAG_ACCEPTED';
+  type: 'TAB_DRAG_MOVE' | 'TAB_DRAG_RELEASE' | 'TAB_DRAG_ACCEPTED';
   sourceLabel?: string;
   targetLabel?: string;
   panelId: string;
