@@ -162,11 +162,12 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await firstMoreBtn.click();
 
     // Verify MobileActionSheet opened
-    const actionSheet = page.locator('button', { hasText: 'Открыть в редакторе' });
+    const actionSheet = page.locator('button', { hasText: 'Фокус-редактор' });
     await expect(actionSheet).toBeVisible();
     await expect(page.locator('button', { hasText: 'Ответить' })).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Скопировать Markdown' })).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Удалить в корзину' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Копировать текст' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Удалить' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Разобрать с ИИ' })).toBeVisible();
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_action_sheet.png' });
 
