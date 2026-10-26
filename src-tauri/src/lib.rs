@@ -5,6 +5,53 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+#[cfg(target_os = "windows")]
+#[link(name = "dwmapi")]
+extern "system" {
+    fn DwmSetWindowAttribute(
+        hwnd: *mut std::ffi::c_void,
+        dw_attribute: u32,
+        pv_attribute: *const std::ffi::c_void,
+        cb_attribute: u32,
+    ) -> i32;
+}
+
+#[cfg(target_os = "windows")]
+fn configure_window_border(window: &tauri::Window) {
+    if let Ok(hwnd) = window.hwnd() {
+        unsafe {
+            // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            let dark_mode: i32 = 1;
+            let _ = DwmSetWindowAttribute(
+                hwnd.0 as *mut std::ffi::c_void,
+                20,
+                &dark_mode as *const i32 as *const std::ffi::c_void,
+                std::mem::size_of::<i32>() as u32,
+            );
+
+            // DWMWA_BORDER_COLOR = 34
+            // DWMWA_COLOR_NONE = 0xFFFFFFFE (disables window border entirely on Windows 11)
+            let border_color: u32 = 0xFFFFFFFE;
+            let _ = DwmSetWindowAttribute(
+                hwnd.0 as *mut std::ffi::c_void,
+                34,
+                &border_color as *const u32 as *const std::ffi::c_void,
+                std::mem::size_of::<u32>() as u32,
+            );
+
+            // DWMWA_WINDOW_CORNER_PREFERENCE = 33
+            // DWMWCP_ROUND = 2 (standard Windows 11 rounded corners)
+            let corner_preference: u32 = 2;
+            let _ = DwmSetWindowAttribute(
+                hwnd.0 as *mut std::ffi::c_void,
+                33,
+                &corner_preference as *const u32 as *const std::ffi::c_void,
+                std::mem::size_of::<u32>() as u32,
+            );
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -45,11 +92,19 @@ pub fn run() {
             Some(vec!["--autostart"]),
         ));
 
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder.on_window_event(|window, _event| {
+            configure_window_border(window);
+        });
+    }
+
     builder
         .setup(|app| {
             #[cfg(desktop)]
             {
                 if let Some(main_window) = app.get_webview_window("main") {
+                    configure_window_border(&main_window.as_ref().window());
                     let win = main_window.clone();
                     main_window.on_window_event(move |event| {
                         if let WindowEvent::CloseRequested { api, .. } = event {
