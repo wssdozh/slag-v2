@@ -3329,9 +3329,21 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 5. Verify the button now displays the CheckSquare task icon without pill
     await expect(typeFilter.locator('svg.lucide-check-square')).toBeVisible();
 
-    // 6. Capture screenshot of compact header for visual inspection
+    // 6. Verify Composer new layout: top-right expand button, icon-only type selectors, TG-style mic/circle
+    const expandBtn = page.locator('button[title*="Раскрыть в полноэкранный редактор"]').first();
+    await expect(expandBtn).toBeVisible();
+
+    const taskTypeBtn = page.locator('button[title="Таска"]').first();
+    await expect(taskTypeBtn).toBeVisible();
+    await taskTypeBtn.click();
+
+    // Verify empty state has media button (Mic or Video)
+    const mediaBtn = page.locator('button[aria-label*="Записать"]').first();
+    await expect(mediaBtn).toBeVisible();
+
+    // Capture screenshot of new composer layout
     await page.screenshot({
-      path: 'test-results/screenshots/compact-header-no-pill.png',
+      path: 'test-results/screenshots/new-composer-layout.png',
       fullPage: false,
     });
   });
