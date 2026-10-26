@@ -101,6 +101,9 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       e.preventDefault();
       if (!isSubmitDisabled) {
         onSubmit();
+        requestAnimationFrame(() => {
+          effectiveRef.current?.focus();
+        });
       }
     }
   };
@@ -132,7 +135,9 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               rows={1}
               placeholder={placeholder}
               disabled={disabled}
-              className={`w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 resize-none overflow-y-auto leading-normal ${isFlat ? 'py-1 px-0.5' : 'py-0 px-1'} outline-none border-none`}
+              className={`w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 placeholder:truncate resize-none ${
+                value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
+              } leading-normal ${isFlat ? 'py-1 px-0.5' : 'py-0 px-1'} outline-none border-none`}
               style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
             />
           </div>
@@ -156,7 +161,15 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               ) : (
                 <button
                   type="button"
-                  onClick={onSubmit}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (!isSubmitDisabled) {
+                      onSubmit();
+                      requestAnimationFrame(() => {
+                        effectiveRef.current?.focus();
+                      });
+                    }
+                  }}
                   disabled={isSubmitDisabled}
                   className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 ${
                     !isSubmitDisabled

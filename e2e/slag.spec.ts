@@ -15,6 +15,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await composerTextarea.fill(noteText);
     await composerTextarea.press('Enter');
 
+    // Verify focus remains on composer textarea
+    await expect(composerTextarea).toBeFocused();
+
     // Verify item appeared in feed
     const createdCard = page.locator('.group', { hasText: noteText });
     await expect(createdCard).toBeVisible();
@@ -2980,5 +2983,34 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 8. Close modal via Escape
     await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
+  });
+
+  test('44. Composer and Assistant focus retention and no placeholder vertical scroll', async ({ page }) => {
+    // 1. Verify feed composer retains focus after Enter
+    const feedTextarea = page.locator('main textarea').first();
+    await feedTextarea.click();
+    await expect(feedTextarea).toBeFocused();
+    await feedTextarea.fill('Фокус тест ' + Date.now());
+    await feedTextarea.press('Enter');
+    await expect(feedTextarea).toBeFocused();
+
+    // 2. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    if (await assistantTab.isVisible()) {
+      await assistantTab.click();
+      const assistantTextarea = page.locator('textarea[placeholder*="Спросите ассистента"]').first();
+      await expect(assistantTextarea).toBeVisible();
+
+      // Verify no vertical scrollbar / no scroll on empty assistant composer
+      const hasVerticalScroll = await assistantTextarea.evaluate(el => el.scrollHeight > el.clientHeight + 2);
+      expect(hasVerticalScroll).toBe(false);
+
+      await page.screenshot({ path: 'test-results/screenshots/assistant-composer-clean.png' });
+
+      // Verify focus retention in assistant composer
+      await assistantTextarea.fill('Привет, проверка фокуса');
+      await assistantTextarea.press('Enter');
+      await expect(assistantTextarea).toBeFocused();
+    }
   });
 });

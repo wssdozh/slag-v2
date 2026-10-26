@@ -898,6 +898,10 @@ export const Composer: React.FC<ComposerProps> = ({
     resetDraftState();
     if (onComplete) {
       onComplete();
+    } else {
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     }
   };
 

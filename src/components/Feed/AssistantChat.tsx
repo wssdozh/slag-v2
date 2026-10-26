@@ -54,6 +54,28 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   const [expandedResultsMap, setExpandedResultsMap] = useState<Record<string, boolean>>({});
   const [batchSelections, setBatchSelections] = useState<Record<string, Record<string, boolean>>>({});
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const prevLoadingRef = useRef(isChatLoading);
+
+  // Restore focus to composer when AI response finishes
+  useEffect(() => {
+    if (prevLoadingRef.current && !isChatLoading) {
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+    }
+    prevLoadingRef.current = isChatLoading;
+  }, [isChatLoading]);
+
+  // Focus textarea on desktop mount
+  useEffect(() => {
+    if (!isMobile) {
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isMobile]);
 
   const isTaskSelected = (msgId: string, taskId: string): boolean => {
     if (!batchSelections[msgId]) return true;
@@ -112,6 +134,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     const text = input;
     setInput('');
     sendChatMessage(text);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
   };
 
   const toggleReasoning = (msgId: string) => {
@@ -126,6 +151,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   const handleQuickPrompt = (prompt: string) => {
     setInput('');
     sendChatMessage(prompt);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
   };
 
   // Render rich text with WikiLinks, markdown headers, dividers, code blocks, bold, italic, code, tags, and structured lists
@@ -935,10 +963,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       <div className="p-2.5 border-t border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md shrink-0 flex justify-center">
         <div className={`w-full ${isSidebar ? '' : 'max-w-2xl'}`}>
           <BaseComposer
+            textareaRef={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onSubmit={handleSend}
-            disabled={isChatLoading}
+            disabled={false}
             isSubmitDisabled={!input.trim() || isChatLoading}
             submitTitle="Отправить сообщение (Enter)"
             maxHeight={isSidebar ? 120 : 180}
@@ -946,10 +975,10 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
               isSidebar
                 ? 'Спросите ассистента...'
                 : isMobile
-                ? 'Спросите ассистента по базе знаний...'
+                ? 'Спросите ассистента...'
                 : isInbox
-                ? 'Спросите ассистента по всем заметкам базы знаний... (Enter для отправки)'
-                : `Спросите о заметках папки «${folderMeta?.name || currentFolder}»... (Enter для отправки)`
+                ? 'Спросите ассистента по всем заметкам...'
+                : `Спросите о «${(folderMeta?.name || currentFolder).length > 20 ? (folderMeta?.name || currentFolder).slice(0, 18) + '…' : folderMeta?.name || currentFolder}»...`
             }
             leftControls={
               <div className="flex items-center gap-1 flex-wrap">
