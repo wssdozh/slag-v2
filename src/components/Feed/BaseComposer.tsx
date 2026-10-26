@@ -30,6 +30,8 @@ export interface BaseComposerProps {
   rightControls?: React.ReactNode;
   /** Верхний слот над textarea (Reply, файлы) */
   topSlot?: React.ReactNode;
+  /** Верхний правый слот (кнопка раскрытия в полноэкранный редактор) */
+  topRightSlot?: React.ReactNode;
   /** Слот метаданных/чипсов под textarea (активные свойства задачи, теги, папка) */
   propertiesSlot?: React.ReactNode;
   /** Оверлейный слот в зоне textarea (выпадающий список автокомплита) */
@@ -68,6 +70,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   leftControls,
   rightControls,
   topSlot,
+  topRightSlot,
   propertiesSlot,
   overlaySlot,
   customControls,
@@ -116,10 +119,17 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       <div
         className={
           isFlat
-            ? `flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none ${className}`
-            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full ${className}`
+            ? `flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none relative ${className}`
+            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
         }
       >
+        {/* Кнопка в правом верхнем углу (раскрытие в полноэкранный редактор) */}
+        {topRightSlot && (
+          <div className="absolute top-2 right-2.5 z-10 flex items-center">
+            {topRightSlot}
+          </div>
+        )}
+
         {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
         {topSlot}
 
@@ -136,6 +146,8 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               placeholder={placeholder}
               disabled={disabled}
               className={`w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 placeholder:truncate resize-none ${
+                topRightSlot ? 'pr-7' : ''
+              } ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
               } leading-normal ${isFlat ? 'py-1 px-0.5' : 'py-0 px-1'} outline-none border-none`}
               style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}

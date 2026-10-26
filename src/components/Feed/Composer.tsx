@@ -21,7 +21,6 @@ import { SlashCommandMenu } from './SlashCommandMenu';
 import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
 import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
 import {
-  Trash2,
   Paperclip,
   Mic,
   Video,
@@ -30,7 +29,6 @@ import {
   CheckSquare,
   X,
   Loader2,
-  ChevronDown,
   Maximize2,
   CornerUpLeft,
   FileText,
@@ -99,7 +97,6 @@ export const Composer: React.FC<ComposerProps> = ({
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
-  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
   // Hold-to-record & lock state
   const [recordMode, setRecordMode] = useState<'idle' | 'holding' | 'locked'>('idle');
@@ -634,33 +631,6 @@ export const Composer: React.FC<ComposerProps> = ({
       } catch {
         addToast('Не удалось вставить медиа из буфера обмена', 'error');
       }
-    }
-  };
-
-  const handlePointerDown = (e: React.PointerEvent, target: 'audio' | 'video') => {
-    if (e.button !== 0) return;
-    if (isRecordingAudio || isRecordingVideo) return;
-    try {
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-    } catch {
-      // ignore
-    }
-
-    pointerStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      time: Date.now(),
-      target,
-    };
-    setRecordMode('holding');
-    setLockHint(target);
-
-    if (target === 'audio') {
-      setIsRecordingVideo(false);
-      setIsRecordingAudio(true);
-    } else {
-      setIsRecordingAudio(false);
-      setIsRecordingVideo(true);
     }
   };
 
@@ -1378,81 +1348,70 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       )}
 
-      {/* +AI Smart Tagging Button - Seamless embedded button */}
-            <button
-              type="button"
-              onClick={handleSmartAiTags}
-              disabled={isGeneratingAiTags}
-              className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-              title="ИИ классификация: папка и теги (+AI)"
-              aria-label="ИИ классификация: папка и теги (+AI)"
-            >
-              {isGeneratingAiTags ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
-              ) : (
-                <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
-              )}
-              <span>+AI</span>
-            </button>
+      {/* +AI Smart Tagging Button - Icon Only */}
+      <button
+        type="button"
+        onClick={handleSmartAiTags}
+        disabled={isGeneratingAiTags}
+        className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
+        title="ИИ классификация: папка и теги (+AI)"
+        aria-label="ИИ классификация: папка и теги (+AI)"
+      >
+        {isGeneratingAiTags ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+        ) : (
+          <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+        )}
+        <span className="sr-only">+AI</span>
+      </button>
 
-            {/* Type Selector Dropdown - Seamless embedded button */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                className="h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center gap-1"
-                aria-label="Сменить тип записи"
-              >
-                <span>
-                  {itemType === 'note' ? 'Заметка' : itemType === 'task' ? 'Таска' : 'Статья'}
-                </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 ${isTypeDropdownOpen ? 'rotate-180 text-zinc-300' : ''}`} />
-              </button>
+      {/* Record Type Selector (Icon-Only: Note, Task, Article) */}
+      <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label="Сменить тип записи">
+        <button
+          type="button"
+          onClick={() => setItemType('note')}
+          className={`h-ctrl-md px-1.5 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+            itemType === 'note'
+              ? 'bg-white/10 text-white'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+          }`}
+          title="Заметка"
+          aria-label="Заметка"
+        >
+          <StickyNote className="w-3.5 h-3.5" />
+          <span className="sr-only">Заметка</span>
+        </button>
 
-              {isTypeDropdownOpen && (
-                <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setItemType('note');
-                      setIsTypeDropdownOpen(false);
-                    }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                      itemType === 'note' ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <StickyNote className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Заметка</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setItemType('task');
-                      setIsTypeDropdownOpen(false);
-                    }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                      itemType === 'task' ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Таска</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setItemType('article');
-                      setIsTypeDropdownOpen(false);
-                    }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                      itemType === 'article' ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Статья</span>
-                  </button>
-                </div>
-              )}
-            </div>
+        <button
+          type="button"
+          onClick={() => setItemType('task')}
+          className={`h-ctrl-md px-1.5 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+            itemType === 'task'
+              ? 'bg-amber-500/15 text-amber-400'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+          }`}
+          title="Таска"
+          aria-label="Таска"
+        >
+          <CheckSquare className="w-3.5 h-3.5" />
+          <span className="sr-only">Таска</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setItemType('article')}
+          className={`h-ctrl-md px-1.5 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+            itemType === 'article'
+              ? 'bg-blue-500/15 text-blue-400'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+          }`}
+          title="Статья"
+          aria-label="Статья"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span className="sr-only">Статья</span>
+        </button>
+      </div>
 
             {/* Task Controls: Always visible in toolbar, lights up blue when active */}
             {itemType === 'task' && (
@@ -1690,109 +1649,18 @@ export const Composer: React.FC<ComposerProps> = ({
   );
 
   const rightControls = (
-    <>
-      {(content.trim() || attachments.length > 0) && (
-        <button
-          type="button"
-          onClick={() => {
-            setContent('');
-            setAttachments([]);
-            setTags([]);
-            setPriority('none');
-            setDueDate('');
-            setDuration(undefined);
-            setIsDurationDismissed(false);
-            setRecurrence(undefined);
-            setIsRecurrenceDismissed(false);
-            setParsedTask(null);
-            setIsDateDismissed(false);
-            setIsPriorityDismissed(false);
-            setDismissedTags(new Set());
-          }}
-          className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-white/[0.04] transition-colors cursor-pointer shrink-0"
-          title="Очистить"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Desktop Dedicated Mic & Video Buttons */}
-      {!isMobile && (
-        <>
-          <button
-            type="button"
-            onClick={() => {
-              if (!isRecordingAudio) {
-                setIsRecordingVideo(false);
-                setIsRecordingAudio(true);
-                setRecordMode('locked');
-                setLockHint(null);
-              }
-            }}
-            onPointerDown={(e) => handlePointerDown(e, 'audio')}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
-              isRecordingAudio
-                ? 'bg-rose-500/20 text-rose-400'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-            }`}
-            title="Записать голос (кликните или удерживайте)"
-            aria-label="Записать голосовую заметку"
-          >
-            <Mic className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (!isRecordingVideo) {
-                setIsRecordingAudio(false);
-                setIsRecordingVideo(true);
-                setRecordMode('locked');
-                setLockHint(null);
-              }
-            }}
-            onPointerDown={(e) => handlePointerDown(e, 'video')}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            className={`w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center transition-colors cursor-pointer touch-none shrink-0 ${
-              isRecordingVideo
-                ? 'bg-rose-500/20 text-rose-400'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-            }`}
-            title="Записать видео-кружок (кликните или удерживайте)"
-            aria-label="Записать видео-кружок"
-          >
-            <Video className="w-4 h-4" />
-          </button>
-        </>
-      )}
-
-      {/* File Attach Button */}
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
-        title="Прикрепить файл"
-      >
-        <Paperclip className="w-4 h-4" />
-      </button>
-
-      {/* Expand to Fullscreen Editor Icon Button */}
-      <button
-        type="button"
-        onClick={handleExpandToFullscreen}
-        className="w-ctrl-md h-ctrl-md rounded-md hidden sm:flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-        title="Раскрыть в полноэкранный редактор"
-      >
-        <Maximize2 className="w-4 h-4" />
-      </button>
-    </>
+    <button
+      type="button"
+      onClick={() => fileInputRef.current?.click()}
+      className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
+      title="Прикрепить файл"
+    >
+      <Paperclip className="w-4 h-4" />
+    </button>
   );
 
   const sendButton =
-    isMobile && !content.trim() && attachments.length === 0 ? (
+    !content.trim() && attachments.length === 0 ? (
       <button
         type="button"
         onPointerDown={handleMobileMediaPointerDown}
@@ -1802,8 +1670,8 @@ export const Composer: React.FC<ComposerProps> = ({
         className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
         title={
           mobileMediaType === 'audio'
-            ? 'Записать аудио (удерживайте) / Нажмите для видео'
-            : 'Записать видео (удерживайте) / Нажмите для аудио'
+            ? 'Записать аудио (удерживайте) / Кликните для видео'
+            : 'Записать видео (удерживайте) / Кликните для аудио'
         }
         aria-label={mobileMediaType === 'audio' ? 'Записать аудио' : 'Записать видео'}
       >
@@ -1845,6 +1713,19 @@ export const Composer: React.FC<ComposerProps> = ({
       isSubmitDisabled={!content.trim() && attachments.length === 0}
       submitTitle="Отправить (Enter)"
       topSlot={topSlot}
+      topRightSlot={
+        !isModal ? (
+          <button
+            type="button"
+            onClick={handleExpandToFullscreen}
+            className="w-6 h-6 rounded-md hidden sm:flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Раскрыть в полноэкранный редактор"
+            aria-label="Раскрыть в полноэкранный редактор"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        ) : undefined
+      }
       propertiesSlot={propertiesSlot}
       overlaySlot={overlaySlot}
       customControls={customControls}

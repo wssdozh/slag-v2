@@ -36,8 +36,8 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
 
   const headerRef = useRef<HTMLElement | null>(null);
   const containerWidth = useContainerWidth(headerRef);
-  const isCompactFilters = containerWidth > 0 && containerWidth < 700;
-  const isCompactViews = containerWidth > 0 && containerWidth < 520;
+  const isCompactFilters = containerWidth > 0 && containerWidth < 460;
+  const isCompactViews = containerWidth > 0 && containerWidth < 380;
 
   const activeViewMode = controlledViewMode ?? contextViewMode;
   const handleViewModeChange = onViewModeChange ?? setFeedViewMode;
