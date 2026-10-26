@@ -275,7 +275,7 @@ export const getTabCrossWindowChannel = (): BroadcastChannel | null => {
 };
 
 export const sendCrossWindowTab = async (msg: CrossWindowTabMessage): Promise<void> => {
-  // 1. BroadcastChannel (standard Web API, works across same-origin tabs and WebViews)
+  // 1. BroadcastChannel (standard Web API, ultra-fast in-memory messaging across WebViews)
   const channel = getTabCrossWindowChannel();
   if (channel) {
     try {
@@ -285,8 +285,9 @@ export const sendCrossWindowTab = async (msg: CrossWindowTabMessage): Promise<vo
     }
   }
 
-  // 2. Tauri native global event emitter (bulletproof IPC between native OS windows)
-  if (isTauri()) {
+  // 2. Tauri native global event emitter for discrete lifecycle events only.
+  // Skipped for high-frequency TAB_DRAG_MOVE to prevent IPC channel congestion and UI stutter.
+  if (isTauri() && msg.type !== 'TAB_DRAG_MOVE') {
     try {
       const { emit } = await import('@tauri-apps/api/event');
       await emit('slag://cross-window-tab', msg);

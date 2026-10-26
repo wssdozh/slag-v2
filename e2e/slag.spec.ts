@@ -2936,8 +2936,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       });
     });
 
-    const dropTabBarIndicator = page.locator('text=Вкладка в группу «Аудиоплеер»');
-    await expect(dropTabBarIndicator).toBeVisible();
+    const dropIndicator = page.locator('[data-testid="drop-preview-indicator"]');
+    await expect(dropIndicator).toBeVisible();
 
     await page.screenshot({
       path: 'test-results/screenshots/cross-window-tab-drag-preview.png',
@@ -2957,8 +2957,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       });
     });
 
-    const splitLeftIndicator = page.locator('text=Разделить слева «Аудиоплеер»');
-    await expect(splitLeftIndicator).toBeVisible();
+    await expect(dropIndicator).toBeVisible();
 
     // 1.2 Move back to the tab bar -> returns to tab bar indicator
     await page.evaluate(() => {
@@ -2972,7 +2971,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
         screenY: window.screenY + 15,
       });
     });
-    await expect(dropTabBarIndicator).toBeVisible();
+    await expect(dropIndicator).toBeVisible();
 
     // 2. Simulate releasing a detached tab over the main window and verify TAB_DRAG_ACCEPTED handshake
     const acceptedMsg = await page.evaluate(() => {

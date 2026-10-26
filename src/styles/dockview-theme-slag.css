@@ -103,7 +103,7 @@
   box-shadow: 0 0 6px rgba(59, 130, 246, 0.4) !important;
 }
 
-/* Ensure empty space (void-container) accepts tab drops, fills entire remaining header width, and acts as tauri drag region */
+/* Ensure empty space (void-container) accepts tab drops and fills entire remaining header width */
 .dockview-theme-slag .dv-tabs-and-actions-container .dv-void-container,
 .dockview-theme-slag .dockview-tabs-and-actions-container .dv-void-container {
   order: 3 !important;
@@ -112,13 +112,6 @@
   height: 100% !important;
   align-self: stretch !important;
   pointer-events: auto !important;
-  -webkit-app-region: drag;
-}
-
-/* During tab drag-and-drop, disable all window drag regions so HTML5 dragover & drop work flawlessly on the tab bar and void container */
-body.tab-dragging *,
-body.tab-dragging .dv-void-container {
-  -webkit-app-region: no-drag !important;
 }
 
 /* Ensure tab container doesn't block drop events */
@@ -210,16 +203,18 @@ body.tab-dragging .dv-void-container {
   line-height: 1;
 }
 
-/* Concise & Sleek Close Button */
+/* Concise & Sleek Close Button — comfortable 18px hit target */
 .dockview-theme-slag .dv-tab .dv-default-tab-action,
 .dockview-theme-slag .dockview-tab .dockview-tab-close-action {
-  width: 14px !important;
-  height: 14px !important;
-  min-width: 14px !important;
-  border-radius: 3px !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  border-radius: 4px !important;
   padding: 0 !important;
-  margin-left: 2px !important;
-  opacity: 0.35 !important;
+  margin-left: 3px !important;
+  opacity: 0.5 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
   transition: all 120ms ease !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -231,20 +226,21 @@ body.tab-dragging .dv-void-container {
 .dockview-theme-slag .dv-tab .dv-default-tab-action svg,
 .dockview-theme-slag .dockview-tab .dockview-tab-close-action svg,
 .dockview-theme-slag .dv-tab .dv-svg {
-  width: 9px !important;
-  height: 9px !important;
+  width: 10px !important;
+  height: 10px !important;
+  pointer-events: none !important;
 }
 
 .dockview-theme-slag .dv-tab:hover .dv-default-tab-action,
 .dockview-theme-slag .dockview-tab:hover .dockview-tab-close-action {
-  opacity: 0.65 !important;
+  opacity: 0.75 !important;
 }
 
 .dockview-theme-slag .dv-tab .dv-default-tab-action:hover,
 .dockview-theme-slag .dockview-tab .dockview-tab-close-action:hover {
   opacity: 1 !important;
   color: #ffffff !important;
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 /* Remove default vertical dividers */

@@ -376,14 +376,57 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     top: number;
     width: number;
     height: number;
-    title: string;
-    isTabBar?: boolean;
-    label?: string;
   } | null>(null);
   const dropPreviewRef = useRef(dropPreview);
   useEffect(() => {
     dropPreviewRef.current = dropPreview;
   }, [dropPreview]);
+
+  const previewRafRef = useRef<number | null>(null);
+  const updateDropPreview = useCallback(
+    (preview: { left: number; top: number; width: number; height: number } | null) => {
+      if (previewRafRef.current !== null) {
+        cancelAnimationFrame(previewRafRef.current);
+      }
+      previewRafRef.current = requestAnimationFrame(() => {
+        previewRafRef.current = null;
+        setDropPreview(preview);
+      });
+    },
+    []
+  );
+
+  const clearDropPreview = useCallback(() => {
+    if (previewRafRef.current !== null) {
+      cancelAnimationFrame(previewRafRef.current);
+      previewRafRef.current = null;
+    }
+    setDropPreview(null);
+  }, []);
+
+  // Native window dragging on empty tab bar space without -webkit-app-region: drag
+  useEffect(() => {
+    if (!isDesktopApp()) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest('.dv-void-container') ||
+        (target?.closest('.dv-tabs-and-actions-container') &&
+          !target?.closest('.dv-tab, button, input, .dv-right-actions-container, .dv-default-tab-action'))
+      ) {
+        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+          getCurrentWindow().startDragging();
+        }).catch(() => {});
+      }
+    };
+
+    window.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, []);
 
   const effectiveInitialPanel = useMemo(() => {
     if (initialPanel) return initialPanel;
@@ -449,7 +492,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       return {
         group: matchedGroup,
         direction: undefined as 'left' | 'right' | 'above' | 'below' | undefined,
-        isTabBar: true,
         preview: {
           left: Math.round(rect.left),
           top: Math.round(rect.top),
@@ -490,7 +532,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     return {
       group: matchedGroup,
       direction,
-      isTabBar: false,
       preview: {
         left: Math.round(previewLeft),
         top: Math.round(previewTop),
@@ -570,24 +611,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         e.dataTransfer.dropEffect = 'move';
       }
 
-      const title = crossTab?.title || 'Вкладка';
       const target = computeDropTarget(e.clientX, e.clientY);
-      if (target) {
-        let label = `Вкладка в группу «${title}»`;
-        if (target.direction === 'left') label = `Разделить слева «${title}»`;
-        else if (target.direction === 'right') label = `Разделить справа «${title}»`;
-        else if (target.direction === 'above') label = `Разделить сверху «${title}»`;
-        else if (target.direction === 'below') label = `Разделить снизу «${title}»`;
-
-        setDropPreview({
-          ...target.preview,
-          title,
-          isTabBar: target.isTabBar,
-          label,
-        });
-      } else {
-        setDropPreview(null);
-      }
+      updateDropPreview(target ? target.preview : null);
     };
 
     const handleWindowDragLeave = (e: DragEvent) => {
@@ -598,7 +623,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         e.clientX >= window.innerWidth ||
         e.clientY >= window.innerHeight
       ) {
-        setDropPreview(null);
+        clearDropPreview();
       }
     };
 
@@ -608,7 +633,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       if (!crossTab && !hasSlagType) return;
 
       e.preventDefault();
-      setDropPreview(null);
+      clearDropPreview();
 
       let panelId = crossTab?.panelId;
       let title = crossTab?.title || 'SLAG';
@@ -653,7 +678,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       window.removeEventListener('dragleave', handleWindowDragLeave);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab]);
+  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab, updateDropPreview, clearDropPreview]);
 
   // Cross-window tab docking listener: handles dragging tabs across OS windows
   useEffect(() => {
@@ -677,14 +702,14 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
       if (isPrimary && msg.type === 'TAB_DRAG_END') {
         setTimeout(() => {
-          setDropPreview(null);
+          clearDropPreview();
         }, 150);
       }
 
       // 2. Live drop target preview indicator on primary window via IPC move coordinates
       if (isPrimary && msg.type === 'TAB_DRAG_MOVE') {
         if (msg.screenX === undefined || msg.screenY === undefined) {
-          setDropPreview(null);
+          clearDropPreview();
           return;
         }
 
@@ -703,33 +728,18 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           clientY <= window.innerHeight + 10;
 
         if (!isInside) {
-          setDropPreview(null);
+          clearDropPreview();
           return;
         }
 
         const target = computeDropTarget(clientX, clientY);
-        if (target) {
-          let label = `Вкладка в группу «${msg.title}»`;
-          if (target.direction === 'left') label = `Разделить слева «${msg.title}»`;
-          else if (target.direction === 'right') label = `Разделить справа «${msg.title}»`;
-          else if (target.direction === 'above') label = `Разделить сверху «${msg.title}»`;
-          else if (target.direction === 'below') label = `Разделить снизу «${msg.title}»`;
-
-          setDropPreview({
-            ...target.preview,
-            title: msg.title,
-            isTabBar: target.isTabBar,
-            label,
-          });
-        } else {
-          setDropPreview(null);
-        }
+        updateDropPreview(target ? target.preview : null);
       }
 
       // 3. Primary window accepts tab, docks it, and sends confirmation
       if (isPrimary && msg.type === 'TAB_DRAG_RELEASE') {
         const lastPreview = dropPreviewRef.current;
-        setDropPreview(null);
+        clearDropPreview();
         activeCrossTabRef.current = null;
 
         const isInside =
@@ -779,14 +789,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         (msg.targetLabel === myLabel || msg.panelId === effectiveInitialPanel?.id)
       ) {
         wsLog.info(`Detached panel accepted by primary window; closing secondary window [${myLabel}]`);
-        if (apiRef.current) {
-          const target = apiRef.current.panels.find(p => getPanelComponent(p) === msg.panelId);
-          if (target) {
-            try {
-              apiRef.current.removePanel(target);
-            } catch {}
-          }
-        }
         void closeWindow();
       }
     });
@@ -794,7 +796,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     return () => {
       unlisten();
     };
-  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab]);
+  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab, updateDropPreview, clearDropPreview]);
 
   // Primary window: restore previously open detached windows across app restarts
   useEffect(() => {
@@ -1238,9 +1240,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
       <WindowControls />
 
-      {/* Visual Drop Target Highlight & Insertion Indicator */}
+      {/* Sleek Minimal Blue Drop Highlight (Zero Slop / No Badges) */}
       {dropPreview && (
         <div
+          data-testid="drop-preview-indicator"
           style={{
             position: 'absolute',
             left: `${dropPreview.left}px`,
@@ -1248,21 +1251,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             width: `${dropPreview.width}px`,
             height: `${dropPreview.height}px`,
           }}
-          className={`pointer-events-none z-[9999] border-2 border-blue-500/80 bg-blue-500/15 shadow-[0_0_24px_rgba(59,130,246,0.35)] backdrop-blur-[1px] flex items-center justify-center animate-in fade-in duration-75 ${
-            dropPreview.isTabBar ? 'rounded-md ring-1 ring-blue-400/50' : 'rounded-xl'
-          }`}
-        >
-          <div
-            className={`bg-[#141417]/95 border border-white/20 text-white flex items-center gap-1.5 shadow-2xl select-none ${
-              dropPreview.isTabBar
-                ? 'px-2.5 py-0.5 rounded-full border-blue-400/40 text-[11px] font-medium text-blue-200'
-                : 'px-3 py-1.5 rounded-lg text-xs font-medium'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            <span>{dropPreview.label || `Вставить «${dropPreview.title}»`}</span>
-          </div>
-        </div>
+          className="pointer-events-none z-[9999] rounded border border-blue-500/70 bg-blue-500/15 shadow-[0_0_20px_rgba(59,130,246,0.25)] transition-all duration-75"
+        />
       )}
 
       <DockviewReact
