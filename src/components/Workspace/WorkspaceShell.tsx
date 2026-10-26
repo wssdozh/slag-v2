@@ -589,6 +589,95 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     []
   );
 
+  // Primary window: live HTML5 dragover & drop preview strictly for CROSS-WINDOW tab dragging
+  useEffect(() => {
+    if (effectiveInitialPanel) return;
+
+    const isCrossDragEvent = (e: DragEvent) => {
+      return Boolean(
+        activeCrossTabRef.current ||
+          e.dataTransfer?.types.includes('application/x-slag-cross-tab')
+      );
+    };
+
+    const handleWindowDragEnter = (e: DragEvent) => {
+      if (!isCrossDragEvent(e)) return;
+      e.preventDefault();
+    };
+
+    const handleWindowDragOver = (e: DragEvent) => {
+      if (!isCrossDragEvent(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'move';
+      }
+      const target = computeDropTarget(e.clientX, e.clientY);
+      updateDropPreview(target ? target.preview : null);
+    };
+
+    const handleWindowDragLeave = (e: DragEvent) => {
+      if (!isCrossDragEvent(e)) return;
+      if (
+        !e.relatedTarget ||
+        e.clientX <= 0 ||
+        e.clientY <= 0 ||
+        e.clientX >= window.innerWidth ||
+        e.clientY >= window.innerHeight
+      ) {
+        clearDropPreview();
+      }
+    };
+
+    const handleWindowDrop = (e: DragEvent) => {
+      if (!isCrossDragEvent(e)) return;
+      e.preventDefault();
+      clearDropPreview();
+
+      let panelId = activeCrossTabRef.current?.panelId;
+      let title = activeCrossTabRef.current?.title || 'SLAG';
+      let sourceLabel = activeCrossTabRef.current?.sourceLabel || '';
+
+      if (!panelId && e.dataTransfer) {
+        try {
+          const raw = e.dataTransfer.getData('application/x-slag-cross-tab');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            panelId = parsed.panelId;
+            title = parsed.title;
+            sourceLabel = parsed.sourceLabel || '';
+          }
+        } catch {}
+      }
+
+      if (panelId) {
+        const target = computeDropTarget(e.clientX, e.clientY);
+        dockCrossWindowTab(panelId, title, target?.group, target?.direction);
+
+        void sendCrossWindowTab({
+          type: 'TAB_DRAG_ACCEPTED',
+          sourceLabel: 'main',
+          targetLabel: sourceLabel,
+          panelId,
+          title,
+        });
+
+        activeCrossTabRef.current = null;
+      }
+    };
+
+    window.addEventListener('dragenter', handleWindowDragEnter);
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleWindowDragEnter);
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('drop', handleWindowDrop);
+    };
+  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab, updateDropPreview, clearDropPreview]);
+
   // Cross-window tab docking listener: handles dragging tabs across OS windows
   useEffect(() => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -892,6 +981,21 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           panelId: rawComponentId,
           title,
         });
+
+        const nativeEvt = dragEvent.nativeEvent as any;
+        if (nativeEvt && nativeEvt.dataTransfer) {
+          try {
+            nativeEvt.dataTransfer.setData(
+              'application/x-slag-cross-tab',
+              JSON.stringify({
+                panelId: rawComponentId,
+                title,
+                sourceLabel: winLabel,
+              })
+            );
+            nativeEvt.dataTransfer.effectAllowed = 'all';
+          } catch {}
+        }
       }
 
       wsLog.debug(`Tab drag gesture started: [${rawComponentId}] "${title}"`, {
