@@ -960,7 +960,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       </div>
 
       {/* Floating Bottom Composer */}
-      <div className="p-2.5 border-t border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md shrink-0 flex justify-center">
+      <div className="p-2.5 shrink-0 flex justify-center">
         <div className={`w-full ${isSidebar ? '' : 'max-w-2xl'}`}>
           <BaseComposer
             textareaRef={textareaRef}

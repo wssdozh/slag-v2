@@ -46,14 +46,16 @@ test.describe('Composer # Tag Selection E2E', () => {
     await page.screenshot({ path: 'test-results/screenshots/tag_chip_active.png' });
   });
 
-  test('2. Clicking tag button (#) in toolbar opens tag menu and clicking item inserts it', async ({ page }) => {
+  test('2. Tag button is permanently absent from toolbar, typing # opens menu and inserts tag', async ({ page }) => {
     const textarea = page.locator('main textarea');
     await expect(textarea).toBeVisible();
 
-    // Click tag (#) button in composer toolbar
-    const tagBtn = page.locator('button[title*="Выбрать тег"]').first();
-    await expect(tagBtn).toBeVisible();
-    await tagBtn.click();
+    // Verify tag button in composer toolbar is removed
+    const tagBtn = page.locator('button[title*="Выбрать тег"]');
+    await expect(tagBtn).toBeHidden();
+
+    // Type # to open tag menu
+    await textarea.fill('#');
 
     // Tag menu should open
     const tagMenuHeader = page.locator('text=Теги хранилища (#)');

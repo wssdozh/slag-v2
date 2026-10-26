@@ -53,14 +53,16 @@ test.describe('Composer @ Folder Selection E2E', () => {
     await expect(page.locator('text=Папка «Дизайн» выбрана')).toBeVisible({ timeout: 3000 });
   });
 
-  test('2. Clicking folder button in toolbar opens folder menu', async ({ page }) => {
+  test('2. Folder button is permanently absent from toolbar, typing @ opens menu', async ({ page }) => {
     const textarea = page.locator('main textarea');
     await expect(textarea).toBeVisible();
 
-    // Click folder button in composer toolbar
-    const folderBtn = page.locator('button[title*="Выбрать целевую папку"]').first();
-    await expect(folderBtn).toBeVisible();
-    await folderBtn.click();
+    // Verify folder button in composer toolbar is removed
+    const folderBtn = page.locator('button[title*="Выбрать целевую папку"]');
+    await expect(folderBtn).toBeHidden();
+
+    // Type @ to open folder menu
+    await textarea.fill('@');
 
     // Folder menu should open
     const folderMenuHeader = page.locator('text=Целевая папка (@)');

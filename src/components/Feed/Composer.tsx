@@ -36,7 +36,6 @@ import {
   FileText,
   StickyNote,
   Lock,
-  Hash
 } from 'lucide-react';
 
 export interface ComposerProps {
@@ -1319,84 +1318,6 @@ export const Composer: React.FC<ComposerProps> = ({
         }
       >
         <span className="sr-only">+AI</span>
-      </ToolbarButton>
-
-      {/* Folder Selector Trigger Button (@) */}
-      <ToolbarButton
-        size="md"
-        onClick={() => {
-          if (folderQuery !== null) {
-            setFolderQuery(null);
-            return;
-          }
-          const el = textareaRef.current;
-          if (el) {
-            el.focus();
-            const cursorPos = el.selectionStart || content.length;
-            const textBefore = content.slice(0, cursorPos);
-            const needsSpace = textBefore.length > 0 && !/\s$/.test(textBefore);
-            const prefix = needsSpace ? ' @' : '@';
-            const newText = textBefore + prefix + content.slice(cursorPos);
-            setContent(newText);
-            const newPos = cursorPos + prefix.length;
-            setTimeout(() => {
-              el.focus();
-              el.setSelectionRange(newPos, newPos);
-            }, 0);
-          }
-          setFolderQuery('');
-          setFolderSelectedIndex(0);
-        }}
-        title={targetFolder ? `Целевая папка: «${targetFolder}» (@)` : 'Выбрать целевую папку (@)'}
-        aria-label="Выбрать целевую папку (@)"
-        icon={
-          <Folder
-            className={`w-4 h-4 transition-colors ${
-              targetFolder ? 'text-amber-400' : 'text-zinc-400'
-            }`}
-          />
-        }
-      >
-        <span className="sr-only">Папка</span>
-      </ToolbarButton>
-
-      {/* Tag Selector Trigger Button (#) */}
-      <ToolbarButton
-        size="md"
-        onClick={() => {
-          if (tagQuery !== null) {
-            setTagQuery(null);
-            return;
-          }
-          const el = textareaRef.current;
-          if (el) {
-            el.focus();
-            const cursorPos = el.selectionStart || content.length;
-            const textBefore = content.slice(0, cursorPos);
-            const needsSpace = textBefore.length > 0 && !/\s$/.test(textBefore);
-            const prefix = needsSpace ? ' #' : '#';
-            const newText = textBefore + prefix + content.slice(cursorPos);
-            setContent(newText);
-            const newPos = cursorPos + prefix.length;
-            setTimeout(() => {
-              el.focus();
-              el.setSelectionRange(newPos, newPos);
-            }, 0);
-          }
-          setTagQuery('');
-          setTagSelectedIndex(0);
-        }}
-        title={allPreviewTags.length > 0 ? `Теги: ${allPreviewTags.map(t => '#' + t).join(' ')} (#)` : 'Выбрать тег (#)'}
-        aria-label="Выбрать тег (#)"
-        icon={
-          <Hash
-            className={`w-4 h-4 transition-colors ${
-              allPreviewTags.length > 0 ? 'text-cyan-400' : 'text-zinc-400'
-            }`}
-          />
-        }
-      >
-        <span className="sr-only">Тег</span>
       </ToolbarButton>
 
       {/* Record Type Selector (Ghost droplist: icon + label + chevron, larger touch target) */}
