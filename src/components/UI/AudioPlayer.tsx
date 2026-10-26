@@ -194,14 +194,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         >
           {bars.map((norm, i) => {
             const barFraction = (i / barsCount) * 100;
-            const isFilled = barFraction <= progressPercent;
-            const height = Math.round(2 + norm * 12);
+            const isFilled = (currentTime === 0 && !isPlaying) || barFraction <= progressPercent;
+            const height = Math.max(3, Math.round(2 + norm * 12));
             return (
               <div
                 key={i}
                 style={{ height: `${height}px` }}
                 className={`w-[2px] rounded-full transition-colors ${
-                  isFilled ? 'bg-white' : 'bg-white/20'
+                  isFilled ? 'bg-white' : 'bg-white/35'
                 }`}
               />
             );
@@ -249,14 +249,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             >
               {bars.map((norm, i) => {
                 const barFraction = (i / barsCount) * 100;
-                const isFilled = barFraction <= progressPercent;
-                const height = Math.round(2 + norm * 16);
+                const isFilled = (currentTime === 0 && !isPlaying) || barFraction <= progressPercent;
+                const height = Math.max(3, Math.round(3 + norm * 15));
                 return (
                   <div
                     key={i}
                     style={{ height: `${height}px` }}
                     className={`w-[2px] rounded-full transition-colors ${
-                      isFilled ? 'bg-white' : 'bg-white/25 hover:bg-white/40'
+                      isFilled ? 'bg-white' : 'bg-white/35 hover:bg-white/55'
                     }`}
                   />
                 );
