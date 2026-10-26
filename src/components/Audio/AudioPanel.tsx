@@ -31,7 +31,7 @@ import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;
 
 export const AudioPanel: React.FC = () => {
-  const { items, folders, currentFolder, scrollToItem } = useApp();
+  const { items, folders, currentFolder, inboxMode, scrollToItem } = useApp();
 
   // Scope & Filter State
   const [scopeMode, setScopeMode] = useState<AudioScopeMode>('active');
@@ -87,8 +87,9 @@ export const AudioPanel: React.FC = () => {
       folderScope: effectiveFolder,
       scopeMode,
       typeFilters,
+      inboxMode,
     });
-  }, [items, effectiveFolder, scopeMode, typeFilters]);
+  }, [items, effectiveFolder, scopeMode, typeFilters, inboxMode]);
 
   // Safe derived track index to avoid out-of-bounds without set-state-in-effect
   const safeTrackIndex = tracks.length === 0 ? 0 : Math.min(currentTrackIndex, tracks.length - 1);

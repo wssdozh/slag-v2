@@ -3446,4 +3446,67 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('72. AudioPlayer sync with hybrid Inbox mode: loads voice notes from other folders in "all" mode', async ({ page }) => {
+    // 1. Seed voice note in 'Личное' folder
+    await page.evaluate(() => {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('slag_items_')) {
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          const personalVoiceNote = {
+            id: 'test_voice_in_personal_folder',
+            type: 'note',
+            title: 'Голосовая заметка из папки Личное',
+            content: 'Быстрый войс в личном',
+            folder: 'Личное',
+            tags: ['войс'],
+            attachments: [
+              {
+                id: 'att_voice_personal_01',
+                name: 'voice_18-05-22.webm',
+                type: 'audio',
+                mimeType: 'audio/webm',
+                size: 45800,
+                duration: 2,
+                relativePath: '.attachments/voice_18-05-22.webm',
+                dataUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+              },
+            ],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          items.push(personalVoiceNote);
+          localStorage.setItem(key, JSON.stringify(items));
+        }
+      }
+    });
+
+    // 2. Reload to apply seeded data
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    // 3. Open AudioPlayer tab in Dockview
+    const centerAddTabBtn = page.locator('.dv-groupview').nth(1).locator('button[title="Добавить вкладку в эту группу"]');
+    await expect(centerAddTabBtn).toBeVisible();
+    await centerAddTabBtn.click();
+
+    const audioMenuOption = page.locator('button', { hasText: 'Аудиоплеер' });
+    await expect(audioMenuOption).toBeVisible();
+    await audioMenuOption.click();
+
+    const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
+    await expect(audioTab).toBeVisible();
+
+    // 4. Verify that AudioPlayer finds the voice note instead of showing "В папке нет аудиозаписей"
+    await expect(page.locator('text=В папке нет аудиозаписей')).not.toBeVisible();
+    await expect(page.locator('text=voice_18-05-22.webm')).toBeVisible();
+    await expect(page.locator('text=Голосовая заметка из папки Личное')).toBeVisible();
+
+    // 5. Take screenshot for visual audit
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-audioplayer-inbox-all-sync.png',
+      fullPage: false,
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import type { SlagItem } from '../types';
+import type { SlagItem, InboxMode } from '../types';
 
 export interface AudioTrack {
   id: string; // track unique id (itemId + attachmentId)
@@ -42,27 +42,42 @@ export interface ExtractAudioOptions {
   folderScope: string | null;
   scopeMode: AudioScopeMode;
   typeFilters: AudioTypeFilter[];
+  inboxMode?: InboxMode;
 }
 
 export function extractAudioTracks(
   items: SlagItem[],
   options: ExtractAudioOptions
 ): AudioTrack[] {
-  const { folderScope, typeFilters } = options;
+  const { folderScope, typeFilters, inboxMode } = options;
   const allowVoice = typeFilters.includes('voice');
   const allowFile = typeFilters.includes('file');
 
   const tracks: AudioTrack[] = [];
 
   items.forEach((item) => {
-    // Folder filter:
-    // If scopeMode is 'pinned', require exact folder match (or root if folderScope is null/empty)
-    // If scopeMode is 'active', follow folderScope. If folderScope is empty/null, consider it "Входящие"
+    // Folder filter matching canonical AppContext / Feed logic:
+    // When target is 'ALL_FOLDERS', allow everything
+    // When target is 'Входящие', respect inboxMode ('all' = entire vault, 'unsorted' = only inbox, 'sorted' = everything else)
+    // When target is a specific folder, include it and its nested subfolders
     const targetFolder = folderScope || 'Входящие';
-    const matchesFolder =
-      targetFolder === 'ALL_FOLDERS'
-        ? true
-        : (item.folder || 'Входящие') === targetFolder;
+    let matchesFolder = false;
+
+    if (targetFolder === 'ALL_FOLDERS') {
+      matchesFolder = true;
+    } else if (targetFolder === 'Входящие') {
+      const mode = inboxMode || 'all';
+      if (mode === 'unsorted') {
+        matchesFolder = (item.folder || 'Входящие') === 'Входящие';
+      } else if (mode === 'all') {
+        matchesFolder = true;
+      } else if (mode === 'sorted') {
+        matchesFolder = (item.folder || 'Входящие') !== 'Входящие';
+      }
+    } else {
+      const itemFolder = item.folder || 'Входящие';
+      matchesFolder = itemFolder === targetFolder || itemFolder.startsWith(targetFolder + '/');
+    }
 
     if (!matchesFolder) return;
 
