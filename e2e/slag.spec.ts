@@ -826,6 +826,48 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
   });
 
+  test('21.1. Workspace Panel Minimum Width & Adaptive Header Verification', async ({ page }) => {
+    const dockviewContainer = page.locator('.dockview-theme-slag');
+    await expect(dockviewContainer).toBeVisible();
+
+    // 1. Locate sashes and Feed group
+    const sashes = page.locator('.dv-sash');
+    await expect(sashes.first()).toBeVisible();
+
+    const feedGroup = page.locator('.dv-groupview').filter({ has: page.locator('header') }).first();
+    await expect(feedGroup).toBeVisible();
+
+    const initialFeedBox = await feedGroup.boundingBox();
+    expect(initialFeedBox).toBeTruthy();
+    if (initialFeedBox) {
+      expect(initialFeedBox.width).toBeGreaterThanOrEqual(320);
+    }
+
+    // 2. Attempt aggressive drag of the sash to the left to try to squash feed
+    const count = await sashes.count();
+    const rightSash = sashes.nth(Math.min(1, count - 1));
+    const sashBox = await rightSash.boundingBox();
+    if (sashBox) {
+      await page.mouse.move(sashBox.x + sashBox.width / 2, sashBox.y + sashBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(sashBox.x - 700, sashBox.y + sashBox.height / 2, { steps: 10 });
+      await page.mouse.up();
+    }
+
+    // 3. Verify that feed width is clamped and never drops below minimumWidth (320px)
+    const clampedFeedBox = await feedGroup.boundingBox();
+    expect(clampedFeedBox).toBeTruthy();
+    if (clampedFeedBox) {
+      expect(clampedFeedBox.width).toBeGreaterThanOrEqual(315);
+    }
+
+    // 4. Capture screenshot of clamped layout
+    await page.screenshot({
+      path: 'test-results/screenshots/dockview-panel-min-width-clamped.png',
+      fullPage: false,
+    });
+  });
+
   test('22. Logging HUD & Diagnostics Engine Verification', async ({ page }) => {
     // 1. Open Log Viewer modal via global shortcut Ctrl+`
     await page.keyboard.press('Control+Backquote');

@@ -38,6 +38,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   const containerWidth = useContainerWidth(headerRef);
   const isCompactFilters = containerWidth > 0 && containerWidth < 460;
   const isCompactViews = containerWidth > 0 && containerWidth < 380;
+  const showCenterFolder = containerWidth === 0 || containerWidth >= 400;
 
   const activeViewMode = controlledViewMode ?? contextViewMode;
   const handleViewModeChange = onViewModeChange ?? setFeedViewMode;
@@ -71,10 +72,12 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   return (
     <header
       ref={headerRef}
-      className="h-12 px-3 sm:px-4 border-b border-white/[0.06] bg-[#0c0c0e] grid grid-cols-[1fr_auto_1fr] items-center gap-2 select-none shrink-0 relative"
+      className={`h-12 px-3 sm:px-4 border-b border-white/[0.06] bg-[#0c0c0e] ${
+        showCenterFolder ? 'grid grid-cols-[1fr_auto_1fr]' : 'flex justify-between'
+      } items-center gap-2 select-none shrink-0 relative`}
     >
       {/* Left Column: Filter Controls & Chips */}
-      <div className="flex items-center gap-1.5 justify-self-start min-w-0 z-10">
+      <div className={`flex items-center gap-1.5 ${showCenterFolder ? 'justify-self-start' : ''} min-w-0 z-10`}>
         {/* Kanban Materials Dock Toggle */}
         {activeViewMode === 'kanban' && (
           <button
@@ -98,26 +101,28 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
         <FeedFilters compact={isCompactFilters} viewMode={activeViewMode} />
       </div>
 
-      {/* Center Column: Prominent folder title in clean grid flow (no overlap) */}
-      <div className="flex items-center justify-center justify-self-center min-w-0 max-w-full px-1 z-0">
-        <button
-          type="button"
-          onClick={() => openFolderInfoModal(currentFolder)}
-          className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none min-w-0"
-          title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
-        >
-          {folderIconComp}
-          <h2 className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors truncate">
-            {folderMeta?.name || currentFolder}
-          </h2>
-          <span className="text-2xs sm:text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors shrink-0">
-            ({filteredItems.length})
-          </span>
-        </button>
-      </div>
+      {/* Center Column: Prominent folder title in clean grid flow (hidden on narrow widths to prevent collision) */}
+      {showCenterFolder && (
+        <div className="flex items-center justify-center justify-self-center min-w-0 max-w-full px-1 z-0">
+          <button
+            type="button"
+            onClick={() => openFolderInfoModal(currentFolder)}
+            className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none min-w-0"
+            title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
+          >
+            {folderIconComp}
+            <h2 className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors truncate">
+              {folderMeta?.name || currentFolder}
+            </h2>
+            <span className="text-2xs sm:text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors shrink-0">
+              ({filteredItems.length})
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Right Column: AI Triage & View Switcher */}
-      <div className="flex items-center gap-1.5 justify-self-end min-w-0 shrink-0 z-10">
+      <div className={`flex items-center gap-1.5 ${showCenterFolder ? 'justify-self-end' : ''} min-w-0 shrink-0 z-10`}>
         {/* AI Triage button in Inbox (Left of switcher with divider) */}
         {isInbox && inboxUnsortedCount > 0 && (
           <div className="flex items-center h-ctrl-sm gap-1.5 shrink-0">

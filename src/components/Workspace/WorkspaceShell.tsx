@@ -86,7 +86,7 @@ const WorkspaceContentPanel: React.FC<{
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           <FeedList />
           {/* Floating Composer Island */}
-          <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 pl-4 pr-[22px] flex justify-center">
+          <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 px-2 sm:pl-4 sm:pr-[22px] flex justify-center">
             <div className="pointer-events-auto max-w-2xl w-full">
               <Composer key={currentFolder} />
             </div>
@@ -155,6 +155,22 @@ const PANELS_TO_ADD = [
   { id: 'folder-info', title: 'Инфо папки', icon: Info },
   { id: 'logs', title: 'Логи & HUD', icon: Terminal },
 ];
+
+// ponytail: central registry for dockview panel minimum dimensions. upgrade: user configurable constraints in settings if requested
+const PANEL_CONSTRAINTS: Record<string, { minWidth: number }> = {
+  sidebar: { minWidth: 200 },
+  feed: { minWidth: 320 },
+  kanban: { minWidth: 320 },
+  calendar: { minWidth: 320 },
+  assistant: { minWidth: 280 },
+  audio: { minWidth: 260 },
+  'folder-info': { minWidth: 260 },
+  logs: { minWidth: 260 },
+};
+
+const getPanelMinWidth = (componentId: string): number => {
+  return PANEL_CONSTRAINTS[componentId]?.minWidth ?? 260;
+};
 
 const wsLog = logger.scope('WORKSPACE');
 
@@ -313,6 +329,7 @@ const GroupHeaderActions: React.FC<any> = (props) => {
         id: uniqueId,
         component: panelId,
         title,
+        minimumWidth: getPanelMinWidth(panelId),
         position: { referenceGroup: props.group },
       });
     } catch {
@@ -320,6 +337,7 @@ const GroupHeaderActions: React.FC<any> = (props) => {
         id: uniqueId,
         component: panelId,
         title,
+        minimumWidth: getPanelMinWidth(panelId),
       });
     }
   };
@@ -573,6 +591,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             id: uniqueId,
             component: panelId,
             title,
+            minimumWidth: getPanelMinWidth(panelId),
             position: targetGroup
               ? (direction ? { referenceGroup: targetGroup, direction } : { referenceGroup: targetGroup })
               : undefined,
@@ -582,6 +601,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             id: uniqueId,
             component: panelId,
             title,
+            minimumWidth: getPanelMinWidth(panelId),
           });
         }
       }
@@ -849,6 +869,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       id: 'panel_feed',
       component: 'feed',
       title: currentFolder || 'Входящие',
+      minimumWidth: getPanelMinWidth('feed'),
     });
 
     // 2. Left navigation sidebar
@@ -858,6 +879,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       title: 'Навигация',
       position: { direction: 'left', referencePanel: centerPanel },
       initialWidth: 260,
+      minimumWidth: getPanelMinWidth('sidebar'),
     });
 
     // 3. Right Assistant & Info in a single group with tabs
@@ -867,6 +889,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       title: 'Ассистент',
       position: { direction: 'right', referencePanel: centerPanel },
       initialWidth: 320,
+      minimumWidth: getPanelMinWidth('assistant'),
     });
 
     api.addPanel({
@@ -874,6 +897,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       component: 'folder-info',
       title: 'Инфо',
       position: { referencePanel: assistantPanel },
+      minimumWidth: getPanelMinWidth('folder-info'),
     });
   }, [currentFolder]);
 
@@ -935,6 +959,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         id: `panel_${effectiveInitialPanel.id}`,
         component: effectiveInitialPanel.id,
         title: effectiveInitialPanel.title,
+        minimumWidth: getPanelMinWidth(effectiveInitialPanel.id),
       });
     } else {
       // Try restoring saved layout
@@ -942,7 +967,24 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       try {
         const savedLayout = localStorage.getItem(WORKSPACE_LAYOUT_KEY);
         if (savedLayout) {
-          event.api.fromJSON(JSON.parse(savedLayout));
+          const parsed = JSON.parse(savedLayout);
+          if (parsed && typeof parsed === 'object' && parsed.panels && typeof parsed.panels === 'object') {
+            for (const key of Object.keys(parsed.panels)) {
+              const p = parsed.panels[key];
+              const comp = p.contentComponent || key.replace(/^panel_/, '').replace(/_\d+$/, '');
+              p.minimumWidth = Math.max(p.minimumWidth || 0, getPanelMinWidth(comp));
+            }
+          }
+          event.api.fromJSON(parsed);
+          // Ensure any restored groups comply with their active panel minimums
+          event.api.groups.forEach(group => {
+            const min = group.minimumWidth;
+            if (min > 0 && group.api.width < min) {
+              try {
+                group.api.setSize({ width: min });
+              } catch {}
+            }
+          });
           restored = true;
           wsLog.debug('Restored saved workspace layout configuration');
         }

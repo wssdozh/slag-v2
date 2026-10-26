@@ -295,8 +295,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           </div>
 
           {/* Row 2: Duration on left and Timestamp on right on the exact same horizontal line */}
-          <div className="flex justify-between items-center text-[11px] font-sans tabular-nums text-zinc-400">
-            <div className="flex items-center gap-1 truncate">
+          <div className="flex justify-between items-center gap-2 min-w-0 text-[11px] font-sans tabular-nums text-zinc-400">
+            <div className="flex items-center gap-1 truncate min-w-0">
               <span>{isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}</span>
               {formattedSize && (
                 <>
