@@ -74,6 +74,7 @@ const SCOPE_STYLES: Record<LogScope, { bg: string; fg: string }> = {
   APP: { bg: '#4c1d95', fg: '#ddd6fe' },
   SYNC: { bg: '#164e63', fg: '#67e8f9' },
   MEDIA: { bg: '#831843', fg: '#fbcfe8' },
+  WORKSPACE: { bg: '#075985', fg: '#bae6fd' },
 };
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -383,6 +384,53 @@ class LoggerEngine {
     };
   }
 
+  public exportAsPlainText(): string {
+    return this.buffer
+      .map(e => {
+        const iso = new Date(e.timestamp).toISOString();
+        const level = e.level.toUpperCase().padEnd(5);
+        const scope = e.scope.padEnd(9);
+        const dur = e.durationMs !== undefined ? ` (+${Math.round(e.durationMs)}ms)` : '';
+        const dataPart = e.data !== undefined ? ` | ${JSON.stringify(e.data)}` : '';
+        return `[${iso}] [${level}] [${scope}] ${e.message}${dur}${dataPart}`;
+      })
+      .join('\n');
+  }
+
+  public downloadLog(format: 'log' | 'json' | 'markdown' = 'log'): string {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return '';
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    let content: string;
+    let mimeType: string;
+    let filename: string;
+
+    if (format === 'json') {
+      content = this.exportAsJson();
+      mimeType = 'application/json';
+      filename = `slag_logs_${timestamp}.json`;
+    } else if (format === 'markdown') {
+      content = this.exportAsMarkdown();
+      mimeType = 'text/markdown;charset=utf-8';
+      filename = `slag_diagnostics_${timestamp}.md`;
+    } else {
+      content = this.exportAsPlainText();
+      mimeType = 'text/plain;charset=utf-8';
+      filename = `slag_logs_${timestamp}.log`;
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    return filename;
+  }
+
   public exportAsJson(): string {
     return JSON.stringify(this.buffer, null, 2);
   }
@@ -441,3 +489,7 @@ class LoggerEngine {
 }
 
 export const logger = new LoggerEngine();
+
+if (typeof window !== 'undefined') {
+  (window as any).logger = logger;
+}

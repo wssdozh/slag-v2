@@ -1,7 +1,7 @@
 # logging-diagnostics-standard.md — Стандарт Логирования и Диагностики SLAG v2
 
 > Регламент системного логирования для модулей приложения и автономных ИИ-агентов.  
-> Скоупы: `AI`, `FS`, `SEARCH`, `UI`, `APP`, `SYNC`, `MEDIA`.
+> Скоупы: `AI`, `FS`, `SEARCH`, `UI`, `APP`, `SYNC`, `MEDIA`, `WORKSPACE`.
 
 ---
 
@@ -16,6 +16,7 @@ const aiLog = logger.scope('AI');
 const fsLog = logger.scope('FS');
 const searchLog = logger.scope('SEARCH');
 const mediaLog = logger.scope('MEDIA');
+const workspaceLog = logger.scope('WORKSPACE');
 ```
 
 ## 2. Скоупы и Уровни
@@ -26,6 +27,7 @@ const mediaLog = logger.scope('MEDIA');
 - **`APP`**: Инициализация приложения, статус сети (online/offline), глобальные ошибки `window.onerror`, unhandled promise rejections.
 - **`SYNC`**: Сетевая синхронизация, WebSocket relay.
 - **`MEDIA`**: Запись аудио и видео кружков, разрешения микрофона и камеры, fallback на синтетические потоки, MediaRecorder lifecycle.
+- **`WORKSPACE`**: Отвязывание вкладок в нативные окна и плавающие группы (tear-off), межсистемное перетаскивание и стыковка (cross-window drag & drop dock-back), управление состоянием окон (сворачивание, максимизация, закрытие, сохранение геометрии), переключение и синхронизация вкладок.
 
 ## 3. Трекинг Времени (Performance Metrics)
 Любые ресурсоёмкие операции (индексация, сетевые запросы к LLM) должны сопровождаться замером длительности:

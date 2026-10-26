@@ -1,4 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { logger } from '../lib/logger';
+
+const uiLog = logger.scope('UI');
 
 export interface DragItemPayload {
   type: string;
@@ -113,6 +116,11 @@ export function usePointerDnd<TPayload extends DragItemPayload = DragItemPayload
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'grabbing';
 
+            uiLog.debug(`Pointer DnD drag started [${session.payload.type}] "${session.payload.title || session.payload.id}"`, {
+              id: session.payload.id,
+              type: session.payload.type,
+            });
+
             optionsRef.current.onDragStart?.(session.payload);
             setState({
               isDragging: true,
@@ -173,6 +181,13 @@ export function usePointerDnd<TPayload extends DragItemPayload = DragItemPayload
           window.addEventListener('click', captureClick, true);
           setTimeout(() => window.removeEventListener('click', captureClick, true), 100);
 
+          uiLog.info(`Pointer DnD dropped [${payload.type}] "${payload.title || payload.id}"`, {
+            id: payload.id,
+            type: payload.type,
+            targetZone: activeZoneData || {},
+            dropPos: { x: upEvent.clientX, y: upEvent.clientY },
+          });
+
           optionsRef.current.onDrop?.(payload, activeZone, activeZoneData || {}, {
             x: upEvent.clientX,
             y: upEvent.clientY,
@@ -184,12 +199,14 @@ export function usePointerDnd<TPayload extends DragItemPayload = DragItemPayload
       const handlePointerCancel = (cancelEvent: PointerEvent) => {
         const session = dragSessionRef.current;
         if (!session || cancelEvent.pointerId !== session.pointerId) return;
+        uiLog.debug('Pointer DnD drag cancelled by pointercancel');
         cleanup();
         optionsRef.current.onDragEnd?.();
       };
 
       const handleKeyDown = (keyEvent: KeyboardEvent) => {
         if (keyEvent.key === 'Escape' && dragSessionRef.current?.isDragging) {
+          uiLog.debug('Pointer DnD drag cancelled by Escape key');
           cleanup();
           optionsRef.current.onDragEnd?.();
         }

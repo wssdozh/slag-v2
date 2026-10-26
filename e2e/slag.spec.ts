@@ -2251,14 +2251,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // 4. Drag untimed task into an hour slot in the time grid (assigns time)
     const hourSlots = page.locator('.grid-cols-7 .h-\\[52px\\]');
-    const targetHourSlot = hourSlots.nth(14); // 14:00 slot
+    const targetHourSlot = hourSlots.nth(16); // 16:00 slot (empty, not obstructed by 14:00 demo meeting)
     await untimedPill.dragTo(targetHourSlot);
     await page.waitForTimeout(400);
 
-    // Scroll time grid so 14:00 is visible
+    // Scroll time grid so 16:00 is visible
     const timeGrid = page.locator('[data-testid="calendar-time-grid"]');
     await timeGrid.evaluate(el => {
-      el.scrollTop = 12 * 52;
+      el.scrollTop = 14 * 52;
     });
     await page.waitForTimeout(200);
 
@@ -3119,5 +3119,174 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const activeDateBtn = page.locator('button[title*="Срок: Завтра"]').first();
     await expect(activeDateBtn).toBeVisible();
     await expect(activeDateBtn).toHaveClass(/bg-blue-500/);
+  });
+
+  test('48. Full Logging for Workspace Detach, Cross-Window Docking, Folder Navigation, and Log Download / Open Folder', async ({ page }) => {
+    test.setTimeout(60000);
+    const dockviewContainer = page.locator('.dockview-theme-slag');
+    await expect(dockviewContainer).toBeVisible();
+
+    // 1. Open Log Viewer HUD via sidebar button
+    const logsBtn = page.locator('button[data-testid="sidebar-logs-btn"]');
+    await expect(logsBtn).toBeVisible();
+    await logsBtn.click();
+
+    const logViewer = page.locator('div[data-testid="log-viewer"]');
+    await expect(logViewer).toBeVisible();
+
+    // 2. Verify WORKSPACE scope button exists in filter row
+    const workspaceFilter = logViewer.locator('button', { hasText: 'WORKSPACE' });
+    await expect(workspaceFilter).toBeVisible();
+
+    // 3. Verify Log Download (.log and .json) and Open Folder action buttons
+    const downloadPlainBtn = logViewer.locator('button[data-testid="log-download-plain"]');
+    const downloadJsonBtn = logViewer.locator('button[data-testid="log-download-json"]');
+    const openFolderBtn = logViewer.locator('button[data-testid="log-open-folder"]');
+
+    await expect(downloadPlainBtn).toBeVisible();
+    await expect(downloadJsonBtn).toBeVisible();
+    await expect(openFolderBtn).toBeVisible();
+
+    // 4. Test downloading plain text .log file
+    const downloadPromisePlain = page.waitForEvent('download');
+    await downloadPlainBtn.click();
+    const downloadPlain = await downloadPromisePlain;
+    expect(downloadPlain.suggestedFilename()).toMatch(/^slag_logs_.*\.log$/);
+
+    // 5. Test downloading JSON log file
+    const downloadPromiseJson = page.waitForEvent('download');
+    await downloadJsonBtn.click();
+    const downloadJson = await downloadPromiseJson;
+    expect(downloadJson.suggestedFilename()).toMatch(/^slag_logs_.*\.json$/);
+
+    // 6. Test Open Folder button
+    await openFolderBtn.click();
+    const folderToast = page.locator('div[role="status"], .fixed').filter({ hasText: /Папка открыта|Прямое открытие папки/ }).first();
+    await expect(folderToast).toBeVisible();
+
+    // 7. Close modal to interact with workspace
+    await page.keyboard.press('Escape');
+    await expect(logViewer).not.toBeVisible();
+
+    // 8. Test folder navigation and return to Inbox (logs UI events)
+    const projectsFolder = page.locator('aside span', { hasText: 'Проекты' }).first();
+    await projectsFolder.click();
+    const inboxBtn = page.locator('aside button', { hasText: 'Входящие' }).first();
+    await inboxBtn.click();
+
+    // 9. Test Cross-Window tab docking & log generation
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+      channel.postMessage({
+        type: 'TAB_DRAG_RELEASE',
+        sourceLabel: 'panel-audio-e2e',
+        panelId: 'audio',
+        title: 'Аудиоплеер',
+        screenX: window.screenX + 150,
+        screenY: window.screenY + 150,
+      });
+    });
+
+    const audioTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first();
+    await expect(audioTab).toBeVisible();
+
+    // 10. Test tab detachment to floating group via context menu (logs WORKSPACE detach)
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click({ button: 'right' });
+    const contextMenu = page.locator('.dv-context-menu');
+    await expect(contextMenu).toBeVisible();
+    await contextMenu.locator('.dv-context-menu-item', { hasText: 'Сделать плавающим' }).click({ force: true });
+
+    // 11. Reopen Log Viewer and verify WORKSPACE logs
+    await page.keyboard.press('Control+`');
+    await expect(logViewer).toBeVisible();
+
+    const workspaceLogs = await page.evaluate(() => {
+      const entries = (window as any).logger ? (window as any).logger.getEntries() : [];
+      return entries.filter((e: any) => e.scope === 'WORKSPACE');
+    });
+    expect(workspaceLogs.length).toBeGreaterThan(0);
+
+    // Filter to WORKSPACE logs
+    await workspaceFilter.click();
+    await expect(logViewer.locator('text=[WORKSPACE]').first()).toBeVisible();
+
+    // 12. Capture screenshot of Log Viewer with WORKSPACE logs and download actions
+    await page.screenshot({
+      path: 'test-results/screenshots/workspace-logging-and-logviewer.png',
+      fullPage: false,
+    });
+
+    // 13. Close modal via Escape
+    await page.keyboard.press('Escape');
+    await expect(logViewer).not.toBeVisible();
+  });
+
+  test('49. Default Vault "main", Second Brain taxonomy, and dedicated Vault Creation Modal', async ({ page }) => {
+    // 1. Verify default vault name is "main" in sidebar bottom trigger
+    const vaultTrigger = page.locator('aside button', { hasText: 'main' });
+    await expect(vaultTrigger).toBeVisible();
+
+    // 2. Verify Second Brain taxonomy folders exist in sidebar
+    await expect(page.locator('aside button', { hasText: 'Входящие' })).toBeVisible();
+    await expect(page.locator('text=Проекты').first()).toBeVisible();
+    await expect(page.locator('text=База знаний').first()).toBeVisible();
+    await expect(page.locator('text=Личное').first()).toBeVisible();
+
+    // 3. Verify onboarding welcome note exists in feed
+    await expect(page.locator('text=Добро пожаловать в SLAG').first()).toBeVisible();
+
+    // 4. Open Vault dropdown
+    await vaultTrigger.click();
+    const dropdown = page.locator('.absolute.bottom-full');
+    await expect(dropdown).toBeVisible();
+    await expect(dropdown.locator('text=Хранилища (Vaults)')).toBeVisible();
+
+    // 5. Click "Создать новое хранилище..."
+    const createVaultBtn = dropdown.locator('button', { hasText: 'Создать новое хранилище...' });
+    await expect(createVaultBtn).toBeVisible();
+    await createVaultBtn.click();
+
+    // 6. Verify VaultModal opens
+    const vaultModal = page.locator('.fixed.z-50', { hasText: 'Новое хранилище' });
+    await expect(vaultModal).toBeVisible();
+    await expect(vaultModal.locator('text=Локальное')).toBeVisible();
+    await expect(vaultModal.locator('text=Папка на диске')).toBeVisible();
+
+    // 7. Capture screenshot for visual inspection
+    await page.screenshot({
+      path: 'test-results/screenshots/vault-modal-created.png',
+      fullPage: false,
+    });
+
+    // 8. Test Escape LIFO closing
+    await page.keyboard.press('Escape');
+    await expect(vaultModal).not.toBeVisible();
+
+    // 9. Reopen and actually create a new test vault
+    await vaultTrigger.click();
+    await createVaultBtn.click();
+    await expect(vaultModal).toBeVisible();
+
+    const nameInput = vaultModal.locator('input[placeholder*="work"]');
+    await nameInput.fill('secondary');
+    const submitBtn = vaultModal.locator('button', { hasText: 'Создать хранилище' });
+    await submitBtn.click();
+
+    // 10. Verify active vault is now "secondary"
+    const secondaryTrigger = page.locator('aside button', { hasText: 'secondary' });
+    await expect(secondaryTrigger).toBeVisible();
+
+    // 11. Switch back to "main"
+    await secondaryTrigger.click();
+    const mainOption = page.locator('.absolute.bottom-full button', { hasText: 'main' });
+    await mainOption.click();
+    await expect(page.locator('aside button', { hasText: 'main' })).toBeVisible();
+
+    // 12. Delete "secondary" vault via trash icon in dropdown
+    await vaultTrigger.click();
+    const deleteSecondaryBtn = page.locator('.group\\/v', { hasText: 'secondary' }).locator('button[title="Удалить хранилище"]');
+    await deleteSecondaryBtn.click();
+    await expect(page.locator('.group\\/v', { hasText: 'secondary' })).toHaveCount(0);
   });
 });

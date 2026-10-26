@@ -221,7 +221,7 @@ export interface ChatMessage {
 }
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
-export type LogScope = 'AI' | 'FS' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA';
+export type LogScope = 'AI' | 'FS' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA' | 'WORKSPACE';
 
 export interface LogEntry {
   id: string;

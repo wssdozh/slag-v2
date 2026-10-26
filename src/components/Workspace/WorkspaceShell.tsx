@@ -20,6 +20,7 @@ import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
 import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
+import { logger } from '../../lib/logger';
 import {
   isDesktopApp,
   openDetachedWindow,
@@ -154,6 +155,8 @@ const PANELS_TO_ADD = [
   { id: 'logs', title: 'Логи & HUD', icon: Terminal },
 ];
 
+const wsLog = logger.scope('WORKSPACE');
+
 // Detach panel to native OS window (in desktop mode) or browser popout / floating group
 const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left: number; top: number; width?: number; height?: number }) => {
   const groupElement = (panel.group as any)?.element as HTMLElement | undefined;
@@ -162,6 +165,15 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
   const panelHeight = box?.height || (rect ? Math.round(rect.height) : panel.api.height) || 580;
   const left = box?.left ?? (rect ? Math.round(window.screenX + rect.left) : Math.max(40, window.screenX + 80));
   const top = box?.top ?? (rect ? Math.round(window.screenY + rect.top) : Math.max(40, window.screenY + 80));
+
+  const rawComponentId = panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+  const title = panel.title || 'Окно SLAG';
+
+  wsLog.info(`Detaching panel [${rawComponentId}] "${title}"`, {
+    panelId: panel.id,
+    mode: isDesktopApp() ? 'native_window' : 'popout/floating',
+    box: { left, top, width: panelWidth, height: panelHeight },
+  });
 
   // Capture existing group widths to preserve proportions when panel/group is removed
   const panelGroup = panel.group;
@@ -194,8 +206,6 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
 
   // 1. In native Tauri desktop app, spawn a genuine independent OS window
   if (isDesktopApp()) {
-    const rawComponentId = panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
-    const title = panel.title || 'Окно SLAG';
     const opened = await openDetachedWindow(rawComponentId, title, {
       left,
       top,
@@ -203,6 +213,9 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
       height: panelHeight,
     });
     if (opened) {
+      wsLog.info(`Detached panel [${rawComponentId}] spawned into native window; removing from workspace`, {
+        panelId: panel.id,
+      });
       try {
         api.removePanel(panel);
         restoreProportions();
@@ -220,6 +233,9 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
       position: { left, top, width: panelWidth, height: panelHeight },
     });
     if (!success) {
+      wsLog.info(`Browser popout failed or blocked; converting [${rawComponentId}] to floating group`, {
+        panelId: panel.id,
+      });
       api.addFloatingGroup(panel, {
         x: Math.max(20, (window.innerWidth - panelWidth) / 2),
         y: Math.max(20, (window.innerHeight - panelHeight) / 2),
@@ -227,9 +243,11 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
         height: panelHeight,
       });
     } else {
+      wsLog.info(`Detached panel [${rawComponentId}] successfully placed in popout group`, { panelId: panel.id });
       restoreProportions();
     }
   } catch {
+    wsLog.info(`Detached panel [${rawComponentId}] placed in fallback floating group`, { panelId: panel.id });
     api.addFloatingGroup(panel, {
       x: Math.max(20, (window.innerWidth - panelWidth) / 2),
       y: Math.max(20, (window.innerHeight - panelHeight) / 2),
@@ -270,6 +288,7 @@ const GroupHeaderActions: React.FC<any> = (props) => {
 
     panelSeqRef.current += 1;
     const uniqueId = `panel_${panelId}_${panelSeqRef.current}`;
+    wsLog.info(`Added panel tab to group: [${panelId}] "${title}"`, { uniqueId });
 
     try {
       containerApi.addPanel({
@@ -373,6 +392,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         if (isInside && apiRef.current) {
           const api = apiRef.current;
           const uniqueId = `panel_${msg.panelId}_${Date.now()}`;
+          wsLog.info(`Cross-window tab accepted and docked into main workspace: [${msg.panelId}] "${msg.title}"`, {
+            from: msg.sourceLabel,
+            forceDock: msg.forceDock,
+            screenPos: { x: msg.screenX, y: msg.screenY },
+            uniqueId,
+          });
           try {
             api.addPanel({
               id: uniqueId,
@@ -394,11 +419,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             panelId: msg.panelId,
             title: msg.title,
           });
+        } else {
+          wsLog.debug(`Cross-window tab drag release ignored outside bounds: [${msg.panelId}]`, {
+            screenPos: { x: msg.screenX, y: msg.screenY },
+          });
         }
       }
 
       // 2. Secondary window removes the accepted panel
       if (!isPrimary && msg.type === 'TAB_DRAG_ACCEPTED' && msg.sourceLabel === myLabel) {
+        wsLog.info(`Detached panel accepted by primary window; removing [${msg.panelId}] from detached window`);
         if (apiRef.current) {
           const target = apiRef.current.panels.find(p => {
             const raw = p.toJSON()?.contentComponent || p.id.replace(/^panel_/, '').replace(/_\d+$/, '');
@@ -457,7 +487,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       const feedPanels = apiRef.current.panels.filter(
         p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_')
       );
-      feedPanels.forEach(p => p.api.setTitle(currentFolder || 'Входящие'));
+      const targetTitle = currentFolder || 'Входящие';
+      feedPanels.forEach(p => p.api.setTitle(targetTitle));
+      wsLog.debug(`Synchronized feed panel tab title to folder: "${targetTitle}"`, { count: feedPanels.length });
     }
   }, [currentFolder]);
 
@@ -572,6 +604,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
   const onReady = (event: DockviewReadyEvent) => {
     apiRef.current = event.api;
+    wsLog.info(`Dockview workspace shell mounted: ${effectiveInitialPanel ? `detached window [${effectiveInitialPanel.id}]` : 'primary window'}`);
 
     const saveLayout = () => {
       if (effectiveInitialPanel) return;
@@ -600,12 +633,18 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
     // Save active tab selection across reloads
     event.api.onDidActivePanelChange(() => {
+      const active = event.api.activePanel;
+      if (active) {
+        wsLog.debug(`Active workspace tab switched: [${active.id}] "${active.title || ''}"`);
+      }
       saveLayout();
     });
 
     // Guard on panel removal: proportional resize and auto-destroy empty secondary windows
     event.api.onDidRemovePanel(() => {
+      wsLog.info('Panel removed from workspace layout', { remainingPanels: event.api.totalPanels });
       if (effectiveInitialPanel && event.api.totalPanels === 0) {
+        wsLog.info('Detached window has no remaining panels -> auto-closing window');
         closeWindow();
         return;
       }
@@ -640,12 +679,14 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         if (savedLayout) {
           event.api.fromJSON(JSON.parse(savedLayout));
           restored = true;
+          wsLog.debug('Restored saved workspace layout configuration');
         }
       } catch {
         restored = false;
       }
 
       if (!restored) {
+        wsLog.debug('Applying default 3-panel workspace layout');
         applyDefaultLayout(event.api);
       }
     }
@@ -677,12 +718,21 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       const isSecondary = Boolean(effectiveInitialPanel);
       const channel = isSecondary ? getTabCrossWindowChannel() : null;
 
+      wsLog.debug(`Tab drag gesture started: [${rawComponentId}] "${title}"`, {
+        isSecondary,
+        winLabel,
+      });
+
       const handleDragEnd = (e: DragEvent | MouseEvent) => {
         window.removeEventListener('dragend', handleDragEnd as EventListener);
         window.removeEventListener('pointerup', handleDragEnd as EventListener);
 
         // If dragging in secondary window, broadcast drop release to main window
         if (isSecondary && channel && e.screenX && e.screenY) {
+          wsLog.debug(`Broadcasting cross-window TAB_DRAG_RELEASE for [${rawComponentId}] "${title}"`, {
+            screenPos: { x: e.screenX, y: e.screenY },
+            sourceLabel: winLabel,
+          });
           channel.postMessage({
             type: 'TAB_DRAG_RELEASE',
             sourceLabel: winLabel,
@@ -706,6 +756,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             e.screenY > window.screenY + window.outerHeight;
 
           if (isOutside) {
+            wsLog.info(`Tab dropped outside window bounds -> triggering tear-off for [${rawComponentId}] "${title}"`, {
+              coords: { x: e.screenX, y: e.screenY },
+            });
             detachPanel(event.api, panel, {
               left: Math.round(e.screenX - Math.min(160, initialWidth / 2)),
               top: Math.round(e.screenY - 25),
@@ -724,16 +777,18 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
   const getTabContextMenuItems = useCallback((params: GetTabContextMenuItemsParams) => {
     const { panel, api } = params;
     const isSecondary = Boolean(effectiveInitialPanel);
+    const rawComponentId =
+      panel.toJSON()?.contentComponent ||
+      panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+
     return [
       isSecondary
         ? {
             label: 'Вернуть в главное окно',
             action: () => {
+              wsLog.info(`Tab context menu: returning [${rawComponentId}] "${panel.title}" to primary window`);
               const channel = getTabCrossWindowChannel();
               if (channel) {
-                const rawComponentId =
-                  panel.toJSON()?.contentComponent ||
-                  panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
                 const winLabel =
                   typeof window !== 'undefined'
                     ? new URLSearchParams(window.location.search).get('label') || ''
@@ -750,11 +805,15 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           }
         : {
             label: 'Вынести в отдельное окно',
-            action: () => detachPanel(api, panel),
+            action: () => {
+              wsLog.info(`Tab context menu: detaching [${rawComponentId}] "${panel.title}" to separate window`);
+              detachPanel(api, panel);
+            },
           },
       {
         label: 'Сделать плавающим',
         action: () => {
+          wsLog.info(`Tab context menu: making [${rawComponentId}] "${panel.title}" floating`);
           api.addFloatingGroup(panel, {
             x: Math.max(20, (window.innerWidth - 680) / 2),
             y: Math.max(20, (window.innerHeight - 520) / 2),

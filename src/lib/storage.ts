@@ -45,7 +45,7 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   isKanbanMaterialsOpen: true,
 };
 
-// Initial default folders
+// Initial default folders (Second Brain taxonomy)
 export const DEFAULT_FOLDERS: FolderMeta[] = [
   {
     path: 'Входящие',
@@ -61,50 +61,36 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
     icon: 'Folder',
   },
   {
-    path: 'Проекты/SLAG v2',
-    name: 'SLAG v2',
-    description: 'Разработка приложения заметок в стиле Linear.',
-    icon: 'Code2',
-  },
-  {
     path: 'Проекты/Дизайн',
     name: 'Дизайн',
     description: 'Интерфейсы, типографика Inter, референсы Linear и Vercel.',
     icon: 'Layers',
   },
   {
-    path: 'Личное',
-    name: 'Личное',
-    description: 'Мысли, книги, бытовые вопросы.',
-    icon: 'Bookmark',
+    path: 'База знаний',
+    name: 'База знаний',
+    description: 'Вечнозеленые заметки, статьи, документация и референсы.',
+    icon: 'Book',
   },
   {
-    path: 'Личное/Финансы',
-    name: 'Финансы',
-    description: 'Счета, подписки, расходы.',
-    icon: 'Briefcase',
+    path: 'Личное',
+    name: 'Личное',
+    description: 'Мысли, книги, бытовые вопросы и личные цели.',
+    icon: 'Bookmark',
   },
 ];
 
-// Initial demo items demonstrating note, article, and task
+// Initial demo & onboarding items
 export const DEFAULT_ITEMS: SlagItem[] = [
   {
-    id: 'demo_task_1',
-    type: 'task',
-    title: 'Реализовать ИИ-тегирование заметок',
-    content: 'Нужно подключить Gemini Flash API для автоматического определения релевантных тегов.\n\nПеред генерацией новых тегов передаем список уже существующих, чтобы не плодить синонимы.\n\n- [x] Собрать словарь всех существующих тегов\n- [x] Написать промпт с Few-Shot примерами для Gemini\n- [ ] Сделать кнопку +Ai в Telegram-композере',
-    folder: 'Проекты/SLAG v2',
-    tags: ['ai', 'gemini', 'architecture'],
-    createdAt: Date.now() - 3600000 * 5,
-    updatedAt: Date.now() - 3600000 * 2,
-    status: 'in_progress',
-    priority: 'high',
-    dueDate: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
-    subtasks: [
-      { id: 'st1', title: 'Собрать словарь всех существующих тегов', completed: true },
-      { id: 'st2', title: 'Написать промпт с Few-Shot примерами для Gemini', completed: true },
-      { id: 'st3', title: 'Сделать кнопку +Ai в Telegram-композере', completed: false },
-    ],
+    id: 'welcome_note_1',
+    type: 'note',
+    title: 'Добро пожаловать в SLAG',
+    content: 'Локальный минималистичный менеджер заметок и задач.\n\nКаждая мысль сохраняется в открытый Markdown без привязки к облаку.\n\n- [x] Открыть приложение SLAG\n- [ ] Написать первую мысль в поле ввода внизу и отправить по Enter\n- [ ] Указать умную дату: например «позвонить завтра в 15:00 p1»\n- [ ] Нажать ⌘K / Ctrl+K для глобального нечёткого поиска\n- [ ] Нажать ПКМ по любой заметке для вызова контекстных действий',
+    folder: 'Входящие',
+    tags: ['старт', 'инструкция'],
+    createdAt: Date.now() - 3600000 * 3,
+    updatedAt: Date.now() - 3600000 * 3,
     attachments: [],
   },
   {
@@ -120,7 +106,7 @@ export const DEFAULT_ITEMS: SlagItem[] = [
 1. **Монохромная тишина**: черный цвет и едва заметные разделители (1px \`rgba(255,255,255,0.06)\`). Никаких цветных радужных градиентов. Глаза отдыхают даже при 10 часах работы.
 2. **Формат Obsidian (.md)**: все данные хранятся в открытом виде как Markdown-файлы с YAML frontmatter. Если приложение исчезнет, ваши заметки останутся в вашей файловой системе.
 3. **Монолог в Telegram**: ввод заметки должен ощущаться как отправка сообщения самому себе в избранное. Минимум кликов — нажал Enter, и мысль зафиксирована.`,
-    folder: 'Проекты/Дизайн',
+    folder: 'База знаний',
     tags: ['дизайн', 'минимализм', 'манифест'],
     createdAt: Date.now() - 86400000 * 2,
     updatedAt: Date.now() - 86400000 * 1,
@@ -129,45 +115,34 @@ export const DEFAULT_ITEMS: SlagItem[] = [
     attachments: [],
   },
   {
-    id: 'demo_article_2',
-    type: 'article',
-    title: '12 правил эффективности',
-    content: `# 12 правил эффективности
-
-Кратко: Личная заметка с правилами эффективности. #продуктивность #эффективность #делегирование #планирование #таймменеджмент #фокус #саморазвитие #приоритеты #работа #заработок #review
-
-1. Фокус на главном и отсечение лишнего.
-2. Делегирование рутинных задач.
-3. Четкое планирование повестки на день и недельный спринт.`,
-    folder: 'Входящие',
-    tags: ['продуктивность', 'эффективность', 'планирование', 'саморазвитие'],
-    createdAt: Date.now() - 3600000,
-    updatedAt: Date.now() - 3600000,
-    readingTimeMinutes: 1,
-    summary: 'Личная заметка с правилами эффективности: фокус, делегирование, планирование.',
-    attachments: [],
-  },
-  {
-    id: 'demo_note_1',
-    type: 'note',
-    title: 'Идея для интеграции с сервером синхронизации',
-    content: 'Сделать сквозное E2E-шифрование на основе мастер-пароля перед отправкой файла на сервер. Полезно для переноса между десктопом и телефоном.',
-    folder: 'Входящие',
-    tags: ['идея', 'безопасность'],
-    createdAt: Date.now() - 1800000,
-    updatedAt: Date.now() - 1800000,
-    attachments: [],
-  },
-  {
     id: 'demo_reply_1',
     type: 'note',
-    title: 'Ответ по архитектуре ИИ',
-    content: 'Сверил требования со статьёй [[Манифест ультра-минимализма: почему интерфейс не должен орать]].\n\nТеги должны подбираться тихо и без навязчивых баннеров.',
-    folder: 'Проекты/SLAG v2',
-    tags: ['ai', 'дизайн'],
+    title: 'Дизайн-система и архитектура UI',
+    content: 'Сверил требования со статьёй [[Манифест ультра-минимализма: почему интерфейс не должен орать]].\n\nТеги и структура должны подбираться тихо, без визуального шума.',
+    folder: 'Проекты/Дизайн',
+    tags: ['дизайн', 'архитектура'],
     replyToId: 'demo_task_1',
     createdAt: Date.now() - 1200000,
     updatedAt: Date.now() - 1200000,
+    attachments: [],
+  },
+  {
+    id: 'demo_task_1',
+    type: 'task',
+    title: 'Реализовать ИИ-тегирование заметок',
+    content: 'Нужно подключить Gemini Flash API для автоматического определения релевантных тегов.\n\nПеред генерацией новых тегов передаем список уже существующих, чтобы не плодить синонимы.\n\n- [x] Собрать словарь всех существующих тегов\n- [x] Написать промпт с Few-Shot примерами для Gemini\n- [ ] Сделать кнопку +Ai в Telegram-композере',
+    folder: 'Проекты',
+    tags: ['ai', 'gemini', 'architecture'],
+    createdAt: Date.now() - 3600000 * 5,
+    updatedAt: Date.now() - 3600000 * 2,
+    status: 'in_progress',
+    priority: 'high',
+    dueDate: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
+    subtasks: [
+      { id: 'st1', title: 'Собрать словарь всех существующих тегов', completed: true },
+      { id: 'st2', title: 'Написать промпт с Few-Shot примерами для Gemini', completed: true },
+      { id: 'st3', title: 'Сделать кнопку +Ai в Telegram-композере', completed: false },
+    ],
     attachments: [],
   },
   {
@@ -193,7 +168,7 @@ export const DEFAULT_ITEMS: SlagItem[] = [
     type: 'task',
     title: 'Синхронизация по архитектуре баз данных',
     content: 'Обсудить SQLite vs Markdown хранилище в 14:00-15:30.\n\n- [x] Подготовить схему таблиц\n- [ ] Сравнить скорость поиска Orama',
-    folder: 'Проекты/SLAG v2',
+    folder: 'Проекты',
     tags: ['architecture', 'meeting'],
     createdAt: Date.now() - 800000,
     updatedAt: Date.now() - 800000,
@@ -205,6 +180,25 @@ export const DEFAULT_ITEMS: SlagItem[] = [
       { id: 'st_db1', title: 'Подготовить схему таблиц', completed: true },
       { id: 'st_db2', title: 'Сравнить скорость поиска Orama', completed: false }
     ],
+    attachments: [],
+  },
+  {
+    id: 'demo_article_2',
+    type: 'article',
+    title: '12 правил эффективности',
+    content: `# 12 правил эффективности
+
+Кратко: Личная заметка с правилами эффективности. #продуктивность #эффективность #делегирование #планирование #таймменеджмент #фокус #саморазвитие #приоритеты #работа #заработок #review
+
+1. Фокус на главном и отсечение лишнего.
+2. Делегирование рутинных задач.
+3. Четкое планирование повестки на день и недельный спринт.`,
+    folder: 'База знаний',
+    tags: ['продуктивность', 'эффективность', 'планирование', 'саморазвитие'],
+    createdAt: Date.now() - 3600000,
+    updatedAt: Date.now() - 3600000,
+    readingTimeMinutes: 1,
+    summary: 'Личная заметка с правилами эффективности: фокус, делегирование, планирование.',
     attachments: [],
   },
   {
@@ -220,7 +214,7 @@ export const DEFAULT_ITEMS: SlagItem[] = [
     priority: 'none',
     dueDate: new Date().toISOString().slice(0, 10),
     attachments: [],
-  }
+  },
 ];
 
 export class StorageService {
@@ -380,14 +374,23 @@ export class StorageService {
     const saved = localStorage.getItem(CURRENT_VAULT_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && parsed.id) {
+          // Auto-migrate old default vault name to 'main'
+          if (parsed.id === 'default_vault' && (parsed.name === 'Основное хранилище (Vault)' || !parsed.name)) {
+            parsed.name = 'main';
+            localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(parsed));
+          }
+          this.currentVault = parsed;
+          return parsed;
+        }
       } catch {
         // ignore
       }
     }
     const defaultVault: VaultMeta = {
       id: 'default_vault',
-      name: 'Основное хранилище (Vault)',
+      name: 'main',
       mode: 'indexeddb',
       isCurrent: true,
     };
@@ -407,7 +410,20 @@ export class StorageService {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed.filter(v => v && typeof v === 'object' && v.id);
+        let changed = false;
+        const vaults = parsed
+          .filter(v => v && typeof v === 'object' && v.id)
+          .map(v => {
+            if (v.id === 'default_vault' && (v.name === 'Основное хранилище (Vault)' || !v.name)) {
+              changed = true;
+              return { ...v, name: 'main' };
+            }
+            return v;
+          });
+        if (changed) {
+          localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
+        }
+        return vaults.length > 0 ? vaults : (this.currentVault ? [this.currentVault] : []);
       }
       return this.currentVault ? [this.currentVault] : [];
     } catch {
@@ -435,16 +451,71 @@ export class StorageService {
     return this.currentVault;
   }
 
-  public createVault(name: string, mode: 'indexeddb' | 'fsa' | 'tauri' = 'indexeddb'): VaultMeta {
+  public createVault(name: string, mode: 'indexeddb' | 'fsa' | 'tauri' = 'indexeddb', path?: string): VaultMeta {
     const newVault: VaultMeta = {
       id: 'vault_' + Date.now(),
       name,
       mode,
+      path,
       isCurrent: true,
     };
     this.saveVaultMeta(newVault);
-    fsLog.info(`Created new vault "${name}" [${mode}]`);
+    fsLog.info(`Created new vault "${name}" [${mode}]${path ? ` at ${path}` : ''}`);
     return this.switchVault(newVault.id);
+  }
+
+  public deleteVault(vaultId: string): boolean {
+    if (vaultId === 'default_vault' || vaultId === this.currentVault.id) {
+      return false; // Cannot delete default or currently active vault
+    }
+    const vaults = this.getVaults().filter(v => v.id !== vaultId);
+    localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
+    try {
+      localStorage.removeItem(`${ITEMS_STORAGE_PREFIX}${vaultId}`);
+      localStorage.removeItem(`${FOLDERS_STORAGE_PREFIX}${vaultId}`);
+      localStorage.removeItem(`${DRAFTS_STORAGE_PREFIX}${vaultId}`);
+      localStorage.removeItem(`${ASSISTANT_STORAGE_PREFIX}${vaultId}`);
+      localStorage.removeItem(`${WORKSPACE_STATE_PREFIX}${vaultId}`);
+    } catch {
+      // ignore
+    }
+    fsLog.info(`Deleted vault "${vaultId}"`);
+    return true;
+  }
+
+  public async pickDirectory(): Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null> {
+    if (isTauri()) {
+      try {
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const selected = await open({
+          directory: true,
+          multiple: false,
+          title: 'Выберите папку хранилища',
+        });
+        if (selected && typeof selected === 'string') {
+          const folderName = selected.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'Папка';
+          return { name: folderName, path: selected, mode: 'tauri' };
+        }
+        return null;
+      } catch (err) {
+        fsLog.error('Tauri folder picker error:', err);
+        return null;
+      }
+    }
+
+    if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker();
+        return { name: dirHandle.name || 'Локальный Vault', mode: 'fsa' };
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          fsLog.warn('showDirectoryPicker error:', err);
+        }
+        return null;
+      }
+    }
+
+    return null;
   }
 
   private getItemsKey(): string {

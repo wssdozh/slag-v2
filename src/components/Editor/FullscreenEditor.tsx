@@ -571,7 +571,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 </div>
 
                 {/* Due Date Trigger */}
-                <span className="text-[11px] font-mono text-zinc-500 mr-1 hidden sm:inline">Срок:</span>
+                <span className="text-[11px] font-mono text-zinc-500 mr-1 hidden sm:inline">Срок выполнения:</span>
                 <div className="relative shrink-0">
                   {dueDate ? (
                     <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">

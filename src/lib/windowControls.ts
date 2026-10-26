@@ -1,6 +1,9 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { logger } from './logger';
+
+const wsLog = logger.scope('WORKSPACE');
 
 export const isDesktopApp = (): boolean => {
   return isTauri();
@@ -11,8 +14,9 @@ export const minimizeWindow = async (): Promise<void> => {
   try {
     const appWindow = getCurrentWindow();
     await appWindow.minimize();
+    wsLog.debug('Window minimized');
   } catch (err) {
-    console.error('Failed to minimize window:', err);
+    wsLog.error('Failed to minimize window', err);
   }
 };
 
@@ -21,8 +25,9 @@ export const toggleMaximizeWindow = async (): Promise<void> => {
   try {
     const appWindow = getCurrentWindow();
     await appWindow.toggleMaximize();
+    wsLog.debug('Window maximize toggled');
   } catch (err) {
-    console.error('Failed to toggle maximize window:', err);
+    wsLog.error('Failed to toggle maximize window', err);
   }
 };
 
@@ -54,7 +59,10 @@ export const saveDetachedWindow = (entry: SavedDetachedWindow): void => {
     const list = getSavedDetachedWindows().filter(w => w.label !== entry.label);
     list.push(entry);
     localStorage.setItem(DETACHED_WINDOWS_KEY, JSON.stringify(list));
-  } catch {}
+    wsLog.debug(`Saved detached window configuration for [${entry.label}]`, entry);
+  } catch (err) {
+    wsLog.error('Failed to save detached window configuration', err);
+  }
 };
 
 export const updateDetachedWindowBounds = (
@@ -71,8 +79,11 @@ export const updateDetachedWindowBounds = (
       target.width = bounds.width;
       target.height = bounds.height;
       localStorage.setItem(DETACHED_WINDOWS_KEY, JSON.stringify(list));
+      wsLog.debug(`Updated detached window bounds [${label}]`, bounds);
     }
-  } catch {}
+  } catch (err) {
+    wsLog.error(`Failed to update detached window bounds [${label}]`, err);
+  }
 };
 
 export const removeDetachedWindow = (label: string): void => {
@@ -80,26 +91,33 @@ export const removeDetachedWindow = (label: string): void => {
   try {
     const list = getSavedDetachedWindows().filter(w => w.label !== label);
     localStorage.setItem(DETACHED_WINDOWS_KEY, JSON.stringify(list));
-  } catch {}
+    wsLog.info(`Removed detached window [${label}] from registry`);
+  } catch (err) {
+    wsLog.error(`Failed to remove detached window [${label}]`, err);
+  }
 };
 
 export const closeWindow = async (): Promise<void> => {
   if (!isTauri()) return;
   try {
     const appWindow = getCurrentWindow();
+    wsLog.info(`Window close requested for [${appWindow.label}]`);
     // Destroy popout windows completely, but keep main window alive in tray
     if (appWindow.label !== 'main') {
       removeDetachedWindow(appWindow.label);
       await appWindow.destroy();
+      wsLog.info(`Destroyed detached window [${appWindow.label}]`);
     } else {
       try {
         await appWindow.hide();
+        wsLog.info('Main window hidden to system tray');
       } catch {
         await appWindow.close();
+        wsLog.info('Main window closed');
       }
     }
   } catch (err) {
-    console.error('Failed to close window:', err);
+    wsLog.error('Failed to close window', err);
   }
 };
 
@@ -120,6 +138,14 @@ export const openDetachedWindow = async (
     const x = box?.left !== undefined ? Math.round(box.left) : undefined;
     const y = box?.top !== undefined ? Math.round(box.top) : undefined;
 
+    wsLog.info(`Opening detached native window for [${panelId}] "${title}"`, {
+      label,
+      width,
+      height,
+      x,
+      y,
+    });
+
     const win = new WebviewWindow(label, {
       url,
       title: `${title} — SLAG`,
@@ -136,7 +162,7 @@ export const openDetachedWindow = async (
     });
 
     win.once('tauri://error', (err) => {
-      console.error('Failed to create detached native window:', err);
+      wsLog.error(`Failed to create detached native window [${label}]`, err);
       removeDetachedWindow(label);
     });
 
@@ -152,7 +178,7 @@ export const openDetachedWindow = async (
 
     return true;
   } catch (err) {
-    console.error('Failed to open detached native window:', err);
+    wsLog.error(`Failed to open detached native window for [${panelId}]`, err);
     return false;
   }
 };
@@ -162,9 +188,13 @@ export const restoreDetachedWindows = async (): Promise<void> => {
   try {
     const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
     const saved = getSavedDetachedWindows();
+    if (saved.length > 0) {
+      wsLog.info(`Restoring detached windows from saved session (${saved.length} windows)`, saved);
+    }
     for (const item of saved) {
       const existing = await WebviewWindow.getByLabel(item.label);
       if (!existing) {
+        wsLog.debug(`Spawning restored detached window [${item.label}] for [${item.panelId}]`);
         await openDetachedWindow(
           item.panelId,
           item.title,
@@ -179,7 +209,7 @@ export const restoreDetachedWindows = async (): Promise<void> => {
       }
     }
   } catch (err) {
-    console.error('Failed to restore detached windows:', err);
+    wsLog.error('Failed to restore detached windows', err);
   }
 };
 
@@ -191,8 +221,11 @@ export const listenDesktopEvents = (handlers: {
   let unlistenComposer: UnlistenFn | null = null;
   let active = true;
 
+  wsLog.debug('Registering desktop event listeners');
+
   void listen('slag://open-composer', () => {
     if (active && handlers.onOpenComposer) {
+      wsLog.info('Received desktop global shortcut event: slag://open-composer');
       handlers.onOpenComposer();
     }
   }).then((unlisten) => {

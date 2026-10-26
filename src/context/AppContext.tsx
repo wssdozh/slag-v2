@@ -155,7 +155,12 @@ interface AppContextType {
   saveFolder: (folder: FolderMeta) => void;
   deleteFolder: (path: string) => void;
   switchVault: (vaultId: string) => void;
-  createVault: (name: string) => void;
+  createVault: (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string) => void;
+  deleteVault: (vaultId: string) => void;
+  pickVaultDirectory: () => Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null>;
+  isVaultModalOpen: boolean;
+  openVaultModal: () => void;
+  closeVaultModal: () => void;
   saveAiSettings: (settings: Partial<AiSettings>) => void;
   addToast: (text: string, type?: 'info' | 'success' | 'error', action?: { label: string; onClick: () => void }) => void;
   undoLastAction: () => boolean;
@@ -368,6 +373,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const closeFolderInfoModal = useCallback(() => {
     setIsFolderInfoModalOpen(false);
     setFolderInfoTarget(null);
+  }, []);
+  const [isVaultModalOpen, setIsVaultModalOpen] = useState<boolean>(false);
+  const openVaultModal = useCallback(() => {
+    setIsVaultModalOpen(true);
+  }, []);
+  const closeVaultModal = useCallback(() => {
+    setIsVaultModalOpen(false);
   }, []);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState<boolean>(false);
   const [isComposerModalOpen, setIsComposerModalOpen] = useState<boolean>(false);
@@ -665,7 +677,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const prevFolderRef = useRef(currentFolder);
   useEffect(() => {
     if (prevFolderRef.current !== currentFolder) {
-      uiLog.debug(`Navigated to folder: "${currentFolder}"`);
+      uiLog.info(`Navigated to folder: "${currentFolder}"`, {
+        from: prevFolderRef.current,
+        to: currentFolder,
+        isInbox: currentFolder === 'Входящие',
+      });
       prevFolderRef.current = currentFolder;
     }
   }, [currentFolder]);
@@ -751,6 +767,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setEditingFolder(null);
       return true;
     }
+    if (isVaultModalOpen) {
+      setIsVaultModalOpen(false);
+      return true;
+    }
     if (isFolderInfoModalOpen) {
       setIsFolderInfoModalOpen(false);
       setFolderInfoTarget(null);
@@ -807,6 +827,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     closeContextMenu,
     isLogViewerOpen,
     isFolderModalOpen,
+    isVaultModalOpen,
     isFolderInfoModalOpen,
     isTriageModalOpen,
     isComposerModalOpen,
@@ -992,16 +1013,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const restoreFromTrash = useCallback((id: string) => {
     const restored = storage.restoreFromTrash(id);
     if (restored) {
+      uiLog.info(`Restored note "${restored.title || id}" from .trash to "${restored.folder}"`, {
+        itemId: id,
+        folder: restored.folder,
+      });
       refreshData();
       addToast(`Запись «${restored.title}» восстановлена`, 'success');
     }
   }, [refreshData, addToast]);
 
   const moveItem = useCallback((itemId: string, targetFolder: string) => {
+    const item = items.find(i => i.id === itemId);
+    const prevFolder = item?.folder || 'Входящие';
+    uiLog.info(`Moved note "${item?.title || itemId}" to folder "${targetFolder}"`, {
+      itemId,
+      title: item?.title,
+      from: prevFolder,
+      to: targetFolder,
+    });
     storage.moveItem(itemId, targetFolder);
     refreshData();
     addToast(`Перемещено в «${targetFolder}»`, 'success');
-  }, [refreshData, addToast]);
+  }, [items, refreshData, addToast]);
 
   const toggleTaskComplete = useCallback((itemId: string, subtaskId?: string) => {
     const item = items.find(i => i.id === itemId);
@@ -1455,13 +1488,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('Хранилище переключено', 'info');
   };
 
-  const createVault = (name: string) => {
-    storage.createVault(name);
+  const createVault = (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string) => {
+    storage.createVault(name, mode, path);
     setCurrentFolder('Входящие');
     setSelectedItem(null);
     refreshData();
     addToast(`Создано хранилище «${name}»`, 'success');
   };
+
+  const deleteVault = (vaultId: string) => {
+    const success = storage.deleteVault(vaultId);
+    if (success) {
+      refreshData();
+      addToast('Хранилище удалено', 'info');
+    } else {
+      addToast('Нельзя удалить активное или системное хранилище', 'error');
+    }
+  };
+
+  const pickVaultDirectory = useCallback(async () => {
+    return await storage.pickDirectory();
+  }, []);
 
   const openCreateFolderModal = (parentPath?: string) => {
     setEditingFolder(parentPath ? { path: `${parentPath}/`, name: '', description: '', icon: 'Folder' } : null);
@@ -1607,6 +1654,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteFolder,
         switchVault,
         createVault,
+        deleteVault,
+        pickVaultDirectory,
+        isVaultModalOpen,
+        openVaultModal,
+        closeVaultModal,
         saveAiSettings,
         addToast,
         undoLastAction,

@@ -52,9 +52,50 @@ fn configure_window_border(window: &tauri::Window) {
     }
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, String> {
+    let base_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let target_dir = match target.as_str() {
+        "logs" => base_dir.join("logs"),
+        "notes" => base_dir.join("notes"),
+        _ => base_dir,
+    };
+    let _ = std::fs::create_dir_all(&target_dir);
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&target_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&target_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&target_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(target_dir.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.invoke_handler(tauri::generate_handler![open_in_folder]);
+    }
 
     #[cfg(desktop)]
     {

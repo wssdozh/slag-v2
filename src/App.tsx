@@ -6,6 +6,7 @@ import { MobileActionSheet } from './components/UI/MobileActionSheet';
 import { SearchModal } from './components/Search/SearchModal';
 import { FolderModal } from './components/Modals/FolderModal';
 import { FolderInfoModal } from './components/Modals/FolderInfoModal';
+import { VaultModal } from './components/Modals/VaultModal';
 import { ComposerModal } from './components/Modals/ComposerModal';
 import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
@@ -113,6 +114,7 @@ const AppContent: React.FC = () => {
         <SettingsModal />
         <FolderModal />
         <FolderInfoModal />
+        <VaultModal />
         <TriageModal />
         <ComposerModal />
         <LogModal />
@@ -147,6 +149,7 @@ const AppContent: React.FC = () => {
       <SearchModal />
       <FolderModal />
       <FolderInfoModal />
+      <VaultModal />
       <ComposerModal />
       <ToastContainer />
       <ImageLightbox

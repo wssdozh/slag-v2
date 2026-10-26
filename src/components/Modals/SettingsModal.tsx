@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
+import { logger } from '../../lib/logger';
+import { openAppFolder } from '../../lib/folderOpener';
 import type { AiProvider } from '../../types';
 import {
   Settings,
@@ -16,7 +18,9 @@ import {
   Keyboard,
   RotateCcw,
   Terminal,
-  ArrowLeft
+  ArrowLeft,
+  FolderOpen,
+  FileText
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
 import { Select } from '../UI/Select';
@@ -137,6 +141,27 @@ export const SettingsModal: React.FC = () => {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleOpenNotesFolder = async () => {
+    const res = await openAppFolder('notes');
+    addToast(res.message, res.success ? 'success' : 'info');
+  };
+
+  const handleOpenLogsFolder = async () => {
+    const res = await openAppFolder('logs');
+    addToast(res.message, res.success ? 'success' : 'info');
+  };
+
+  const handleDownloadLogFile = () => {
+    try {
+      const filename = logger.downloadLog('log');
+      if (filename) {
+        addToast(`Лог сохранён (${filename})`, 'success');
+      }
+    } catch {
+      addToast('Ошибка выгрузки лога', 'error');
+    }
   };
 
   const resetPanelSizes = () => {
@@ -577,6 +602,48 @@ export const SettingsModal: React.FC = () => {
                       <div className="text-left">
                         <div className="font-medium">Полный бэкап в JSON</div>
                         <div className="text-[10px] text-zinc-500">Экспорт структуры, заметок и настроек</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenNotesFolder}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Открыть папку заметок на диске</div>
+                        <div className="text-[10px] text-zinc-500">Показать хранилище .md файлов в Проводнике / Finder</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenLogsFolder}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Terminal className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Открыть папку системных логов</div>
+                        <div className="text-[10px] text-zinc-500">Показать директорию с логами и дампами отладки</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadLogFile}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Скачать системный лог (.log)</div>
+                        <div className="text-[10px] text-zinc-500">Выгрузить структурированный текстовый журнал событий</div>
                       </div>
                     </div>
                   </button>

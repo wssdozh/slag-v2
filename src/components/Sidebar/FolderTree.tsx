@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { FOLDER_ICONS } from './folderIcons';
+import { logger } from '../../lib/logger';
 import {
   ChevronRight,
   ChevronDown,
   Folder,
   MoreHorizontal
 } from 'lucide-react';
+
+const uiLog = logger.scope('UI');
 
 interface TreeNode {
   name: string;
@@ -95,6 +98,10 @@ export const FolderTree: React.FC = () => {
     setDragOverPath(null);
     const itemId = e.dataTransfer.getData('text/plain');
     if (itemId) {
+      uiLog.info(`Drag-and-drop: Note dropped on folder tree node "${targetPath}"`, {
+        itemId,
+        targetFolder: targetPath,
+      });
       moveItem(itemId, targetPath);
     }
   };

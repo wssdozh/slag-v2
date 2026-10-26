@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { logger } from '../../lib/logger';
+import { openAppFolder } from '../../lib/folderOpener';
 import type { LogEntry, LogLevel, LogScope } from '../../types';
 import { useApp } from '../../context/AppContext';
 import {
@@ -12,7 +13,9 @@ import {
   ChevronDown,
   ChevronRight,
   Check,
-  ArrowDown
+  ArrowDown,
+  FolderOpen,
+  FileText
 } from 'lucide-react';
 
 interface LogViewerProps {
@@ -29,6 +32,7 @@ const SCOPE_COLORS: Record<LogScope, string> = {
   APP: 'text-purple-400/90',
   SYNC: 'text-cyan-400/90',
   MEDIA: 'text-pink-400/90',
+  WORKSPACE: 'text-sky-400/90',
 };
 
 const LEVEL_COLORS: Record<LogLevel, { text: string; labelColor: string }> = {
@@ -39,7 +43,7 @@ const LEVEL_COLORS: Record<LogLevel, { text: string; labelColor: string }> = {
   error: { text: 'text-rose-300/95', labelColor: 'text-rose-400' },
 };
 
-const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC', 'MEDIA'];
+const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC', 'MEDIA', 'WORKSPACE'];
 const ALL_LEVELS: LogLevel[] = ['error', 'warn', 'info', 'debug'];
 
 export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose }) => {
@@ -132,19 +136,23 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
     }
   };
 
-  const handleExportJson = () => {
+  const handleDownloadLog = (format: 'log' | 'json' | 'markdown' = 'log') => {
     try {
-      const json = logger.exportAsJson();
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `slag_logs_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      addToast('Логи выгружены в JSON', 'success');
+      const filename = logger.downloadLog(format);
+      if (filename) {
+        addToast(`Файл логов скачан: ${filename}`, 'success');
+      }
     } catch {
-      addToast('Ошибка экспорта логов', 'error');
+      addToast('Ошибка скачивания лога', 'error');
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    try {
+      const res = await openAppFolder('logs');
+      addToast(res.message, res.success ? 'success' : 'info');
+    } catch {
+      addToast('Не удалось открыть папку логов', 'error');
     }
   };
 
@@ -240,12 +248,33 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
           </button>
 
           <button
-            onClick={handleExportJson}
-            title="Скачать JSON"
+            onClick={() => handleDownloadLog('log')}
+            title="Скачать структурированный лог (.log)"
+            data-testid="log-download-plain"
+            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
+          >
+            <FileText className="w-3 h-3" />
+            <span className="text-[11px] hidden sm:inline">.log</span>
+          </button>
+
+          <button
+            onClick={() => handleDownloadLog('json')}
+            title="Скачать машинный массив (.json)"
+            data-testid="log-download-json"
             className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
           >
             <Download className="w-3 h-3" />
             <span className="text-[11px] hidden sm:inline">JSON</span>
+          </button>
+
+          <button
+            onClick={handleOpenFolder}
+            title="Открыть папку с логами"
+            data-testid="log-open-folder"
+            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
+          >
+            <FolderOpen className="w-3 h-3" />
+            <span className="text-[11px] hidden sm:inline">Папка</span>
           </button>
 
           <button

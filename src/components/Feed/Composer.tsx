@@ -1522,7 +1522,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     }`}
                     title={
                       effectiveDuration !== undefined
-                        ? `Длительность: ${
+                        ? `длительность: ${
                             effectiveDuration >= 60
                               ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
                               : `${effectiveDuration}м`
@@ -1588,8 +1588,8 @@ export const Composer: React.FC<ComposerProps> = ({
                     }`}
                     title={
                       effectiveRecurrence
-                        ? `Повтор: ${formatRecurrenceLabel(effectiveRecurrence)} (клик для изменения, ПКМ для сброса)`
-                        : 'Повторяющаяся задача'
+                        ? `повторение: ${formatRecurrenceLabel(effectiveRecurrence)} (клик для изменения, ПКМ для сброса)`
+                        : 'повторение: настроить повтор'
                     }
                     aria-label="Повторяющаяся задача"
                   >
