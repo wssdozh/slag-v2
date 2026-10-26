@@ -1636,6 +1636,17 @@ export const Composer: React.FC<ComposerProps> = ({
                     variant="ghost"
                     direction="up"
                     value={effectivePriority}
+                    showLabel={false}
+                    showArrow={false}
+                    title={`Приоритет: ${
+                      effectivePriority === 'high'
+                        ? 'Высокий'
+                        : effectivePriority === 'medium'
+                        ? 'Средний'
+                        : effectivePriority === 'low'
+                        ? 'Низкий'
+                        : 'Обычный'
+                    } (клик для изменения)`}
                     onChange={(val) => {
                       setPriority(val as any);
                       setIsPriorityDismissed(false);

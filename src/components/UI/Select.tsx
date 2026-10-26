@@ -22,6 +22,9 @@ export interface SelectProps {
   dropdownClassName?: string;
   disabled?: boolean;
   'aria-label'?: string;
+  title?: string;
+  showLabel?: boolean;
+  showArrow?: boolean;
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -36,6 +39,9 @@ export const Select: React.FC<SelectProps> = ({
   dropdownClassName = '',
   disabled = false,
   'aria-label': ariaLabel,
+  title,
+  showLabel = true,
+  showArrow = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [calculatedDirection, setCalculatedDirection] = useState<'down' | 'up'>('down');
@@ -206,6 +212,7 @@ export const Select: React.FC<SelectProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel || placeholder}
+        title={title || ariaLabel || selectedOption?.label || placeholder}
         className={`w-full flex items-center justify-between gap-1 transition-all cursor-pointer text-left ${
           variant === 'ghost'
             ? isSmall
@@ -218,15 +225,19 @@ export const Select: React.FC<SelectProps> = ({
       >
         <span className="truncate flex items-center gap-1.5">
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
-          <span className={selectedOption?.color || (selectedOption ? 'text-zinc-200' : 'text-zinc-500')}>
-            {selectedOption ? selectedOption.label : placeholder}
-          </span>
+          {showLabel && (
+            <span className={selectedOption?.color || (selectedOption ? 'text-zinc-200' : 'text-zinc-500')}>
+              {selectedOption ? selectedOption.label : placeholder}
+            </span>
+          )}
         </span>
-        <ChevronDown
-          className={`shrink-0 transition-transform duration-150 text-zinc-500 ${
-            isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'
-          } ${isOpen ? 'rotate-180 text-zinc-300' : ''}`}
-        />
+        {showArrow && (
+          <ChevronDown
+            className={`shrink-0 transition-transform duration-150 text-zinc-500 ${
+              isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'
+            } ${isOpen ? 'rotate-180 text-zinc-300' : ''}`}
+          />
+        )}
       </button>
 
       {portalContent}

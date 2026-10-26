@@ -709,7 +709,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(dueDateBtn).toBeVisible();
     await expect(dueDateBtn).toHaveClass(/bg-blue-500/);
 
-    const prioBtn = page.locator('button', { hasText: 'Высокий' });
+    const prioBtn = page.locator('button[title*="Приоритет: Высокий"]').first();
     await expect(prioBtn).toBeVisible();
 
     // 5. Take screenshot of unified toolbar controls
@@ -729,7 +729,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(250);
 
     // Verify priority updated to medium
-    await expect(page.locator('button', { hasText: 'Средний' })).toBeVisible();
+    await expect(page.locator('button[title*="Приоритет: Средний"]').first()).toBeVisible();
 
     // Send task via Enter
     await composerTextarea.press('Enter');
