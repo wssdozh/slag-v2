@@ -76,7 +76,7 @@ const WorkspaceContentPanel: React.FC<{
   );
 
   return (
-    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-[320px]">
       <FeedHeader viewMode={activeMode} onViewModeChange={handleModeChange} />
       {activeMode === 'kanban' ? (
         <KanbanBoard />
@@ -156,20 +156,47 @@ const PANELS_TO_ADD = [
   { id: 'logs', title: 'Логи & HUD', icon: Terminal },
 ];
 
-// ponytail: central registry for dockview panel minimum dimensions. upgrade: user configurable constraints in settings if requested
-const PANEL_CONSTRAINTS: Record<string, { minWidth: number }> = {
-  sidebar: { minWidth: 200 },
+// ponytail: central registry for dockview panel min/max dimensions. Prevents squishing adjacent panels.
+const PANEL_CONSTRAINTS: Record<string, { minWidth: number; maxWidth?: number }> = {
+  sidebar: { minWidth: 200, maxWidth: 420 },
   feed: { minWidth: 320 },
   kanban: { minWidth: 320 },
   calendar: { minWidth: 320 },
-  assistant: { minWidth: 280 },
-  audio: { minWidth: 260 },
-  'folder-info': { minWidth: 260 },
-  logs: { minWidth: 260 },
+  assistant: { minWidth: 280, maxWidth: 640 },
+  audio: { minWidth: 260, maxWidth: 640 },
+  'folder-info': { minWidth: 260, maxWidth: 540 },
+  logs: { minWidth: 260, maxWidth: 720 },
 };
 
 const getPanelMinWidth = (componentId: string): number => {
   return PANEL_CONSTRAINTS[componentId]?.minWidth ?? 260;
+};
+
+const getPanelMaxWidth = (componentId: string): number | undefined => {
+  return PANEL_CONSTRAINTS[componentId]?.maxWidth;
+};
+
+const syncAllGroupConstraints = (api: DockviewApi) => {
+  api.groups.forEach(group => {
+    const active = group.activePanel;
+    if (!active) return;
+    const comp = getPanelComponent(active);
+    const minWidth = getPanelMinWidth(comp);
+    const maxWidth = getPanelMaxWidth(comp);
+    try {
+      group.api.setConstraints({
+        minimumWidth: minWidth,
+        maximumWidth: maxWidth,
+      });
+      if (minWidth > 0 && group.api.width < minWidth) {
+        group.api.setSize({ width: minWidth });
+      } else if (maxWidth && group.api.width > maxWidth) {
+        group.api.setSize({ width: maxWidth });
+      }
+    } catch {
+      // Group may be disposing
+    }
+  });
 };
 
 const wsLog = logger.scope('WORKSPACE');
@@ -324,12 +351,16 @@ const GroupHeaderActions: React.FC<any> = (props) => {
     const uniqueId = `panel_${panelId}_g${seqRef.current}_${props.group?.id || 'main'}`;
     wsLog.info(`Added panel tab to group: [${panelId}] "${title}"`, { uniqueId });
 
+    const minW = getPanelMinWidth(panelId);
+    const maxW = getPanelMaxWidth(panelId);
+
     try {
       containerApi.addPanel({
         id: uniqueId,
         component: panelId,
         title,
-        minimumWidth: getPanelMinWidth(panelId),
+        minimumWidth: minW,
+        maximumWidth: maxW,
         position: { referenceGroup: props.group },
       });
     } catch {
@@ -337,9 +368,11 @@ const GroupHeaderActions: React.FC<any> = (props) => {
         id: uniqueId,
         component: panelId,
         title,
-        minimumWidth: getPanelMinWidth(panelId),
+        minimumWidth: minW,
+        maximumWidth: maxW,
       });
     }
+    syncAllGroupConstraints(containerApi);
   };
 
   return (
@@ -586,12 +619,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           uniqueId,
         });
 
+        const minW = getPanelMinWidth(panelId);
+        const maxW = getPanelMaxWidth(panelId);
+
         try {
           api.addPanel({
             id: uniqueId,
             component: panelId,
             title,
-            minimumWidth: getPanelMinWidth(panelId),
+            minimumWidth: minW,
+            maximumWidth: maxW,
             position: targetGroup
               ? (direction ? { referenceGroup: targetGroup, direction } : { referenceGroup: targetGroup })
               : undefined,
@@ -601,9 +638,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             id: uniqueId,
             component: panelId,
             title,
-            minimumWidth: getPanelMinWidth(panelId),
+            minimumWidth: minW,
+            maximumWidth: maxW,
           });
         }
+        syncAllGroupConstraints(api);
       }
     },
     []
@@ -870,6 +909,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       component: 'feed',
       title: currentFolder || 'Входящие',
       minimumWidth: getPanelMinWidth('feed'),
+      maximumWidth: getPanelMaxWidth('feed'),
     });
 
     // 2. Left navigation sidebar
@@ -880,6 +920,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       position: { direction: 'left', referencePanel: centerPanel },
       initialWidth: 260,
       minimumWidth: getPanelMinWidth('sidebar'),
+      maximumWidth: getPanelMaxWidth('sidebar'),
     });
 
     // 3. Right Assistant & Info in a single group with tabs
@@ -890,6 +931,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       position: { direction: 'right', referencePanel: centerPanel },
       initialWidth: 320,
       minimumWidth: getPanelMinWidth('assistant'),
+      maximumWidth: getPanelMaxWidth('assistant'),
     });
 
     api.addPanel({
@@ -898,7 +940,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       title: 'Инфо',
       position: { referencePanel: assistantPanel },
       minimumWidth: getPanelMinWidth('folder-info'),
+      maximumWidth: getPanelMaxWidth('folder-info'),
     });
+
+    syncAllGroupConstraints(api);
   }, [currentFolder]);
 
   const onReady = (event: DockviewReadyEvent) => {
@@ -920,13 +965,18 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       saveLayout();
     });
 
-    // Save active tab selection across reloads
+    // Save active tab selection across reloads and sync group constraints
     event.api.onDidActivePanelChange(() => {
       const active = event.api.activePanel;
       if (active) {
         wsLog.debug(`Active workspace tab switched: [${active.id}] "${active.title || ''}"`);
       }
+      syncAllGroupConstraints(event.api);
       saveLayout();
+    });
+
+    event.api.onDidAddPanel(() => {
+      syncAllGroupConstraints(event.api);
     });
 
     // Guard on panel removal: proportional resize and auto-destroy empty secondary windows
@@ -937,6 +987,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         closeWindow();
         return;
       }
+      syncAllGroupConstraints(event.api);
       requestAnimationFrame(() => {
         if (event.api.groups.length === 2) {
           const centerGroup = event.api.groups.find(g =>
@@ -960,7 +1011,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         component: effectiveInitialPanel.id,
         title: effectiveInitialPanel.title,
         minimumWidth: getPanelMinWidth(effectiveInitialPanel.id),
+        maximumWidth: getPanelMaxWidth(effectiveInitialPanel.id),
       });
+      syncAllGroupConstraints(event.api);
     } else {
       // Try restoring saved layout
       let restored = false;
@@ -973,18 +1026,14 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
               const p = parsed.panels[key];
               const comp = p.contentComponent || key.replace(/^panel_/, '').replace(/_\d+$/, '');
               p.minimumWidth = Math.max(p.minimumWidth || 0, getPanelMinWidth(comp));
+              const max = getPanelMaxWidth(comp);
+              if (max !== undefined) {
+                p.maximumWidth = p.maximumWidth ? Math.min(p.maximumWidth, max) : max;
+              }
             }
           }
           event.api.fromJSON(parsed);
-          // Ensure any restored groups comply with their active panel minimums
-          event.api.groups.forEach(group => {
-            const min = group.minimumWidth;
-            if (min > 0 && group.api.width < min) {
-              try {
-                group.api.setSize({ width: min });
-              } catch {}
-            }
-          });
+          syncAllGroupConstraints(event.api);
           restored = true;
           wsLog.debug('Restored saved workspace layout configuration');
         }

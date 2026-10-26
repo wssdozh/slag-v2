@@ -861,7 +861,29 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       expect(clampedFeedBox.width).toBeGreaterThanOrEqual(315);
     }
 
-    // 4. Capture screenshot of clamped layout
+    // 4. Attempt aggressive expansion of the left sash (Sidebar) to the right
+    const leftSash = sashes.first();
+    const leftSashBox = await leftSash.boundingBox();
+    if (leftSashBox) {
+      await page.mouse.move(leftSashBox.x + leftSashBox.width / 2, leftSashBox.y + leftSashBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(leftSashBox.x + 800, leftSashBox.y + leftSashBox.height / 2, { steps: 10 });
+      await page.mouse.up();
+    }
+
+    // 5. Verify Sidebar obeys maximumWidth (420px) and Feed is still protected
+    const sidebarGroup = page.locator('.dv-groupview').filter({ has: page.locator('aside') }).first();
+    const sidebarBox = await sidebarGroup.boundingBox();
+    if (sidebarBox) {
+      expect(sidebarBox.width).toBeLessThanOrEqual(430);
+    }
+
+    const postExpansionFeedBox = await feedGroup.boundingBox();
+    if (postExpansionFeedBox) {
+      expect(postExpansionFeedBox.width).toBeGreaterThanOrEqual(315);
+    }
+
+    // 6. Capture screenshot of clamped layout
     await page.screenshot({
       path: 'test-results/screenshots/dockview-panel-min-width-clamped.png',
       fullPage: false,
