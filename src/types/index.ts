@@ -1,6 +1,7 @@
 export type SlagItemType = 'note' | 'article' | 'task';
 export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'done';
 export type SlagItemStatus = TaskStatus;
+export type SlagItemPriority = 'none' | 'low' | 'medium' | 'high';
 
 export interface SlagAttachment {
   id: string;

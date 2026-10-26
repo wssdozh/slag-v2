@@ -380,8 +380,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(inboxFilter).toBeVisible();
 
     // 3. Switch composer to Task mode
-    const taskBtn = page.locator('button[aria-label="Таска"], button[title*="Таска"]').first();
-    await taskBtn.click();
+    const typeBtn = page.locator('button[aria-label="Сменить тип записи"]').or(page.locator('button', { hasText: 'Заметка' })).first();
+    await typeBtn.click();
+    await page.locator('body > div button', { hasText: 'Таска' }).first().click();
 
     // Verify the old bloated row "Приоритет:" & "Дедлайн:" is completely absent
     await expect(page.locator('text=Приоритет:')).not.toBeVisible();

@@ -6,17 +6,16 @@ import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
+import { useComposerMedia } from '../../hooks/useComposerMedia';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
-import { Select } from '../UI/Select';
 import { categorizeDraft } from '../../lib/aiService';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
-import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
 import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
-import { DatePickerPopover } from '../UI/DatePickerPopover';
-import { LinearSignalBars } from '../UI/PriorityBadge';
+import { ToolbarButton } from '../UI/ToolbarButton';
+import { ComposerTaskControls } from './ComposerTaskControls';
 import { TagChip } from '../UI/TagChip';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
@@ -35,9 +34,6 @@ import {
   FileText,
   StickyNote,
   Lock,
-  Calendar,
-  Clock,
-  Repeat,
   Hash
 } from 'lucide-react';
 
@@ -95,26 +91,26 @@ export const Composer: React.FC<ComposerProps> = ({
     setTargetFolderOverride(folder ? { folder, forCurrent: currentFolder } : null);
   };
   const [attachments, setAttachments] = useState<SlagAttachment[]>(() => initialDraft?.attachments || []);
-  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
-  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
 
-  // Hold-to-record & lock state
-  const [recordMode, setRecordMode] = useState<'idle' | 'holding' | 'locked'>('idle');
-  const [lockHint, setLockHint] = useState<'audio' | 'video' | null>(null);
-  const [mobileMediaType, setMobileMediaType] = useState<'audio' | 'video'>('audio');
-  const pointerStartRef = useRef<{ x: number; y: number; time: number; target: 'audio' | 'video' } | null>(null);
-  const triggerFinishRef = useRef<((autoSend?: boolean) => void) | null>(null);
-  const holdTimerRef = useRef<number | null>(null);
-
-  // Clear hold timer on unmount
-  useEffect(() => {
-    return () => {
-      if (holdTimerRef.current) {
-        clearTimeout(holdTimerRef.current);
-      }
-    };
-  }, []);
+  // Hold-to-record & lock state via custom hook
+  const {
+    isRecordingAudio,
+    setIsRecordingAudio,
+    isRecordingVideo,
+    setIsRecordingVideo,
+    recordMode,
+    setRecordMode,
+    lockHint,
+    setLockHint,
+    mobileMediaType,
+    triggerFinishRef,
+    handlePointerDown: handleMobileMediaPointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+    cancelRecording,
+  } = useComposerMedia({ addToast });
 
   // WikiLink [[ autocomplete state
   const [wikiQuery, setWikiQuery] = useState<string | null>(null);
@@ -132,14 +128,11 @@ export const Composer: React.FC<ComposerProps> = ({
   // Todoist parser & Ghost-chips state
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
   const [isDateDismissed, setIsDateDismissed] = useState(false);
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
   const [duration, setDuration] = useState<number | undefined>(undefined);
   const [isDurationDismissed, setIsDurationDismissed] = useState(false);
-  const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
   const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(undefined);
   const [isRecurrenceDismissed, setIsRecurrenceDismissed] = useState(false);
-  const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
   const [dismissedTags, setDismissedTags] = useState<Set<string>>(new Set());
 
   // 150ms debounced Todoist parsing when content changes
@@ -185,10 +178,8 @@ export const Composer: React.FC<ComposerProps> = ({
     setDueDate('');
     setDuration(undefined);
     setIsDurationDismissed(false);
-    setIsDurationDropdownOpen(false);
     setRecurrence(undefined);
     setIsRecurrenceDismissed(false);
-    setIsRecurrenceDropdownOpen(false);
     setReplyTarget(null);
     setWikiQuery(null);
     setSlashQuery(null);
@@ -198,7 +189,6 @@ export const Composer: React.FC<ComposerProps> = ({
     setIsTagNavigated(false);
     setParsedTask(null);
     setIsDateDismissed(false);
-    setIsDatePickerOpen(false);
     setIsPriorityDismissed(false);
     setDismissedTags(new Set());
     if (textareaRef.current) {
@@ -635,139 +625,6 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  const handleMobileMediaPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    if (isRecordingAudio || isRecordingVideo) return;
-    try {
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-    } catch {
-      // ignore
-    }
-
-    const currentTarget = mobileMediaType;
-    pointerStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      time: Date.now(),
-      target: currentTarget,
-    };
-
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-    }
-
-    // 220ms hold threshold to differentiate single tap (toggle audio/video) from holding (record)
-    holdTimerRef.current = window.setTimeout(() => {
-      holdTimerRef.current = null;
-      setRecordMode('holding');
-      setLockHint(currentTarget);
-      if (currentTarget === 'audio') {
-        setIsRecordingVideo(false);
-        setIsRecordingAudio(true);
-      } else {
-        setIsRecordingAudio(false);
-        setIsRecordingVideo(true);
-      }
-      try {
-        navigator.vibrate?.(15);
-      } catch {}
-    }, 220);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!pointerStartRef.current) return;
-    const dy = e.clientY - pointerStartRef.current.y;
-    const dx = e.clientX - pointerStartRef.current.x;
-
-    // If hold timer is still pending and user moved noticeably, trigger hold immediately
-    if (holdTimerRef.current && (dy < -15 || dx < -15)) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-      const target = pointerStartRef.current.target;
-      setRecordMode('holding');
-      setLockHint(target);
-      if (target === 'audio') {
-        setIsRecordingVideo(false);
-        setIsRecordingAudio(true);
-      } else {
-        setIsRecordingAudio(false);
-        setIsRecordingVideo(true);
-      }
-    }
-
-    if (recordMode !== 'holding') return;
-
-    // Swipe up -> Lock hands-free recording
-    if (dy < -35) {
-      setRecordMode('locked');
-      setLockHint(null);
-      pointerStartRef.current = null;
-      try {
-        navigator.vibrate?.(10);
-      } catch {}
-      return;
-    }
-
-    // Swipe left -> Cancel
-    if (dx < -55) {
-      setIsRecordingAudio(false);
-      setIsRecordingVideo(false);
-      setRecordMode('idle');
-      setLockHint(null);
-      pointerStartRef.current = null;
-      addToast('Запись отменена', 'info');
-      try {
-        navigator.vibrate?.(15);
-      } catch {}
-    }
-  };
-
-  const handlePointerUp = (_e: React.PointerEvent) => {
-    if (!pointerStartRef.current) return;
-    const holdTime = Date.now() - pointerStartRef.current.time;
-    pointerStartRef.current = null;
-
-    if (holdTimerRef.current) {
-      // Tap detected (<220ms): toggle audio <-> video mode
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-      setMobileMediaType((prev) => (prev === 'audio' ? 'video' : 'audio'));
-      try {
-        navigator.vibrate?.(10);
-      } catch {}
-      return;
-    }
-
-    if (recordMode === 'holding') {
-      if (holdTime < 350) {
-        // Short tap while in holding mode -> lock in hands-free mode for comfortable recording
-        setRecordMode('locked');
-        setLockHint(null);
-      } else {
-        // Held and released -> auto-finish and send
-        setRecordMode('idle');
-        setLockHint(null);
-        if (triggerFinishRef.current) {
-          triggerFinishRef.current(true);
-        }
-      }
-    }
-  };
-
-  const handlePointerCancel = () => {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (recordMode === 'holding') {
-      setIsRecordingAudio(false);
-      setIsRecordingVideo(false);
-      setRecordMode('idle');
-      setLockHint(null);
-    }
-    pointerStartRef.current = null;
-  };
-
   const sendItemWithAttachments = (attachmentsToSend: SlagAttachment[]) => {
     if (!content.trim() && attachmentsToSend.length === 0) return;
 
@@ -1004,18 +861,8 @@ export const Composer: React.FC<ComposerProps> = ({
       }
     }
 
-    // Close dropdowns or dismiss active date / duration / recurrence / priority on Escape
+    // Dismiss active date / duration / recurrence / priority on Escape
     if (e.key === 'Escape') {
-      if (isDurationDropdownOpen) {
-        e.preventDefault();
-        setIsDurationDropdownOpen(false);
-        return;
-      }
-      if (isRecurrenceDropdownOpen) {
-        e.preventDefault();
-        setIsRecurrenceDropdownOpen(false);
-        return;
-      }
       if (!isDurationDismissed && (parsedTask?.duration !== undefined || duration !== undefined)) {
         e.preventDefault();
         setIsDurationDismissed(true);
@@ -1283,11 +1130,7 @@ export const Composer: React.FC<ComposerProps> = ({
       <AudioRecorder
         finishTriggerRef={triggerFinishRef}
         onRecorded={handleRecordedAudio}
-        onCancel={() => {
-          setIsRecordingAudio(false);
-          setRecordMode('idle');
-          setLockHint(null);
-        }}
+        onCancel={cancelRecording}
       />
     </div>
   ) : isRecordingVideo ? (
@@ -1295,11 +1138,7 @@ export const Composer: React.FC<ComposerProps> = ({
       <VideoRecorder
         finishTriggerRef={triggerFinishRef}
         onRecorded={handleRecordedVideo}
-        onCancel={() => {
-          setIsRecordingVideo(false);
-          setRecordMode('idle');
-          setLockHint(null);
-        }}
+        onCancel={cancelRecording}
       />
     </div>
   ) : undefined;
@@ -1350,23 +1189,24 @@ export const Composer: React.FC<ComposerProps> = ({
       )}
 
       {/* +AI Smart Tagging Button - Icon Only */}
-      <button
-        type="button"
+      <ToolbarButton
+        size="md"
         onClick={handleSmartAiTags}
         disabled={isGeneratingAiTags}
-        className="h-ctrl-md px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center justify-center shrink-0"
         title="ИИ классификация: папка и теги (+AI)"
         aria-label="ИИ классификация: папка и теги (+AI)"
+        icon={
+          isGeneratingAiTags ? (
+            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+          ) : (
+            <Sparkles className="w-4 h-4 text-zinc-400" />
+          )
+        }
       >
-        {isGeneratingAiTags ? (
-          <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-        ) : (
-          <Sparkles className="w-4 h-4 text-zinc-400" />
-        )}
         <span className="sr-only">+AI</span>
-      </button>
+      </ToolbarButton>
 
-      {/* Record Type Selector (Ghost droplist: icon + chevron, larger touch target) */}
+      {/* Record Type Selector (Ghost droplist: icon + label + chevron, larger touch target) */}
       <ResponsiveSegmented<SlagItemType>
         value={itemType}
         onChange={setItemType}
@@ -1374,6 +1214,7 @@ export const Composer: React.FC<ComposerProps> = ({
           {
             value: 'note',
             label: 'Заметка',
+            showLabelInTrigger: true,
             icon: <StickyNote className="w-4 h-4 text-zinc-300" />,
             title: 'Заметка',
             ariaLabel: 'Заметка',
@@ -1381,6 +1222,7 @@ export const Composer: React.FC<ComposerProps> = ({
           {
             value: 'task',
             label: 'Таска',
+            showLabelInTrigger: true,
             icon: <CheckSquare className="w-4 h-4 text-amber-400" />,
             title: 'Таска',
             ariaLabel: 'Таска',
@@ -1388,6 +1230,7 @@ export const Composer: React.FC<ComposerProps> = ({
           {
             value: 'article',
             label: 'Статья',
+            showLabelInTrigger: true,
             icon: <FileText className="w-4 h-4 text-blue-400" />,
             title: 'Статья',
             ariaLabel: 'Статья',
@@ -1399,250 +1242,47 @@ export const Composer: React.FC<ComposerProps> = ({
         ariaLabel="Сменить тип записи"
       />
 
-            {/* Task Controls: Always visible in toolbar, lights up blue when active */}
-            {itemType === 'task' && (
-              <div className="flex items-center gap-0.5 shrink-0">
-                {/* Due Date Icon Button */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsDatePickerOpen(prev => !prev)}
-                    onContextMenu={(e) => {
-                      if (effectiveDueDate) {
-                        e.preventDefault();
-                        setIsDateDismissed(true);
-                        setDueDate('');
-                      }
-                    }}
-                    className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
-                      effectiveDueDate
-                        ? 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(96,165,250,0.7))]'
-                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
-                    }`}
-                    title={
-                      effectiveDueDate
-                        ? `Срок: ${effectiveDateLabel} (клик для изменения, ПКМ для сброса)`
-                        : 'Установить срок задачи'
-                    }
-                    aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок задачи'}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                  </button>
-
-                  {isDatePickerOpen && (
-                    <DatePickerPopover
-                      value={effectiveDueDate}
-                      onChange={(newDate) => {
-                        setDueDate(newDate);
-                        setIsDateDismissed(false);
-                        setIsDatePickerOpen(false);
-                      }}
-                      onClear={() => {
-                        setIsDateDismissed(true);
-                        setDueDate('');
-                        setIsDatePickerOpen(false);
-                      }}
-                      onClose={() => setIsDatePickerOpen(false)}
-                      direction="up"
-                    />
-                  )}
-                </div>
-
-                {/* Duration Icon Button */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                    onContextMenu={(e) => {
-                      if (effectiveDuration !== undefined) {
-                        e.preventDefault();
-                        setIsDurationDismissed(true);
-                        setDuration(undefined);
-                      }
-                    }}
-                    className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
-                      effectiveDuration !== undefined
-                        ? 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(96,165,250,0.7))]'
-                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
-                    }`}
-                    title={
-                      effectiveDuration !== undefined
-                        ? `длительность: ${
-                            effectiveDuration >= 60
-                              ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
-                              : `${effectiveDuration}м`
-                          } (клик для изменения, ПКМ для сброса)`
-                        : 'Установить длительность задачи'
-                    }
-                    aria-label="Установить длительность задачи"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                  </button>
-
-                  {isDurationDropdownOpen && (
-                    <div className="absolute left-0 bottom-full mb-1.5 w-36 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                      {effectiveDuration !== undefined && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsDurationDismissed(true);
-                            setDuration(undefined);
-                            setIsDurationDropdownOpen(false);
-                          }}
-                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-white/[0.06] mb-0.5"
-                        >
-                          <span>Без длительности</span>
-                        </button>
-                      )}
-                      {[15, 30, 45, 60, 90, 120].map(mins => (
-                        <button
-                          key={mins}
-                          type="button"
-                          onClick={() => {
-                            setDuration(mins);
-                            setIsDurationDismissed(false);
-                            setIsDurationDropdownOpen(false);
-                          }}
-                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                            effectiveDuration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                          }`}
-                        >
-                          <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Recurrence Icon Button */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                    onContextMenu={(e) => {
-                      if (effectiveRecurrence) {
-                        e.preventDefault();
-                        setIsRecurrenceDismissed(true);
-                        setRecurrence(undefined);
-                      }
-                    }}
-                    className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
-                      effectiveRecurrence
-                        ? 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(96,165,250,0.7))]'
-                        : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
-                    }`}
-                    title={
-                      effectiveRecurrence
-                        ? `повторение: ${formatRecurrenceLabel(effectiveRecurrence)} (клик для изменения, ПКМ для сброса)`
-                        : 'повторение: настроить повтор'
-                    }
-                    aria-label="Повторяющаяся задача"
-                  >
-                    <Repeat className="w-3.5 h-3.5" />
-                  </button>
-
-                  {isRecurrenceDropdownOpen && (
-                    <div className="absolute left-0 bottom-full mb-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
-                      {effectiveRecurrence && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsRecurrenceDismissed(true);
-                            setRecurrence(undefined);
-                            setIsRecurrenceDropdownOpen(false);
-                          }}
-                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-white/[0.06] mb-0.5"
-                        >
-                          <span>Без повторения</span>
-                        </button>
-                      )}
-                      {RECURRENCE_PRESETS.map(opt => (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          onClick={() => {
-                            setRecurrence(opt.rule);
-                            setIsRecurrenceDismissed(false);
-                            setIsRecurrenceDropdownOpen(false);
-                          }}
-                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                        >
-                          <span>{opt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Priority Selector */}
-                <div className="flex items-center shrink-0">
-                  <Select
-                    size="md"
-                    variant="ghost"
-                    direction="up"
-                    value={effectivePriority}
-                    showLabel={false}
-                    showArrow={false}
-                    title={`Приоритет: ${
-                      effectivePriority === 'high'
-                        ? 'Высокий'
-                        : effectivePriority === 'medium'
-                        ? 'Средний'
-                        : effectivePriority === 'low'
-                        ? 'Низкий'
-                        : 'Обычный'
-                    } (клик для изменения)`}
-                    onChange={(val) => {
-                      setPriority(val as any);
-                      setIsPriorityDismissed(false);
-                    }}
-                    className={
-                      effectivePriority !== 'none'
-                        ? 'rounded-md'
-                        : ''
-                    }
-                    options={[
-                      {
-                        value: 'none',
-                        label: 'Обычный',
-                        icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
-                        color: 'text-zinc-400',
-                      },
-                      {
-                        value: 'low',
-                        label: 'Низкий',
-                        icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
-                        color: 'text-zinc-300',
-                      },
-                      {
-                        value: 'medium',
-                        label: 'Средний',
-                        icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
-                        color: 'text-amber-400',
-                      },
-                      {
-                        value: 'high',
-                        label: 'Высокий',
-                        icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
-                        color: 'text-rose-400',
-                      },
-                    ]}
-                  />
-                </div>
-              </div>
-            )}
+      {/* Task Controls: Always visible in toolbar, lights up blue when active */}
+      {itemType === 'task' && (
+        <ComposerTaskControls
+          effectiveDueDate={effectiveDueDate}
+          effectiveDateLabel={effectiveDateLabel}
+          onDateChange={(newDate) => {
+            setDueDate(newDate);
+            setIsDateDismissed(false);
+          }}
+          onDateClear={() => {
+            setIsDateDismissed(true);
+            setDueDate('');
+          }}
+          effectiveDuration={effectiveDuration}
+          onDurationChange={(mins) => {
+            setDuration(mins);
+            setIsDurationDismissed(mins === undefined);
+          }}
+          effectiveRecurrence={effectiveRecurrence}
+          onRecurrenceChange={(rule) => {
+            setRecurrence(rule);
+            setIsRecurrenceDismissed(!rule);
+          }}
+          effectivePriority={effectivePriority}
+          onPriorityChange={(val) => {
+            setPriority(val);
+            setIsPriorityDismissed(false);
+          }}
+        />
+      )}
     </div>
   );
 
   const rightControls = (
-    <button
-      type="button"
+    <ToolbarButton
+      size="md"
       onClick={() => fileInputRef.current?.click()}
-      className="w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
       title="Прикрепить файл"
-    >
-      <Paperclip className="w-4 h-4" />
-    </button>
+      aria-label="Прикрепить файл"
+      icon={<Paperclip className="w-4 h-4" />}
+    />
   );
 
   const sendButton =
@@ -1701,15 +1341,14 @@ export const Composer: React.FC<ComposerProps> = ({
       topSlot={topSlot}
       topRightSlot={
         !isModal ? (
-          <button
-            type="button"
+          <ToolbarButton
+            size="sm"
             onClick={handleExpandToFullscreen}
-            className="w-6 h-6 rounded-md hidden sm:flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Раскрыть в полноэкранный редактор"
             aria-label="Раскрыть в полноэкранный редактор"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-          </button>
+            className="hidden sm:flex text-zinc-500 hover:text-zinc-200"
+            icon={<Maximize2 className="w-3.5 h-3.5" />}
+          />
         ) : undefined
       }
       propertiesSlot={propertiesSlot}
