@@ -20,7 +20,13 @@ import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
 import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
-import { isDesktopApp, openDetachedWindow, closeWindow } from '../../lib/windowControls';
+import {
+  isDesktopApp,
+  openDetachedWindow,
+  closeWindow,
+  restoreDetachedWindows,
+  updateDetachedWindowBounds,
+} from '../../lib/windowControls';
 import {
   Plus,
   Layers,
@@ -149,10 +155,12 @@ const PANELS_TO_ADD = [
 
 // Detach panel to native OS window (in desktop mode) or browser popout / floating group
 const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left: number; top: number; width?: number; height?: number }) => {
-  const panelWidth = box?.width || 760;
-  const panelHeight = box?.height || 580;
-  const left = box?.left ?? Math.max(40, window.screenX + 80);
-  const top = box?.top ?? Math.max(40, window.screenY + 80);
+  const groupElement = (panel.group as any)?.element as HTMLElement | undefined;
+  const rect = groupElement?.getBoundingClientRect();
+  const panelWidth = box?.width || (rect ? Math.round(rect.width) : panel.api.width) || 760;
+  const panelHeight = box?.height || (rect ? Math.round(rect.height) : panel.api.height) || 580;
+  const left = box?.left ?? (rect ? Math.round(window.screenX + rect.left) : Math.max(40, window.screenX + 80));
+  const top = box?.top ?? (rect ? Math.round(window.screenY + rect.top) : Math.max(40, window.screenY + 80));
 
   // Capture existing group widths to preserve proportions when panel/group is removed
   const panelGroup = panel.group;
@@ -350,6 +358,39 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     }
     return undefined;
   }, [initialPanel]);
+
+  // Primary window: restore previously open detached windows across app restarts
+  useEffect(() => {
+    if (effectiveInitialPanel) return;
+    void restoreDetachedWindows();
+  }, [effectiveInitialPanel]);
+
+  // Secondary window: track resizing to preserve geometry on restart
+  useEffect(() => {
+    if (!effectiveInitialPanel || typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const winLabel = urlParams.get('label');
+    if (!winLabel) return;
+
+    let timer: number | null = null;
+    const handleBoundsChange = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        updateDetachedWindowBounds(winLabel, {
+          left: window.screenX,
+          top: window.screenY,
+          width: window.outerWidth,
+          height: window.outerHeight,
+        });
+      }, 400);
+    };
+
+    window.addEventListener('resize', handleBoundsChange);
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      window.removeEventListener('resize', handleBoundsChange);
+    };
+  }, [effectiveInitialPanel]);
 
   // Dynamically update feed panel tab title to match currentFolder
   useEffect(() => {
@@ -561,6 +602,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       const panel = dragEvent.panel;
       if (!panel) return;
 
+      const groupElement = (panel.group as any)?.element as HTMLElement | undefined;
+      const rect = groupElement?.getBoundingClientRect();
+      const initialWidth = rect ? Math.round(rect.width) : panel.api.width;
+      const initialHeight = rect ? Math.round(rect.height) : panel.api.height;
+
       const handleDragEnd = (e: DragEvent) => {
         window.removeEventListener('dragend', handleDragEnd);
 
@@ -577,10 +623,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
         if (isOutside) {
           detachPanel(event.api, panel, {
-            left: e.screenX - 100,
-            top: e.screenY - 30,
-            width: 720,
-            height: 540,
+            left: Math.round(e.screenX - Math.min(160, initialWidth / 2)),
+            top: Math.round(e.screenY - 25),
+            width: initialWidth,
+            height: initialHeight,
           });
         }
       };

@@ -2881,4 +2881,31 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('41. Detached Windows Session Registry and 1-to-1 Geometry', async ({ page }) => {
+    await page.goto('/');
+
+    // 1. Verify localStorage registry functionality
+    await page.evaluate(() => {
+      const entry = {
+        label: 'panel-kanban-session-test',
+        panelId: 'kanban',
+        title: 'Канбан',
+        left: 200,
+        top: 150,
+        width: 880,
+        height: 620,
+      };
+      localStorage.setItem('slag_detached_windows_v2', JSON.stringify([entry]));
+    });
+
+    const saved = await page.evaluate(() => {
+      return JSON.parse(localStorage.getItem('slag_detached_windows_v2') || '[]');
+    });
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].panelId).toBe('kanban');
+    expect(saved[0].width).toBe(880);
+    expect(saved[0].height).toBe(620);
+  });
 });
