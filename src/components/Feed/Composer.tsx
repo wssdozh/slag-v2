@@ -14,6 +14,7 @@ import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '
 import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
+import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
 import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { TagChip } from '../UI/TagChip';
@@ -1358,60 +1359,45 @@ export const Composer: React.FC<ComposerProps> = ({
         aria-label="ИИ классификация: папка и теги (+AI)"
       >
         {isGeneratingAiTags ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+          <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
         ) : (
-          <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+          <Sparkles className="w-4 h-4 text-zinc-400" />
         )}
         <span className="sr-only">+AI</span>
       </button>
 
-      {/* Record Type Selector (Icon-Only: Note, Task, Article) */}
-      <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label="Сменить тип записи">
-        <button
-          type="button"
-          onClick={() => setItemType('note')}
-          className={`h-ctrl-md px-1.5 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
-            itemType === 'note'
-              ? 'bg-white/10 text-white'
-              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-          }`}
-          title="Заметка"
-          aria-label="Заметка"
-        >
-          <StickyNote className="w-3.5 h-3.5" />
-          <span className="sr-only">Заметка</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setItemType('task')}
-          className={`h-ctrl-md px-1.5 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
-            itemType === 'task'
-              ? 'bg-amber-500/15 text-amber-400'
-              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-          }`}
-          title="Таска"
-          aria-label="Таска"
-        >
-          <CheckSquare className="w-3.5 h-3.5" />
-          <span className="sr-only">Таска</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setItemType('article')}
-          className={`h-ctrl-md px-1.5 rounded-md transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
-            itemType === 'article'
-              ? 'bg-blue-500/15 text-blue-400'
-              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-          }`}
-          title="Статья"
-          aria-label="Статья"
-        >
-          <FileText className="w-3.5 h-3.5" />
-          <span className="sr-only">Статья</span>
-        </button>
-      </div>
+      {/* Record Type Selector (Ghost droplist: icon + chevron, larger touch target) */}
+      <ResponsiveSegmented<SlagItemType>
+        value={itemType}
+        onChange={setItemType}
+        options={[
+          {
+            value: 'note',
+            label: 'Заметка',
+            icon: <StickyNote className="w-4 h-4 text-zinc-300" />,
+            title: 'Заметка',
+            ariaLabel: 'Заметка',
+          },
+          {
+            value: 'task',
+            label: 'Таска',
+            icon: <CheckSquare className="w-4 h-4 text-amber-400" />,
+            title: 'Таска',
+            ariaLabel: 'Таска',
+          },
+          {
+            value: 'article',
+            label: 'Статья',
+            icon: <FileText className="w-4 h-4 text-blue-400" />,
+            title: 'Статья',
+            ariaLabel: 'Статья',
+          },
+        ]}
+        compact={true}
+        size="md"
+        direction="up"
+        ariaLabel="Сменить тип записи"
+      />
 
             {/* Task Controls: Always visible in toolbar, lights up blue when active */}
             {itemType === 'task' && (

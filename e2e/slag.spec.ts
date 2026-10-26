@@ -3333,9 +3333,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const expandBtn = page.locator('button[title*="Раскрыть в полноэкранный редактор"]').first();
     await expect(expandBtn).toBeVisible();
 
-    const taskTypeBtn = page.locator('button[title="Таска"]').first();
-    await expect(taskTypeBtn).toBeVisible();
-    await taskTypeBtn.click();
+    const typeBtnComposer = page.locator('button[aria-label="Сменить тип записи"]').first();
+    await expect(typeBtnComposer).toBeVisible();
+    await typeBtnComposer.click();
+    const taskOptionComposer = page.locator('body > div button', { hasText: 'Таска' }).first();
+    await expect(taskOptionComposer).toBeVisible();
+    await taskOptionComposer.click();
 
     // Verify empty state has media button (Mic or Video)
     const mediaBtn = page.locator('button[aria-label*="Записать"]').first();

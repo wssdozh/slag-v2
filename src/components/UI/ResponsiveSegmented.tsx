@@ -18,6 +18,7 @@ export interface ResponsiveSegmentedProps<T extends string = string> {
   options: SegmentedOption<T>[];
   compact?: boolean;
   size?: 'sm' | 'md';
+  direction?: 'down' | 'up' | 'auto';
   className?: string;
   ariaLabel?: string;
 }
@@ -28,11 +29,12 @@ export function ResponsiveSegmented<T extends string = string>({
   options,
   compact = false,
   size = 'sm',
+  direction = 'auto',
   className = '',
   ariaLabel,
 }: ResponsiveSegmentedProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -42,17 +44,35 @@ export function ResponsiveSegmented<T extends string = string>({
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const dropdownWidth = 160;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    let dir: 'down' | 'up' = 'down';
+    if (direction === 'up') {
+      dir = 'up';
+    } else if (direction === 'down') {
+      dir = 'down';
+    } else {
+      dir = spaceBelow < 180 && spaceAbove > spaceBelow ? 'up' : 'down';
+    }
 
     let left = rect.left;
     if (left + dropdownWidth > window.innerWidth - 8) {
       left = Math.max(8, window.innerWidth - dropdownWidth - 8);
     }
 
-    setCoords({
-      top: rect.bottom + 6,
-      left,
-    });
-  }, []);
+    if (dir === 'up') {
+      setCoords({
+        bottom: window.innerHeight - rect.top + 6,
+        left,
+      });
+    } else {
+      setCoords({
+        top: rect.bottom + 6,
+        left,
+      });
+    }
+  }, [direction]);
 
   const handleToggle = () => {
     if (!isOpen) {
@@ -110,7 +130,8 @@ export function ResponsiveSegmented<T extends string = string>({
               ref={dropdownRef}
               style={{
                 position: 'fixed',
-                top: `${coords.top}px`,
+                ...(coords.top !== undefined ? { top: `${coords.top}px` } : {}),
+                ...(coords.bottom !== undefined ? { bottom: `${coords.bottom}px` } : {}),
                 left: `${coords.left}px`,
               }}
               className="z-[9999] min-w-[150px] rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100"
@@ -152,11 +173,11 @@ export function ResponsiveSegmented<T extends string = string>({
           onClick={handleToggle}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
-          aria-label={selectedOption?.ariaLabel || selectedOption?.label}
+          aria-label={ariaLabel || selectedOption?.ariaLabel || selectedOption?.label}
           title={selectedOption?.title || selectedOption?.label}
-          className={`${heightClass} px-1.5 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 ${
+          className={`${heightClass} px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 ${
             isOpen ? 'bg-white/[0.06] text-white' : ''
-          } flex items-center gap-1 text-xs transition-colors cursor-pointer shrink-0`}
+          } flex items-center gap-1.5 text-xs transition-colors cursor-pointer shrink-0`}
         >
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
           {showTriggerLabel && selectedOption?.label && (
@@ -165,7 +186,7 @@ export function ResponsiveSegmented<T extends string = string>({
             </span>
           )}
           <ChevronDown
-            className={`w-3 h-3 text-zinc-500 transition-transform duration-150 shrink-0 ${
+            className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 shrink-0 ${
               isOpen ? 'rotate-180 text-zinc-300' : ''
             }`}
           />
