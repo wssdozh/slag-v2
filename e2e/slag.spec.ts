@@ -3013,4 +3013,36 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       await expect(assistantTextarea).toBeFocused();
     }
   });
+
+  test('45. Enhanced Context Menu with AI Decomposition, Duplicate, Priority, Deadline', async ({ page }) => {
+    const card = page.locator('[id^="item-"]').first();
+    await expect(card).toBeVisible();
+    await card.click({ button: 'right' });
+
+    const contextMenu = page.locator('.fixed.z-50', { hasText: 'Ответить' });
+    await expect(contextMenu).toBeVisible();
+
+    // Verify new actions
+    await expect(contextMenu.locator('text=Разобрать с ИИ')).toBeVisible();
+    await expect(contextMenu.locator('text=Подобрать теги (ИИ)')).toBeVisible();
+    await expect(contextMenu.locator('text=Спросить ассистента')).toBeVisible();
+    await expect(contextMenu.locator('text=Приоритет')).toBeVisible();
+    await expect(contextMenu.locator('text=Дедлайн')).toBeVisible();
+    await expect(contextMenu.locator('text=Дублировать')).toBeVisible();
+
+    // Take screenshot of enhanced context menu
+    await page.screenshot({ path: 'test-results/screenshots/context-menu-enhanced.png' });
+
+    // Click Duplicate
+    const dupBtn = contextMenu.locator('button', { hasText: 'Дублировать' });
+    await dupBtn.click();
+    await expect(page.locator('text=Запись продублирована')).toBeVisible();
+
+    // Test "Разобрать с ИИ"
+    const secondCard = page.locator('[id^="item-"]').first();
+    await secondCard.click({ button: 'right' });
+    const aiBtn = page.locator('.fixed.z-50 button', { hasText: 'Разобрать с ИИ' });
+    await aiBtn.click();
+    await expect(page.locator('text=Запись разобрана: добавлено')).toBeVisible();
+  });
 });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItemType } from '../../types';
+import type { SlagItem, SlagItemType, SlagSubtask } from '../../types';
+import { decomposeItemWithAi, generateSmartTags } from '../../lib/aiService';
 import {
   Maximize2,
   Trash2,
@@ -12,7 +13,11 @@ import {
   CornerUpLeft,
   Pin,
   Check,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  Tag,
+  CopyPlus,
+  Archive
 } from 'lucide-react';
 
 export const MobileActionSheet: React.FC = () => {
@@ -23,10 +28,12 @@ export const MobileActionSheet: React.FC = () => {
     setIsFullscreenEditorOpen,
     deleteItem,
     updateItem,
+    saveItem,
     folders,
     moveItem,
     setReplyTarget,
-    addToast
+    addToast,
+    aiSettings,
   } = useApp();
 
   const [isMoveFolderOpen, setIsMoveFolderOpen] = useState(false);
@@ -84,6 +91,82 @@ export const MobileActionSheet: React.FC = () => {
   const handleMoveToFolder = (targetFolder: string) => {
     moveItem(item.id, targetFolder);
     addToast(`Перемещено в «${targetFolder}»`, 'success');
+    handleClose();
+  };
+
+  const handleAiDecompose = async () => {
+    handleClose();
+    addToast('ИИ разбирает запись на шаги...', 'info');
+    try {
+      const res = await decomposeItemWithAi(item, aiSettings);
+      const updatedSubtasks: SlagSubtask[] = res.subtasks.map((st, i) => ({
+        id: `st_${Date.now()}_${i}`,
+        title: st.title,
+        completed: false,
+      }));
+      const mergedTags = Array.from(new Set([...(item.tags || []), ...(res.tags || [])]));
+      const isGeneric =
+        !item.title ||
+        ['заметка', 'черновик', 'новая заметка', 'без названия', 'новая задача'].includes(
+          item.title.trim().toLowerCase()
+        );
+
+      const updatedItem: SlagItem = {
+        ...item,
+        type: 'task',
+        title: !isGeneric ? item.title : (res.title || item.title || 'Разобранная задача'),
+        subtasks: [...(item.subtasks || []), ...updatedSubtasks],
+        tags: mergedTags,
+        summary: res.summary || item.summary,
+        updatedAt: Date.now(),
+      };
+      updateItem(updatedItem);
+      addToast(`Запись разобрана: добавлено ${updatedSubtasks.length} подзадач`, 'success');
+    } catch {
+      addToast('Не удалось разобрать запись через ИИ', 'error');
+    }
+  };
+
+  const handleAiTags = async () => {
+    handleClose();
+    addToast('Подбор тегов через ИИ...', 'info');
+    try {
+      const tags = await generateSmartTags(item.content || item.title, aiSettings);
+      if (tags.length > 0) {
+        const merged = Array.from(new Set([...(item.tags || []), ...tags]));
+        updateItem({ ...item, tags: merged, updatedAt: Date.now() });
+        addToast(`Добавлены теги: #${tags.join(' #')}`, 'success');
+      } else {
+        addToast('Подходящих новых тегов не найдено', 'info');
+      }
+    } catch {
+      addToast('Не удалось подобрать теги', 'error');
+    }
+  };
+
+  const handleDuplicate = () => {
+    const copy: Partial<SlagItem> & { title: string; content: string; type: SlagItemType } = {
+      type: item.type,
+      title: item.title ? `${item.title} (копия)` : 'Копия записи',
+      content: item.content,
+      folder: item.folder,
+      tags: item.tags ? [...item.tags] : [],
+      attachments: item.attachments ? [...item.attachments] : [],
+      priority: item.priority,
+      dueDate: item.dueDate,
+      reminder: item.reminder,
+      duration: item.duration,
+      recurrence: item.recurrence,
+      subtasks: item.subtasks ? item.subtasks.map(s => ({ ...s, completed: false })) : undefined,
+    };
+    saveItem(copy);
+    addToast('Запись продублирована', 'success');
+    handleClose();
+  };
+
+  const handleToggleArchive = () => {
+    updateItem({ ...item, isArchived: !item.isArchived });
+    addToast(item.isArchived ? 'Запись разархивирована' : 'Запись перемещена в архив', 'info');
     handleClose();
   };
 
@@ -196,12 +279,45 @@ export const MobileActionSheet: React.FC = () => {
               <span>Ответить</span>
             </button>
 
+            {/* AI Actions */}
+            <button
+              onClick={handleAiDecompose}
+              className="w-full h-12 px-3.5 rounded-2xl bg-purple-500/10 hover:bg-purple-500/20 active:scale-[0.98] flex items-center gap-3 text-sm text-purple-300 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+              <span className="font-medium">Разобрать с ИИ</span>
+            </button>
+
+            <button
+              onClick={handleAiTags}
+              className="w-full h-12 px-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-[0.98] flex items-center gap-3 text-sm text-zinc-200 transition-all cursor-pointer"
+            >
+              <Tag className="w-4 h-4 text-zinc-400 shrink-0" />
+              <span>Подобрать теги (ИИ)</span>
+            </button>
+
             <button
               onClick={handleTogglePin}
               className="w-full h-12 px-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-[0.98] flex items-center gap-3 text-sm text-zinc-200 transition-all cursor-pointer"
             >
               <Pin className={`w-4 h-4 shrink-0 ${item.isPinned ? 'text-amber-400 rotate-45' : 'text-zinc-400'}`} />
               <span>{item.isPinned ? 'Открепить запись' : 'Закрепить вверху'}</span>
+            </button>
+
+            <button
+              onClick={handleDuplicate}
+              className="w-full h-12 px-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-[0.98] flex items-center gap-3 text-sm text-zinc-200 transition-all cursor-pointer"
+            >
+              <CopyPlus className="w-4 h-4 text-zinc-400 shrink-0" />
+              <span>Дублировать запись</span>
+            </button>
+
+            <button
+              onClick={handleToggleArchive}
+              className="w-full h-12 px-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-[0.98] flex items-center gap-3 text-sm text-zinc-200 transition-all cursor-pointer"
+            >
+              <Archive className="w-4 h-4 text-zinc-400 shrink-0" />
+              <span>{item.isArchived ? 'Разархивировать' : 'В архив'}</span>
             </button>
 
             <button
