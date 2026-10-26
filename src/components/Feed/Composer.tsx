@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, FolderMeta } from '../../types';
 import { storage } from '../../lib/storage';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
@@ -19,6 +19,7 @@ import { ComposerTaskControls } from './ComposerTaskControls';
 import { TagChip } from '../UI/TagChip';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
+import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
 import {
   Paperclip,
@@ -116,6 +117,10 @@ export const Composer: React.FC<ComposerProps> = ({
   const [wikiQuery, setWikiQuery] = useState<string | null>(null);
   const [wikiSelectedIndex, setWikiSelectedIndex] = useState(0);
 
+  // Folder @ autocomplete state
+  const [folderQuery, setFolderQuery] = useState<string | null>(null);
+  const [folderSelectedIndex, setFolderSelectedIndex] = useState(0);
+
   // Slash command / state
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
@@ -182,6 +187,8 @@ export const Composer: React.FC<ComposerProps> = ({
     setIsRecurrenceDismissed(false);
     setReplyTarget(null);
     setWikiQuery(null);
+    setFolderQuery(null);
+    setFolderSelectedIndex(0);
     setSlashQuery(null);
     setSlashSelectedIndex(0);
     setTagQuery(null);
@@ -323,6 +330,23 @@ export const Composer: React.FC<ComposerProps> = ({
       })
     : [];
 
+  // Folders matching current @ query
+  const matchingFolders = useMemo(() => {
+    if (folderQuery === null) return [];
+    const sorted = [...folders].sort((a, b) => {
+      if (a.path === currentFolder) return -1;
+      if (b.path === currentFolder) return 1;
+      if (a.path === 'Входящие') return -1;
+      if (b.path === 'Входящие') return 1;
+      return a.path.localeCompare(b.path, 'ru');
+    });
+    const q = folderQuery.toLowerCase().trim();
+    if (!q) return sorted;
+    return sorted.filter(
+      (f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q)
+    );
+  }, [folderQuery, folders, currentFolder]);
+
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setContent(text);
@@ -332,6 +356,7 @@ export const Composer: React.FC<ComposerProps> = ({
       setIsDateDismissed(false);
       setIsPriorityDismissed(false);
       setDismissedTags(new Set());
+      setFolderQuery(null);
       setSlashQuery(null);
       setTagQuery(null);
     }
@@ -349,27 +374,38 @@ export const Composer: React.FC<ComposerProps> = ({
     if (wikiMatch) {
       setWikiQuery(wikiMatch[1]);
       setWikiSelectedIndex(0);
+      setFolderQuery(null);
       setSlashQuery(null);
       setTagQuery(null);
     } else {
       setWikiQuery(null);
-      // Slash command trigger: beginning of line or preceded by whitespace, followed by non-space chars
-      const slashMatch = textBefore.match(/(?:^|\s)\/([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
-      if (slashMatch) {
-        setSlashQuery(slashMatch[1]);
-        setSlashSelectedIndex(0);
+      // Folder trigger: beginning of line or preceded by whitespace, followed by @ and folder characters
+      const folderMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
+      if (folderMatch) {
+        setFolderQuery(folderMatch[1]);
+        setFolderSelectedIndex(0);
+        setSlashQuery(null);
         setTagQuery(null);
       } else {
-        setSlashQuery(null);
-        // Tag trigger: beginning of line or preceded by whitespace, followed by # and letters/digits
-        const tagMatch = textBefore.match(/(?:^|\s)#([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
-        if (tagMatch) {
-          setTagQuery(tagMatch[1]);
-          setTagSelectedIndex(0);
-          setIsTagNavigated(false);
-        } else {
+        setFolderQuery(null);
+        // Slash command trigger: beginning of line or preceded by whitespace, followed by non-space chars
+        const slashMatch = textBefore.match(/(?:^|\s)\/([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
+        if (slashMatch) {
+          setSlashQuery(slashMatch[1]);
+          setSlashSelectedIndex(0);
           setTagQuery(null);
-          setIsTagNavigated(false);
+        } else {
+          setSlashQuery(null);
+          // Tag trigger: beginning of line or preceded by whitespace, followed by # and letters/digits
+          const tagMatch = textBefore.match(/(?:^|\s)#([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
+          if (tagMatch) {
+            setTagQuery(tagMatch[1]);
+            setTagSelectedIndex(0);
+            setIsTagNavigated(false);
+          } else {
+            setTagQuery(null);
+            setIsTagNavigated(false);
+          }
         }
       }
     }
@@ -465,6 +501,47 @@ export const Composer: React.FC<ComposerProps> = ({
     } finally {
       setIsGeneratingAiTags(false);
     }
+  };
+
+  const selectFolder = (folder: FolderMeta) => {
+    const el = textareaRef.current;
+    const cursorPos = el && typeof el.selectionStart === 'number' && el.selectionStart > 0
+      ? el.selectionStart
+      : content.length;
+    const textBefore = content.slice(0, cursorPos);
+    const textAfter = content.slice(cursorPos);
+    let atMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
+
+    if (atMatch && atMatch.index !== undefined) {
+      const isStartOfLine = atMatch[0].startsWith('@');
+      const replaceStart = isStartOfLine ? atMatch.index : atMatch.index + 1;
+      const newText = textBefore.slice(0, replaceStart) + textAfter;
+      setContent(newText);
+      setTimeout(() => {
+        if (el) {
+          el.focus();
+          el.setSelectionRange(replaceStart, replaceStart);
+        }
+      }, 0);
+    } else {
+      const globalMatch = content.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
+      if (globalMatch && globalMatch.index !== undefined) {
+        const isStartOfLine = globalMatch[0].startsWith('@');
+        const replaceStart = isStartOfLine ? globalMatch.index : globalMatch.index + 1;
+        const newText = content.slice(0, replaceStart);
+        setContent(newText);
+        setTimeout(() => {
+          if (el) {
+            el.focus();
+            el.setSelectionRange(replaceStart, replaceStart);
+          }
+        }, 0);
+      }
+    }
+
+    setTargetFolder(folder.path);
+    setFolderQuery(null);
+    addToast(`Папка «${folder.name}» выбрана`, 'info');
   };
 
   const executeSlashCommand = (cmd: SlashCommand) => {
@@ -835,6 +912,32 @@ export const Composer: React.FC<ComposerProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Folder autocomplete keyboard controls
+    if (folderQuery !== null) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setFolderQuery(null);
+        return;
+      }
+      if (matchingFolders.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setFolderSelectedIndex(prev => (prev < matchingFolders.length - 1 ? prev + 1 : 0));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setFolderSelectedIndex(prev => (prev > 0 ? prev - 1 : matchingFolders.length - 1));
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          selectFolder(matchingFolders[folderSelectedIndex]);
+          return;
+        }
+      }
+    }
+
     // Slash commands keyboard controls
     if (slashQuery !== null) {
       if (e.key === 'Escape') {
@@ -941,7 +1044,7 @@ export const Composer: React.FC<ComposerProps> = ({
       }
     }
 
-    if (isModal && e.key === 'Escape' && !wikiQuery && !slashQuery && !tagQuery) {
+    if (isModal && e.key === 'Escape' && !wikiQuery && !folderQuery && !slashQuery && !tagQuery) {
       e.preventDefault();
       onCancel?.();
       return;
@@ -1064,6 +1167,18 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const overlaySlot = (
     <>
+      {folderQuery !== null && (
+        <FolderSuggestionMenu
+          query={folderQuery}
+          folders={matchingFolders}
+          currentFolder={currentFolder}
+          selectedFolder={targetFolder}
+          selectedIndex={folderSelectedIndex}
+          onSelect={selectFolder}
+          placement="top"
+          isModal={isModal}
+        />
+      )}
       {slashQuery !== null && (
         <SlashCommandMenu
           query={slashQuery}
@@ -1206,6 +1321,45 @@ export const Composer: React.FC<ComposerProps> = ({
         <span className="sr-only">+AI</span>
       </ToolbarButton>
 
+      {/* Folder Selector Trigger Button (@) */}
+      <ToolbarButton
+        size="md"
+        onClick={() => {
+          if (folderQuery !== null) {
+            setFolderQuery(null);
+            return;
+          }
+          const el = textareaRef.current;
+          if (el) {
+            el.focus();
+            const cursorPos = el.selectionStart || content.length;
+            const textBefore = content.slice(0, cursorPos);
+            const needsSpace = textBefore.length > 0 && !/\s$/.test(textBefore);
+            const prefix = needsSpace ? ' @' : '@';
+            const newText = textBefore + prefix + content.slice(cursorPos);
+            setContent(newText);
+            const newPos = cursorPos + prefix.length;
+            setTimeout(() => {
+              el.focus();
+              el.setSelectionRange(newPos, newPos);
+            }, 0);
+          }
+          setFolderQuery('');
+          setFolderSelectedIndex(0);
+        }}
+        title={targetFolder ? `Целевая папка: «${targetFolder}» (@)` : 'Выбрать целевую папку (@)'}
+        aria-label="Выбрать целевую папку (@)"
+        icon={
+          <Folder
+            className={`w-4 h-4 transition-colors ${
+              targetFolder ? 'text-amber-400' : 'text-zinc-400'
+            }`}
+          />
+        }
+      >
+        <span className="sr-only">Папка</span>
+      </ToolbarButton>
+
       {/* Record Type Selector (Ghost droplist: icon + label + chevron, larger touch target) */}
       <ResponsiveSegmented<SlagItemType>
         value={itemType}
@@ -1323,19 +1477,19 @@ export const Composer: React.FC<ComposerProps> = ({
       placeholder={
         isModal
           ? itemType === 'task'
-            ? 'Название задачи... (Enter)'
-            : 'Содержимое записи... (Enter)'
+            ? 'Название задачи... (@ папка, Enter)'
+            : 'Содержимое записи... (@ папка, Enter)'
           : isMobile
           ? itemType === 'task'
-            ? 'Задача... ([[ для ссылки)'
+            ? 'Задача... (@ папка, [[ ссылка)'
             : itemType === 'article'
-            ? 'Черновик статьи... ([[ для ссылки)'
-            : 'Мысль, заметка или задача...'
+            ? 'Черновик статьи... (@ папка, [[ ссылка)'
+            : 'Мысль, заметка или задача... (@ папка)'
           : itemType === 'task'
-          ? 'Задача... (- [ ] для подзадач, [[ для ссылки)'
+          ? 'Задача... (@ папка, - [ ] подзадачи, [[ ссылка)'
           : itemType === 'article'
-          ? 'Черновик статьи... (Shift+Enter для новой строки, [[ для ссылки)'
-          : 'Мысль, заметка или код... (Enter для отправки, [[ для ссылки)'
+          ? 'Черновик статьи... (@ папка, Shift+Enter для новой строки)'
+          : 'Мысль, заметка или код... (@ папка, / команды)'
       }
       textareaRef={textareaRef}
       hideTextarea={isRecordingAudio && !content.trim()}
