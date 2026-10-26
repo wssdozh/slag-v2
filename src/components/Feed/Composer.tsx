@@ -20,6 +20,7 @@ import { TagChip } from '../UI/TagChip';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
+import { TagSuggestionMenu, type TagMeta } from './TagSuggestionMenu';
 import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
 import {
   Paperclip,
@@ -281,24 +282,26 @@ export const Composer: React.FC<ComposerProps> = ({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeFolder]);
 
-  // All unique tags in vault
-  const allVaultTags = React.useMemo(() => {
-    const set = new Set<string>();
+  // All unique tags in vault with usage counts, sorted by frequency
+  const allVaultTags = useMemo<TagMeta[]>(() => {
+    const counts = new Map<string, number>();
     items.forEach(it => {
       it.tags?.forEach(t => {
-        if (t && t.trim()) set.add(t.trim());
+        const clean = t && t.trim();
+        if (clean) counts.set(clean, (counts.get(clean) || 0) + 1);
       });
     });
-    return Array.from(set);
+    return Array.from(counts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'ru'));
   }, [items]);
 
   // Tags matching current # autocomplete query
-  const matchingAutocompleteTags = React.useMemo(() => {
+  const matchingAutocompleteTags = useMemo(() => {
     if (tagQuery === null) return [];
     const q = tagQuery.toLowerCase().trim();
-    return allVaultTags
-      .filter(t => !q || t.toLowerCase().includes(q))
-      .slice(0, 8);
+    if (!q) return allVaultTags;
+    return allVaultTags.filter(t => t.tag.toLowerCase().includes(q));
   }, [tagQuery, allVaultTags]);
 
   // Live tags recognized from content (excluding dismissed)
@@ -413,8 +416,9 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const insertTag = (selectedTag: string) => {
     const el = textareaRef.current;
-    if (!el) return;
-    const cursorPos = el.selectionStart || content.length;
+    const cursorPos = el && typeof el.selectionStart === 'number' && el.selectionStart > 0
+      ? el.selectionStart
+      : content.length;
     const textBefore = content.slice(0, cursorPos);
     const textAfter = content.slice(cursorPos);
     const hashIndex = textBefore.lastIndexOf('#');
@@ -423,10 +427,26 @@ export const Composer: React.FC<ComposerProps> = ({
       setContent(newText);
       setTagQuery(null);
       setTimeout(() => {
-        el.focus();
-        const newCursor = hashIndex + selectedTag.length + 2;
-        el.setSelectionRange(newCursor, newCursor);
-      }, 10);
+        if (el) {
+          el.focus();
+          const newCursor = hashIndex + selectedTag.length + 2;
+          el.setSelectionRange(newCursor, newCursor);
+        }
+      }, 0);
+    } else {
+      const globalHashIndex = content.lastIndexOf('#');
+      if (globalHashIndex !== -1) {
+        const newText = content.slice(0, globalHashIndex) + `#${selectedTag} `;
+        setContent(newText);
+        setTagQuery(null);
+        setTimeout(() => {
+          if (el) {
+            el.focus();
+            const newCursor = newText.length;
+            el.setSelectionRange(newCursor, newCursor);
+          }
+        }, 0);
+      }
     }
   };
 
