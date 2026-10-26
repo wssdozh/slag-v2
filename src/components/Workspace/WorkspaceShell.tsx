@@ -39,8 +39,6 @@ import {
   Info,
   Terminal,
   Music,
-  ExternalLink,
-  FoldHorizontal,
 } from 'lucide-react';
 
 const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
@@ -289,51 +287,8 @@ const GroupHeaderActions: React.FC<any> = (props) => {
     }
   };
 
-  const isSecondaryWindow =
-    typeof window !== 'undefined' && Boolean(new URLSearchParams(window.location.search).get('panel'));
-
-  const handlePopoutOrDock = () => {
-    const containerApi = props.containerApi as DockviewApi | undefined;
-    const activePanel = props.activePanel as IDockviewPanel | undefined;
-    if (!containerApi || !activePanel) return;
-
-    if (isSecondaryWindow) {
-      const channel = getTabCrossWindowChannel();
-      if (channel) {
-        const rawComponentId =
-          activePanel.toJSON()?.contentComponent ||
-          activePanel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
-        const winLabel =
-          typeof window !== 'undefined'
-            ? new URLSearchParams(window.location.search).get('label') || ''
-            : '';
-        channel.postMessage({
-          type: 'TAB_DRAG_RELEASE',
-          sourceLabel: winLabel,
-          panelId: rawComponentId,
-          title: activePanel.title || 'SLAG',
-          forceDock: true,
-        });
-      }
-    } else {
-      detachPanel(containerApi, activePanel);
-    }
-  };
-
   return (
     <div className="relative flex items-center h-full px-0.5 gap-0.5">
-      <button
-        onClick={handlePopoutOrDock}
-        className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
-        title={isSecondaryWindow ? 'Вернуть вкладку в главное окно' : 'Вынести вкладку в отдельное окно'}
-      >
-        {isSecondaryWindow ? (
-          <FoldHorizontal className="w-3.5 h-3.5" />
-        ) : (
-          <ExternalLink className="w-3.5 h-3.5" />
-        )}
-      </button>
-
       <button
         onClick={() => setIsOpen(prev => !prev)}
         className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
@@ -389,8 +344,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     return undefined;
   }, [initialPanel]);
 
-  const [crossWindowDropInfo, setCrossWindowDropInfo] = useState<{ active: boolean; title?: string }>({ active: false });
-
   // Cross-window tab docking listener: handles dragging tabs across OS windows
   useEffect(() => {
     const channel = getTabCrossWindowChannel();
@@ -403,57 +356,44 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     channel.onmessage = (event: MessageEvent<CrossWindowTabMessage>) => {
       const msg = event.data;
       if (!msg || typeof msg !== 'object') return;
+      // Guard: Never process messages originating from this exact window
+      if (msg.sourceLabel === myLabel) return;
 
       // 1. Primary window accepts tab and adds it to layout
-      if (isPrimary) {
-        if (msg.type === 'TAB_DRAG_MOVE' && msg.screenX !== undefined && msg.screenY !== undefined) {
-          const isInside =
+      if (isPrimary && msg.type === 'TAB_DRAG_RELEASE') {
+        const isInside =
+          msg.forceDock ||
+          (msg.screenX !== undefined &&
+            msg.screenY !== undefined &&
             msg.screenX >= window.screenX &&
             msg.screenX <= window.screenX + window.outerWidth &&
             msg.screenY >= window.screenY &&
-            msg.screenY <= window.screenY + window.outerHeight;
+            msg.screenY <= window.screenY + window.outerHeight);
 
-          setCrossWindowDropInfo(prev => {
-            if (prev.active === isInside && prev.title === msg.title) return prev;
-            return { active: isInside, title: msg.title };
-          });
-        } else if (msg.type === 'TAB_DRAG_RELEASE') {
-          const isInside =
-            msg.forceDock ||
-            (msg.screenX !== undefined &&
-              msg.screenY !== undefined &&
-              msg.screenX >= window.screenX &&
-              msg.screenX <= window.screenX + window.outerWidth &&
-              msg.screenY >= window.screenY &&
-              msg.screenY <= window.screenY + window.outerHeight);
-
-          setCrossWindowDropInfo({ active: false });
-
-          if (isInside && apiRef.current) {
-            const api = apiRef.current;
-            const uniqueId = `panel_${msg.panelId}_${Date.now()}`;
-            try {
-              api.addPanel({
-                id: uniqueId,
-                component: msg.panelId,
-                title: msg.title,
-                position: { referenceGroup: api.activeGroup || api.groups[0] },
-              });
-            } catch {
-              api.addPanel({
-                id: uniqueId,
-                component: msg.panelId,
-                title: msg.title,
-              });
-            }
-
-            channel.postMessage({
-              type: 'TAB_DRAG_ACCEPTED',
-              sourceLabel: msg.sourceLabel,
-              panelId: msg.panelId,
+        if (isInside && apiRef.current) {
+          const api = apiRef.current;
+          const uniqueId = `panel_${msg.panelId}_${Date.now()}`;
+          try {
+            api.addPanel({
+              id: uniqueId,
+              component: msg.panelId,
+              title: msg.title,
+              position: { referenceGroup: api.activeGroup || api.groups[0] },
+            });
+          } catch {
+            api.addPanel({
+              id: uniqueId,
+              component: msg.panelId,
               title: msg.title,
             });
           }
+
+          channel.postMessage({
+            type: 'TAB_DRAG_ACCEPTED',
+            sourceLabel: msg.sourceLabel,
+            panelId: msg.panelId,
+            title: msg.title,
+          });
         }
       }
 
@@ -734,32 +674,15 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         typeof window !== 'undefined'
           ? new URLSearchParams(window.location.search).get('label') || 'main'
           : 'main';
-      const channel = getTabCrossWindowChannel();
-
-      let lastMove = 0;
-      const handleDragMove = (e: DragEvent | MouseEvent) => {
-        const now = Date.now();
-        if (now - lastMove < 35) return;
-        lastMove = now;
-        if (channel && e.screenX && e.screenY) {
-          channel.postMessage({
-            type: 'TAB_DRAG_MOVE',
-            sourceLabel: winLabel,
-            panelId: rawComponentId,
-            title,
-            screenX: e.screenX,
-            screenY: e.screenY,
-          });
-        }
-      };
+      const isSecondary = Boolean(effectiveInitialPanel);
+      const channel = isSecondary ? getTabCrossWindowChannel() : null;
 
       const handleDragEnd = (e: DragEvent | MouseEvent) => {
-        window.removeEventListener('drag', handleDragMove as EventListener);
         window.removeEventListener('dragend', handleDragEnd as EventListener);
-        window.removeEventListener('pointermove', handleDragMove as EventListener);
         window.removeEventListener('pointerup', handleDragEnd as EventListener);
 
-        if (channel && e.screenX && e.screenY) {
+        // If dragging in secondary window, broadcast drop release to main window
+        if (isSecondary && channel && e.screenX && e.screenY) {
           channel.postMessage({
             type: 'TAB_DRAG_RELEASE',
             sourceLabel: winLabel,
@@ -771,7 +694,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
 
         // If dragging in main window, tear-off into new OS window when dropped outside
-        if (!effectiveInitialPanel) {
+        if (!isSecondary) {
           const isOutside =
             e.clientX < 10 ||
             e.clientX > window.innerWidth - 10 ||
@@ -793,9 +716,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
       };
 
-      window.addEventListener('drag', handleDragMove as EventListener);
       window.addEventListener('dragend', handleDragEnd as EventListener, { once: true });
-      window.addEventListener('pointermove', handleDragMove as EventListener);
       window.addEventListener('pointerup', handleDragEnd as EventListener, { once: true });
     });
   };
@@ -852,20 +773,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
       <WindowControls />
-
-      {/* Cross-window Drag & Drop Target Indicator in Main Window */}
-      {crossWindowDropInfo.active && (
-        <div className="absolute top-[34px] inset-x-0 z-40 bg-blue-600/20 border-b border-blue-500/80 backdrop-blur-sm px-4 py-1.5 flex items-center justify-between text-xs text-blue-200 pointer-events-none animate-in fade-in duration-150">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            <span className="font-medium tracking-wide">
-              Отпустите вкладку «{crossWindowDropInfo.title || 'Панель'}» для возврата в главное окно
-            </span>
-          </div>
-          <span className="text-[11px] text-blue-400 font-mono">Прикрепить</span>
-        </div>
-      )}
-
       <DockviewReact
         components={components}
         rightHeaderActionsComponent={GroupHeaderActions}

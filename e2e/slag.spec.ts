@@ -2831,9 +2831,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const floatingContainer = page.locator('.dv-resize-container');
     await expect(floatingContainer).toBeVisible();
 
-    // 4. Verify popout icon button in header actions
-    const popoutBtn = page.locator('button[title*="Вынести вкладку в отдельное окно"]').first();
-    await expect(popoutBtn).toBeVisible();
+    // 4. Verify clean header [+] button
+    const addTabBtn = page.locator('button[title*="Добавить вкладку"]').first();
+    await expect(addTabBtn).toBeVisible();
 
     // 5. Capture screenshot of floating panel
     await page.screenshot({
@@ -2915,24 +2915,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const dockviewContainer = page.locator('.dockview-theme-slag');
     await expect(dockviewContainer).toBeVisible();
 
-    // 1. Simulate a detached window dragging a tab over the main window
-    await page.evaluate(() => {
-      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
-      channel.postMessage({
-        type: 'TAB_DRAG_MOVE',
-        sourceLabel: 'panel-audio-test',
-        panelId: 'audio',
-        title: 'Аудиоплеер',
-        screenX: window.screenX + 100,
-        screenY: window.screenY + 100,
-      });
-    });
-
-    // 2. Verify visual drop indicator appears
-    const dropIndicator = page.locator('text=Отпустите вкладку «Аудиоплеер» для возврата в главное окно');
-    await expect(dropIndicator).toBeVisible();
-
-    // 3. Simulate releasing the tab over the main window
+    // 1. Simulate releasing a detached tab over the main window
     await page.evaluate(() => {
       const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
       channel.postMessage({
@@ -2945,12 +2928,11 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       });
     });
 
-    // 4. Verify drop indicator hides and the Audio tab appears in the main window
-    await expect(dropIndicator).not.toBeVisible();
+    // 2. Verify the Audio tab appears in the main window
     const audioTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // 5. Screenshot verification
+    // 3. Screenshot verification
     await page.screenshot({
       path: 'test-results/screenshots/cross-window-tab-docked.png',
       fullPage: false,
