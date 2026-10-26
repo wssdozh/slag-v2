@@ -26,6 +26,8 @@ import {
   closeWindow,
   restoreDetachedWindows,
   updateDetachedWindowBounds,
+  getTabCrossWindowChannel,
+  type CrossWindowTabMessage,
 } from '../../lib/windowControls';
 import {
   Plus,
@@ -38,6 +40,7 @@ import {
   Terminal,
   Music,
   ExternalLink,
+  FoldHorizontal,
 } from 'lucide-react';
 
 const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
@@ -286,10 +289,33 @@ const GroupHeaderActions: React.FC<any> = (props) => {
     }
   };
 
-  const handlePopout = () => {
+  const isSecondaryWindow =
+    typeof window !== 'undefined' && Boolean(new URLSearchParams(window.location.search).get('panel'));
+
+  const handlePopoutOrDock = () => {
     const containerApi = props.containerApi as DockviewApi | undefined;
     const activePanel = props.activePanel as IDockviewPanel | undefined;
-    if (containerApi && activePanel) {
+    if (!containerApi || !activePanel) return;
+
+    if (isSecondaryWindow) {
+      const channel = getTabCrossWindowChannel();
+      if (channel) {
+        const rawComponentId =
+          activePanel.toJSON()?.contentComponent ||
+          activePanel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+        const winLabel =
+          typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('label') || ''
+            : '';
+        channel.postMessage({
+          type: 'TAB_DRAG_RELEASE',
+          sourceLabel: winLabel,
+          panelId: rawComponentId,
+          title: activePanel.title || 'SLAG',
+          forceDock: true,
+        });
+      }
+    } else {
       detachPanel(containerApi, activePanel);
     }
   };
@@ -297,11 +323,15 @@ const GroupHeaderActions: React.FC<any> = (props) => {
   return (
     <div className="relative flex items-center h-full px-0.5 gap-0.5">
       <button
-        onClick={handlePopout}
+        onClick={handlePopoutOrDock}
         className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
-        title="Вынести вкладку в отдельное окно"
+        title={isSecondaryWindow ? 'Вернуть вкладку в главное окно' : 'Вынести вкладку в отдельное окно'}
       >
-        <ExternalLink className="w-3.5 h-3.5" />
+        {isSecondaryWindow ? (
+          <FoldHorizontal className="w-3.5 h-3.5" />
+        ) : (
+          <ExternalLink className="w-3.5 h-3.5" />
+        )}
       </button>
 
       <button
@@ -358,6 +388,95 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     }
     return undefined;
   }, [initialPanel]);
+
+  const [crossWindowDropInfo, setCrossWindowDropInfo] = useState<{ active: boolean; title?: string }>({ active: false });
+
+  // Cross-window tab docking listener: handles dragging tabs across OS windows
+  useEffect(() => {
+    const channel = getTabCrossWindowChannel();
+    if (!channel) return;
+
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const myLabel = urlParams?.get('label') || 'main';
+    const isPrimary = !effectiveInitialPanel;
+
+    channel.onmessage = (event: MessageEvent<CrossWindowTabMessage>) => {
+      const msg = event.data;
+      if (!msg || typeof msg !== 'object') return;
+
+      // 1. Primary window accepts tab and adds it to layout
+      if (isPrimary) {
+        if (msg.type === 'TAB_DRAG_MOVE' && msg.screenX !== undefined && msg.screenY !== undefined) {
+          const isInside =
+            msg.screenX >= window.screenX &&
+            msg.screenX <= window.screenX + window.outerWidth &&
+            msg.screenY >= window.screenY &&
+            msg.screenY <= window.screenY + window.outerHeight;
+
+          setCrossWindowDropInfo(prev => {
+            if (prev.active === isInside && prev.title === msg.title) return prev;
+            return { active: isInside, title: msg.title };
+          });
+        } else if (msg.type === 'TAB_DRAG_RELEASE') {
+          const isInside =
+            msg.forceDock ||
+            (msg.screenX !== undefined &&
+              msg.screenY !== undefined &&
+              msg.screenX >= window.screenX &&
+              msg.screenX <= window.screenX + window.outerWidth &&
+              msg.screenY >= window.screenY &&
+              msg.screenY <= window.screenY + window.outerHeight);
+
+          setCrossWindowDropInfo({ active: false });
+
+          if (isInside && apiRef.current) {
+            const api = apiRef.current;
+            const uniqueId = `panel_${msg.panelId}_${Date.now()}`;
+            try {
+              api.addPanel({
+                id: uniqueId,
+                component: msg.panelId,
+                title: msg.title,
+                position: { referenceGroup: api.activeGroup || api.groups[0] },
+              });
+            } catch {
+              api.addPanel({
+                id: uniqueId,
+                component: msg.panelId,
+                title: msg.title,
+              });
+            }
+
+            channel.postMessage({
+              type: 'TAB_DRAG_ACCEPTED',
+              sourceLabel: msg.sourceLabel,
+              panelId: msg.panelId,
+              title: msg.title,
+            });
+          }
+        }
+      }
+
+      // 2. Secondary window removes the accepted panel
+      if (!isPrimary && msg.type === 'TAB_DRAG_ACCEPTED' && msg.sourceLabel === myLabel) {
+        if (apiRef.current) {
+          const target = apiRef.current.panels.find(p => {
+            const raw = p.toJSON()?.contentComponent || p.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+            return raw === msg.panelId;
+          });
+          if (target) {
+            try {
+              apiRef.current.removePanel(target);
+            } catch {}
+          }
+        }
+      }
+    };
+
+    return () => {
+      channel.close();
+    };
+  }, [effectiveInitialPanel]);
 
   // Primary window: restore previously open detached windows across app restarts
   useEffect(() => {
@@ -597,7 +716,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     );
     feedPanels.forEach(p => p.api.setTitle(currentFolder || 'Входящие'));
 
-    // Tab tear-off: drag tab out of application window to create an external/floating popout
+    // Tab tear-off & cross-window drag docking
     event.api.onWillDragPanel((dragEvent) => {
       const panel = dragEvent.panel;
       if (!panel) return;
@@ -607,41 +726,111 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       const initialWidth = rect ? Math.round(rect.width) : panel.api.width;
       const initialHeight = rect ? Math.round(rect.height) : panel.api.height;
 
-      const handleDragEnd = (e: DragEvent) => {
-        window.removeEventListener('dragend', handleDragEnd);
+      const rawComponentId =
+        panel.toJSON()?.contentComponent ||
+        panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+      const title = panel.title || 'SLAG';
+      const winLabel =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('label') || 'main'
+          : 'main';
+      const channel = getTabCrossWindowChannel();
 
-        // Check if cursor released outside main window bounds
-        const isOutside =
-          e.clientX < 10 ||
-          e.clientX > window.innerWidth - 10 ||
-          e.clientY < 10 ||
-          e.clientY > window.innerHeight - 10 ||
-          e.screenX < window.screenX ||
-          e.screenX > window.screenX + window.outerWidth ||
-          e.screenY < window.screenY ||
-          e.screenY > window.screenY + window.outerHeight;
-
-        if (isOutside) {
-          detachPanel(event.api, panel, {
-            left: Math.round(e.screenX - Math.min(160, initialWidth / 2)),
-            top: Math.round(e.screenY - 25),
-            width: initialWidth,
-            height: initialHeight,
+      let lastMove = 0;
+      const handleDragMove = (e: DragEvent | MouseEvent) => {
+        const now = Date.now();
+        if (now - lastMove < 35) return;
+        lastMove = now;
+        if (channel && e.screenX && e.screenY) {
+          channel.postMessage({
+            type: 'TAB_DRAG_MOVE',
+            sourceLabel: winLabel,
+            panelId: rawComponentId,
+            title,
+            screenX: e.screenX,
+            screenY: e.screenY,
           });
         }
       };
 
-      window.addEventListener('dragend', handleDragEnd, { once: true });
+      const handleDragEnd = (e: DragEvent | MouseEvent) => {
+        window.removeEventListener('drag', handleDragMove as EventListener);
+        window.removeEventListener('dragend', handleDragEnd as EventListener);
+        window.removeEventListener('pointermove', handleDragMove as EventListener);
+        window.removeEventListener('pointerup', handleDragEnd as EventListener);
+
+        if (channel && e.screenX && e.screenY) {
+          channel.postMessage({
+            type: 'TAB_DRAG_RELEASE',
+            sourceLabel: winLabel,
+            panelId: rawComponentId,
+            title,
+            screenX: e.screenX,
+            screenY: e.screenY,
+          });
+        }
+
+        // If dragging in main window, tear-off into new OS window when dropped outside
+        if (!effectiveInitialPanel) {
+          const isOutside =
+            e.clientX < 10 ||
+            e.clientX > window.innerWidth - 10 ||
+            e.clientY < 10 ||
+            e.clientY > window.innerHeight - 10 ||
+            e.screenX < window.screenX ||
+            e.screenX > window.screenX + window.outerWidth ||
+            e.screenY < window.screenY ||
+            e.screenY > window.screenY + window.outerHeight;
+
+          if (isOutside) {
+            detachPanel(event.api, panel, {
+              left: Math.round(e.screenX - Math.min(160, initialWidth / 2)),
+              top: Math.round(e.screenY - 25),
+              width: initialWidth,
+              height: initialHeight,
+            });
+          }
+        }
+      };
+
+      window.addEventListener('drag', handleDragMove as EventListener);
+      window.addEventListener('dragend', handleDragEnd as EventListener, { once: true });
+      window.addEventListener('pointermove', handleDragMove as EventListener);
+      window.addEventListener('pointerup', handleDragEnd as EventListener, { once: true });
     });
   };
 
   const getTabContextMenuItems = useCallback((params: GetTabContextMenuItemsParams) => {
     const { panel, api } = params;
+    const isSecondary = Boolean(effectiveInitialPanel);
     return [
-      {
-        label: 'Вынести в отдельное окно',
-        action: () => detachPanel(api, panel),
-      },
+      isSecondary
+        ? {
+            label: 'Вернуть в главное окно',
+            action: () => {
+              const channel = getTabCrossWindowChannel();
+              if (channel) {
+                const rawComponentId =
+                  panel.toJSON()?.contentComponent ||
+                  panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+                const winLabel =
+                  typeof window !== 'undefined'
+                    ? new URLSearchParams(window.location.search).get('label') || ''
+                    : '';
+                channel.postMessage({
+                  type: 'TAB_DRAG_RELEASE',
+                  sourceLabel: winLabel,
+                  panelId: rawComponentId,
+                  title: panel.title || 'SLAG',
+                  forceDock: true,
+                });
+              }
+            },
+          }
+        : {
+            label: 'Вынести в отдельное окно',
+            action: () => detachPanel(api, panel),
+          },
       {
         label: 'Сделать плавающим',
         action: () => {
@@ -658,11 +847,25 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       'closeOthers' as const,
       'closeAll' as const,
     ];
-  }, []);
+  }, [effectiveInitialPanel]);
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
       <WindowControls />
+
+      {/* Cross-window Drag & Drop Target Indicator in Main Window */}
+      {crossWindowDropInfo.active && (
+        <div className="absolute top-[34px] inset-x-0 z-40 bg-blue-600/20 border-b border-blue-500/80 backdrop-blur-sm px-4 py-1.5 flex items-center justify-between text-xs text-blue-200 pointer-events-none animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span className="font-medium tracking-wide">
+              Отпустите вкладку «{crossWindowDropInfo.title || 'Панель'}» для возврата в главное окно
+            </span>
+          </div>
+          <span className="text-[11px] text-blue-400 font-mono">Прикрепить</span>
+        </div>
+      )}
+
       <DockviewReact
         components={components}
         rightHeaderActionsComponent={GroupHeaderActions}

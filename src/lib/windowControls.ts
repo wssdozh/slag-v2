@@ -210,3 +210,18 @@ export const listenDesktopEvents = (handlers: {
     }
   };
 };
+
+export interface CrossWindowTabMessage {
+  type: 'TAB_DRAG_MOVE' | 'TAB_DRAG_RELEASE' | 'TAB_DRAG_ACCEPTED';
+  sourceLabel?: string;
+  panelId: string;
+  title: string;
+  screenX?: number;
+  screenY?: number;
+  forceDock?: boolean;
+}
+
+export const getTabCrossWindowChannel = (): BroadcastChannel | null => {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
+  return new BroadcastChannel('slag_cross_window_tabs_v2');
+};

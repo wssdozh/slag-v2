@@ -2908,4 +2908,52 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     expect(saved[0].width).toBe(880);
     expect(saved[0].height).toBe(620);
   });
+
+  test('42. Cross-Window Tab Drag & Drop Dock-back via BroadcastChannel', async ({ page }) => {
+    await page.goto('/');
+
+    const dockviewContainer = page.locator('.dockview-theme-slag');
+    await expect(dockviewContainer).toBeVisible();
+
+    // 1. Simulate a detached window dragging a tab over the main window
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+      channel.postMessage({
+        type: 'TAB_DRAG_MOVE',
+        sourceLabel: 'panel-audio-test',
+        panelId: 'audio',
+        title: 'Аудиоплеер',
+        screenX: window.screenX + 100,
+        screenY: window.screenY + 100,
+      });
+    });
+
+    // 2. Verify visual drop indicator appears
+    const dropIndicator = page.locator('text=Отпустите вкладку «Аудиоплеер» для возврата в главное окно');
+    await expect(dropIndicator).toBeVisible();
+
+    // 3. Simulate releasing the tab over the main window
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+      channel.postMessage({
+        type: 'TAB_DRAG_RELEASE',
+        sourceLabel: 'panel-audio-test',
+        panelId: 'audio',
+        title: 'Аудиоплеер',
+        screenX: window.screenX + 100,
+        screenY: window.screenY + 100,
+      });
+    });
+
+    // 4. Verify drop indicator hides and the Audio tab appears in the main window
+    await expect(dropIndicator).not.toBeVisible();
+    const audioTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first();
+    await expect(audioTab).toBeVisible();
+
+    // 5. Screenshot verification
+    await page.screenshot({
+      path: 'test-results/screenshots/cross-window-tab-docked.png',
+      fullPage: false,
+    });
+  });
 });
