@@ -129,7 +129,6 @@ export const Composer: React.FC<ComposerProps> = ({
   // Tag # autocomplete state
   const [tagQuery, setTagQuery] = useState<string | null>(null);
   const [tagSelectedIndex, setTagSelectedIndex] = useState(0);
-  const [isTagNavigated, setIsTagNavigated] = useState(false);
 
   // Todoist parser & Ghost-chips state
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
@@ -194,7 +193,6 @@ export const Composer: React.FC<ComposerProps> = ({
     setSlashSelectedIndex(0);
     setTagQuery(null);
     setTagSelectedIndex(0);
-    setIsTagNavigated(false);
     setParsedTask(null);
     setIsDateDismissed(false);
     setIsPriorityDismissed(false);
@@ -404,10 +402,8 @@ export const Composer: React.FC<ComposerProps> = ({
           if (tagMatch) {
             setTagQuery(tagMatch[1]);
             setTagSelectedIndex(0);
-            setIsTagNavigated(false);
           } else {
             setTagQuery(null);
-            setIsTagNavigated(false);
           }
         }
       }
@@ -1041,26 +1037,22 @@ export const Composer: React.FC<ComposerProps> = ({
       if (e.key === 'Escape') {
         e.preventDefault();
         setTagQuery(null);
-        setIsTagNavigated(false);
         return;
       }
       if (matchingAutocompleteTags.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
-          setIsTagNavigated(true);
           setTagSelectedIndex(prev => (prev < matchingAutocompleteTags.length - 1 ? prev + 1 : 0));
           return;
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault();
-          setIsTagNavigated(true);
           setTagSelectedIndex(prev => (prev > 0 ? prev - 1 : matchingAutocompleteTags.length - 1));
           return;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
           insertTag(matchingAutocompleteTags[tagSelectedIndex].tag);
-          setIsTagNavigated(false);
           return;
         }
       }
@@ -1368,6 +1360,45 @@ export const Composer: React.FC<ComposerProps> = ({
         <span className="sr-only">Папка</span>
       </ToolbarButton>
 
+      {/* Tag Selector Trigger Button (#) */}
+      <ToolbarButton
+        size="md"
+        onClick={() => {
+          if (tagQuery !== null) {
+            setTagQuery(null);
+            return;
+          }
+          const el = textareaRef.current;
+          if (el) {
+            el.focus();
+            const cursorPos = el.selectionStart || content.length;
+            const textBefore = content.slice(0, cursorPos);
+            const needsSpace = textBefore.length > 0 && !/\s$/.test(textBefore);
+            const prefix = needsSpace ? ' #' : '#';
+            const newText = textBefore + prefix + content.slice(cursorPos);
+            setContent(newText);
+            const newPos = cursorPos + prefix.length;
+            setTimeout(() => {
+              el.focus();
+              el.setSelectionRange(newPos, newPos);
+            }, 0);
+          }
+          setTagQuery('');
+          setTagSelectedIndex(0);
+        }}
+        title={allPreviewTags.length > 0 ? `Теги: ${allPreviewTags.map(t => '#' + t).join(' ')} (#)` : 'Выбрать тег (#)'}
+        aria-label="Выбрать тег (#)"
+        icon={
+          <Hash
+            className={`w-4 h-4 transition-colors ${
+              allPreviewTags.length > 0 ? 'text-cyan-400' : 'text-zinc-400'
+            }`}
+          />
+        }
+      >
+        <span className="sr-only">Тег</span>
+      </ToolbarButton>
+
       {/* Record Type Selector (Ghost droplist: icon + label + chevron, larger touch target) */}
       <ResponsiveSegmented<SlagItemType>
         value={itemType}
@@ -1485,19 +1516,19 @@ export const Composer: React.FC<ComposerProps> = ({
       placeholder={
         isModal
           ? itemType === 'task'
-            ? 'Название задачи... (@ папка, Enter)'
-            : 'Содержимое записи... (@ папка, Enter)'
+            ? 'Название задачи... (@ папка, # тег, Enter)'
+            : 'Содержимое записи... (@ папка, # тег, Enter)'
           : isMobile
           ? itemType === 'task'
-            ? 'Задача... (@ папка, [[ ссылка)'
+            ? 'Задача... (@ папка, # тег)'
             : itemType === 'article'
-            ? 'Черновик статьи... (@ папка, [[ ссылка)'
-            : 'Мысль, заметка или задача... (@ папка)'
+            ? 'Черновик статьи... (@ папка, # тег)'
+            : 'Мысль, заметка или задача... (@ папка, # тег)'
           : itemType === 'task'
-          ? 'Задача... (@ папка, - [ ] подзадачи, [[ ссылка)'
+          ? 'Задача... (@ папка, # тег, - [ ] подзадачи)'
           : itemType === 'article'
-          ? 'Черновик статьи... (@ папка, Shift+Enter для новой строки)'
-          : 'Мысль, заметка или код... (@ папка, / команды)'
+          ? 'Черновик статьи... (@ папка, # тег, Shift+Enter)'
+          : 'Мысль, заметка или код... (@ папка, # тег, / команды)'
       }
       textareaRef={textareaRef}
       hideTextarea={isRecordingAudio && !content.trim()}
