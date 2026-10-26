@@ -411,15 +411,28 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
             isPureVoice
               ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
               : 'sm:top-2.5 sm:right-2.5 flex items-center'
-          } gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150 z-20 pointer-events-auto`}
+          } gap-1 sm:gap-0 sm:group-hover:gap-1 transition-all duration-150 z-20 pointer-events-auto`}
         >
           <button
             onClick={() => setReplyTarget(item)}
-            className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer hidden sm:flex items-center justify-center"
+            className="h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-all duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100"
             title="Ответить (R)"
           >
-            <CornerUpLeft className="w-3.5 h-3.5" />
+            <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
           </button>
+
+          {/* Article Focus Editor Button in top-right corner */}
+          {isArticle && (
+            <button
+              type="button"
+              onClick={handleOpenArticle}
+              className="w-6 h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              title="Открыть в фокус-редакторе (⌘E)"
+              aria-label="Открыть в фокус-редакторе"
+            >
+              <Maximize2 className="w-3.5 h-3.5 shrink-0" />
+            </button>
+          )}
 
           <button
             onClick={(e) => {
@@ -437,25 +450,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                 });
               }
             }}
-            className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center"
+            className="w-6 h-6 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-all duration-150 cursor-pointer flex items-center justify-center shrink-0"
             title="Действия"
           >
-            <MoreVertical className="w-3.5 h-3.5" />
+            <MoreVertical className="w-3.5 h-3.5 shrink-0" />
           </button>
         </div>
-
-        {/* Article Focus Editor Button in top-right corner */}
-        {isArticle && (
-          <button
-            type="button"
-            onClick={handleOpenArticle}
-            className="absolute top-2 right-9 sm:top-2.5 sm:right-16 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer z-10"
-            title="Открыть в фокус-редакторе (⌘E)"
-            aria-label="Открыть в фокус-редакторе"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
-        )}
 
       {/* Reply Parent Quote Banner */}
       {item.replyToId && (
@@ -568,7 +568,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
         <div className="flex flex-col gap-1.5 pt-0.5">
           <h3
             onClick={handleOpenArticle}
-            className="text-sm font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-18 sm:pr-24"
+            className="text-sm font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-14 sm:pr-20"
           >
             <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>{item.title}</span>
