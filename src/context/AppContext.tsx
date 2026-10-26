@@ -13,6 +13,7 @@ import type {
   AiItemFilter,
   ChatMessage,
   SuggestedAction,
+  ItemUpdates,
   MobileTabId,
   AppUiConfig,
   DeviceUiConfig
@@ -20,7 +21,7 @@ import type {
 import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
-import { listenDesktopEvents } from '../lib/windowControls';
+import { listenDesktopEvents, isDesktopApp } from '../lib/windowControls';
 import { useIsMobile } from '../hooks/useIsMobile';
 import {
   evaluateRecurringTasks,
@@ -210,6 +211,69 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
   tagCaseStyle: 'lowercase',
 };
 
+export function applyItemUpdates(target: SlagItem, updates: ItemUpdates): SlagItem {
+  let content = target.content;
+  if (updates.content !== undefined) {
+    content = updates.content;
+  }
+  if (updates.appendContent) {
+    content = content ? `${content}\n\n${updates.appendContent}` : updates.appendContent;
+  }
+
+  let subtasks = target.subtasks;
+  if (updates.subtasks !== undefined && Array.isArray(updates.subtasks) && updates.subtasks.length > 0) {
+    const first = updates.subtasks[0];
+    const newChecklines = typeof first === 'string'
+      ? (updates.subtasks as string[]).map(st => `- [ ] ${st}`)
+      : (updates.subtasks as Array<{ id?: string; title: string; completed?: boolean }>).map(
+          st => `- [${st.completed ? 'x' : ' '}] ${st.title}`
+        );
+    content = content ? `${content}\n\n${newChecklines.join('\n')}` : newChecklines.join('\n');
+    const parsed = parseSubtasksFromContent(content);
+    subtasks = parsed.length > 0 ? parsed : subtasks;
+  }
+
+  let tags = target.tags || [];
+  if (updates.tags !== undefined) {
+    tags = updates.tags;
+  } else {
+    if (updates.addTags && updates.addTags.length > 0) {
+      tags = Array.from(new Set([...tags, ...updates.addTags]));
+    }
+    if (updates.removeTags && updates.removeTags.length > 0) {
+      const removeSet = new Set(updates.removeTags.map(t => t.toLowerCase()));
+      tags = tags.filter(t => !removeSet.has(t.toLowerCase()));
+    }
+  }
+
+  const SPECIAL_KEYS = new Set([
+    'title', 'content', 'appendContent', 'tags', 'addTags', 'removeTags', 'subtasks', 'dueDate', 'reminder', 'customProps'
+  ]);
+
+  const result: SlagItem = {
+    ...target,
+    title: updates.title !== undefined && updates.title.trim() ? updates.title.trim() : target.title,
+    content,
+    tags,
+    subtasks,
+    dueDate: updates.dueDate !== undefined ? (updates.dueDate === null ? undefined : updates.dueDate) : target.dueDate,
+    reminder: updates.reminder !== undefined ? (updates.reminder === null ? undefined : updates.reminder) : target.reminder,
+    customProps: updates.customProps !== undefined
+      ? { ...(target.customProps || {}), ...updates.customProps }
+      : target.customProps,
+    updatedAt: Date.now(),
+  };
+
+  // Dynamically apply any additional scalar properties from updates
+  for (const key of Object.keys(updates) as Array<keyof ItemUpdates>) {
+    if (!SPECIAL_KEYS.has(key) && updates[key] !== undefined) {
+      (result as any)[key] = updates[key];
+    }
+  }
+
+  return result;
+}
+
 export const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -340,10 +404,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(clamped));
   };
 
-  // Mobile navigation & touch state
+  // Mobile navigation & touch state: desktop and standalone popouts never default to phone layout
   const isMobileScreen = useIsMobile(768);
   const [forceMobileMode, setForceMobileMode] = useState<boolean | null>(null);
-  const isMobile = forceMobileMode !== null ? forceMobileMode : isMobileScreen;
+  const isDesktop = isDesktopApp();
+  const isStandalone = typeof window !== 'undefined' && Boolean(new URLSearchParams(window.location.search).get('panel'));
+  const isMobile = !isStandalone && (forceMobileMode !== null ? forceMobileMode : (!isDesktop && isMobileScreen));
 
   const toggleMobileMode = useCallback(() => {
     setForceMobileMode(prev => {
@@ -1114,129 +1180,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // 2. Decompose Task (add subtasks to target task)
-    else if (action.type === 'decompose_task') {
-      const lowerActionTitle = action.title.toLowerCase();
+    // 2. Universal Update Item (single)
+    else if (action.type === 'update_item') {
+      const targetQuery = (action.targetItemId || action.title || '').trim().toLowerCase();
       const target = items.find(i =>
-        i.type === 'task' && (
-          i.id === action.targetItemId ||
-          i.title.toLowerCase() === lowerActionTitle ||
-          i.title.toLowerCase().includes(lowerActionTitle) ||
-          lowerActionTitle.includes(i.title.toLowerCase())
-        )
+        (action.targetItemId && i.id === action.targetItemId) ||
+        (targetQuery && (i.title.toLowerCase() === targetQuery || i.title.toLowerCase().includes(targetQuery) || targetQuery.includes(i.title.toLowerCase())))
       );
-      if (target) {
-        const newSubtasks = action.subtasks || [];
-        const newChecklines = newSubtasks.map(st => `- [${st.completed ? 'x' : ' '}] ${st.title}`);
-        const existingContent = target.content ? target.content.trim() : '';
-        const updatedContent = existingContent
-          ? `${existingContent}\n\n${newChecklines.join('\n')}`
-          : newChecklines.join('\n');
-        const parsed = parseSubtasksFromContent(updatedContent);
 
-        const updated = {
-          ...target,
-          content: updatedContent,
-          subtasks: parsed.length > 0 ? parsed : [...(target.subtasks || []), ...newSubtasks],
-          updatedAt: Date.now(),
-        };
-        updateItem(updated);
-        savedItem = updated;
-        addToast(`К задаче «${target.title}» добавлено ${newSubtasks.length} подзадач`, 'success');
-      } else {
-        const newSubtasks = action.subtasks || [];
-        const newChecklines = newSubtasks.map(st => `- [${st.completed ? 'x' : ' '}] ${st.title}`);
-        const baseContent = (action.content || '').trim();
-        const fullContent = baseContent
-          ? `${baseContent}\n\n${newChecklines.join('\n')}`
-          : newChecklines.join('\n');
-        const parsed = parseSubtasksFromContent(fullContent);
-
-        const created = saveItem({
-          type: 'task',
-          title: action.title.trim(),
-          content: fullContent,
-          folder: action.folder || currentFolder,
-          tags: ['задачи'],
-          subtasks: parsed.length > 0 ? parsed : action.subtasks || [],
-        });
-        savedItem = created;
-        addToast(`Создана задача «${created.title}» с ${action.subtasks?.length || 0} подзадачами`, 'success');
-      }
-    }
-
-    // 3. Update Task Status
-    else if (action.type === 'update_task_status') {
-      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
-      if (target && action.status) {
-        actionHistoryRef.current.push({
-          id: 'hist_' + Date.now(),
-          timestamp: Date.now(),
-          description: `Смена статуса «${target.title}»`,
-          itemSnapshots: [{ ...target }],
-        });
-        const updated = { ...target, status: action.status, updatedAt: Date.now() };
-        updateItem(updated);
-        savedItem = updated;
-        addToast(`Статус задачи изменен на «${action.status}»`, 'success', {
-          label: 'Отменить',
-          onClick: () => undoLastAction(),
-        });
-      }
-    }
-
-    // 4. Reschedule Task
-    else if (action.type === 'reschedule_task') {
-      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
       if (target) {
         actionHistoryRef.current.push({
           id: 'hist_' + Date.now(),
           timestamp: Date.now(),
-          description: `Перенос «${target.title}»`,
+          description: `Изменение «${target.title}»`,
           itemSnapshots: [{ ...target }],
         });
-        const updated = {
-          ...target,
+
+        const rawUpdates: ItemUpdates = action.updates || {
+          title: action.title && action.title !== target.title ? action.title : undefined,
+          content: action.content || undefined,
+          appendContent: action.appendContent || undefined,
+          folder: action.folder && action.folder !== target.folder ? action.folder : undefined,
+          status: action.status,
+          priority: action.priority,
           dueDate: action.dueDate,
           reminder: action.reminder,
-          priority: action.priority || target.priority,
-          updatedAt: Date.now(),
+          subtasks: action.subtasks,
+          tags: action.tags && action.tags.length > 0 ? action.tags : undefined,
         };
+
+        const updated = applyItemUpdates(target, rawUpdates);
         updateItem(updated);
         savedItem = updated;
-        addToast(action.dueDate ? `Задача перенесена на ${action.dueDate}` : 'Срок задачи снят', 'success', {
+
+        let toastMsg = `Запись «${updated.title}» обновлена`;
+        if (rawUpdates.subtasks && Array.isArray(rawUpdates.subtasks) && rawUpdates.subtasks.length > 0) {
+          toastMsg = `К задаче «${updated.title}» добавлено ${rawUpdates.subtasks.length} подзадач`;
+        } else if (rawUpdates.appendContent) {
+          toastMsg = `Заметка «${updated.title}» дополнена`;
+        } else if (rawUpdates.dueDate !== undefined) {
+          toastMsg = rawUpdates.dueDate ? `Задача перенесена на ${rawUpdates.dueDate}` : 'Срок задачи снят';
+        } else if (rawUpdates.status) {
+          toastMsg = `Статус задачи изменен на «${rawUpdates.status}»`;
+        } else if (rawUpdates.folder) {
+          toastMsg = `Запись перенесена в «${rawUpdates.folder}»`;
+        }
+
+        addToast(toastMsg, 'success', {
           label: 'Отменить',
           onClick: () => undoLastAction(),
         });
       }
     }
 
-    // 4b. Batch Reschedule Tasks
-    else if (action.type === 'batch_reschedule') {
-      const batch = action.batchItems || [];
+    // 3. Universal Batch Update (multiple)
+    else if (action.type === 'batch_update') {
+      const batchList = action.batchUpdateItems || [];
       const snapshots: SlagItem[] = [];
       let updatedCount = 0;
-      for (const item of batch) {
-        const target = items.find(i => i.id === item.targetItemId || i.title.toLowerCase() === item.title.toLowerCase());
+
+      for (const item of batchList) {
+        const tId = item.targetItemId;
+        const tTitle = (item.title || '').toLowerCase().trim();
+        const target = items.find(i =>
+          (tId && i.id === tId) ||
+          (tTitle && (i.title.toLowerCase() === tTitle || i.title.toLowerCase().includes(tTitle) || tTitle.includes(i.title.toLowerCase())))
+        );
+
         if (target) {
           snapshots.push({ ...target });
-          const updated = {
-            ...target,
-            dueDate: item.dueDate,
-            reminder: item.reminder,
-            priority: item.priority || target.priority,
-            updatedAt: Date.now(),
-          };
+          const updated = applyItemUpdates(target, item.updates);
           updateItem(updated);
           savedItem = updated;
           updatedCount++;
         }
       }
+
       if (updatedCount > 0) {
         actionHistoryRef.current.push({
           id: 'hist_' + Date.now(),
           timestamp: Date.now(),
-          description: `Пакетный перенос ${updatedCount} задач`,
+          description: `Пакетное обновление ${updatedCount} записей`,
           itemSnapshots: snapshots,
         });
         addToast(`Перенесено задач: ${updatedCount}`, 'success', {
@@ -1246,42 +1270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // 4c. Append Content to Note
-    else if (action.type === 'append_to_note') {
-      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
-      if (target && action.content) {
-        actionHistoryRef.current.push({
-          id: 'hist_' + Date.now(),
-          timestamp: Date.now(),
-          description: `Дополнение «${target.title}»`,
-          itemSnapshots: [{ ...target }],
-        });
-        const newContent = target.content ? `${target.content}\n\n${action.content}` : action.content;
-        const updated = {
-          ...target,
-          content: newContent,
-          updatedAt: Date.now(),
-        };
-        updateItem(updated);
-        savedItem = updated;
-        addToast(`Заметка «${target.title}» дополнена`, 'success', {
-          label: 'Отменить',
-          onClick: () => undoLastAction(),
-        });
-      }
-    }
-
-    // 5. Move Note to Folder
-    else if (action.type === 'move_note') {
-      const target = items.find(i => i.id === action.targetItemId || i.title.toLowerCase() === action.title.toLowerCase());
-      if (target && action.folder) {
-        moveItem(target.id, action.folder);
-        savedItem = { ...target, folder: action.folder, updatedAt: Date.now() };
-        addToast(`Запись перенесена в «${action.folder}»`, 'success');
-      }
-    }
-
-    if (messageId && (savedItem || action.type === 'batch_reschedule')) {
+    if (messageId && (savedItem || action.type === 'batch_update')) {
       const finalSavedId = savedItem?.id;
       setChatMessages(prev => prev.map(m => {
         if (m.id !== messageId) return m;
@@ -1306,7 +1295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return savedItem;
-  }, [currentFolder, saveItem, updateItem, moveItem, items, addToast, undoLastAction]);
+  }, [currentFolder, saveItem, updateItem, items, addToast, undoLastAction]);
 
   const rejectAction = useCallback((messageId: string) => {
     setChatMessages(prev => prev.map(m => {

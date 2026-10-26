@@ -2776,6 +2776,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   });
 
   test('40. Detached Popout Window: Full Dockview Workspace and Functional Controls', async ({ page }) => {
+    // Set viewport below 768px to ensure popout window never collapses into mobile shell
+    await page.setViewportSize({ width: 550, height: 450 });
+
     // Mock Tauri environment so desktop WindowControls are active
     await page.addInitScript(() => {
       (window as any).isTauri = true;
@@ -2787,9 +2790,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Navigate directly with query params as a spawned detached window would
     await page.goto('/?panel=sidebar&title=%D0%9D%D0%B0%D0%B2%D0%B8%D0%B3%D0%B0%D1%86%D0%B8%D1%8F');
 
-    // 1. Verify Dockview is mounted
+    // 1. Verify Dockview is mounted (desktop mode) and mobile nav dock is absent
     const dockviewContainer = page.locator('.dockview-theme-slag');
     await expect(dockviewContainer).toBeVisible();
+    await expect(page.locator('nav[aria-label="Мобильная навигация"]')).not.toBeVisible();
 
     // 2. Verify the detached panel is present as a tab
     const sidebarTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Навигация' }).first();

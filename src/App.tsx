@@ -75,10 +75,18 @@ const AppContent: React.FC = () => {
 
   const isDesktopWidth = typeof window !== 'undefined' && window.innerWidth >= 768;
 
-  // Standalone Native Popout Window Router
+  // Standalone Native Popout Window Router: always desktop Dockview workspace
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const standalonePanelId = urlParams?.get('panel');
   const standalonePanelTitle = urlParams?.get('title') || 'SLAG';
+
+  if (standalonePanelId) {
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative">
+        <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
+      </div>
+    );
+  }
 
   if (isMobile && forceMobileMode && isDesktopWidth) {
     return (
@@ -121,15 +129,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative">
-      {isMobile ? (
-        <MobileShell />
-      ) : (
-        <WorkspaceShell
-          initialPanel={
-            standalonePanelId ? { id: standalonePanelId, title: standalonePanelTitle } : undefined
-          }
-        />
-      )}
+      {isMobile ? <MobileShell /> : <WorkspaceShell />}
 
       {/* Global Right-Click Context Menu (Desktop) & Mobile Action Sheet (Touch) */}
       {!isMobile && <ContextMenu />}
