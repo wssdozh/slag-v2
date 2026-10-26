@@ -1471,7 +1471,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     }}
                     className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
                       effectiveDueDate
-                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                        ? 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(96,165,250,0.7))]'
                         : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
                     }`}
                     title={
@@ -1517,7 +1517,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     }}
                     className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
                       effectiveDuration !== undefined
-                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                        ? 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(96,165,250,0.7))]'
                         : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
                     }`}
                     title={
@@ -1583,7 +1583,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     }}
                     className={`h-ctrl-md px-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center shrink-0 ${
                       effectiveRecurrence
-                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                        ? 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(96,165,250,0.7))]'
                         : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]'
                     }`}
                     title={
@@ -1653,7 +1653,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     }}
                     className={
                       effectivePriority !== 'none'
-                        ? 'bg-blue-500/20 text-blue-400 rounded-md font-medium'
+                        ? 'rounded-md'
                         : ''
                     }
                     options={[

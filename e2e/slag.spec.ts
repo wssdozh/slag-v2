@@ -707,7 +707,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 4. Verify toolbar controls light up in blue directly on the bottom bar
     const dueDateBtn = page.locator('button[title*="Срок: Завтра"]').first();
     await expect(dueDateBtn).toBeVisible();
-    await expect(dueDateBtn).toHaveClass(/bg-blue-500/);
+    await expect(dueDateBtn).toHaveClass(/text-blue-400/);
 
     const prioBtn = page.locator('button[title*="Приоритет: Высокий"]').first();
     await expect(prioBtn).toBeVisible();
@@ -3118,7 +3118,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(popover).not.toBeVisible();
     const activeDateBtn = page.locator('button[title*="Срок: Завтра"]').first();
     await expect(activeDateBtn).toBeVisible();
-    await expect(activeDateBtn).toHaveClass(/bg-blue-500/);
+    await expect(activeDateBtn).toHaveClass(/text-blue-400/);
   });
 
   test('48. Full Logging for Workspace Detach, Cross-Window Docking, Folder Navigation, and Log Download / Open Folder', async ({ page }) => {
