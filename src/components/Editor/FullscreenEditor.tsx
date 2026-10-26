@@ -51,11 +51,9 @@ let activeEditorView: EditorView | null = null;
 
 const editorExtensions = [
   ViewPlugin.define((view) => {
-    console.log('[DEBUG] ViewPlugin MOUNTED');
     activeEditorView = view;
     return {
       destroy() {
-        console.log('[DEBUG] ViewPlugin DESTROYED');
         if (activeEditorView === view) {
           activeEditorView = null;
         }
@@ -275,15 +273,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     setAttachments(prev => [...prev, ...newAtts]);
     const links = newAtts.map(a => `![[${a.name}]]`).join('\n') + '\n';
     const view = getEditorView();
-    console.log('[DEBUG] handleAttachmentsAdded called, view is:', Boolean(view), 'links:', links);
     if (view) {
       const pos = view.state.selection.main.head;
-      console.log('[DEBUG] pos is', pos, 'doc length is', view.state.doc.length);
       view.dispatch({
         changes: { from: pos, insert: links },
         selection: { anchor: pos + links.length },
       });
-      console.log('[DEBUG] doc after dispatch is:', view.state.doc.toString());
       view.focus();
     } else {
       setContent(prev => (prev.trim() ? prev + '\n\n' + links : links));

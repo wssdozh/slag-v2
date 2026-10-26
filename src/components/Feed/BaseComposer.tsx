@@ -119,13 +119,13 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       <div
         className={
           isFlat
-            ? `flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none relative ${className}`
-            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 md:p-2.5 flex flex-col gap-1 md:gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
+            ? `flex flex-col gap-2 p-0 bg-transparent border-0 shadow-none relative ${className}`
+            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2.5 sm:p-3 flex flex-col gap-2 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
         }
       >
         {/* Кнопка в правом верхнем углу (раскрытие в полноэкранный редактор) */}
         {topRightSlot && (
-          <div className="absolute top-2 right-2.5 z-10 flex items-center">
+          <div className="absolute top-2.5 right-2.5 z-10 flex items-center">
             {topRightSlot}
           </div>
         )}
@@ -146,10 +146,10 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               placeholder={placeholder}
               disabled={disabled}
               className={`w-full bg-transparent text-base md:text-sm text-[#f4f4f5] placeholder-zinc-500 placeholder:truncate resize-none ${
-                topRightSlot ? 'pr-7' : ''
+                topRightSlot ? 'pr-8' : 'pr-1'
               } ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } leading-normal ${isFlat ? 'py-1 px-0.5' : 'py-0 px-1'} outline-none border-none`}
+              } leading-relaxed ${isFlat ? 'py-1 px-0.5' : 'py-1 px-1.5'} outline-none border-none`}
               style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
             />
           </div>
@@ -162,10 +162,10 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {customControls ? (
           customControls
         ) : (
-          <div className="flex items-center justify-between pt-1 gap-1.5 relative min-w-0">
+          <div className="flex items-center justify-between gap-2 relative min-w-0">
             {leftControls}
 
-            <div className="flex items-center gap-1 shrink-0 ml-auto">
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
               {rightControls}
 
               {sendButton !== undefined ? (

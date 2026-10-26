@@ -2923,7 +2923,34 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const dockviewContainer = page.locator('.dockview-theme-slag');
     await expect(dockviewContainer).toBeVisible();
 
-    // 1. Simulate releasing a detached tab over the main window
+    // 1. Simulate releasing a detached tab over the main window and verify TAB_DRAG_ACCEPTED handshake
+    const acceptedMsg = await page.evaluate(() => {
+      return new Promise<any>((resolve) => {
+        const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+        channel.onmessage = (e) => {
+          if (e.data && e.data.type === 'TAB_DRAG_ACCEPTED') {
+            resolve(e.data);
+          }
+        };
+        channel.postMessage({
+          type: 'TAB_DRAG_RELEASE',
+          sourceLabel: 'panel-audio-test',
+          panelId: 'audio',
+          title: 'Аудиоплеер',
+          screenX: window.screenX + 100,
+          screenY: window.screenY + 100,
+        });
+      });
+    });
+
+    expect(acceptedMsg.targetLabel).toBe('panel-audio-test');
+    expect(acceptedMsg.panelId).toBe('audio');
+
+    // 2. Verify the Audio tab appears in the main window
+    const audioTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first();
+    await expect(audioTab).toBeVisible();
+
+    // 3. Verify deduplication: re-releasing the same tab does not create duplicate tabs
     await page.evaluate(() => {
       const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
       channel.postMessage({
@@ -2936,11 +2963,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       });
     });
 
-    // 2. Verify the Audio tab appears in the main window
-    const audioTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first();
-    await expect(audioTab).toBeVisible();
+    const audioTabs = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' });
+    await expect(audioTabs).toHaveCount(1);
 
-    // 3. Screenshot verification
+    // 4. Screenshot verification
     await page.screenshot({
       path: 'test-results/screenshots/cross-window-tab-docked.png',
       fullPage: false,

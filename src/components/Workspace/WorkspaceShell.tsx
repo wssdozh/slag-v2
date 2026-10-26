@@ -157,7 +157,7 @@ const PANELS_TO_ADD = [
 
 const wsLog = logger.scope('WORKSPACE');
 
-export const getPanelComponent = (panel: IDockviewPanel): string => {
+const getPanelComponent = (panel: IDockviewPanel): string => {
   return panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
 };
 
@@ -398,7 +398,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           const existingPanel = api.panels.find(p => getPanelComponent(p) === msg.panelId);
 
           if (existingPanel) {
-            api.setActivePanel(existingPanel);
+            existingPanel.api.setActive();
             wsLog.info(`Cross-window tab already open in workspace; focused [${msg.panelId}] "${msg.title}"`);
           } else {
             // Determine spatial drop target group and split direction
@@ -734,12 +734,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       }
     }
 
-    // Ensure feed panel tab reflects current folder
-    const feedPanels = event.api.panels.filter(
-      p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_')
-    );
-    feedPanels.forEach(p => p.api.setTitle(currentFolder || 'Входящие'));
-
     // Tab tear-off & cross-window drag docking
     event.api.onWillDragPanel((dragEvent) => {
       const panel = dragEvent.panel;
@@ -750,9 +744,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       const initialWidth = rect ? Math.round(rect.width) : panel.api.width;
       const initialHeight = rect ? Math.round(rect.height) : panel.api.height;
 
-      const rawComponentId =
-        panel.toJSON()?.contentComponent ||
-        panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+      const rawComponentId = getPanelComponent(panel);
       const title = panel.title || 'SLAG';
       const winLabel =
         typeof window !== 'undefined'
@@ -820,9 +812,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
   const getTabContextMenuItems = useCallback((params: GetTabContextMenuItemsParams) => {
     const { panel, api } = params;
     const isSecondary = Boolean(effectiveInitialPanel);
-    const rawComponentId =
-      panel.toJSON()?.contentComponent ||
-      panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+    const rawComponentId = getPanelComponent(panel);
 
     return [
       isSecondary

@@ -1244,33 +1244,36 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Task Controls: Always visible in toolbar, lights up blue when active */}
       {itemType === 'task' && (
-        <ComposerTaskControls
-          effectiveDueDate={effectiveDueDate}
-          effectiveDateLabel={effectiveDateLabel}
-          onDateChange={(newDate) => {
-            setDueDate(newDate);
-            setIsDateDismissed(false);
-          }}
-          onDateClear={() => {
-            setIsDateDismissed(true);
-            setDueDate('');
-          }}
-          effectiveDuration={effectiveDuration}
-          onDurationChange={(mins) => {
-            setDuration(mins);
-            setIsDurationDismissed(mins === undefined);
-          }}
-          effectiveRecurrence={effectiveRecurrence}
-          onRecurrenceChange={(rule) => {
-            setRecurrence(rule);
-            setIsRecurrenceDismissed(!rule);
-          }}
-          effectivePriority={effectivePriority}
-          onPriorityChange={(val) => {
-            setPriority(val);
-            setIsPriorityDismissed(false);
-          }}
-        />
+        <div className="flex items-center gap-1 shrink-0">
+          <div className="h-3.5 w-px bg-white/[0.1] mx-0.5 shrink-0" />
+          <ComposerTaskControls
+            effectiveDueDate={effectiveDueDate}
+            effectiveDateLabel={effectiveDateLabel}
+            onDateChange={(newDate) => {
+              setDueDate(newDate);
+              setIsDateDismissed(false);
+            }}
+            onDateClear={() => {
+              setIsDateDismissed(true);
+              setDueDate('');
+            }}
+            effectiveDuration={effectiveDuration}
+            onDurationChange={(mins) => {
+              setDuration(mins);
+              setIsDurationDismissed(mins === undefined);
+            }}
+            effectiveRecurrence={effectiveRecurrence}
+            onRecurrenceChange={(rule) => {
+              setRecurrence(rule);
+              setIsRecurrenceDismissed(!rule);
+            }}
+            effectivePriority={effectivePriority}
+            onPriorityChange={(val) => {
+              setPriority(val);
+              setIsPriorityDismissed(false);
+            }}
+          />
+        </div>
       )}
     </div>
   );
