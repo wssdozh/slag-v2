@@ -98,7 +98,12 @@ export const removeDetachedWindow = (label: string): void => {
 };
 
 export const closeWindow = async (): Promise<void> => {
-  if (!isTauri()) return;
+  if (!isTauri()) {
+    if (typeof window !== 'undefined' && window.opener) {
+      window.close();
+    }
+    return;
+  }
   try {
     const appWindow = getCurrentWindow();
     wsLog.info(`Window close requested for [${appWindow.label}]`);
@@ -245,8 +250,9 @@ export const listenDesktopEvents = (handlers: {
 };
 
 export interface CrossWindowTabMessage {
-  type: 'TAB_DRAG_MOVE' | 'TAB_DRAG_RELEASE' | 'TAB_DRAG_ACCEPTED';
+  type: 'TAB_DRAG_RELEASE' | 'TAB_DRAG_ACCEPTED';
   sourceLabel?: string;
+  targetLabel?: string;
   panelId: string;
   title: string;
   screenX?: number;

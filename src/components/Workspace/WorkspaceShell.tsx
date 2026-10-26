@@ -157,6 +157,10 @@ const PANELS_TO_ADD = [
 
 const wsLog = logger.scope('WORKSPACE');
 
+export const getPanelComponent = (panel: IDockviewPanel): string => {
+  return panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+};
+
 // Detach panel to native OS window (in desktop mode) or browser popout / floating group
 const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left: number; top: number; width?: number; height?: number }) => {
   const groupElement = (panel.group as any)?.element as HTMLElement | undefined;
@@ -166,7 +170,7 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
   const left = box?.left ?? (rect ? Math.round(window.screenX + rect.left) : Math.max(40, window.screenX + 80));
   const top = box?.top ?? (rect ? Math.round(window.screenY + rect.top) : Math.max(40, window.screenY + 80));
 
-  const rawComponentId = panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
+  const rawComponentId = getPanelComponent(panel);
   const title = panel.title || 'Окно SLAG';
 
   wsLog.info(`Detaching panel [${rawComponentId}] "${title}"`, {
@@ -378,7 +382,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       // Guard: Never process messages originating from this exact window
       if (msg.sourceLabel === myLabel) return;
 
-      // 1. Primary window accepts tab and adds it to layout
+      // 1. Primary window accepts tab, handles deduplication, and docks with spatial split
       if (isPrimary && msg.type === 'TAB_DRAG_RELEASE') {
         const isInside =
           msg.forceDock ||
@@ -391,31 +395,68 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
         if (isInside && apiRef.current) {
           const api = apiRef.current;
-          const uniqueId = `panel_${msg.panelId}_${Date.now()}`;
-          wsLog.info(`Cross-window tab accepted and docked into main workspace: [${msg.panelId}] "${msg.title}"`, {
-            from: msg.sourceLabel,
-            forceDock: msg.forceDock,
-            screenPos: { x: msg.screenX, y: msg.screenY },
-            uniqueId,
-          });
-          try {
-            api.addPanel({
-              id: uniqueId,
-              component: msg.panelId,
-              title: msg.title,
-              position: { referenceGroup: api.activeGroup || api.groups[0] },
+          const existingPanel = api.panels.find(p => getPanelComponent(p) === msg.panelId);
+
+          if (existingPanel) {
+            api.setActivePanel(existingPanel);
+            wsLog.info(`Cross-window tab already open in workspace; focused [${msg.panelId}] "${msg.title}"`);
+          } else {
+            // Determine spatial drop target group and split direction
+            let targetGroup = api.activeGroup || api.groups[0];
+            let direction: 'left' | 'right' | 'above' | 'below' | undefined;
+
+            if (!msg.forceDock && msg.screenX !== undefined && msg.screenY !== undefined) {
+              const clientX = msg.screenX - window.screenX;
+              const clientY = msg.screenY - window.screenY;
+              const dropEl = document.elementFromPoint(clientX, clientY);
+              const targetGroupEl = dropEl?.closest<HTMLElement>('.dv-groupview');
+
+              if (targetGroupEl) {
+                const matched = api.groups.find(g => (g as any)?.element === targetGroupEl);
+                if (matched) {
+                  targetGroup = matched;
+                  const rect = targetGroupEl.getBoundingClientRect();
+                  const relX = (clientX - rect.left) / Math.max(1, rect.width);
+                  const relY = (clientY - rect.top) / Math.max(1, rect.height);
+
+                  // Edge proximity (25%) -> split into a resizable pane with sash
+                  if (relX < 0.25) direction = 'left';
+                  else if (relX > 0.75) direction = 'right';
+                  else if (relY < 0.25) direction = 'above';
+                  else if (relY > 0.75) direction = 'below';
+                }
+              }
+            }
+
+            const uniqueId = `panel_${msg.panelId}_${Date.now()}`;
+            wsLog.info(`Cross-window tab accepted and docked into workspace: [${msg.panelId}] "${msg.title}"`, {
+              from: msg.sourceLabel,
+              direction,
+              uniqueId,
             });
-          } catch {
-            api.addPanel({
-              id: uniqueId,
-              component: msg.panelId,
-              title: msg.title,
-            });
+
+            try {
+              api.addPanel({
+                id: uniqueId,
+                component: msg.panelId,
+                title: msg.title,
+                position: targetGroup
+                  ? (direction ? { referenceGroup: targetGroup, direction } : { referenceGroup: targetGroup })
+                  : undefined,
+              });
+            } catch {
+              api.addPanel({
+                id: uniqueId,
+                component: msg.panelId,
+                title: msg.title,
+              });
+            }
           }
 
           channel.postMessage({
             type: 'TAB_DRAG_ACCEPTED',
-            sourceLabel: msg.sourceLabel,
+            sourceLabel: myLabel,
+            targetLabel: msg.sourceLabel,
             panelId: msg.panelId,
             title: msg.title,
           });
@@ -426,20 +467,22 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
       }
 
-      // 2. Secondary window removes the accepted panel
-      if (!isPrimary && msg.type === 'TAB_DRAG_ACCEPTED' && msg.sourceLabel === myLabel) {
-        wsLog.info(`Detached panel accepted by primary window; removing [${msg.panelId}] from detached window`);
+      // 2. Secondary window: close once primary accepts the panel
+      if (
+        !isPrimary &&
+        msg.type === 'TAB_DRAG_ACCEPTED' &&
+        (msg.targetLabel === myLabel || msg.panelId === effectiveInitialPanel?.id)
+      ) {
+        wsLog.info(`Detached panel accepted by primary window; closing secondary window [${myLabel}]`);
         if (apiRef.current) {
-          const target = apiRef.current.panels.find(p => {
-            const raw = p.toJSON()?.contentComponent || p.id.replace(/^panel_/, '').replace(/_\d+$/, '');
-            return raw === msg.panelId;
-          });
+          const target = apiRef.current.panels.find(p => getPanelComponent(p) === msg.panelId);
           if (target) {
             try {
               apiRef.current.removePanel(target);
             } catch {}
           }
         }
+        void closeWindow();
       }
     };
 

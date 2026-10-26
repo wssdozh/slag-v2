@@ -58,7 +58,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
               : 'Установить срок задачи'
           }
           aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок задачи'}
-          icon={<Calendar className="w-3.5 h-3.5" />}
+          icon={<Calendar className="w-4 h-4" />}
         />
 
         {isDatePickerOpen && (
@@ -106,7 +106,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 : 'Установить длительность задачи'
             }
             aria-label="Установить длительность задачи"
-            icon={<Clock className="w-3.5 h-3.5" />}
+            icon={<Clock className="w-4 h-4" />}
           />
         }
       >
@@ -167,7 +167,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 : 'повторение: настроить повтор'
             }
             aria-label="Повторяющаяся задача"
-            icon={<Repeat className="w-3.5 h-3.5" />}
+            icon={<Repeat className="w-4 h-4" />}
           />
         }
       >
@@ -224,25 +224,25 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
             {
               value: 'none',
               label: 'Обычный',
-              icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
+              icon: <LinearSignalBars size="md" priority="none" />,
               color: 'text-zinc-400',
             },
             {
               value: 'low',
               label: 'Низкий',
-              icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
+              icon: <LinearSignalBars size="md" priority="low" />,
               color: 'text-zinc-300',
             },
             {
               value: 'medium',
               label: 'Средний',
-              icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
+              icon: <LinearSignalBars size="md" priority="medium" />,
               color: 'text-amber-400',
             },
             {
               value: 'high',
               label: 'Высокий',
-              icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
+              icon: <LinearSignalBars size="md" priority="high" />,
               color: 'text-rose-400',
             },
           ]}

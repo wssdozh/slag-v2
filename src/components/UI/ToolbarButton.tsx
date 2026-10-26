@@ -27,14 +27,11 @@ export const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonPr
     let activeGlowClass = '';
     if (active) {
       if (glow === 'blue') {
-        activeGlowClass =
-          'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(96,165,250,0.7))]';
+        activeGlowClass = 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06]';
       } else if (glow === 'amber') {
-        activeGlowClass =
-          'text-amber-400 hover:text-amber-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(251,191,36,0.7))]';
+        activeGlowClass = 'text-amber-400 hover:text-amber-300 hover:bg-white/[0.06]';
       } else if (glow === 'rose') {
-        activeGlowClass =
-          'text-rose-400 hover:text-rose-300 hover:bg-white/[0.06] [filter:drop-shadow(0_0_6px_rgba(251,113,133,0.7))]';
+        activeGlowClass = 'text-rose-400 hover:text-rose-300 hover:bg-white/[0.06]';
       } else {
         activeGlowClass = 'bg-white/10 text-white';
       }
