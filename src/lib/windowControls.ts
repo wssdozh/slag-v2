@@ -259,7 +259,7 @@ export const listenDesktopEvents = (handlers: {
 };
 
 export interface CrossWindowTabMessage {
-  type: 'TAB_DRAG_MOVE' | 'TAB_DRAG_RELEASE' | 'TAB_DRAG_ACCEPTED';
+  type: 'TAB_DRAG_START' | 'TAB_DRAG_MOVE' | 'TAB_DRAG_RELEASE' | 'TAB_DRAG_ACCEPTED' | 'TAB_DRAG_END';
   sourceLabel?: string;
   targetLabel?: string;
   panelId: string;

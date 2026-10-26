@@ -356,13 +356,15 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
   const { currentFolder } = useApp();
   const apiRef = useRef<DockviewApi | null>(null);
   const dockSeqRef = useRef(0);
+  const activeCrossTabRef = useRef<{ panelId: string; title: string; sourceLabel: string } | null>(null);
   const [dropPreview, setDropPreview] = useState<{
     left: number;
     top: number;
     width: number;
     height: number;
     title: string;
-    direction?: string;
+    isTabBar?: boolean;
+    label?: string;
   } | null>(null);
 
   const effectiveInitialPanel = useMemo(() => {
@@ -377,6 +379,264 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     return undefined;
   }, [initialPanel]);
 
+  // Helper to determine spatial target group, tab bar detection, and split direction
+  const computeDropTarget = useCallback((clientX: number, clientY: number) => {
+    const api = apiRef.current;
+    if (!api) return null;
+
+    const clampedX = Math.max(0, Math.min(clientX, window.innerWidth - 1));
+    const clampedY = Math.max(0, Math.min(clientY, window.innerHeight - 1));
+
+    const dropEl = document.elementFromPoint(clampedX, clampedY);
+    let targetGroupEl = dropEl?.closest<HTMLElement>('.dv-groupview');
+    if (!targetGroupEl) {
+      const allGroups = document.querySelectorAll<HTMLElement>('.dv-groupview');
+      for (const el of allGroups) {
+        const r = el.getBoundingClientRect();
+        if (
+          clampedX >= r.left - 4 &&
+          clampedX <= r.right + 4 &&
+          clampedY >= r.top - 4 &&
+          clampedY <= r.bottom + 4
+        ) {
+          targetGroupEl = el;
+          break;
+        }
+      }
+    }
+
+    if (!targetGroupEl) return null;
+
+    const matchedGroup =
+      api.groups.find((g) => (g as any)?.element === targetGroupEl) ||
+      api.activeGroup ||
+      api.groups[0];
+    const rect = targetGroupEl.getBoundingClientRect();
+
+    // Check if cursor is over the tab header row (~34px)
+    const headerEl = targetGroupEl.querySelector<HTMLElement>(
+      '.dv-tabs-and-actions-container, .dv-header'
+    );
+    const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 34;
+
+    const isOverTabBar =
+      Boolean(
+        dropEl?.closest(
+          '.dv-tabs-and-actions-container, .dv-tab, .dv-tabs-container, .dv-void-container, .dv-right-actions-container'
+        )
+      ) ||
+      (clampedY >= rect.top && clampedY <= rect.top + headerHeight + 6);
+
+    if (isOverTabBar) {
+      return {
+        group: matchedGroup,
+        direction: undefined as 'left' | 'right' | 'above' | 'below' | undefined,
+        isTabBar: true,
+        preview: {
+          left: Math.round(rect.left),
+          top: Math.round(rect.top),
+          width: Math.round(rect.width),
+          height: Math.round(Math.max(32, headerHeight)),
+        },
+      };
+    }
+
+    // Cursor is in content area below the tab bar
+    const contentTop = rect.top + headerHeight;
+    const contentHeight = Math.max(1, rect.height - headerHeight);
+    const relContentX = (clampedX - rect.left) / Math.max(1, rect.width);
+    const relContentY = (clampedY - contentTop) / contentHeight;
+
+    let direction: 'left' | 'right' | 'above' | 'below' | undefined;
+    let previewLeft = rect.left;
+    let previewTop = contentTop;
+    let previewWidth = rect.width;
+    let previewHeight = contentHeight;
+
+    if (relContentX < 0.20) {
+      direction = 'left';
+      previewWidth = rect.width / 2;
+    } else if (relContentX > 0.80) {
+      direction = 'right';
+      previewLeft = rect.left + rect.width / 2;
+      previewWidth = rect.width / 2;
+    } else if (relContentY < 0.20) {
+      direction = 'above';
+      previewHeight = contentHeight / 2;
+    } else if (relContentY > 0.80) {
+      direction = 'below';
+      previewTop = contentTop + contentHeight / 2;
+      previewHeight = contentHeight / 2;
+    }
+
+    return {
+      group: matchedGroup,
+      direction,
+      isTabBar: false,
+      preview: {
+        left: Math.round(previewLeft),
+        top: Math.round(previewTop),
+        width: Math.round(previewWidth),
+        height: Math.round(previewHeight),
+      },
+    };
+  }, []);
+
+  const dockCrossWindowTab = useCallback(
+    (
+      panelId: string,
+      title: string,
+      targetGroup: any,
+      direction: 'left' | 'right' | 'above' | 'below' | undefined
+    ) => {
+      const api = apiRef.current;
+      if (!api) return;
+
+      const existingPanel = api.panels.find((p) => getPanelComponent(p) === panelId);
+      if (existingPanel) {
+        if (targetGroup && existingPanel.group !== targetGroup) {
+          existingPanel.api.moveTo(
+            direction
+              ? { group: targetGroup, position: direction as any }
+              : { group: targetGroup }
+          );
+        }
+        existingPanel.api.setActive();
+        wsLog.info(`Cross-window tab already open in workspace; moved/focused [${panelId}] "${title}"`);
+      } else {
+        dockSeqRef.current += 1;
+        const uniqueId = `panel_${panelId}_dock${dockSeqRef.current}`;
+        wsLog.info(`Cross-window tab accepted and docked into workspace: [${panelId}] "${title}"`, {
+          direction,
+          uniqueId,
+        });
+
+        try {
+          api.addPanel({
+            id: uniqueId,
+            component: panelId,
+            title,
+            position: targetGroup
+              ? (direction ? { referenceGroup: targetGroup, direction } : { referenceGroup: targetGroup })
+              : undefined,
+          });
+        } catch {
+          api.addPanel({
+            id: uniqueId,
+            component: panelId,
+            title,
+          });
+        }
+      }
+    },
+    []
+  );
+
+  // Primary window: native HTML5 dragover & drop listeners for 60fps cursor tracking & docking
+  useEffect(() => {
+    if (effectiveInitialPanel) return;
+
+    const handleWindowDragEnter = (e: DragEvent) => {
+      if (activeCrossTabRef.current || e.dataTransfer?.types.includes('application/x-slag-tab')) {
+        e.preventDefault();
+      }
+    };
+
+    const handleWindowDragOver = (e: DragEvent) => {
+      const crossTab = activeCrossTabRef.current;
+      const hasSlagType = e.dataTransfer?.types.includes('application/x-slag-tab');
+      if (!crossTab && !hasSlagType) return;
+
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'move';
+      }
+
+      const title = crossTab?.title || 'Вкладка';
+      const target = computeDropTarget(e.clientX, e.clientY);
+      if (target) {
+        let label = `Вкладка в группу «${title}»`;
+        if (target.direction === 'left') label = `Разделить слева «${title}»`;
+        else if (target.direction === 'right') label = `Разделить справа «${title}»`;
+        else if (target.direction === 'above') label = `Разделить сверху «${title}»`;
+        else if (target.direction === 'below') label = `Разделить снизу «${title}»`;
+
+        setDropPreview({
+          ...target.preview,
+          title,
+          isTabBar: target.isTabBar,
+          label,
+        });
+      } else {
+        setDropPreview(null);
+      }
+    };
+
+    const handleWindowDragLeave = (e: DragEvent) => {
+      if (
+        !e.relatedTarget ||
+        e.clientX <= 0 ||
+        e.clientY <= 0 ||
+        e.clientX >= window.innerWidth ||
+        e.clientY >= window.innerHeight
+      ) {
+        setDropPreview(null);
+      }
+    };
+
+    const handleWindowDrop = (e: DragEvent) => {
+      const crossTab = activeCrossTabRef.current;
+      const hasSlagType = e.dataTransfer?.types.includes('application/x-slag-tab');
+      if (!crossTab && !hasSlagType) return;
+
+      e.preventDefault();
+      setDropPreview(null);
+
+      let panelId = crossTab?.panelId;
+      let title = crossTab?.title || 'SLAG';
+      let sourceLabel = crossTab?.sourceLabel || '';
+
+      if (!panelId && e.dataTransfer) {
+        try {
+          const raw = e.dataTransfer.getData('application/x-slag-tab');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            panelId = parsed.panelId;
+            title = parsed.title;
+            sourceLabel = parsed.sourceLabel || '';
+          }
+        } catch {}
+      }
+
+      if (panelId) {
+        const target = computeDropTarget(e.clientX, e.clientY);
+        dockCrossWindowTab(panelId, title, target?.group, target?.direction);
+
+        void sendCrossWindowTab({
+          type: 'TAB_DRAG_ACCEPTED',
+          sourceLabel: 'main',
+          targetLabel: sourceLabel,
+          panelId,
+          title,
+        });
+
+        activeCrossTabRef.current = null;
+      }
+    };
+
+    window.addEventListener('dragenter', handleWindowDragEnter);
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleWindowDragEnter);
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('drop', handleWindowDrop);
+    };
+  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab]);
+
   // Cross-window tab docking listener: handles dragging tabs across OS windows
   useEffect(() => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -388,7 +648,21 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       // Guard: Never process messages originating from this exact window
       if (msg.sourceLabel === myLabel) return;
 
-      // 1. Live drop target preview indicator on primary window
+      // 1. Cross-window drag lifecycle tracking on primary window
+      if (isPrimary && msg.type === 'TAB_DRAG_START') {
+        activeCrossTabRef.current = {
+          panelId: msg.panelId,
+          title: msg.title,
+          sourceLabel: msg.sourceLabel || '',
+        };
+      }
+
+      if (isPrimary && msg.type === 'TAB_DRAG_END') {
+        activeCrossTabRef.current = null;
+        setDropPreview(null);
+      }
+
+      // 2. Live drop target preview indicator on primary window via IPC move coordinates
       if (isPrimary && msg.type === 'TAB_DRAG_MOVE') {
         if (msg.screenX === undefined || msg.screenY === undefined) {
           setDropPreview(null);
@@ -408,54 +682,30 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           return;
         }
 
-        const dropEl = document.elementFromPoint(
-          Math.max(0, Math.min(clientX, window.innerWidth - 1)),
-          Math.max(0, Math.min(clientY, window.innerHeight - 1))
-        );
-        const targetGroupEl = dropEl?.closest<HTMLElement>('.dv-groupview');
-        if (targetGroupEl) {
-          const rect = targetGroupEl.getBoundingClientRect();
-          const relX = (clientX - rect.left) / Math.max(1, rect.width);
-          const relY = (clientY - rect.top) / Math.max(1, rect.height);
-
-          let direction: 'left' | 'right' | 'above' | 'below' | undefined;
-          let previewLeft = rect.left;
-          let previewTop = rect.top;
-          let previewWidth = rect.width;
-          let previewHeight = rect.height;
-
-          if (relX < 0.25) {
-            direction = 'left';
-            previewWidth = rect.width / 2;
-          } else if (relX > 0.75) {
-            direction = 'right';
-            previewLeft = rect.left + rect.width / 2;
-            previewWidth = rect.width / 2;
-          } else if (relY < 0.25) {
-            direction = 'above';
-            previewHeight = rect.height / 2;
-          } else if (relY > 0.75) {
-            direction = 'below';
-            previewTop = rect.top + rect.height / 2;
-            previewHeight = rect.height / 2;
-          }
+        const target = computeDropTarget(clientX, clientY);
+        if (target) {
+          let label = `Вкладка в группу «${msg.title}»`;
+          if (target.direction === 'left') label = `Разделить слева «${msg.title}»`;
+          else if (target.direction === 'right') label = `Разделить справа «${msg.title}»`;
+          else if (target.direction === 'above') label = `Разделить сверху «${msg.title}»`;
+          else if (target.direction === 'below') label = `Разделить снизу «${msg.title}»`;
 
           setDropPreview({
-            left: Math.round(previewLeft),
-            top: Math.round(previewTop),
-            width: Math.round(previewWidth),
-            height: Math.round(previewHeight),
+            ...target.preview,
             title: msg.title,
-            direction,
+            isTabBar: target.isTabBar,
+            label,
           });
         } else {
           setDropPreview(null);
         }
       }
 
-      // 2. Primary window accepts tab, docks it with spatial split, and sends confirmation
+      // 3. Primary window accepts tab, docks it, and sends confirmation
       if (isPrimary && msg.type === 'TAB_DRAG_RELEASE') {
         setDropPreview(null);
+        activeCrossTabRef.current = null;
+
         const isInside =
           msg.forceDock ||
           (msg.screenX !== undefined &&
@@ -466,75 +716,20 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             msg.screenY <= window.screenY + window.outerHeight + 40);
 
         if (isInside && apiRef.current) {
-          const api = apiRef.current;
-          const existingPanel = api.panels.find(p => getPanelComponent(p) === msg.panelId);
-
-          // Determine spatial drop target group and split direction
-          let targetGroup = api.activeGroup || api.groups[0];
+          let targetGroup = apiRef.current.activeGroup || apiRef.current.groups[0];
           let direction: 'left' | 'right' | 'above' | 'below' | undefined;
 
           if (!msg.forceDock && msg.screenX !== undefined && msg.screenY !== undefined) {
             const clientX = msg.screenX - window.screenX;
             const clientY = msg.screenY - window.screenY;
-            const dropEl = document.elementFromPoint(
-              Math.max(0, Math.min(clientX, window.innerWidth - 1)),
-              Math.max(0, Math.min(clientY, window.innerHeight - 1))
-            );
-            const targetGroupEl = dropEl?.closest<HTMLElement>('.dv-groupview');
-
-            if (targetGroupEl) {
-              const matched = api.groups.find(g => (g as any)?.element === targetGroupEl);
-              if (matched) {
-                targetGroup = matched;
-                const rect = targetGroupEl.getBoundingClientRect();
-                const relX = (clientX - rect.left) / Math.max(1, rect.width);
-                const relY = (clientY - rect.top) / Math.max(1, rect.height);
-
-                // Edge proximity (25%) -> split into a resizable pane with sash
-                if (relX < 0.25) direction = 'left';
-                else if (relX > 0.75) direction = 'right';
-                else if (relY < 0.25) direction = 'above';
-                else if (relY > 0.75) direction = 'below';
-              }
+            const target = computeDropTarget(clientX, clientY);
+            if (target) {
+              targetGroup = target.group;
+              direction = target.direction;
             }
           }
 
-          if (existingPanel) {
-            if (targetGroup && existingPanel.group !== targetGroup) {
-              existingPanel.api.moveTo(
-                direction
-                  ? { group: targetGroup, position: direction as any }
-                  : { group: targetGroup }
-              );
-            }
-            existingPanel.api.setActive();
-            wsLog.info(`Cross-window tab already open in workspace; moved/focused [${msg.panelId}] "${msg.title}"`);
-          } else {
-            dockSeqRef.current += 1;
-            const uniqueId = `panel_${msg.panelId}_dock${dockSeqRef.current}`;
-            wsLog.info(`Cross-window tab accepted and docked into workspace: [${msg.panelId}] "${msg.title}"`, {
-              from: msg.sourceLabel,
-              direction,
-              uniqueId,
-            });
-
-            try {
-              api.addPanel({
-                id: uniqueId,
-                component: msg.panelId,
-                title: msg.title,
-                position: targetGroup
-                  ? (direction ? { referenceGroup: targetGroup, direction } : { referenceGroup: targetGroup })
-                  : undefined,
-              });
-            } catch {
-              api.addPanel({
-                id: uniqueId,
-                component: msg.panelId,
-                title: msg.title,
-              });
-            }
-          }
+          dockCrossWindowTab(msg.panelId, msg.title, targetGroup, direction);
 
           void sendCrossWindowTab({
             type: 'TAB_DRAG_ACCEPTED',
@@ -550,7 +745,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
       }
 
-      // 3. Secondary window: close once primary accepts the panel
+      // 4. Secondary window: close once primary accepts the panel
       if (
         !isPrimary &&
         msg.type === 'TAB_DRAG_ACCEPTED' &&
@@ -572,7 +767,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     return () => {
       unlisten();
     };
-  }, [effectiveInitialPanel]);
+  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab]);
 
   // Primary window: restore previously open detached windows across app restarts
   useEffect(() => {
@@ -835,6 +1030,32 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           : 'main';
       const isSecondary = Boolean(effectiveInitialPanel);
 
+      document.body.classList.add('tab-dragging');
+
+      if (isSecondary) {
+        void sendCrossWindowTab({
+          type: 'TAB_DRAG_START',
+          sourceLabel: winLabel,
+          panelId: rawComponentId,
+          title,
+        });
+      }
+
+      const nativeEvt = dragEvent.nativeEvent as any;
+      if (nativeEvt && nativeEvt.dataTransfer) {
+        try {
+          nativeEvt.dataTransfer.setData(
+            'application/x-slag-tab',
+            JSON.stringify({
+              panelId: rawComponentId,
+              title,
+              sourceLabel: winLabel,
+            })
+          );
+          nativeEvt.dataTransfer.effectAllowed = 'all';
+        } catch {}
+      }
+
       wsLog.debug(`Tab drag gesture started: [${rawComponentId}] "${title}"`, {
         isSecondary,
         winLabel,
@@ -846,7 +1067,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         const now = Date.now();
         if (now - lastMoveTime < 25) return;
         lastMoveTime = now;
-        if (e.screenX && e.screenY) {
+        if (e.screenX || e.screenY) {
           void sendCrossWindowTab({
             type: 'TAB_DRAG_MOVE',
             sourceLabel: winLabel,
@@ -862,40 +1083,56 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       window.addEventListener('pointermove', handlePointerMove as EventListener);
 
       const handleDragEnd = (e: DragEvent | MouseEvent) => {
+        document.body.classList.remove('tab-dragging');
         window.removeEventListener('drag', handlePointerMove as EventListener);
         window.removeEventListener('pointermove', handlePointerMove as EventListener);
         window.removeEventListener('dragend', handleDragEnd as EventListener);
         window.removeEventListener('pointerup', handleDragEnd as EventListener);
 
         // If dragging in secondary window, broadcast drop release to main window
-        if (isSecondary && e.screenX && e.screenY) {
-          wsLog.debug(`Broadcasting cross-window TAB_DRAG_RELEASE for [${rawComponentId}] "${title}"`, {
-            screenPos: { x: e.screenX, y: e.screenY },
-            sourceLabel: winLabel,
-          });
+        if (isSecondary) {
           void sendCrossWindowTab({
-            type: 'TAB_DRAG_RELEASE',
+            type: 'TAB_DRAG_END',
             sourceLabel: winLabel,
             panelId: rawComponentId,
             title,
-            screenX: e.screenX,
-            screenY: e.screenY,
           });
+
+          if (e.screenX || e.screenY) {
+            wsLog.debug(`Broadcasting cross-window TAB_DRAG_RELEASE for [${rawComponentId}] "${title}"`, {
+              screenPos: { x: e.screenX, y: e.screenY },
+              sourceLabel: winLabel,
+            });
+            void sendCrossWindowTab({
+              type: 'TAB_DRAG_RELEASE',
+              sourceLabel: winLabel,
+              panelId: rawComponentId,
+              title,
+              screenX: e.screenX,
+              screenY: e.screenY,
+            });
+          }
         }
 
-        // If dragging in main window, tear-off into new OS window when dropped outside
+        // If dragging in main window, tear-off into new OS window ONLY when dropped genuinely outside window
         if (!isSecondary) {
-          const isOutside =
-            e.clientX < 10 ||
-            e.clientX > window.innerWidth - 10 ||
-            e.clientY < 10 ||
-            e.clientY > window.innerHeight - 10 ||
-            e.screenX < window.screenX ||
-            e.screenX > window.screenX + window.outerWidth ||
-            e.screenY < window.screenY ||
-            e.screenY > window.screenY + window.outerHeight;
+          const dragEvt = e as DragEvent;
+          const dropEffect = dragEvt.dataTransfer?.dropEffect;
+          // If drop was accepted inside window by Dockview, dropEffect is 'move' -> never tear off
+          if (dropEffect && dropEffect !== 'none') {
+            return;
+          }
 
-          if (isOutside) {
+          // Ignore (0,0) coordinates which occur when drag is canceled or released on certain controls
+          const hasValidCoords = Boolean(e.screenX || e.screenY);
+          const isGenuinelyOutside =
+            hasValidCoords &&
+            (e.screenX < window.screenX - 25 ||
+              e.screenX > window.screenX + window.outerWidth + 25 ||
+              e.screenY < window.screenY - 25 ||
+              e.screenY > window.screenY + window.outerHeight + 25);
+
+          if (isGenuinelyOutside) {
             wsLog.info(`Tab dropped outside window bounds -> triggering tear-off for [${rawComponentId}] "${title}"`, {
               coords: { x: e.screenX, y: e.screenY },
             });
@@ -978,11 +1215,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             width: `${dropPreview.width}px`,
             height: `${dropPreview.height}px`,
           }}
-          className="pointer-events-none z-[9999] rounded-xl border-2 border-blue-500/80 bg-blue-500/15 shadow-[0_0_30px_rgba(59,130,246,0.3)] backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-75"
+          className={`pointer-events-none z-[9999] border-2 border-blue-500/80 bg-blue-500/15 shadow-[0_0_24px_rgba(59,130,246,0.35)] backdrop-blur-[1px] flex items-center justify-center animate-in fade-in duration-75 ${
+            dropPreview.isTabBar ? 'rounded-md ring-1 ring-blue-400/50' : 'rounded-xl'
+          }`}
         >
-          <div className="px-3 py-1.5 rounded-lg bg-[#141417]/95 border border-white/20 text-xs font-medium text-white flex items-center gap-2 shadow-2xl">
+          <div
+            className={`bg-[#141417]/95 border border-white/20 text-white flex items-center gap-1.5 shadow-2xl select-none ${
+              dropPreview.isTabBar
+                ? 'px-2.5 py-0.5 rounded-full border-blue-400/40 text-[11px] font-medium text-blue-200'
+                : 'px-3 py-1.5 rounded-lg text-xs font-medium'
+            }`}
+          >
             <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            <span>Вставить «{dropPreview.title}»</span>
+            <span>{dropPreview.label || `Вставить «${dropPreview.title}»`}</span>
           </div>
         </div>
       )}

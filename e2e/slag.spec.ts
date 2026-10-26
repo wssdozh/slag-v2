@@ -2923,7 +2923,58 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const dockviewContainer = page.locator('.dockview-theme-slag');
     await expect(dockviewContainer).toBeVisible();
 
-    // 1. Simulate releasing a detached tab over the main window and verify TAB_DRAG_ACCEPTED handshake
+    // 1. Simulate dragging tab over tab bar header and verify glowing drop preview indicator
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+      channel.postMessage({
+        type: 'TAB_DRAG_MOVE',
+        sourceLabel: 'panel-audio-test',
+        panelId: 'audio',
+        title: 'Аудиоплеер',
+        screenX: window.screenX + 450,
+        screenY: window.screenY + 15, // exactly on top tab bar
+      });
+    });
+
+    const dropTabBarIndicator = page.locator('text=Вкладка в группу «Аудиоплеер»');
+    await expect(dropTabBarIndicator).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/cross-window-tab-drag-preview.png',
+      fullPage: false,
+    });
+
+    // 1.1 Test moving to left edge of center content area -> triggers split preview
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+      channel.postMessage({
+        type: 'TAB_DRAG_MOVE',
+        sourceLabel: 'panel-audio-test',
+        panelId: 'audio',
+        title: 'Аудиоплеер',
+        screenX: window.screenX + 270,
+        screenY: window.screenY + 300,
+      });
+    });
+
+    const splitLeftIndicator = page.locator('text=Разделить слева «Аудиоплеер»');
+    await expect(splitLeftIndicator).toBeVisible();
+
+    // 1.2 Move back to the tab bar -> returns to tab bar indicator
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+      channel.postMessage({
+        type: 'TAB_DRAG_MOVE',
+        sourceLabel: 'panel-audio-test',
+        panelId: 'audio',
+        title: 'Аудиоплеер',
+        screenX: window.screenX + 450,
+        screenY: window.screenY + 15,
+      });
+    });
+    await expect(dropTabBarIndicator).toBeVisible();
+
+    // 2. Simulate releasing a detached tab over the main window and verify TAB_DRAG_ACCEPTED handshake
     const acceptedMsg = await page.evaluate(() => {
       return new Promise<any>((resolve) => {
         const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
@@ -2937,8 +2988,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
           sourceLabel: 'panel-audio-test',
           panelId: 'audio',
           title: 'Аудиоплеер',
-          screenX: window.screenX + 100,
-          screenY: window.screenY + 100,
+          screenX: window.screenX + 300,
+          screenY: window.screenY + 15,
         });
       });
     });
@@ -2946,11 +2997,11 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     expect(acceptedMsg.targetLabel).toBe('panel-audio-test');
     expect(acceptedMsg.panelId).toBe('audio');
 
-    // 2. Verify the Audio tab appears in the main window
+    // 3. Verify the Audio tab appears in the main window
     const audioTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // 3. Verify deduplication: re-releasing the same tab does not create duplicate tabs
+    // 4. Verify deduplication: re-releasing the same tab does not create duplicate tabs
     await page.evaluate(() => {
       const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
       channel.postMessage({
@@ -2958,8 +3009,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
         sourceLabel: 'panel-audio-test',
         panelId: 'audio',
         title: 'Аудиоплеер',
-        screenX: window.screenX + 100,
-        screenY: window.screenY + 100,
+        screenX: window.screenX + 300,
+        screenY: window.screenY + 15,
       });
     });
 

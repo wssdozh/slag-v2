@@ -115,6 +115,12 @@
   -webkit-app-region: drag;
 }
 
+/* During tab drag-and-drop, disable all window drag regions so HTML5 dragover & drop work flawlessly on the tab bar and void container */
+body.tab-dragging *,
+body.tab-dragging .dv-void-container {
+  -webkit-app-region: no-drag !important;
+}
+
 /* Ensure tab container doesn't block drop events */
 .dockview-theme-slag .dv-tabs-and-actions-container,
 .dockview-theme-slag .dockview-tabs-and-actions-container {
