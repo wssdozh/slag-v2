@@ -108,6 +108,13 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/article-card-teaser.png',
     });
 
+    // Hover over article card to verify smooth expand of reply and more actions
+    await articleCard.hover();
+    await page.waitForTimeout(200);
+    await articleCard.screenshot({
+      path: 'test-results/screenshots/article-card-hover.png',
+    });
+
     // Open via corner Focus Editor button
     const focusEditorBtn = articleCard.locator('button[aria-label="Открыть в фокус-редакторе"]');
     await expect(focusEditorBtn).toBeVisible();
@@ -130,13 +137,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
   test('5. Unified Context Menu and Pinning via Right Click', async ({ page }) => {
     const card = page.locator('[id^="item-"]').first();
     await expect(card).toBeVisible();
+
+    // Verify hover state: Reply is left, More is right
+    await card.hover();
+    await page.waitForTimeout(100);
+    await card.screenshot({ path: 'screenshots/regular-card-hover.png' });
+
     await card.click({ button: 'right' });
 
     // Verify Context Menu is open with Linear shortcuts
     const contextMenu = page.locator('.fixed.z-50', { hasText: 'Ответить' });
     await expect(contextMenu).toBeVisible();
     await expect(contextMenu.locator('text=Фокус-редактор')).toBeVisible();
-    await expect(contextMenu.locator('text=Сменить тип')).toBeVisible();
+    await expect(contextMenu.locator('text=Закрепить')).toBeVisible();
     await expect(contextMenu.locator('text=Копировать текст')).toBeVisible();
 
     // Toggle Pin
@@ -3096,19 +3109,21 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const contextMenu = page.locator('.fixed.z-50', { hasText: 'Ответить' });
     await expect(contextMenu).toBeVisible();
 
-    // Verify new actions
+    // Verify clean context menu actions (no redundant property matryoshka)
+    await expect(contextMenu.locator('text=Ответить')).toBeVisible();
+    await expect(contextMenu.locator('text=Фокус-редактор')).toBeVisible();
+    await expect(contextMenu.locator('text=Закрепить')).toBeVisible();
     await expect(contextMenu.locator('text=Разобрать с ИИ')).toBeVisible();
-    await expect(contextMenu.locator('text=Подобрать теги (ИИ)')).toBeVisible();
-    await expect(contextMenu.locator('text=Спросить ассистента')).toBeVisible();
-    await expect(contextMenu.locator('text=Приоритет')).toBeVisible();
-    await expect(contextMenu.locator('text=Дедлайн')).toBeVisible();
-    await expect(contextMenu.locator('text=Дублировать')).toBeVisible();
+    await expect(contextMenu.locator('text=Копировать текст')).toBeVisible();
+    await expect(contextMenu.locator('text=Дополнительно')).toBeVisible();
 
     // Take screenshot of enhanced context menu
     await page.screenshot({ path: 'test-results/screenshots/context-menu-enhanced.png' });
 
-    // Click Duplicate
+    // Open "Дополнительно" submenu to access Duplicate
+    await contextMenu.locator('button', { hasText: 'Дополнительно' }).click();
     const dupBtn = contextMenu.locator('button', { hasText: 'Дублировать' });
+    await expect(dupBtn).toBeVisible();
     await dupBtn.click();
     await expect(page.locator('text=Запись продублирована')).toBeVisible();
 
@@ -3136,6 +3151,11 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // Take screenshot of Desktop editor with sticky toolbar
     await page.screenshot({ path: 'test-results/screenshots/editor-desktop-sticky.png' });
+
+    // Switch to task mode to verify clean monochrome task metadata without lines
+    await page.locator('header button', { hasText: 'Таска' }).click();
+    await page.waitForTimeout(100);
+    await page.screenshot({ path: 'screenshots/editor-task-clean.png' });
 
     // 3. Emulate mobile viewport to test Telegram-style bottom bar
     await page.setViewportSize({ width: 390, height: 844 });

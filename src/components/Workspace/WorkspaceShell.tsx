@@ -86,7 +86,7 @@ const WorkspaceContentPanel: React.FC<{
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           <FeedList />
           {/* Floating Composer Island */}
-          <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 px-3 flex justify-center">
+          <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 pl-4 pr-[22px] flex justify-center">
             <div className="pointer-events-auto max-w-2xl w-full">
               <Composer key={currentFolder} />
             </div>
