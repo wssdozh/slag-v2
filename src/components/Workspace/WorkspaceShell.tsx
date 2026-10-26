@@ -162,103 +162,117 @@ const getPanelComponent = (panel: IDockviewPanel): string => {
   return panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
 };
 
+const detachingPanels = new Set<string>();
+
 // Detach panel to native OS window (in desktop mode) or browser popout / floating group
 const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left: number; top: number; width?: number; height?: number }) => {
-  const groupElement = (panel.group as any)?.element as HTMLElement | undefined;
-  const rect = groupElement?.getBoundingClientRect();
-  const panelWidth = box?.width || (rect ? Math.round(rect.width) : panel.api.width) || 760;
-  const panelHeight = box?.height || (rect ? Math.round(rect.height) : panel.api.height) || 580;
-  const left = box?.left ?? (rect ? Math.round(window.screenX + rect.left) : Math.max(40, window.screenX + 80));
-  const top = box?.top ?? (rect ? Math.round(window.screenY + rect.top) : Math.max(40, window.screenY + 80));
+  if (detachingPanels.has(panel.id)) {
+    wsLog.debug(`Ignoring duplicate detach request for panel [${panel.id}]`);
+    return;
+  }
+  detachingPanels.add(panel.id);
 
-  const rawComponentId = getPanelComponent(panel);
-  const title = panel.title || 'Окно SLAG';
+  try {
+    const groupElement = (panel.group as any)?.element as HTMLElement | undefined;
+    const rect = groupElement?.getBoundingClientRect();
+    const panelWidth = box?.width || (rect ? Math.round(rect.width) : panel.api.width) || 760;
+    const panelHeight = box?.height || (rect ? Math.round(rect.height) : panel.api.height) || 580;
+    const left = box?.left ?? (rect ? Math.round(window.screenX + rect.left) : Math.max(40, window.screenX + 80));
+    const top = box?.top ?? (rect ? Math.round(window.screenY + rect.top) : Math.max(40, window.screenY + 80));
 
-  wsLog.info(`Detaching panel [${rawComponentId}] "${title}"`, {
-    panelId: panel.id,
-    mode: isDesktopApp() ? 'native_window' : 'popout/floating',
-    box: { left, top, width: panelWidth, height: panelHeight },
-  });
+    const rawComponentId = getPanelComponent(panel);
+    const title = panel.title || 'Окно SLAG';
 
-  // Capture existing group widths to preserve proportions when panel/group is removed
-  const panelGroup = panel.group;
-  const remainingGroups = api.groups.filter(g => g !== panelGroup);
-  const capturedWidths = new Map<string, number>();
-  remainingGroups.forEach(g => {
-    capturedWidths.set(g.id, g.api.width);
-  });
+    wsLog.info(`Detaching panel [${rawComponentId}] "${title}"`, {
+      panelId: panel.id,
+      mode: isDesktopApp() ? 'native_window' : 'popout/floating',
+      box: { left, top, width: panelWidth, height: panelHeight },
+    });
 
-  const restoreProportions = () => {
-    requestAnimationFrame(() => {
-      // If 2 groups remain (Center workspace + 1 side panel), keep side panel compact (~320px)
-      if (api.groups.length === 2) {
-        const centerGroup = api.groups.find(g =>
-          g.panels.some(p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_'))
-        );
-        const sideGroup = api.groups.find(g => g !== centerGroup);
-        if (sideGroup) {
-          const prevWidth = capturedWidths.get(sideGroup.id) || 320;
-          const targetWidth = Math.min(Math.max(prevWidth, 240), 380);
-          try {
-            sideGroup.api.setSize({ width: targetWidth });
-          } catch {
-            // Group might be disposing
+    // Capture existing group widths to preserve proportions when panel/group is removed
+    const panelGroup = panel.group;
+    const remainingGroups = api.groups.filter(g => g !== panelGroup);
+    const capturedWidths = new Map<string, number>();
+    remainingGroups.forEach(g => {
+      capturedWidths.set(g.id, g.api.width);
+    });
+
+    const restoreProportions = () => {
+      requestAnimationFrame(() => {
+        // If 2 groups remain (Center workspace + 1 side panel), keep side panel compact (~320px)
+        if (api.groups.length === 2) {
+          const centerGroup = api.groups.find(g =>
+            g.panels.some(p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_'))
+          );
+          const sideGroup = api.groups.find(g => g !== centerGroup);
+          if (sideGroup) {
+            const prevWidth = capturedWidths.get(sideGroup.id) || 320;
+            const targetWidth = Math.min(Math.max(prevWidth, 240), 380);
+            try {
+              sideGroup.api.setSize({ width: targetWidth });
+            } catch {
+              // Group might be disposing
+            }
           }
         }
-      }
-    });
-  };
-
-  // 1. In native Tauri desktop app, spawn a genuine independent OS window
-  if (isDesktopApp()) {
-    const opened = await openDetachedWindow(rawComponentId, title, {
-      left,
-      top,
-      width: panelWidth,
-      height: panelHeight,
-    });
-    if (opened) {
-      wsLog.info(`Detached panel [${rawComponentId}] spawned into native window; removing from workspace`, {
-        panelId: panel.id,
       });
-      try {
-        api.removePanel(panel);
-        restoreProportions();
-      } catch {
-        // Ignore if already unmounted
+    };
+
+    // 1. In native Tauri desktop app, spawn a genuine independent OS window
+    if (isDesktopApp()) {
+      const opened = await openDetachedWindow(rawComponentId, title, {
+        left,
+        top,
+        width: panelWidth,
+        height: panelHeight,
+      });
+      if (opened) {
+        wsLog.info(`Detached panel [${rawComponentId}] spawned into native window; removing from workspace`, {
+          panelId: panel.id,
+        });
+        try {
+          api.removePanel(panel);
+          restoreProportions();
+        } catch {
+          // Ignore if already unmounted
+        }
+        return;
       }
-      return;
     }
-  }
 
-  // 2. Web browser fallback: try window.open / popout.html
-  try {
-    const success = await api.addPopoutGroup(panel, {
-      popoutUrl: '/popout.html',
-      position: { left, top, width: panelWidth, height: panelHeight },
-    });
-    if (!success) {
-      wsLog.info(`Browser popout failed or blocked; converting [${rawComponentId}] to floating group`, {
-        panelId: panel.id,
+    // 2. Web browser fallback: try window.open / popout.html
+    try {
+      const success = await api.addPopoutGroup(panel, {
+        popoutUrl: '/popout.html',
+        position: { left, top, width: panelWidth, height: panelHeight },
       });
+      if (!success) {
+        wsLog.info(`Browser popout failed or blocked; converting [${rawComponentId}] to floating group`, {
+          panelId: panel.id,
+        });
+        api.addFloatingGroup(panel, {
+          x: Math.max(20, (window.innerWidth - panelWidth) / 2),
+          y: Math.max(20, (window.innerHeight - panelHeight) / 2),
+          width: panelWidth,
+          height: panelHeight,
+        });
+      } else {
+        wsLog.info(`Detached panel [${rawComponentId}] successfully placed in popout group`, { panelId: panel.id });
+        restoreProportions();
+      }
+    } catch {
+      wsLog.info(`Detached panel [${rawComponentId}] placed in fallback floating group`, { panelId: panel.id });
       api.addFloatingGroup(panel, {
         x: Math.max(20, (window.innerWidth - panelWidth) / 2),
         y: Math.max(20, (window.innerHeight - panelHeight) / 2),
         width: panelWidth,
         height: panelHeight,
       });
-    } else {
-      wsLog.info(`Detached panel [${rawComponentId}] successfully placed in popout group`, { panelId: panel.id });
-      restoreProportions();
     }
-  } catch {
-    wsLog.info(`Detached panel [${rawComponentId}] placed in fallback floating group`, { panelId: panel.id });
-    api.addFloatingGroup(panel, {
-      x: Math.max(20, (window.innerWidth - panelWidth) / 2),
-      y: Math.max(20, (window.innerHeight - panelHeight) / 2),
-      width: panelWidth,
-      height: panelHeight,
-    });
+  } finally {
+    setTimeout(() => {
+      detachingPanels.delete(panel.id);
+    }, 1200);
   }
 };
 
@@ -366,6 +380,10 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     isTabBar?: boolean;
     label?: string;
   } | null>(null);
+  const dropPreviewRef = useRef(dropPreview);
+  useEffect(() => {
+    dropPreviewRef.current = dropPreview;
+  }, [dropPreview]);
 
   const effectiveInitialPanel = useMemo(() => {
     if (initialPanel) return initialPanel;
@@ -658,8 +676,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       }
 
       if (isPrimary && msg.type === 'TAB_DRAG_END') {
-        activeCrossTabRef.current = null;
-        setDropPreview(null);
+        setTimeout(() => {
+          setDropPreview(null);
+        }, 150);
       }
 
       // 2. Live drop target preview indicator on primary window via IPC move coordinates
@@ -668,6 +687,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           setDropPreview(null);
           return;
         }
+
+        activeCrossTabRef.current = {
+          panelId: msg.panelId,
+          title: msg.title,
+          sourceLabel: msg.sourceLabel || '',
+        };
 
         const clientX = msg.screenX - window.screenX;
         const clientY = msg.screenY - window.screenY;
@@ -703,11 +728,13 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
       // 3. Primary window accepts tab, docks it, and sends confirmation
       if (isPrimary && msg.type === 'TAB_DRAG_RELEASE') {
+        const lastPreview = dropPreviewRef.current;
         setDropPreview(null);
         activeCrossTabRef.current = null;
 
         const isInside =
           msg.forceDock ||
+          Boolean(lastPreview) ||
           (msg.screenX !== undefined &&
             msg.screenY !== undefined &&
             msg.screenX >= window.screenX - 40 &&
@@ -1061,13 +1088,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         winLabel,
       });
 
+      let dragEnded = false;
+      let lastScreenX = 0;
+      let lastScreenY = 0;
+
       let lastMoveTime = 0;
       const handlePointerMove = (e: MouseEvent | DragEvent) => {
-        if (!isSecondary) return;
+        if (!isSecondary || dragEnded) return;
         const now = Date.now();
         if (now - lastMoveTime < 25) return;
         lastMoveTime = now;
         if (e.screenX || e.screenY) {
+          lastScreenX = e.screenX;
+          lastScreenY = e.screenY;
           void sendCrossWindowTab({
             type: 'TAB_DRAG_MOVE',
             sourceLabel: winLabel,
@@ -1080,38 +1113,39 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       };
 
       window.addEventListener('drag', handlePointerMove as EventListener);
-      window.addEventListener('pointermove', handlePointerMove as EventListener);
 
       const handleDragEnd = (e: DragEvent | MouseEvent) => {
+        if (dragEnded) return;
+        dragEnded = true;
+
         document.body.classList.remove('tab-dragging');
         window.removeEventListener('drag', handlePointerMove as EventListener);
-        window.removeEventListener('pointermove', handlePointerMove as EventListener);
         window.removeEventListener('dragend', handleDragEnd as EventListener);
-        window.removeEventListener('pointerup', handleDragEnd as EventListener);
+
+        const releaseScreenX = e.screenX || lastScreenX;
+        const releaseScreenY = e.screenY || lastScreenY;
 
         // If dragging in secondary window, broadcast drop release to main window
         if (isSecondary) {
+          wsLog.debug(`Broadcasting cross-window TAB_DRAG_RELEASE for [${rawComponentId}] "${title}"`, {
+            screenPos: { x: releaseScreenX, y: releaseScreenY },
+            sourceLabel: winLabel,
+          });
+          void sendCrossWindowTab({
+            type: 'TAB_DRAG_RELEASE',
+            sourceLabel: winLabel,
+            panelId: rawComponentId,
+            title,
+            screenX: releaseScreenX,
+            screenY: releaseScreenY,
+          });
+
           void sendCrossWindowTab({
             type: 'TAB_DRAG_END',
             sourceLabel: winLabel,
             panelId: rawComponentId,
             title,
           });
-
-          if (e.screenX || e.screenY) {
-            wsLog.debug(`Broadcasting cross-window TAB_DRAG_RELEASE for [${rawComponentId}] "${title}"`, {
-              screenPos: { x: e.screenX, y: e.screenY },
-              sourceLabel: winLabel,
-            });
-            void sendCrossWindowTab({
-              type: 'TAB_DRAG_RELEASE',
-              sourceLabel: winLabel,
-              panelId: rawComponentId,
-              title,
-              screenX: e.screenX,
-              screenY: e.screenY,
-            });
-          }
         }
 
         // If dragging in main window, tear-off into new OS window ONLY when dropped genuinely outside window
@@ -1147,7 +1181,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       };
 
       window.addEventListener('dragend', handleDragEnd as EventListener, { once: true });
-      window.addEventListener('pointerup', handleDragEnd as EventListener, { once: true });
     });
   };
 
