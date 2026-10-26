@@ -3045,4 +3045,51 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await aiBtn.click();
     await expect(page.locator('text=Запись разобрана: добавлено')).toBeVisible();
   });
+
+  test('46. FullscreenEditor: Desktop Sticky Top Toolbar and Mobile Telegram-style Bottom Bar', async ({ page }) => {
+    // 1. Open editor on first card
+    const card = page.locator('[id^="item-"]').first();
+    await card.click({ button: 'right' });
+    await page.locator('.fixed.z-50 button', { hasText: 'Фокус-редактор' }).click();
+
+    const editorRoot = page.locator('#fullscreen-editor-root');
+    await expect(editorRoot).toBeVisible();
+
+    // 2. Desktop: Verify sticky toolbar at top
+    const desktopStickyToolbar = page.locator('.hidden.md\\:flex.sticky.top-0');
+    await expect(desktopStickyToolbar).toBeVisible();
+    await expect(desktopStickyToolbar.locator('button[title*="Заголовок 1"]')).toBeVisible();
+
+    // Take screenshot of Desktop editor with sticky toolbar
+    await page.screenshot({ path: 'test-results/screenshots/editor-desktop-sticky.png' });
+
+    // 3. Emulate mobile viewport to test Telegram-style bottom bar
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(200);
+
+    // Verify Telegram-style bottom bar is visible
+    const mobileBottomBar = page.locator('.md\\:hidden.fixed.bottom-0');
+    await expect(mobileBottomBar).toBeVisible();
+
+    // Verify top settings are still at the top
+    await expect(page.locator('header select, header button[aria-haspopup="listbox"]').first()).toBeVisible();
+
+    // Tap Lists button (:=) to open lists popover sheet
+    const listBtn = mobileBottomBar.locator('button[title*="Списки"]').first();
+    await listBtn.click();
+
+    // Verify Lists popover sheet appears above toolbar
+    await expect(page.locator('text=Список с маркерами')).toBeVisible();
+    await expect(page.locator('text=Чек-лист')).toBeVisible();
+
+    // Take screenshot of Mobile Telegram-style editor with lists popover open
+    await page.screenshot({ path: 'test-results/screenshots/editor-mobile-telegram-lists.png' });
+
+    // Close popover by clicking an item
+    await page.locator('text=Чек-лист').click();
+
+    // Close editor
+    await page.locator('header button', { hasText: 'Назад' }).first().click();
+    await expect(editorRoot).not.toBeVisible();
+  });
 });

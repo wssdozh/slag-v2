@@ -9,6 +9,7 @@ import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceH
 import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/taskUtils';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
+import { undo, redo } from '@codemirror/commands';
 import {
   ArrowLeft,
   Save,
@@ -34,10 +35,16 @@ import {
   Check,
   Calendar,
   Repeat,
+  Undo2,
+  Redo2,
+  Sparkles,
+  Table,
+  Send,
 } from 'lucide-react';
 import { Select } from '../UI/Select';
 import { TagChip } from '../UI/TagChip';
 import { formatDueDateLabel } from '../../lib/dateUtils';
+import { decomposeItemWithAi, generateSmartTags } from '../../lib/aiService';
 
 let activeEditorView: EditorView | null = null;
 
@@ -69,8 +76,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     setSelectedItem,
     folders,
     addToast,
-    openLightbox
+    openLightbox,
+    aiSettings,
   } = useApp();
+
+  const [activeMobilePopover, setActiveMobilePopover] = useState<'formatting' | 'lists' | 'ai' | null>(null);
 
   const [title, setTitle] = useState(item.title || '');
   const [content, setContent] = useState(() =>
@@ -149,6 +159,16 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     setSelectedItem(null);
   }, [setIsFullscreenEditorOpen, setSelectedItem]);
 
+  const handleUndo = useCallback(() => {
+    const view = getEditorView();
+    if (view) undo(view);
+  }, [getEditorView]);
+
+  const handleRedo = useCallback(() => {
+    const view = getEditorView();
+    if (view) redo(view);
+  }, [getEditorView]);
+
   // Keyboard shortcuts: Esc = Cancel / Back, Ctrl/Cmd+S = Save
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -193,6 +213,45 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     });
     view.focus();
   }, [getEditorView]);
+
+  const handleInsertTable = useCallback(() => {
+    insertMarkdown('\n| Колонка 1 | Колонка 2 |\n|---|---|\n| Запись 1 | Запись 2 |\n', '');
+  }, [insertMarkdown]);
+
+  const handleAiDecomposeInline = useCallback(async () => {
+    addToast('ИИ разбирает запись на шаги...', 'info');
+    try {
+      const res = await decomposeItemWithAi(
+        { ...item, title, content, type, tags, folder, attachments },
+        aiSettings
+      );
+      if (res.subtasks && res.subtasks.length > 0) {
+        const subtasksMd = '\n' + res.subtasks.map(s => `- [ ] ${s.title}`).join('\n') + '\n';
+        insertMarkdown(subtasksMd, '');
+        if (res.tags && res.tags.length > 0) {
+          setTags(prev => Array.from(new Set([...prev, ...(res.tags || [])])));
+        }
+        addToast(`Добавлено ${res.subtasks.length} подзадач`, 'success');
+      }
+    } catch {
+      addToast('Не удалось разобрать запись через ИИ', 'error');
+    }
+  }, [item, title, content, type, tags, folder, attachments, aiSettings, insertMarkdown, addToast]);
+
+  const handleAiTagsInline = useCallback(async () => {
+    addToast('Подбор тегов...', 'info');
+    try {
+      const newTags = await generateSmartTags(content || title, aiSettings);
+      if (newTags.length > 0) {
+        setTags(prev => Array.from(new Set([...prev, ...newTags])));
+        addToast(`Добавлены теги: #${newTags.join(' #')}`, 'success');
+      } else {
+        addToast('Новых подходящих тегов не найдено', 'info');
+      }
+    } catch {
+      addToast('Ошибка генерации тегов', 'error');
+    }
+  }, [content, title, aiSettings, addToast]);
 
   const insertAttachmentMarkdown = useCallback((attName: string) => {
     const link = `![[${attName}]]\n`;
@@ -388,7 +447,27 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           </div>
 
           {/* Stats & Actions */}
-          <div className="flex items-center gap-2 md:gap-3 text-xs text-zinc-500 ml-auto">
+          <div className="flex items-center gap-1.5 md:gap-3 text-xs text-zinc-500 ml-auto">
+            {/* Undo / Redo in header */}
+            <div className="flex items-center gap-0.5 border-r border-white/[0.08] pr-1.5 mr-0.5">
+              <button
+                type="button"
+                onClick={handleUndo}
+                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                title="Отменить (Ctrl+Z)"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleRedo}
+                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                title="Повторить (Ctrl+Y)"
+              >
+                <Redo2 className="w-4 h-4" />
+              </button>
+            </div>
+
             <div className="hidden sm:flex items-center gap-2 font-mono text-[11px]">
               <span>{wordCount} слов</span>
               <span>•</span>
@@ -448,232 +527,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             />
           </div>
 
-          {/* Formatting Shortcut Toolbar */}
-          <div className="flex items-center gap-1 py-1.5 border-y border-white/[0.04] text-zinc-400 overflow-x-auto scrollbar-none">
-            <button
-              onClick={() => insertMarkdown('# ', '')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Заголовок 1"
-            >
-              <Heading1 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('## ', '')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Заголовок 2"
-            >
-              <Heading2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('**', '**')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Жирный"
-            >
-              <Bold className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('*', '*')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Курсив"
-            >
-              <Italic className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('- ', '')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Список"
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('- [ ] ', '')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Чекбокс"
-            >
-              <CheckSquare className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('> ', '')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Цитата"
-            >
-              <Quote className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('```\n', '\n```')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Блок кода"
-            >
-              <Code className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => insertMarkdown('[[', ']]')}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Ссылка [[заметка]]"
-            >
-              <Link2 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1"
-              title="Прикрепить файл или медиа"
-            >
-              <Paperclip className="w-4 h-4 text-zinc-400" />
-            </button>
-          </div>
-
-          {/* Media Attachments Section in Fullscreen Editor */}
-          {attachments.length > 0 && (
-            <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-              <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span className="font-medium flex items-center gap-1.5">
-                  <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>Медиа и вложения ({attachments.length})</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  + Добавить еще
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-2.5 pt-1">
-                {attachments.map((att, idx) => (
-                  <div
-                    key={att.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg bg-black/40 border border-white/[0.06]"
-                  >
-                    {/* Media Rendering */}
-                    <div className="flex-1 min-w-0">
-                      {att.type === 'audio' ? (
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-mono text-zinc-400 font-medium">
-                              🎙 Войс:
-                            </span>
-                            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[200px]">
-                              {att.name}
-                            </span>
-                          </div>
-                          <AudioPlayer
-                            src={att.dataUrl || ''}
-                            duration={att.duration}
-                            waveform={att.waveform}
-                            size={att.size}
-                            extractedText={att.extractedText}
-                            enrichmentStatus={att.enrichmentStatus}
-                          />
-                        </div>
-                      ) : att.type === 'video' ? (
-                        <div className="flex items-center gap-3">
-                          <VideoCirclePlayer src={att.dataUrl || ''} compact={true} />
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-xs font-mono text-zinc-300 font-medium truncate">
-                              {att.name}
-                            </span>
-                            <span className="text-[10px] text-zinc-500 font-mono">
-                              Видео-кружок {att.duration ? `• ${att.duration} сек` : ''}
-                            </span>
-                          </div>
-                        </div>
-                      ) : att.type === 'image' ? (
-                        <div className="flex items-center gap-3">
-                          <div
-                            onClick={() => {
-                              if (att.dataUrl) {
-                                openLightbox([{
-                                  id: att.id,
-                                  name: att.name,
-                                  url: att.dataUrl,
-                                  extractedText: att.extractedText,
-                                  summary: att.summary,
-                                  enrichmentStatus: att.enrichmentStatus,
-                                  enrichmentError: att.enrichmentError,
-                                  itemId: item.id,
-                                }], 0);
-                              }
-                            }}
-                            className="w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"
-                          >
-                            <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <span className="text-xs font-mono text-zinc-300 font-medium truncate">
-                              {att.name}
-                            </span>
-                            <span className="text-[10px] text-zinc-500 font-mono">
-                              {Math.round(att.size / 1024)} KB
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Paperclip className="w-4 h-4 text-zinc-400 shrink-0" />
-                          <span className="text-xs font-mono text-zinc-300 truncate">{att.name}</span>
-                          <span className="text-[10px] text-zinc-500 font-mono">
-                            {Math.round(att.size / 1024)} KB
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions: Insert into text, Move up/down, Delete */}
-                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                      <button
-                        type="button"
-                        onClick={() => insertAttachmentMarkdown(att.name)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white text-[11px] font-mono transition-colors cursor-pointer"
-                        title="Вставить ссылку ![[файл]] в позицию курсора markdown для структурирования заметки"
-                      >
-                        <Link2 className="w-3 h-3 text-[#529ee8]" />
-                        <span>Вставить в текст</span>
-                      </button>
-
-                      {/* Reorder Up */}
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => moveAttachment(idx, 'up')}
-                        className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        title="Переместить выше"
-                      >
-                        <ArrowUp className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Reorder Down */}
-                      <button
-                        type="button"
-                        disabled={idx === attachments.length - 1}
-                        onClick={() => moveAttachment(idx, 'down')}
-                        className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                        title="Переместить ниже"
-                      >
-                        <ArrowDown className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Remove */}
-                      <button
-                        type="button"
-                        onClick={() => removeAttachment(att.id)}
-                        className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                        title="Удалить"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Task-Specific Metadata Options copied from Composer */}
+          {/* Task-Specific Metadata Options: ALWAYS AT THE TOP */}
           {type === 'task' && (
-            <div className="flex flex-col gap-2.5 pt-1 pb-3 border-b border-white/[0.06]">
-              {/* Task Controls Row copied directly from Composer */}
+            <div className="flex flex-col gap-2.5 pb-2 border-b border-white/[0.06]">
+              {/* Task Controls Row */}
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
                 {/* Hidden Date Input */}
                 <input
@@ -724,7 +581,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 </div>
 
                 {/* Due Date Trigger */}
-                <span className="text-[11px] font-mono text-zinc-500 mr-1">Срок выполнения:</span>
+                <span className="text-[11px] font-mono text-zinc-500 mr-1 hidden sm:inline">Срок:</span>
                 {dueDate ? (
                   <div className="flex items-center gap-1 h-ctrl-md px-2 rounded-md hover:bg-white/[0.06] text-xs transition-colors shrink-0">
                     <button
@@ -911,6 +768,276 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             </div>
           )}
 
+          {/* Desktop Sticky Shortcut Toolbar (PINS TO TOP ON SCROLL) */}
+          <div className="hidden md:flex sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-2 border-y border-white/[0.08] bg-[#09090b]/95 backdrop-blur-md text-zinc-300 items-center justify-between gap-1 overflow-x-auto scrollbar-none shadow-sm">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleUndo}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Отменить (Ctrl+Z)"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleRedo}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Повторить (Ctrl+Y)"
+              >
+                <Redo2 className="w-4 h-4" />
+              </button>
+              <div className="h-4 w-px bg-white/[0.1] mx-1" />
+              <button
+                type="button"
+                onClick={() => insertMarkdown('# ', '')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Заголовок 1"
+              >
+                <Heading1 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('## ', '')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Заголовок 2"
+              >
+                <Heading2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('**', '**')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Жирный"
+              >
+                <Bold className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('*', '*')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Курсив"
+              >
+                <Italic className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('- ', '')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Список"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('- [ ] ', '')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Чекбокс"
+              >
+                <CheckSquare className="w-4 h-4 text-emerald-400" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('> ', '')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Цитата"
+              >
+                <Quote className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('```\n', '\n```')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Блок кода"
+              >
+                <Code className="w-4 h-4 text-blue-400" />
+              </button>
+              <button
+                type="button"
+                onClick={handleInsertTable}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Вставить таблицу"
+              >
+                <Table className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdown('[[', ']]')}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                title="Ссылка [[заметка]]"
+              >
+                <Link2 className="w-4 h-4 text-purple-400" />
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer flex items-center gap-1"
+                title="Прикрепить файл или медиа"
+              >
+                <Paperclip className="w-4 h-4 text-zinc-400" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleAiDecomposeInline}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-medium transition-colors cursor-pointer"
+                title="Декомпозировать на шаги через ИИ"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <span>Разобрать ИИ</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Media Attachments Section in Fullscreen Editor */}
+          {attachments.length > 0 && (
+            <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span className="font-medium flex items-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Медиа и вложения ({attachments.length})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  + Добавить еще
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2.5 pt-1">
+                {attachments.map((att, idx) => (
+                  <div
+                    key={att.id}
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg bg-black/40 border border-white/[0.06]"
+                  >
+                    {/* Media Rendering */}
+                    <div className="flex-1 min-w-0">
+                      {att.type === 'audio' ? (
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono text-zinc-400 font-medium">
+                              🎙 Войс:
+                            </span>
+                            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[200px]">
+                              {att.name}
+                            </span>
+                          </div>
+                          <AudioPlayer
+                            src={att.dataUrl || ''}
+                            duration={att.duration}
+                            waveform={att.waveform}
+                            size={att.size}
+                            extractedText={att.extractedText}
+                            enrichmentStatus={att.enrichmentStatus}
+                          />
+                        </div>
+                      ) : att.type === 'video' ? (
+                        <div className="flex items-center gap-3">
+                          <VideoCirclePlayer src={att.dataUrl || ''} compact={true} />
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-xs font-mono text-zinc-300 font-medium truncate">
+                              {att.name}
+                            </span>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              Видео-кружок {att.duration ? `• ${att.duration} сек` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      ) : att.type === 'image' ? (
+                        <div className="flex items-center gap-3">
+                          <div
+                            onClick={() => {
+                              if (att.dataUrl) {
+                                openLightbox([{
+                                  id: att.id,
+                                  name: att.name,
+                                  url: att.dataUrl,
+                                  extractedText: att.extractedText,
+                                  summary: att.summary,
+                                  enrichmentStatus: att.enrichmentStatus,
+                                  enrichmentError: att.enrichmentError,
+                                  itemId: item.id,
+                                }], 0);
+                              }
+                            }}
+                            className="w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"
+                          >
+                            <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-xs font-mono text-zinc-300 font-medium truncate">
+                              {att.name}
+                            </span>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              {Math.round(att.size / 1024)} KB
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="w-4 h-4 text-zinc-400 shrink-0" />
+                          <span className="text-xs font-mono text-zinc-300 truncate">{att.name}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">
+                            {Math.round(att.size / 1024)} KB
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions: Insert into text, Move up/down, Delete */}
+                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => insertAttachmentMarkdown(att.name)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white text-[11px] font-mono transition-colors cursor-pointer"
+                        title="Вставить ссылку ![[файл]] в позицию курсора markdown для структурирования заметки"
+                      >
+                        <Link2 className="w-3 h-3 text-[#529ee8]" />
+                        <span>Вставить в текст</span>
+                      </button>
+
+                      {/* Reorder Up */}
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => moveAttachment(idx, 'up')}
+                        className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="Переместить выше"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Reorder Down */}
+                      <button
+                        type="button"
+                        disabled={idx === attachments.length - 1}
+                        onClick={() => moveAttachment(idx, 'down')}
+                        className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="Переместить ниже"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Remove */}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(att.id)}
+                        className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Main Markdown Editor with Obsidian-style Live Preview */}
           <div
             id="fullscreen-editor-root"
@@ -946,6 +1073,291 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               className="bg-transparent text-xs font-mono text-white placeholder-zinc-600 w-28 px-1 outline-none"
             />
           </div>
+
+          {/* Bottom spacer on mobile so last lines clear the bottom bar */}
+          <div className="h-24 md:hidden shrink-0" aria-hidden="true" />
+        </div>
+      </div>
+
+      {/* Mobile Telegram-Style Floating Bottom Toolbar */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-30 select-none pointer-events-auto">
+        {/* Invisible Backdrop to dismiss active popover */}
+        {activeMobilePopover && (
+          <div
+            className="fixed inset-0 z-35 bg-black/20"
+            onClick={() => setActiveMobilePopover(null)}
+          />
+        )}
+
+        {/* Floating Popovers */}
+        {activeMobilePopover === 'formatting' && (
+          <div className="relative z-40 px-3 pb-2">
+            <div className="max-w-xs mx-auto rounded-2xl bg-[#18181c] border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+              <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
+                <span>Стили текста</span>
+                <span className="font-mono text-[10px] text-zinc-500">Aa</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('# ', '');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <Heading1 className="w-4 h-4 text-zinc-400" />
+                <span>Заголовок 1</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('## ', '');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <Heading2 className="w-4 h-4 text-zinc-400" />
+                <span>Заголовок 2</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('**', '**');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left font-bold"
+              >
+                <Bold className="w-4 h-4 text-zinc-400" />
+                <span>Жирный</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('*', '*');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left italic"
+              >
+                <Italic className="w-4 h-4 text-zinc-400" />
+                <span>Курсив</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('~~', '~~');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left line-through"
+              >
+                <span className="font-mono text-xs text-zinc-400">S</span>
+                <span>Зачёркнутый</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('`', '`');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left font-mono"
+              >
+                <Code className="w-4 h-4 text-blue-400" />
+                <span>Моноширинный</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeMobilePopover === 'lists' && (
+          <div className="relative z-40 px-3 pb-2">
+            <div className="max-w-xs mx-auto rounded-2xl bg-[#18181c] border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+              <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
+                <span>Списки и блоки</span>
+                <span className="font-mono text-[10px] text-zinc-500">:=</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('- ', '');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <List className="w-4 h-4 text-zinc-400" />
+                <span>Список с маркерами</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('1. ', '');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <span className="font-mono text-xs text-zinc-400 font-bold">1=</span>
+                <span>Список с номерами</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('- [ ] ', '');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                <span>Чек-лист</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('> ', '');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <Quote className="w-4 h-4 text-zinc-400" />
+                <span>Цитата</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('```\n', '\n```');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <Code className="w-4 h-4 text-blue-400" />
+                <span>Блок кода</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  insertMarkdown('[[', ']]');
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <Link2 className="w-4 h-4 text-purple-400" />
+                <span>Ссылка [[заметка]]</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeMobilePopover === 'ai' && (
+          <div className="relative z-40 px-3 pb-2">
+            <div className="max-w-xs mx-auto rounded-2xl bg-[#18181c] border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+              <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
+                <span>ИИ-Помощник</span>
+                <span className="font-mono text-[10px] text-purple-400">AI</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  handleAiDecomposeInline();
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-purple-300 hover:bg-purple-500/10 active:scale-98 transition-all text-left"
+              >
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <span>Разобрать на подзадачи</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleAiTagsInline();
+                  setActiveMobilePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+              >
+                <Tag className="w-4 h-4 text-zinc-400" />
+                <span>Подобрать теги</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Bar Container */}
+        <div
+          className="relative z-40 bg-[#0c0c0e]/95 backdrop-blur-xl border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
+          style={{ paddingBottom: 'max(var(--sab), 0.5rem)' }}
+        >
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* AI Button */}
+            <button
+              type="button"
+              onClick={() => setActiveMobilePopover(prev => (prev === 'ai' ? null : 'ai'))}
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                activeMobilePopover === 'ai'
+                  ? 'bg-purple-500/20 text-purple-300'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title="ИИ-инструменты"
+            >
+              <div className="flex items-center gap-0.5">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-semibold">Ai</span>
+              </div>
+            </button>
+
+            {/* Aa Text Styles Button */}
+            <button
+              type="button"
+              onClick={() => setActiveMobilePopover(prev => (prev === 'formatting' ? null : 'formatting'))}
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                activeMobilePopover === 'formatting'
+                  ? 'bg-white/15 text-white'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title="Форматирование текста"
+            >
+              <span className="font-semibold text-sm leading-none px-0.5">Aa</span>
+            </button>
+
+            {/* Lists Button */}
+            <button
+              type="button"
+              onClick={() => setActiveMobilePopover(prev => (prev === 'lists' ? null : 'lists'))}
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                activeMobilePopover === 'lists'
+                  ? 'bg-white/15 text-white'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title="Списки и чек-листы"
+            >
+              <List className="w-4 h-4" />
+            </button>
+
+            {/* Table Button */}
+            <button
+              type="button"
+              onClick={handleInsertTable}
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
+              title="Вставить таблицу"
+            >
+              <Table className="w-4 h-4" />
+            </button>
+
+            {/* Attachments (Paperclip) */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
+              title="Прикрепить файл"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Telegram-style Circular Send / Save Button */}
+          <button
+            type="button"
+            onClick={handleSave}
+            className="w-10 h-10 rounded-full bg-[#2a82e4] hover:bg-[#2474cd] text-white flex items-center justify-center shadow-lg shadow-blue-500/25 active:scale-90 transition-all cursor-pointer shrink-0 ml-2"
+            title="Сохранить и закрыть (Ctrl+S)"
+          >
+            <Send className="w-4 h-4 ml-0.5" />
+          </button>
         </div>
       </div>
     </div>
