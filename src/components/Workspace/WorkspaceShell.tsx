@@ -162,15 +162,14 @@ const getPanelComponent = (panel: IDockviewPanel): string => {
   return panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
 };
 
-const detachingPanels = new Set<string>();
+let isDetaching = false;
 
 // Detach panel to native OS window (in desktop mode) or browser popout / floating group
 const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left: number; top: number; width?: number; height?: number }) => {
-  if (detachingPanels.has(panel.id)) {
-    wsLog.debug(`Ignoring duplicate detach request for panel [${panel.id}]`);
+  if (isDetaching || !api.panels.some(p => p.id === panel.id)) {
     return;
   }
-  detachingPanels.add(panel.id);
+  isDetaching = true;
 
   try {
     const groupElement = (panel.group as any)?.element as HTMLElement | undefined;
@@ -270,9 +269,9 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
       });
     }
   } finally {
-    setTimeout(() => {
-      detachingPanels.delete(panel.id);
-    }, 1200);
+    requestAnimationFrame(() => {
+      isDetaching = false;
+    });
   }
 };
 
@@ -412,9 +411,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       if (e.button !== 0) return;
       const target = e.target as HTMLElement | null;
       if (
-        target?.closest('.dv-void-container') ||
-        (target?.closest('.dv-tabs-and-actions-container') &&
-          !target?.closest('.dv-tab, button, input, .dv-right-actions-container, .dv-default-tab-action'))
+        target?.closest('.dv-void-container') &&
+        !target?.closest('.dv-tab, .dv-tabs-container, button, input, .dv-right-actions-container, .dv-default-tab-action')
       ) {
         import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
           getCurrentWindow().startDragging();
@@ -591,95 +589,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     []
   );
 
-  // Primary window: native HTML5 dragover & drop listeners for 60fps cursor tracking & docking
-  useEffect(() => {
-    if (effectiveInitialPanel) return;
-
-    const handleWindowDragEnter = (e: DragEvent) => {
-      if (activeCrossTabRef.current || e.dataTransfer?.types.includes('application/x-slag-tab')) {
-        e.preventDefault();
-      }
-    };
-
-    const handleWindowDragOver = (e: DragEvent) => {
-      const crossTab = activeCrossTabRef.current;
-      const hasSlagType = e.dataTransfer?.types.includes('application/x-slag-tab');
-      if (!crossTab && !hasSlagType) return;
-
-      e.preventDefault();
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = 'move';
-      }
-
-      const target = computeDropTarget(e.clientX, e.clientY);
-      updateDropPreview(target ? target.preview : null);
-    };
-
-    const handleWindowDragLeave = (e: DragEvent) => {
-      if (
-        !e.relatedTarget ||
-        e.clientX <= 0 ||
-        e.clientY <= 0 ||
-        e.clientX >= window.innerWidth ||
-        e.clientY >= window.innerHeight
-      ) {
-        clearDropPreview();
-      }
-    };
-
-    const handleWindowDrop = (e: DragEvent) => {
-      const crossTab = activeCrossTabRef.current;
-      const hasSlagType = e.dataTransfer?.types.includes('application/x-slag-tab');
-      if (!crossTab && !hasSlagType) return;
-
-      e.preventDefault();
-      clearDropPreview();
-
-      let panelId = crossTab?.panelId;
-      let title = crossTab?.title || 'SLAG';
-      let sourceLabel = crossTab?.sourceLabel || '';
-
-      if (!panelId && e.dataTransfer) {
-        try {
-          const raw = e.dataTransfer.getData('application/x-slag-tab');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            panelId = parsed.panelId;
-            title = parsed.title;
-            sourceLabel = parsed.sourceLabel || '';
-          }
-        } catch {}
-      }
-
-      if (panelId) {
-        const target = computeDropTarget(e.clientX, e.clientY);
-        dockCrossWindowTab(panelId, title, target?.group, target?.direction);
-
-        void sendCrossWindowTab({
-          type: 'TAB_DRAG_ACCEPTED',
-          sourceLabel: 'main',
-          targetLabel: sourceLabel,
-          panelId,
-          title,
-        });
-
-        activeCrossTabRef.current = null;
-      }
-    };
-
-    window.addEventListener('dragenter', handleWindowDragEnter);
-    window.addEventListener('dragover', handleWindowDragOver);
-    window.addEventListener('dragleave', handleWindowDragLeave);
-    window.addEventListener('drop', handleWindowDrop);
-
-    return () => {
-      window.removeEventListener('dragenter', handleWindowDragEnter);
-      window.removeEventListener('dragover', handleWindowDragOver);
-      window.removeEventListener('dragleave', handleWindowDragLeave);
-      window.removeEventListener('drop', handleWindowDrop);
-    };
-  }, [effectiveInitialPanel, computeDropTarget, dockCrossWindowTab, updateDropPreview, clearDropPreview]);
-
   // Cross-window tab docking listener: handles dragging tabs across OS windows
   useEffect(() => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -843,79 +752,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     }
   }, [currentFolder]);
 
-  // Safety cleaner and singular guardian for Dockview drag-and-drop overlays
-  useEffect(() => {
-    const purgeStaleOverlays = () => {
-      const dropzones = document.querySelectorAll(
-        '.dv-drop-target-dropzone, .dv-drop-target-anchor, .dv-drop-target-selection'
-      );
-      if (dropzones.length > 0) {
-        dropzones.forEach(el => el.remove());
-      }
-      document.querySelectorAll('.dv-drop-target').forEach(el => {
-        el.classList.remove('dv-drop-target');
-      });
-    };
-
-    // Clean up orphaned panel content dropzones (e.g. when drag exits a panel without dragleave)
-    // Runs throttled via requestAnimationFrame so we never interrupt Dockview's active drag loop or tab stick
-    let rafId: number | null = null;
-    const cleanOrphanedContentDropzones = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        const contentDropzones = Array.from(
-          document.querySelectorAll<HTMLElement>('.dv-content-container > .dv-drop-target-dropzone')
-        );
-        if (contentDropzones.length > 1) {
-          // Keep only the newest content dropzone, remove older orphaned ones
-          for (let i = 0; i < contentDropzones.length - 1; i++) {
-            const stale = contentDropzones[i];
-            const parent = stale.closest('.dv-drop-target');
-            stale.remove();
-            if (parent && !parent.querySelector('.dv-drop-target-dropzone')) {
-              parent.classList.remove('dv-drop-target');
-            }
-          }
-        }
-      });
-    };
-
-    const handlePointerOrDragEnd = (e: MouseEvent | DragEvent) => {
-      if (e.buttons === 0 || e.type === 'dragend' || e.type === 'drop' || e.type === 'mouseup' || e.type === 'pointerup') {
-        purgeStaleOverlays();
-      }
-    };
-
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.addedNodes.length > 0) {
-          cleanOrphanedContentDropzones();
-          break;
-        }
-      }
-    });
-
-    const dockHost = document.querySelector('.dockview-theme-slag') || document.body;
-    observer.observe(dockHost, { childList: true, subtree: true });
-
-    window.addEventListener('dragend', handlePointerOrDragEnd);
-    window.addEventListener('drop', handlePointerOrDragEnd);
-    window.addEventListener('mouseup', handlePointerOrDragEnd);
-    window.addEventListener('pointerup', handlePointerOrDragEnd);
-    window.addEventListener('blur', purgeStaleOverlays);
-
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      observer.disconnect();
-      window.removeEventListener('dragend', handlePointerOrDragEnd);
-      window.removeEventListener('drop', handlePointerOrDragEnd);
-      window.removeEventListener('mouseup', handlePointerOrDragEnd);
-      window.removeEventListener('pointerup', handlePointerOrDragEnd);
-      window.removeEventListener('blur', purgeStaleOverlays);
-    };
-  }, []);
-
   const applyDefaultLayout = useCallback((api: DockviewApi) => {
     api.clear();
 
@@ -966,18 +802,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       }
     };
 
-    // Save layout on changes and clear lingering drop overlays
+    // Save layout on changes
     event.api.onDidLayoutChange(() => {
-      const dropzones = document.querySelectorAll(
-        '.dv-drop-target-dropzone, .dv-drop-target-anchor, .dv-drop-target-selection'
-      );
-      if (dropzones.length > 0) {
-        dropzones.forEach(el => el.remove());
-      }
-      document.querySelectorAll('.dv-drop-target').forEach(el => {
-        el.classList.remove('dv-drop-target');
-      });
-
       saveLayout();
     });
 
@@ -1059,8 +885,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           : 'main';
       const isSecondary = Boolean(effectiveInitialPanel);
 
-      document.body.classList.add('tab-dragging');
-
       if (isSecondary) {
         void sendCrossWindowTab({
           type: 'TAB_DRAG_START',
@@ -1068,21 +892,6 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
           panelId: rawComponentId,
           title,
         });
-      }
-
-      const nativeEvt = dragEvent.nativeEvent as any;
-      if (nativeEvt && nativeEvt.dataTransfer) {
-        try {
-          nativeEvt.dataTransfer.setData(
-            'application/x-slag-tab',
-            JSON.stringify({
-              panelId: rawComponentId,
-              title,
-              sourceLabel: winLabel,
-            })
-          );
-          nativeEvt.dataTransfer.effectAllowed = 'all';
-        } catch {}
       }
 
       wsLog.debug(`Tab drag gesture started: [${rawComponentId}] "${title}"`, {
@@ -1093,16 +902,24 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       let dragEnded = false;
       let lastScreenX = 0;
       let lastScreenY = 0;
-
+      let lastClientX = 0;
+      let lastClientY = 0;
       let lastMoveTime = 0;
+
       const handlePointerMove = (e: MouseEvent | DragEvent) => {
-        if (!isSecondary || dragEnded) return;
-        const now = Date.now();
-        if (now - lastMoveTime < 25) return;
-        lastMoveTime = now;
+        if (dragEnded) return;
         if (e.screenX || e.screenY) {
           lastScreenX = e.screenX;
           lastScreenY = e.screenY;
+        }
+        if (e.clientX || e.clientY) {
+          lastClientX = e.clientX;
+          lastClientY = e.clientY;
+        }
+        if (isSecondary && (e.screenX || e.screenY)) {
+          const now = Date.now();
+          if (now - lastMoveTime < 25) return;
+          lastMoveTime = now;
           void sendCrossWindowTab({
             type: 'TAB_DRAG_MOVE',
             sourceLabel: winLabel,
@@ -1114,20 +931,23 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
       };
 
-      window.addEventListener('drag', handlePointerMove as EventListener);
+      const cleanupDrag = () => {
+        window.removeEventListener('drag', handlePointerMove as EventListener);
+        window.removeEventListener('dragover', handlePointerMove as EventListener);
+        window.removeEventListener('dragend', handleDragEnd as EventListener);
+      };
 
       const handleDragEnd = (e: DragEvent | MouseEvent) => {
         if (dragEnded) return;
         dragEnded = true;
-
-        document.body.classList.remove('tab-dragging');
-        window.removeEventListener('drag', handlePointerMove as EventListener);
-        window.removeEventListener('dragend', handleDragEnd as EventListener);
+        cleanupDrag();
 
         const releaseScreenX = e.screenX || lastScreenX;
         const releaseScreenY = e.screenY || lastScreenY;
+        const releaseClientX = e.clientX || lastClientX;
+        const releaseClientY = e.clientY || lastClientY;
 
-        // If dragging in secondary window, broadcast drop release to main window
+        // 1. If dragging in secondary window, broadcast drop release to main window
         if (isSecondary) {
           wsLog.debug(`Broadcasting cross-window TAB_DRAG_RELEASE for [${rawComponentId}] "${title}"`, {
             screenPos: { x: releaseScreenX, y: releaseScreenY },
@@ -1148,33 +968,28 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             panelId: rawComponentId,
             title,
           });
-        }
+        } else {
+          // 2. If dragging in main window, tear-off into new OS window when dropped outside window bounds
+          const isOutsideClient =
+            releaseClientX < 0 ||
+            releaseClientX > window.innerWidth ||
+            releaseClientY < 0 ||
+            releaseClientY > window.innerHeight;
+          const isOutsideScreen =
+            releaseScreenX > 0 &&
+            releaseScreenY > 0 &&
+            (releaseScreenX < window.screenX - 10 ||
+              releaseScreenX > window.screenX + window.innerWidth + 10 ||
+              releaseScreenY < window.screenY - 10 ||
+              releaseScreenY > window.screenY + window.innerHeight + 10);
 
-        // If dragging in main window, tear-off into new OS window ONLY when dropped genuinely outside window
-        if (!isSecondary) {
-          const dragEvt = e as DragEvent;
-          const dropEffect = dragEvt.dataTransfer?.dropEffect;
-          // If drop was accepted inside window by Dockview, dropEffect is 'move' -> never tear off
-          if (dropEffect && dropEffect !== 'none') {
-            return;
-          }
-
-          // Ignore (0,0) coordinates which occur when drag is canceled or released on certain controls
-          const hasValidCoords = Boolean(e.screenX || e.screenY);
-          const isGenuinelyOutside =
-            hasValidCoords &&
-            (e.screenX < window.screenX - 25 ||
-              e.screenX > window.screenX + window.outerWidth + 25 ||
-              e.screenY < window.screenY - 25 ||
-              e.screenY > window.screenY + window.outerHeight + 25);
-
-          if (isGenuinelyOutside) {
+          if (isOutsideClient || isOutsideScreen) {
             wsLog.info(`Tab dropped outside window bounds -> triggering tear-off for [${rawComponentId}] "${title}"`, {
-              coords: { x: e.screenX, y: e.screenY },
+              coords: { screenX: releaseScreenX, screenY: releaseScreenY, clientX: releaseClientX, clientY: releaseClientY },
             });
             detachPanel(event.api, panel, {
-              left: Math.round(e.screenX - Math.min(160, initialWidth / 2)),
-              top: Math.round(e.screenY - 25),
+              left: Math.round((releaseScreenX || window.screenX + releaseClientX) - Math.min(160, initialWidth / 2)),
+              top: Math.round((releaseScreenY || window.screenY + releaseClientY) - 25),
               width: initialWidth,
               height: initialHeight,
             });
@@ -1182,6 +997,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         }
       };
 
+      window.addEventListener('drag', handlePointerMove as EventListener);
+      window.addEventListener('dragover', handlePointerMove as EventListener);
       window.addEventListener('dragend', handleDragEnd as EventListener, { once: true });
     });
   };
