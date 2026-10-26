@@ -101,6 +101,7 @@
 | [`code-style-ts-react.md`](.agents/rules/code-style-ts-react.md) | **Engineering** | React 19, чистые эффекты, типизация TypeScript, Fast Refresh, правила oxlint. |
 | [`triz-contradiction-resolution.md`](.agents/rules/triz-contradiction-resolution.md) | **Architecture/UX** | Разрешение технических и физических противоречий по ТРИЗ, 4 оператора разделения, ИКР. |
 | [`logging-diagnostics-standard.md`](.agents/rules/logging-diagnostics-standard.md) | **Diagnostics** | Регламент логгера, скоупы `AI/FS/SEARCH/UI/APP/SYNC`, замер длительности, маскирование ключей. |
+| [`BUILD.md`](BUILD.md) | **Build & Run** | Матрица сборок: Web Check, Desktop Live HMR, Standalone Release (.exe). |
 
 ---
 
@@ -144,6 +145,7 @@ SLAG v2/
 │   ├── lib/                            # logger.ts, storage.ts, aiService.ts, searchService.ts
 │   └── types/index.ts                  # Модели данных: SlagItem, FolderMeta, VaultMeta, LogEntry
 ├── AGENTS.md                           # Главный кодекс агента (этот файл)
+├── BUILD.md                            # Регламент сборок (Web, HMR Desktop, Standalone .exe)
 ├── SPECIFICATION.md                    # Полная техническая спецификация продукта
 └── playwright.config.ts                # Конфигурация Playwright
 ```
