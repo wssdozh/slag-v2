@@ -66,6 +66,9 @@ export interface SlagItem {
   // Link & Reply fields
   replyToId?: string; // ID of the note/task this is replying to
   linkedItemIds?: string[]; // IDs of explicitly linked tasks/notes
+
+  // Arbitrary frontmatter & dynamic properties
+  customProps?: Record<string, any>;
 }
 
 export interface KanbanColumn {
@@ -131,15 +134,39 @@ export interface LightboxImage {
   itemId?: string;
 }
 
+export interface ItemUpdates {
+  title?: string;
+  content?: string;
+  appendContent?: string;
+  folder?: string;
+  type?: SlagItemType;
+  status?: TaskStatus;
+  priority?: 'none' | 'low' | 'medium' | 'high';
+  dueDate?: string | null;
+  reminder?: string | null;
+  duration?: number;
+  kanbanColumn?: string;
+  tags?: string[];
+  addTags?: string[];
+  removeTags?: string[];
+  subtasks?: Array<{ id?: string; title: string; completed?: boolean }> | string[];
+  isPinned?: boolean;
+  isArchived?: boolean;
+  customProps?: Record<string, any>;
+}
+
+export interface BatchUpdateItem {
+  targetItemId: string;
+  title: string;
+  updates: ItemUpdates;
+  reason?: string;
+}
+
 export type SuggestedActionType =
   | 'create_note'
-  | 'append_to_note'
   | 'schedule_task'
-  | 'reschedule_task'
-  | 'batch_reschedule'
-  | 'update_task_status'
-  | 'decompose_task'
-  | 'move_note';
+  | 'update_item'
+  | 'batch_update';
 
 export type ActionState = 'suggested' | 'executing' | 'applied' | 'rejected';
 
@@ -155,11 +182,17 @@ export interface BatchRescheduleItem {
 export interface SuggestedAction {
   type: SuggestedActionType;
   title: string;
+  actionLabel?: string;
   folder: string;
   content: string;
   tags: string[];
   itemType: SlagItemType;
   targetItemId?: string;
+  updates?: ItemUpdates;
+  batchUpdateItems?: BatchUpdateItem[];
+  actionState?: ActionState;
+  appliedItemId?: string;
+  error?: string;
   appendContent?: string;
   dueDate?: string;
   reminder?: string;
@@ -167,9 +200,6 @@ export interface SuggestedAction {
   status?: 'backlog' | 'todo' | 'in_progress' | 'done';
   subtasks?: { id: string; title: string; completed: boolean }[];
   batchItems?: BatchRescheduleItem[];
-  actionState?: ActionState;
-  appliedItemId?: string;
-  error?: string;
 }
 
 export interface ChatToolCall {

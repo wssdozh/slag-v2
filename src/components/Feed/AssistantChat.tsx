@@ -16,7 +16,6 @@ import {
   CheckSquare,
   ArrowUpRight,
   Calendar,
-  ListTodo,
   Check,
   FolderOpen,
   X,
@@ -389,63 +388,64 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       </div>
 
       {/* Messages Stream */}
-      <div className={`flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3.5 ${isSidebar ? 'text-[11px]' : 'p-4 gap-4'}`}>
-        {chatMessages.length === 0 ? (
-          <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
-            <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-300 mb-2.5">
-              <Sparkles className="w-4 h-4 text-zinc-300" />
-            </div>
-            <h3 className="text-xs font-semibold text-zinc-200 mb-1">
-              {isInbox ? 'Ассистент по всем заметкам' : `Ассистент «${folderMeta?.name || currentFolder}»`}
-            </h3>
-            <p className="text-[11px] text-zinc-500 mb-4 leading-relaxed">
-              Задайте вопрос, найдите записи или попросите создать задачу.
-            </p>
+      <div className={`flex-1 min-h-0 overflow-y-auto p-3 flex flex-col ${isSidebar ? 'text-[11px]' : 'p-4'}`}>
+        <div className={`w-full flex-1 flex flex-col gap-3.5 ${isSidebar ? '' : 'max-w-2xl mx-auto'}`}>
+          {chatMessages.length === 0 ? (
+            <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
+              <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-300 mb-2.5">
+                <Sparkles className="w-4 h-4 text-zinc-300" />
+              </div>
+              <h3 className="text-xs font-semibold text-zinc-200 mb-1">
+                {isInbox ? 'Ассистент по всем заметкам' : `Ассистент «${folderMeta?.name || currentFolder}»`}
+              </h3>
+              <p className="text-[11px] text-zinc-500 mb-4 leading-relaxed">
+                Задайте вопрос, найдите записи или попросите создать задачу.
+              </p>
 
-            <div className="flex flex-col gap-1.5 w-full">
-              <button
-                onClick={() => handleQuickPrompt('Покажи план на сегодня и календарную повестку')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
-              >
-                <span className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  <span>План на сегодня</span>
-                </span>
-                <span className="text-[10px] text-zinc-600 font-mono">agenda</span>
-              </button>
-              <button
-                onClick={() => handleQuickPrompt('Найди ключевые заметки')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
-              >
-                <span className="flex items-center gap-2">
-                  <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  <span>Поиск заметок</span>
-                </span>
-                <span className="text-[10px] text-zinc-600 font-mono">search</span>
-              </button>
-              <button
-                onClick={() => handleQuickPrompt('Создай новую задачу: Проверить синхронизацию заметок')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
-              >
-                <span className="flex items-center gap-2">
-                  <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  <span>Создать задачу</span>
-                </span>
-                <span className="text-[10px] text-zinc-600 font-mono">task</span>
-              </button>
-              <button
-                onClick={() => handleQuickPrompt('Сколько заметок и задач в хранилище?')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
-              >
-                <span className="flex items-center gap-2">
-                  <BarChart3 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  <span>Сводка хранилища</span>
-                </span>
-                <span className="text-[10px] text-zinc-600 font-mono">stats</span>
-              </button>
+              <div className="flex flex-col gap-1.5 w-full">
+                <button
+                  onClick={() => handleQuickPrompt('Покажи план на сегодня и календарную повестку')}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <span>План на сегодня</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-600 font-mono">agenda</span>
+                </button>
+                <button
+                  onClick={() => handleQuickPrompt('Найди ключевые заметки')}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <span>Поиск заметок</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-600 font-mono">search</span>
+                </button>
+                <button
+                  onClick={() => handleQuickPrompt('Создай новую задачу: Проверить синхронизацию заметок')}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <span>Создать задачу</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-600 font-mono">task</span>
+                </button>
+                <button
+                  onClick={() => handleQuickPrompt('Сколько заметок и задач в хранилище?')}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <span>Сводка хранилища</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-600 font-mono">stats</span>
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
+          ) : (
           chatMessages.map(msg => {
             const searchCall = msg.toolCalls?.find(
               tc => tc.name === 'search_notes' && Array.isArray(tc.result) && tc.result.length > 0
@@ -553,7 +553,8 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     return (
                       <div
                         key={`act-${actIdx}-${action.type}`}
-                        className={`max-w-[92%] w-full rounded-xl bg-[#141416] border border-white/[0.08] overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
+                        data-testid="action-card"
+                        className={`w-full ${isSidebar ? 'max-w-full' : 'max-w-xl'} rounded-xl bg-[#141416] border border-white/[0.08] overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
                           isRejected ? 'opacity-50' : ''
                         }`}
                       >
@@ -561,27 +562,26 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                         <div className="flex items-center justify-between px-3.5 py-2.5 bg-white/[0.02] border-b border-white/[0.04] text-2xs font-mono text-zinc-400">
                           <div className="flex items-center gap-1.5">
                             {action.type === 'schedule_task' && <Calendar className="w-3.5 h-3.5 text-zinc-400" />}
-                            {action.type === 'decompose_task' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />}
-                            {action.type === 'update_task_status' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />}
-                            {(action.type === 'reschedule_task' || action.type === 'batch_reschedule') && <Clock className="w-3.5 h-3.5 text-zinc-400" />}
-                            {action.type === 'append_to_note' && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
-                            {action.type === 'move_note' && <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />}
+                            {action.type === 'batch_update' && <Clock className="w-3.5 h-3.5 text-zinc-400" />}
+                            {action.type === 'update_item' && (
+                              action.updates?.appendContent || action.appendContent ? <Plus className="w-3.5 h-3.5 text-zinc-400" /> :
+                              action.updates?.dueDate || action.dueDate ? <Clock className="w-3.5 h-3.5 text-zinc-400" /> :
+                              action.updates?.status ? <CheckSquare className="w-3.5 h-3.5 text-zinc-400" /> :
+                              action.updates?.folder ? <FolderOpen className="w-3.5 h-3.5 text-zinc-400" /> :
+                              <FileText className="w-3.5 h-3.5 text-zinc-400" />
+                            )}
                             {(!action.type || action.type === 'create_note') && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
                             <span className={isRejected ? 'text-zinc-500' : isApplied ? 'text-zinc-300 font-medium' : 'text-zinc-200 font-medium'}>
-                              {action.type === 'schedule_task' && 'Планирование в календарь'}
-                              {action.type === 'decompose_task' && 'Декомпозиция задачи'}
-                              {action.type === 'update_task_status' && 'Смена статуса канбан'}
-                              {action.type === 'reschedule_task' && 'Перенос срока'}
-                              {action.type === 'batch_reschedule' && (action.title || 'Перенос задач')}
-                              {action.type === 'append_to_note' && 'Дополнение заметки'}
-                              {action.type === 'move_note' && 'Перемещение по папкам'}
-                              {action.type === 'create_note' && (
-                                action.itemType === 'task'
-                                  ? 'Черновик задачи'
-                                  : action.itemType === 'article'
-                                  ? 'Черновик статьи'
-                                  : 'Черновик заметки'
-                              )}
+                              {action.actionLabel ? action.actionLabel :
+                               action.type === 'schedule_task' ? 'Планирование в календарь' :
+                               action.type === 'batch_update' ? (action.title || 'Перенос задач') :
+                               action.type === 'create_note' ? (
+                                 action.itemType === 'task' ? 'Черновик задачи' :
+                                 action.itemType === 'article' ? 'Черновик статьи' :
+                                 'Черновик заметки'
+                               ) :
+                               'Обновление записи'
+                              }
                             </span>
                           </div>
                           <span className="text-zinc-500 truncate max-w-[130px]">
@@ -590,41 +590,41 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                         </div>
 
                         <div className="p-3.5 flex flex-col gap-2.5">
-                          {/* Title & Priority (Only for single-item actions, omitted for batch_reschedule to prevent duplicate header) */}
-                          {action.type !== 'batch_reschedule' && (
+                          {/* Title & Priority (Only for single-item actions, omitted for batch_update to prevent duplicate header) */}
+                          {action.type !== 'batch_update' && (
                             <div className="text-xs font-semibold flex items-center justify-between gap-2">
                               <span className={isRejected ? 'line-through text-zinc-500' : isApplied ? 'text-zinc-300' : 'text-zinc-100'}>
                                 {action.title}
                               </span>
-                              {action.priority && !isRejected && (
+                              {(action.updates?.priority || action.priority) && !isRejected && (
                                 <span className="flex items-center gap-1 shrink-0">
-                                  <LinearSignalBars priority={action.priority} className="w-3 h-3" />
+                                  <LinearSignalBars priority={(action.updates?.priority || action.priority)!} className="w-3 h-3" />
                                   <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
-                                    action.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
-                                    action.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
+                                    (action.updates?.priority || action.priority) === 'high' ? 'bg-rose-500/15 text-rose-300' :
+                                    (action.updates?.priority || action.priority) === 'medium' ? 'bg-amber-500/15 text-amber-300' :
                                     'bg-blue-500/15 text-blue-300'
                                   }`}>
-                                    {action.priority.toUpperCase()}
+                                    {(action.updates?.priority || action.priority)!.toUpperCase()}
                                   </span>
                                 </span>
                               )}
                             </div>
                           )}
 
-                          {/* Single Schedule info */}
-                          {action.dueDate && (
+                          {/* Single Schedule info: show ONLY if dueDate was actually set or changed */}
+                          {Boolean(action.type === 'schedule_task' || action.updates?.dueDate || (action.type === 'update_item' && !action.updates && action.dueDate)) && (
                             <div className="flex items-center gap-2 text-2xs font-mono text-zinc-400">
                               <Calendar className="w-3 h-3 text-zinc-500" />
-                              <span>Срок: {action.dueDate}</span>
-                              {action.reminder && (
+                              <span>Срок: {action.updates?.dueDate || action.dueDate}</span>
+                              {(action.updates?.reminder || action.reminder) && (
                                 <span className="text-zinc-500">
-                                  ({formatReminderTime(action.reminder)})
+                                  ({formatReminderTime((action.updates?.reminder || action.reminder)!)})
                                 </span>
                               )}
                             </div>
                           )}
 
-                          {/* Subtasks checklist if decompose_task */}
+                          {/* Subtasks checklist if present */}
                           {action.subtasks && action.subtasks.length > 0 && (
                             <div className="flex flex-col gap-1.5 py-0.5">
                               {action.subtasks.map((st, sIdx) => (
@@ -636,11 +636,12 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             </div>
                           )}
 
-                          {/* Batch reschedule items list with selection checkboxes */}
-                          {action.type === 'batch_reschedule' && action.batchItems && action.batchItems.length > 0 && (
+                          {/* Batch update items list with selection checkboxes */}
+                          {action.type === 'batch_update' && action.batchUpdateItems && action.batchUpdateItems.length > 0 && (
                             <div className="flex flex-col divide-y divide-white/[0.04] border-t border-b border-white/[0.04] -mx-3.5 px-3.5 py-1">
-                              {action.batchItems.map((item, bIdx) => {
+                              {action.batchUpdateItems.map((item, bIdx) => {
                                 const selected = isTaskSelected(msg.id, item.targetItemId);
+                                const up = item.updates || {};
                                 return (
                                   <div key={bIdx} className={`flex items-center justify-between text-xs py-1.5 gap-2 transition-opacity ${
                                     !selected && !isApplied ? 'opacity-40' : ''
@@ -659,20 +660,29 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0 text-2xs font-mono text-zinc-400">
-                                      <Calendar className="w-3 h-3 text-zinc-500" />
-                                      <span>{item.dueDate || 'без срока'}</span>
-                                      {item.reminder && (
+                                      {up.dueDate !== undefined && (
+                                        <>
+                                          <Calendar className="w-3 h-3 text-zinc-500" />
+                                          <span>{up.dueDate || 'без срока'}</span>
+                                        </>
+                                      )}
+                                      {up.reminder && (
                                         <span className="text-zinc-400 font-medium">
-                                          {formatReminderTime(item.reminder)}
+                                          {formatReminderTime(up.reminder)}
                                         </span>
                                       )}
-                                      {item.priority && item.priority !== 'none' && (
+                                      {up.priority && up.priority !== 'none' && (
                                         <span className={`px-1 py-0.5 rounded text-[9px] font-semibold ${
-                                          item.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
-                                          item.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
+                                          up.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
+                                          up.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
                                           'bg-blue-500/15 text-blue-300'
                                         }`}>
-                                          {item.priority.toUpperCase()}
+                                          {up.priority.toUpperCase()}
+                                        </span>
+                                      )}
+                                      {up.status && (
+                                        <span className="px-1 py-0.5 rounded text-[9px] font-semibold bg-white/[0.06] text-zinc-300">
+                                          {up.status}
                                         </span>
                                       )}
                                     </div>
@@ -682,15 +692,15 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             </div>
                           )}
 
-                          {/* Append to note diff preview: flat on first surface, no matryoshka container */}
-                          {action.type === 'append_to_note' && action.content && (
+                          {/* Append to note diff preview */}
+                          {(action.updates?.appendContent || action.appendContent) && (
                             <div className="border-l border-white/20 pl-2.5 py-0.5 text-xs text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed">
-                              + {action.content}
+                              + {action.updates?.appendContent || action.appendContent}
                             </div>
                           )}
 
                           {/* Content snippet */}
-                          {action.type !== 'append_to_note' && action.content && (
+                          {!action.updates?.appendContent && !action.appendContent && action.content && (
                             <p className="text-[11px] text-zinc-400 line-clamp-2">
                               {action.content}
                             </p>
@@ -701,6 +711,27 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             <div className="flex items-center gap-1 flex-wrap">
                               {action.tags.map((t, idx) => (
                                 <TagChip key={idx} tag={t} variant="flat" />
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Dynamic extra properties (e.g. duration, customProps) */}
+                          {action.updates && Object.keys(action.updates).some(k => ['duration', 'kanbanColumn', 'customProps'].includes(k)) && (
+                            <div className="flex items-center gap-1.5 flex-wrap text-2xs font-mono text-zinc-400 pt-0.5">
+                              {action.updates.duration !== undefined && (
+                                <span className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
+                                  ⏳ {action.updates.duration} мин
+                                </span>
+                              )}
+                              {action.updates.kanbanColumn !== undefined && (
+                                <span className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
+                                  📋 {action.updates.kanbanColumn}
+                                </span>
+                              )}
+                              {action.updates.customProps && Object.entries(action.updates.customProps).map(([k, v]) => (
+                                <span key={k} className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
+                                  {k}: {String(v)}
+                                </span>
                               ))}
                             </div>
                           )}
@@ -717,10 +748,13 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                 <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                                 <span>
                                   {action.type === 'schedule_task' ? `Запланировано на ${action.dueDate}` :
-                                   action.type === 'batch_reschedule' ? `Перенесено: ${action.batchItems?.length || 0}` :
-                                   action.type === 'reschedule_task' ? `Срок: ${action.dueDate || 'бэклог'}` :
-                                   action.type === 'append_to_note' ? 'Дополнено' :
-                                   'Сохранено'}
+                                   action.type === 'batch_update' ? (action.actionLabel ? `${action.actionLabel}` : `Применено: ${action.batchUpdateItems?.length || 0}`) :
+                                   action.updates?.appendContent || action.appendContent ? 'Дополнено' :
+                                   action.updates?.dueDate ? `Срок: ${action.updates.dueDate || 'бэклог'}` :
+                                   action.updates?.priority ? `Приоритет: ${action.updates.priority.toUpperCase()}` :
+                                   action.updates?.status ? `Статус: ${action.updates.status}` :
+                                   action.actionLabel ? `Применено: ${action.actionLabel}` :
+                                   'Обновлено'}
                                 </span>
                               </div>
                               <button
@@ -728,7 +762,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                 className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                                 title="Показать запись в ленте"
                               >
-                                <span>{action.type === 'append_to_note' ? 'Открыть' : 'Перейти к записи'}</span>
+                                <span>{action.updates?.appendContent || action.appendContent ? 'Открыть' : 'Перейти к записи'}</span>
                                 <ArrowUpRight className="w-3 h-3 text-zinc-400" />
                               </button>
                             </div>
@@ -744,18 +778,28 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             <div className="mt-1 flex items-center gap-2">
                               {(() => {
                                 let finalAction = action;
-                                let count = action.batchItems?.length || 0;
+                                let count = action.batchUpdateItems?.length || 0;
                                 let isDisabled = false;
 
-                                if (action.type === 'batch_reschedule' && action.batchItems) {
-                                  const activeItems = action.batchItems.filter(it => isTaskSelected(msg.id, it.targetItemId));
+                                if (action.type === 'batch_update' && action.batchUpdateItems) {
+                                  const activeItems = action.batchUpdateItems.filter(it => isTaskSelected(msg.id, it.targetItemId));
                                   count = activeItems.length;
                                   isDisabled = count === 0;
                                   finalAction = {
                                     ...action,
-                                    batchItems: activeItems,
+                                    batchUpdateItems: activeItems,
                                   };
                                 }
+
+                                const buttonLabel = count > 0
+                                  ? `Применить (${count})`
+                                  : action.type === 'create_note'
+                                  ? 'Сохранить'
+                                  : action.type === 'schedule_task'
+                                  ? 'Запланировать'
+                                  : (action.updates?.appendContent || action.appendContent)
+                                  ? 'Дописать'
+                                  : 'Применить';
 
                                 return (
                                   <button
@@ -767,56 +811,8 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                         : 'bg-white text-black hover:bg-zinc-200 cursor-pointer'
                                     }`}
                                   >
-                                    {action.type === 'decompose_task' && (
-                                      <>
-                                        <ListTodo className="w-3.5 h-3.5 shrink-0" />
-                                        <span>
-                                          {action.subtasks?.length ? `Применить (${action.subtasks.length})` : 'Применить'}
-                                        </span>
-                                      </>
-                                    )}
-                                    {action.type === 'schedule_task' && (
-                                      <>
-                                        <Calendar className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Запланировать</span>
-                                      </>
-                                    )}
-                                    {action.type === 'reschedule_task' && (
-                                      <>
-                                        <Clock className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Перенести</span>
-                                      </>
-                                    )}
-                                    {action.type === 'batch_reschedule' && (
-                                      <>
-                                        <Clock className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Применить ({count})</span>
-                                      </>
-                                    )}
-                                    {action.type === 'append_to_note' && (
-                                      <>
-                                        <Plus className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Дописать</span>
-                                      </>
-                                    )}
-                                    {action.type === 'update_task_status' && (
-                                      <>
-                                        <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Сменить статус</span>
-                                      </>
-                                    )}
-                                    {action.type === 'move_note' && (
-                                      <>
-                                        <FolderOpen className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Переместить</span>
-                                      </>
-                                    )}
-                                    {(!action.type || action.type === 'create_note') && (
-                                      <>
-                                        <Plus className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Сохранить</span>
-                                      </>
-                                    )}
+                                    <Check className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{buttonLabel}</span>
                                   </button>
                                 );
                               })()}
@@ -925,6 +921,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
         )}
 
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Floating Bottom Composer */}

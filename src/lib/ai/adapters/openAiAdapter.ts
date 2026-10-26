@@ -92,7 +92,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
       }
     }
 
-    const res = await fetch(endpointUrl, {
+    let res = await fetch(endpointUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -101,6 +101,23 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(10000),
     });
+
+    // Rate limit backoff: retry once on HTTP 429
+    if (res.status === 429) {
+      const retryHeader = res.headers.get('retry-after');
+      const waitMs = retryHeader ? Math.min(Math.max(parseInt(retryHeader, 10) * 1000, 1000), 5000) : 1200;
+      aiLog.warn(`OpenAI Adapter HTTP 429 rate limit hit, backing off ${waitMs}ms before retry...`);
+      await new Promise(r => setTimeout(r, waitMs));
+      res = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10000),
+      });
+    }
 
     if (!res.ok) {
       const errorBody = await res.text().catch(() => '');

@@ -1165,7 +1165,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(applyInvertedBtn).toBeVisible();
 
     // Verify first task in the inverted batch card is "Полить цветы в кабинете" (lowest priority first)
-    const lastCard = page.locator('.max-w-\\[92\\%\\]').last();
+    const lastCard = page.locator('[data-testid="action-card"], .max-w-xl, .max-w-\\[92\\%\\]').last();
     await expect(lastCard.locator('text=Полить цветы').first()).toBeVisible();
 
     // Verify raw code block or leaked suggested status is NOT displayed in user-facing message text
@@ -1209,6 +1209,37 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 4. Click Apply
     await applyBtn.click();
     await expect(page.locator('text=обновлена').or(page.locator('text=Обновлено')).first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('25.6. Assistant Batch priority update ("у всех сегодняшних задач сделать минимум приоритета")', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Ask batch priority change: "можешь у всех сегодняшних задач сделать минимум приоритета"
+    await textarea.fill('можешь у всех сегодняшних задач сделать минимум приоритета');
+    await textarea.press('Enter');
+
+    // 3. Verify batch update action card appears with LOW badge and "Применить"
+    await expect(page.locator('text=LOW').first()).toBeVisible({ timeout: 5000 });
+    const batchCard = page.locator('[data-testid="action-card"], .max-w-xl').last();
+    await expect(batchCard).toContainText(/Приоритет|Изменение приоритета/);
+
+    const applyBtn = page.locator('button', { hasText: /Применить/ }).last();
+    await expect(applyBtn).toBeVisible();
+
+    // Visual screenshot verification
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-batch-priority-low.png',
+      fullPage: false,
+    });
+
+    // 4. Click Apply
+    await applyBtn.click();
+    await expect(page.locator('text=Приоритет ➔ LOW').or(page.locator('text=Применено')).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('26. KIE.AI Provider with Gemini 4 Argon Endpoint and Structured Settings', async ({ page }) => {
