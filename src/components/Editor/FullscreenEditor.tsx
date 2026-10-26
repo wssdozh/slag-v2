@@ -525,7 +525,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
           {/* Task-Specific Metadata Options: ALWAYS AT THE TOP */}
           {type === 'task' && (
-            <div className="flex flex-col gap-2.5 pb-2 border-b border-white/[0.06]">
+            <div className="flex flex-col gap-2.5 pb-2">
               {/* Task Controls Row */}
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
                 {/* Status Selector */}
@@ -552,14 +552,14 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                       {
                         value: 'in_progress',
                         label: 'В работе',
-                        icon: <Clock className="w-3.5 h-3.5 text-blue-400" />,
-                        color: 'text-blue-400',
+                        icon: <Clock className="w-3.5 h-3.5 text-zinc-400" />,
+                        color: 'text-zinc-300',
                       },
                       {
                         value: 'done',
                         label: 'Выполнено',
-                        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
-                        color: 'text-emerald-400',
+                        icon: <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400" />,
+                        color: 'text-zinc-300',
                       },
                     ]}
                   />
@@ -573,10 +573,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                       <button
                         type="button"
                         onClick={() => setIsDatePickerOpen(prev => !prev)}
-                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors cursor-pointer"
                         title="Изменить срок"
                       >
-                        <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                         <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
                       </button>
                       <button
@@ -624,10 +624,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                       <button
                         type="button"
                         onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors cursor-pointer"
                         title="Изменить длительность"
                       >
-                        <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                         <span className="font-medium max-w-[70px] truncate">
                           {duration >= 60
                             ? `${Math.floor(duration / 60)}ч${duration % 60 ? ` ${duration % 60}м` : ''}`
@@ -772,7 +772,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           )}
 
           {/* Desktop Sticky Shortcut Toolbar (PINS TO TOP ON SCROLL) */}
-          <div className="hidden md:flex sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-2 border-y border-white/[0.08] bg-[#09090b]/95 backdrop-blur-md text-zinc-300 items-center justify-between gap-1 overflow-x-auto scrollbar-none shadow-sm">
+          <div className="hidden md:flex sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-2 border-b border-white/[0.06] bg-[#09090b]/95 backdrop-blur-md text-zinc-300 items-center justify-between gap-1 overflow-x-auto scrollbar-none shadow-sm">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -837,7 +837,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                 title="Чекбокс"
               >
-                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                <CheckSquare className="w-4 h-4" />
               </button>
               <button
                 type="button"
@@ -853,7 +853,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                 title="Блок кода"
               >
-                <Code className="w-4 h-4 text-blue-400" />
+                <Code className="w-4 h-4" />
               </button>
               <button
                 type="button"
@@ -869,7 +869,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 className="p-1.5 rounded hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                 title="Ссылка [[заметка]]"
               >
-                <Link2 className="w-4 h-4 text-purple-400" />
+                <Link2 className="w-4 h-4" />
               </button>
               <button
                 type="button"
@@ -885,10 +885,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               <button
                 type="button"
                 onClick={handleAiDecomposeInline}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium transition-colors cursor-pointer border border-white/[0.06]"
                 title="Декомпозировать на шаги через ИИ"
               >
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Разобрать ИИ</span>
               </button>
             </div>
@@ -1163,7 +1163,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 }}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left font-mono"
               >
-                <Code className="w-4 h-4 text-blue-400" />
+                <Code className="w-4 h-4 text-zinc-400" />
                 <span>Моноширинный</span>
               </button>
             </div>
@@ -1207,7 +1207,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 }}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
               >
-                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                <CheckSquare className="w-4 h-4 text-zinc-400" />
                 <span>Чек-лист</span>
               </button>
               <button
@@ -1229,7 +1229,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 }}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
               >
-                <Code className="w-4 h-4 text-blue-400" />
+                <Code className="w-4 h-4 text-zinc-400" />
                 <span>Блок кода</span>
               </button>
               <button
@@ -1240,7 +1240,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 }}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
               >
-                <Link2 className="w-4 h-4 text-purple-400" />
+                <Link2 className="w-4 h-4 text-zinc-400" />
                 <span>Ссылка [[заметка]]</span>
               </button>
             </div>
@@ -1252,7 +1252,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <div className="max-w-xs mx-auto rounded-2xl bg-[#18181c] border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
               <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
                 <span>ИИ-Помощник</span>
-                <span className="font-mono text-[10px] text-purple-400">AI</span>
+                <span className="font-mono text-[10px] text-zinc-400">AI</span>
               </div>
               <button
                 type="button"
@@ -1260,9 +1260,9 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   handleAiDecomposeInline();
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-purple-300 hover:bg-purple-500/10 active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
               >
-                <Sparkles className="w-4 h-4 text-purple-400" />
+                <Sparkles className="w-4 h-4 text-zinc-400" />
                 <span>Разобрать на подзадачи</span>
               </button>
               <button
@@ -1292,13 +1292,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               onClick={() => setActiveMobilePopover(prev => (prev === 'ai' ? null : 'ai'))}
               className={`p-2 rounded-xl transition-all cursor-pointer ${
                 activeMobilePopover === 'ai'
-                  ? 'bg-purple-500/20 text-purple-300'
+                  ? 'bg-white/15 text-white'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
               }`}
               title="ИИ-инструменты"
             >
               <div className="flex items-center gap-0.5">
-                <Sparkles className="w-4 h-4 text-purple-400" />
+                <Sparkles className="w-4 h-4 text-zinc-400" />
                 <span className="text-xs font-semibold">Ai</span>
               </div>
             </button>
