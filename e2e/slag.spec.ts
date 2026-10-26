@@ -3241,6 +3241,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const dropdown = page.locator('.absolute.bottom-full');
     await expect(dropdown).toBeVisible();
     await expect(dropdown.locator('text=Хранилища (Vaults)')).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/screenshots/vault-dropdown.png',
+      fullPage: false,
+    });
 
     // 5. Click "Создать новое хранилище..."
     const createVaultBtn = dropdown.locator('button', { hasText: 'Создать новое хранилище...' });
@@ -3258,6 +3262,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/vault-modal-created.png',
       fullPage: false,
     });
+
+    // 7.1. Inspect Disk mode
+    await vaultModal.locator('button', { hasText: 'Папка на диске' }).click();
+    await page.screenshot({
+      path: 'test-results/screenshots/vault-modal-disk.png',
+      fullPage: false,
+    });
+    await vaultModal.locator('button', { hasText: 'Локальное' }).click();
 
     // 8. Test Escape LIFO closing
     await page.keyboard.press('Escape');
@@ -3288,5 +3300,39 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const deleteSecondaryBtn = page.locator('.group\\/v', { hasText: 'secondary' }).locator('button[title="Удалить хранилище"]');
     await deleteSecondaryBtn.click();
     await expect(page.locator('.group\\/v', { hasText: 'secondary' })).toHaveCount(0);
+  });
+
+  test('51. Responsive compact FeedHeader without background underlays and with anti-collision layout', async ({ page }) => {
+    // 1. Set viewport to narrower width (e.g. 860px) so center feed panel is ~480px (narrow mode)
+    await page.setViewportSize({ width: 860, height: 720 });
+    await page.waitForTimeout(300);
+
+    // 2. Locate FeedHeader
+    const header = page.locator('header.grid').first();
+    await expect(header).toBeVisible();
+
+    // 3. Locate type filter compact button
+    const typeFilter = page.locator('div[aria-label="Фильтр по типу"] button').first();
+    await expect(typeFilter).toBeVisible();
+
+    // Verify it doesn't have boxy background pill classes
+    const classList = await typeFilter.getAttribute('class');
+    expect(classList).not.toContain('bg-white/[0.04]');
+    expect(classList).not.toContain('border-white/[0.08]');
+
+    // 4. Click type filter dropdown and select "Таски"
+    await typeFilter.click();
+    const taskOption = page.locator('body > div button', { hasText: 'Таски' });
+    await expect(taskOption).toBeVisible();
+    await taskOption.click();
+
+    // 5. Verify the button now displays the CheckSquare task icon without pill
+    await expect(typeFilter.locator('svg.lucide-check-square')).toBeVisible();
+
+    // 6. Capture screenshot of compact header for visual inspection
+    await page.screenshot({
+      path: 'test-results/screenshots/compact-header-no-pill.png',
+      fullPage: false,
+    });
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
 import { openAppFolder } from '../../lib/folderOpener';
@@ -35,6 +35,30 @@ export const Sidebar: React.FC = () => {
   } = useApp();
 
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
+  const bottomBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isVaultDropdownOpen) return;
+
+    const handlePointerDown = (e: MouseEvent) => {
+      if (bottomBarRef.current && !bottomBarRef.current.contains(e.target as Node)) {
+        setIsVaultDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsVaultDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isVaultDropdownOpen]);
 
   const inboxItemsCount = items.filter(i => i.folder === 'Входящие').length;
 
@@ -103,107 +127,114 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Bottom Vault Switcher & Settings */}
-      <div className="p-2 border-t border-white/[0.06] flex items-center justify-between gap-1 relative bg-[#0c0c0e]">
+      <div
+        ref={bottomBarRef}
+        className="p-2 border-t border-white/[0.06] flex items-center justify-between gap-1 relative bg-[#0c0c0e]"
+      >
         {/* Vault Switcher Trigger */}
-        <div className="relative flex-1 min-w-0">
+        <div className="flex-1 min-w-0">
           <button
             onClick={() => setIsVaultDropdownOpen(!isVaultDropdownOpen)}
-            className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] transition-colors truncate"
+            className="w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] transition-colors truncate"
           >
             <div className="flex items-center gap-2 truncate">
               <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <span className="truncate text-xs font-medium">{vault.name}</span>
             </div>
-            <ChevronDown className="w-3 h-3 text-zinc-500 shrink-0 ml-1" />
+            <ChevronDown
+              className={`w-3 h-3 text-zinc-500 shrink-0 ml-1 transition-transform duration-150 ${
+                isVaultDropdownOpen ? 'rotate-180 text-zinc-300' : ''
+              }`}
+            />
           </button>
-
-          {/* Vault Switcher Dropdown */}
-          {isVaultDropdownOpen && (
-            <div className="absolute bottom-full left-0 mb-1 w-64 rounded-lg bg-[#18181b] border border-white/[0.08] shadow-2xl p-1.5 z-40 flex flex-col gap-1 text-xs animate-in fade-in duration-100">
-              <div className="px-2 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-                Хранилища (Vaults)
-              </div>
-
-              <div className="max-h-48 overflow-y-auto space-y-0.5">
-                {vaults.map(v => {
-                  const isCurrent = v.id === vault.id;
-                  return (
-                    <div
-                      key={v.id}
-                      className={`group/v flex items-center justify-between px-2 py-1.5 rounded text-left transition-colors ${
-                        isCurrent
-                          ? 'bg-white/[0.08] text-white font-medium'
-                          : 'text-zinc-300 hover:bg-white/[0.04] hover:text-white'
-                      }`}
-                    >
-                      <button
-                        onClick={() => {
-                          switchVault(v.id);
-                          setIsVaultDropdownOpen(false);
-                        }}
-                        className="flex-1 min-w-0 text-left cursor-pointer flex flex-col"
-                      >
-                        <span className="truncate">{v.name}</span>
-                        {v.path && (
-                          <span className="text-[10px] text-zinc-500 truncate font-mono">
-                            {v.path}
-                          </span>
-                        )}
-                      </button>
-                      <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                        {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-200" />}
-                        {!isCurrent && v.id !== 'default_vault' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteVault(v.id);
-                            }}
-                            title="Удалить хранилище"
-                            className="p-1 rounded text-zinc-500 hover:text-rose-400 opacity-0 group-hover/v:opacity-100 transition-opacity cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="my-1 border-t border-white/[0.06]" />
-
-              {/* Create new vault option */}
-              <button
-                onClick={() => {
-                  setIsVaultDropdownOpen(false);
-                  openVaultModal();
-                }}
-                className="flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer"
-              >
-                <PlusCircle className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Создать новое хранилище...</span>
-              </button>
-
-              {/* Open local folder option */}
-              <button
-                onClick={handleOpenLocalDirectory}
-                className="flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer"
-              >
-                <FolderSync className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Подключить папку на диске...</span>
-              </button>
-
-              {/* Reveal notes folder in OS explorer */}
-              <button
-                onClick={handleRevealNotesInExplorer}
-                className="flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Показать заметки в Проводнике</span>
-              </button>
-            </div>
-          )}
         </div>
+
+        {/* Vault Switcher Dropdown */}
+        {isVaultDropdownOpen && (
+          <div className="absolute bottom-full left-2 right-2 mb-1.5 rounded-xl bg-[#141416] border border-white/[0.08] shadow-2xl p-1.5 z-40 flex flex-col gap-0.5 text-xs animate-in fade-in duration-100">
+            <div className="px-2.5 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+              Хранилища (Vaults)
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-0.5">
+              {vaults.map((v) => {
+                const isCurrent = v.id === vault.id;
+                return (
+                  <div
+                    key={v.id}
+                    className={`group/v flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+                      isCurrent
+                        ? 'bg-white/[0.08] text-white font-medium'
+                        : 'text-zinc-300 hover:bg-white/[0.04] hover:text-white'
+                    }`}
+                  >
+                    <button
+                      onClick={() => {
+                        switchVault(v.id);
+                        setIsVaultDropdownOpen(false);
+                      }}
+                      className="flex-1 min-w-0 text-left cursor-pointer flex flex-col"
+                    >
+                      <span className="truncate">{v.name}</span>
+                      {v.path && (
+                        <span className="text-[10px] text-zinc-500 truncate font-mono">
+                          {v.path}
+                        </span>
+                      )}
+                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-200" />}
+                      {!isCurrent && v.id !== 'default_vault' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteVault(v.id);
+                          }}
+                          title="Удалить хранилище"
+                          className="p-1 rounded text-zinc-500 hover:text-rose-400 opacity-0 group-hover/v:opacity-100 transition-opacity cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="my-1 border-t border-white/[0.06]" />
+
+            {/* Create new vault option */}
+            <button
+              onClick={() => {
+                setIsVaultDropdownOpen(false);
+                openVaultModal();
+              }}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer w-full text-left"
+            >
+              <PlusCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span className="truncate">Создать новое хранилище...</span>
+            </button>
+
+            {/* Open local folder option */}
+            <button
+              onClick={handleOpenLocalDirectory}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer w-full text-left"
+            >
+              <FolderSync className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span className="truncate">Подключить папку на диске...</span>
+            </button>
+
+            {/* Reveal notes folder in OS explorer */}
+            <button
+              onClick={handleRevealNotesInExplorer}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer w-full text-left"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span className="truncate">Показать заметки в Проводнике</span>
+            </button>
+          </div>
+        )}
 
         {/* Logs HUD button */}
         <button

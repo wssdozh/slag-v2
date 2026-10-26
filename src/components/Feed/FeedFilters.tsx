@@ -10,15 +10,18 @@ import {
   X,
 } from 'lucide-react';
 import type { FeedViewMode } from '../../types';
+import { ResponsiveSegmented, type SegmentedOption } from '../UI/ResponsiveSegmented';
 
 export interface FeedFiltersProps {
   className?: string;
   viewMode?: FeedViewMode;
+  compact?: boolean;
 }
 
 export const FeedFilters: React.FC<FeedFiltersProps> = ({
   className = '',
   viewMode: controlledViewMode,
+  compact = false,
 }) => {
   const {
     inboxMode,
@@ -36,48 +39,63 @@ export const FeedFilters: React.FC<FeedFiltersProps> = ({
   const isInbox = currentFolder === 'Входящие';
   const activeViewMode = controlledViewMode ?? contextViewMode;
 
+  const inboxOptions: SegmentedOption[] = [
+    {
+      value: 'all',
+      label: 'Все',
+      title: 'Все заметки хранилища сквозным списком',
+    },
+    {
+      value: 'sorted',
+      label: 'Разобранные',
+      icon: <FolderCheck className="w-3.5 h-3.5" />,
+      title: 'Только распределенные по папкам (Разобранные)',
+    },
+    {
+      value: 'unsorted',
+      label: 'Неразобранные',
+      icon: <Inbox className="w-3.5 h-3.5" />,
+      title: 'Только неразобранные заметки во Входящих',
+    },
+  ];
+
+  const typeOptions: SegmentedOption[] = [
+    {
+      value: 'all',
+      label: 'Все',
+      title: 'Все типы записей',
+    },
+    {
+      value: 'note',
+      label: 'Заметки',
+      icon: <StickyNote className="w-3.5 h-3.5" />,
+      title: 'Только заметки',
+    },
+    {
+      value: 'task',
+      label: 'Таски',
+      icon: <CheckSquare className="w-3.5 h-3.5" />,
+      title: 'Только таски',
+    },
+    {
+      value: 'article',
+      label: 'Статьи',
+      icon: <FileText className="w-3.5 h-3.5" />,
+      title: 'Только статьи',
+    },
+  ];
+
   return (
-    <div className={`flex items-center gap-2 shrink-0 z-10 min-w-0 ${className}`}>
+    <div className={`flex items-center gap-1.5 shrink-0 z-10 min-w-0 ${className}`}>
       {/* Inbox Sub-mode Filter - only in feed mode */}
       {isInbox && activeViewMode === 'feed' && (
-        <div aria-label="Фильтр входящих" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setInboxMode('all')}
-            className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
-              inboxMode === 'all'
-                ? 'bg-white/10 text-white font-medium'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title="Все заметки хранилища сквозным списком"
-          >
-            Все
-          </button>
-          <button
-            type="button"
-            onClick={() => setInboxMode('sorted')}
-            className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
-              inboxMode === 'sorted'
-                ? 'bg-white/10 text-white'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title="Только распределенные по папкам (Разобранные)"
-          >
-            <FolderCheck className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setInboxMode('unsorted')}
-            className={`h-full px-1.5 rounded-md text-xs flex items-center justify-center transition-colors cursor-pointer ${
-              inboxMode === 'unsorted'
-                ? 'bg-white/10 text-white'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title="Только неразобранные заметки во Входящих"
-          >
-            <Inbox className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ResponsiveSegmented
+          value={inboxMode}
+          onChange={(val) => setInboxMode(val as any)}
+          options={inboxOptions}
+          compact={compact}
+          ariaLabel="Фильтр входящих"
+        />
       )}
 
       {/* Divider line between inbox filter and type filters */}
@@ -87,63 +105,20 @@ export const FeedFilters: React.FC<FeedFiltersProps> = ({
 
       {/* Type filters (feed mode only) */}
       {activeViewMode === 'feed' && (
-        <div aria-label="Фильтр по типу" className="flex items-center h-ctrl-sm gap-0.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveTypeFilter('all')}
-            className={`h-full px-2 rounded-md text-xs transition-colors cursor-pointer ${
-              activeTypeFilter === 'all'
-                ? 'bg-white/10 text-white font-medium'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title="Все типы записей"
-          >
-            Все
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTypeFilter('note')}
-            className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
-              activeTypeFilter === 'note'
-                ? 'bg-white/10 text-white'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title="Только заметки"
-          >
-            <StickyNote className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTypeFilter('task')}
-            className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
-              activeTypeFilter === 'task'
-                ? 'bg-white/10 text-white'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title="Только таски"
-          >
-            <CheckSquare className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTypeFilter('article')}
-            className={`h-full px-1.5 rounded-md text-xs flex items-center transition-colors cursor-pointer ${
-              activeTypeFilter === 'article'
-                ? 'bg-white/10 text-white'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-            }`}
-            title="Только статьи"
-          >
-            <FileText className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <ResponsiveSegmented
+          value={activeTypeFilter}
+          onChange={(val) => setActiveTypeFilter(val as any)}
+          options={typeOptions}
+          compact={compact}
+          ariaLabel="Фильтр по типу"
+        />
       )}
 
       {/* AI Filter Chip when Assistant filtered the feed */}
       {aiItemFilter && (
         <div className="flex items-center gap-1.5 px-2.5 h-ctrl-sm rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 text-xs font-mono shrink-0">
           <Filter className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="truncate max-w-[140px]">
+          <span className="truncate max-w-[120px]">
             ИИ: "{aiItemFilter.queryLabel}" ({aiItemFilter.itemIds.length})
           </span>
           <button

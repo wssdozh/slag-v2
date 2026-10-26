@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FeedFilters } from './FeedFilters';
 import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
+import { useContainerWidth } from '../../hooks/useContainerWidth';
 import {
   Folder,
   Inbox,
@@ -32,6 +33,11 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     setIsTriageModalOpen,
     openFolderInfoModal,
   } = useApp();
+
+  const headerRef = useRef<HTMLElement | null>(null);
+  const containerWidth = useContainerWidth(headerRef);
+  const isCompactFilters = containerWidth > 0 && containerWidth < 700;
+  const isCompactViews = containerWidth > 0 && containerWidth < 520;
 
   const activeViewMode = controlledViewMode ?? contextViewMode;
   const handleViewModeChange = onViewModeChange ?? setFeedViewMode;
@@ -63,9 +69,12 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   );
 
   return (
-    <header className="h-12 px-4 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-3 select-none shrink-0 relative">
-      {/* Left: Filter Controls & Chips */}
-      <div className="flex items-center gap-2 shrink-0 z-10 min-w-0">
+    <header
+      ref={headerRef}
+      className="h-12 px-3 sm:px-4 border-b border-white/[0.06] bg-[#0c0c0e] grid grid-cols-[1fr_auto_1fr] items-center gap-2 select-none shrink-0 relative"
+    >
+      {/* Left Column: Filter Controls & Chips */}
+      <div className="flex items-center gap-1.5 justify-self-start min-w-0 z-10">
         {/* Kanban Materials Dock Toggle */}
         {activeViewMode === 'kanban' && (
           <button
@@ -86,29 +95,29 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           </button>
         )}
 
-        <FeedFilters viewMode={activeViewMode} />
+        <FeedFilters compact={isCompactFilters} viewMode={activeViewMode} />
       </div>
 
-      {/* Center: Large prominent folder title in the center of the bar */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* Center Column: Prominent folder title in clean grid flow (no overlap) */}
+      <div className="flex items-center justify-center justify-self-center min-w-0 max-w-full px-1 z-0">
         <button
           type="button"
           onClick={() => openFolderInfoModal(currentFolder)}
-          className="flex items-center gap-2 pointer-events-auto px-2.5 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none"
+          className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none min-w-0"
           title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
         >
           {folderIconComp}
-          <h2 className="text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors">
+          <h2 className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors truncate">
             {folderMeta?.name || currentFolder}
           </h2>
-          <span className="text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors">
+          <span className="text-2xs sm:text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors shrink-0">
             ({filteredItems.length})
           </span>
         </button>
       </div>
 
-      {/* Center / Right Controls */}
-      <div className="flex items-center gap-1.5 shrink-0 ml-auto z-10">
+      {/* Right Column: AI Triage & View Switcher */}
+      <div className="flex items-center gap-1.5 justify-self-end min-w-0 shrink-0 z-10">
         {/* AI Triage button in Inbox (Left of switcher with divider) */}
         {isInbox && inboxUnsortedCount > 0 && (
           <div className="flex items-center h-ctrl-sm gap-1.5 shrink-0">
@@ -126,7 +135,11 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           </div>
         )}
 
-        <ViewModeSwitcher viewMode={activeViewMode} onViewModeChange={handleViewModeChange} />
+        <ViewModeSwitcher
+          compact={isCompactViews}
+          viewMode={activeViewMode}
+          onViewModeChange={handleViewModeChange}
+        />
       </div>
     </header>
   );

@@ -80,15 +80,15 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       role={role}
       aria-modal="true"
       aria-label={ariaLabelString}
-      className={`fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none ${className}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none ${className}`}
     >
       <div
-        className={`w-full ${maxWidth} ${maxHeight || ''} rounded-none md:rounded-2xl bg-[#141416] border-0 md:border md:border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 ${containerClassName}`}
+        className={`w-full ${maxWidth} ${maxHeight || 'max-h-[calc(100dvh-2rem)]'} rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 ${containerClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         {!hideHeader && (
-          <div className="rounded-t-none md:rounded-t-[15px] overflow-hidden shrink-0">
+          <div className="overflow-hidden shrink-0">
             {customHeader || (
               <div
                 className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
@@ -140,7 +140,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0 rounded-b-none md:rounded-b-[15px]">
+          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0">
             {footer}
           </div>
         )}
