@@ -802,11 +802,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsFullscreenEditorOpen(false);
       return true;
     }
-    if (mobileFolderInfoOpen) {
+    if (isMobile && mobileFolderInfoOpen) {
       setMobileFolderInfoOpen(false);
       return true;
     }
-    if (mobileActiveFolder !== null) {
+    if (isMobile && mobileActiveFolder !== null) {
       if (mobileActiveFolder.includes('/')) {
         const parent = mobileActiveFolder.substring(0, mobileActiveFolder.lastIndexOf('/'));
         setMobileActiveFolder(parent);
@@ -815,7 +815,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return true;
     }
-    if (activeMobileTab !== 'folders') {
+    if (isMobile && activeMobileTab !== 'folders') {
       setActiveMobileTab('folders');
       return true;
     }
@@ -836,6 +836,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isSearchOpen,
     replyTarget,
     isFullscreenEditorOpen,
+    isMobile,
     mobileFolderInfoOpen,
     mobileActiveFolder,
     setMobileActiveFolder,
@@ -891,28 +892,113 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [dismissTopLayer, openComposerModal, isFullscreenEditorOpen, isComposerModalOpen, isSearchOpen, isSettingsOpen]);
 
-  // Android Back Gesture & PopState Handler
+  // Navigation & Layer Depth Calculation (LIFO Stack)
+  const overlayDepth = (
+    (activeLightboxIndex !== null ? 1 : 0) +
+    (mobileActionSheetItem !== null ? 1 : 0) +
+    (contextMenu !== null ? 1 : 0) +
+    (isLogViewerOpen ? 1 : 0) +
+    (isFolderModalOpen ? 1 : 0) +
+    (isVaultModalOpen ? 1 : 0) +
+    (isFolderInfoModalOpen ? 1 : 0) +
+    (isTriageModalOpen ? 1 : 0) +
+    (isComposerModalOpen ? 1 : 0) +
+    (isSettingsOpen ? 1 : 0) +
+    (isSearchOpen ? 1 : 0) +
+    (replyTarget !== null ? 1 : 0) +
+    (isFullscreenEditorOpen ? 1 : 0) +
+    (isMobile && mobileFolderInfoOpen ? 1 : 0)
+  );
+  const mobileFolderDepth = (isMobile && mobileActiveFolder) ? mobileActiveFolder.split('/').length : 0;
+  const mobileTabDepth = (isMobile && activeMobileTab !== 'folders') ? 1 : 0;
+  const totalLayerDepth = overlayDepth + mobileFolderDepth + mobileTabDepth;
+
+  const historyDepthRef = useRef<number>(0);
+  const isProgrammaticNavRef = useRef<boolean>(false);
+
+  // Initialize base history state on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      window.history.replaceState({ slagApp: true }, '');
+      window.history.replaceState({ slagRoot: true, depth: 0 }, '');
     } catch {
       // Ignore
     }
+  }, []);
 
-    const handlePopState = () => {
-      const handled = dismissTopLayer();
-      if (handled) {
+  // Sync totalLayerDepth with window.history
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const targetDepth = totalLayerDepth;
+    const currentHistDepth = historyDepthRef.current;
+
+    if (targetDepth > currentHistDepth) {
+      const diff = targetDepth - currentHistDepth;
+      for (let i = 0; i < diff; i++) {
         try {
-          window.history.pushState({ slagApp: true }, '');
+          window.history.pushState({ slagLayer: true, depth: currentHistDepth + i + 1 }, '');
         } catch {
           // Ignore
         }
       }
+      historyDepthRef.current = targetDepth;
+    } else if (targetDepth < currentHistDepth) {
+      const diff = currentHistDepth - targetDepth;
+      historyDepthRef.current = targetDepth;
+      isProgrammaticNavRef.current = true;
+      try {
+        window.history.go(-diff);
+      } catch {
+        // Ignore
+      }
+      const timer = setTimeout(() => {
+        isProgrammaticNavRef.current = false;
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [totalLayerDepth]);
+
+  // Handle hardware back / browser back / swipe gestures via popstate
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      if (isProgrammaticNavRef.current) {
+        isProgrammaticNavRef.current = false;
+        return;
+      }
+
+      if (historyDepthRef.current > 0) {
+        historyDepthRef.current -= 1;
+      }
+      dismissTopLayer();
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, [dismissTopLayer]);
+
+  // Handle Mouse Back button (Mouse button 4 / Back / e.button === 3)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleMouseBack = (e: MouseEvent) => {
+      if (e.button === 3) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'mouseup') {
+          dismissTopLayer();
+        }
+      }
+    };
+
+    window.addEventListener('mouseup', handleMouseBack, true);
+    window.addEventListener('auxclick', handleMouseBack, true);
+    return () => {
+      window.removeEventListener('mouseup', handleMouseBack, true);
+      window.removeEventListener('auxclick', handleMouseBack, true);
+    };
   }, [dismissTopLayer]);
 
   const scrollToItem = useCallback((idOrTitle: string) => {
