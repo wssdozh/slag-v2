@@ -301,7 +301,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof initialWorkspace.isKanbanMaterialsOpen === 'boolean') {
       return initialWorkspace.isKanbanMaterialsOpen;
     }
-    return true;
+    const isMobileInitial = typeof window !== 'undefined' && window.innerWidth < 768;
+    return !isMobileInitial;
   });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
   const [isChatLoading, setIsChatLoading] = useState(false);

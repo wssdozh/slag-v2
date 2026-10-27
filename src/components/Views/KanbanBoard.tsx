@@ -73,6 +73,7 @@ export const KanbanBoard: React.FC = () => {
     openComposerModal,
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
+    isMobile,
   } = useApp();
 
   // Search state for TRIZ Materials Dock
@@ -208,9 +209,24 @@ export const KanbanBoard: React.FC = () => {
       {/* ============================================================== */}
       {/* TRIZ Dock on the left: [ 📚 Материалы папки ] (collapsible)   */}
       {/* ============================================================== */}
+      {/* On mobile: backdrop overlay when materials drawer is open */}
+      {isMobile && isKanbanMaterialsOpen && (
+        <div
+          onClick={() => setIsKanbanMaterialsOpen(false)}
+          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-30 animate-in fade-in duration-150"
+        />
+      )}
+
+      {/* TRIZ Dock: Slide-over drawer on mobile, inline dock on desktop */}
       <div
-        className={`bg-[#0c0c0e]/95 flex flex-col transition-all duration-200 shrink-0 overflow-hidden ${
-          isKanbanMaterialsOpen ? 'w-60 sm:w-64 border-r border-white/[0.06]' : 'w-0 border-r-0'
+        className={`${
+          isMobile
+            ? `absolute inset-y-0 left-0 z-40 w-72 bg-[#0c0c0e] shadow-2xl border-r border-white/[0.08] transition-transform duration-200 ${
+                isKanbanMaterialsOpen ? 'translate-x-0' : '-translate-x-full'
+              }`
+            : `bg-[#0c0c0e]/95 flex flex-col transition-all duration-200 shrink-0 overflow-hidden ${
+                isKanbanMaterialsOpen ? 'w-60 sm:w-64 border-r border-white/[0.06]' : 'w-0 border-r-0'
+              }`
         }`}
       >
         <div className="w-60 sm:w-64 flex flex-col h-full shrink-0">
