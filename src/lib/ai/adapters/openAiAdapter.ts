@@ -3,6 +3,19 @@ import { logger } from '../../logger';
 
 const aiLog = logger.scope('AI');
 
+export function extractErrorMessage(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed.error?.message) return parsed.error.message;
+    if (parsed.msg) return parsed.msg;
+    if (parsed.error && typeof parsed.error === 'string') return parsed.error;
+  } catch {
+    // not JSON
+  }
+  const clean = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return clean ? clean.slice(0, 160) : `HTTP ${status}`;
+}
+
 export class OpenAiChatAdapter implements LlmProtocolAdapter {
   async executeTurn(request: LlmAdapterTurnRequest): Promise<LlmAdapterTurnResponse> {
     const {
@@ -133,13 +146,16 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
 
     if (!res.ok) {
       const errorBody = await res.text().catch(() => '');
-      aiLog.warn(`OpenAI Adapter HTTP ${res.status}:`, errorBody);
-      throw new Error(`OpenAI HTTP ${res.status}: ${errorBody.slice(0, 200)}`);
+      const detail = extractErrorMessage(res.status, errorBody);
+      aiLog.warn(`OpenAI Adapter HTTP ${res.status}: ${detail}`, { status: res.status, raw: errorBody.slice(0, 300) });
+      throw new Error(`OpenAI HTTP ${res.status}: ${detail}`);
     }
 
     const data = await res.json();
     if (data.code && data.code !== 200) {
-      throw new Error(data.msg || `OpenAI Adapter error code ${data.code}`);
+      const msg = data.msg || `OpenAI Adapter error code ${data.code}`;
+      aiLog.warn(`OpenAI Adapter error code ${data.code}: ${msg}`);
+      throw new Error(msg);
     }
 
     const choice = data.choices?.[0];
@@ -180,10 +196,18 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
       }
     }
 
+    const usage = data.usage ? {
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+      reasoningTokens: data.usage.completion_tokens_details?.reasoning_tokens,
+    } : undefined;
+
     return {
       content,
       reasoning: reasoning || undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      usage,
     };
   }
 }
