@@ -35,6 +35,24 @@ export interface SendAssistantChatResult {
 }
 
 /**
+ * Sanitizes markdown content into a single-line, lightweight text snippet
+ * stripping headings, bullet markers, horizontal rules and excess whitespace.
+ */
+export function cleanSnippetText(text: string, maxLen = 140): string {
+  if (!text) return '';
+  return text
+    .replace(/#+\s*/g, '')
+    .replace(/[-*]\s+/g, '')
+    .replace(/\d+\.\s+/g, '')
+    .replace(/---[-*]*/g, ' ')
+    .replace(/[`~_>|]/g, '')
+    .replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
+/**
  * Parses embedded action block from assistant response (create_note, schedule_task, reschedule_task, update_task_status, decompose_task, move_note)
  */
 export function extractActionBlock(text: string): { cleanText: string; suggestedAction?: SuggestedAction } {
@@ -269,8 +287,8 @@ export class AssistantOrchestrator {
           : results;
 
         return filtered.slice(0, 5).map((item) => {
-          const bodySnippet = (item.content || '').slice(0, 200).trim();
-          const attachSnippet = getSearchableAttachmentText(item.attachments).slice(0, 200).trim();
+          const bodySnippet = cleanSnippetText(item.content || '', 140);
+          const attachSnippet = cleanSnippetText(getSearchableAttachmentText(item.attachments), 100);
           let snippet = bodySnippet;
           if (attachSnippet) {
             snippet = snippet ? `${snippet} [Вложения: ${attachSnippet}]` : `[Вложения: ${attachSnippet}]`;
@@ -766,6 +784,9 @@ ${isInbox
    - Когда пользователь спрашивает «что я говорил в голосовом про X?», «найди чек/скриншот с Y» или любые факты из базы — СНАЧАЛА вызови search_notes по ключевым словам.
    - Если для ответа недостаточно сниппета из поиска — вызови read_note по названию или id нужной заметки.
    - НОРМАЛИЗАЦИЯ ЗАПРОСОВ: При вызове search_notes очищай запрос от стоп-слов («поищи», «как», «вообще», «что») и исправляй опечатки пользователя (например, «прафилам как жить вообще» -> search_notes("правила")). Не копируй опечатки и шум буквально.
+   - ФОРМАТ ОТВЕТА ПО РЕЗУЛЬТАТАМ ПОИСКА (ZERO-SLOP ВЫЖИМКА):
+     * КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО копировать сырой markdown заметок или вываливать их текст простыней в чат!
+     * Всегда формулируй ответ своими словами: краткая фактологическая выжимка, структурированный список идей/ответов по существу вопроса, и аккуратные вики-ссылки на источники [[Название заметки]].
    - get_calendar_agenda: используй для повестки дня, расписания, задач на сегодня/завтра/дату (date: 'YYYY-MM-DD').
    - При вопросах общего характера («что?», «почему?», «не хочу», «поговори со мной», «кто ты?») — отвечай прямо текстом без бессмысленного вызова инструментов.
 
@@ -969,9 +990,18 @@ ${isInbox
           );
           if (foundNotesSearch && Array.isArray(foundNotesSearch.result)) {
             const list = foundNotesSearch.result
-              .map((r: any) => `- [[${r.title}]] (${r.folder}): ${r.snippet || ''}`)
+              .map((r: any) => `• [[${r.title}]] (${r.folder})${r.snippet && r.snippet !== '(пусто)' ? ` — ${r.snippet}` : ''}`)
               .join('\n');
             finalContent = `По вашему запросу найдены следующие записи:\n\n${list}`;
+            if (!capturedFeedFilter) {
+              const ids = foundNotesSearch.result.map((r: any) => r.id).filter(Boolean);
+              if (ids.length > 0) {
+                capturedFeedFilter = {
+                  itemIds: ids,
+                  queryLabel: 'Результаты поиска',
+                };
+              }
+            }
           } else {
             const batchAction = capturedActions.find((a) => a.type === 'batch_update');
             const updateAction = capturedActions.find((a) => a.type === 'update_item');
@@ -2056,12 +2086,19 @@ ${isInbox
     executedToolCalls.push({ name: 'search_notes', args: { query: lastUserMsg }, result: searchResults });
 
     if (searchResults.length > 0) {
-      const list = searchResults.map((r: any) => `- [[${r.title}]] (${r.folder}): ${r.snippet}`).join('\n');
+      const list = searchResults
+        .map((r: any) => `• [[${r.title}]] (${r.folder})${r.snippet && r.snippet !== '(пусто)' ? ` — ${r.snippet}` : ''}`)
+        .join('\n');
+      const candidateIds = searchResults.map((r: any) => r.id).filter(Boolean);
       return {
-        content: `По вашему запросу найдены следующие записи в контексте "${isInbox ? 'Все хранилище' : currentFolder}":\n\n${list}`,
-        reasoning: `Выполнен поиск Orama по базе и вложениям по запросу: "${lastUserMsg}"`,
+        content: `По вашему запросу в контексте "${isInbox ? 'Все хранилище' : currentFolder}" найдено ${searchResults.length} записей:\n\n${list}`,
+        reasoning: `Локальный поиск Orama: найдено ${searchResults.length} записей по "${lastUserMsg}"`,
         reasoningTimeMs: Date.now() - startTime,
         toolCalls: executedToolCalls,
+        feedFilter: candidateIds.length > 0 ? {
+          itemIds: candidateIds,
+          queryLabel: `Поиск: ${lastUserMsg}`,
+        } : undefined,
       };
     }
 

@@ -330,9 +330,8 @@ export const SettingsModal: React.FC = () => {
                             onChange={(val) => setModel(val)}
                             options={[
                               { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B' },
-                              { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
-                              { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B' },
-                              { value: 'llama-3.3-70b-specdec', label: 'Llama 3.3 70B SpecDec' },
+                              { value: 'openai/gpt-oss-20b', label: 'OpenAI GPT-OSS 20B (Быстрая)' },
+                              { value: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B' },
                             ]}
                           />
                         </div>

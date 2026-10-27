@@ -102,12 +102,23 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
       signal: AbortSignal.timeout(10000),
     });
 
-    // Rate limit backoff: retry once on HTTP 429
-    if (res.status === 429) {
+    // Rate limit backoff: retry on HTTP 429 (up to 2 retries with Groq error parsing)
+    for (let retry = 0; retry < 2 && res.status === 429; retry++) {
+      const errorText = await res.text().catch(() => '');
       const retryHeader = res.headers.get('retry-after');
-      const waitMs = retryHeader ? Math.min(Math.max(parseInt(retryHeader, 10) * 1000, 1000), 5000) : 1200;
-      aiLog.warn(`OpenAI Adapter HTTP 429 rate limit hit, backing off ${waitMs}ms before retry...`);
-      await new Promise(r => setTimeout(r, waitMs));
+      const waitMatch = errorText.match(/try again in ([\d.]+)\s*s/i);
+
+      let waitMs = 2800 * (retry + 1);
+      if (waitMatch) {
+        waitMs = Math.ceil(parseFloat(waitMatch[1]) * 1000) + 400;
+      } else if (retryHeader) {
+        waitMs = Math.max(parseInt(retryHeader, 10) * 1000, 1000) + 400;
+      }
+      waitMs = Math.min(Math.max(waitMs, 1500), 7000);
+
+      aiLog.warn(`OpenAI Adapter HTTP 429 rate limit hit (attempt ${retry + 1}/2), backing off ${waitMs}ms before retry...`);
+      await new Promise((r) => setTimeout(r, waitMs));
+
       res = await fetch(endpointUrl, {
         method: 'POST',
         headers: {
@@ -115,7 +126,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(12000),
       });
     }
 
