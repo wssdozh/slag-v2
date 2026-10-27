@@ -9,7 +9,6 @@ import {
   MoreVertical,
   Calendar,
   Inbox,
-  X
 } from 'lucide-react';
 import { MobileCalendarView } from './MobileCalendarView';
 import { MobileScreenHeader } from './MobileScreenHeader';
@@ -33,18 +32,16 @@ const COLUMN_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done', 'backlog'];
 export const MobileTasksView: React.FC = () => {
   const {
     items,
-    saveItem,
     toggleTaskComplete,
     setSelectedItem,
     setIsFullscreenEditorOpen,
     setMobileActionSheetItem,
+    openComposerModal,
     currentFolder
   } = useApp();
 
   const [viewMode, setViewMode] = useState<'tasks' | 'calendar'>('tasks');
   const [activeStatusTab, setActiveStatusTab] = useState<TaskStatus>('todo');
-  const [quickTaskTitle, setQuickTaskTitle] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
 
   const { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } = useSwipeGesture({
     onSwipeLeft: () => {
@@ -89,25 +86,6 @@ export const MobileTasksView: React.FC = () => {
 
   const currentColumnTasks = tasksByStatus[activeStatusTab] || [];
 
-  const handleCreateTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickTaskTitle.trim()) return;
-
-    saveItem({
-      title: quickTaskTitle.trim(),
-      content: '',
-      type: 'task',
-      folder: currentFolder || 'Входящие',
-      status: activeStatusTab,
-      priority: 'none',
-      attachments: [],
-      tags: [],
-    });
-
-    setQuickTaskTitle('');
-    setIsAdding(false);
-  };
-
   const switcher = (
     <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
       <button
@@ -124,6 +102,8 @@ export const MobileTasksView: React.FC = () => {
       <button
         type="button"
         onClick={() => setViewMode('calendar')}
+        title="Календарь"
+        aria-label="Календарь"
         className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1 ${
           viewMode === 'calendar'
             ? 'bg-white/10 text-white shadow-sm'
@@ -285,45 +265,21 @@ export const MobileTasksView: React.FC = () => {
           })
         )}
 
-        {/* Inline Quick Add Task Button / Form (After the last task card) */}
-        {isAdding ? (
-          <form
-            onSubmit={handleCreateTask}
-            className="p-3 bg-[#141417] border border-white/[0.08] rounded-2xl flex items-center gap-2 animate-in fade-in duration-150 shadow-sm"
-          >
-            <input
-              type="text"
-              value={quickTaskTitle}
-              onChange={e => setQuickTaskTitle(e.target.value)}
-              placeholder={`Новая задача в «${COLUMNS.find(c => c.id === activeStatusTab)?.title}»...`}
-              autoFocus
-              className="flex-1 bg-black/40 border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none"
-            />
-            <button
-              type="submit"
-              className="px-3.5 py-2 rounded-xl bg-white text-black text-xs font-semibold cursor-pointer active:scale-95 transition-all shrink-0"
-            >
-              Добавить
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsAdding(false)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              title="Отмена"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </form>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsAdding(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-white/[0.1] hover:border-white/20 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer active:scale-[0.99]"
-          >
-            <Plus className="w-4 h-4 text-zinc-400" />
-            <span>Добавить задачу</span>
-          </button>
-        )}
+        {/* Add Task Button (Opens Unified Composer with preset Task type & current Status) */}
+        <button
+          type="button"
+          onClick={() => {
+            openComposerModal({
+              type: 'task',
+              status: activeStatusTab,
+              folder: currentFolder || 'Входящие'
+            });
+          }}
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-white/[0.1] hover:border-white/20 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer active:scale-[0.99]"
+        >
+          <Plus className="w-4 h-4 text-zinc-400" />
+          <span>Добавить задачу</span>
+        </button>
       </div>
     </div>
   );
