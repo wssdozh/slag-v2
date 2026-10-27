@@ -54,11 +54,6 @@ export const MobileFolderInfoView: React.FC = () => {
       <MobileScreenHeader
         onBack={() => setMobileFolderInfoOpen(false)}
         backLabel="Назад"
-        centerSlot={
-          <span className="text-sm font-semibold text-zinc-200 truncate max-w-[200px]">
-            {currentFolderMeta?.name || currentFolder}
-          </span>
-        }
         rightSlot={
           currentFolderMeta && !currentFolderMeta.isSystem ? (
             <button
@@ -108,6 +103,17 @@ export const MobileFolderInfoView: React.FC = () => {
               <Plus className="w-3.5 h-3.5" />
               <span>Запись</span>
             </button>
+
+            {currentFolderMeta && !currentFolderMeta.isSystem && (
+              <button
+                onClick={() => openEditFolderModal(currentFolderMeta)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium active:scale-95 transition-all cursor-pointer border border-white/[0.06]"
+                title="Редактировать папку"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Изменить</span>
+              </button>
+            )}
 
             {isInbox && (
               <button

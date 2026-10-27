@@ -523,6 +523,27 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             />
           </div>
 
+          {/* Compact Tags Ribbon directly under Title */}
+          <div className="flex flex-wrap items-center gap-1.5 pb-2 text-xs">
+            <Tag className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            {tags.map(t => (
+              <TagChip
+                key={t}
+                tag={t}
+                variant="pill"
+                onRemove={() => setTags(tags.filter(tag => tag !== t))}
+              />
+            ))}
+            <input
+              type="text"
+              value={newTagInput}
+              onChange={(e) => setNewTagInput(e.target.value)}
+              onKeyDown={handleAddTag}
+              placeholder="+ тег"
+              className="bg-transparent text-xs font-mono text-zinc-300 placeholder-zinc-600 w-20 px-1 outline-none"
+            />
+          </div>
+
           {/* Task-Specific Metadata Options: ALWAYS AT THE TOP */}
           {type === 'task' && (
             <div className="flex flex-col gap-2.5 pb-2">
@@ -1056,29 +1077,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             />
           </div>
 
-          {/* Tags Section */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-4 border-t border-white/[0.06]">
-            <Tag className="w-3.5 h-3.5 text-zinc-500" />
-            {tags.map(t => (
-              <TagChip
-                key={t}
-                tag={t}
-                variant="pill"
-                onRemove={() => setTags(tags.filter(tag => tag !== t))}
-              />
-            ))}
-            <input
-              type="text"
-              value={newTagInput}
-              onChange={(e) => setNewTagInput(e.target.value)}
-              onKeyDown={handleAddTag}
-              placeholder="+ тег"
-              className="bg-transparent text-xs font-mono text-white placeholder-zinc-600 w-20 px-1 outline-none"
-            />
-          </div>
-
-          {/* Bottom spacer on mobile so last lines clear the bottom bar */}
-          <div className="h-24 md:hidden shrink-0" aria-hidden="true" />
+          {/* Bottom spacer on mobile so last lines clear the floating bottom bar */}
+          <div className="h-16 md:hidden shrink-0" aria-hidden="true" />
         </div>
       </div>
 
