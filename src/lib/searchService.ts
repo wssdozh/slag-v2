@@ -113,12 +113,33 @@ export function getSearchableAttachmentText(attachments?: SlagItem['attachments'
     .join(' ');
 }
 
-export async function initSearchIndex(items: SlagItem[]) {
-  const signature = items.map(i => `${i.id}:${i.updatedAt}`).join('|');
+let isIndexing = false;
+let pendingIndexItems: SlagItem[] | null = null;
+
+function computeItemsSignature(items: SlagItem[]): string {
+  // Fast signature based on length, first/last IDs and timestamps without giant string concatenation
+  if (items.length === 0) return 'empty';
+  const first = items[0];
+  const last = items[items.length - 1];
+  let sumUpdated = 0;
+  for (let i = 0; i < items.length; i++) {
+    sumUpdated = (sumUpdated + (items[i].updatedAt || 0)) % 1000000007;
+  }
+  return `${items.length}:${first?.id}:${first?.updatedAt}:${last?.id}:${last?.updatedAt}:${sumUpdated}`;
+}
+
+export async function initSearchIndex(items: SlagItem[]): Promise<Orama<any> | null> {
+  const signature = computeItemsSignature(items);
   if (dbInstance && signature === lastIndexSignature) {
     return dbInstance;
   }
 
+  if (isIndexing) {
+    pendingIndexItems = items;
+    return dbInstance;
+  }
+
+  isIndexing = true;
   const endTimer = searchLog.time(`Indexing ${items.length} items in Orama`);
   try {
     const db = await create({
@@ -152,6 +173,13 @@ export async function initSearchIndex(items: SlagItem[]) {
   } catch (err) {
     searchLog.error('Failed to init Orama search:', err);
     return null;
+  } finally {
+    isIndexing = false;
+    if (pendingIndexItems) {
+      const nextItems = pendingIndexItems;
+      pendingIndexItems = null;
+      void initSearchIndex(nextItems);
+    }
   }
 }
 
@@ -189,7 +217,7 @@ export async function querySearch(
 
         if (filtered.length > 0) {
           const duration = performance.now() - startMs;
-          searchLog.debug(`Exact phrase "${queryText}" yielded ${filtered.length} hits via Orama (${Math.round(duration)}ms)`);
+          searchLog.trace(`Exact phrase "${queryText}" yielded ${filtered.length} hits via Orama (${Math.round(duration)}ms)`);
           return filtered;
         }
       }
@@ -214,7 +242,7 @@ export async function querySearch(
 
           if (filtered.length > 0) {
             const duration = performance.now() - startMs;
-            searchLog.debug(`Keywords [${keywords.join(', ')}] yielded ${filtered.length} hits via Orama multi-term (${Math.round(duration)}ms)`);
+            searchLog.trace(`Keywords [${keywords.join(', ')}] yielded ${filtered.length} hits via Orama multi-term (${Math.round(duration)}ms)`);
             return filtered;
           }
         }
@@ -276,7 +304,7 @@ export async function querySearch(
   const fallbackResults = scoredItems.slice(0, 15).map(s => s.item);
 
   const duration = performance.now() - startMs;
-  searchLog.debug(`Query "${queryText}" [tokens: ${keywords.join(', ')}] yielded ${fallbackResults.length} hits via tokenized scorer (${Math.round(duration)}ms)`);
+  searchLog.trace(`Query "${queryText}" [tokens: ${keywords.join(', ')}] yielded ${fallbackResults.length} hits via tokenized scorer (${Math.round(duration)}ms)`);
   return fallbackResults;
 }
 

@@ -40,14 +40,19 @@ const SearchDialog: React.FC = () => {
 
   useEffect(() => {
     let isCancelled = false;
-    querySearch(query, items, filterType).then(res => {
-      if (!isCancelled) {
-        setResults(res);
-        setSelectedIndex(0);
-      }
-    });
+    const delay = query.trim() ? 120 : 0;
+    const timer = setTimeout(() => {
+      querySearch(query, items, filterType).then(res => {
+        if (!isCancelled) {
+          setResults(res);
+          setSelectedIndex(0);
+        }
+      });
+    }, delay);
+
     return () => {
       isCancelled = true;
+      clearTimeout(timer);
     };
   }, [query, filterType, items]);
 
@@ -251,10 +256,15 @@ const SearchDialog: React.FC = () => {
 export const SearchModal: React.FC = () => {
   const { isSearchOpen, items } = useApp();
 
-  // Initialize / re-index Orama when items change
+  // Lazy index: initialize / re-index Orama only when the search modal is opened,
+  // preventing constant indexing churn during rapid note writing or background operations.
   useEffect(() => {
-    initSearchIndex(items);
-  }, [items]);
+    if (!isSearchOpen) return;
+    const timer = setTimeout(() => {
+      initSearchIndex(items);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [items, isSearchOpen]);
 
   if (!isSearchOpen) return null;
 
