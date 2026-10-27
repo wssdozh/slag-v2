@@ -132,7 +132,21 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Verify dock customization section exists
     await expect(page.locator('text=Нижняя панель (Dock)')).toBeVisible();
+    await expect(page.locator('text=Порядок кнопок')).toBeVisible();
 
+    // Test tab reordering: shift "Папки" to the right
+    const shiftFoldersRightBtn = page.locator('button[aria-label="Сдвинуть Папки вправо"]');
+    await expect(shiftFoldersRightBtn).toBeVisible();
+    await shiftFoldersRightBtn.click();
+
+    // Verify that in the dock, "Таски" is now before "Папки"
+    const dockButtons = page.locator('nav[aria-label="Мобильная навигация"] button');
+    const firstTabLabel = await dockButtons.nth(0).getAttribute('aria-label');
+    const secondTabLabel = await dockButtons.nth(1).getAttribute('aria-label');
+    expect(firstTabLabel).toBe('Таски');
+    expect(secondTabLabel).toBe('Папки');
+
+    await page.screenshot({ path: 'test-results/screenshots/audit/25_settings_root.png' });
     await page.screenshot({ path: 'test-results/screenshots/mobile_settings.png' });
   });
 

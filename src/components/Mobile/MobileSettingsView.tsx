@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { MobileTabId } from '../../types';
 import {
@@ -6,6 +6,7 @@ import {
   Database,
   Terminal,
   ChevronRight,
+  ChevronLeft,
   Shield,
   Folder,
   CheckSquare,
@@ -39,6 +40,35 @@ export const MobileSettingsView: React.FC = () => {
     setMobileDockTabs,
     addToast
   } = useApp();
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const moveTab = (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= mobileDockTabs.length) return;
+    const nextTabs = [...mobileDockTabs];
+    const [moved] = nextTabs.splice(index, 1);
+    nextTabs.splice(targetIndex, 0, moved);
+    setMobileDockTabs(nextTabs);
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    const nextTabs = [...mobileDockTabs];
+    const [removed] = nextTabs.splice(draggedIndex, 1);
+    nextTabs.splice(index, 0, removed);
+    setDraggedIndex(index);
+    setMobileDockTabs(nextTabs);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
 
   const toggleDockTab = (tabId: MobileTabId) => {
     if (mobileDockTabs.includes(tabId)) {
@@ -145,7 +175,7 @@ export const MobileSettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Group 2: Dock Customization (Single-Row Horizontal Scrollable Strip) */}
+        {/* Group 2: Dock Customization & Ordering */}
         <div className="flex flex-col gap-1.5">
           <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider flex items-center justify-between">
             <span>Нижняя панель (Dock)</span>
@@ -157,37 +187,95 @@ export const MobileSettingsView: React.FC = () => {
               <span>Сбросить</span>
             </button>
           </div>
-          <div className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] p-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-xs text-zinc-400">
-              <span>Кнопки в плавающем острове:</span>
-              <span className="text-[10px] font-mono text-zinc-500">выбрано {mobileDockTabs.length}/5</span>
-            </div>
-            {/* Wrapped Pills so all 5 options are visible without awkward clipping */}
-            <div className="flex flex-wrap items-center gap-1.5 py-0.5">
-              {ALL_AVAILABLE_TABS.map(tab => {
-                const Icon = tab.icon;
-                const isSelected = mobileDockTabs.includes(tab.id);
+          <div className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] p-3 flex flex-col gap-3">
+            {/* Section A: Selection Pills */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span>Включенные кнопки:</span>
+                <span className="text-[10px] font-mono text-zinc-500">выбрано {mobileDockTabs.length}/5</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+                {ALL_AVAILABLE_TABS.map(tab => {
+                  const Icon = tab.icon;
+                  const isSelected = mobileDockTabs.includes(tab.id);
 
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => toggleDockTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
-                      isSelected
-                        ? 'bg-white/10 border-white/[0.15] text-white shadow-sm'
-                        : 'bg-black/30 border-white/[0.04] text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-xs font-medium">{tab.label}</span>
-                    {isSelected ? (
-                      <Check className="w-3 h-3 text-zinc-200 shrink-0 ml-0.5" />
-                    ) : (
-                      <span className="text-[10px] text-zinc-600 font-mono ml-0.5">+</span>
-                    )}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => toggleDockTab(tab.id)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                        isSelected
+                          ? 'bg-white/10 border-white/[0.15] text-white shadow-sm'
+                          : 'bg-black/30 border-white/[0.04] text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-xs font-medium">{tab.label}</span>
+                      {isSelected ? (
+                        <Check className="w-3 h-3 text-zinc-200 shrink-0 ml-0.5" />
+                      ) : (
+                        <span className="text-[10px] text-zinc-600 font-mono ml-0.5">+</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section B: Order Reorder Strip */}
+            <div className="pt-2.5 border-t border-white/[0.04] flex flex-col gap-1.5">
+              <div className="text-[11px] text-zinc-400 font-medium">
+                Порядок кнопок (стрелки или перетаскивание):
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {mobileDockTabs.map((tabId, idx) => {
+                  const tab = ALL_AVAILABLE_TABS.find(t => t.id === tabId);
+                  if (!tab) return null;
+                  const Icon = tab.icon;
+                  const isFirst = idx === 0;
+                  const isLast = idx === mobileDockTabs.length - 1;
+
+                  return (
+                    <div
+                      key={tabId}
+                      draggable
+                      onDragStart={() => handleDragStart(idx)}
+                      onDragOver={(e) => handleDragOver(e, idx)}
+                      onDragEnd={handleDragEnd}
+                      className={`flex items-center gap-1 pl-1 pr-1 py-1 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white transition-all select-none ${
+                        draggedIndex === idx ? 'opacity-40 scale-95 border-dashed border-blue-400' : ''
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => moveTab(idx, -1)}
+                        disabled={isFirst}
+                        className="w-5 h-5 rounded hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                        title="Сдвинуть влево"
+                        aria-label={`Сдвинуть ${tab.label} влево`}
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+
+                      <div className="flex items-center gap-1 px-1">
+                        <Icon className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
+                        <span className="text-xs font-medium text-zinc-200">{tab.label}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => moveTab(idx, 1)}
+                        disabled={isLast}
+                        className="w-5 h-5 rounded hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                        title="Сдвинуть вправо"
+                        aria-label={`Сдвинуть ${tab.label} вправо`}
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
