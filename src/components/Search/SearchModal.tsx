@@ -23,7 +23,8 @@ const SearchDialog: React.FC = () => {
     items,
     setCurrentFolder,
     setSelectedItem,
-    setIsFullscreenEditorOpen
+    setIsFullscreenEditorOpen,
+    isMobile,
   } = useApp();
 
   const [query, setQuery] = useState('');
@@ -112,7 +113,7 @@ const SearchDialog: React.FC = () => {
     </div>
   );
 
-  const footer = (
+  const footer = isMobile ? undefined : (
     <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
       <div className="flex items-center gap-3">
         <span>↑↓ Навигация</span>
