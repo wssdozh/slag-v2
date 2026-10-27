@@ -292,6 +292,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     );
     expect(hasHorizontalOverflow).toBe(false);
 
+    // Verify feed is anchored completely at the bottom on initial load
+    const scrollInfo = await feedContainer.evaluate((el) => ({
+      distFromBottom: el.scrollHeight - el.clientHeight - el.scrollTop,
+    }));
+    expect(scrollInfo.distFromBottom).toBeLessThanOrEqual(2);
+
     // 1. Capture full page viewport
     await page.screenshot({
       path: 'test-results/screenshots/main-layout.png',

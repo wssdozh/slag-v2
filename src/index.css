@@ -301,8 +301,7 @@
 
 /* Feed card rendering & memory optimization */
 .feed-card-contain {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 120px;
+  /* content-visibility skipped: PAGE_SIZE windowing handles DOM ceiling without layout shifts */
 }
 
 

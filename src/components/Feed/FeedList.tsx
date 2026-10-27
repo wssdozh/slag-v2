@@ -97,14 +97,24 @@ export const FeedList: React.FC = () => {
     setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filteredItems.length));
   }, [hasMoreOlder, filteredItems.length]);
 
-  // Maintain scroll anchor when prepending items at the top
+  const isStuckToBottomRef = useRef(true);
+
+  // Maintain scroll anchor when prepending items at the top OR keep pinned to bottom on layout shifts
   useLayoutEffect(() => {
-    if (isPrependRef.current && containerRef.current) {
-      const delta = containerRef.current.scrollHeight - prevScrollHeightRef.current;
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (isPrependRef.current) {
+      const delta = container.scrollHeight - prevScrollHeightRef.current;
       if (delta > 0) {
-        containerRef.current.scrollTop = prevScrollTopRef.current + delta;
+        container.scrollTop = prevScrollTopRef.current + delta;
       }
       isPrependRef.current = false;
+      return;
+    }
+
+    if (isStuckToBottomRef.current) {
+      container.scrollTop = container.scrollHeight;
     }
   });
 
@@ -128,11 +138,33 @@ export const FeedList: React.FC = () => {
 
   // Instant scroll-to-bottom on folder switch or initial mount
   useLayoutEffect(() => {
+    isStuckToBottomRef.current = true;
     const container = containerRef.current;
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
   }, [currentFolder]);
+
+  // Multi-pass settling (RAF + timer) to ensure bottom-pin after async markdown/image layout shifts
+  useEffect(() => {
+    if (!isStuckToBottomRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const snap = () => {
+      if (isStuckToBottomRef.current && container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    };
+
+    const rafId = requestAnimationFrame(snap);
+    const timerId = setTimeout(snap, 60);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+    };
+  }, [currentFolder, windowedItems]);
 
   // Smart bottom scroll: only auto-scroll on new items if user is already near bottom
   useEffect(() => {
@@ -144,7 +176,8 @@ export const FeedList: React.FC = () => {
 
     if (isNewItemAdded) {
       const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-      if (distFromBottom <= 200) {
+      if (distFromBottom <= 200 || isStuckToBottomRef.current) {
+        isStuckToBottomRef.current = true;
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
       }
     }
@@ -154,10 +187,13 @@ export const FeedList: React.FC = () => {
     const container = containerRef.current;
     if (!container) return;
     const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    // Unlock stick-to-bottom only when user deliberately scrolls up past threshold
+    isStuckToBottomRef.current = distFromBottom <= 40;
     setShowScrollBottom(distFromBottom > 220);
   }, []);
 
   const scrollToBottom = useCallback(() => {
+    isStuckToBottomRef.current = true;
     containerRef.current?.scrollTo({
       top: containerRef.current.scrollHeight,
       behavior: 'smooth',
@@ -339,7 +375,7 @@ export const FeedList: React.FC = () => {
         )}
 
         {/* Bottom spacer so the last card clears the composer with a clean gap */}
-        <div className="h-24 shrink-0 pointer-events-none" aria-hidden="true" />
+        <div className="h-36 shrink-0 pointer-events-none" aria-hidden="true" />
         <div ref={bottomAnchorRef} />
       </div>
 
