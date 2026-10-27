@@ -1479,10 +1479,10 @@ ${isInbox
 
     // Check 2: Vault stats / count
     const isStatsIntent =
-      (/\bсколько\b/i.test(lowerMsg) && !lowerMsg.includes('несколько')) ||
+      (lowerMsg.includes('сколько') && !lowerMsg.includes('несколько')) ||
       lowerMsg.includes('статистик') ||
       lowerMsg.includes('сводка') ||
-      (/\bвсего\b/i.test(lowerMsg) && !lowerMsg.includes('всего лишь'));
+      (lowerMsg.includes('всего') && !lowerMsg.includes('всего лишь'));
 
     if (isStatsIntent) {
       const stats = await executeLocalTool('get_vault_stats', { target: 'all' });

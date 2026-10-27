@@ -87,7 +87,7 @@ const LEVEL_COLORS: Record<LogLevel, string> = {
 
 class LoggerEngine {
   private buffer: LogEntry[] = [];
-  private maxEntries = 1000;
+  private maxEntries = 250;
   private listeners: Set<LogListener> = new Set();
   private timers: Map<string, number> = new Map();
   private persistTimeout: number | null = null;
@@ -100,7 +100,7 @@ class LoggerEngine {
         if (raw) {
           const parsed: LogEntry[] = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            this.buffer = parsed.slice(-50).map(e => ({
+            this.buffer = parsed.slice(-20).map(e => ({
               ...e,
               message: `[PREV_SESSION] ${e.message}`,
             }));
@@ -136,7 +136,7 @@ class LoggerEngine {
     this.persistTimeout = window.setTimeout(() => {
       this.persistTimeout = null;
       try {
-        const compact = this.buffer.slice(-60).map(e => ({
+        const compact = this.buffer.slice(-20).map(e => ({
           id: e.id,
           timestamp: e.timestamp,
           level: e.level,
@@ -148,7 +148,7 @@ class LoggerEngine {
       } catch {
         // Ignore quota
       }
-    }, 250);
+    }, 1000);
   }
 
   private emit(entry: LogEntry): void {
@@ -175,6 +175,11 @@ class LoggerEngine {
   }
 
   private printToConsole(entry: LogEntry): void {
+    // In non-dev environments skip noisy trace logs from console to prevent console buffer memory bloat
+    if (entry.level === 'trace' && typeof import.meta !== 'undefined' && !import.meta.env?.DEV) {
+      return;
+    }
+
     const timeStr = new Date(entry.timestamp).toLocaleTimeString('ru-RU', {
       hour12: false,
       hour: '2-digit',
@@ -213,7 +218,16 @@ class LoggerEngine {
         textStyle,
         durationStyle
       );
-      consoleMethod(entry.data);
+      // Detach payload from live application object graph to prevent DevTools memory retention
+      try {
+        if (typeof entry.data === 'object' && entry.data !== null) {
+          consoleMethod(JSON.parse(JSON.stringify(entry.data)));
+        } else {
+          consoleMethod(entry.data);
+        }
+      } catch {
+        consoleMethod(entry.data);
+      }
       console.groupEnd();
     } else {
       consoleMethod(

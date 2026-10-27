@@ -1,5 +1,5 @@
 /* oxlint-disable react/only-export-components */
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
   SlagItem,
   FolderMeta,
@@ -929,9 +929,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // Sync totalLayerDepth with window.history
+  // Sync totalLayerDepth with window.history (mobile Android back gesture only)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !isMobile) return;
 
     const targetDepth = totalLayerDepth;
     const currentHistDepth = historyDepthRef.current;
@@ -960,7 +960,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [totalLayerDepth]);
+  }, [totalLayerDepth, isMobile]);
 
   // Handle hardware back / browser back / swipe gestures via popstate
   useEffect(() => {
@@ -1005,12 +1005,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [dismissTopLayer]);
 
   const scrollToItem = useCallback((idOrTitle: string) => {
-    const cleanQuery = idOrTitle.trim().replace(/^\[\[/, '').replace(/\]\]$/, '');
-    const found = items.find(i => 
-      i.id === cleanQuery || 
-      i.title.toLowerCase() === cleanQuery.toLowerCase() ||
-      i.title.toLowerCase().startsWith(cleanQuery.toLowerCase())
-    );
+    // Strip [[...]] brackets and optional #anchor or .md extension
+    let cleanQuery = idOrTitle.trim().replace(/^\[\[/, '').replace(/\]\]$/, '').trim();
+    if (cleanQuery.includes('#')) {
+      cleanQuery = cleanQuery.split('#')[0].trim();
+    }
+    cleanQuery = cleanQuery.replace(/\.md$/i, '').trim();
+
+    // Extract note name if query is formatted as folder path e.g. "Folder/Note"
+    const noteNameFromPath = cleanQuery.includes('/')
+      ? cleanQuery.slice(cleanQuery.lastIndexOf('/') + 1).trim()
+      : cleanQuery;
+
+    const queryLower = cleanQuery.toLowerCase();
+    const nameLower = noteNameFromPath.toLowerCase();
+
+    // Matching cascade: exact ID -> exact title -> exact filename -> prefix/substring match
+    const found =
+      items.find(i => i.id === cleanQuery) ||
+      items.find(i => i.title.toLowerCase() === queryLower || i.title.toLowerCase() === nameLower) ||
+      items.find(i => {
+        const baseFilename = (i.filename || '').replace(/\.md$/i, '').toLowerCase();
+        return baseFilename === queryLower || baseFilename === nameLower;
+      }) ||
+      items.find(i => i.title.toLowerCase().startsWith(queryLower) || i.title.toLowerCase().startsWith(nameLower)) ||
+      items.find(i => {
+        const baseFilename = (i.filename || '').replace(/\.md$/i, '').toLowerCase();
+        return baseFilename.startsWith(queryLower) || baseFilename.startsWith(nameLower);
+      }) ||
+      items.find(i => i.title.toLowerCase().includes(nameLower));
 
     if (!found) {
       addToast(`Запись «${cleanQuery}» не найдена`, 'info');
@@ -1021,15 +1044,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentFolder(found.folder);
     }
 
+    // Set highlighted item. FeedList observes this and anchors with centered scroll
     setHighlightedItemId(found.id);
 
-    setTimeout(() => {
-      const el = document.getElementById(`item-${found.id}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 120);
-
+    // Keep highlight effect for 2.4s then clear
     setTimeout(() => {
       setHighlightedItemId(prev => (prev === found.id ? null : prev));
     }, 2400);
@@ -1636,45 +1654,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEditingFolder(null);
   };
 
-  // Filter items by current folder, hybrid inbox mode, type filter, and tag filter
-  const filteredItems = items.filter(item => {
-    let matchesFolder = false;
-    if (aiItemFilter) {
-      matchesFolder = true;
-    } else if (currentFolder === 'Входящие') {
-      if (inboxMode === 'unsorted') {
-        matchesFolder = item.folder === 'Входящие';
-      } else if (inboxMode === 'all') {
+  // Filter items by current folder, hybrid inbox mode, type filter, and tag filter (memoized to prevent layout churn)
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      let matchesFolder = false;
+      if (aiItemFilter) {
         matchesFolder = true;
-      } else if (inboxMode === 'sorted') {
-        matchesFolder = item.folder !== 'Входящие';
+      } else if (currentFolder === 'Входящие') {
+        if (inboxMode === 'unsorted') {
+          matchesFolder = item.folder === 'Входящие';
+        } else if (inboxMode === 'all') {
+          matchesFolder = true;
+        } else if (inboxMode === 'sorted') {
+          matchesFolder = item.folder !== 'Входящие';
+        }
+      } else {
+        matchesFolder = item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
       }
-    } else {
-      matchesFolder = item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
-    }
 
-    if (!matchesFolder) return false;
+      if (!matchesFolder) return false;
 
-    if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) {
-      return false;
-    }
+      if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) {
+        return false;
+      }
 
-    if (activeTagFilter && !item.tags.includes(activeTagFilter)) {
-      return false;
-    }
+      if (activeTagFilter && !item.tags.includes(activeTagFilter)) {
+        return false;
+      }
 
-    if (aiItemFilter && !aiItemFilter.itemIds.includes(item.id)) {
-      return false;
-    }
+      if (aiItemFilter && !aiItemFilter.itemIds.includes(item.id)) {
+        return false;
+      }
 
-    return true;
-  }).sort((a, b) => {
-    // Pinned items prioritize on top
-    if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
-      return a.isPinned ? -1 : 1;
-    }
-    return a.createdAt - b.createdAt;
-  });
+      return true;
+    }).sort((a, b) => {
+      // Pinned items prioritize on top
+      if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
+        return a.isPinned ? -1 : 1;
+      }
+      return a.createdAt - b.createdAt;
+    });
+  }, [items, aiItemFilter, currentFolder, inboxMode, activeTypeFilter, activeTagFilter]);
 
   return (
     <AppContext.Provider
