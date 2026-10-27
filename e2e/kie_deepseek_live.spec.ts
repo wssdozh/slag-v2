@@ -53,7 +53,7 @@ test.describe('KIE.AI DeepSeek V4.1 Flash Live Integration', () => {
     // Content must cite the note using wikilinks and formulate human answer
     expect(result.content).toContain('Идеи тем для роликов');
     // Must NOT be the fallback offline agent
-    expect(result.reasoning).not.toContain('⚠️ Оффлайн-агент');
+    expect(result.reasoning || '').not.toContain('⚠️ Оффлайн-агент');
   });
 
   test('Decomposes note into multiple tasks with suggested action', async ({ page }) => {
