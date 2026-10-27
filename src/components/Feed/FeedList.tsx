@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
-import type { SlagItem } from '../../types';
+import type { SlagItem, SlagAttachment, LightboxImage } from '../../types';
 import { Inbox, UploadCloud, Sparkles, ChevronDown } from 'lucide-react';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
@@ -38,8 +38,11 @@ export const FeedList: React.FC = () => {
     updateItem,
     aiSettings,
     currentFolder,
+    activeTypeFilter,
+    activeTagFilter,
     addToast,
     highlightedItemId,
+    openLightbox,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -50,11 +53,66 @@ export const FeedList: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
-  // Sync state during render on folder change (React pure pattern)
-  const [prevFolder, setPrevFolder] = useState(currentFolder);
-  if (prevFolder !== currentFolder) {
-    setPrevFolder(currentFolder);
+  // Fast O(1) item lookup map for reply targets
+  const itemMap = useMemo(() => new Map(items.map(i => [i.id, i])), [items]);
+
+  // Precomputed reply counts & first reply IDs in a single pass across items
+  const replyMetaMap = useMemo(() => {
+    const countMap = new Map<string, number>();
+    const firstReplyMap = new Map<string, string>();
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.replyToId) {
+        countMap.set(it.replyToId, (countMap.get(it.replyToId) || 0) + 1);
+        if (!firstReplyMap.has(it.replyToId)) {
+          firstReplyMap.set(it.replyToId, it.id);
+        }
+      }
+    }
+    return { countMap, firstReplyMap };
+  }, [items]);
+
+  // Stable handler for image lightbox in feed
+  const handleImageClick = useCallback((img: SlagAttachment) => {
+    const folderImages: LightboxImage[] = filteredItems.flatMap(it =>
+      (it.attachments || [])
+        .filter(att => att.type === 'image' && att.dataUrl)
+        .map(att => ({
+          id: att.id,
+          name: att.name,
+          url: att.dataUrl!,
+          extractedText: att.extractedText,
+          summary: att.summary,
+          enrichmentStatus: att.enrichmentStatus,
+          enrichmentError: att.enrichmentError,
+          sourceItem: it,
+        }))
+    );
+    const clickedIdx = folderImages.findIndex(i => i.id === img.id);
+    openLightbox(folderImages, clickedIdx >= 0 ? clickedIdx : 0);
+  }, [filteredItems, openLightbox]);
+
+  // Sync state during render on folder or filter change (React pure pattern)
+  const filterKey = `${currentFolder}:${activeTypeFilter}:${activeTagFilter || ''}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
     setVisibleCount(PAGE_SIZE);
+  }
+
+  // Permanently expand visibleCount during render when an item is targeted (React pure pattern)
+  const [prevHighlightedId, setPrevHighlightedId] = useState(highlightedItemId);
+  if (prevHighlightedId !== highlightedItemId) {
+    setPrevHighlightedId(highlightedItemId);
+    if (highlightedItemId) {
+      const targetIdx = filteredItems.findIndex(i => i.id === highlightedItemId);
+      if (targetIdx !== -1) {
+        const needed = filteredItems.length - targetIdx + 10;
+        if (needed > visibleCount) {
+          setVisibleCount(needed);
+        }
+      }
+    }
   }
 
   const prevScrollHeightRef = useRef<number>(0);
@@ -71,7 +129,7 @@ export const FeedList: React.FC = () => {
     if (!highlightedItemId) return visibleCount;
     const targetIdx = filteredItems.findIndex(i => i.id === highlightedItemId);
     if (targetIdx !== -1) {
-      const neededCount = filteredItems.length - targetIdx;
+      const neededCount = filteredItems.length - targetIdx + 10;
       return Math.max(visibleCount, neededCount);
     }
     return visibleCount;
@@ -113,10 +171,64 @@ export const FeedList: React.FC = () => {
       return;
     }
 
-    if (isStuckToBottomRef.current) {
+    if (isStuckToBottomRef.current && !highlightedItemId) {
       container.scrollTop = container.scrollHeight;
     }
   });
+
+  // Dedicated anchoring effect when an item is highlighted / targeted via wiki-link
+  useEffect(() => {
+    if (!highlightedItemId) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Immediately un-pin from bottom so layout settling doesn't yank scroll back
+    isStuckToBottomRef.current = false;
+
+    let rafId: number;
+    let timerId: ReturnType<typeof setTimeout>;
+
+    const tryScrollToTarget = (attempt = 0) => {
+      const el = document.getElementById(`item-${highlightedItemId}`);
+      if (!el || !container) {
+        if (attempt < 6) {
+          timerId = setTimeout(() => tryScrollToTarget(attempt + 1), 35);
+        }
+        return;
+      }
+
+      isStuckToBottomRef.current = false;
+
+      // Calculate exact centered position relative to feed container (no ancestor scroll jitter)
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const currentRelTop = elRect.top - containerRect.top;
+      const targetScrollTop = container.scrollTop + currentRelTop - (container.clientHeight / 2) + (el.clientHeight / 2);
+
+      const targetClamped = Math.max(0, Math.round(targetScrollTop));
+      const distance = Math.abs(container.scrollTop - targetClamped);
+
+      // If note is far away (>900px), leap close first then smooth-magnetize the final 200px
+      if (distance > 900) {
+        const intermediate = targetClamped > container.scrollTop
+          ? targetClamped - 200
+          : targetClamped + 200;
+        container.scrollTop = Math.max(0, intermediate);
+      }
+
+      container.scrollTo({
+        top: targetClamped,
+        behavior: 'smooth',
+      });
+    };
+
+    rafId = requestAnimationFrame(() => tryScrollToTarget(0));
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+    };
+  }, [highlightedItemId]);
 
   // Top sentinel intersection observer to auto-load older items when scrolling up
   useEffect(() => {
@@ -136,23 +248,30 @@ export const FeedList: React.FC = () => {
     return () => observer.disconnect();
   }, [hasMoreOlder, loadMoreOlder]);
 
-  // Instant scroll-to-bottom on folder switch or initial mount
+  const prevFolderForScrollRef = useRef(currentFolder);
+
+  // Instant scroll-to-bottom strictly on folder switch
   useLayoutEffect(() => {
-    isStuckToBottomRef.current = true;
-    const container = containerRef.current;
-    if (container) {
-      container.scrollTop = container.scrollHeight;
+    if (prevFolderForScrollRef.current !== currentFolder) {
+      prevFolderForScrollRef.current = currentFolder;
+      if (!highlightedItemId) {
+        isStuckToBottomRef.current = true;
+        const container = containerRef.current;
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }
     }
-  }, [currentFolder]);
+  }, [currentFolder, highlightedItemId]);
 
   // Multi-pass settling (RAF + timer) to ensure bottom-pin after async markdown/image layout shifts
   useEffect(() => {
-    if (!isStuckToBottomRef.current) return;
+    if (!isStuckToBottomRef.current || highlightedItemId) return;
     const container = containerRef.current;
     if (!container) return;
 
     const snap = () => {
-      if (isStuckToBottomRef.current && container) {
+      if (isStuckToBottomRef.current && !highlightedItemId && container) {
         container.scrollTop = container.scrollHeight;
       }
     };
@@ -164,7 +283,7 @@ export const FeedList: React.FC = () => {
       cancelAnimationFrame(rafId);
       clearTimeout(timerId);
     };
-  }, [currentFolder, windowedItems]);
+  }, [currentFolder, windowedItems, highlightedItemId]);
 
   // Smart bottom scroll: only auto-scroll on new items if user is already near bottom
   useEffect(() => {
@@ -187,10 +306,12 @@ export const FeedList: React.FC = () => {
     const container = containerRef.current;
     if (!container) return;
     const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    // Unlock stick-to-bottom only when user deliberately scrolls up past threshold
-    isStuckToBottomRef.current = distFromBottom <= 40;
+    // Unlock stick-to-bottom only when user deliberately scrolls up past threshold and not in mid-highlight
+    if (!highlightedItemId) {
+      isStuckToBottomRef.current = distFromBottom <= 40;
+    }
     setShowScrollBottom(distFromBottom > 220);
-  }, []);
+  }, [highlightedItemId]);
 
   const scrollToBottom = useCallback(() => {
     isStuckToBottomRef.current = true;
@@ -290,6 +411,7 @@ export const FeedList: React.FC = () => {
     <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
       <div
         ref={containerRef}
+        data-testid="feed-list-container"
         onScroll={handleScroll}
         onContextMenu={handleFeedContextMenu}
         onDragOver={handleDragOver}
@@ -366,7 +488,15 @@ export const FeedList: React.FC = () => {
                 {/* List of cards */}
                 <div className="flex flex-col gap-1.5">
                   {group.items.map(item => (
-                    <ItemCard key={item.id} item={item} />
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      isHighlighted={highlightedItemId === item.id}
+                      repliesCount={replyMetaMap.countMap.get(item.id) || 0}
+                      firstReplyId={replyMetaMap.firstReplyMap.get(item.id) || null}
+                      replyParent={item.replyToId ? itemMap.get(item.replyToId) || null : null}
+                      onImageClick={handleImageClick}
+                    />
                   ))}
                 </div>
               </div>
@@ -379,9 +509,9 @@ export const FeedList: React.FC = () => {
         <div ref={bottomAnchorRef} />
       </div>
 
-      {/* Floating scroll to bottom button: centered above the composer island */}
+      {/* Floating scroll to bottom button: centered comfortably above the composer island */}
       {showScrollBottom && (
-        <div className="absolute bottom-28 inset-x-0 pointer-events-none z-30 flex justify-center px-4">
+        <div className="absolute bottom-40 inset-x-0 pointer-events-none z-30 flex justify-center px-4">
           <button
             type="button"
             onClick={scrollToBottom}

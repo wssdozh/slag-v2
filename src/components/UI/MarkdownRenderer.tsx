@@ -36,7 +36,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             <span
               role="button"
               tabIndex={0}
+              draggable={false}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onWikiLinkClick?.(target);
               }}
@@ -47,7 +50,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   onWikiLinkClick?.(target);
                 }
               }}
-              className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer font-medium"
+              className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer font-medium select-text"
               title={`Перейти к «${target}»`}
             >
               {children}

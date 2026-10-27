@@ -24,8 +24,13 @@ import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnric
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { TagChip } from '../UI/TagChip';
 
-interface ItemCardProps {
+export interface ItemCardProps {
   item: SlagItem;
+  isHighlighted?: boolean;
+  repliesCount?: number;
+  firstReplyId?: string | null;
+  replyParent?: SlagItem | null;
+  onImageClick?: (img: SlagAttachment, currentItem: SlagItem) => void;
 }
 
 const formatDueDate = (rawDate?: string): string => {
@@ -47,17 +52,21 @@ const formatDueDate = (rawDate?: string): string => {
   return rawDate;
 };
 
-const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
+const ItemCardComponent: React.FC<ItemCardProps> = ({
+  item,
+  isHighlighted = false,
+  repliesCount = 0,
+  firstReplyId = null,
+  replyParent = null,
+  onImageClick,
+}) => {
   const {
-    items,
-    filteredItems,
     toggleTaskComplete,
     setSelectedItem,
     setIsFullscreenEditorOpen,
     setActiveTagFilter,
     openContextMenu,
     setReplyTarget,
-    highlightedItemId,
     scrollToItem,
     openLightbox,
     isMobile,
@@ -171,10 +180,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
   const completedSubtasksCount = item.subtasks?.filter(s => s.completed).length || 0;
   const totalSubtasksCount = item.subtasks?.length || 0;
 
-  // Replied parent item
-  const replyParent = item.replyToId ? items.find(i => i.id === item.replyToId) : null;
-  const repliesCount = items.filter(i => i.replyToId === item.id).length;
-
   const isPureVoice =
     audioAttachments.length === 1 &&
     videoAttachments.length === 0 &&
@@ -190,22 +195,24 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
     (!item.priority || item.priority === 'none');
 
   const handleImageClick = (img: SlagAttachment) => {
-    const folderImages: LightboxImage[] = filteredItems.flatMap(it =>
-      (it.attachments || [])
-        .filter(att => att.type === 'image' && att.dataUrl)
-        .map(att => ({
-          id: att.id,
-          name: att.name,
-          url: att.dataUrl!,
-          extractedText: att.extractedText,
-          summary: att.summary,
-          enrichmentStatus: att.enrichmentStatus,
-          enrichmentError: att.enrichmentError,
-          itemId: it.id,
-        }))
-    );
-    const targetIdx = folderImages.findIndex(fi => fi.url === img.dataUrl);
-    openLightbox(folderImages, Math.max(0, targetIdx));
+    if (onImageClick) {
+      onImageClick(img, item);
+      return;
+    }
+    const itemImages: LightboxImage[] = (item.attachments || [])
+      .filter(att => att.type === 'image' && att.dataUrl)
+      .map(att => ({
+        id: att.id,
+        name: att.name,
+        url: att.dataUrl!,
+        extractedText: att.extractedText,
+        summary: att.summary,
+        enrichmentStatus: att.enrichmentStatus,
+        enrichmentError: att.enrichmentError,
+        sourceItem: item,
+      }));
+    const clickedIdx = itemImages.findIndex(i => i.id === img.id);
+    openLightbox(itemImages, clickedIdx >= 0 ? clickedIdx : 0);
   };
 
   const folderDisplayName =
@@ -315,6 +322,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
   };
 
   const handleDragStart = (e: React.DragEvent) => {
+    // If dragging an interactive element (wiki-link, tag, button, input), prevent card drag
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('a, button, [role="button"], input, textarea, .cursor-pointer')) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('text/plain', item.id);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -338,8 +351,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
     }
     return text;
   })();
-
-  const isHighlighted = highlightedItemId === item.id;
 
   return (
     <div className={`relative max-w-2xl w-full mx-auto feed-card-contain ${swipeOffset ? 'overflow-hidden' : ''}`}>
@@ -560,18 +571,34 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
           </p>
         </div>
       ) : (
-        /* Note Variant: pure stream note without separate title header (title is managed in Focus Editor) */
-        <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-          {item.content ? (
-            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
-              <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
+        /* Note Variant: pure stream note, title is rendered if distinct and not prefix of content */
+        (() => {
+          const hasDistinctTitle = Boolean(
+            item.title &&
+            item.content &&
+            !item.content.toLowerCase().startsWith(item.title.toLowerCase().trim()) &&
+            !item.title.toLowerCase().trim().startsWith(item.content.slice(0, 30).toLowerCase().trim())
+          );
+          if (!hasDistinctTitle && !item.content && !item.title) return null;
+          return (
+            <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
+              {hasDistinctTitle && (
+                <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
+                  {item.title}
+                </h3>
+              )}
+              {item.content ? (
+                <div className="text-xs text-zinc-300 leading-relaxed font-normal whitespace-pre-wrap [&_ol]:whitespace-normal [&_ul]:whitespace-normal">
+                  <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
+                </div>
+              ) : item.title ? (
+                <div className="text-xs text-zinc-300 leading-relaxed font-normal">
+                  <MarkdownRenderer content={item.title} onWikiLinkClick={scrollToItem} />
+                </div>
+              ) : null}
             </div>
-          ) : item.title ? (
-            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
-              <MarkdownRenderer content={item.title} onWikiLinkClick={scrollToItem} />
-            </div>
-          ) : null}
-        </div>
+          );
+        })()
       )}
 
       {/* Video Circle Notes (Telegram style) */}
@@ -610,6 +637,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
                 <img
                   src={imageAttachments[0].dataUrl}
                   alt={imageAttachments[0].name}
+                  loading="lazy"
+                  decoding="async"
                   className="w-auto h-auto max-h-[420px] max-w-full object-contain rounded-lg"
                 />
 
@@ -674,7 +703,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
                     className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 aspect-[4/3] flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
                     onClick={() => handleImageClick(img)}
                   >
-                    <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+                    <img
+                      src={img.dataUrl}
+                      alt={img.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   {img.extractedText && (
                     <div className="w-full mt-1">
@@ -776,8 +811,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
       {repliesCount > 0 && (
         <button
           onClick={() => {
-            const firstReply = items.find(i => i.replyToId === item.id);
-            if (firstReply) scrollToItem(firstReply.id);
+            if (firstReplyId) scrollToItem(firstReplyId);
           }}
           className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 hover:text-blue-400 transition-colors pt-1 select-none w-fit"
         >
