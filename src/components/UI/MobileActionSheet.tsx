@@ -35,23 +35,23 @@ export const MobileActionSheet: React.FC = () => {
   return (
     <div
       onClick={handleClose}
-      className="fixed inset-0 z-50 z-[110] bg-black/60 backdrop-blur-md flex flex-col justify-end animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full bg-[#161619] border-t border-white/[0.08] rounded-t-3xl p-4 flex flex-col gap-2.5 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
-        style={{ paddingBottom: 'max(var(--sab), 1rem)' }}
+        className="w-full bg-[#121215] border-t border-white/[0.08] rounded-t-2xl p-3 flex flex-col gap-2 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
+        style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
       >
         {/* Drag handle */}
-        <div className="w-10 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1" />
+        <div className="w-8 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1" />
 
-        {/* Header */}
-        <div className="px-1 py-1 border-b border-white/[0.06] flex items-center justify-between">
+        {/* Item Title Header */}
+        <div className="px-3 py-1.5 flex items-center justify-between border-b border-white/[0.05]">
           <div className="flex items-center gap-2 min-w-0">
-            {item.type === 'task' && <CheckSquare className="w-4 h-4 text-amber-400 shrink-0" />}
-            {item.type === 'article' && <FileText className="w-4 h-4 text-blue-400 shrink-0" />}
-            {item.type === 'note' && <StickyNote className="w-4 h-4 text-zinc-400 shrink-0" />}
-            <span className="text-sm font-semibold text-white truncate">
+            {item.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+            {item.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+            {item.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+            <span className="text-xs font-semibold text-zinc-200 truncate">
               {item.title || item.content.slice(0, 40) || 'Без названия'}
             </span>
           </div>
@@ -60,68 +60,54 @@ export const MobileActionSheet: React.FC = () => {
           </span>
         </div>
 
-        {/* Quick Actions Horizontal Bar (4 Large Touch Tiles) */}
-        <div className="grid grid-cols-4 gap-2 pt-1 pb-1">
+        {/* Single Unified Linear-style Action List (Zero-Matryoshka) */}
+        <div className="flex flex-col rounded-xl overflow-hidden divide-y divide-white/[0.04] border border-white/[0.05] bg-[#161619]/60">
           <button
             onClick={actions.handleReply}
-            className="py-2 px-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 transition-all flex flex-col items-center justify-center gap-1 text-zinc-300 cursor-pointer h-15"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <CornerUpLeft className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="text-[10px] font-medium leading-tight text-center">Ответить</span>
+            <span className="font-medium">Ответить</span>
           </button>
 
           <button
             onClick={actions.handleOpenFocus}
-            className="py-2 px-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 transition-all flex flex-col items-center justify-center gap-1 text-zinc-300 cursor-pointer h-15"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <Maximize2 className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="text-[10px] font-medium leading-tight text-center max-w-[68px]">
-              Фокус-редактор
-            </span>
+            <span className="font-medium">Фокус-редактор</span>
           </button>
 
           <button
             onClick={actions.handleTogglePin}
-            className="py-2 px-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 transition-all flex flex-col items-center justify-center gap-1 text-zinc-300 cursor-pointer h-15"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
-            <Pin
-              className={`w-4 h-4 shrink-0 ${
-                item.isPinned ? 'text-amber-400 rotate-45' : 'text-zinc-400'
-              }`}
-            />
-            <span className="text-[10px] font-medium leading-tight text-center max-w-[68px]">
-              {item.isPinned ? 'Открепить' : 'Закрепить'}
-            </span>
+            <Pin className={`w-4 h-4 shrink-0 ${item.isPinned ? 'text-amber-400 rotate-45' : 'text-zinc-400'}`} />
+            <span className="font-medium">{item.isPinned ? 'Открепить' : 'Закрепить'}</span>
           </button>
 
           <button
             onClick={actions.handleCopyMarkdown}
-            className="py-2 px-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 transition-all flex flex-col items-center justify-center gap-1 text-zinc-300 cursor-pointer h-15"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <Copy className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="text-[10px] font-medium leading-tight text-center max-w-[68px]">
-              Копировать текст
-            </span>
+            <span className="font-medium">Копировать текст</span>
           </button>
-        </div>
 
-        {/* AI Action Banner */}
-        <button
-          onClick={actions.handleAiDecompose}
-          className="w-full h-11 px-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] active:scale-[0.98] flex items-center justify-between text-xs text-zinc-200 transition-all cursor-pointer font-medium"
-        >
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span>Разобрать с ИИ</span>
-          </div>
-          <span className="text-[10px] text-zinc-500 font-mono">AI</span>
-        </button>
+          <button
+            onClick={actions.handleAiDecompose}
+            className="w-full h-10 px-3.5 flex items-center justify-between text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+              <span className="font-medium">Разобрать с ИИ</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono">AI</span>
+          </button>
 
-        {/* Secondary Utilities */}
-        <div className="flex flex-col gap-1">
           <button
             onClick={actions.handleDuplicate}
-            className="w-full h-10 px-3.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] flex items-center gap-2.5 text-xs text-zinc-300 transition-all cursor-pointer"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <CopyPlus className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>Дублировать</span>
@@ -129,7 +115,7 @@ export const MobileActionSheet: React.FC = () => {
 
           <button
             onClick={actions.handleCopyLink}
-            className="w-full h-10 px-3.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] flex items-center gap-2.5 text-xs text-zinc-300 transition-all cursor-pointer"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>Копировать [[линк]]</span>
@@ -137,26 +123,25 @@ export const MobileActionSheet: React.FC = () => {
 
           <button
             onClick={actions.handleToggleArchive}
-            className="w-full h-10 px-3.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] flex items-center gap-2.5 text-xs text-zinc-300 transition-all cursor-pointer"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <Archive className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>{item.isArchived ? 'Разархивировать' : 'В архив'}</span>
           </button>
 
-          {/* Danger Zone */}
           <button
             onClick={actions.handleDelete}
-            className="w-full h-10 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] flex items-center gap-2.5 text-xs text-rose-400 transition-all cursor-pointer mt-1"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-rose-400 hover:bg-rose-500/10 active:bg-rose-500/15 transition-colors cursor-pointer text-left"
           >
             <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>Удалить</span>
+            <span className="font-medium">Удалить</span>
           </button>
         </div>
 
         {/* Cancel Button */}
         <button
           onClick={handleClose}
-          className="w-full h-10 rounded-xl bg-white/[0.06] hover:bg-white/10 active:scale-[0.98] text-white font-medium text-xs flex items-center justify-center transition-all cursor-pointer mt-0.5"
+          className="w-full h-10 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] active:bg-white/10 text-zinc-300 hover:text-white font-medium text-xs flex items-center justify-center transition-all cursor-pointer"
         >
           Отмена
         </button>
