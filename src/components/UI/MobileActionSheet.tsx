@@ -108,13 +108,13 @@ export const MobileActionSheet: React.FC = () => {
         {/* AI Action Banner */}
         <button
           onClick={actions.handleAiDecompose}
-          className="w-full h-11 px-3.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 active:scale-[0.98] flex items-center justify-between text-xs text-purple-200 transition-all cursor-pointer font-medium"
+          className="w-full h-11 px-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] active:scale-[0.98] flex items-center justify-between text-xs text-zinc-200 transition-all cursor-pointer font-medium"
         >
           <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+            <Sparkles className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>Разобрать с ИИ</span>
           </div>
-          <span className="text-[10px] text-purple-400/80 font-mono">AI</span>
+          <span className="text-[10px] text-zinc-500 font-mono">AI</span>
         </button>
 
         {/* Secondary Utilities */}

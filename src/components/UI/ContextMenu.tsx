@@ -109,13 +109,13 @@ export const ContextMenu: React.FC = () => {
           {/* AI Action */}
           <button
             onClick={actions.handleAiDecompose}
-            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-purple-500/15 hover:text-purple-200 text-purple-300 transition-colors text-left cursor-pointer group"
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
           >
             <div className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
-              <span className="font-medium">Разобрать с ИИ</span>
+              <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Разобрать с ИИ</span>
             </div>
-            <span className="text-[10px] text-purple-400/70 font-mono">AI</span>
+            <span className="text-[10px] text-zinc-500 font-mono">AI</span>
           </button>
 
           <div className="my-0.5 border-t border-white/[0.06]" />
