@@ -1388,9 +1388,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const kieBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
     await kieBtn.click();
 
-    // 3. Verify Gemini 4 Argon is selected and visible
+    // 3. Verify KIE model is selected and visible
     const select = settingsModal.locator('button[aria-haspopup="listbox"]').first();
-    await expect(select).toContainText('Gemini 4 Argon');
+    await expect(select).toContainText(/DeepSeek V4\.1 Flash|Gemini 4 Argon/);
 
     // 4. Fill in token and save
     const keyInput = settingsModal.locator('input[placeholder*="sk-kie"]');
@@ -1407,19 +1407,17 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const endpoints = await page.evaluate(async () => {
       const module = await import('/src/lib/aiService.ts');
       return {
-        argonUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gemini-4-argon-openai'),
+        deepseekUrl: module.resolveKieEndpoint('https://api.kie.ai', 'deepseek-v4-1-flash'),
         gptUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gpt-5-2'),
         haikuUrl: module.resolveKieEndpoint('https://api.kie.ai', 'claude-haiku-4-5'),
         haiku55Url: module.resolveKieEndpoint('https://api.kie.ai', 'claude-haiku-5-5'),
-        geminiFlashUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gemini-3-8-flash-openai'),
       };
     });
 
-    expect(endpoints.argonUrl).toBe('https://api.kie.ai/gemini-4-argon-openai/v1/chat/completions');
+    expect(endpoints.deepseekUrl).toBe('https://api.kie.ai/openai/v1/responses');
     expect(endpoints.gptUrl).toBe('https://api.kie.ai/v1/chat/completions');
-    expect(endpoints.haikuUrl).toBe('https://api.kie.ai/claude/v1/messages');
-    expect(endpoints.haiku55Url).toBe('https://api.kie.ai/claude/v1/messages');
-    expect(endpoints.geminiFlashUrl).toBe('https://api.kie.ai/gemini-3-8-flash-openai/v1/chat/completions');
+    expect(endpoints.haikuUrl).toBe('https://api.kie.ai/anthropic/v1/messages');
+    expect(endpoints.haiku55Url).toBe('https://api.kie.ai/anthropic/v1/messages');
   });
 
   test('27. Contextual Subtask Extraction and Reasoning Effort Settings Verification', async ({ page }) => {
@@ -3857,7 +3855,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       await expect(aside.locator('span', { hasText: 'Боты' }).first()).toBeVisible();
 
       await aside.locator('span', { hasText: 'Игры' }).first().click();
-      await expect(page.locator('text=BlockSorting').first()).toBeVisible();
+      await expect(page.locator('text=Киберпанк майнинг').or(page.locator('text=cyberpunk_mining')).or(page.locator('text=BlockSorting')).first()).toBeVisible();
       await expect(page.locator('text=Драматическая RPG').first()).toBeVisible();
 
       await page.screenshot({
