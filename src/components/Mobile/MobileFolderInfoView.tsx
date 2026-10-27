@@ -116,9 +116,10 @@ export const MobileFolderInfoView: React.FC = () => {
                   setIsTriageModalOpen(true);
                 }}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-xs font-medium active:scale-95 transition-all cursor-pointer border border-blue-500/20"
+                title="AI Triage — сортировка входящих"
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>Трибунал</span>
+                <span>Сортировка</span>
               </button>
             )}
           </div>

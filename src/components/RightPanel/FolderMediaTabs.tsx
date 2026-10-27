@@ -54,7 +54,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
     <div className={`flex flex-col gap-3 ${className}`}>
       {/* Tabs Header */}
       {isMobile ? (
-        <div className="flex items-center gap-1.5 bg-[#141417]/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 bg-[#141417]/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
           {tabDefs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -63,7 +63,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 ${
+                className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 ${
                   isActive
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
