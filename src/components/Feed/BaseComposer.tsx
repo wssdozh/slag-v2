@@ -83,14 +83,16 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   const localRef = useRef<HTMLTextAreaElement | null>(null);
   const effectiveRef = textareaRef || localRef;
 
-  // Динамический авто-ресайз поля ввода по содержимому
+  // Динамический авто-ресайз поля ввода по содержимому без лишних reflow
   useLayoutEffect(() => {
     if (effectiveRef.current) {
+      if (!value.trim()) {
+        effectiveRef.current.style.height = `${minHeight}px`;
+        return;
+      }
       effectiveRef.current.style.height = 'auto';
-      const targetHeight = value.trim()
-        ? Math.min(effectiveRef.current.scrollHeight, maxHeight)
-        : Math.max(minHeight, effectiveRef.current.scrollHeight);
-      effectiveRef.current.style.height = `${targetHeight}px`;
+      const targetHeight = Math.min(effectiveRef.current.scrollHeight, maxHeight);
+      effectiveRef.current.style.height = `${Math.max(minHeight, targetHeight)}px`;
     }
   }, [value, minHeight, maxHeight, effectiveRef]);
 

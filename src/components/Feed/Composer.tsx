@@ -9,7 +9,7 @@ import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { useComposerMedia } from '../../hooks/useComposerMedia';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { categorizeDraft } from '../../lib/aiService';
-import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
+import { enrichItemAttachments, downscaleImageDataUrl } from '../../lib/attachmentEnrichment';
 import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
@@ -470,18 +470,23 @@ export const Composer: React.FC<ComposerProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach(file => {
+    Array.from(files).forEach((file) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const id = 'att_' + Date.now() + Math.random().toString(36).slice(2, 6);
+        const isImg = type === 'image' || file.type.startsWith('image/');
+        let finalDataUrl = reader.result as string;
+        if (isImg && typeof finalDataUrl === 'string') {
+          finalDataUrl = await downscaleImageDataUrl(finalDataUrl, 1440);
+        }
         const attachment: SlagAttachment = {
           id,
           name: file.name,
-          type: type === 'image' || file.type.startsWith('image/') ? 'image' : 'file',
-          mimeType: file.type || 'application/octet-stream',
+          type: isImg ? 'image' : 'file',
+          mimeType: isImg ? 'image/jpeg' : (file.type || 'application/octet-stream'),
           size: file.size,
           relativePath: `.attachments/${id}_${file.name}`,
-          dataUrl: reader.result as string,
+          dataUrl: finalDataUrl,
         };
         setAttachments(prev => [...prev, attachment]);
       };
