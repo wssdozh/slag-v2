@@ -1430,6 +1430,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <BaseComposer
       value={content}
       variant={isModal ? 'flat' : 'card'}
+      minHeight={isModal ? 64 : 22}
       onChange={handleContentChange}
       onSubmit={handleSend}
       onKeyDown={handleKeyDown}
@@ -1474,7 +1475,7 @@ export const Composer: React.FC<ComposerProps> = ({
       leftControls={leftControls}
       rightControls={rightControls}
       sendButton={sendButton}
-      className={isRecordingAudio ? 'max-w-[420px]' : 'max-w-2xl'}
+      className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-2xl'}
     />
   );
 };

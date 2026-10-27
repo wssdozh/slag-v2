@@ -462,64 +462,6 @@ ${settings.customTagRules ? `Пользовательские правила: ${
   return fallbackResult;
 }
 
-export interface DecomposeResult {
-  title?: string;
-  subtasks: Array<{ title: string; completed?: boolean }>;
-  tags?: string[];
-  summary?: string;
-}
-
-/**
- * Intelligent note/task decomposition:
- * Breaks down any note or task into actionable subtasks, extracts relevant tags and summary.
- */
-export async function decomposeItemWithAi(
-  item: SlagItem,
-  settings: AiSettings
-): Promise<DecomposeResult> {
-  const content = `${item.title ? item.title + '\n' : ''}${item.content}`.trim();
-  const existingTags = storage.getAllExistingTags();
-  const style = settings.tagCaseStyle || 'lowercase';
-
-  const systemPrompt = `Ты — персональный ИИ-ассистент базы знаний SLAG.
-Твоя задача — детально разобрать и декомпозировать заметку или задачу пользователя.
-1. Выдели конкретные практические шаги (subtasks). Каждый пункт — чёткое короткое действие в инфинитиве (например: "Изучить документацию", "Написать миграцию БД").
-2. Если в заметке есть выраженные темы или сущности, предложи 2-4 тега из словаря существующих или новые точные теги (без знака #, в формате ${style === 'kebab-case' ? 'kebab-case' : 'строчные буквы'}).
-3. Составь 1-2 предложения краткой выжимки (summary) сути заметки.
-4. Уточни заголовок (title), если исходный был неинформативным ("Заметка", "Черновик", пустой).
-
-СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
-[${existingTags.join(', ')}]
-
-Ответь СТРОГО в формате JSON:
-{
-  "title": "Уточненный заголовок",
-  "subtasks": [
-    { "title": "Шаг 1" },
-    { "title": "Шаг 2" }
-  ],
-  "tags": ["тег1", "тег2"],
-  "summary": "Краткая суть"
-}`;
-
-  const userPrompt = `Текст записи:\n"""\n${content}\n"""`;
-
-  const res = await callJsonLlm<DecomposeResult>(systemPrompt, userPrompt, settings, 0.2);
-  if (res && Array.isArray(res.subtasks) && res.subtasks.length > 0) {
-    return res;
-  }
-
-  // Local fallback if offline or API key missing
-  const lines = content.split('\n').map(l => l.replace(/^[-*•\d.)\]\s]+/, '').trim()).filter(l => l.length > 2);
-  const fallbackSubtasks = lines.slice(1, 6).map(t => ({ title: t }));
-  return {
-    title: item.title || lines[0] || 'Разобранная задача',
-    subtasks: fallbackSubtasks.length > 0 ? fallbackSubtasks : [{ title: 'Выполнить задачу' }],
-    tags: item.tags || [],
-    summary: lines.slice(0, 2).join(' '),
-  };
-}
-
 /**
  * Intelligent AI tagging (backwards-compatible wrapper around categorizeDraft).
  */

@@ -3187,12 +3187,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await dupBtn.click();
     await expect(page.locator('text=Запись продублирована')).toBeVisible();
 
-    // Test "Разобрать с ИИ"
+    // Test "Разобрать с ИИ" (Real triage: folder & tags)
     const secondCard = page.locator('[id^="item-"]').first();
     await secondCard.click({ button: 'right' });
     const aiBtn = page.locator('.fixed.z-50 button', { hasText: 'Разобрать с ИИ' });
     await aiBtn.click();
-    await expect(page.locator('text=Запись разобрана: добавлено')).toBeVisible();
+    await expect(page.locator('text=Запись разобрана')).toBeVisible();
   });
 
   test('46. FullscreenEditor: Desktop Sticky Top Toolbar and Mobile Telegram-style Bottom Bar', async ({ page }) => {

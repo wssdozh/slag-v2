@@ -45,7 +45,7 @@ import { Select } from '../UI/Select';
 import { TagChip } from '../UI/TagChip';
 import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../lib/dateUtils';
-import { decomposeItemWithAi, generateSmartTags } from '../../lib/aiService';
+import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 
 let activeEditorView: EditorView | null = null;
 
@@ -218,24 +218,24 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   }, [insertMarkdown]);
 
   const handleAiDecomposeInline = useCallback(async () => {
-    addToast('ИИ разбирает запись на шаги...', 'info');
+    addToast('ИИ определяет папку и теги...', 'info');
     try {
-      const res = await decomposeItemWithAi(
-        { ...item, title, content, type, tags, folder, attachments },
-        aiSettings
-      );
-      if (res.subtasks && res.subtasks.length > 0) {
-        const subtasksMd = '\n' + res.subtasks.map(s => `- [ ] ${s.title}`).join('\n') + '\n';
-        insertMarkdown(subtasksMd, '');
-        if (res.tags && res.tags.length > 0) {
-          setTags(prev => Array.from(new Set([...prev, ...(res.tags || [])])));
-        }
-        addToast(`Добавлено ${res.subtasks.length} подзадач`, 'success');
+      const fullText = `${title ? title + '\n' : ''}${content}`.trim();
+      const res = await categorizeDraft(fullText, folder || 'Входящие', folders, aiSettings);
+      if (res.targetFolder && res.targetFolder !== folder) {
+        setFolder(res.targetFolder);
       }
+      if (res.tags && res.tags.length > 0) {
+        setTags(prev => Array.from(new Set([...prev, ...res.tags])));
+      }
+      const folderNotice = res.targetFolder && res.targetFolder !== folder ? `папка: ${res.targetFolder}` : '';
+      const tagsNotice = res.tags.length > 0 ? `теги: #${res.tags.join(' #')}` : '';
+      const details = [folderNotice, tagsNotice].filter(Boolean).join(', ');
+      addToast(`Запись разобрана${details ? ` (${details})` : ''}: ${res.reason}`, 'success');
     } catch {
       addToast('Не удалось разобрать запись через ИИ', 'error');
     }
-  }, [item, title, content, type, tags, folder, attachments, aiSettings, insertMarkdown, addToast]);
+  }, [title, content, folder, folders, aiSettings, addToast]);
 
   const handleAiTagsInline = useCallback(async () => {
     addToast('Подбор тегов...', 'info');
@@ -886,7 +886,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 type="button"
                 onClick={handleAiDecomposeInline}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium transition-colors cursor-pointer border border-white/[0.06]"
-                title="Декомпозировать на шаги через ИИ"
+                title="Определить папку и теги через ИИ"
               >
                 <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Разобрать ИИ</span>
@@ -1263,7 +1263,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
               >
                 <Sparkles className="w-4 h-4 text-zinc-400" />
-                <span>Разобрать на подзадачи</span>
+                <span>Разобрать (папка и теги)</span>
               </button>
               <button
                 type="button"

@@ -119,7 +119,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       <div
         className={
           isFlat
-            ? `flex flex-col gap-2 p-0 bg-transparent border-0 shadow-none relative ${className}`
+            ? `w-full flex flex-col gap-2.5 p-0 bg-transparent border-0 shadow-none relative ${className}`
             : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2.5 sm:p-3 flex flex-col gap-2 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
         }
       >

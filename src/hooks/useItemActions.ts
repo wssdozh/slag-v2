@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext';
-import { decomposeItemWithAi, generateSmartTags } from '../lib/aiService';
-import type { SlagItem, SlagItemType, SlagSubtask } from '../types';
+import { categorizeDraft, generateSmartTags } from '../lib/aiService';
+import type { SlagItem, SlagItemType } from '../types';
 
 export const PRIORITY_LABELS: Record<'none' | 'low' | 'medium' | 'high', string> = {
   high: 'Срочный',
@@ -27,6 +27,7 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
     completeTaskForever,
     addToast,
     aiSettings,
+    folders,
     sendChatMessage,
     setActiveMobileTab,
     isMobile,
@@ -144,32 +145,28 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
   const handleAiDecompose = async () => {
     if (!item) return;
     onDone?.();
-    addToast('ИИ разбирает запись на шаги...', 'info');
+    addToast('ИИ определяет папку и теги...', 'info');
     try {
-      const res = await decomposeItemWithAi(item, aiSettings);
-      const updatedSubtasks: SlagSubtask[] = res.subtasks.map((st, i) => ({
-        id: `st_${Date.now()}_${i}`,
-        title: st.title,
-        completed: false,
-      }));
-      const mergedTags = Array.from(new Set([...(item.tags || []), ...(res.tags || [])]));
-      const isGeneric =
-        !item.title ||
-        ['заметка', 'черновик', 'новая заметка', 'без названия', 'новая задача'].includes(
-          item.title.trim().toLowerCase()
-        );
+      const fullText = `${item.title ? item.title + '\n' : ''}${item.content || ''}`.trim();
+      const res = await categorizeDraft(fullText, item.folder || 'Входящие', folders, aiSettings);
 
-      const updatedItem: SlagItem = {
+      const mergedTags = Array.from(new Set([...(item.tags || []), ...(res.tags || [])]));
+      const targetFolder = res.targetFolder || item.folder || 'Входящие';
+
+      if (targetFolder !== item.folder) {
+        moveItem(item.id, targetFolder);
+      }
+
+      updateItem({
         ...item,
-        type: 'task',
-        title: !isGeneric ? item.title : (res.title || item.title || 'Разобранная задача'),
-        subtasks: [...(item.subtasks || []), ...updatedSubtasks],
+        folder: targetFolder,
         tags: mergedTags,
-        summary: res.summary || item.summary,
         updatedAt: Date.now(),
-      };
-      updateItem(updatedItem);
-      addToast(`Запись разобрана: добавлено ${updatedSubtasks.length} подзадач`, 'success');
+      });
+
+      const folderNotice = targetFolder !== item.folder ? ` → ${targetFolder}` : '';
+      const tagsNotice = res.tags.length > 0 ? ` [${res.tags.map(t => '#' + t).join(' ')}]` : '';
+      addToast(`Запись разобрана${folderNotice}${tagsNotice}: ${res.reason}`, 'success');
     } catch {
       addToast('Не удалось разобрать запись через ИИ', 'error');
     }
