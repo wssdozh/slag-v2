@@ -179,7 +179,21 @@ const ChatGPTOrbCanvas: React.FC<{
     }
   }, [isPlaying]);
 
-  // WebGL Render Loop
+  // Keep isPlaying in a ref so WebGL pipeline does not re-compile shaders on every play/pause
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  // Wake up WebGL render loop when playback starts
+  const wakeUpLoopRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (isPlaying && wakeUpLoopRef.current) {
+      wakeUpLoopRef.current();
+    }
+  }, [isPlaying]);
+
+  // WebGL Pipeline Lifecycle: Initialized ONCE on mount
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -232,14 +246,21 @@ const ChatGPTOrbCanvas: React.FC<{
     const uHighLoc = gl.getUniformLocation(program, 'uHigh');
     const uResLoc = gl.getUniformLocation(program, 'uResolution');
 
-    let animationId: number;
+    let animationId: number | null = null;
     let time = 0;
     let curVol = 0;
     let curBass = 0;
     let curMid = 0;
     let curHigh = 0;
+    let idleFramesRemaining = isPlayingRef.current ? -1 : 24;
 
     const render = () => {
+      if (document.hidden) {
+        animationId = null;
+        return;
+      }
+
+      const activePlaying = isPlayingRef.current;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const displayW = Math.floor(canvas.clientWidth * dpr);
       const displayH = Math.floor(canvas.clientHeight * dpr);
@@ -255,7 +276,7 @@ const ChatGPTOrbCanvas: React.FC<{
       let targetHigh = 0;
       let targetVol = 0;
 
-      if (isPlaying) {
+      if (activePlaying) {
         if (analyserRef.current && dataArrayRef.current) {
           try {
             analyserRef.current.getByteFrequencyData(dataArrayRef.current);
@@ -309,7 +330,7 @@ const ChatGPTOrbCanvas: React.FC<{
       curHigh += (targetHigh - curHigh) * 0.16;
 
       // Time progression
-      const speed = isPlaying ? 0.016 + curVol * 0.02 : 0.008;
+      const speed = activePlaying ? 0.016 + curVol * 0.02 : 0.008;
       time += speed;
 
       gl.clearColor(0, 0, 0, 0);
@@ -324,17 +345,50 @@ const ChatGPTOrbCanvas: React.FC<{
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-      animationId = requestAnimationFrame(render);
+      // In idle resting state, gracefully settle within 24 frames then stop RAF loop to eliminate GPU/CPU waste
+      if (!activePlaying) {
+        if (idleFramesRemaining > 0) {
+          idleFramesRemaining--;
+          animationId = requestAnimationFrame(render);
+        } else {
+          animationId = null;
+        }
+      } else {
+        animationId = requestAnimationFrame(render);
+      }
     };
+
+    const wakeUp = () => {
+      idleFramesRemaining = isPlayingRef.current ? -1 : 24;
+      if (!animationId && !document.hidden) {
+        animationId = requestAnimationFrame(render);
+      }
+    };
+    wakeUpLoopRef.current = wakeUp;
 
     animationId = requestAnimationFrame(render);
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !animationId) {
+        wakeUp();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      cancelAnimationFrame(animationId);
+      wakeUpLoopRef.current = null;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
       gl.deleteBuffer(posBuffer);
       gl.deleteProgram(program);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, [isPlaying]);
+  }, []);
 
   return (
     <canvas
