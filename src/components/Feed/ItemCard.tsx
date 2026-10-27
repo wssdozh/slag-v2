@@ -505,7 +505,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                     : 'text-zinc-100'
                 }`}
               >
-                {item.title}
+                <MarkdownRenderer
+                  content={item.title}
+                  inline
+                  onWikiLinkClick={scrollToItem}
+                  className={item.status === 'done' ? 'line-through text-zinc-500' : 'text-zinc-100'}
+                />
               </h3>
 
               {taskBodyContent && (
@@ -550,11 +555,16 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
                         )}
                       </button>
                       <span
-                        className={`text-xs ${
+                        className={`text-xs flex-1 min-w-0 ${
                           st.completed ? 'line-through text-zinc-500' : 'text-zinc-300'
                         }`}
                       >
-                        {st.title}
+                        <MarkdownRenderer
+                          content={st.title}
+                          inline
+                          onWikiLinkClick={scrollToItem}
+                          className={st.completed ? 'line-through text-zinc-500' : 'text-zinc-300'}
+                        />
                       </span>
                     </div>
                   ))}

@@ -7,6 +7,7 @@ interface MarkdownRendererProps {
   content: string;
   onWikiLinkClick?: (target: string) => void;
   className?: string;
+  inline?: boolean;
 }
 
 // Convert Obsidian-style [[Target|Label]] and [[Target]] into markdown links [Label](wiki:Target)
@@ -22,6 +23,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   onWikiLinkClick,
   className = '',
+  inline = false,
 }) => {
   const transformed = useMemo(() => transformWikiLinks(content), [content]);
 
@@ -58,7 +60,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-blue-400 hover:text-blue-300 hover:underline"
+            className="text-blue-400 hover:text-blue-300 hover:underline break-all"
             {...props}
           >
             {children}
@@ -77,7 +79,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       h4: ({ children }) => (
         <h4 className="text-xs font-medium text-zinc-300 my-0.5 first:mt-0">{children}</h4>
       ),
-      p: ({ children }) => <p className="mb-1.5 last:mb-0 leading-relaxed">{children}</p>,
+      p: ({ children }) =>
+        inline ? (
+          <span className="inline leading-normal">{children}</span>
+        ) : (
+          <p className="mb-1.5 last:mb-0 leading-relaxed">{children}</p>
+        ),
       strong: ({ children }) => <strong className="font-semibold text-zinc-100">{children}</strong>,
       em: ({ children }) => <em className="italic text-zinc-300">{children}</em>,
       ul: ({ children }) => <ul className="list-disc list-inside my-1 space-y-0.5 pl-1">{children}</ul>,
@@ -143,8 +150,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       ),
       hr: () => <hr className="my-2 border-white/[0.08]" />,
     }),
-    [onWikiLinkClick]
+    [onWikiLinkClick, inline]
   );
+
+  if (inline) {
+    return (
+      <span className={`slag-markdown inline text-xs ${className}`}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={components}
+          urlTransform={(url) => url}
+        >
+          {transformed}
+        </ReactMarkdown>
+      </span>
+    );
+  }
 
   return (
     <div className={`slag-markdown text-xs text-zinc-300 font-normal ${className}`}>

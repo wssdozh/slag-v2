@@ -3883,4 +3883,68 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       await expect(searchModal).not.toBeVisible();
     }
   });
+
+  test('55. Task and Subtask Inline Markdown Rendering and Link Click Isolation', async ({ page }) => {
+    // 1. Inject a task with markdown links, bold text, and subtasks
+    await page.evaluate(() => {
+      const taskItem = {
+        id: 'test_md_task_1',
+        type: 'task',
+        title: 'Тестовая задача с [ссылкой](https://example.com) и **жирным**',
+        content:
+          '- [ ] Книга о улучшении логики и памяти "[Быстрый ум](https://ozon.ru/test)"\n' +
+          '- [ ] [видосик](https://youtube.com/watch) от автора\n' +
+          '- [ ] Обычная подзадача без разметки',
+        folder: 'Входящие',
+        tags: ['тест'],
+        status: 'todo',
+        priority: 'none',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        attachments: [],
+        subtasks: [
+          { id: 'st_1', title: 'Книга о улучшении логики и памяти "[Быстрый ум](https://ozon.ru/test)"', completed: false },
+          { id: 'st_2', title: '[видосик](https://youtube.com/watch) от автора', completed: false },
+          { id: 'st_3', title: 'Обычная подзадача без разметки', completed: false },
+        ]
+      };
+
+      const storageKey = 'slag_items_default_vault';
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      localStorage.setItem(storageKey, JSON.stringify([taskItem, ...existing]));
+      window.location.reload();
+    });
+
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    // 2. Locate the task card
+    const card = page.locator('.group', { hasText: 'Тестовая задача с' }).first();
+    await expect(card).toBeVisible();
+
+    // 3. Verify task title markdown link rendered
+    const titleLink = card.locator('h3 a', { hasText: 'ссылкой' });
+    await expect(titleLink).toBeVisible();
+    await expect(titleLink).toHaveAttribute('href', 'https://example.com');
+
+    // 4. Verify subtasks markdown links rendered as <a>, not raw markdown brackets
+    const subtaskLink1 = card.locator('a', { hasText: 'Быстрый ум' });
+    await expect(subtaskLink1).toBeVisible();
+    await expect(subtaskLink1).toHaveAttribute('href', 'https://ozon.ru/test');
+
+    const subtaskLink2 = card.locator('a', { hasText: 'видосик' });
+    await expect(subtaskLink2).toBeVisible();
+    await expect(subtaskLink2).toHaveAttribute('href', 'https://youtube.com/watch');
+
+    // Verify raw markdown brackets are NOT in visible text
+    const cardText = await card.innerText();
+    expect(cardText).not.toContain('[Быстрый ум](');
+    expect(cardText).not.toContain('[видосик](');
+
+    // 5. Capture screenshot of rendered task with markdown subtasks
+    await page.screenshot({
+      path: 'test-results/screenshots/task-subtasks-markdown.png',
+      fullPage: false,
+    });
+  });
 });
