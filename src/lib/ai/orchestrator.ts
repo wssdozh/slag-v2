@@ -821,6 +821,8 @@ ${isInbox
     const isKie = settings.provider === 'kie' && Boolean(settings.kieApiKey);
     const isGemini = settings.provider === 'gemini' && Boolean(settings.geminiApiKey);
 
+    let fallbackReason: string | undefined = undefined;
+
     if (isGroq || isKie || isGemini) {
       const providerName = isGroq ? 'Groq' : isKie ? 'KIE.AI' : 'Gemini';
       const apiKey = isGroq ? settings.groqApiKey : isKie ? settings.kieApiKey : settings.geminiApiKey;
@@ -863,12 +865,13 @@ ${isInbox
           round++;
           const isLastAllowedRound = round === MAX_TOOL_ROUNDS;
 
-          aiLog.info(`Agent round ${round}/${MAX_TOOL_ROUNDS} [${providerName}]`, {
+          aiLog.info(`Agent round ${round}/${MAX_TOOL_ROUNDS} [${providerName}] started`, {
             model,
             adapter: adapter.constructor.name,
             endpoint: endpointUrl,
           });
 
+          const roundStart = performance.now();
           let turnResponse: LlmAdapterTurnResponse;
           try {
             turnResponse = await adapter.executeTurn({
@@ -893,11 +896,19 @@ ${isInbox
             throw turnErr;
           }
 
+          const roundDuration = Math.round(performance.now() - roundStart);
+          const responseToolCalls = turnResponse.toolCalls;
+          const usageStr = turnResponse.usage
+            ? ` | tokens: ${turnResponse.usage.promptTokens ?? '?'} in / ${turnResponse.usage.completionTokens ?? '?'} out`
+            : '';
+          const toolsStr = responseToolCalls && responseToolCalls.length > 0
+            ? ` | tools: ${responseToolCalls.map((t) => t.name).join(', ')}`
+            : ' | final answer';
+          aiLog.info(`Agent round ${round}/${MAX_TOOL_ROUNDS} [${providerName}] finished in ${roundDuration}ms${usageStr}${toolsStr}`);
+
           if (turnResponse.reasoning) {
             accumulatedReasoning = (accumulatedReasoning ? `${accumulatedReasoning}\n\n` : '') + turnResponse.reasoning;
           }
-
-          const responseToolCalls = turnResponse.toolCalls;
 
           // If no tool calls returned, this is the final answer
           if (!responseToolCalls || responseToolCalls.length === 0) {
@@ -932,7 +943,23 @@ ${isInbox
               const rawResult = await executeLocalTool(toolName, toolArgs);
               const toolDuration = Math.round(performance.now() - toolStart);
 
-              aiLog.info(`Tool executed: ${toolName}`, { args: toolArgs, durationMs: toolDuration });
+              let summary = '';
+              if (Array.isArray(rawResult)) {
+                summary = `→ ${rawResult.length} items`;
+              } else if (rawResult && typeof rawResult === 'object') {
+                if (rawResult.totalItems !== undefined) summary = `→ ${rawResult.totalItems} total`;
+                else if (rawResult.count !== undefined) summary = `→ ${rawResult.count} items`;
+                else if (rawResult.error) summary = `→ error: ${rawResult.error}`;
+                else summary = '→ ok';
+              } else if (typeof rawResult === 'string') {
+                summary = `→ ${rawResult.length} chars`;
+              }
+              const argsSummary = Object.entries(toolArgs).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ');
+              aiLog.info(`Tool ${toolName}(${argsSummary.slice(0, 80)}) ${summary} (+${toolDuration}ms)`, {
+                tool: toolName,
+                args: toolArgs,
+                durationMs: toolDuration,
+              });
 
               if (toolName === 'search_notes' && Array.isArray(rawResult) && rawResult.length === 0) {
                 const allTags = storage.getAllExistingTags().slice(0, 8);
@@ -1107,13 +1134,14 @@ ${isInbox
           suggestedActions: finalActions.length > 0 ? finalActions : undefined,
           feedFilter: capturedFeedFilter,
         };
-      } catch (err) {
-        aiLog.warn(`${providerName} Assistant API call failed, falling back to local agent`, err);
+      } catch (err: any) {
+        fallbackReason = err?.message || `${providerName} error`;
+        aiLog.warn(`${providerName} Assistant API call failed, falling back to local agent: ${fallbackReason}`, err);
       }
     }
 
     // Offline / Local Heuristic Agent
-    return this.runLocalFallbackAgent({
+    const localResult = await this.runLocalFallbackAgent({
       messages,
       currentFolder,
       allItems,
@@ -1121,6 +1149,15 @@ ${isInbox
       executeLocalTool,
       isInbox,
     });
+
+    if (fallbackReason) {
+      const banner = `⚠️ Оффлайн-агент (API недоступен: ${fallbackReason})`;
+      localResult.reasoning = localResult.reasoning
+        ? `${banner}\n\n${localResult.reasoning}`
+        : banner;
+    }
+
+    return localResult;
   }
 
   private async runLocalFallbackAgent(params: {
