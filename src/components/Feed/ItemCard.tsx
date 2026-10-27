@@ -560,29 +560,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
           </p>
         </div>
       ) : (
-        /* Note Variant: pure stream note, title is rendered only if distinct and not derived from content */
-        (() => {
-          const hasDistinctTitle = Boolean(
-            item.title &&
-            !item.content.toLowerCase().startsWith(item.title.toLowerCase().trim()) &&
-            !item.title.toLowerCase().trim().startsWith(item.content.slice(0, 30).toLowerCase().trim())
-          );
-          if (!hasDistinctTitle && !item.content) return null;
-          return (
-            <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-              {hasDistinctTitle && (
-                <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
-                  {item.title}
-                </h3>
-              )}
-              {item.content && (
-                <div className="text-xs text-zinc-300 leading-relaxed font-normal whitespace-pre-wrap [&_ol]:whitespace-normal [&_ul]:whitespace-normal">
-                  <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
-                </div>
-              )}
+        /* Note Variant: pure stream note without separate title header (title is managed in Focus Editor) */
+        <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
+          {item.content ? (
+            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
+              <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
             </div>
-          );
-        })()
+          ) : item.title ? (
+            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
+              <MarkdownRenderer content={item.title} onWikiLinkClick={scrollToItem} />
+            </div>
+          ) : null}
+        </div>
       )}
 
       {/* Video Circle Notes (Telegram style) */}
