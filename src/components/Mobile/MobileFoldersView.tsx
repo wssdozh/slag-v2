@@ -262,7 +262,7 @@ export const MobileFoldersView: React.FC = () => {
             </button>
           )}
 
-          <FeedFilters />
+          <FeedFilters compact />
 
           {/* Unified View Mode Switcher matching Desktop */}
           <ViewModeSwitcher className="ml-auto" />

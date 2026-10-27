@@ -113,7 +113,7 @@ const SearchDialog: React.FC = () => {
     </div>
   );
 
-  const footer = isMobile ? undefined : (
+  const footer = (
     <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
       <div className="flex items-center gap-3">
         <span>↑↓ Навигация</span>
@@ -124,18 +124,10 @@ const SearchDialog: React.FC = () => {
     </div>
   );
 
-  return (
-    <BaseModal
-      isOpen={true}
-      onClose={() => setIsSearchOpen(false)}
-      customHeader={customHeader}
-      footer={footer}
-      className="items-start md:pt-20"
-      maxWidth="md:max-w-xl"
-      maxHeight="h-full md:h-auto md:max-h-[70vh]"
-    >
+  const searchBody = (
+    <>
       {/* Filter Pills */}
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/[0.04] bg-[#0f0f11] text-[11px]">
+      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/[0.04] bg-[#0f0f11] text-[11px] shrink-0">
         <span className="text-zinc-500 mr-1">Фильтр:</span>
         {(['all', 'note', 'task', 'article'] as const).map(t => (
           <button
@@ -229,6 +221,29 @@ const SearchDialog: React.FC = () => {
           })
         )}
       </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col select-none animate-in fade-in duration-150">
+        {customHeader}
+        {searchBody}
+      </div>
+    );
+  }
+
+  return (
+    <BaseModal
+      isOpen={true}
+      onClose={() => setIsSearchOpen(false)}
+      customHeader={customHeader}
+      footer={footer}
+      className="items-start md:pt-20"
+      maxWidth="md:max-w-xl"
+      maxHeight="h-full md:h-auto md:max-h-[70vh]"
+    >
+      {searchBody}
     </BaseModal>
   );
 };
