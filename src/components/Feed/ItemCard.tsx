@@ -189,38 +189,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     !item.isPinned &&
     (!item.priority || item.priority === 'none');
 
-  const isGenericMediaTitle = (title?: string) => {
-    if (!title) return true;
-    const t = title.trim().toLowerCase();
-    return (
-      t === 'голосовая заметка' ||
-      t === 'изображение' ||
-      t === 'видео-сообщение' ||
-      t === 'заметка' ||
-      t === 'черновик' ||
-      t === 'новая заметка' ||
-      t === 'без названия' ||
-      t === 'untitled' ||
-      t === 'вложение' ||
-      item.attachments.some(a => a.name && a.name.toLowerCase() === t)
-    );
-  };
-
-  // For notes, check if title is just an excerpt or prefix of the content
-  const isTitleExcerptOfContent = Boolean(
-    item.title &&
-    item.content &&
-    (item.content.trim().toLowerCase().startsWith(item.title.trim().toLowerCase()) ||
-      item.title.trim().toLowerCase().startsWith(item.content.trim().toLowerCase()) ||
-      item.content.trim().toLowerCase().startsWith(item.title.trim().toLowerCase().slice(0, 25)))
-  );
-
-  const shouldRenderNoteTitle = Boolean(
-    item.title &&
-    !isGenericMediaTitle(item.title) &&
-    !isTitleExcerptOfContent
-  );
-
   const handleImageClick = (img: SlagAttachment) => {
     const folderImages: LightboxImage[] = filteredItems.flatMap(it =>
       (it.attachments || [])
@@ -514,7 +482,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
               </h3>
 
               {taskBodyContent && (
-                <div className="mt-1 text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-normal">
+                <div className="mt-1 text-xs text-zinc-400 leading-relaxed font-normal">
                   <MarkdownRenderer content={taskBodyContent} onWikiLinkClick={scrollToItem} />
                 </div>
               )}
@@ -592,22 +560,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           </p>
         </div>
       ) : (
-        /* Note Variant */
-        (shouldRenderNoteTitle || item.content) && (
+        /* Note Variant: pure stream note, title is not rendered in feed (used for disk filename and search only) */
+        item.content ? (
           <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-            {shouldRenderNoteTitle && (
-              <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
-                {item.title}
-              </h3>
-            )}
-
-            {item.content && (
-              <div className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap font-normal">
-                <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
-              </div>
-            )}
+            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
+              <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
+            </div>
           </div>
-        )
+        ) : null
       )}
 
       {/* Video Circle Notes (Telegram style) */}

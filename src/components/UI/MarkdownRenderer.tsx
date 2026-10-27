@@ -81,9 +81,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       ),
       p: ({ children }) =>
         inline ? (
-          <span className="inline leading-normal">{children}</span>
+          <span className="inline leading-normal whitespace-pre-line">{children}</span>
         ) : (
-          <p className="mb-1.5 last:mb-0 leading-relaxed">{children}</p>
+          <p className="mb-1.5 last:mb-0 leading-relaxed whitespace-pre-line">{children}</p>
         ),
       strong: ({ children }) => <strong className="font-semibold text-zinc-100">{children}</strong>,
       em: ({ children }) => <em className="italic text-zinc-300">{children}</em>,
@@ -93,7 +93,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         if (className?.includes('task-list-item')) {
           return <li className="list-none flex items-start gap-1.5 my-0.5">{children}</li>;
         }
-        return <li className="leading-relaxed">{children}</li>;
+        return <li className="leading-relaxed [&>p]:inline [&>p]:mb-0">{children}</li>;
       },
       input: ({ type, checked }) => {
         if (type === 'checkbox') {

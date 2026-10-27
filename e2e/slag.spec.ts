@@ -3947,4 +3947,55 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('56. Note Markdown tight line spacing without extra whitespace in lists', async ({ page }) => {
+    // 1. Inject note with numbered list and paragraphs
+    await page.evaluate(() => {
+      const noteItem = {
+        id: 'test_tight_spacing_note',
+        type: 'note',
+        title: 'Контент: Идеи тем для роликов и блогов',
+        content:
+          '# идеи для роликов\n\n' +
+          'Кратко: Список идей для роликов.\n\n' +
+          '#идеи #блоггинг #видео #review\n\n' +
+          'идеи для роликов:\n' +
+          '1. Как привлечь твоё внимание\n' +
+          '2. Соцсети это инструмент\n' +
+          '3. Почему ты ребёнок в 25?\n' +
+          '4. тикток идеальный наркотик (покрывает визуалов и аудиалов)',
+        folder: 'Входящие',
+        tags: ['контент', 'идеи'],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        attachments: [],
+      };
+
+      const storageKey = 'slag_items_default_vault';
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      localStorage.setItem(storageKey, JSON.stringify([noteItem, ...existing]));
+      window.location.reload();
+    });
+
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const card = page.locator('.group', { hasText: 'идеи для роликов:' }).first();
+    await expect(card).toBeVisible();
+
+    // Verify list items exist and are compact
+    const listItems = card.locator('ol li');
+    await expect(listItems).toHaveCount(4);
+
+    // Verify list height is compact (not blown up by whitespace-pre-wrap)
+    const olBox = await card.locator('ol').boundingBox();
+    expect(olBox).toBeTruthy();
+    expect(olBox!.height).toBeLessThan(120);
+
+    // Capture screenshot to visually verify tight spacing
+    await page.screenshot({
+      path: 'test-results/screenshots/note-tight-markdown-spacing.png',
+      fullPage: false,
+    });
+  });
 });
