@@ -403,7 +403,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           </span>
         </div>
 
-        {chatMessages.length > 0 && (
+        {chatMessages.length > 0 && !isMobile && (
           <button
             onClick={clearChatMessages}
             className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.04] shrink-0"
