@@ -251,108 +251,110 @@ export const FeedList: React.FC = () => {
   }, [windowedItems, todayMidnight, yesterdayMidnight, currentYear]);
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      onContextMenu={handleFeedContextMenu}
-      onDragOver={handleDragOver}
-      onDragEnter={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 flex flex-col gap-6 relative scrollbar-thin"
-    >
-      {/* Drag & Drop Visual Dropzone Overlay */}
-      {isDraggingOver && (
-        <div className="absolute inset-2 z-30 rounded-2xl bg-[#09090b]/92 backdrop-blur-md border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none animate-in fade-in duration-100">
-          <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
-          <span className="text-sm font-medium text-zinc-200">
-            Перетащите файлы сюда для создания заметки
-          </span>
-          <span className="text-xs text-zinc-500 font-mono">
-            Изображения, аудио, видео или документы сохранятся в локальное хранилище
-          </span>
-        </div>
-      )}
+    <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        onContextMenu={handleFeedContextMenu}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 flex flex-col gap-6 relative scrollbar-thin"
+      >
+        {/* Drag & Drop Visual Dropzone Overlay */}
+        {isDraggingOver && (
+          <div className="absolute inset-2 z-30 rounded-2xl bg-[#09090b]/92 backdrop-blur-md border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none animate-in fade-in duration-100">
+            <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
+            <span className="text-sm font-medium text-zinc-200">
+              Перетащите файлы сюда для создания заметки
+            </span>
+            <span className="text-xs text-zinc-500 font-mono">
+              Изображения, аудио, видео или документы сохранятся в локальное хранилище
+            </span>
+          </div>
+        )}
 
-      {filteredItems.length === 0 ? (
-        <EmptyState
-          icon={items.length === 0 ? <Sparkles className="w-5 h-5 text-amber-400" /> : <Inbox className="w-5 h-5" />}
-          title={items.length === 0 ? 'Хранилище пустое' : 'В этой папке пусто'}
-          description={
-            items.length === 0
-              ? 'Создайте первую мысль в поле ввода внизу или сгенерируйте стартовые демо-заметки и папки.'
-              : 'Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.'
-          }
-          action={
-            items.length === 0 ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={seedDemoData}
-                className="gap-1.5 text-xs text-zinc-200 hover:text-white"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                Сгенерировать демо-заметки и папки
-              </Button>
-            ) : undefined
-          }
-          className="flex-1"
-        />
-      ) : (
-        <>
-          {/* Top spacer to push items to the bottom when list doesn't fill screen (Telegram-style) */}
-          <div className="mt-auto pointer-events-none" aria-hidden="true" />
+        {filteredItems.length === 0 ? (
+          <EmptyState
+            icon={items.length === 0 ? <Sparkles className="w-5 h-5 text-amber-400" /> : <Inbox className="w-5 h-5" />}
+            title={items.length === 0 ? 'Хранилище пустое' : 'В этой папке пусто'}
+            description={
+              items.length === 0
+                ? 'Создайте первую мысль в поле ввода внизу или сгенерируйте стартовые демо-заметки и папки.'
+                : 'Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.'
+            }
+            action={
+              items.length === 0 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={seedDemoData}
+                  className="gap-1.5 text-xs text-zinc-200 hover:text-white"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Сгенерировать демо-заметки и папки
+                </Button>
+              ) : undefined
+            }
+            className="flex-1"
+          />
+        ) : (
+          <>
+            {/* Top spacer to push items to the bottom when list doesn't fill screen (Telegram-style) */}
+            <div className="mt-auto pointer-events-none" aria-hidden="true" />
 
-          {/* Top sentinel / load earlier notes trigger */}
-          {hasMoreOlder && (
-            <div ref={topSentinelRef} className="flex justify-center py-2 select-none">
-              <button
-                type="button"
-                onClick={loadMoreOlder}
-                className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded-full bg-[#141417] border border-white/[0.04] cursor-pointer"
-              >
-                Показать более ранние записи...
-              </button>
-            </div>
-          )}
-
-          {grouped.map(group => (
-            <div key={group.dateLabel} className="flex flex-col gap-2">
-              {/* Telegram-style date bubble */}
-              <div className="flex justify-center py-1 select-none">
-                <span className="px-3 py-0.5 rounded-full bg-[#18181b] border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
-                  {group.dateLabel}
-                </span>
+            {/* Top sentinel / load earlier notes trigger */}
+            {hasMoreOlder && (
+              <div ref={topSentinelRef} className="flex justify-center py-2 select-none">
+                <button
+                  type="button"
+                  onClick={loadMoreOlder}
+                  className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded-full bg-[#141417] border border-white/[0.04] cursor-pointer"
+                >
+                  Показать более ранние записи...
+                </button>
               </div>
+            )}
 
-              {/* List of cards */}
-              <div className="flex flex-col gap-1.5">
-                {group.items.map(item => (
-                  <ItemCard key={item.id} item={item} />
-                ))}
+            {grouped.map(group => (
+              <div key={group.dateLabel} className="flex flex-col gap-2">
+                {/* Telegram-style date bubble */}
+                <div className="flex justify-center py-1 select-none">
+                  <span className="px-3 py-0.5 rounded-full bg-[#18181b] border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
+                    {group.dateLabel}
+                  </span>
+                </div>
+
+                {/* List of cards */}
+                <div className="flex flex-col gap-1.5">
+                  {group.items.map(item => (
+                    <ItemCard key={item.id} item={item} />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </>
-      )}
+            ))}
+          </>
+        )}
+
+        {/* Bottom spacer so the last card clears the composer with a clean gap */}
+        <div className="h-24 shrink-0 pointer-events-none" aria-hidden="true" />
+        <div ref={bottomAnchorRef} />
+      </div>
 
       {/* Floating scroll to bottom button */}
       {showScrollBottom && (
         <button
           type="button"
           onClick={scrollToBottom}
-          className="sticky bottom-28 ml-auto mr-2 sm:mr-4 z-20 w-8 h-8 rounded-full bg-[#18181b]/95 hover:bg-[#27272a] text-zinc-300 hover:text-white border border-white/[0.1] shadow-xl backdrop-blur flex items-center justify-center cursor-pointer transition-all active:scale-95 animate-in fade-in zoom-in-90"
+          className="absolute bottom-36 sm:bottom-40 right-4 sm:right-6 md:right-8 z-30 w-10 h-10 rounded-full aspect-square shrink-0 bg-[#18181b]/95 hover:bg-[#27272a] active:bg-[#323238] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer transition-all active:scale-90 animate-in fade-in zoom-in-95 group"
           title="К последним заметкам"
           aria-label="Прокрутить к последним заметкам"
         >
-          <ChevronDown className="w-4 h-4" />
+          <ChevronDown className="w-5 h-5 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-y-0.5" />
         </button>
       )}
-
-      {/* Bottom spacer so the last card clears the composer with a clean gap */}
-      <div className="h-24 shrink-0 pointer-events-none" aria-hidden="true" />
-      <div ref={bottomAnchorRef} />
     </div>
   );
 };

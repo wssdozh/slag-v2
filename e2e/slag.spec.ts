@@ -313,6 +313,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/sidebar.png',
     });
 
+    // 4. Scroll up to verify bottom button appearance and capture screenshot
+    await feedContainer.evaluate((el) => {
+      el.scrollTop = 0;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForTimeout(200);
+    const scrollDownBtn = page.locator('button[aria-label="Прокрутить к последним заметкам"]');
+    if (await scrollDownBtn.isVisible()) {
+      await page.screenshot({
+        path: 'test-results/screenshots/scroll-down-button.png',
+      });
+    }
+
     // 4. Capture Fullscreen Editor layout for visual audit
     const focusEditorBtn = page.locator('button[aria-label="Открыть в фокус-редакторе"]').first();
     if (await focusEditorBtn.isVisible()) {
