@@ -468,14 +468,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Verify Gemini provider tab is cut out / removed from top tabs
     await expect(settingsModal.locator('button', { hasText: '✨ Gemini' })).not.toBeVisible();
 
-    // Verify KIE.AI provider is available and defaults to Gemini 4 Argon
+    // Verify KIE.AI provider is available and defaults to DeepSeek V4.1 Flash
     const kieProviderBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
     await expect(kieProviderBtn).toBeVisible();
     await kieProviderBtn.click();
     await expect(settingsModal.locator('input[placeholder*="sk-kie"]')).toBeVisible();
 
-    // Verify Gemini 4 Argon model option is visible in KIE.AI
-    const kieModelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /Gemini 4 Argon/ });
+    // Verify DeepSeek V4.1 Flash model option is visible in KIE.AI
+    const kieModelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /DeepSeek V4\.1 Flash/ });
     await expect(kieModelSelect).toBeVisible();
 
     // Take screenshot of KIE.AI settings with Argon for visual audit

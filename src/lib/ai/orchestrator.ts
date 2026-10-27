@@ -217,26 +217,15 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
  */
 export function resolveKieEndpoint(baseUrl?: string, model?: string): string {
   const clean = (baseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
-  if (clean.endsWith('/chat/completions') || clean.endsWith('/messages')) return clean;
+  if (clean.endsWith('/chat/completions') || clean.endsWith('/messages') || clean.endsWith('/responses')) return clean;
 
   const m = (model || '').toLowerCase();
   if (m.startsWith('claude-')) {
-    return `${clean}/claude/v1/messages`;
+    return `${clean}/anthropic/v1/messages`;
   }
 
-  if (m.includes('gemini-4-argon') || m === 'gemini-4-argon-openai') {
-    if (clean.includes('gemini-4-argon-openai')) {
-      return clean.endsWith('/v1') ? `${clean}/chat/completions` : `${clean}/v1/chat/completions`;
-    }
-    return `${clean}/gemini-4-argon-openai/v1/chat/completions`;
-  }
-
-  if (m.includes('gemini-3-8-flash') || m === 'gemini-3-8-flash-openai') {
-    return `${clean}/gemini-3-8-flash-openai/v1/chat/completions`;
-  }
-
-  if (m.includes('gemini-3-5-flash') || m === 'gemini-3-5-flash-openai') {
-    return `${clean}/gemini-3-5-flash-openai/v1/chat/completions`;
+  if (m.includes('deepseek')) {
+    return `${clean}/openai/v1/chat/completions`;
   }
 
   return clean.endsWith('/v1') ? `${clean}/chat/completions` : `${clean}/v1/chat/completions`;
@@ -835,7 +824,7 @@ ${isInbox
     if (isGroq || isKie || isGemini) {
       const providerName = isGroq ? 'Groq' : isKie ? 'KIE.AI' : 'Gemini';
       const apiKey = isGroq ? settings.groqApiKey : isKie ? settings.kieApiKey : settings.geminiApiKey;
-      const defaultModel = isGroq ? 'openai/gpt-oss-120b' : isKie ? 'gemini-3-8-flash-openai' : 'gemini-2.0-flash';
+      const defaultModel = isGroq ? 'openai/gpt-oss-120b' : isKie ? 'deepseek-v4-1-flash' : 'gemini-2.0-flash';
       const model = settings.model || defaultModel;
 
       let adapter: LlmProtocolAdapter;
@@ -859,7 +848,7 @@ ${isInbox
       try {
         const executedToolCalls: ChatToolCall[] = [];
         const turnHistory: AdapterTurnHistoryItem[] = [];
-        const MAX_TOOL_ROUNDS = 4;
+        const MAX_TOOL_ROUNDS = 2;
         let round = 0;
         let finalContent = '';
         let accumulatedReasoning = '';
@@ -1298,8 +1287,65 @@ ${isInbox
       };
     }
 
+    // Check 1.8: Split / Decompose note intent ("раздели заметку", "разбей на таски", "раздели на несколько")
+    const isSplitIntent =
+      /раздели|разбей|декомпозируй|располовинь/i.test(lowerMsg) &&
+      (lowerMsg.includes('заметк') || lowerMsg.includes('таск') || lowerMsg.includes('несколько') || lowerMsg.includes('пункт'));
+
+    if (isSplitIntent) {
+      let targetNote: SlagItem | undefined;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const text = messages[i].content;
+        const wikiMatches = Array.from(text.matchAll(/\[\[([^\]]+)\]\]/g)).map((m) => m[1]);
+        if (wikiMatches.length > 0) {
+          targetNote = allItems.find((item) => wikiMatches.some((w) => w.toLowerCase() === item.title.toLowerCase()));
+          if (targetNote) break;
+        }
+      }
+
+      if (targetNote && targetNote.content) {
+        const lines = targetNote.content
+          .split('\n')
+          .map((l) => l.replace(/^[-\s*]*\[[ xX]?\]\s*|^[-*\d.]+\s*/, '').trim())
+          .filter((l) => l.length > 2 && !l.startsWith('#'));
+
+        if (lines.length > 1) {
+          const batchItems: BatchUpdateItem[] = lines.slice(0, 10).map((line, idx) => ({
+            targetItemId: `new_${idx}`,
+            title: line,
+            updates: {
+              status: 'todo',
+            },
+          }));
+
+          return {
+            content: `Разделил заметку «${targetNote.title}» на ${batchItems.length} задач в папке «${targetNote.folder}». Нажмите «Применить» для подтверждения.`,
+            reasoning: `Декомпозиция заметки [[${targetNote.title}]] на ${batchItems.length} задач`,
+            reasoningTimeMs: Date.now() - startTime,
+            suggestedAction: {
+              type: 'batch_update',
+              title: `Разделение заметки (${batchItems.length} задач)`,
+              actionLabel: `Создать ${batchItems.length} задач`,
+              folder: targetNote.folder,
+              content: '',
+              tags: targetNote.tags || [],
+              itemType: 'task',
+              batchUpdateItems: batchItems,
+              actionState: 'suggested',
+            },
+          };
+        }
+      }
+    }
+
     // Check 2: Vault stats / count
-    if (lowerMsg.includes('сколько') || lowerMsg.includes('статистик') || lowerMsg.includes('всего') || lowerMsg.includes('сводка')) {
+    const isStatsIntent =
+      (/\bсколько\b/i.test(lowerMsg) && !lowerMsg.includes('несколько')) ||
+      lowerMsg.includes('статистик') ||
+      lowerMsg.includes('сводка') ||
+      (/\bвсего\b/i.test(lowerMsg) && !lowerMsg.includes('всего лишь'));
+
+    if (isStatsIntent) {
       const stats = await executeLocalTool('get_vault_stats', { target: 'all' });
       executedToolCalls.push({ name: 'get_vault_stats', args: { target: 'all' }, result: stats });
 

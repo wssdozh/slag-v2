@@ -62,4 +62,48 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
     expect(chatResponse.feedFilter).toBeDefined();
     expect(chatResponse.feedFilter?.itemIds).toContain('note_video_ideas');
   });
+
+  test('Decomposition intent splits note into tasks without triggering vault stats', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const chatResponse = await page.evaluate(async () => {
+      const { assistantOrchestrator } = await import('/src/lib/ai/orchestrator.ts');
+      const now = Date.now();
+
+      const items: any[] = [
+        {
+          id: 'note_pool',
+          type: 'note',
+          title: 'Пул игровых концептов',
+          content: '- [ ] стать медиагигантом\n- [ ] ведение тг канала\n- [ ] ДРАМАТИК ИГРА',
+          folder: 'Проекты/Идеи',
+          tags: ['игры'],
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+
+      return assistantOrchestrator.runChat({
+        messages: [
+          { role: 'assistant', content: 'Вот заметка: [[Пул игровых концептов]]' },
+          { role: 'user', content: 'раздели эту заметку на несколько' },
+        ],
+        currentFolder: 'Проекты/Идеи',
+        settings: {
+          provider: 'groq',
+          groqApiKey: '',
+          model: 'openai/gpt-oss-120b',
+        } as any,
+        folders: [{ id: 'f1', name: 'Проекты/Идеи', path: 'Проекты/Идеи' }] as any,
+        allItems: items,
+      });
+    });
+
+    // Content must not be stats summary
+    expect(chatResponse.content).not.toContain('Сводка по хранилищу');
+    expect(chatResponse.suggestedAction).toBeDefined();
+    expect(chatResponse.suggestedAction?.type).toBe('batch_update');
+    expect(chatResponse.suggestedAction?.batchUpdateItems?.length).toBe(3);
+  });
 });

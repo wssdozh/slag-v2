@@ -71,7 +71,7 @@ export const SettingsModal: React.FC = () => {
     if (newProvider === 'groq') {
       setModel('openai/gpt-oss-120b');
     } else if (newProvider === 'kie') {
-      setModel('gemini-4-argon-openai');
+      setModel('deepseek-v4-1-flash');
     }
   };
 
@@ -399,15 +399,8 @@ export const SettingsModal: React.FC = () => {
                             value={model}
                             onChange={(val) => setModel(val)}
                             options={[
-                              { value: 'gemini-4-argon-openai', label: 'Gemini 4 Argon' },
-                              { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 ($0.06/1M, 1M ctx)' },
-                              { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Anthropic)' },
-                              { value: 'gemini-3-8-flash-openai', label: 'Gemini 3.8 Flash (Дешёвый)' },
-                              { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (Anthropic)' },
                               { value: 'deepseek-v4-1-flash', label: 'DeepSeek V4.1 Flash' },
-                              { value: 'gpt-5-2', label: 'GPT 5.2' },
-                              { value: 'grok-4-5', label: 'Grok 4.5' },
-                              { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B' },
+                              { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
                             ]}
                           />
                         </div>

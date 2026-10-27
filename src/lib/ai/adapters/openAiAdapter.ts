@@ -62,6 +62,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
       model,
       messages: formattedMessages,
       temperature: 0.2,
+      max_tokens: 2048,
     };
 
     const isArgon = model.toLowerCase().includes('gemini-4-argon');
