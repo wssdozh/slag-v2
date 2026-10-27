@@ -7,6 +7,7 @@ import type {
 } from './types';
 import { OpenAiChatAdapter } from './adapters/openAiAdapter';
 import { AnthropicMessagesAdapter } from './adapters/anthropicAdapter';
+import { OpenAiResponsesAdapter } from './adapters/openAiResponsesAdapter';
 import { storage } from '../storage';
 import { querySearch, getSearchableAttachmentText } from '../searchService';
 import { serializeItemToMarkdown } from '../markdownSerializer';
@@ -225,7 +226,7 @@ export function resolveKieEndpoint(baseUrl?: string, model?: string): string {
   }
 
   if (m.includes('deepseek')) {
-    return `${clean}/openai/v1/chat/completions`;
+    return `${clean}/openai/v1/responses`;
   }
 
   return clean.endsWith('/v1') ? `${clean}/chat/completions` : `${clean}/v1/chat/completions`;
@@ -833,8 +834,12 @@ ${isInbox
       let endpointUrl: string;
 
       const isClaudeOnKie = isKie && model.toLowerCase().startsWith('claude-');
+      const isResponsesOnKie = isKie && model.toLowerCase().includes('deepseek');
       if (isClaudeOnKie) {
         adapter = new AnthropicMessagesAdapter();
+        endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
+      } else if (isResponsesOnKie) {
+        adapter = new OpenAiResponsesAdapter();
         endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
       } else if (isGroq) {
         adapter = new OpenAiChatAdapter();
@@ -850,7 +855,7 @@ ${isInbox
       try {
         const executedToolCalls: ChatToolCall[] = [];
         const turnHistory: AdapterTurnHistoryItem[] = [];
-        const MAX_TOOL_ROUNDS = 2;
+        const MAX_TOOL_ROUNDS = 3;
         let round = 0;
         let finalContent = '';
         let accumulatedReasoning = '';
