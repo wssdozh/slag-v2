@@ -111,4 +111,68 @@ test.describe('KIE.AI DeepSeek V4.1 Flash Live Integration', () => {
     expect(result.suggestedAction).toBeDefined();
     expect(result.reasoning).not.toContain('⚠️ Оффлайн-агент');
   });
+
+  test('Finds latest notes for today without reading notes or emitting DSML', async ({ page }) => {
+    test.skip(!LIVE_KIE_KEY, 'KIE_API_KEY environment variable not set');
+    test.setTimeout(30000);
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const result = await page.evaluate(async (apiKey) => {
+      const { assistantOrchestrator } = await import('/src/lib/ai/orchestrator.ts');
+      const now = Date.now();
+      const threeDaysAgo = now - 3 * 86400000;
+
+      return assistantOrchestrator.runChat({
+        messages: [
+          { role: 'user', content: 'именно последние за сегодня по играм' },
+        ],
+        currentFolder: 'Входящие',
+        settings: {
+          provider: 'kie',
+          kieApiKey: apiKey,
+          model: 'deepseek-v4-1-flash',
+          reasoningEffort: 'low',
+        } as any,
+        folders: [
+          { id: 'f2', name: 'Проекты/Игры', path: 'Проекты/Игры' },
+        ] as any,
+        allItems: [
+          {
+            id: 'note_old_game',
+            type: 'note',
+            title: 'Старый концепт RPG',
+            content: 'архивная задумка',
+            folder: 'Проекты/Игры',
+            tags: ['игры'],
+            createdAt: threeDaysAgo,
+            updatedAt: threeDaysAgo,
+          },
+          {
+            id: 'note_today_game',
+            type: 'note',
+            title: 'ДРАМАТИК ИГРА',
+            content: 'свежие заметки по боевой системе',
+            folder: 'Проекты/Игры',
+            tags: ['игры'],
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      });
+    }, LIVE_KIE_KEY);
+
+    console.log('=== TIMEFRAME TEST RESULT ===');
+    console.log('Content:', result.content);
+    console.log('Reasoning:', result.reasoning);
+    console.log('Tools:', result.toolCalls?.map((t: any) => t.name));
+
+    // Must NOT contain DSML tags
+    expect(result.content).not.toContain('DSML');
+    expect(result.content).not.toContain('invoke');
+    expect(result.content).toContain('ДРАМАТИК ИГРА');
+    // Must NOT be the fallback offline agent
+    expect(result.reasoning || '').not.toContain('⚠️ Оффлайн-агент');
+  });
 });

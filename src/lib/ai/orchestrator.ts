@@ -269,26 +269,84 @@ export class AssistantOrchestrator {
     // Local Tool Executor
     const executeLocalTool = async (name: string, args: Record<string, any>): Promise<any> => {
       if (name === 'search_notes') {
-        const query = args.query || '';
+        const query = typeof args.query === 'string' ? args.query.trim() : '';
+        const requestedType = args.type && args.type !== 'all' ? args.type : undefined;
         const folderFilter = isInbox ? args.folder : currentFolder;
-        const results = await querySearch(query, allItems, args.type);
-        const filtered = folderFilter && folderFilter !== 'Входящие'
-          ? results.filter((i) => i.folder === folderFilter)
-          : results;
 
-        return filtered.slice(0, 5).map((item) => {
+        // Base search pool: text query or type filter
+        let pool = query
+          ? await querySearch(query, allItems, requestedType)
+          : allItems.filter((i) => (!requestedType ? true : i.type === requestedType));
+
+        // Deduplicate pool by ID
+        pool = Array.from(new Map(pool.map((item) => [item.id, item])).values());
+
+        // Folder scoping
+        if (folderFilter && folderFilter !== 'Входящие' && folderFilter !== 'all') {
+          pool = pool.filter((i) => i.folder === folderFilter || i.folder.startsWith(folderFilter + '/'));
+        }
+
+        // Timeframe filtering
+        const tf = (args.timeframe || 'all').toLowerCase();
+        const todayMidnight = new Date().setHours(0, 0, 0, 0);
+        const yesterdayMidnight = todayMidnight - 86400000;
+        const now = Date.now();
+
+        if (tf === 'today') {
+          pool = pool.filter((i) => {
+            const t = Math.max(i.createdAt || 0, i.updatedAt || 0);
+            return t >= todayMidnight;
+          });
+        } else if (tf === 'yesterday') {
+          pool = pool.filter((i) => {
+            const t = Math.max(i.createdAt || 0, i.updatedAt || 0);
+            return t >= yesterdayMidnight && t < todayMidnight;
+          });
+        } else if (tf === 'week') {
+          const weekAgo = now - 7 * 86400000;
+          pool = pool.filter((i) => Math.max(i.createdAt || 0, i.updatedAt || 0) >= weekAgo);
+        } else if (tf === 'month') {
+          const monthAgo = now - 30 * 86400000;
+          pool = pool.filter((i) => Math.max(i.createdAt || 0, i.updatedAt || 0) >= monthAgo);
+        }
+
+        // Sorting
+        const defaultSort = (tf === 'today' || tf === 'yesterday' || !query) ? 'recent' : 'relevance';
+        const sortBy = (args.sortBy || defaultSort).toLowerCase();
+        if (sortBy === 'recent') {
+          pool.sort((a, b) => Math.max(b.createdAt || 0, b.updatedAt || 0) - Math.max(a.createdAt || 0, a.updatedAt || 0));
+        } else if (sortBy === 'oldest') {
+          pool.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        }
+
+        // Limit
+        const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 15);
+        pool = pool.slice(0, limit);
+
+        return pool.map((item) => {
           const bodySnippet = cleanSnippetText(item.content || '', 140);
           const attachSnippet = cleanSnippetText(getSearchableAttachmentText(item.attachments), 100);
           let snippet = bodySnippet;
           if (attachSnippet) {
             snippet = snippet ? `${snippet} [Вложения: ${attachSnippet}]` : `[Вложения: ${attachSnippet}]`;
           }
+
+          const itemTime = Math.max(item.createdAt || 0, item.updatedAt || 0);
+          let dateStr = new Date(itemTime || now).toISOString().slice(0, 10);
+          if (itemTime >= todayMidnight) {
+            dateStr = `Сегодня, ${new Date(itemTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+          } else if (itemTime >= yesterdayMidnight) {
+            dateStr = `Вчера, ${new Date(itemTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+          }
+
           return {
             id: item.id,
             title: item.title,
             type: item.type,
             folder: item.folder,
-            tags: item.tags,
+            date: dateStr,
+            tags: item.tags || [],
+            ...(item.type === 'task' ? { status: item.status, priority: item.priority || 'medium', dueDate: item.dueDate } : {}),
             snippet: snippet || '(пусто)',
           };
         });
@@ -596,16 +654,38 @@ export class AssistantOrchestrator {
     const canonicalTools: AssistantToolDefinition[] = [
       {
         name: 'search_notes',
-        description: 'Полнотекстовый нечеткий поиск по заметкам, таскам, статьям, а также по расшифровкам аудиозаписей (Whisper), распознанному тексту изображений (OCR) и саммари файлов.',
+        description: 'Полнотекстовый нечеткий поиск по заметкам, таскам, статьям с фильтрацией по времени, типу и папке. Возвращает список совпадений с датой создания, типом, статусом и краткой сутью.',
         parameters: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
-              description: 'Поисковый запрос. Передавай ключевые существительные или основы слов (1-3 слова). Поддерживается поиск по голосовым заметкам и изображениям. Обязательно исправляй опечатки пользователя (например: "прафилам как жить" -> "правила") и удаляй разговорный шум.',
+              description: 'Поисковый запрос (1-3 ключевых слова). Для запросов "все записи за сегодня" или "последние заметки" query можно оставить пустым или передать тему.',
+            },
+            timeframe: {
+              type: 'string',
+              enum: ['all', 'today', 'yesterday', 'week', 'month'],
+              description: 'Временной фильтр. Для запросов "последние за сегодня", "что создал сегодня" передавай "today", для "вчера" — "yesterday", для "за неделю" — "week".',
+            },
+            type: {
+              type: 'string',
+              enum: ['all', 'note', 'task', 'article'],
+              description: 'Тип записей: note (заметки), task (задачи), article (статьи), all (любые).',
+            },
+            folder: {
+              type: 'string',
+              description: 'Папка для ограничения поиска (например "Проекты/Идеи").',
+            },
+            sortBy: {
+              type: 'string',
+              enum: ['relevance', 'recent', 'oldest'],
+              description: 'Сортировка: "recent" для самых свежих/последних сначала, "relevance" по смысловой релевантности.',
+            },
+            limit: {
+              type: 'number',
+              description: 'Максимум записей в ответе (по умолчанию 5, от 1 до 15).',
             },
           },
-          required: ['query'],
         },
       },
       {
@@ -782,10 +862,12 @@ ${isInbox
    - В ЭТОМ СЛУЧАЕ КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО вызывать search_notes! Не выдумывай случайные или искаженные слова для поиска (например, «гидрецифаллизм» и т.п.).
 
 2. МНОГОШАГОВЫЙ АГЕНТНЫЙ ПОИСК (MULTI-STEP AGENTIC WORKFLOW):
-   - Ты поддерживаешь цепочки вызовов инструментов (до 4 раундов в одном диалоговом ходе).
-   - Заметки могут содержать голосовые аудиозаписи, скриншоты/фотографии и документы. Их расшифровки речи (Whisper), распознанный текст (OCR) и саммари автоматически индексируются в поиске и возвращаются в search_notes (сниппеты вида [Вложения: ...]) и в read_note.
-   - Когда пользователь спрашивает «что я говорил в голосовом про X?», «найди чек/скриншот с Y» или ищет заметки по теме — вызови search_notes по ключевым словам.
-   - НЕ вызывай read_note на общий поисковый запрос! read_note нужен ТОЛЬКО тогда, когда пользователь прямо просит прочитать, пересказать, декомпозировать или подробно разобрать содержимое конкретной записи.
+   - Заметки могут содержать голосовые аудиозаписи, скриншоты/фотографии и документы. Их расшифровки речи (Whisper), распознанный текст (OCR) и саммари автоматически индексируются в поиске и возвращаются в search_notes.
+   - ПОЛНОЦЕННЫЙ ПОИСК (search_notes):
+     * При запросах «последние», «свежие», «за сегодня», «за вчера» ОБЯЗАТЕЛЬНО передавай параметры timeframe: "today" | "yesterday" | "week" и sortBy: "recent"!
+     * Если пользователь ищет конкретный тип (например «найди задачи про X» или «статьи по Y») — передавай type: "task" или type: "article".
+     * Не вызывай read_note ради даты создания! search_notes УЖЕ возвращает точную дату (поле date) и краткую суть для каждой записи.
+     * НЕ вызывай read_note на общий поисковый запрос! read_note нужен ТОЛЬКО тогда, когда пользователь прямо просит прочитать, декомпозировать или подробно разобрать конкретный документ.
    - НОРМАЛИЗАЦИЯ ЗАПРОСОВ: При вызове search_notes очищай запрос от стоп-слов («поищи», «как», «вообще», «что») и исправляй опечатки пользователя (например, «прафилам как жить вообще» -> search_notes("правила")). Не копируй опечатки и шум буквально.
    - ФОРМАТ ВЫДАЧИ ПОИСКА (ТОЛЬКО КРАТКАЯ СУТЬ В ОДНО ПРЕДЛОЖЕНИЕ):
      * КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО вываливать внутренние пункты, списки или подробный текст из найденных заметок, если пользователь прямо не просил раскрыть детали!

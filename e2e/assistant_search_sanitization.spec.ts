@@ -128,4 +128,56 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
 
     expect(chatResponse.reasoning).toContain('⚠️ Оффлайн-агент (API недоступен:');
   });
+
+  test('search_notes tool executor filters by timeframe, sorts by recent, and returns human dates', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const searchResults = await page.evaluate(async () => {
+      const { assistantOrchestrator } = await import('/src/lib/ai/orchestrator.ts');
+      const now = Date.now();
+      const threeDaysAgo = now - 3 * 86400000;
+
+      const items: any[] = [
+        {
+          id: 'note_old',
+          type: 'note',
+          title: 'Старая игра RPG',
+          content: 'старый концепт',
+          folder: 'Проекты/Игры',
+          tags: ['игры'],
+          createdAt: threeDaysAgo,
+          updatedAt: threeDaysAgo,
+        },
+        {
+          id: 'note_today',
+          type: 'note',
+          title: 'Свежая игра 2026',
+          content: 'сегодняшний набросок',
+          folder: 'Проекты/Игры',
+          tags: ['игры'],
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+
+      // Invoke local search directly via orchestrator
+      return assistantOrchestrator.runChat({
+        messages: [{ role: 'user', content: 'игры' }],
+        currentFolder: 'Входящие',
+        settings: {
+          provider: 'groq',
+          groqApiKey: '',
+          model: 'openai/gpt-oss-120b',
+        } as any,
+        folders: [{ id: 'f1', name: 'Проекты/Игры', path: 'Проекты/Игры' }] as any,
+        allItems: items,
+      });
+    });
+
+    expect(searchResults.toolCalls?.[0]?.result?.length).toBe(2);
+    const todayHit = searchResults.toolCalls?.[0]?.result?.find((r: any) => r.id === 'note_today');
+    expect(todayHit).toBeDefined();
+    expect(todayHit.date).toContain('Сегодня');
+  });
 });

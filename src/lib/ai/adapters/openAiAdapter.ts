@@ -167,6 +167,13 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
     let reasoning = msg.reasoning_content || '';
     let content = msg.content || '';
 
+    if (content.includes('DSML') || content.includes('invoke')) {
+      content = content
+        .replace(/<[|｜\s]*DSML[\s\S]*?(?:<\/?[|｜\s]*DSML.*?>|$)/gi, '')
+        .replace(/<[|｜\s]*invoke[\s\S]*?(?:<\/?[|｜\s]*invoke.*?>|$)/gi, '')
+        .trim();
+    }
+
     if (content.includes('<think>')) {
       const match = content.match(/<think>([\s\S]*?)<\/think>/);
       if (match) {

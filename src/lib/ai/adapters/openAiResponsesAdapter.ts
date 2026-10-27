@@ -176,8 +176,40 @@ export class OpenAiResponsesAdapter implements LlmProtocolAdapter {
       reasoningTokens: data.usage.output_tokens_details?.reasoning_tokens,
     } : undefined;
 
+    // Parse any leaked internal model markup (DSML / invoke tags) into real tool calls
+    if (textContent.includes('DSML') || textContent.includes('invoke')) {
+      const invokeRegex = /<[/\\|｜\s]*invoke\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/[/\\|｜\s]*invoke>/gi;
+      let match;
+      while ((match = invokeRegex.exec(textContent)) !== null) {
+        const name = match[1];
+        const body = match[2];
+        const args: Record<string, any> = {};
+        const paramRegex = /<[/\\|｜\s]*parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/[/\\|｜\s]*parameter>/gi;
+        let pMatch;
+        while ((pMatch = paramRegex.exec(body)) !== null) {
+          const pName = pMatch[1];
+          const pVal = pMatch[2].trim();
+          try {
+            args[pName] = JSON.parse(pVal);
+          } catch {
+            args[pName] = pVal;
+          }
+        }
+        toolCalls.push({
+          id: `call_dsml_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          name,
+          args,
+        });
+      }
+    }
+
+    // Clean any leaked internal model markup (DSML / invoke tags)
+    const cleanContent = textContent
+      .replace(/<[/\\|｜\s]*(?:DSML|invoke|parameter|calls)[\s\S]*?>/gi, '')
+      .trim();
+
     return {
-      content: textContent,
+      content: cleanContent,
       reasoning: reasoning || undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       usage,
