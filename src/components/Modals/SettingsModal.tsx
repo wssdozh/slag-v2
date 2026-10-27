@@ -170,123 +170,76 @@ export const SettingsModal: React.FC = () => {
     addToast('Размеры панелей сброшены', 'info');
   };
 
-  return (
-    <BaseModal
-      isOpen={isSettingsOpen}
-      onClose={() => setIsSettingsOpen(false)}
-      hideHeader
-      maxWidth="md:max-w-[720px]"
-      maxHeight="h-full md:h-[670px]"
-      contentClassName="flex flex-col h-full overflow-hidden"
-      containerClassName="rounded-none md:rounded-2xl border-0 md:border md:border-white/[0.08]"
-    >
-      {/* Top Header */}
-      <div
-        className="px-4 md:px-5 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
-        style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
-      >
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsSettingsOpen(false)}
-            className="md:hidden p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer active:scale-95"
-            title="Назад"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white hidden md:flex">
-            <Settings className="w-3.5 h-3.5" />
-          </div>
-          <h3 className="text-sm font-semibold text-white">
-            Настройки
-            <span className="md:hidden text-zinc-500 font-normal ml-2">
-              / {
-                activeTab === 'ai' ? 'ИИ & Провайдеры' :
-                activeTab === 'vault' ? 'Хранилище & Бэкап' :
-                activeTab === 'ui' ? 'Интерфейс & Панели' :
-                activeTab === 'shortcuts' ? 'Горячие клавиши' :
-                'Логи & Диагностика'
-              }
-            </span>
-          </h3>
-        </div>
+  const settingsBody = (
+    <div className="flex-1 flex flex-col md:flex-row min-h-0">
+      {/* Tabs Nav: Hidden on mobile (single section subview), vertical left column on desktop */}
+      <div className="hidden md:flex md:flex-col md:w-48 border-r border-white/[0.06] bg-[#0c0c0e] p-2 gap-1 select-none shrink-0">
         <button
-          onClick={() => setIsSettingsOpen(false)}
-          className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors hidden md:block cursor-pointer"
+          type="button"
+          onClick={() => setActiveTab('ai')}
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+            activeTab === 'ai'
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
         >
-          <X className="w-4 h-4" />
+          <Sparkles className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span>ИИ & Провайдеры</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('vault')}
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+            activeTab === 'vault'
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span>Хранилище & Бэкап</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('ui')}
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+            activeTab === 'ui'
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span>Интерфейс & Панели</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('shortcuts')}
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+            activeTab === 'shortcuts'
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <Keyboard className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span>Горячие клавиши</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('logs')}
+          data-testid="settings-tab-logs"
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+            activeTab === 'logs'
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <Terminal className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span>Логи & Диагностика</span>
         </button>
       </div>
-
-        {/* Responsive Body: Tabs Navigation on Left (Desktop) or Hidden (Mobile), Tab Content */}
-        <div className="flex-1 flex flex-col md:flex-row min-h-0">
-          {/* Tabs Nav: Hidden on mobile (single section subview), vertical left column on desktop */}
-          <div className="hidden md:flex md:flex-col md:w-48 border-r border-white/[0.06] bg-[#0c0c0e] p-2 gap-1 select-none shrink-0">
-            <button
-              type="button"
-              onClick={() => setActiveTab('ai')}
-              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
-                activeTab === 'ai'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span>ИИ & Провайдеры</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('vault')}
-              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
-                activeTab === 'vault'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span>Хранилище & Бэкап</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('ui')}
-              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
-                activeTab === 'ui'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-              }`}
-            >
-              <Sliders className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span>Интерфейс & Панели</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('shortcuts')}
-              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
-                activeTab === 'shortcuts'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-              }`}
-            >
-              <Keyboard className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span>Горячие клавиши</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('logs')}
-              data-testid="settings-tab-logs"
-              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
-                activeTab === 'logs'
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
-              }`}
-            >
-              <Terminal className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span>Логи & Диагностика</span>
-            </button>
-          </div>
 
           {/* Right Tab Content */}
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-[#141416]">
@@ -863,18 +816,21 @@ export const SettingsModal: React.FC = () => {
             </div>
 
             {/* Bottom Form Actions */}
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0">
+            <div
+              className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0"
+              style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
+            >
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(false)}
-                className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
               >
                 Закрыть
               </button>
               {activeTab !== 'logs' && (
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer"
+                  className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shadow-sm active:scale-95"
                 >
                   Сохранить
                 </button>
@@ -882,6 +838,77 @@ export const SettingsModal: React.FC = () => {
             </div>
           </form>
         </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col select-none animate-in slide-in-from-right duration-200 overflow-hidden">
+        {/* Top Header */}
+        <div
+          className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+          style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
+        >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSettingsOpen(false)}
+              className="p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer active:scale-95"
+              title="Назад"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h3 className="text-sm font-semibold text-white">
+              Настройки
+              <span className="text-zinc-500 font-normal ml-2">
+                / {
+                  activeTab === 'ai' ? 'ИИ & Провайдеры' :
+                  activeTab === 'vault' ? 'Хранилище & Бэкап' :
+                  activeTab === 'ui' ? 'Интерфейс & Панели' :
+                  activeTab === 'shortcuts' ? 'Горячие клавиши' :
+                  'Логи & Диагностика'
+                }
+              </span>
+            </h3>
+          </div>
+        </div>
+
+        {/* Form Body */}
+        {settingsBody}
+      </div>
+    );
+  }
+
+  return (
+    <BaseModal
+      isOpen={isSettingsOpen}
+      onClose={() => setIsSettingsOpen(false)}
+      hideHeader
+      maxWidth="md:max-w-[720px]"
+      maxHeight="h-full md:h-[670px]"
+      contentClassName="flex flex-col h-full overflow-hidden"
+      containerClassName="rounded-none md:rounded-2xl border-0 md:border md:border-white/[0.08]"
+    >
+      {/* Top Header */}
+      <div
+        className="px-4 md:px-5 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+        style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white hidden md:flex">
+            <Settings className="w-3.5 h-3.5" />
+          </div>
+          <h3 className="text-sm font-semibold text-white">
+            Настройки
+          </h3>
+        </div>
+        <button
+          onClick={() => setIsSettingsOpen(false)}
+          className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors hidden md:block cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {settingsBody}
     </BaseModal>
   );
 };

@@ -168,21 +168,20 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await page.locator('button', { hasText: /Готово/ }).click();
     await page.screenshot({ path: 'test-results/screenshots/audit/18_tasks_done.png' });
 
-    // Click "+ Добавить задачу" inline button
+    // Click "+ Добавить задачу" button (opens unified ComposerModal)
     const addInlineTaskBtn = page.locator('button', { hasText: 'Добавить задачу' });
     if (await addInlineTaskBtn.isVisible()) {
       await addInlineTaskBtn.click();
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(300);
+      await expect(page.locator('h3', { hasText: 'Новая задача' })).toBeVisible();
       await page.screenshot({ path: 'test-results/screenshots/audit/19_tasks_inline_add.png' });
-      // cancel inline add
-      const cancelInlineBtn = page.locator('button', { hasText: 'Отмена' });
-      if (await cancelInlineBtn.isVisible()) {
-        await cancelInlineBtn.click();
-      }
+      // Close composer modal
+      await page.locator('button[aria-label="Закрыть"]').click();
+      await page.waitForTimeout(200);
     }
 
     // Switch to Calendar View inside Tasks screen
-    const calendarToggle = page.locator('button', { hasText: 'Календарь' }).first();
+    const calendarToggle = page.locator('button[aria-label="Календарь"]').or(page.locator('button[title*="Календарь"]')).first();
     await calendarToggle.click();
     await expect(page.locator('text=ПН').first()).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/20_tasks_calendar_agenda.png' });
