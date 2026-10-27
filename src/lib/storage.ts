@@ -62,6 +62,12 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
     icon: 'Folder',
   },
   {
+    path: 'Проекты/Дизайн',
+    name: 'Дизайн',
+    description: 'Интерфейсы, типографика Inter, референсы Linear и Vercel.',
+    icon: 'Layers',
+  },
+  {
     path: 'База знаний',
     name: 'База знаний',
     description: 'Вечнозеленые заметки, статьи, документация и референсы.',
@@ -76,14 +82,7 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
 ];
 
 // Obsolete dev/manifest demo IDs that should never pollute a clean vault
-export const OBSOLETE_DEMO_IDS = new Set([
-  'demo_article_1',
-  'demo_article_2',
-  'demo_reply_1',
-  'demo_task_1',
-  'demo_task_3',
-  'demo_note_1',
-]);
+export const OBSOLETE_DEMO_IDS = new Set<string>();
 
 // ponytail: regex-санитизация под ограничения Windows/Unix без внешних slug-библиотек; срез до 60 символов
 export function getSafeNoteFilename(title?: string, fallbackId: string = 'untitled'): string {
@@ -588,9 +587,7 @@ export class StorageService {
     const raw = localStorage.getItem(this.getFoldersKey());
     if (!raw) return DEFAULT_FOLDERS;
     try {
-      let parsed: FolderMeta[] = JSON.parse(raw);
-      // Remove obsolete dev folder
-      parsed = parsed.filter(f => f.path !== 'Проекты/Дизайн');
+      const parsed: FolderMeta[] = JSON.parse(raw);
       // Ensure "Входящие" always exists
       if (!parsed.some(f => f.path === 'Входящие')) {
         parsed.unshift(DEFAULT_FOLDERS[0]);

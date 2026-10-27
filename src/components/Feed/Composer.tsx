@@ -1050,9 +1050,18 @@ export const Composer: React.FC<ComposerProps> = ({
           return;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
-          e.preventDefault();
-          insertTag(matchingAutocompleteTags[tagSelectedIndex].tag);
-          return;
+          // If the user already fully typed the exact tag, Enter sends the item while Tab confirms
+          if (
+            e.key === 'Enter' &&
+            tagQuery &&
+            matchingAutocompleteTags[tagSelectedIndex].tag.toLowerCase() === tagQuery.toLowerCase()
+          ) {
+            // Fall through to handleSend
+          } else {
+            e.preventDefault();
+            insertTag(matchingAutocompleteTags[tagSelectedIndex].tag);
+            return;
+          }
         }
       }
     }
@@ -1416,7 +1425,7 @@ export const Composer: React.FC<ComposerProps> = ({
             ? 'Записать аудио (удерживайте) / Кликните для видео'
             : 'Записать видео (удерживайте) / Кликните для аудио'
         }
-        aria-label={mobileMediaType === 'audio' ? 'Записать аудио' : 'Записать видео'}
+        aria-label={mobileMediaType === 'audio' ? 'Записать голосовую заметку' : 'Записать видео'}
       >
         {mobileMediaType === 'audio' ? (
           <Mic className="w-4 h-4 transition-transform duration-150" />
@@ -1430,7 +1439,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <BaseComposer
       value={content}
       variant={isModal ? 'flat' : 'card'}
-      minHeight={isModal ? 64 : 22}
+      minHeight={isModal ? 64 : 28}
       onChange={handleContentChange}
       onSubmit={handleSend}
       onKeyDown={handleKeyDown}
@@ -1447,10 +1456,10 @@ export const Composer: React.FC<ComposerProps> = ({
             ? 'Черновик статьи... (@ папка, # тег)'
             : 'Мысль, заметка или задача... (@ папка, # тег)'
           : itemType === 'task'
-          ? 'Задача... (@ папка, # тег, - [ ] подзадачи)'
+          ? 'Задача... (@ папка, # тег, - [ ] подзадачи, [[ ссылки)'
           : itemType === 'article'
-          ? 'Черновик статьи... (@ папка, # тег, Shift+Enter)'
-          : 'Мысль, заметка или код... (@ папка, # тег, / команды)'
+          ? 'Черновик статьи... (@ папка, # тег, Shift+Enter, [[ ссылки)'
+          : 'Мысль, заметка или код... (@ папка, # тег, / команды, [[ ссылки)'
       }
       textareaRef={textareaRef}
       hideTextarea={isRecordingAudio && !content.trim()}

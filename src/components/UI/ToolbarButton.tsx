@@ -47,7 +47,8 @@ export const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonPr
         className={`transition-all cursor-pointer flex items-center justify-center shrink-0 outline-none select-none disabled:opacity-40 disabled:cursor-not-allowed ${sizeClass} ${activeGlowClass} ${className}`}
         {...props}
       >
-        {icon || children}
+        {icon}
+        {children}
       </button>
     );
   }

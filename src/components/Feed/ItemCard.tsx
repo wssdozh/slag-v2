@@ -47,7 +47,7 @@ const formatDueDate = (rawDate?: string): string => {
   return rawDate;
 };
 
-export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
+const ItemCardComponent: React.FC<ItemCardProps> = ({ item }) => {
   const {
     items,
     filteredItems,
@@ -342,7 +342,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
   const isHighlighted = highlightedItemId === item.id;
 
   return (
-    <div className={`relative max-w-2xl w-full mx-auto ${swipeOffset ? 'overflow-hidden' : ''}`}>
+    <div className={`relative max-w-2xl w-full mx-auto feed-card-contain ${swipeOffset ? 'overflow-hidden' : ''}`}>
       {/* Background Reply Swipe Indicator */}
       {swipeOffset < 0 && (
         <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center text-blue-400">
@@ -560,14 +560,29 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
           </p>
         </div>
       ) : (
-        /* Note Variant: pure stream note, title is not rendered in feed (used for disk filename and search only) */
-        item.content ? (
-          <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
-              <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
+        /* Note Variant: pure stream note, title is rendered only if distinct and not derived from content */
+        (() => {
+          const hasDistinctTitle = Boolean(
+            item.title &&
+            !item.content.toLowerCase().startsWith(item.title.toLowerCase().trim()) &&
+            !item.title.toLowerCase().trim().startsWith(item.content.slice(0, 30).toLowerCase().trim())
+          );
+          if (!hasDistinctTitle && !item.content) return null;
+          return (
+            <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
+              {hasDistinctTitle && (
+                <h3 className="text-sm font-semibold text-zinc-200 tracking-tight">
+                  {item.title}
+                </h3>
+              )}
+              {item.content && (
+                <div className="text-xs text-zinc-300 leading-relaxed font-normal whitespace-pre-wrap [&_ol]:whitespace-normal [&_ul]:whitespace-normal">
+                  <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
+                </div>
+              )}
             </div>
-          </div>
-        ) : null
+          );
+        })()
       )}
 
       {/* Video Circle Notes (Telegram style) */}
@@ -785,3 +800,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item }) => {
     </div>
   );
 };
+
+export const ItemCard = React.memo(ItemCardComponent);
+

@@ -299,4 +299,11 @@
   min-height: 420px;
 }
 
+/* Feed card rendering & memory optimization */
+.feed-card-contain {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+
 

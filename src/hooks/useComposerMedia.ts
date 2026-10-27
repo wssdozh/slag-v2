@@ -120,9 +120,22 @@ export function useComposerMedia(options: UseComposerMediaOptions = {}) {
     pointerStartRef.current = null;
 
     if (holdTimerRef.current) {
-      // Tap detected (<220ms): toggle audio <-> video mode
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
+      if (_e.pointerType === 'mouse') {
+        // Desktop click: directly start hands-free locked recording
+        setRecordMode('locked');
+        setLockHint(null);
+        if (mobileMediaType === 'audio') {
+          setIsRecordingVideo(false);
+          setIsRecordingAudio(true);
+        } else {
+          setIsRecordingAudio(false);
+          setIsRecordingVideo(true);
+        }
+        return;
+      }
+      // Mobile tap: toggle audio <-> video mode
       setMobileMediaType((prev) => (prev === 'audio' ? 'video' : 'audio'));
       try {
         navigator.vibrate?.(10);

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useLayoutEffect } from 'react';
 import { Send } from 'lucide-react';
 
 export interface BaseComposerProps {
@@ -74,7 +74,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   propertiesSlot,
   overlaySlot,
   customControls,
-  minHeight = 22,
+  minHeight = 32,
   maxHeight = 220,
   variant = 'card',
   hideTextarea = false,
@@ -84,12 +84,12 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   const effectiveRef = textareaRef || localRef;
 
   // Динамический авто-ресайз поля ввода по содержимому
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (effectiveRef.current) {
       effectiveRef.current.style.height = 'auto';
       const targetHeight = value.trim()
         ? Math.min(effectiveRef.current.scrollHeight, maxHeight)
-        : minHeight;
+        : Math.max(minHeight, effectiveRef.current.scrollHeight);
       effectiveRef.current.style.height = `${targetHeight}px`;
     }
   }, [value, minHeight, maxHeight, effectiveRef]);
