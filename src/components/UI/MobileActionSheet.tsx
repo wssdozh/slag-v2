@@ -60,54 +60,60 @@ export const MobileActionSheet: React.FC = () => {
           </span>
         </div>
 
-        {/* Single Unified Linear-style Action List (Zero-Matryoshka) */}
-        <div className="flex flex-col rounded-xl overflow-hidden divide-y divide-white/[0.04] border border-white/[0.05] bg-[#161619]/60">
+        {/* Top 4 Quick Actions (Unified Segmented Row, No Clunky Podlozhki) */}
+        <div className="grid grid-cols-4 rounded-xl border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden bg-transparent">
           <button
             onClick={actions.handleReply}
-            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+            className="py-2.5 px-1 flex flex-col items-center justify-center gap-1.5 text-zinc-300 hover:text-white hover:bg-white/[0.05] active:bg-white/10 transition-colors cursor-pointer"
           >
             <CornerUpLeft className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="font-medium">Ответить</span>
+            <span className="text-[11px] font-medium leading-tight text-center">Ответить</span>
           </button>
 
           <button
             onClick={actions.handleOpenFocus}
-            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+            className="py-2.5 px-1 flex flex-col items-center justify-center gap-1.5 text-zinc-300 hover:text-white hover:bg-white/[0.05] active:bg-white/10 transition-colors cursor-pointer"
           >
             <Maximize2 className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="font-medium">Фокус-редактор</span>
+            <span className="text-[11px] font-medium leading-tight text-center">Фокус-редактор</span>
           </button>
 
           <button
             onClick={actions.handleTogglePin}
-            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+            className="py-2.5 px-1 flex flex-col items-center justify-center gap-1.5 text-zinc-300 hover:text-white hover:bg-white/[0.05] active:bg-white/10 transition-colors cursor-pointer"
           >
             <Pin className={`w-4 h-4 shrink-0 ${item.isPinned ? 'text-amber-400 rotate-45' : 'text-zinc-400'}`} />
-            <span className="font-medium">{item.isPinned ? 'Открепить' : 'Закрепить'}</span>
+            <span className="text-[11px] font-medium leading-tight text-center">
+              {item.isPinned ? 'Открепить' : 'Закрепить'}
+            </span>
           </button>
 
           <button
             onClick={actions.handleCopyMarkdown}
-            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+            className="py-2.5 px-1 flex flex-col items-center justify-center gap-1.5 text-zinc-300 hover:text-white hover:bg-white/[0.05] active:bg-white/10 transition-colors cursor-pointer"
           >
             <Copy className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="font-medium">Копировать текст</span>
+            <span className="text-[11px] font-medium leading-tight text-center">Копировать текст</span>
           </button>
+        </div>
 
-          <button
-            onClick={actions.handleAiDecompose}
-            className="w-full h-10 px-3.5 flex items-center justify-between text-xs text-zinc-200 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-3">
-              <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
-              <span className="font-medium">Разобрать с ИИ</span>
-            </div>
-            <span className="text-[10px] text-zinc-500 font-mono">AI</span>
-          </button>
+        {/* 5th Main Action: AI Triage Banner */}
+        <button
+          onClick={actions.handleAiDecompose}
+          className="w-full h-11 px-3.5 rounded-xl border border-white/[0.08] hover:bg-white/[0.05] active:bg-white/10 flex items-center justify-between text-xs text-zinc-200 transition-colors cursor-pointer bg-transparent"
+        >
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+            <span className="font-medium">Разобрать с ИИ</span>
+          </div>
+          <span className="text-[10px] text-zinc-500 font-mono">AI</span>
+        </button>
 
+        {/* Secondary Utilities List (Clean hairline divide, no card-in-card podlozhki) */}
+        <div className="flex flex-col rounded-xl overflow-hidden divide-y divide-white/[0.04] border border-white/[0.06] bg-transparent">
           <button
             onClick={actions.handleDuplicate}
-            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <CopyPlus className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>Дублировать</span>
@@ -115,7 +121,7 @@ export const MobileActionSheet: React.FC = () => {
 
           <button
             onClick={actions.handleCopyLink}
-            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>Копировать [[линк]]</span>
@@ -123,7 +129,7 @@ export const MobileActionSheet: React.FC = () => {
 
           <button
             onClick={actions.handleToggleArchive}
-            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <Archive className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>{item.isArchived ? 'Разархивировать' : 'В архив'}</span>
