@@ -85,6 +85,17 @@ export const OBSOLETE_DEMO_IDS = new Set([
   'demo_note_1',
 ]);
 
+// ponytail: regex-санитизация под ограничения Windows/Unix без внешних slug-библиотек; срез до 60 символов
+export function getSafeNoteFilename(title?: string, fallbackId: string = 'untitled'): string {
+  const clean = (title || '')
+    .trim()
+    .replace(/[\\/:*?"<>|\r\n\t]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const safe = clean.slice(0, 60).trim();
+  return `${safe || fallbackId}.md`;
+}
+
 // Initial demo & onboarding items
 export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
@@ -182,7 +193,7 @@ export class StorageService {
       if (loadedItems.length > 0) {
         for (const item of loadedItems) {
           if (OBSOLETE_DEMO_IDS.has(item.id)) {
-            void this.removeItemFromDisk(item.id, item.folder);
+            void this.removeItemFromDisk(item);
           }
         }
         const filteredLoaded = loadedItems.filter(i => !OBSOLETE_DEMO_IDS.has(i.id));
@@ -243,6 +254,7 @@ export class StorageService {
               : (normalized === notesBase ? 'Входящие' : normalized);
             const fallbackId = entry.name.replace(/\.md$/, '');
             const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
+            parsed.filename = entry.name;
             items.push(parsed);
           } catch (e) {
             fsLog.warn(`Failed to read note file ${subPath}:`, e);
@@ -255,7 +267,7 @@ export class StorageService {
     return items;
   }
 
-  private async flushItemToDisk(item: SlagItem, oldFolder?: string): Promise<void> {
+  private async flushItemToDisk(item: SlagItem, oldFolder?: string, oldFilename?: string): Promise<void> {
     if (!isTauri()) return;
     try {
       const notesBase = this.getVaultNotesPath();
@@ -263,35 +275,54 @@ export class StorageService {
       const targetDir = `${notesBase}/${folder}`;
       await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
 
-      if (oldFolder && oldFolder !== folder) {
-        const oldPath = `${notesBase}/${oldFolder}/${item.id}.md`;
-        if (await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
-          await remove(oldPath, { baseDir: BaseDirectory.AppData });
-        }
+      const newFilename = item.filename || getSafeNoteFilename(item.title, item.id);
+      const newPath = `${targetDir}/${newFilename}`;
+
+      const prevFolder = oldFolder || folder;
+      const prevFilename = oldFilename || newFilename;
+      const oldPath = `${notesBase}/${prevFolder}/${prevFilename}`;
+      const legacyOldPath = `${notesBase}/${prevFolder}/${item.id}.md`;
+      const legacyTargetPath = `${targetDir}/${item.id}.md`;
+
+      if (oldPath !== newPath && await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
+        await remove(oldPath, { baseDir: BaseDirectory.AppData });
+      }
+      if (legacyOldPath !== newPath && await exists(legacyOldPath, { baseDir: BaseDirectory.AppData })) {
+        await remove(legacyOldPath, { baseDir: BaseDirectory.AppData });
+      }
+      if (legacyTargetPath !== newPath && await exists(legacyTargetPath, { baseDir: BaseDirectory.AppData })) {
+        await remove(legacyTargetPath, { baseDir: BaseDirectory.AppData });
       }
 
       const content = serializeItemToMarkdown(item);
-      await writeTextFile(`${targetDir}/${item.id}.md`, content, { baseDir: BaseDirectory.AppData });
+      await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
     } catch (err) {
       fsLog.error(`Failed to flush note ${item.id} to disk:`, err);
     }
   }
 
-  private async removeItemFromDisk(id: string, folder?: string): Promise<void> {
+  private async removeItemFromDisk(item: SlagItem): Promise<void> {
     if (!isTauri()) return;
     try {
       const notesBase = this.getVaultNotesPath();
       const trashBase = this.getVaultTrashPath();
-      const targetFolder = folder || 'Входящие';
-      const path = `${notesBase}/${targetFolder}/${id}.md`;
-      if (await exists(path, { baseDir: BaseDirectory.AppData })) {
+      const targetFolder = item.folder || 'Входящие';
+      const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+      const notePath = `${notesBase}/${targetFolder}/${filename}`;
+      const legacyPath = `${notesBase}/${targetFolder}/${item.id}.md`;
+
+      const pathToRemove = (await exists(notePath, { baseDir: BaseDirectory.AppData }))
+        ? notePath
+        : ((await exists(legacyPath, { baseDir: BaseDirectory.AppData })) ? legacyPath : null);
+
+      if (pathToRemove) {
         await mkdir(trashBase, { baseDir: BaseDirectory.AppData, recursive: true });
-        const content = await readTextFile(path, { baseDir: BaseDirectory.AppData });
-        await writeTextFile(`${trashBase}/${id}.md`, content, { baseDir: BaseDirectory.AppData });
-        await remove(path, { baseDir: BaseDirectory.AppData });
+        const content = await readTextFile(pathToRemove, { baseDir: BaseDirectory.AppData });
+        await writeTextFile(`${trashBase}/${filename}`, content, { baseDir: BaseDirectory.AppData });
+        await remove(pathToRemove, { baseDir: BaseDirectory.AppData });
       }
     } catch (err) {
-      fsLog.error(`Failed to remove note ${id} from disk:`, err);
+      fsLog.error(`Failed to remove note ${item.id} from disk:`, err);
     }
   }
 
@@ -299,9 +330,13 @@ export class StorageService {
     if (!isTauri()) return;
     try {
       const trashBase = this.getVaultTrashPath();
-      const trashPath = `${trashBase}/${item.id}.md`;
+      const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+      const trashPath = `${trashBase}/${filename}`;
+      const legacyTrashPath = `${trashBase}/${item.id}.md`;
       if (await exists(trashPath, { baseDir: BaseDirectory.AppData })) {
         await remove(trashPath, { baseDir: BaseDirectory.AppData });
+      } else if (await exists(legacyTrashPath, { baseDir: BaseDirectory.AppData })) {
+        await remove(legacyTrashPath, { baseDir: BaseDirectory.AppData });
       }
       await this.flushItemToDisk(item);
     } catch (err) {
@@ -695,8 +730,10 @@ export class StorageService {
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
-    const updatedItem = {
+    const filename = getSafeNoteFilename(item.title, item.id);
+    const updatedItem: SlagItem = {
       ...item,
+      filename,
       updatedAt: Date.now(),
     };
 
@@ -719,7 +756,7 @@ export class StorageService {
     }
 
     if (isTauri()) {
-      void this.flushItemToDisk(updatedItem, oldItem?.folder);
+      void this.flushItemToDisk(updatedItem, oldItem?.folder, oldItem?.filename);
     }
 
     return updatedItem;
@@ -728,7 +765,11 @@ export class StorageService {
   public saveItems(itemsToSave: SlagItem[]): void {
     if (itemsToSave.length === 0) return;
     const items = this.getItems();
-    const saveMap = new Map(itemsToSave.map(i => [i.id, i]));
+    const oldItemsMap = new Map(items.map(i => [i.id, i]));
+    const saveMap = new Map(itemsToSave.map(i => {
+      const filename = getSafeNoteFilename(i.title, i.id);
+      return [i.id, { ...i, filename, updatedAt: Date.now() }];
+    }));
     const updated = items.map(i => saveMap.get(i.id) || i);
     for (const [id, item] of saveMap) {
       if (!items.some(i => i.id === id)) {
@@ -743,8 +784,9 @@ export class StorageService {
     }
 
     if (isTauri()) {
-      for (const it of itemsToSave) {
-        void this.flushItemToDisk(it);
+      for (const it of saveMap.values()) {
+        const old = oldItemsMap.get(it.id);
+        void this.flushItemToDisk(it, old?.folder, old?.filename);
       }
     }
   }
@@ -779,7 +821,7 @@ export class StorageService {
     fsLog.info(`Moved "${item.title || item.id}" to .trash`);
 
     if (isTauri()) {
-      void this.removeItemFromDisk(id, item.folder);
+      void this.removeItemFromDisk(item);
     }
   }
 
@@ -1050,8 +1092,7 @@ export class StorageService {
   public exportObsidianBundle(): Array<{ path: string; content: string }> {
     const items = this.getItems();
     return items.map(item => {
-      const safeTitle = (item.title || 'untitled').replace(/[\\/:*?"<>|]/g, '-').slice(0, 50);
-      const filename = `${safeTitle}.md`;
+      const filename = item.filename || getSafeNoteFilename(item.title, item.id);
       const filePath = item.folder ? `${item.folder}/${filename}` : filename;
       const content = serializeItemToMarkdown(item);
       return { path: filePath, content };

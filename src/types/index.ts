@@ -40,6 +40,7 @@ export interface SlagItem {
   title: string;
   content: string; // Markdown body
   folder: string; // Folder path, e.g. "Входящие" or "Проекты/SLAG"
+  filename?: string; // Physical file name on disk, e.g. "Купить молоко.md"
   tags: string[];
   attachments: SlagAttachment[];
   createdAt: number;

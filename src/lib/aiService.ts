@@ -22,6 +22,7 @@ export interface CategorizeResult {
   targetFolder: string;
   tags: string[];
   reason: string;
+  suggestedTitle?: string;
 }
 
 export interface TriageSuggestion extends CategorizeResult {
@@ -389,6 +390,7 @@ export async function categorizeDraft(
 1. Наиболее подходящую целевую папку (targetFolder).
 2. От 0 до ${maxTags} лучших тегов (tags).
 3. Краткую причину (reason, 5-8 слов на русском).
+4. Сформулировать ёмкий, нормализованный заголовок (suggestedTitle, 3-6 слов на русском, без спецсимволов и кавычек).
 
 СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
 [${existingTags.join(', ')}]
@@ -409,10 +411,13 @@ ${JSON.stringify(foldersContext, null, 2)}
    - Формат тегов: ${style === 'kebab-case' ? 'kebab-case без пробелов' : 'строчные буквы без знака #'}.
 3. ПРИЧИНА:
    - 5-8 слов на русском языке, объясняющих выбор.
+4. ЗАГОЛОВОК:
+   - 3-6 слов на русском, отражающих суть.
 ${settings.customTagRules ? `Пользовательские правила: ${settings.customTagRules}` : ''}
 
 Ответь СТРОГО в формате JSON:
 {
+  "suggestedTitle": "краткий заголовок",
   "targetFolder": "путь_папки",
   "tags": ["тег1", "тег2"],
   "reason": "краткая причина"
@@ -421,6 +426,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
   const userPrompt = `Текст заметки:\n${content.slice(0, 2000)}`;
 
   const parsed = await callJsonLlm<{
+    suggestedTitle?: string;
     targetFolder?: string;
     tags?: string[];
     reason?: string;
@@ -443,6 +449,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
       targetFolder,
       tags: combinedTags,
       reason: parsed.reason?.trim() || 'По смыслу заметки',
+      suggestedTitle: parsed.suggestedTitle?.trim() || undefined,
     };
     aiLog.info(`Draft categorized: -> "${finalResult.targetFolder}" [${finalResult.tags.map(t => '#' + t).join(' ')}]`);
     return finalResult;
@@ -517,6 +524,7 @@ export async function triageInboxItems(
 1. Выбрать наиболее подходящую целевую папку (targetFolder) на основе описаний папок.
 2. Подобрать от 0 до ${maxTags} точных тегов (tags). Если тема не выражена или это бытовой фрагмент — верни пустой массив []. Запрещено использовать в качестве тегов слова "заметка", "таска", "задача", "статья", "файл", "аудио", "фото".
 3. Написать краткую причину на русском языке (reason, 5-8 слов).
+4. Сформулировать ёмкий, нормализованный заголовок заметки (suggestedTitle, 3-6 слов на русском, без спецсимволов и кавычек). Если текущий заголовок уже информативен, оставь его.
 
 СПИСОК ДОСТУПНЫХ ПАПОК:
 ${JSON.stringify(foldersContext, null, 2)}
@@ -528,7 +536,8 @@ ${JSON.stringify(foldersContext, null, 2)}
 1. targetFolder должен в точности совпадать с полем path одной из папок.
 2. Теги должны отражать суть заметки (${style === 'kebab-case' ? 'kebab-case' : 'строчные буквы без #'}). Если тема не выражена — верни пустой массив tags: [].
 3. reason — 5-8 слов на русском.
-4. Верни ТОЛЬКО JSON-массив объектов: [{ "itemId": "...", "targetFolder": "...", "tags": ["..."], "reason": "..." }]`;
+4. suggestedTitle — 3-6 слов на русском, суть заметки для имени файла.
+5. Верни ТОЛЬКО JSON-массив объектов: [{ "itemId": "...", "suggestedTitle": "...", "targetFolder": "...", "tags": ["..."], "reason": "..." }]`;
 
     const userPrompt = `НЕРАЗОБРАННЫЕ ЗАМЕТКИ (ПАКЕТ):\n${JSON.stringify(itemsContext, null, 2)}`;
 
@@ -536,7 +545,7 @@ ${JSON.stringify(foldersContext, null, 2)}
 
     try {
       const parsed = await callJsonLlm<
-        Array<{ itemId: string; targetFolder: string; tags?: string[]; reason: string }>
+        Array<{ itemId: string; suggestedTitle?: string; targetFolder: string; tags?: string[]; reason: string }>
       >(systemPrompt, userPrompt, settings, 0.1);
 
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -555,6 +564,7 @@ ${JSON.stringify(foldersContext, null, 2)}
           return {
             itemId: item.id,
             itemTitle: item.title || 'Без названия',
+            suggestedTitle: match?.suggestedTitle?.trim() || item.title || 'Без названия',
             targetFolder,
             tags: mergedTags,
             reason: match?.reason || 'Распределено по смыслу',
@@ -577,6 +587,7 @@ ${JSON.stringify(foldersContext, null, 2)}
         return {
           itemId: item.id,
           itemTitle: item.title,
+          suggestedTitle: item.title,
           targetFolder: matched.folder,
           tags: mergedTags,
           reason: matched.reason,

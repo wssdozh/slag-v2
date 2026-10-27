@@ -20,7 +20,6 @@ const TriageModalDialog: React.FC = () => {
     items,
     folders,
     aiSettings,
-    moveItem,
     updateItem,
     addToast,
     isMobile,
@@ -156,23 +155,25 @@ const TriageModalDialog: React.FC = () => {
     suggestions.forEach(s => {
       if (selectedIds.has(s.itemId)) {
         const originalItem = items.find(i => i.id === s.itemId);
-        if (originalItem && s.tags && s.tags.length > 0) {
-          const mergedTags = Array.from(new Set([...originalItem.tags, ...s.tags]));
+        if (originalItem) {
+          const mergedTags = s.tags && s.tags.length > 0
+            ? Array.from(new Set([...originalItem.tags, ...s.tags]))
+            : originalItem.tags;
+          const nextTitle = s.suggestedTitle?.trim() || originalItem.title;
           updateItem({
             ...originalItem,
+            title: nextTitle,
             folder: s.targetFolder,
             tags: mergedTags,
             updatedAt: Date.now(),
           });
-        } else {
-          moveItem(s.itemId, s.targetFolder);
+          count++;
         }
-        count++;
       }
     });
 
     setIsTriageModalOpen(false);
-    addToast(`ИИ распределил ${count} заметок и обновил теги`, 'success');
+    addToast(`ИИ распределил ${count} заметок и нормализовал названия`, 'success');
   };
 
   const modalSubtitle = isAnalyzing ? (
@@ -263,9 +264,19 @@ const TriageModalDialog: React.FC = () => {
                   <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                     {/* Top line: Title & Folder Selector */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                      <span className="text-xs font-semibold text-zinc-200 truncate">
-                        {s.itemTitle}
-                      </span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs font-semibold text-zinc-200 truncate">
+                          {s.suggestedTitle || s.itemTitle}
+                        </span>
+                        {s.suggestedTitle && s.suggestedTitle !== s.itemTitle && (
+                          <span
+                            className="text-[10px] text-zinc-500 line-through truncate max-w-[140px] hidden sm:inline"
+                            title={`Исходный заголовок: ${s.itemTitle}`}
+                          >
+                            {s.itemTitle}
+                          </span>
+                        )}
+                      </div>
 
                       {/* Interactive Folder Selector */}
                       <div
