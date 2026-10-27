@@ -5,6 +5,7 @@ import { MobileTasksView } from './MobileTasksView';
 import { MobileAssistantView } from './MobileAssistantView';
 import { MobileSettingsView } from './MobileSettingsView';
 import { MobileCalendarView } from './MobileCalendarView';
+import { MobileAudioView } from './MobileAudioView';
 import { MobileFolderInfoView } from './MobileFolderInfoView';
 import { MobileFloatingDock } from './MobileFloatingDock';
 
@@ -28,6 +29,7 @@ export const MobileShell: React.FC = () => {
         {activeMobileTab === 'assistant' && <MobileAssistantView />}
         {activeMobileTab === 'settings' && <MobileSettingsView />}
         {activeMobileTab === 'calendar' && <MobileCalendarView />}
+        {activeMobileTab === 'audio' && <MobileAudioView />}
       </main>
 
       {/* Floating Linear Island Dock (Visible on root views except Assistant) */}

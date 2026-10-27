@@ -162,7 +162,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
       </div>
 
       {/* Playlist Items */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+      <div className="flex-1 overflow-y-auto px-2 py-2 pb-24 space-y-1">
         {filteredTracks.length === 0 ? (
           <div className="py-12 text-center text-xs text-zinc-500">
             {searchQuery ? 'Ничего не найдено' : 'В списке нет треков'}

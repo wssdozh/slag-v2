@@ -7,6 +7,7 @@ import {
   Sparkles,
   Settings,
   Calendar,
+  Music,
   Plus
 } from 'lucide-react';
 
@@ -22,6 +23,7 @@ const ALL_TABS: Record<MobileTabId, TabConfig> = {
   assistant: { id: 'assistant', label: 'ИИ', icon: Sparkles },
   settings: { id: 'settings', label: 'Настройки', icon: Settings },
   calendar: { id: 'calendar', label: 'Календарь', icon: Calendar },
+  audio: { id: 'audio', label: 'Плеер', icon: Music },
 };
 
 export const MobileFloatingDock: React.FC = () => {

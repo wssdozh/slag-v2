@@ -429,4 +429,39 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Capture screenshot of Assistant calendar response
     await page.screenshot({ path: 'test-results/screenshots/mobile_assistant_tomorrow.png' });
   });
+
+  test('14. Mobile Audio Player Tab & Dock Customization', async ({ page }) => {
+    const dock = page.locator('nav[aria-label="Мобильная навигация"]');
+    await expect(dock).toBeVisible();
+
+    // 1. Go to Settings tab
+    await dock.locator('button[aria-label="Настройки"]').click();
+    await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
+
+    // 2. Locate "Плеер" pill in dock customization
+    const audioPill = page.locator('button:has-text("Плеер")');
+    await expect(audioPill).toBeVisible();
+    await audioPill.click();
+
+    // 3. Verify audio player tab button appeared in dock
+    const audioDockBtn = dock.locator('button[aria-label="Плеер"]');
+    await expect(audioDockBtn).toBeVisible();
+
+    // 4. Click Audio Player dock tab
+    await audioDockBtn.click();
+
+    // Verify MobileAudioView is rendered with header "Плеер"
+    await expect(page.locator('header h1', { hasText: 'Плеер' })).toBeVisible();
+
+    // Verify player transport or placeholder is visible
+    const playerView = page.locator('text=В папке нет аудиозаписей').or(page.locator('button[aria-label="Воспроизведение"]')).first();
+    await expect(playerView).toBeVisible();
+
+    // Capture screenshot of mobile audio player
+    await page.screenshot({ path: 'test-results/screenshots/audit/31_mobile_audio_player.png' });
+
+    // 5. Test Hardware/Browser back from Audio Player returns to Folders
+    await page.goBack();
+    await expect(page.locator('header h1', { hasText: 'Заметки' })).toBeVisible();
+  });
 });

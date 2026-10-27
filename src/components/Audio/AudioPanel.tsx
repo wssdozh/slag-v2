@@ -31,7 +31,7 @@ import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;
 
 export const AudioPanel: React.FC = () => {
-  const { items, folders, currentFolder, inboxMode, scrollToItem } = useApp();
+  const { items, folders, currentFolder, inboxMode, scrollToItem, isMobile } = useApp();
 
   // Scope & Filter State
   const [scopeMode, setScopeMode] = useState<AudioScopeMode>('active');
@@ -577,7 +577,7 @@ export const AudioPanel: React.FC = () => {
       </main>
 
       {/* 7. Bottom Folder Toggle strictly at the bottom ("прям внизу внизу") */}
-      <footer className="relative z-10 w-full flex items-center justify-center py-2.5 select-none">
+      <footer className={`relative z-10 w-full flex items-center justify-center select-none ${isMobile ? 'pt-2 pb-24' : 'py-2.5'}`}>
         <div className="relative" ref={folderPickerRef}>
           <div className="group flex items-center gap-1 py-0.5 text-xs select-none transition-colors">
             {/* Pin Icon Toggle */}

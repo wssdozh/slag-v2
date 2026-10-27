@@ -53,7 +53,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
                 {icon}
               </div>
             )}
-            {title && (
+            {title && !subtitle && (
               <h1 className="text-base font-bold text-white tracking-tight truncate">
                 {title}
               </h1>
@@ -69,7 +69,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
         </div>
       ) : subtitle ? (
         <div className="flex flex-col items-center min-w-0 px-2">
-          {title && <span className="text-sm font-bold text-white truncate max-w-[160px]">{title}</span>}
+          {title && <h1 className="text-sm font-bold text-white truncate max-w-[160px]">{title}</h1>}
           <span className="text-[10px] font-mono text-zinc-500 truncate">{subtitle}</span>
         </div>
       ) : null}

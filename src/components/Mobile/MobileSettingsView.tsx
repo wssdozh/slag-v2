@@ -10,6 +10,7 @@ import {
   Folder,
   CheckSquare,
   Calendar,
+  Music,
   Settings as SettingsIcon,
   RotateCcw,
   Check,
@@ -24,6 +25,7 @@ const ALL_AVAILABLE_TABS: { id: MobileTabId; label: string; icon: React.FC<{ cla
   { id: 'assistant', label: 'ИИ', icon: Sparkles },
   { id: 'settings', label: 'Настройки', icon: SettingsIcon },
   { id: 'calendar', label: 'Календарь', icon: Calendar },
+  { id: 'audio', label: 'Плеер', icon: Music },
 ];
 
 export const MobileSettingsView: React.FC = () => {
