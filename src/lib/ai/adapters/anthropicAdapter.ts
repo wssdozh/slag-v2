@@ -3,6 +3,19 @@ import { logger } from '../../logger';
 
 const aiLog = logger.scope('AI');
 
+function extractErrorMessage(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed.error?.message) return parsed.error.message;
+    if (parsed.msg) return parsed.msg;
+    if (parsed.error && typeof parsed.error === 'string') return parsed.error;
+  } catch {
+    // not JSON
+  }
+  const clean = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return clean ? clean.slice(0, 160) : `HTTP ${status}`;
+}
+
 export class AnthropicMessagesAdapter implements LlmProtocolAdapter {
   async executeTurn(request: LlmAdapterTurnRequest): Promise<LlmAdapterTurnResponse> {
     const {
@@ -123,13 +136,16 @@ export class AnthropicMessagesAdapter implements LlmProtocolAdapter {
 
     if (!res.ok) {
       const errorBody = await res.text().catch(() => '');
-      aiLog.warn(`Anthropic Adapter HTTP ${res.status}:`, errorBody);
-      throw new Error(`Anthropic HTTP ${res.status}: ${errorBody.slice(0, 200)}`);
+      const detail = extractErrorMessage(res.status, errorBody);
+      aiLog.warn(`Anthropic Adapter HTTP ${res.status}: ${detail}`, { status: res.status, raw: errorBody.slice(0, 300) });
+      throw new Error(`Anthropic HTTP ${res.status}: ${detail}`);
     }
 
     const data = await res.json();
     if (data.error) {
-      throw new Error(data.error.message || `Anthropic Error: ${JSON.stringify(data.error)}`);
+      const msg = data.error.message || `Anthropic Error: ${JSON.stringify(data.error)}`;
+      aiLog.warn(`Anthropic API Error: ${msg}`);
+      throw new Error(msg);
     }
 
     let textContent = '';
@@ -154,10 +170,17 @@ export class AnthropicMessagesAdapter implements LlmProtocolAdapter {
       textContent = data.content;
     }
 
+    const usage = data.usage ? {
+      promptTokens: data.usage.input_tokens,
+      completionTokens: data.usage.output_tokens,
+      totalTokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0),
+    } : undefined;
+
     return {
       content: textContent,
       reasoning: reasoning || undefined,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      usage,
     };
   }
 }

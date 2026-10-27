@@ -106,4 +106,26 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
     expect(chatResponse.suggestedAction?.type).toBe('batch_update');
     expect(chatResponse.suggestedAction?.batchUpdateItems?.length).toBe(3);
   });
+
+  test('Fallback reason banner is attached to reasoning when API call fails', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const chatResponse = await page.evaluate(async () => {
+      const { assistantOrchestrator } = await import('/src/lib/ai/orchestrator.ts');
+      return assistantOrchestrator.runChat({
+        messages: [{ role: 'user', content: 'Привет' }],
+        currentFolder: 'Входящие',
+        settings: {
+          provider: 'groq',
+          groqApiKey: 'dummy_invalid_key_for_test',
+          model: 'openai/gpt-oss-120b',
+        } as any,
+        folders: [] as any,
+        allItems: [],
+      });
+    });
+
+    expect(chatResponse.reasoning).toContain('⚠️ Оффлайн-агент (API недоступен:');
+  });
 });

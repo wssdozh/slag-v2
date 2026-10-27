@@ -47,6 +47,12 @@ export interface LlmAdapterTurnResponse {
     name: string;
     args: Record<string, any>;
   }>;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    reasoningTokens?: number;
+  };
 }
 
 export interface LlmProtocolAdapter {
