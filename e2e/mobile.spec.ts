@@ -132,12 +132,14 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Verify dock customization section exists
     await expect(page.locator('text=Нижняя панель (Dock)')).toBeVisible();
-    await expect(page.locator('text=Порядок кнопок')).toBeVisible();
 
-    // Test tab reordering: shift "Папки" to the right
-    const shiftFoldersRightBtn = page.locator('button[aria-label="Сдвинуть Папки вправо"]');
-    await expect(shiftFoldersRightBtn).toBeVisible();
-    await shiftFoldersRightBtn.click();
+    // Verify active rows have checkmark and grip handle
+    const foldersActiveRow = page.locator('[data-dock-tab-index="0"]');
+    await expect(foldersActiveRow).toContainText('Папки');
+
+    // Drag-and-drop test: drag "Папки" over "Таски" (index 0 to index 1)
+    const tasksActiveRow = page.locator('[data-dock-tab-index="1"]');
+    await foldersActiveRow.dragTo(tasksActiveRow);
 
     // Verify that in the dock, "Таски" is now before "Папки"
     const dockButtons = page.locator('nav[aria-label="Мобильная навигация"] button');
@@ -452,8 +454,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await dock.locator('button[aria-label="Настройки"]').click();
     await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
 
-    // 2. Locate "Плеер" pill in dock customization
-    const audioPill = page.locator('button:has-text("Плеер")');
+    // 2. Locate "Плеер" row in dock customization
+    const audioPill = page.locator('[aria-label="Добавить Плеер"]');
     await expect(audioPill).toBeVisible();
     await audioPill.click();
 
