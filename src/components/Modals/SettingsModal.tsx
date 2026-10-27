@@ -290,7 +290,7 @@ export const SettingsModal: React.FC = () => {
 
           {/* Right Tab Content */}
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-[#141416]">
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4">
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
                   {/* Section 1: Выбор провайдера ИИ (Groq & KIE.AI) */}
@@ -525,7 +525,7 @@ export const SettingsModal: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 items-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-medium text-zinc-300">Максимум тегов на запись</label>
                         <NumberInput
