@@ -1072,8 +1072,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               value={newTagInput}
               onChange={(e) => setNewTagInput(e.target.value)}
               onKeyDown={handleAddTag}
-              placeholder="+ тег (Enter)"
-              className="bg-transparent text-xs font-mono text-white placeholder-zinc-600 w-28 px-1 outline-none"
+              placeholder="+ тег"
+              className="bg-transparent text-xs font-mono text-white placeholder-zinc-600 w-20 px-1 outline-none"
             />
           </div>
 
