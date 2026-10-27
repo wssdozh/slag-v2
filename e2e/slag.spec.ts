@@ -3453,6 +3453,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // 12. Delete "secondary" vault via trash icon in dropdown
     await vaultTrigger.click();
+    await page.screenshot({ path: 'test-results/screenshots/vault-dropdown-with-secondary.png' });
     const deleteSecondaryBtn = page.locator('.group\\/v', { hasText: 'secondary' }).locator('button[title="Удалить хранилище"]');
     await deleteSecondaryBtn.click();
     await expect(page.locator('.group\\/v', { hasText: 'secondary' })).toHaveCount(0);
@@ -3679,5 +3680,87 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     await page.keyboard.press('Escape');
     await expect(composerDialog).not.toBeVisible();
+  });
+
+  test('53. Workspace Demo Seeding and Empty State Mini-Component', async ({ page }) => {
+    // 1. Verify default vault trigger
+    const vaultTrigger = page.locator('aside button', { hasText: 'main' });
+    await expect(vaultTrigger).toBeVisible();
+
+    // 2. Open VaultModal and create new vault "demo_check"
+    await vaultTrigger.click();
+    const dropdown = page.locator('.absolute.bottom-full');
+    await expect(dropdown).toBeVisible();
+
+    const createVaultBtn = dropdown.locator('button', { hasText: 'Создать новое хранилище...' });
+    await createVaultBtn.click();
+
+    const vaultModal = page.locator('.fixed.z-50', { hasText: 'Новое хранилище' });
+    await expect(vaultModal).toBeVisible();
+
+    const nameInput = vaultModal.locator('input[placeholder*="work"]');
+    await nameInput.fill('demo_check');
+    const submitBtn = vaultModal.locator('button', { hasText: 'Создать хранилище' });
+    await submitBtn.click();
+
+    // 3. Verify newly created vault "demo_check" is active
+    const demoCheckTrigger = page.locator('aside button', { hasText: 'demo_check' });
+    await expect(demoCheckTrigger).toBeVisible();
+
+    // 4. Verify demo note exists in Входящие
+    await expect(page.locator('text=Добро пожаловать в SLAG').first()).toBeVisible();
+
+    // 5. Navigate to Проекты and verify demo task exists
+    const projectsBtn = page.locator('aside span', { hasText: 'Проекты' }).first();
+    await projectsBtn.click();
+    await expect(page.locator('text=План работы над проектом').first()).toBeVisible();
+
+    // 6. Navigate to База знаний and verify demo note exists
+    const kbBtn = page.locator('aside span', { hasText: 'База знаний' }).first();
+    await kbBtn.click();
+    await expect(page.locator('text=Горячие клавиши и разметка').first()).toBeVisible();
+
+    // 7. Clear items in localStorage for this vault to test Empty State Mini-Component
+    await page.evaluate(() => {
+      const currentVaultRaw = localStorage.getItem('slag_current_vault_v2');
+      if (currentVaultRaw) {
+        const currentVault = JSON.parse(currentVaultRaw);
+        localStorage.setItem(`slag_items_${currentVault.id}`, JSON.stringify([]));
+        window.location.reload();
+      }
+    });
+
+    // 8. Verify empty state mini-component appears
+    const emptyHeading = page.locator('text=Хранилище пустое');
+    await expect(emptyHeading).toBeVisible();
+
+    const seedButton = page.locator('button', { hasText: 'Сгенерировать демо-заметки и папки' });
+    await expect(seedButton).toBeVisible();
+
+    // Capture visual screenshot of the empty vault mini-component
+    await page.screenshot({
+      path: 'test-results/screenshots/empty-vault-demo-seeder.png',
+      fullPage: false,
+    });
+
+    // 9. Click seed button
+    await seedButton.click();
+    await expect(page.locator('text=Горячие клавиши и разметка').first()).toBeVisible();
+
+    const inboxBtn = page.locator('aside button', { hasText: 'Входящие' }).first();
+    await inboxBtn.click();
+    await expect(page.locator('text=Добро пожаловать в SLAG').first()).toBeVisible();
+
+    // 10. Switch back to "main" and delete "demo_check"
+    const currentTrigger = page.locator('aside button', { hasText: 'demo_check' });
+    await currentTrigger.click();
+    const mainOption = page.locator('.absolute.bottom-full button', { hasText: 'main' });
+    await mainOption.click();
+    await expect(page.locator('aside button', { hasText: 'main' })).toBeVisible();
+
+    await vaultTrigger.click();
+    const deleteDemoCheckBtn = page.locator('.group\\/v', { hasText: 'demo_check' }).locator('button[title="Удалить хранилище"]');
+    await deleteDemoCheckBtn.click();
+    await expect(page.locator('.group\\/v', { hasText: 'demo_check' })).toHaveCount(0);
   });
 });

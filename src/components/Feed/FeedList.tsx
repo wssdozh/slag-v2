@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState, useMemo, useSyncExternalStore } fro
 import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
 import type { SlagItem } from '../../types';
-import { Inbox, UploadCloud } from 'lucide-react';
+import { Inbox, UploadCloud, Sparkles } from 'lucide-react';
 import { EmptyState } from '../UI/EmptyState';
+import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 
@@ -18,7 +19,7 @@ function getTodayMidnight() {
 }
 
 export const FeedList: React.FC = () => {
-  const { filteredItems, openContextMenu, saveItem, updateItem, aiSettings, currentFolder, addToast } = useApp();
+  const { filteredItems, items, seedDemoData, openContextMenu, saveItem, updateItem, aiSettings, currentFolder, addToast } = useApp();
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -143,9 +144,27 @@ export const FeedList: React.FC = () => {
 
       {filteredItems.length === 0 ? (
         <EmptyState
-          icon={<Inbox className="w-5 h-5" />}
-          title="В этой папке пусто"
-          description="Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл."
+          icon={items.length === 0 ? <Sparkles className="w-5 h-5 text-amber-400" /> : <Inbox className="w-5 h-5" />}
+          title={items.length === 0 ? 'Хранилище пустое' : 'В этой папке пусто'}
+          description={
+            items.length === 0
+              ? 'Создайте первую мысль в поле ввода внизу или сгенерируйте стартовые демо-заметки и папки.'
+              : 'Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.'
+          }
+          action={
+            items.length === 0 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={seedDemoData}
+                className="gap-1.5 text-xs text-zinc-200 hover:text-white"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                Сгенерировать демо-заметки и папки
+              </Button>
+            ) : undefined
+          }
           className="flex-1"
         />
       ) : (

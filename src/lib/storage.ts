@@ -8,6 +8,7 @@ import type {
   ChatMessage,
 } from '../types';
 import { serializeItemToMarkdown, parseMarkdownToItem } from './markdownSerializer';
+import { generateDemoItems } from './demoVault';
 import { logger } from './logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -61,12 +62,6 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
     icon: 'Folder',
   },
   {
-    path: 'Проекты/Дизайн',
-    name: 'Дизайн',
-    description: 'Интерфейсы, типографика Inter, референсы Linear и Vercel.',
-    icon: 'Layers',
-  },
-  {
     path: 'База знаний',
     name: 'База знаний',
     description: 'Вечнозеленые заметки, статьи, документация и референсы.',
@@ -80,142 +75,18 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
   },
 ];
 
+// Obsolete dev/manifest demo IDs that should never pollute a clean vault
+export const OBSOLETE_DEMO_IDS = new Set([
+  'demo_article_1',
+  'demo_article_2',
+  'demo_reply_1',
+  'demo_task_1',
+  'demo_task_3',
+  'demo_note_1',
+]);
+
 // Initial demo & onboarding items
-export const DEFAULT_ITEMS: SlagItem[] = [
-  {
-    id: 'welcome_note_1',
-    type: 'note',
-    title: 'Добро пожаловать в SLAG',
-    content: 'Локальный минималистичный менеджер заметок и задач.\n\nКаждая мысль сохраняется в открытый Markdown без привязки к облаку.\n\n- [x] Открыть приложение SLAG\n- [ ] Написать первую мысль в поле ввода внизу и отправить по Enter\n- [ ] Указать умную дату: например «позвонить завтра в 15:00 p1»\n- [ ] Нажать ⌘K / Ctrl+K для глобального нечёткого поиска\n- [ ] Нажать ПКМ по любой заметке для вызова контекстных действий',
-    folder: 'Входящие',
-    tags: ['старт', 'инструкция'],
-    createdAt: Date.now() - 3600000 * 3,
-    updatedAt: Date.now() - 3600000 * 3,
-    attachments: [],
-  },
-  {
-    id: 'demo_article_1',
-    type: 'article',
-    title: 'Манифест ультра-минимализма: почему интерфейс не должен орать',
-    content: `# Манифест ультра-минимализма
-
-Большинство современных приложений для заметок перегружены визуальным шумом: яркие градиенты, громоздкие тулбары, постоянные всплывающие подсказки и рамки фокуса на каждом инпуте.
-
-### Три ключевых принципа SLAG
-
-1. **Монохромная тишина**: черный цвет и едва заметные разделители (1px \`rgba(255,255,255,0.06)\`). Никаких цветных радужных градиентов. Глаза отдыхают даже при 10 часах работы.
-2. **Формат Obsidian (.md)**: все данные хранятся в открытом виде как Markdown-файлы с YAML frontmatter. Если приложение исчезнет, ваши заметки останутся в вашей файловой системе.
-3. **Монолог в Telegram**: ввод заметки должен ощущаться как отправка сообщения самому себе в избранное. Минимум кликов — нажал Enter, и мысль зафиксирована.`,
-    folder: 'База знаний',
-    tags: ['дизайн', 'минимализм', 'манифест'],
-    createdAt: Date.now() - 86400000 * 2,
-    updatedAt: Date.now() - 86400000 * 1,
-    readingTimeMinutes: 2,
-    summary: 'Философия интерфейса в стиле Linear и Vercel: отсутствие визуального мусора и честное хранение в Markdown.',
-    attachments: [],
-  },
-  {
-    id: 'demo_reply_1',
-    type: 'note',
-    title: 'Дизайн-система и архитектура UI',
-    content: 'Сверил требования со статьёй [[Манифест ультра-минимализма: почему интерфейс не должен орать]].\n\nТеги и структура должны подбираться тихо, без визуального шума.',
-    folder: 'Проекты/Дизайн',
-    tags: ['дизайн', 'архитектура'],
-    replyToId: 'demo_task_1',
-    createdAt: Date.now() - 1200000,
-    updatedAt: Date.now() - 1200000,
-    attachments: [],
-  },
-  {
-    id: 'demo_task_1',
-    type: 'task',
-    title: 'Реализовать ИИ-тегирование заметок',
-    content: 'Нужно подключить Gemini Flash API для автоматического определения релевантных тегов.\n\nПеред генерацией новых тегов передаем список уже существующих, чтобы не плодить синонимы.\n\n- [x] Собрать словарь всех существующих тегов\n- [x] Написать промпт с Few-Shot примерами для Gemini\n- [ ] Сделать кнопку +Ai в Telegram-композере',
-    folder: 'Проекты',
-    tags: ['ai', 'gemini', 'architecture'],
-    createdAt: Date.now() - 3600000 * 5,
-    updatedAt: Date.now() - 3600000 * 2,
-    status: 'in_progress',
-    priority: 'high',
-    dueDate: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
-    subtasks: [
-      { id: 'st1', title: 'Собрать словарь всех существующих тегов', completed: true },
-      { id: 'st2', title: 'Написать промпт с Few-Shot примерами для Gemini', completed: true },
-      { id: 'st3', title: 'Сделать кнопку +Ai в Telegram-композере', completed: false },
-    ],
-    attachments: [],
-  },
-  {
-    id: 'demo_task_2',
-    type: 'task',
-    title: 'Купить хороший зеленый чай',
-    content: 'Сенча или Габа для работы по вечерам. Не забыть взять на развес.\n\n- [ ] Проверить чайную лавку у дома',
-    folder: 'Входящие',
-    tags: ['покупки', 'личное'],
-    createdAt: Date.now() - 900000,
-    updatedAt: Date.now() - 900000,
-    status: 'todo',
-    priority: 'low',
-    dueDate: new Date().toISOString().slice(0, 10),
-    reminder: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(),
-    subtasks: [
-      { id: 'st_tea1', title: 'Проверить чайную лавку у дома', completed: false }
-    ],
-    attachments: [],
-  },
-  {
-    id: 'demo_task_3',
-    type: 'task',
-    title: 'Синхронизация по архитектуре баз данных',
-    content: 'Обсудить SQLite vs Markdown хранилище в 14:00-15:30.\n\n- [x] Подготовить схему таблиц\n- [ ] Сравнить скорость поиска Orama',
-    folder: 'Проекты',
-    tags: ['architecture', 'meeting'],
-    createdAt: Date.now() - 800000,
-    updatedAt: Date.now() - 800000,
-    status: 'todo',
-    priority: 'medium',
-    dueDate: new Date().toISOString().slice(0, 10),
-    reminder: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(),
-    subtasks: [
-      { id: 'st_db1', title: 'Подготовить схему таблиц', completed: true },
-      { id: 'st_db2', title: 'Сравнить скорость поиска Orama', completed: false }
-    ],
-    attachments: [],
-  },
-  {
-    id: 'demo_article_2',
-    type: 'article',
-    title: '12 правил эффективности',
-    content: `# 12 правил эффективности
-
-Кратко: Личная заметка с правилами эффективности. #продуктивность #эффективность #делегирование #планирование #таймменеджмент #фокус #саморазвитие #приоритеты #работа #заработок #review
-
-1. Фокус на главном и отсечение лишнего.
-2. Делегирование рутинных задач.
-3. Четкое планирование повестки на день и недельный спринт.`,
-    folder: 'База знаний',
-    tags: ['продуктивность', 'эффективность', 'планирование', 'саморазвитие'],
-    createdAt: Date.now() - 3600000,
-    updatedAt: Date.now() - 3600000,
-    readingTimeMinutes: 1,
-    summary: 'Личная заметка с правилами эффективности: фокус, делегирование, планирование.',
-    attachments: [],
-  },
-  {
-    id: 'demo_task_4',
-    type: 'task',
-    title: 'Полить цветы в кабинете',
-    content: 'Еженедельный уход за растениями.',
-    folder: 'Входящие',
-    tags: ['быт'],
-    createdAt: Date.now() - 700000,
-    updatedAt: Date.now() - 700000,
-    status: 'todo',
-    priority: 'none',
-    dueDate: new Date().toISOString().slice(0, 10),
-    attachments: [],
-  },
-];
+export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
 export class StorageService {
   private currentVault: VaultMeta;
@@ -229,36 +100,104 @@ export class StorageService {
     }
   }
 
-  // ponytail: in-memory sync cache with async fs flush. ceiling: 5,000 notes. upgrade: worker-thread batch indexing if disk io throttles
-  public async initTauriFs(): Promise<boolean> {
-    if (!isTauri() || this.tauriInitialized) return false;
-    this.tauriInitialized = true;
+  // Vault disk paths for strict multi-vault isolation
+  public getVaultDir(vault: VaultMeta = this.currentVault): string {
+    const dirName = vault.id === 'default_vault' ? 'main' : vault.id;
+    return `vaults/${dirName}`;
+  }
 
-    try {
-      await mkdir('notes/Входящие', { baseDir: BaseDirectory.AppData, recursive: true });
-      await mkdir('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+  public getVaultNotesPath(vault: VaultMeta = this.currentVault): string {
+    return `${this.getVaultDir(vault)}/notes`;
+  }
 
-      const loadedItems = await this.scanNotesDir('notes');
-      if (loadedItems.length > 0) {
-        const currentItems = this.getItems();
-        const map = new Map(currentItems.map(i => [i.id, i]));
-        for (const item of loadedItems) {
-          map.set(item.id, item);
-        }
-        const merged = Array.from(map.values());
-        localStorage.setItem(this.getItemsKey(), JSON.stringify(merged));
-        fsLog.info(`Loaded ${loadedItems.length} notes from Tauri native AppData`);
-        return true;
+  public getVaultTrashPath(vault: VaultMeta = this.currentVault): string {
+    return `${this.getVaultDir(vault)}/.trash`;
+  }
+
+  public getVaultStatePath(vault: VaultMeta = this.currentVault): string {
+    return `${this.getVaultDir(vault)}/state.json`;
+  }
+
+  private async copyDirRecursive(src: string, dest: string): Promise<void> {
+    await mkdir(dest, { baseDir: BaseDirectory.AppData, recursive: true });
+    const entries = await readDir(src, { baseDir: BaseDirectory.AppData });
+    for (const entry of entries) {
+      const srcChild = `${src}/${entry.name}`;
+      const destChild = `${dest}/${entry.name}`;
+      if (entry.isDirectory) {
+        await this.copyDirRecursive(srcChild, destChild);
       } else {
-        const current = this.getItems();
+        const content = await readTextFile(srcChild, { baseDir: BaseDirectory.AppData });
+        await writeTextFile(destChild, content, { baseDir: BaseDirectory.AppData });
+      }
+    }
+  }
+
+  public async migrateLegacyNotesToVaults(): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      const legacyNotesExists = await exists('notes', { baseDir: BaseDirectory.AppData });
+      if (legacyNotesExists) {
+        fsLog.info('Migrating legacy AppData/notes to AppData/vaults/main/notes...');
+        await this.copyDirRecursive('notes', 'vaults/main/notes');
+        await remove('notes', { baseDir: BaseDirectory.AppData, recursive: true });
+        fsLog.info('Legacy AppData/notes successfully migrated to vaults/main/notes');
+      }
+
+      const legacyTrashExists = await exists('.trash', { baseDir: BaseDirectory.AppData });
+      if (legacyTrashExists) {
+        await this.copyDirRecursive('.trash', 'vaults/main/.trash');
+        await remove('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+      }
+
+      const legacyStateExists = await exists('state.json', { baseDir: BaseDirectory.AppData });
+      if (legacyStateExists) {
+        const mainStateExists = await exists('vaults/main/state.json', { baseDir: BaseDirectory.AppData });
+        if (!mainStateExists) {
+          const stateContent = await readTextFile('state.json', { baseDir: BaseDirectory.AppData });
+          await mkdir('vaults/main', { baseDir: BaseDirectory.AppData, recursive: true });
+          await writeTextFile('vaults/main/state.json', stateContent, { baseDir: BaseDirectory.AppData });
+        }
+        await remove('state.json', { baseDir: BaseDirectory.AppData });
+      }
+    } catch (err) {
+      fsLog.warn('Legacy vault migration error:', err);
+    }
+  }
+
+  public async syncCurrentVaultFs(): Promise<boolean> {
+    if (!isTauri()) return false;
+    try {
+      const notesPath = this.getVaultNotesPath();
+      const trashPath = this.getVaultTrashPath();
+      const statePath = this.getVaultStatePath();
+
+      await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
+      const folders = this.getFolders();
+      for (const f of folders) {
+        await mkdir(`${notesPath}/${f.path}`, { baseDir: BaseDirectory.AppData, recursive: true });
+      }
+
+      const loadedItems = await this.scanNotesDir(notesPath);
+      if (loadedItems.length > 0) {
+        for (const item of loadedItems) {
+          if (OBSOLETE_DEMO_IDS.has(item.id)) {
+            void this.removeItemFromDisk(item.id, item.folder);
+          }
+        }
+        const filteredLoaded = loadedItems.filter(i => !OBSOLETE_DEMO_IDS.has(i.id));
+        localStorage.setItem(this.getItemsKey(), JSON.stringify(filteredLoaded));
+        fsLog.info(`Loaded ${filteredLoaded.length} notes for vault "${this.currentVault.name}" from ${notesPath}`);
+      } else {
+        const current = this.getItems().filter(i => !OBSOLETE_DEMO_IDS.has(i.id));
         for (const item of current) {
           await this.flushItemToDisk(item);
         }
       }
 
-      const hasState = await exists('state.json', { baseDir: BaseDirectory.AppData });
+      const hasState = await exists(statePath, { baseDir: BaseDirectory.AppData });
       if (hasState) {
-        const stateStr = await readTextFile('state.json', { baseDir: BaseDirectory.AppData });
+        const stateStr = await readTextFile(statePath, { baseDir: BaseDirectory.AppData });
         try {
           const parsed = JSON.parse(stateStr);
           if (Array.isArray(parsed.folders)) {
@@ -270,10 +209,19 @@ export class StorageService {
       } else {
         await this.flushStateToDisk();
       }
+      return true;
     } catch (err) {
-      fsLog.error('Failed to initialize Tauri native storage in AppData:', err);
+      fsLog.error(`Failed to sync vault "${this.currentVault.name}" in AppData:`, err);
+      return false;
     }
-    return false;
+  }
+
+  // ponytail: in-memory sync cache with async fs flush. ceiling: 5,000 notes. upgrade: worker-thread batch indexing if disk io throttles
+  public async initTauriFs(): Promise<boolean> {
+    if (!isTauri() || this.tauriInitialized) return false;
+    this.tauriInitialized = true;
+    await this.migrateLegacyNotesToVaults();
+    return await this.syncCurrentVaultFs();
   }
 
   private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {
@@ -289,9 +237,10 @@ export class StorageService {
           try {
             const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
             const normalized = dirPath.replace(/\\/g, '/');
-            const folderPart = normalized.startsWith('notes/')
-              ? normalized.slice('notes/'.length)
-              : (normalized === 'notes' ? 'Входящие' : normalized);
+            const notesBase = this.getVaultNotesPath().replace(/\\/g, '/');
+            const folderPart = normalized.startsWith(notesBase + '/')
+              ? normalized.slice(notesBase.length + 1)
+              : (normalized === notesBase ? 'Входящие' : normalized);
             const fallbackId = entry.name.replace(/\.md$/, '');
             const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
             items.push(parsed);
@@ -309,12 +258,13 @@ export class StorageService {
   private async flushItemToDisk(item: SlagItem, oldFolder?: string): Promise<void> {
     if (!isTauri()) return;
     try {
+      const notesBase = this.getVaultNotesPath();
       const folder = item.folder || 'Входящие';
-      const targetDir = `notes/${folder}`;
+      const targetDir = `${notesBase}/${folder}`;
       await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
 
       if (oldFolder && oldFolder !== folder) {
-        const oldPath = `notes/${oldFolder}/${item.id}.md`;
+        const oldPath = `${notesBase}/${oldFolder}/${item.id}.md`;
         if (await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
           await remove(oldPath, { baseDir: BaseDirectory.AppData });
         }
@@ -330,12 +280,14 @@ export class StorageService {
   private async removeItemFromDisk(id: string, folder?: string): Promise<void> {
     if (!isTauri()) return;
     try {
+      const notesBase = this.getVaultNotesPath();
+      const trashBase = this.getVaultTrashPath();
       const targetFolder = folder || 'Входящие';
-      const path = `notes/${targetFolder}/${id}.md`;
+      const path = `${notesBase}/${targetFolder}/${id}.md`;
       if (await exists(path, { baseDir: BaseDirectory.AppData })) {
-        await mkdir('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+        await mkdir(trashBase, { baseDir: BaseDirectory.AppData, recursive: true });
         const content = await readTextFile(path, { baseDir: BaseDirectory.AppData });
-        await writeTextFile(`.trash/${id}.md`, content, { baseDir: BaseDirectory.AppData });
+        await writeTextFile(`${trashBase}/${id}.md`, content, { baseDir: BaseDirectory.AppData });
         await remove(path, { baseDir: BaseDirectory.AppData });
       }
     } catch (err) {
@@ -346,7 +298,8 @@ export class StorageService {
   private async restoreItemOnDisk(item: SlagItem): Promise<void> {
     if (!isTauri()) return;
     try {
-      const trashPath = `.trash/${item.id}.md`;
+      const trashBase = this.getVaultTrashPath();
+      const trashPath = `${trashBase}/${item.id}.md`;
       if (await exists(trashPath, { baseDir: BaseDirectory.AppData })) {
         await remove(trashPath, { baseDir: BaseDirectory.AppData });
       }
@@ -359,14 +312,15 @@ export class StorageService {
   private async flushStateToDisk(): Promise<void> {
     if (!isTauri()) return;
     try {
+      const statePath = this.getVaultStatePath();
       const state = {
         folders: this.getFolders(),
         workspace: this.getWorkspaceState(),
         updatedAt: Date.now(),
       };
-      await writeTextFile('state.json', JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+      await writeTextFile(statePath, JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
     } catch (err) {
-      fsLog.warn('Failed to flush state.json to disk:', err);
+      fsLog.warn(`Failed to flush state.json to disk:`, err);
     }
   }
 
@@ -446,27 +400,48 @@ export class StorageService {
       localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(this.currentVault));
       this.initDefaultsIfNeeded();
       fsLog.info(`Switched vault to "${this.currentVault.name}" (${this.currentVault.id})`);
+      if (isTauri()) {
+        void this.syncCurrentVaultFs();
+      }
       return this.currentVault;
     }
     return this.currentVault;
   }
 
-  public createVault(name: string, mode: 'indexeddb' | 'fsa' | 'tauri' = 'indexeddb', path?: string): VaultMeta {
+  public createVault(name: string, mode: 'indexeddb' | 'fsa' | 'tauri' = isTauri() ? 'tauri' : 'indexeddb', path?: string): VaultMeta {
+    const resolvedMode = isTauri() && mode === 'indexeddb' ? 'tauri' : mode;
     const newVault: VaultMeta = {
       id: 'vault_' + Date.now(),
       name,
-      mode,
+      mode: resolvedMode,
       path,
       isCurrent: true,
     };
     this.saveVaultMeta(newVault);
-    fsLog.info(`Created new vault "${name}" [${mode}]${path ? ` at ${path}` : ''}`);
+    fsLog.info(`Created new vault "${name}" [${resolvedMode}]${path ? ` at ${path}` : ''}`);
     return this.switchVault(newVault.id);
   }
 
+  public seedDemoData(): SlagItem[] {
+    const demoItems = generateDemoItems();
+    const existing = this.getItems();
+    const updated = [...existing, ...demoItems];
+    localStorage.setItem(this.getItemsKey(), JSON.stringify(updated));
+    if (isTauri()) {
+      for (const item of demoItems) {
+        void this.flushItemToDisk(item);
+      }
+    }
+    fsLog.info(`Seeded ${demoItems.length} demo items into vault "${this.currentVault.name}"`);
+    return updated;
+  }
+
   public deleteVault(vaultId: string): boolean {
-    if (vaultId === 'default_vault' || vaultId === this.currentVault.id) {
-      return false; // Cannot delete default or currently active vault
+    if (vaultId === 'default_vault') {
+      return false; // Cannot delete default root vault
+    }
+    if (vaultId === this.currentVault.id) {
+      this.switchVault('default_vault');
     }
     const vaults = this.getVaults().filter(v => v.id !== vaultId);
     localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
@@ -478,6 +453,14 @@ export class StorageService {
       localStorage.removeItem(`${WORKSPACE_STATE_PREFIX}${vaultId}`);
     } catch {
       // ignore
+    }
+    if (isTauri()) {
+      try {
+        const vaultDir = `vaults/${vaultId}`;
+        void remove(vaultDir, { baseDir: BaseDirectory.AppData, recursive: true });
+      } catch (err) {
+        fsLog.warn(`Failed to clean up vault directory on disk:`, err);
+      }
     }
     fsLog.info(`Deleted vault "${vaultId}"`);
     return true;
@@ -546,7 +529,22 @@ export class StorageService {
 
     const itemsKey = this.getItemsKey();
     if (!localStorage.getItem(itemsKey)) {
-      localStorage.setItem(itemsKey, JSON.stringify(DEFAULT_ITEMS));
+      const initialItems = generateDemoItems();
+      localStorage.setItem(itemsKey, JSON.stringify(initialItems));
+    } else {
+      // Auto-prune obsolete demo items from existing storage
+      try {
+        const raw = localStorage.getItem(itemsKey);
+        if (raw) {
+          const parsed: SlagItem[] = JSON.parse(raw);
+          const filtered = parsed.filter(i => !OBSOLETE_DEMO_IDS.has(i.id));
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem(itemsKey, JSON.stringify(filtered));
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -555,7 +553,9 @@ export class StorageService {
     const raw = localStorage.getItem(this.getFoldersKey());
     if (!raw) return DEFAULT_FOLDERS;
     try {
-      const parsed: FolderMeta[] = JSON.parse(raw);
+      let parsed: FolderMeta[] = JSON.parse(raw);
+      // Remove obsolete dev folder
+      parsed = parsed.filter(f => f.path !== 'Проекты/Дизайн');
       // Ensure "Входящие" always exists
       if (!parsed.some(f => f.path === 'Входящие')) {
         parsed.unshift(DEFAULT_FOLDERS[0]);
@@ -809,9 +809,10 @@ export class StorageService {
     if (isTauri()) {
       void (async () => {
         try {
-          if (await exists('.trash', { baseDir: BaseDirectory.AppData })) {
-            await remove('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
-            await mkdir('.trash', { baseDir: BaseDirectory.AppData, recursive: true });
+          const trashPath = this.getVaultTrashPath();
+          if (await exists(trashPath, { baseDir: BaseDirectory.AppData })) {
+            await remove(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
+            await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
           }
         } catch (e) {
           fsLog.warn('Failed to empty .trash on disk:', e);

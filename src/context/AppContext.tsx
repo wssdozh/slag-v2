@@ -21,6 +21,7 @@ import type {
 import { storage } from '../lib/storage';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
+import { openAppFolder } from '../lib/folderOpener';
 import { listenDesktopEvents, isDesktopApp } from '../lib/windowControls';
 import { useIsMobile } from '../hooks/useIsMobile';
 import {
@@ -158,6 +159,8 @@ interface AppContextType {
   createVault: (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string) => void;
   deleteVault: (vaultId: string) => void;
   pickVaultDirectory: () => Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null>;
+  revealVaultInExplorer: () => Promise<void>;
+  seedDemoData: () => void;
   isVaultModalOpen: boolean;
   openVaultModal: () => void;
   closeVaultModal: () => void;
@@ -1584,18 +1587,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteVault = (vaultId: string) => {
+    const wasCurrent = vault.id === vaultId;
     const success = storage.deleteVault(vaultId);
     if (success) {
+      if (wasCurrent) {
+        setVault(storage.getCurrentVault());
+        setFolders(storage.getFolders());
+        setItems(storage.getItems());
+        setCurrentFolder('Входящие');
+        setSelectedItem(null);
+      }
+      setVaults(storage.getVaults());
       refreshData();
       addToast('Хранилище удалено', 'info');
     } else {
-      addToast('Нельзя удалить активное или системное хранилище', 'error');
+      addToast('Нельзя удалить системное хранилище', 'error');
     }
   };
 
   const pickVaultDirectory = useCallback(async () => {
     return await storage.pickDirectory();
   }, []);
+
+  const revealVaultInExplorer = useCallback(async () => {
+    const target = storage.getVaultNotesPath();
+    const res = await openAppFolder(target);
+    addToast(res.message, res.success ? 'success' : 'info');
+  }, [addToast]);
+
+  const seedDemoData = useCallback(() => {
+    storage.seedDemoData();
+    refreshData();
+    addToast('Созданы стартовые демо-заметки и папки', 'success');
+  }, [refreshData, addToast]);
 
   const openCreateFolderModal = (parentPath?: string) => {
     setEditingFolder(parentPath ? { path: `${parentPath}/`, name: '', description: '', icon: 'Folder' } : null);
@@ -1743,6 +1767,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createVault,
         deleteVault,
         pickVaultDirectory,
+        revealVaultInExplorer,
+        seedDemoData,
         isVaultModalOpen,
         openVaultModal,
         closeVaultModal,
