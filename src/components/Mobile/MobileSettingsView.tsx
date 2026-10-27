@@ -160,8 +160,8 @@ export const MobileSettingsView: React.FC = () => {
               <span>Кнопки в плавающем острове:</span>
               <span className="text-[10px] font-mono text-zinc-500">выбрано {mobileDockTabs.length}/5</span>
             </div>
-            {/* 1-Row Horizontally Scrollable Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
+            {/* Wrapped Pills so all 5 options are visible without awkward clipping */}
+            <div className="flex flex-wrap items-center gap-1.5 py-0.5">
               {ALL_AVAILABLE_TABS.map(tab => {
                 const Icon = tab.icon;
                 const isSelected = mobileDockTabs.includes(tab.id);
@@ -170,16 +170,16 @@ export const MobileSettingsView: React.FC = () => {
                   <button
                     key={tab.id}
                     onClick={() => toggleDockTab(tab.id)}
-                    className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
                       isSelected
                         ? 'bg-white/10 border-white/[0.15] text-white shadow-sm'
                         : 'bg-black/30 border-white/[0.04] text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-xs font-medium">{tab.label}</span>
                     {isSelected ? (
-                      <Check className="w-3.5 h-3.5 text-zinc-200 shrink-0 ml-0.5" />
+                      <Check className="w-3 h-3 text-zinc-200 shrink-0 ml-0.5" />
                     ) : (
                       <span className="text-[10px] text-zinc-600 font-mono ml-0.5">+</span>
                     )}
