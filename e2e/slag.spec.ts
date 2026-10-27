@@ -3763,4 +3763,124 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await deleteDemoCheckBtn.click();
     await expect(page.locator('.group\\/v', { hasText: 'demo_check' })).toHaveCount(0);
   });
+
+  test('54. Migrated Obsidian Vault Structure, Subfolder Tree and Orama Search', async ({ page }) => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const appData = process.env.APPDATA || '';
+    const mainDir = path.join(appData, 'com.slag.notes', 'vaults', 'main');
+    const statePath = path.join(mainDir, 'state.json');
+    const notesBase = path.join(mainDir, 'notes');
+
+    if (fs.existsSync(statePath) && fs.existsSync(notesBase)) {
+      const rawState = fs.readFileSync(statePath, 'utf8').replace(/^\uFEFF/, '');
+      const stateContent = JSON.parse(rawState);
+      const scanFiles = (dir: string): any[] => {
+        const results: any[] = [];
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            if (entry.name !== '.trash' && entry.name !== '.attachments') {
+              results.push(...scanFiles(full));
+            }
+          } else if (entry.name.endsWith('.md')) {
+            const raw = fs.readFileSync(full, 'utf8');
+            const fallbackId = entry.name.replace(/\.md$/, '');
+            const folderPart = full.slice(notesBase.length + 1, full.lastIndexOf(path.sep)).replace(/\\/g, '/');
+            const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+            let title = fallbackId;
+            const tags: string[] = [];
+            let type = 'note';
+            let content = raw;
+            if (fmMatch) {
+              content = fmMatch[2].trim();
+              const lines = fmMatch[1].split('\n');
+              for (const l of lines) {
+                if (l.startsWith('title:')) title = l.replace(/^title:\s*"?/, '').replace(/"?\s*$/, '');
+                if (l.startsWith('type:')) type = l.replace(/^type:\s*/, '').trim();
+              }
+            }
+            results.push({
+              id: fallbackId,
+              type,
+              title,
+              content,
+              folder: folderPart || 'Входящие',
+              tags,
+              attachments: [],
+              createdAt: Date.now() - 3600000,
+              updatedAt: Date.now() - 3600000,
+            });
+          }
+        }
+        return results;
+      };
+
+      const scannedItems = scanFiles(notesBase);
+
+      await page.evaluate(({ folders, items }) => {
+        localStorage.setItem('slag_folders_default_vault', JSON.stringify(folders));
+        localStorage.setItem('slag_items_default_vault', JSON.stringify(items));
+        window.location.reload();
+      }, { folders: stateContent.folders, items: scannedItems });
+
+      await page.waitForLoadState('domcontentloaded');
+      await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+      const aside = page.locator('aside');
+      await expect(aside.locator('span', { hasText: 'Проекты' }).first()).toBeVisible();
+      await expect(aside.locator('span', { hasText: 'База знаний' }).first()).toBeVisible();
+      await expect(aside.locator('span', { hasText: 'Личное' }).first()).toBeVisible();
+
+      await aside.locator('span', { hasText: 'Проекты' }).first().click();
+      await expect(aside.locator('span', { hasText: 'Игры' }).first()).toBeVisible();
+      await expect(aside.locator('span', { hasText: 'Боты' }).first()).toBeVisible();
+
+      await aside.locator('span', { hasText: 'Игры' }).first().click();
+      await expect(page.locator('text=BlockSorting').first()).toBeVisible();
+      await expect(page.locator('text=Драматическая RPG').first()).toBeVisible();
+
+      await page.screenshot({
+        path: 'test-results/screenshots/migrated-games-folder.png',
+        fullPage: false,
+      });
+
+      await aside.locator('span', { hasText: 'База знаний' }).first().click();
+      await expect(aside.locator('span', { hasText: 'C# и Unity' }).first()).toBeVisible();
+      await aside.locator('span', { hasText: 'C# и Unity' }).first().click();
+      await expect(page.locator('text=C# / Unity / Designing Rules').first()).toBeVisible();
+
+      // Verify "Статья" badge is visible on the card
+      await expect(page.locator('.group', { hasText: 'C# / Unity / Designing Rules' }).locator('text=Статья')).toBeVisible();
+
+      // Test type filter: select "Статьи"
+      const mainPane = page.locator('main').first();
+      await mainPane.locator('button[title="Только статьи"]').click();
+      await expect(mainPane.locator('text=C# / Unity / Designing Rules').first()).toBeVisible();
+
+      await page.screenshot({
+        path: 'test-results/screenshots/migrated-articles-filter.png',
+        fullPage: false,
+      });
+
+      // Reset filter back to "Все"
+      await mainPane.locator('button[title="Все типы записей"]').click();
+
+      await page.keyboard.press('Control+k');
+      const searchModal = page.locator('.fixed.z-50');
+      const searchInput = searchModal.locator('input[placeholder*="Поиск по заметкам"]');
+      await expect(searchInput).toBeVisible();
+      await searchInput.fill('BlockSorting');
+      await expect(searchModal.locator('text=BlockSorting').first()).toBeVisible();
+
+      await page.screenshot({
+        path: 'test-results/screenshots/migrated-orama-search.png',
+        fullPage: false,
+      });
+
+      await page.keyboard.press('Escape');
+      await expect(searchModal).not.toBeVisible();
+    }
+  });
 });

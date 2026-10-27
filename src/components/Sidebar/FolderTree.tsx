@@ -31,6 +31,7 @@ export const FolderTree: React.FC = () => {
 
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({
     'Проекты': true,
+    'База знаний': true,
     'Личное': true,
   });
 
@@ -135,7 +136,12 @@ export const FolderTree: React.FC = () => {
     return (
       <div key={node.fullPath} className="flex flex-col select-none">
         <div
-          onClick={() => setCurrentFolder(node.fullPath)}
+          onClick={() => {
+            setCurrentFolder(node.fullPath);
+            if (hasChildren && !isExpanded) {
+              setExpandedPaths(prev => ({ ...prev, [node.fullPath]: true }));
+            }
+          }}
           onContextMenu={handleContextMenu}
           onDragOver={(e) => handleDragOver(e, node.fullPath)}
           onDragLeave={handleDragLeave}
