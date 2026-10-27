@@ -439,12 +439,12 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
               setPickerMonth(Number(parts[1]) - 1);
               setIsMonthPickerOpen(true);
             }}
-            className="flex items-center gap-1 py-1 px-1.5 -ml-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-left shrink-0"
+            className="flex items-center gap-1 py-1 px-1.5 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-left shrink-0"
           >
-            <span className="text-xs font-bold text-white tracking-tight">
+            <span className="text-xs font-bold text-white tracking-tight truncate max-w-[105px]">
               {currentMonthLabel}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           </button>
 
           <button
@@ -467,7 +467,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           <button
             type="button"
             onClick={() => setCalendarLayout('agenda')}
-            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
               calendarLayout === 'agenda'
                 ? 'bg-white/10 text-white shadow-xs font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -480,7 +480,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           <button
             type="button"
             onClick={() => setCalendarLayout('3day')}
-            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
               calendarLayout === '3day'
                 ? 'bg-white/10 text-white shadow-xs font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'

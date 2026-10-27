@@ -109,11 +109,11 @@ export const MobileTasksView: React.FC = () => {
   };
 
   const switcher = (
-    <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.08]">
+    <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
       <button
         type="button"
         onClick={() => setViewMode('tasks')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+        className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
           viewMode === 'tasks'
             ? 'bg-white/10 text-white shadow-sm'
             : 'text-zinc-400 hover:text-zinc-200'
@@ -124,14 +124,14 @@ export const MobileTasksView: React.FC = () => {
       <button
         type="button"
         onClick={() => setViewMode('calendar')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1 ${
+        className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1 ${
           viewMode === 'calendar'
             ? 'bg-white/10 text-white shadow-sm'
             : 'text-zinc-400 hover:text-zinc-200'
         }`}
       >
         <Calendar className="w-3 h-3" />
-        <span>Календарь</span>
+        <span className="hidden sm:inline">Календарь</span>
       </button>
     </div>
   );
@@ -161,7 +161,7 @@ export const MobileTasksView: React.FC = () => {
 
       {/* Segmented Status Tabs (Pills style matching MobileFolderInfoView) */}
       <div className="px-3 py-2 bg-[#0c0c0e]/60 border-b border-white/[0.04] shrink-0">
-        <div className="flex items-center gap-1.5 bg-[#141417]/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+        <div className="flex items-center justify-between gap-1 bg-[#141417]/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
           {COLUMNS.map(col => {
             const count = (tasksByStatus[col.id] || []).length;
             const isActive = activeStatusTab === col.id;
@@ -170,13 +170,13 @@ export const MobileTasksView: React.FC = () => {
               <button
                 key={col.id}
                 onClick={() => setActiveStatusTab(col.id)}
-                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 ${
+                className={`flex-1 min-w-0 px-2 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 ${
                   isActive
-                    ? 'bg-white/10 text-white shadow-sm'
+                    ? 'bg-white/10 text-white shadow-sm font-semibold'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <span>{col.title}</span>
+                <span className="truncate">{col.title}</span>
                 <span className={`text-[10px] font-mono shrink-0 ${isActive ? 'text-zinc-200' : 'text-zinc-500'}`}>
                   ({count})
                 </span>
