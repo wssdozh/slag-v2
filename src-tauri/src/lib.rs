@@ -58,8 +58,15 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
     let base_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let target_dir = match target.as_str() {
         "logs" => base_dir.join("logs"),
-        "notes" => base_dir.join("notes"),
-        _ => base_dir,
+        "notes" => base_dir.join("vaults").join("main").join("notes"),
+        other => {
+            let clean = other.trim_start_matches(|c| c == '/' || c == '\\');
+            if clean.is_empty() {
+                base_dir
+            } else {
+                base_dir.join(clean)
+            }
+        }
     };
     let _ = std::fs::create_dir_all(&target_dir);
 

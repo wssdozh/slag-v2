@@ -24,16 +24,18 @@ function devFolderOpenerPlugin() {
             (process.platform === 'darwin'
               ? `${process.env.HOME}/Library/Application Support`
               : `${process.env.HOME}/.config`);
-          const tauriAppData = path.join(
-            appData,
-            'com.slag.notes',
-            target === 'notes' ? 'notes' : target === 'logs' ? 'logs' : ''
-          );
+          const subPath =
+            target === 'notes'
+              ? path.join('vaults', 'main', 'notes')
+              : target === 'logs'
+              ? 'logs'
+              : target.replace(/^[/\\]+/, '');
+          const tauriAppData = path.join(appData, 'com.slag.notes', subPath);
 
           if (fs.existsSync(path.join(appData, 'com.slag.notes'))) {
             targetDir = tauriAppData;
           } else {
-            targetDir = path.resolve(process.cwd(), target === 'notes' ? 'vault' : 'logs');
+            targetDir = path.resolve(process.cwd(), target === 'notes' ? path.join('vaults', 'main', 'notes') : 'logs');
           }
 
           if (!fs.existsSync(targetDir)) {

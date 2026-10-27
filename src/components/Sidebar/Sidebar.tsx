@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
-import { openAppFolder } from '../../lib/folderOpener';
 import {
   Inbox,
   FolderPlus,
@@ -31,6 +30,7 @@ export const Sidebar: React.FC = () => {
     deleteVault,
     openVaultModal,
     pickVaultDirectory,
+    revealVaultInExplorer,
     addToast
   } = useApp();
 
@@ -75,8 +75,7 @@ export const Sidebar: React.FC = () => {
   };
 
   const handleRevealNotesInExplorer = async () => {
-    const res = await openAppFolder('notes');
-    addToast(res.message, res.success ? 'success' : 'info');
+    await revealVaultInExplorer();
     setIsVaultDropdownOpen(false);
   };
 
@@ -184,14 +183,14 @@ export const Sidebar: React.FC = () => {
                     </button>
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-200" />}
-                      {!isCurrent && v.id !== 'default_vault' && (
+                      {v.id !== 'default_vault' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteVault(v.id);
                           }}
                           title="Удалить хранилище"
-                          className="p-1 rounded text-zinc-500 hover:text-rose-400 opacity-0 group-hover/v:opacity-100 transition-opacity cursor-pointer"
+                          className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-white/[0.08] transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

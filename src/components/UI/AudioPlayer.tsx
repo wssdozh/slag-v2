@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
-import { formatBytes } from '../../lib/formatUtils';
 import { formatAudioDuration } from '../../lib/audioHelper';
+
+const formatBytes = (bytes?: number): string => {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
   <svg

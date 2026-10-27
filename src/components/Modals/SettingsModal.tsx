@@ -40,6 +40,7 @@ export const SettingsModal: React.FC = () => {
     setRightPanelWidth,
     refreshData,
     addToast,
+    revealVaultInExplorer,
     uiConfig,
     updateUiConfig,
     isMobile
@@ -144,8 +145,7 @@ export const SettingsModal: React.FC = () => {
   };
 
   const handleOpenNotesFolder = async () => {
-    const res = await openAppFolder('notes');
-    addToast(res.message, res.success ? 'success' : 'info');
+    await revealVaultInExplorer();
   };
 
   const handleOpenLogsFolder = async () => {

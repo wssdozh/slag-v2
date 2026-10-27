@@ -17,7 +17,7 @@ export interface OpenFolderResult {
  * 3. Browser fallback with informative toast notification
  */
 export async function openAppFolder(
-  target: 'logs' | 'notes' | 'appdata' = 'logs'
+  target: 'logs' | 'notes' | 'appdata' | string = 'logs'
 ): Promise<OpenFolderResult> {
   // 1. Desktop native app via Tauri invoke
   if (isTauri()) {
