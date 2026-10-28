@@ -204,4 +204,36 @@ test.describe('Composer @ Folder Selection E2E', () => {
       fullPage: false,
     });
   });
+
+  test('5. Discreet Linear Dark scrollbar verification: scrollbar-width is auto so Chromium uses custom webkit scrollbar without native buttons', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const feedContainer = page.locator('[data-testid="feed-list-container"]').first();
+    await expect(feedContainer).toBeVisible();
+
+    // Verify computed scrollbar-width is 'auto' (NOT 'thin', which breaks ::-webkit-scrollbar in Chromium)
+    const scrollbarWidth = await feedContainer.evaluate((el) => {
+      return window.getComputedStyle(el).scrollbarWidth;
+    });
+    expect(scrollbarWidth).toBe('auto');
+
+    // Scroll up to trigger scrollbar visibility and is-scrolling
+    await feedContainer.evaluate((el) => {
+      el.scrollTop = 0;
+      el.dispatchEvent(new Event('scroll'));
+    });
+
+    const isScrollingActive = await page.evaluate(() => {
+      return document.documentElement.classList.contains('is-scrolling');
+    });
+    expect(isScrollingActive).toBe(true);
+
+    // Hover over feed container
+    await feedContainer.hover();
+
+    // Screenshot feed container with custom Linear Dark scrollbar active
+    await page.screenshot({
+      path: 'test-results/screenshots/discreet-scrollbar.png',
+      fullPage: false,
+    });
+  });
 });
