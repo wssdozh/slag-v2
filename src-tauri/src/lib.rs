@@ -14,6 +14,19 @@ extern "system" {
         pv_attribute: *const std::ffi::c_void,
         cb_attribute: u32,
     ) -> i32;
+    fn SetProcessWorkingSetSize(
+        hProcess: *mut std::ffi::c_void,
+        dwMinimumWorkingSetSize: usize,
+        dwMaximumWorkingSetSize: usize,
+    ) -> i32;
+    fn GetCurrentProcess() -> *mut std::ffi::c_void;
+}
+
+#[cfg(target_os = "windows")]
+pub fn trim_working_set() {
+    unsafe {
+        let _ = SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -155,9 +168,14 @@ pub fn run() {
                     configure_window_border(&main_window.as_ref().window());
                     let win = main_window.clone();
                     main_window.on_window_event(move |event| {
-                        if let WindowEvent::CloseRequested { api, .. } = event {
-                            api.prevent_close();
-                            let _ = win.hide();
+                        match event {
+                            WindowEvent::CloseRequested { api, .. } => {
+                                api.prevent_close();
+                                let _ = win.hide();
+                                #[cfg(target_os = "windows")]
+                                trim_working_set();
+                            }
+                            _ => {}
                         }
                     });
                 }

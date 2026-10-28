@@ -23,7 +23,7 @@
         "transparent": false,
         "theme": "Dark",
         "dragDropEnabled": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,msEdgeAutofill,msEdgeShopping,msEdgeWallet --renderer-process-limit=1 --js-flags=--scavenger_max_new_space_capacity_mb=4"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,msEdgeAutofill,msEdgeShopping,msEdgeWallet,Translate,MediaRouter --disable-background-networking --disable-component-update --disable-sync --renderer-process-limit=1 --js-flags=--scavenger_max_new_space_capacity_mb=4"
       }
     ],
     "security": {

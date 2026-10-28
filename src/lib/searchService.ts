@@ -159,10 +159,10 @@ export async function initSearchIndex(items: SlagItem[]): Promise<Orama<any> | n
         id: item.id,
         type: item.type,
         title: item.title || '',
-        content: item.content || '',
+        content: (item.content || '').slice(0, 4000),
         tags: item.tags || [],
         folder: item.folder || '',
-        attachmentsText: getSearchableAttachmentText(item.attachments),
+        attachmentsText: getSearchableAttachmentText(item.attachments).slice(0, 4000),
       });
     }
 
