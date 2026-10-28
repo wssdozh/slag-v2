@@ -165,4 +165,45 @@ test.describe('Composer @ Folder Selection E2E', () => {
 
     await textarea.press('Enter');
   });
+
+  test('5. Pure file note card: sleek compact row without matryoshka or thin pill', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const composer = page.locator('main').locator('.rounded-2xl').filter({ has: page.locator('textarea') }).first();
+    await expect(composer).toBeVisible();
+
+    // Drop file directly into composer without any text
+    await composer.evaluate((el) => {
+      const dt = new DataTransfer();
+      const file = new File(['log events content'], 'slag_logs_2026-10-28-06-12-30.json', { type: 'application/json' });
+      dt.items.add(file);
+      el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    });
+
+    // Wait for attachment in composer strip
+    await expect(page.locator('text=slag_logs_2026-10-28-06-12-30.json').first()).toBeVisible({ timeout: 5000 });
+
+    // Submit with Enter (no text typed)
+    const textarea = page.locator('main textarea').first();
+    await textarea.press('Enter');
+
+    // Verify pure file card in feed
+    const fileCard = page.locator('.group').filter({ hasText: 'slag_logs_2026-10-28-06-12-30.json' }).first();
+    await expect(fileCard).toBeVisible({ timeout: 5000 });
+    await fileCard.scrollIntoViewIfNeeded();
+
+    // Verify format badge JSON exists
+    await expect(fileCard.locator('text="JSON"')).toBeVisible();
+
+    // Verify no separate nested card border or chopped pill
+    await expect(fileCard.locator('a[download]')).toBeVisible();
+
+    // Screenshot pure file card in feed
+    await page.screenshot({
+      path: 'test-results/screenshots/pure-file-card.png',
+      fullPage: false,
+    });
+  });
 });

@@ -8,7 +8,6 @@ import {
   Circle,
   Maximize2,
   MoreVertical,
-  Paperclip,
   Calendar,
   ChevronDown,
   ChevronUp,
@@ -17,7 +16,8 @@ import {
   Pin,
   Sparkles,
   Loader2,
-  Flame
+  Flame,
+  Download
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
@@ -66,6 +66,22 @@ const isGenericTitle = (title?: string): boolean => {
     t === 'черновик' ||
     t === 'без названия'
   );
+};
+
+const formatBytes = (bytes?: number): string => {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getFileExt = (name?: string): string => {
+  if (!name) return '';
+  const parts = name.split('.');
+  if (parts.length > 1) {
+    return parts.pop()?.toUpperCase() || '';
+  }
+  return '';
 };
 
 const ItemCardComponent: React.FC<ItemCardProps> = ({
@@ -211,6 +227,20 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     !item.isPinned &&
     (!item.priority || item.priority === 'none');
 
+  const isPureFile =
+    fileAttachments.length === 1 &&
+    audioAttachments.length === 0 &&
+    videoAttachments.length === 0 &&
+    imageAttachments.length === 0 &&
+    !item.content.trim() &&
+    !isTask &&
+    !isArticle &&
+    (!item.subtasks || item.subtasks.length === 0) &&
+    (!item.tags || item.tags.length === 0) &&
+    !item.replyToId &&
+    !item.isPinned &&
+    (!item.priority || item.priority === 'none');
+
   const handleImageClick = (img: SlagAttachment) => {
     if (onImageClick) {
       onImageClick(img, item);
@@ -320,7 +350,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const hasBottomMeta =
     metaElements.length > 0 || Boolean(item.tags && item.tags.length > 0);
 
-  const shouldRenderBottomBar = !isPureVoice || hasBottomMeta;
+  const shouldRenderBottomBar = (!isPureVoice && !isPureFile) || hasBottomMeta;
 
   const handleOpenArticle = () => {
     setSelectedItem(item);
@@ -394,17 +424,17 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           transition: swipeOffset ? 'none' : 'transform 150ms ease-out',
         }}
         className={`group relative flex flex-col ${
-          isPureVoice ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'
+          isPureVoice || isPureFile ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'
         } p-2.5 sm:p-3 rounded-xl transition-all cursor-default select-none ${
           isHighlighted
             ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
             : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
         }`}
       >
-        {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice bubbles */}
+        {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
         <div
           className={`absolute top-2 right-2 ${
-            isPureVoice
+            isPureVoice || isPureFile
               ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
               : 'sm:top-2.5 sm:right-2.5 flex items-center'
           } gap-1 sm:gap-0 sm:group-hover:gap-1 transition-all duration-150 z-20 pointer-events-auto`}
@@ -747,27 +777,68 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* File Attachments */}
       {fileAttachments.length > 0 && (
-        <div className="flex flex-col gap-1.5 pt-1">
-          {fileAttachments.map(file => (
-            <div key={file.id} className="flex items-center gap-2 flex-wrap">
+        <div className={`flex flex-col gap-1.5 ${isPureFile ? 'w-full' : 'pt-1 w-full'}`}>
+          {fileAttachments.map(file => {
+            const ext = getFileExt(file.name);
+            return (
               <a
+                key={file.id}
                 href={file.dataUrl}
                 download={file.name}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.06] text-xs text-zinc-300 border border-white/[0.05] transition-colors shrink-0"
+                className={
+                  isPureFile
+                    ? 'flex items-center gap-3 w-full select-none group/file cursor-pointer'
+                    : 'flex items-center gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-all group/file select-none cursor-pointer w-full'
+                }
               >
-                <Paperclip className="w-3 h-3 text-zinc-400" />
-                <span className="truncate max-w-[150px]">{file.name}</span>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  {Math.round(file.size / 1024)} KB
-                </span>
+                {/* File Icon Block */}
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex flex-col items-center justify-center shrink-0 group-hover/file:bg-blue-500/20 group-hover/file:border-blue-500/30 transition-all">
+                  <FileText className="w-4 h-4 shrink-0" />
+                  {ext && (
+                    <span className="text-[8px] font-mono font-bold tracking-tight text-blue-300 uppercase leading-none mt-0.5">
+                      {ext.slice(0, 4)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Filename & Info */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                  <span
+                    className="text-xs sm:text-[13px] font-medium text-zinc-200 group-hover/file:text-white truncate font-sans"
+                    title={file.name}
+                  >
+                    {file.name}
+                  </span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-sans truncate">
+                    <span className="font-mono text-zinc-400">{formatBytes(file.size)}</span>
+                    {file.summary && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-zinc-600 shrink-0" />
+                        <span className="truncate text-zinc-400" title={file.summary}>
+                          {file.summary}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Action: Timestamp + Download for pure file, or Download icon */}
+                <div className="flex items-center gap-2 shrink-0 ml-1">
+                  {isPureFile && (
+                    <span className="text-[11px] font-mono text-zinc-500 select-none leading-none">
+                      {formattedTime}
+                    </span>
+                  )}
+                  <div
+                    className="w-7 h-7 rounded-lg text-zinc-400 group-hover/file:text-white group-hover/file:bg-white/[0.08] flex items-center justify-center transition-all"
+                    title="Скачать файл"
+                  >
+                    <Download className="w-4 h-4" />
+                  </div>
+                </div>
               </a>
-              {file.summary && (
-                <span className="text-[11px] text-zinc-400 truncate max-w-[320px] font-sans" title={file.summary}>
-                  → {file.summary}
-                </span>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
