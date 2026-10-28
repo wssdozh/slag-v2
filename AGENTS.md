@@ -31,7 +31,7 @@
    - `npm run lint` — 0 warnings, 0 errors (`oxlint`).
    - `npm run build` — чистая сборка (`tsc -b && vite build`).
    - `npx playwright test` — 100% тестов пройдены.
-   - Изменения UI: сделать скриншот в тесте (`test-results/screenshots/`), просмотреть через `read_image`, проверить на отсутствие сползания верстки, наложений и рамок.
+   - Скриншот-верификация (UI и логика действий): снять скриншот в Playwright (`test-results/screenshots/<name>.png`), подтверждающий правильность работы измененной логики или верстки, проверить через `read_image` и **обязательно показать скриншот пользователю в ответе**: `![Результат](<test-results/screenshots/...>)`.
    - Атомарный коммит Conventional Commits на английском языке.
 
 ---

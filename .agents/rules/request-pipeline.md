@@ -36,8 +36,8 @@ paths: ["**/*"]
 1. `npm run lint` — 0 warnings, 0 errors (`oxlint`).
 2. `npm run build` — чистая сборка Vite и `tsc -b`.
 3. `npx playwright test` — 100% тестов пройдены.
-4. **Скриншот-аудит UI**:
-   - Снять скриншот: `await page.screenshot({ path: 'test-results/screenshots/<name>.png', fullPage: true })`.
-   - Просмотреть через `read_image`.
-   - Проверить: нет горизонтального скролла, нет наложений текста, иконки не сжаты (`shrink-0`), нет рамок фокуса (`ring-0`), нет чипсов на чипсе, нет изогнутых бордеров.
+4. **Скриншот-верификация (UI и логика действий)**:
+   - Снять скриншот работы фичи/действия: `await page.screenshot({ path: 'test-results/screenshots/<name>.png', fullPage: true })`.
+   - Просмотреть через `read_image`, проверить корректность работы логики и верстки.
+   - **Обязательно показать скриншот пользователю в ответе**: `![Результат](<test-results/screenshots/<name>.png>)`.
 5. Коммит Conventional Commits на английском языке.

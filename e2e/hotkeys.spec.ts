@@ -165,6 +165,7 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
   });
 
   test('10. Standalone Quick Composer Island view rendering and audit', async ({ page }) => {
+    await page.setViewportSize({ width: 660, height: 220 });
     await page.goto('/?window=quick-composer');
     await page.waitForLoadState('networkidle');
 

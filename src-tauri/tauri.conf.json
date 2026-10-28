@@ -29,8 +29,8 @@
         "label": "quick-composer",
         "title": "SLAG — Быстрая мысль",
         "url": "index.html?window=quick-composer",
-        "width": 680,
-        "height": 260,
+        "width": 660,
+        "height": 220,
         "resizable": false,
         "decorations": false,
         "transparent": true,
@@ -38,6 +38,7 @@
         "center": true,
         "visible": false,
         "skipTaskbar": true,
+        "shadow": false,
         "dragDropEnabled": false,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,msEdgeAutofill,msEdgeShopping,msEdgeWallet,Translate,MediaRouter,msEdgeHub,msEdgeSidebarV2,msEdgeVisualSearch,msEdgeCollections,msEdgeDiagnosticData --disable-background-networking --disable-component-update --disable-sync --disable-extensions --disable-speech-api --disable-print-preview --js-flags=\"--scavenger_max_new_space_capacity_mb=4 --optimize_for_size --max_old_space_size=512\""
       }

@@ -55,23 +55,12 @@ export const QuickComposerWindow: React.FC = () => {
   }, [handleClose]);
 
   return (
-    <div
-      className="w-screen h-screen bg-transparent p-2 sm:p-3 flex items-center justify-center select-none overflow-hidden"
-      onClick={(e) => {
-        // Clicking outside the card on the transparent padding dismisses
-        if (e.target === e.currentTarget) {
-          handleClose();
-        }
-      }}
-    >
-      <div
-        className="w-full max-w-[660px] bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="w-screen h-screen bg-transparent select-none overflow-hidden flex flex-col">
+      <div className="w-full h-full bg-[#121215] border border-white/[0.12] rounded-2xl flex flex-col overflow-hidden">
         {/* Island Header */}
         <div
           data-tauri-drag-region
-          className="px-4 pt-3.5 pb-2 flex items-center justify-between border-b border-white/[0.04] cursor-move select-none"
+          className="px-4 pt-3 pb-2 flex items-center justify-between border-b border-white/[0.04] cursor-move select-none shrink-0"
         >
           <div className="flex items-center gap-2 pointer-events-none">
             <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
@@ -96,7 +85,7 @@ export const QuickComposerWindow: React.FC = () => {
         </div>
 
         {/* Island Body: Full Composer capabilities */}
-        <div className="px-4 pt-2 pb-3 !overflow-visible">
+        <div className="px-4 pt-2 pb-3 !overflow-visible flex-1 flex flex-col min-h-0">
           <Composer
             key={sessionKey}
             isModal

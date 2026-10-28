@@ -106,11 +106,31 @@ pub fn set_webview_memory_level(window: &tauri::WebviewWindow, low: bool) {
 
 #[cfg(target_os = "windows")]
 fn configure_window_border(window: &tauri::Window) {
-    if window.label() == "quick-composer" {
-        return;
-    }
     if let Ok(hwnd) = window.hwnd() {
         unsafe {
+            // DWMWA_BORDER_COLOR = 34
+            // DWMWA_COLOR_NONE = 0xFFFFFFFE (disables window border entirely on Windows 11)
+            let border_color: u32 = 0xFFFFFFFE;
+            let _ = DwmSetWindowAttribute(
+                hwnd.0 as *mut std::ffi::c_void,
+                34,
+                &border_color as *const u32 as *const std::ffi::c_void,
+                std::mem::size_of::<u32>() as u32,
+            );
+
+            // For quick-composer, disable native DWM rounding/shadows so only the transparent webview shape shows
+            if window.label() == "quick-composer" {
+                // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_DONOTROUND = 1
+                let corner_pref: u32 = 1;
+                let _ = DwmSetWindowAttribute(
+                    hwnd.0 as *mut std::ffi::c_void,
+                    33,
+                    &corner_pref as *const u32 as *const std::ffi::c_void,
+                    std::mem::size_of::<u32>() as u32,
+                );
+                return;
+            }
+
             // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
             let dark_mode: i32 = 1;
             let _ = DwmSetWindowAttribute(
