@@ -1587,10 +1587,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // Reload page to reflect new item
     await page.reload();
-    await expect(page.locator('text=Тестовый войс').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Заметка с голосовым сообщением').first()).toBeVisible({ timeout: 10000 });
 
     // Verify Linear Monochrome AudioPlayer components (no redundant 1x speed button)
-    const audioCard = page.locator('.group', { hasText: 'Тестовый войс' });
+    const audioCard = page.locator('.group', { hasText: 'Заметка с голосовым сообщением' });
     await audioCard.scrollIntoViewIfNeeded();
     await expect(audioCard.locator('button[title*="Воспроизвести"]').first()).toBeVisible();
     await expect(audioCard.locator('text=31.6 KB').or(audioCard.locator('text=32.4 KB')).or(audioCard.locator('text=31.6')).or(audioCard.locator('text=KB')).first()).toBeVisible();
@@ -1972,7 +1972,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(noteBody).toHaveText('вот такая вот собачка');
 
     // Verify tag is present in bottom bar as clickable tag button
-    const bottomTag = noteCard.locator('button', { hasText: '#паста' }).first();
+    const bottomTag = noteCard.locator('[role="button"], button', { hasText: '#паста' }).first();
     await expect(bottomTag).toBeVisible();
 
     // Verify note has no duplicate cut-off <h3> header

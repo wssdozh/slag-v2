@@ -168,12 +168,16 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
 
     // Close search dialog
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    if (await searchModal.isVisible()) {
+      await page.keyboard.press('Escape');
+    }
+    await expect(searchModal).not.toBeVisible();
 
     // --- Verify Lightbox Full View with OCR side panel ---
-    const imageThumb = imageCard.locator('img').first();
-    await expect(imageThumb).toBeVisible();
-    await imageThumb.click({ force: true });
+    const imageContainer = imageCard.locator('.group\\/img').first();
+    await imageContainer.scrollIntoViewIfNeeded();
+    await expect(imageContainer).toBeVisible();
+    await imageContainer.click({ position: { x: 20, y: 20 } });
 
     // Check lightbox opened
     const textToggleBtn = page.locator('button[aria-label="Распознанный текст"]');

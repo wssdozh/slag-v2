@@ -52,6 +52,22 @@ const formatDueDate = (rawDate?: string): string => {
   return rawDate;
 };
 
+const isGenericTitle = (title?: string): boolean => {
+  if (!title) return true;
+  const t = title.trim().toLowerCase();
+  return (
+    t === 'заметка' ||
+    t === 'новая заметка' ||
+    t === 'голосовая заметка' ||
+    t === 'видео-сообщение' ||
+    t === 'видеосообщение' ||
+    t === 'изображение' ||
+    t === 'вложение' ||
+    t === 'черновик' ||
+    t === 'без названия'
+  );
+};
+
 const ItemCardComponent: React.FC<ItemCardProps> = ({
   item,
   isHighlighted = false,
@@ -573,17 +589,23 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         </div>
       ) : (
         /* Note Variant: pure stream note without title header (title is managed only in Focus Editor) */
-        <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-          {item.content ? (
-            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
-              <MarkdownRenderer content={item.content} onWikiLinkClick={scrollToItem} />
+        (() => {
+          const hasContent = Boolean(item.content && item.content.trim());
+          const hasAttachments = Boolean(item.attachments && item.attachments.length > 0);
+          const textToRender = hasContent
+            ? item.content
+            : (!hasAttachments && item.title && !isGenericTitle(item.title) ? item.title : null);
+
+          if (!textToRender) return null;
+
+          return (
+            <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
+              <div className="text-xs text-zinc-300 leading-relaxed font-normal whitespace-pre-wrap">
+                <MarkdownRenderer content={textToRender} onWikiLinkClick={scrollToItem} />
+              </div>
             </div>
-          ) : item.title ? (
-            <div className="text-xs text-zinc-300 leading-relaxed font-normal">
-              <MarkdownRenderer content={item.title} onWikiLinkClick={scrollToItem} />
-            </div>
-          ) : null}
-        </div>
+          );
+        })()
       )}
 
       {/* Video Circle Notes (Telegram style) */}
@@ -595,7 +617,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* Audio Notes Player */}
       {audioAttachments.map(att => (
-        <div key={att.id} className="pt-0.5 w-full">
+        <div key={att.id} className={isPureVoice ? 'w-full' : 'pt-0.5 w-full'}>
           <AudioPlayer
             src={att.dataUrl || ''}
             duration={att.duration}
