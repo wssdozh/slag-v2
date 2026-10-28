@@ -281,26 +281,14 @@ pub fn run() {
                     configure_window_border(&main_window.as_ref().window());
                     let win = main_window.clone();
                     main_window.on_window_event(move |event| {
-                        match event {
-                            WindowEvent::CloseRequested { api, .. } => {
-                                api.prevent_close();
-                                let _ = win.hide();
-                                #[cfg(target_os = "windows")]
-                                {
-                                    set_webview_memory_level(&win, true);
-                                    trim_working_set();
-                                }
+                        if let WindowEvent::CloseRequested { api, .. } = event {
+                            api.prevent_close();
+                            let _ = win.hide();
+                            #[cfg(target_os = "windows")]
+                            {
+                                set_webview_memory_level(&win, true);
+                                trim_working_set();
                             }
-                            WindowEvent::Focused(focused) => {
-                                #[cfg(target_os = "windows")]
-                                {
-                                    set_webview_memory_level(&win, !focused);
-                                    if !focused {
-                                        trim_working_set();
-                                    }
-                                }
-                            }
-                            _ => {}
                         }
                     });
                 }

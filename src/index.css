@@ -177,11 +177,7 @@
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-  }
-  *:hover,
-  .is-scrolling * {
-    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
 }
 
@@ -194,29 +190,16 @@
   background: transparent !important;
 }
 
-/* В статике ползунок полностью невидим — не мозолит глаза */
+/* Элегантный полупрозрачный капсульный ползунок без лишних repaint-пересчетов */
 ::-webkit-scrollbar-thumb {
-  background-color: transparent !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
   border-radius: 9999px !important;
   border: 1px solid transparent !important;
   background-clip: padding-box !important;
-  transition: background-color 300ms ease;
-}
-
-/* Появляется при движении курсора над скроллируемым блоком */
-*:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.16) !important;
-}
-
-/* Мгновенно появляется во время активного скролла */
-.is-scrolling *::-webkit-scrollbar-thumb,
-.is-scrolling::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.22) !important;
-  transition: background-color 100ms ease;
 }
 
 /* При наведении на сам ползунок */
-*:hover::-webkit-scrollbar-thumb:hover {
+::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.35) !important;
 }
 

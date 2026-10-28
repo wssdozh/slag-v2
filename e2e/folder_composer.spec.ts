@@ -216,16 +216,11 @@ test.describe('Composer @ Folder Selection E2E', () => {
     });
     expect(scrollbarWidth).toBe('auto');
 
-    // Scroll up to trigger scrollbar visibility and is-scrolling
+    // Scroll up to trigger scroll position
     await feedContainer.evaluate((el) => {
       el.scrollTop = 0;
       el.dispatchEvent(new Event('scroll'));
     });
-
-    const isScrollingActive = await page.evaluate(() => {
-      return document.documentElement.classList.contains('is-scrolling');
-    });
-    expect(isScrollingActive).toBe(true);
 
     // Hover over feed container
     await feedContainer.hover();
