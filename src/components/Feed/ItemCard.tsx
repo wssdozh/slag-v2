@@ -77,6 +77,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   } = useApp();
 
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
+  const [isTagsExpanded, setIsTagsExpanded] = useState(false);
   const [expandedOcrIds, setExpandedOcrIds] = useState<Set<string>>(new Set());
   const [swipeOffset, setSwipeOffset] = useState(0);
 
@@ -765,19 +766,39 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 <span className="w-1 h-1 rounded-full bg-zinc-600/80 inline-block shrink-0" />
               )}
 
-              {/* Tags */}
-              {item.tags && item.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 items-center">
-                  {item.tags.map(tag => (
-                    <TagChip
-                      key={tag}
-                      tag={tag}
-                      variant="flat"
-                      onClick={() => setActiveTagFilter(tag)}
-                    />
-                  ))}
-                </div>
-              )}
+              {/* Tags with overflow folding */}
+              {item.tags && item.tags.length > 0 && (() => {
+                const maxVisible = 3;
+                const hasOverflow = item.tags.length > maxVisible;
+                const visibleTags = isTagsExpanded || !hasOverflow ? item.tags : item.tags.slice(0, maxVisible);
+                const hiddenCount = item.tags.length - maxVisible;
+
+                return (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    {visibleTags.map(tag => (
+                      <TagChip
+                        key={tag}
+                        tag={tag}
+                        variant="flat"
+                        onClick={() => setActiveTagFilter(tag)}
+                      />
+                    ))}
+                    {hasOverflow && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsTagsExpanded(prev => !prev);
+                        }}
+                        className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer px-1 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.05] select-none leading-none"
+                        title={isTagsExpanded ? 'Свернуть теги' : `Показать ещё ${hiddenCount} тегов`}
+                      >
+                        {isTagsExpanded ? 'свернуть' : `+${hiddenCount}`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div />

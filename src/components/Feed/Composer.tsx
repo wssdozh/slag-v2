@@ -1216,7 +1216,7 @@ export const Composer: React.FC<ComposerProps> = ({
         />
       )}
       {wikiQuery !== null && matchingWikiItems.length > 0 && (
-        <div className={`absolute left-0 ${isModal ? 'bottom-full mb-[96px]' : 'bottom-full mb-1'} w-72 rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto`}>
+        <div className="absolute left-0 bottom-full mb-2 w-72 max-h-52 overflow-y-auto rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
           <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
             Связать заметку [[...]]
           </div>
@@ -1274,19 +1274,19 @@ export const Composer: React.FC<ComposerProps> = ({
   const hasActiveProperties = Boolean(targetFolder) || allPreviewTags.length > 0;
 
   const propertiesSlot = hasActiveProperties ? (
-    <div className="flex items-center gap-1.5 px-1 py-1 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150 text-xs">
+    <div className="flex items-center gap-2 px-1 py-0.5 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150 text-xs">
       {/* Target Folder */}
       {targetFolder && (
         <span
-          className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.1] text-zinc-200 text-[11px] font-medium"
+          className="shrink-0 inline-flex items-center gap-1 text-zinc-400 text-[11px] font-mono select-none"
           title={`Целевая папка для сохранения: «${targetFolder}»`}
         >
-          <Folder className="w-3 h-3 text-amber-400 shrink-0" />
-          <span>{targetFolder}</span>
+          <Folder className="w-3 h-3 text-amber-400/90 shrink-0" />
+          <span>@{targetFolder}</span>
           <button
             type="button"
             onClick={() => setTargetFolder(null)}
-            className="hover:text-rose-400 transition-colors cursor-pointer"
+            className="text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer p-0.5"
             title="Сбросить целевую папку"
           >
             <X className="w-2.5 h-2.5" />
@@ -1299,7 +1299,7 @@ export const Composer: React.FC<ComposerProps> = ({
         <TagChip
           key={tag}
           tag={tag}
-          variant="pill"
+          variant="flat"
           onRemove={() => removeTag(tag)}
         />
       ))}
@@ -1444,7 +1444,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <BaseComposer
       value={content}
       variant={isModal ? 'flat' : 'card'}
-      minHeight={isModal ? 64 : 28}
+      minHeight={24}
       onChange={handleContentChange}
       onSubmit={handleSend}
       onKeyDown={handleKeyDown}

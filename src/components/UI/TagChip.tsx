@@ -51,12 +51,30 @@ export const TagChip: React.FC<TagChipProps> = ({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-[11px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer leading-none p-0 bg-transparent border-0 select-none ${className}`}
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors select-none ${className}`}
     >
-      {prefix}{cleanTag}
-    </button>
+      <span
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        className={onClick ? 'cursor-pointer hover:underline' : undefined}
+      >
+        {prefix}{cleanTag}
+      </span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer p-0.5 leading-none"
+          aria-label={`Удалить тег ${cleanTag}`}
+        >
+          <X className="w-2.5 h-2.5" />
+        </button>
+      )}
+    </span>
   );
 };

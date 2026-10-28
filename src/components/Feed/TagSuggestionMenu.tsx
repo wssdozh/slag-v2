@@ -21,7 +21,7 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
   selectedIndex,
   onSelect,
   placement = 'top',
-  isModal = false,
+  isModal: _isModal = false,
 }) => {
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -36,8 +36,6 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
   const isBottom = placement === 'bottom';
   const positionClasses = isBottom
     ? 'top-full mt-2'
-    : isModal
-    ? 'bottom-full mb-[96px]'
     : 'bottom-full mb-2';
   const animationClasses = isBottom ? 'slide-in-from-top-2' : 'slide-in-from-bottom-2';
 
@@ -57,9 +55,7 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
   return (
     <div
       ref={listRef}
-      className={`absolute left-0 right-0 ${positionClasses} w-full ${
-        isModal ? 'max-h-60' : 'max-h-72'
-      } overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none`}
+      className={`absolute left-0 right-0 ${positionClasses} w-full max-h-52 overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none`}
     >
       {/* Шапка меню тегов */}
       <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider">

@@ -74,7 +74,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   propertiesSlot,
   overlaySlot,
   customControls,
-  minHeight = 32,
+  minHeight = 24,
   maxHeight = 220,
   variant = 'card',
   hideTextarea = false,
@@ -121,8 +121,8 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       <div
         className={
           isFlat
-            ? `w-full flex flex-col gap-2.5 p-0 bg-transparent border-0 shadow-none relative ${className}`
-            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2.5 sm:p-3 flex flex-col gap-2 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
+            ? `w-full flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none relative ${className}`
+            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
         }
       >
         {/* Кнопка в правом верхнем углу (раскрытие в полноэкранный редактор) */}
@@ -134,6 +134,9 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
 
         {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
         {topSlot}
+
+        {/* Слот свойств: активные свойства задачи, теги, папка над полем ввода */}
+        {propertiesSlot}
 
         {/* Зона ввода */}
         {!hideTextarea && (
@@ -151,14 +154,11 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 topRightSlot ? 'pr-8' : 'pr-1'
               } ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } leading-relaxed ${isFlat ? 'py-1 px-0.5' : 'py-1 px-1.5'} outline-none border-none`}
+              } leading-snug ${isFlat ? 'py-0.5 px-0.5' : 'py-0.5 px-1'} outline-none border-none`}
               style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
             />
           </div>
         )}
-
-        {/* Слот свойств: активные свойства задачи, теги, папка под полем ввода */}
-        {propertiesSlot}
 
         {/* Нижняя панель действий (Toolbar) — без внутренней линии-разделителя */}
         {customControls ? (

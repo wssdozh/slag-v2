@@ -33,7 +33,7 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
       id: 'note_image_' + (now - 1000),
       type: 'note',
       title: 'Чек за спортивное питание',
-      content: 'Скан чека после покупки',
+      content: 'Чек за спортивное питание (скан чека)',
       folder: 'Входящие',
       tags: ['финансы'],
       attachments: [{
@@ -57,7 +57,7 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
       id: 'note_file_' + (now - 2000),
       type: 'note',
       title: 'Лог сбоя бэкенда',
-      content: 'Анализ ошибки сервера',
+      content: 'Лог сбоя бэкенда (анализ ошибки сервера)',
       folder: 'Входящие',
       tags: ['бэкенд', 'ошибки'],
       attachments: [{

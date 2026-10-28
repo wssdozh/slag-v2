@@ -165,7 +165,7 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
   });
 
   test('10. Standalone Quick Composer Island view rendering and audit', async ({ page }) => {
-    await page.setViewportSize({ width: 660, height: 220 });
+    await page.setViewportSize({ width: 660, height: 380 });
     await page.goto('/?window=quick-composer');
     await page.waitForLoadState('networkidle');
 
@@ -174,23 +174,36 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
     await expect(page.locator('span:has-text("Esc — закрыть")')).toBeVisible();
     await expect(page.locator('button[aria-label="Закрыть окно"]')).toBeVisible();
 
+    // Verify header does not contain duplicate folder badge
+    const headerTitleContainer = page.locator('div[data-tauri-drag-region]');
+    await expect(headerTitleContainer.locator('span:has-text("Входящие")')).toHaveCount(0);
+
     // Verify Textarea Placeholder
     const textarea = page.locator('textarea[placeholder*="Содержимое записи..."]');
     await expect(textarea).toBeVisible();
-
-    // Verify Folder Chip
-    await expect(page.locator('button:has-text("Входящие"), span:has-text("Входящие")').first()).toBeVisible();
 
     // Verify Action Controls
     await expect(page.locator('button[aria-label*="ИИ классификация"]')).toBeVisible();
     await expect(page.locator('button[aria-label="Прикрепить файл"]')).toBeVisible();
     await expect(page.locator('button[aria-label="Записать голосовую заметку"]')).toBeVisible();
 
-    // Take screenshot of Quick Composer Island
+    // Type @ sequentially to open folder suggestions menu in transparent area
+    await textarea.pressSequentially('@');
+    await page.waitForTimeout(300);
+    const suggestionMenu = page.locator('div:has-text("Целевая папка (@)"), div:has-text("не найдена")');
+    await expect(suggestionMenu.first()).toBeVisible();
+
+    // Take screenshot with command menu open above island
+    await page.screenshot({ path: 'test-results/screenshots/quick_composer_island_menu.png' });
+
+    // Clear @ to reset
+    await textarea.fill('');
+    await page.waitForTimeout(100);
     await page.screenshot({ path: 'test-results/screenshots/quick_composer_island.png' });
   });
 
   test('11. Quick Composer Island typing and Enter submission', async ({ page }) => {
+    await page.setViewportSize({ width: 660, height: 380 });
     await page.goto('/?window=quick-composer');
     await page.waitForLoadState('networkidle');
 
@@ -204,5 +217,28 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
 
     // Verify input clears after submission
     await expect(textarea).toHaveValue('');
+  });
+
+  test('12. Item card tag overflow folding (+N counter)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Find main composer and create a note with many tags
+    const composer = page.locator('textarea[placeholder*="Мысль, заметка или код"]');
+    await expect(composer).toBeVisible();
+    await composer.fill('Заметка с кучей тегов для проверки счетчика #один #два #три #четыре #пять #шесть');
+    await composer.press('Enter');
+    await page.waitForTimeout(500);
+
+    // Verify +3 counter button is visible on the created note
+    const tagCounter = page.locator('button:has-text("+3")').first();
+    await expect(tagCounter).toBeVisible();
+
+    // Take screenshot of collapsed tags in item card
+    await page.screenshot({ path: 'test-results/screenshots/item_card_compact_tags.png' });
+
+    // Click counter to expand
+    await tagCounter.click();
+    await expect(page.locator('button:has-text("свернуть")').first()).toBeVisible();
   });
 });

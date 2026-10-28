@@ -55,23 +55,25 @@ export const QuickComposerWindow: React.FC = () => {
   }, [handleClose]);
 
   return (
-    <div className="w-screen h-screen bg-transparent select-none overflow-hidden flex flex-col">
-      <div className="w-full h-full bg-[#121215] border border-white/[0.12] rounded-2xl flex flex-col overflow-hidden">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
+      className="w-screen h-screen bg-transparent select-none overflow-visible flex flex-col justify-end p-2 pb-3 cursor-default"
+    >
+      <div className="w-full bg-[#121215] border border-white/[0.12] rounded-2xl flex flex-col overflow-visible shadow-2xl relative">
         {/* Island Header */}
         <div
           data-tauri-drag-region
-          className="px-4 pt-3 pb-2 flex items-center justify-between border-b border-white/[0.04] cursor-move select-none shrink-0"
+          className="px-3.5 pt-2.5 pb-1.5 flex items-center justify-between border-b border-white/[0.04] cursor-move select-none shrink-0"
         >
           <div className="flex items-center gap-2 pointer-events-none">
             <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
             <span className="text-sm font-semibold text-zinc-100">Быстрая мысль</span>
-            <span className="text-[11px] font-mono text-zinc-400 bg-white/[0.05] border border-white/[0.06] rounded px-2 py-0.5">
-              {currentFolder || 'Входящие'}
-            </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-zinc-500 font-mono pointer-events-none">Esc — закрыть</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-[11px] text-zinc-500 font-mono pointer-events-none">Esc — закрыть</span>
             <button
               type="button"
               onClick={handleClose}
@@ -79,13 +81,13 @@ export const QuickComposerWindow: React.FC = () => {
               title="Закрыть (Esc)"
               aria-label="Закрыть окно"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
         {/* Island Body: Full Composer capabilities */}
-        <div className="px-4 pt-2 pb-3 !overflow-visible flex-1 flex flex-col min-h-0">
+        <div className="px-3 pt-1.5 pb-2 !overflow-visible flex flex-col min-h-0">
           <Composer
             key={sessionKey}
             isModal
