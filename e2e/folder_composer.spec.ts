@@ -194,11 +194,9 @@ test.describe('Composer @ Folder Selection E2E', () => {
     await expect(fileCard).toBeVisible({ timeout: 5000 });
     await fileCard.scrollIntoViewIfNeeded();
 
-    // Verify format badge JSON exists
-    await expect(fileCard.locator('text="JSON"')).toBeVisible();
-
-    // Verify no separate nested card border or chopped pill
+    // Verify pure file icon and download link exist without nested pill
     await expect(fileCard.locator('a[download]')).toBeVisible();
+    await expect(fileCard.locator('text=slag_logs_2026-10-28-06-12-30.json')).toBeVisible();
 
     // Screenshot pure file card in feed
     await page.screenshot({

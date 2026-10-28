@@ -75,15 +75,6 @@ const formatBytes = (bytes?: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const getFileExt = (name?: string): string => {
-  if (!name) return '';
-  const parts = name.split('.');
-  if (parts.length > 1) {
-    return parts.pop()?.toUpperCase() || '';
-  }
-  return '';
-};
-
 const ItemCardComponent: React.FC<ItemCardProps> = ({
   item,
   isHighlighted = false,
@@ -778,31 +769,22 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {/* File Attachments */}
       {fileAttachments.length > 0 && (
         <div className={`flex flex-col gap-1.5 ${isPureFile ? 'w-full' : 'pt-1 w-full'}`}>
-          {fileAttachments.map(file => {
-            const ext = getFileExt(file.name);
-            return (
-              <a
-                key={file.id}
-                href={file.dataUrl}
-                download={file.name}
-                className={
-                  isPureFile
-                    ? 'flex items-center gap-3 w-full select-none group/file cursor-pointer'
-                    : 'flex items-center gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-all group/file select-none cursor-pointer w-full'
-                }
-              >
-                {/* File Icon Block */}
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex flex-col items-center justify-center shrink-0 group-hover/file:bg-blue-500/20 group-hover/file:border-blue-500/30 transition-all">
-                  <FileText className="w-4 h-4 shrink-0" />
-                  {ext && (
-                    <span className="text-[8px] font-mono font-bold tracking-tight text-blue-300 uppercase leading-none mt-0.5">
-                      {ext.slice(0, 4)}
-                    </span>
-                  )}
-                </div>
+          {fileAttachments.map(file => (
+            <a
+              key={file.id}
+              href={file.dataUrl}
+              download={file.name}
+              className={
+                isPureFile
+                  ? 'flex items-center gap-2.5 sm:gap-3 w-full select-none group/file cursor-pointer'
+                  : 'flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-all group/file select-none cursor-pointer w-full'
+              }
+            >
+              {/* Pure File Icon without podlozhka */}
+              <FileText className="w-5 h-5 text-zinc-400 group-hover/file:text-zinc-200 transition-colors shrink-0" />
 
-                {/* Filename & Info */}
-                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+              {/* Filename & Info */}
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
                   <span
                     className="text-xs sm:text-[13px] font-medium text-zinc-200 group-hover/file:text-white truncate font-sans"
                     title={file.name}
@@ -837,8 +819,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   </div>
                 </div>
               </a>
-            );
-          })}
+            ))}
         </div>
       )}
 
