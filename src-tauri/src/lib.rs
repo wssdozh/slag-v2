@@ -20,13 +20,88 @@ extern "system" {
         dwMaximumWorkingSetSize: usize,
     ) -> i32;
     fn GetCurrentProcess() -> *mut std::ffi::c_void;
+    fn GetCurrentProcessId() -> u32;
+    fn CreateToolhelp32Snapshot(dwFlags: u32, th32ProcessID: u32) -> *mut std::ffi::c_void;
+    fn Process32FirstW(hSnapshot: *mut std::ffi::c_void, lppe: *mut PROCESSENTRY32W) -> i32;
+    fn Process32NextW(hSnapshot: *mut std::ffi::c_void, lppe: *mut PROCESSENTRY32W) -> i32;
+    fn OpenProcess(dwDesiredAccess: u32, bInheritHandle: i32, dwProcessId: u32) -> *mut std::ffi::c_void;
+    fn CloseHandle(hObject: *mut std::ffi::c_void) -> i32;
+}
+
+#[cfg(target_os = "windows")]
+#[repr(C)]
+struct PROCESSENTRY32W {
+    dw_size: u32,
+    cnt_usage: u32,
+    th32_process_id: u32,
+    th32_default_heap_id: usize,
+    th32_module_id: u32,
+    cnt_threads: u32,
+    th32_parent_process_id: u32,
+    pc_pri_class_base: i32,
+    dw_flags: u32,
+    sz_exe_file: [u16; 260],
 }
 
 #[cfg(target_os = "windows")]
 pub fn trim_working_set() {
     unsafe {
+        // Trim our own main process
         let _ = SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
+
+        // Enumerate and trim all child WebView2 helper processes
+        // TH32CS_SNAPPROCESS = 0x00000002
+        let snapshot = CreateToolhelp32Snapshot(0x00000002, 0);
+        let invalid_handle = -1isize as *mut std::ffi::c_void;
+        if snapshot != invalid_handle && !snapshot.is_null() {
+            let my_pid = GetCurrentProcessId();
+            let mut entry = std::mem::zeroed::<PROCESSENTRY32W>();
+            entry.dw_size = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+
+            if Process32FirstW(snapshot, &mut entry) != 0 {
+                loop {
+                    if entry.th32_parent_process_id == my_pid {
+                        // PROCESS_SET_QUOTA (0x0100) | PROCESS_QUERY_INFORMATION (0x0400)
+                        let child = OpenProcess(0x0100 | 0x0400, 0, entry.th32_process_id);
+                        if !child.is_null() {
+                            let _ = SetProcessWorkingSetSize(child, usize::MAX, usize::MAX);
+                            let _ = CloseHandle(child);
+                        }
+                    }
+                    if Process32NextW(snapshot, &mut entry) == 0 {
+                        break;
+                    }
+                }
+            }
+            let _ = CloseHandle(snapshot);
+        }
     }
+}
+
+#[cfg(target_os = "windows")]
+pub fn set_webview_memory_level(window: &tauri::WebviewWindow, low: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+        ICoreWebView2_19,
+    };
+    use windows_core::Interface;
+
+    let _ = window.with_webview(move |wv| {
+        unsafe {
+            let controller = wv.controller();
+            if let Ok(core_webview) = controller.CoreWebView2() {
+                if let Ok(webview_19) = core_webview.cast::<ICoreWebView2_19>() {
+                    let level = if low {
+                        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+                    } else {
+                        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+                    };
+                    let _ = webview_19.SetMemoryUsageTargetLevel(level);
+                }
+            }
+        }
+    });
 }
 
 #[cfg(target_os = "windows")]
@@ -125,6 +200,8 @@ pub fn run() {
                     let _ = window.show();
                     let _ = window.unminimize();
                     let _ = window.set_focus();
+                    #[cfg(target_os = "windows")]
+                    set_webview_memory_level(&window, false);
                 }
             }))
             .plugin(tauri_plugin_window_state::Builder::default().build())
@@ -136,6 +213,8 @@ pub fn run() {
                                 let _ = window.show();
                                 let _ = window.unminimize();
                                 let _ = window.set_focus();
+                                #[cfg(target_os = "windows")]
+                                set_webview_memory_level(&window, false);
                                 let _ = window.emit("slag://open-composer", ());
                             }
                         }
@@ -173,7 +252,19 @@ pub fn run() {
                                 api.prevent_close();
                                 let _ = win.hide();
                                 #[cfg(target_os = "windows")]
-                                trim_working_set();
+                                {
+                                    set_webview_memory_level(&win, true);
+                                    trim_working_set();
+                                }
+                            }
+                            WindowEvent::Focused(focused) => {
+                                #[cfg(target_os = "windows")]
+                                {
+                                    set_webview_memory_level(&win, !focused);
+                                    if !focused {
+                                        trim_working_set();
+                                    }
+                                }
                             }
                             _ => {}
                         }
@@ -217,6 +308,8 @@ pub fn run() {
                                     let _ = window.show();
                                     let _ = window.unminimize();
                                     let _ = window.set_focus();
+                                    #[cfg(target_os = "windows")]
+                                    set_webview_memory_level(&window, false);
                                 }
                             }
                             "quick_note" => {
@@ -224,6 +317,8 @@ pub fn run() {
                                     let _ = window.show();
                                     let _ = window.unminimize();
                                     let _ = window.set_focus();
+                                    #[cfg(target_os = "windows")]
+                                    set_webview_memory_level(&window, false);
                                     let _ = window.emit("slag://open-composer", ());
                                 }
                             }
@@ -243,10 +338,17 @@ pub fn run() {
                                 if let Some(window) = app.get_webview_window("main") {
                                     if window.is_visible().unwrap_or(false) {
                                         let _ = window.hide();
+                                        #[cfg(target_os = "windows")]
+                                        {
+                                            set_webview_memory_level(&window, true);
+                                            trim_working_set();
+                                        }
                                     } else {
                                         let _ = window.show();
                                         let _ = window.unminimize();
                                         let _ = window.set_focus();
+                                        #[cfg(target_os = "windows")]
+                                        set_webview_memory_level(&window, false);
                                     }
                                 }
                             }
