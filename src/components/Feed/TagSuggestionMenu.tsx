@@ -56,11 +56,10 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
 
   return (
     <div
-      ref={listRef}
-      className={`absolute left-0 right-0 ${positionClasses} w-full max-h-52 overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none`}
+      className={`absolute left-0 right-0 ${positionClasses} w-full rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none overflow-hidden`}
     >
-      {/* Шапка меню тегов */}
-      <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider">
+      {/* Шапка меню тегов — фиксированная */}
+      <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider shrink-0">
         <div className="flex items-center gap-1.5 text-zinc-300 uppercase">
           <Hash className="w-3 h-3 text-zinc-400" />
           <span>Теги хранилища</span>
@@ -74,8 +73,11 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
         </div>
       </div>
 
-      {/* Список существующих тегов */}
-      <div className="flex flex-col gap-0.5 pt-1">
+      {/* Список существующих тегов со скроллом строго внутри */}
+      <div
+        ref={listRef}
+        className="flex flex-col gap-0.5 pt-1 max-h-44 overflow-y-auto pr-0.5"
+      >
         {tags.map((item, idx) => {
           const isSelected = idx === selectedIndex;
 
