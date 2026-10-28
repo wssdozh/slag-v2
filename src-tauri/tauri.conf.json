@@ -22,7 +22,8 @@
         "decorations": false,
         "transparent": false,
         "theme": "Dark",
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,msEdgeAutofill,msEdgeShopping,msEdgeWallet --renderer-process-limit=1 --js-flags=--scavenger_max_new_space_capacity_mb=4"
       }
     ],
     "security": {
