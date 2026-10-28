@@ -1,5 +1,5 @@
 import React, { useRef, useLayoutEffect } from 'react';
-import { Send } from 'lucide-react';
+import { Send, UploadCloud } from 'lucide-react';
 
 export interface BaseComposerProps {
   /** Текстовое значение поля ввода */
@@ -46,6 +46,16 @@ export interface BaseComposerProps {
   variant?: 'card' | 'flat';
   /** Скрыть поле textarea (например, при активном монохромном режиме войс-записи) */
   hideTextarea?: boolean;
+  /** Флаг активного перетаскивания файлов над композером */
+  isDraggingOver?: boolean;
+  /** Обработчик входа курсора с файлами */
+  onDragEnter?: React.DragEventHandler<HTMLDivElement>;
+  /** Обработчик перемещения файлов над карточкой */
+  onDragOver?: React.DragEventHandler<HTMLDivElement>;
+  /** Обработчик ухода курсора с файлами */
+  onDragLeave?: React.DragEventHandler<HTMLDivElement>;
+  /** Обработчик сброса файлов */
+  onDrop?: React.DragEventHandler<HTMLDivElement>;
   /** Дополнительные классы для контейнера-каркаса */
   className?: string;
 }
@@ -78,6 +88,11 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   maxHeight = 220,
   variant = 'card',
   hideTextarea = false,
+  isDraggingOver = false,
+  onDragEnter,
+  onDragOver,
+  onDragLeave,
+  onDrop,
   className = '',
 }) => {
   const localRef = useRef<HTMLTextAreaElement | null>(null);
@@ -119,12 +134,29 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
     <div className="w-full select-none relative flex justify-center">
       {overlaySlot}
       <div
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
         className={
           isFlat
-            ? `w-full flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none relative ${className}`
-            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border border-white/[0.12] p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
+            ? `w-full flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none relative ${
+                isDraggingOver ? 'rounded-2xl ring-2 ring-blue-500/50 bg-blue-500/[0.04]' : ''
+              } ${className}`
+            : `rounded-2xl bg-[#18181c]/80 backdrop-blur-xl border ${
+                isDraggingOver
+                  ? 'border-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
+                  : 'border-white/[0.12]'
+              } p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
         }
       >
+        {/* Drag & Drop Visual Dropzone Overlay */}
+        {isDraggingOver && (
+          <div className="absolute inset-0.5 z-30 rounded-xl bg-[#121215]/92 backdrop-blur-sm border-2 border-dashed border-blue-500/50 flex items-center justify-center gap-2 pointer-events-none select-none text-xs font-mono text-zinc-300 animate-in fade-in duration-100">
+            <UploadCloud className="w-4 h-4 text-blue-400 animate-bounce" />
+            <span>Отпустите файлы для прикрепления</span>
+          </div>
+        )}
         {/* Кнопка в правом верхнем углу (раскрытие в полноэкранный редактор) */}
         {topRightSlot && (
           <div className="absolute top-2.5 right-2.5 z-10 flex items-center">

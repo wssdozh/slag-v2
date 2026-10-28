@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, FolderMeta } from '../../types';
 import { storage } from '../../lib/storage';
@@ -699,6 +699,110 @@ export const Composer: React.FC<ComposerProps> = ({
         : recurrence)
     : undefined;
 
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const attachFiles = useCallback(async (files: FileList | File[]) => {
+    try {
+      const processed = await processFileListToAttachments(files);
+      if (processed.length > 0) {
+        setAttachments(prev => [...prev, ...processed]);
+        addToast(`Прикреплено: ${processed.length === 1 ? processed[0].name : `${processed.length} файла`}`, 'success');
+        setTimeout(() => {
+          textareaRef.current?.focus();
+        }, 50);
+      }
+    } catch {
+      addToast('Не удалось обработать прикрепленные файлы', 'error');
+    }
+  }, [addToast]);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(false);
+
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        await attachFiles(e.dataTransfer.files);
+      }
+    }
+  }, [attachFiles]);
+
+  // Window-level drag & drop and paste support when running as a dedicated modal/window island
+  useEffect(() => {
+    if (!isModal) return;
+
+    const onWindowDragOver = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) {
+        e.preventDefault();
+        setIsDraggingOver(true);
+      }
+    };
+
+    const onWindowDragLeave = (e: DragEvent) => {
+      if (!e.relatedTarget || e.relatedTarget === document.documentElement) {
+        setIsDraggingOver(false);
+      }
+    };
+
+    const onWindowDrop = async (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) {
+        e.preventDefault();
+        setIsDraggingOver(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          await attachFiles(e.dataTransfer.files);
+        }
+      }
+    };
+
+    const onWindowPaste = async (e: ClipboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      const clipboardFiles: File[] = [];
+      if (e.clipboardData?.items) {
+        for (let i = 0; i < e.clipboardData.items.length; i++) {
+          const item = e.clipboardData.items[i];
+          if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) clipboardFiles.push(file);
+          }
+        }
+      }
+      if (clipboardFiles.length > 0) {
+        e.preventDefault();
+        await attachFiles(clipboardFiles);
+      }
+    };
+
+    window.addEventListener('dragover', onWindowDragOver);
+    window.addEventListener('dragleave', onWindowDragLeave);
+    window.addEventListener('drop', onWindowDrop);
+    window.addEventListener('paste', onWindowPaste);
+
+    return () => {
+      window.removeEventListener('dragover', onWindowDragOver);
+      window.removeEventListener('dragleave', onWindowDragLeave);
+      window.removeEventListener('drop', onWindowDrop);
+      window.removeEventListener('paste', onWindowPaste);
+    };
+  }, [isModal, attachFiles]);
+
   const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardFiles: File[] = [];
     if (e.clipboardData.items) {
@@ -713,15 +817,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
     if (clipboardFiles.length > 0) {
       e.preventDefault();
-      try {
-        const processed = await processFileListToAttachments(clipboardFiles);
-        if (processed.length > 0) {
-          setAttachments(prev => [...prev, ...processed]);
-          addToast(`Прикреплено: ${processed.length === 1 ? processed[0].name : `${processed.length} файла`}`, 'success');
-        }
-      } catch {
-        addToast('Не удалось вставить медиа из буфера обмена', 'error');
-      }
+      await attachFiles(clipboardFiles);
     }
   };
 
@@ -1492,6 +1588,11 @@ export const Composer: React.FC<ComposerProps> = ({
       leftControls={leftControls}
       rightControls={rightControls}
       sendButton={sendButton}
+      isDraggingOver={isDraggingOver}
+      onDragEnter={handleDragOver}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-2xl'}
     />
   );
