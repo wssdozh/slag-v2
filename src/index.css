@@ -169,39 +169,47 @@
   padding-right: max(var(--sar), 0.5rem);
 }
 
-/* Custom discreet dark scrollbars across all elements */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+/* Custom discreet Linear Dark scrollbars across all elements */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
 }
 
-*::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
 }
 
-*::-webkit-scrollbar-track {
-  background: transparent;
+::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
-*::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-radius: 9999px !important;
   transition: background-color 150ms ease;
 }
 
-*::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
 }
 
-*::-webkit-scrollbar-corner {
-  background: transparent;
+::-webkit-scrollbar-corner {
+  background: transparent !important;
 }
 
-*::-webkit-scrollbar-button {
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-button:single-button,
+::-webkit-scrollbar-button:vertical:decrement,
+::-webkit-scrollbar-button:vertical:increment,
+::-webkit-scrollbar-button:horizontal:decrement,
+::-webkit-scrollbar-button:horizontal:increment {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
+  background: transparent !important;
 }
 
 /* Explicit scrollbar utilities */
@@ -216,9 +224,9 @@
   height: 0 !important;
 }
 
-.scrollbar-thin {
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent !important;
+.scrollbar-thin::-webkit-scrollbar {
+  width: 3px !important;
+  height: 3px !important;
 }
 
 /* Apple-style smooth spring press feedback */
