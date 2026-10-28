@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useApp } from '../../context/AppContext';
 import { Composer } from '../Feed/Composer';
 import { Sparkles, X } from 'lucide-react';
 import { hideQuickComposer, listenQuickComposerFocus, notifyDataChanged } from '../../lib/windowControls';
 
 export const QuickComposerWindow: React.FC = () => {
-  const { currentFolder } = useApp();
   const [sessionKey, setSessionKey] = useState<number>(() => Date.now());
 
   // Enable complete window transparency
@@ -36,7 +34,7 @@ export const QuickComposerWindow: React.FC = () => {
   // Listen for global shortcut focus event from desktop Rust harness
   useEffect(() => {
     const unlisten = listenQuickComposerFocus(() => {
-      setSessionKey(Date.now());
+      // Keep existing draft intact when re-summoning the window
     });
     return unlisten;
   }, []);
@@ -91,7 +89,7 @@ export const QuickComposerWindow: React.FC = () => {
           <Composer
             key={sessionKey}
             isModal
-            initialFolder={currentFolder || 'Входящие'}
+            initialFolder="Входящие"
             onComplete={handleComplete}
             onCancel={handleClose}
           />

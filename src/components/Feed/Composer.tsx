@@ -74,7 +74,8 @@ export const Composer: React.FC<ComposerProps> = ({
     isMobile
   } = useApp();
 
-  const activeFolder = initialFolder || currentFolder;
+  const effectiveDefaultFolder = isModal ? 'Входящие' : (initialFolder || currentFolder);
+  const activeFolder = isModal ? 'quick-composer' : effectiveDefaultFolder;
   const [initialDraft] = useState(() => storage.getComposerDraft(activeFolder));
 
   const [content, setContent] = useState(() => initialDraft?.content || '');
@@ -85,11 +86,13 @@ export const Composer: React.FC<ComposerProps> = ({
   const [reminder] = useState<string | undefined>(initialReminder);
   const [tags, setTags] = useState<string[]>(() => initialDraft?.tags || []);
   const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(
-    initialFolder ? { folder: initialFolder, forCurrent: currentFolder } : null
+    initialFolder && initialFolder !== effectiveDefaultFolder
+      ? { folder: initialFolder, forCurrent: effectiveDefaultFolder }
+      : null
   );
-  const targetFolder = targetFolderOverride?.forCurrent === currentFolder ? targetFolderOverride.folder : null;
+  const targetFolder = targetFolderOverride?.forCurrent === effectiveDefaultFolder ? targetFolderOverride.folder : null;
   const setTargetFolder = (folder: string | null) => {
-    setTargetFolderOverride(folder ? { folder, forCurrent: currentFolder } : null);
+    setTargetFolderOverride(folder ? { folder, forCurrent: effectiveDefaultFolder } : null);
   };
   const [attachments, setAttachments] = useState<SlagAttachment[]>(() => initialDraft?.attachments || []);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
@@ -788,7 +791,7 @@ export const Composer: React.FC<ComposerProps> = ({
           : duration)
       : undefined;
 
-    const destinationFolder = targetFolder || currentFolder;
+    const destinationFolder = targetFolder || effectiveDefaultFolder;
     const saved = saveItem({
       type: itemType,
       title,
@@ -1198,7 +1201,7 @@ export const Composer: React.FC<ComposerProps> = ({
         <FolderSuggestionMenu
           query={folderQuery}
           folders={matchingFolders}
-          currentFolder={currentFolder}
+          currentFolder={effectiveDefaultFolder}
           selectedFolder={targetFolder}
           selectedIndex={folderSelectedIndex}
           onSelect={selectFolder}
