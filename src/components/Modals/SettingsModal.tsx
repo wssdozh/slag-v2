@@ -27,6 +27,7 @@ import { Select } from '../UI/Select';
 import { Checkbox } from '../UI/Checkbox';
 import { NumberInput } from '../UI/NumberInput';
 import { BaseModal } from './BaseModal';
+import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -762,39 +763,72 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {activeTab === 'shortcuts' && (
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-semibold text-zinc-200">
-                  Клавиатурные комбинации
-                </span>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-zinc-200">
+                    Глобальные команды и шорткаты
+                  </span>
+                  <span className="text-[11px] text-zinc-500">
+                    Работают в любом месте приложения (одиночные клавиши срабатывают вне полей ввода)
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 text-xs">
+                  {APP_COMMANDS.filter(c => c.shortcut).map(cmd => {
+                    const shortcuts = [cmd.shortcut, ...(cmd.aliases || [])]
+                      .filter(Boolean)
+                      .map(s => formatShortcut(s!))
+                      .join(' / ');
+                    return (
+                      <div key={cmd.id} className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+                        <div className="flex flex-col">
+                          <span className="text-zinc-300 font-medium">{cmd.title}</span>
+                          {cmd.description && (
+                            <span className="text-[10px] text-zinc-500">{cmd.description}</span>
+                          )}
+                        </div>
+                        <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06] shrink-0 ml-3">
+                          {shortcuts}
+                        </kbd>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-col gap-1 pt-2">
+                  <span className="text-xs font-semibold text-zinc-200">
+                    Редактор, модальные окна и ввод
+                  </span>
+                </div>
 
                 <div className="flex flex-col gap-1 text-xs">
                   <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Быстрый поиск</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Cmd / Ctrl + K</kbd>
+                    <span className="text-zinc-400">Сохранить запись (редактор)</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">
+                      {formatShortcut('mod+s')}
+                    </kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Переключение Лента / Ассистент</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Cmd / Ctrl + J</kbd>
+                    <span className="text-zinc-400">Применить AI Diff</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">
+                      {formatShortcut('mod+enter')}
+                    </kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Системные логи & HUD</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Cmd / Ctrl + `</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Отправить запись</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Enter</kbd>
+                    <span className="text-zinc-400">Отправить запись (композер)</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">Enter</kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
                     <span className="text-zinc-400">Перенос строки</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Shift + Enter</kbd>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">Shift + Enter</kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Закрыть окно / Полноэкранный режим</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">Esc</kbd>
+                    <span className="text-zinc-400">Закрыть окно / Esc</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">Esc</kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
                     <span className="text-zinc-400">Контекстное меню</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200">ПКМ (Правый клик)</kbd>
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">ПКМ</kbd>
                   </div>
                 </div>
               </div>

@@ -1,54 +1,46 @@
-# logging-diagnostics-standard.md — Стандарт Логирования и Диагностики SLAG v2
+# Стандарт Логирования и Диагностики
 
-> Регламент системного логирования для модулей приложения и автономных ИИ-агентов.  
-> Скоупы: `AI`, `FS`, `SEARCH`, `UI`, `APP`, `SYNC`, `MEDIA`, `WORKSPACE`.
+Регламент системного логирования для модулей приложения и ИИ-агентов.
 
 ---
 
-## 1. Запрет на сырые `console.log`
-В коде проекта запрещено оставлять произвольные `console.log` или `console.warn` без структуры. Все события приложения маршрутизируются через `logger`:
+## 1. Запрет сырых `console.log`
+Все события маршрутизируются через `logger.scope(...)`:
 
 ```typescript
 import { logger } from '../lib/logger';
 
-// Создание скоупированного инстанса
 const aiLog = logger.scope('AI');
 const fsLog = logger.scope('FS');
-const searchLog = logger.scope('SEARCH');
-const mediaLog = logger.scope('MEDIA');
-const workspaceLog = logger.scope('WORKSPACE');
 ```
 
-## 2. Скоупы и Уровни
-- **`AI`**: Вызовы моделей Groq/Gemini/KIE, парсинг тегов, триаж, reasoning, тулколлы, переключение на локальные эвристики, замеры `durationMs`.
-- **`FS`**: Создание, чтение, изменение, перемещение в корзину `.trash`, сохранение аттачментов, переполнение квоты (`QuotaExceededError`).
-- **`SEARCH`**: Индексация Orama BM25, выполнение поисковых запросов, время поиска, fallback на fuzzy-фильтр.
-- **`UI`**: Тосты, breadcrumbs навигации по папкам, смена представлений (Feed/Kanban/Calendar), открытие/закрытие модалок.
-- **`APP`**: Инициализация приложения, статус сети (online/offline), глобальные ошибки `window.onerror`, unhandled promise rejections.
-- **`SYNC`**: Сетевая синхронизация, WebSocket relay.
-- **`MEDIA`**: Запись аудио и видео кружков, разрешения микрофона и камеры, fallback на синтетические потоки, MediaRecorder lifecycle.
-- **`WORKSPACE`**: Отвязывание вкладок в нативные окна и плавающие группы (tear-off), межсистемное перетаскивание и стыковка (cross-window drag & drop dock-back), управление состоянием окон (сворачивание, максимизация, закрытие, сохранение геометрии), переключение и синхронизация вкладок.
+---
 
-## 3. Трекинг Времени (Performance Metrics)
-Любые ресурсоёмкие операции (индексация, сетевые запросы к LLM) должны сопровождаться замером длительности:
+## 2. Скоупы
+- `AI`: Вызовы LLM, парсинг тегов, триаж, reasoning, замеры `durationMs`.
+- `FS`: Операции с файлами, `.trash`, сохранение вложений, квота хранилища.
+- `SEARCH`: Индексация Orama BM25, поисковые запросы, fallback.
+- `UI`: Тосты, навигация по папкам, смена представлений, модальные окна.
+- `APP`: Инициализация, статус сети, глобальные ошибки.
+- `SYNC`: Сетевая синхронизация, WebSocket relay.
+- `MEDIA`: Запись аудио/видео, разрешения микрофона и камеры, MediaRecorder.
+- `WORKSPACE`: Отвязывание вкладок (tear-off), стыковка окон, сохранение геометрии.
+
+---
+
+## 3. Замер времени выполнения
+Тяжелые операции сопровождаются замером длительности:
 
 ```typescript
-// Вариант 1: Через time()
 const endTimer = searchLog.time('Orama index rebuild');
 // ...
-endTimer('Orama index rebuilt'); // Автоматически запишет durationMs
+endTimer('Orama index rebuilt');
 
-// Вариант 2: Через trackAsync()
-const data = await aiLog.trackAsync('Groq:AssistantChat', async () => {
-  return await fetch(...);
-});
+// или
+const data = await aiLog.trackAsync('AssistantChat', async () => fetch(...));
 ```
 
-## 4. Защита Чувствительных Данных (Privacy Filtering)
-Логгер автоматически маскирует строки, содержащие:
-- `gsk_...` (Groq API keys)
-- `AIzaSy...` (Gemini API keys)
-- `Bearer ...` (токены авторизации)
-- Объектные ключи со словами `token`, `secret`, `key`, `password`
+---
 
-Ни при каких обстоятельствах не отключать санитизацию в `src/lib/logger.ts`.
+## 4. Защита чувствительных данных
+Логгер автоматически маскирует строки с `gsk_`, `AIzaSy`, `Bearer` и ключи объектов со словами `token`, `secret`, `key`, `password`. Запрещено отключать санитизацию в `src/lib/logger.ts`.

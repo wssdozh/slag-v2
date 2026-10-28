@@ -900,6 +900,44 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     }
   }, [currentFolder]);
 
+  // Listen for global assistant toggle command (mod+j)
+  useEffect(() => {
+    const handleToggleAssistant = () => {
+      const api = apiRef.current;
+      if (!api) return;
+
+      const assistantPanel = api.getPanel('panel_assistant') || api.panels.find(p => p.id.includes('assistant'));
+      if (assistantPanel) {
+        if (assistantPanel.api.isActive) {
+          const infoPanel = api.getPanel('panel_info') || api.panels.find(p => p.id.includes('info'));
+          if (infoPanel) {
+            infoPanel.api.setActive();
+          }
+        } else {
+          assistantPanel.api.setActive();
+        }
+      } else {
+        try {
+          const center = api.panels.find(p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_')) || api.panels[0];
+          api.addPanel({
+            id: 'panel_assistant',
+            component: 'assistant',
+            title: 'Ассистент',
+            position: center ? { direction: 'right', referencePanel: center } : { direction: 'right' },
+            initialWidth: 320,
+            minimumWidth: getPanelMinWidth('assistant'),
+            maximumWidth: getPanelMaxWidth('assistant'),
+          });
+        } catch (err) {
+          wsLog.warn('Failed to add panel_assistant on toggle', { err });
+        }
+      }
+    };
+
+    window.addEventListener('slag:toggle-assistant', handleToggleAssistant);
+    return () => window.removeEventListener('slag:toggle-assistant', handleToggleAssistant);
+  }, []);
+
   const applyDefaultLayout = useCallback((api: DockviewApi) => {
     api.clear();
 

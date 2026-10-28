@@ -174,7 +174,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       if (e.key === 'Escape') {
         e.preventDefault();
         handleClose();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.code === 'KeyS')) {
         e.preventDefault();
         handleSave();
       }

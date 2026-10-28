@@ -8,6 +8,7 @@ import { FolderModal } from './components/Modals/FolderModal';
 import { FolderInfoModal } from './components/Modals/FolderInfoModal';
 import { VaultModal } from './components/Modals/VaultModal';
 import { ComposerModal } from './components/Modals/ComposerModal';
+import { QuickComposerWindow } from './components/Composer/QuickComposerWindow';
 import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
@@ -77,8 +78,13 @@ const AppContent: React.FC = () => {
 
   const isDesktopWidth = typeof window !== 'undefined' && window.innerWidth >= 768;
 
-  // Standalone Native Popout Window Router: always desktop Dockview workspace
+  // Standalone Native Popout & Quick Composer Window Router
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const isQuickComposer = urlParams?.get('window') === 'quick-composer';
+  if (isQuickComposer) {
+    return <QuickComposerWindow />;
+  }
+
   const standalonePanelId = urlParams?.get('panel');
   const standalonePanelTitle = urlParams?.get('title') || 'SLAG';
 

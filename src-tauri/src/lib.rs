@@ -106,6 +106,9 @@ pub fn set_webview_memory_level(window: &tauri::WebviewWindow, low: bool) {
 
 #[cfg(target_os = "windows")]
 fn configure_window_border(window: &tauri::Window) {
+    if window.label() == "quick-composer" {
+        return;
+    }
     if let Ok(hwnd) = window.hwnd() {
         unsafe {
             // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
@@ -204,12 +207,23 @@ pub fn run() {
                     set_webview_memory_level(&window, false);
                 }
             }))
-            .plugin(tauri_plugin_window_state::Builder::default().build())
+            .plugin(
+                tauri_plugin_window_state::Builder::default()
+                    .with_denylist(&["quick-composer"])
+                    .build(),
+            )
             .plugin(
                 tauri_plugin_global_shortcut::Builder::new()
                     .with_handler(move |app, _shortcut, event| {
                         if event.state() == ShortcutState::Pressed {
-                            if let Some(window) = app.get_webview_window("main") {
+                            if let Some(quick_win) = app.get_webview_window("quick-composer") {
+                                let _ = quick_win.show();
+                                let _ = quick_win.unminimize();
+                                let _ = quick_win.set_focus();
+                                #[cfg(target_os = "windows")]
+                                set_webview_memory_level(&quick_win, false);
+                                let _ = quick_win.emit("slag://focus-composer", ());
+                            } else if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.show();
                                 let _ = window.unminimize();
                                 let _ = window.set_focus();
@@ -271,6 +285,24 @@ pub fn run() {
                     });
                 }
 
+                if let Some(quick_window) = app.get_webview_window("quick-composer") {
+                    let qwin = quick_window.clone();
+                    quick_window.on_window_event(move |event| {
+                        match event {
+                            WindowEvent::CloseRequested { api, .. } => {
+                                api.prevent_close();
+                                let _ = qwin.hide();
+                            }
+                            WindowEvent::Focused(focused) => {
+                                if !focused {
+                                    let _ = qwin.hide();
+                                }
+                            }
+                            _ => {}
+                        }
+                    });
+                }
+
                 // Register global hotkey: Ctrl + Shift + Space
                 let hotkey = Shortcut::new(
                     Some(Modifiers::CONTROL | Modifiers::SHIFT),
@@ -284,7 +316,7 @@ pub fn run() {
                 let open_item = MenuItemBuilder::with_id("open", "Открыть SLAG").build(app)?;
                 let composer_item = MenuItemBuilder::with_id(
                     "quick_note",
-                    "Быстрая заметка (Ctrl+Shift+Space)",
+                    "Быстрая мысль (Ctrl+Shift+Space)",
                 )
                 .build(app)?;
                 let quit_item = MenuItemBuilder::with_id("quit", "Выход").build(app)?;
@@ -313,7 +345,14 @@ pub fn run() {
                                 }
                             }
                             "quick_note" => {
-                                if let Some(window) = app.get_webview_window("main") {
+                                if let Some(quick_win) = app.get_webview_window("quick-composer") {
+                                    let _ = quick_win.show();
+                                    let _ = quick_win.unminimize();
+                                    let _ = quick_win.set_focus();
+                                    #[cfg(target_os = "windows")]
+                                    set_webview_memory_level(&quick_win, false);
+                                    let _ = quick_win.emit("slag://focus-composer", ());
+                                } else if let Some(window) = app.get_webview_window("main") {
                                     let _ = window.show();
                                     let _ = window.unminimize();
                                     let _ = window.set_focus();

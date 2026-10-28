@@ -78,6 +78,7 @@ interface AppContextType {
   isFullscreenEditorOpen: boolean;
   isSearchOpen: boolean;
   isSettingsOpen: boolean;
+  toggleAssistant: () => void;
   isLogViewerOpen: boolean;
   isFolderModalOpen: boolean;
   editingFolder: FolderMeta | null;
@@ -655,6 +656,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onOpenComposer: () => {
         openComposerModal();
       },
+      onDataChanged: () => {
+        refreshData();
+      },
     });
 
     return () => {
@@ -846,54 +850,97 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activeMobileTab,
   ]);
 
-  // Global Keyboard Shortcuts
+  const toggleAssistant = useCallback(() => {
+    if (isMobile) {
+      setActiveMobileTab(prev => (prev === 'assistant' ? 'folders' : 'assistant'));
+    } else {
+      window.dispatchEvent(new CustomEvent('slag:toggle-assistant'));
+    }
+  }, [isMobile, setActiveMobileTab]);
+
+  // Global In-App Keyboard Shortcuts (Zero-Overhead native keydown)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      // 1. Escape: dismiss top layer in LIFO stack
+      if (e.key === 'Escape') {
+        if (dismissTopLayer()) {
+          e.preventDefault();
+          return;
+        }
+      }
+
+      const mod = e.metaKey || e.ctrlKey;
+
+      // 2. Ctrl/Cmd + F or Ctrl/Cmd + K: Toggle Search (prevent browser find)
+      if (mod && (e.code === 'KeyF' || e.code === 'KeyK' || e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'k')) {
         e.preventDefault();
         setIsSearchOpen(prev => !prev);
         return;
       }
 
-      if ((e.metaKey || e.ctrlKey) && (e.key === '`' || e.key === '~' || e.key === 'ё' || e.key === 'Ё')) {
+      // 3. Ctrl/Cmd + J: Toggle Assistant
+      if (mod && (e.code === 'KeyJ' || e.key.toLowerCase() === 'j')) {
+        e.preventDefault();
+        toggleAssistant();
+        return;
+      }
+
+      // 4. Ctrl/Cmd + `: Toggle System Logs & HUD (support tilde and Cyrillic ё)
+      if (mod && (e.code === 'Backquote' || e.key === '`' || e.key === '~' || e.key === 'ё' || e.key === 'Ё')) {
         e.preventDefault();
         setIsLogViewerOpen(prev => !prev);
         return;
       }
 
-      if (
-        (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.altKey
-      ) {
-        const activeTag = (document.activeElement?.tagName || '').toLowerCase();
-        const isEditable = document.activeElement?.getAttribute('contenteditable') === 'true';
+      // 5. Ctrl/Cmd + ,: Open Settings
+      if (mod && (e.key === ',' || e.code === 'Comma')) {
+        e.preventDefault();
+        openSettingsModal();
+        return;
+      }
+
+      // 6. Single-key shortcuts ('C' for task, 'N' for note) outside typing elements
+      if (!mod && !e.altKey && !e.shiftKey) {
+        const target = e.target as HTMLElement | null;
+        const tag = (target?.tagName || '').toLowerCase();
+        const isEditable = target?.isContentEditable || target?.getAttribute('contenteditable') === 'true';
+
         if (
-          activeTag !== 'input' &&
-          activeTag !== 'textarea' &&
+          tag !== 'input' &&
+          tag !== 'textarea' &&
+          tag !== 'select' &&
           !isEditable &&
           !isFullscreenEditorOpen &&
           !isComposerModalOpen &&
           !isSearchOpen &&
           !isSettingsOpen
         ) {
-          e.preventDefault();
-          openComposerModal({ type: 'task' });
-          return;
-        }
-      }
-
-      if (e.key === 'Escape') {
-        if (dismissTopLayer()) {
-          e.preventDefault();
+          if (e.code === 'KeyC' || e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'с') {
+            e.preventDefault();
+            openComposerModal({ type: 'task' });
+            return;
+          }
+          if (e.code === 'KeyN' || e.key.toLowerCase() === 'n' || e.key.toLowerCase() === 'т') {
+            e.preventDefault();
+            openComposerModal({ type: 'note' });
+            return;
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dismissTopLayer, openComposerModal, isFullscreenEditorOpen, isComposerModalOpen, isSearchOpen, isSettingsOpen]);
+  }, [
+    dismissTopLayer,
+    toggleAssistant,
+    openComposerModal,
+    openSettingsModal,
+    isFullscreenEditorOpen,
+    isComposerModalOpen,
+    isSearchOpen,
+    isSettingsOpen,
+  ]);
 
   // Navigation & Layer Depth Calculation (LIFO Stack)
   const overlayDepth = (
@@ -1761,6 +1808,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsFullscreenEditorOpen,
         setIsSearchOpen,
         setIsSettingsOpen,
+        toggleAssistant,
         settingsTab,
         setSettingsTab,
         openSettingsModal,

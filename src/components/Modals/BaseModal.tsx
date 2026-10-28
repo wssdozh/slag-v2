@@ -1,6 +1,5 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { useHotkey } from '../../hooks/useHotkeys';
 import { IconButton } from '../UI/IconButton';
 
 export interface BaseModalProps {
@@ -50,12 +49,19 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 }) => {
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  useHotkey('escape', onClose, {
-    enabled: isOpen && closeOnEsc,
-    preventDefault: true,
-    stopPropagation: true,
-    allowInInput: true,
-  });
+  useEffect(() => {
+    if (!isOpen || !closeOnEsc) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, closeOnEsc, onClose]);
 
   if (!isOpen) return null;
 

@@ -107,6 +107,14 @@ export const closeWindow = async (): Promise<void> => {
   try {
     const appWindow = getCurrentWindow();
     wsLog.info(`Window close requested for [${appWindow.label}]`);
+
+    // Quick composer window stays alive, just hides
+    if (appWindow.label === 'quick-composer') {
+      await appWindow.hide();
+      wsLog.info('Quick composer window hidden');
+      return;
+    }
+
     // Destroy popout windows completely, but keep main window alive in tray
     if (appWindow.label !== 'main') {
       removeDetachedWindow(appWindow.label);
@@ -227,12 +235,62 @@ export const restoreDetachedWindows = async (): Promise<void> => {
   }
 };
 
+export const hideQuickComposer = async (): Promise<void> => {
+  if (!isTauri()) {
+    if (typeof window !== 'undefined') window.close();
+    return;
+  }
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    const win = getCurrentWindow();
+    await win.hide();
+    wsLog.info('Quick composer hidden');
+  } catch (err) {
+    wsLog.error('Failed to hide quick composer', err);
+  }
+};
+
+export const listenQuickComposerFocus = (onFocus: () => void): (() => void) => {
+  if (!isTauri()) return () => {};
+  let unlisten: UnlistenFn | null = null;
+  let active = true;
+
+  void listen('slag://focus-composer', () => {
+    if (active) onFocus();
+  }).then((fn) => {
+    if (!active) fn();
+    else unlisten = fn;
+  });
+
+  return () => {
+    active = false;
+    if (unlisten) unlisten();
+  };
+};
+
+export const notifyDataChanged = async (): Promise<void> => {
+  const channel = getTabCrossWindowChannel();
+  if (channel) {
+    try {
+      channel.postMessage({ type: 'DATA_CHANGED' });
+    } catch {}
+  }
+  if (isTauri()) {
+    try {
+      const { emit } = await import('@tauri-apps/api/event');
+      await emit('slag://data-changed', null);
+    } catch {}
+  }
+};
+
 export const listenDesktopEvents = (handlers: {
   onOpenComposer?: () => void;
+  onDataChanged?: () => void;
 }): (() => void) => {
   if (!isTauri()) return () => {};
 
   let unlistenComposer: UnlistenFn | null = null;
+  let unlistenData: UnlistenFn | null = null;
   let active = true;
 
   wsLog.debug('Registering desktop event listeners');
@@ -250,10 +308,26 @@ export const listenDesktopEvents = (handlers: {
     }
   });
 
+  void listen('slag://data-changed', () => {
+    if (active && handlers.onDataChanged) {
+      wsLog.info('Received desktop data changed event: slag://data-changed');
+      handlers.onDataChanged();
+    }
+  }).then((unlisten) => {
+    if (!active) {
+      unlisten();
+    } else {
+      unlistenData = unlisten;
+    }
+  });
+
   return () => {
     active = false;
     if (unlistenComposer) {
       unlistenComposer();
+    }
+    if (unlistenData) {
+      unlistenData();
     }
   };
 };

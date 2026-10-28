@@ -304,5 +304,14 @@
   /* content-visibility skipped: PAGE_SIZE windowing handles DOM ceiling without layout shifts */
 }
 
+/* Standalone Floating Island Transparency */
+html.window-transparent,
+body.window-transparent,
+body.window-transparent #root {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+
 
 
