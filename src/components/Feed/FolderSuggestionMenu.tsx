@@ -38,7 +38,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
   const positionClasses = isBottom
     ? 'top-full mt-2'
     : isModal
-    ? 'bottom-[calc(100%+48px)]'
+    ? 'bottom-[calc(100%+51px)]'
     : 'bottom-[calc(100%+10px)]';
   const animationClasses = isBottom ? 'slide-in-from-top-2' : 'slide-in-from-bottom-2';
 
@@ -49,7 +49,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
       >
         <div className="flex items-center gap-2 text-xs text-zinc-400">
           <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-          <span>Папка «@{query}» не найдена</span>
+          <span>Папка «{query}» не найдена</span>
         </div>
       </div>
     );
@@ -63,8 +63,8 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
       {/* Шапка меню папок */}
       <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider">
         <div className="flex items-center gap-1.5 text-zinc-300 uppercase">
-          <Folder className="w-3 h-3 text-amber-400" />
-          <span>Целевая папка (@)</span>
+          <Folder className="w-3 h-3 text-zinc-400" />
+          <span>Целевая папка</span>
         </div>
         <div className="flex items-center gap-2 text-zinc-500">
           <span>↑↓ выбор</span>
@@ -103,7 +103,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
               <div className="flex items-center gap-2.5 min-w-0">
                 <IconComponent
                   className={`w-4 h-4 shrink-0 transition-colors ${
-                    isTarget || isCurrent ? 'text-amber-400' : isSelected ? 'text-zinc-200' : 'text-zinc-400'
+                    isSelected ? 'text-zinc-100' : 'text-zinc-400'
                   }`}
                 />
 
@@ -121,12 +121,12 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
 
               <div className="flex items-center gap-1.5 shrink-0">
                 {isTarget && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  <span className="text-[10px] font-mono text-zinc-300">
                     выбрана
                   </span>
                 )}
                 {isCurrent && !isTarget && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
+                  <span className="text-[10px] font-mono text-zinc-500">
                     текущая
                   </span>
                 )}

@@ -65,10 +65,10 @@ export const QuickComposerWindow: React.FC = () => {
         {/* Island Header */}
         <div
           data-tauri-drag-region
-          className="px-3.5 pt-2.5 pb-1.5 flex items-center justify-between border-b border-white/[0.04] cursor-move select-none shrink-0"
+          className="px-3.5 pt-2.5 pb-2 flex items-center justify-between border-b border-white/[0.04] cursor-move select-none shrink-0"
         >
           <div className="flex items-center gap-2 pointer-events-none">
-            <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+            <Sparkles className="w-4 h-4 text-zinc-400 shrink-0" />
             <span className="text-sm font-semibold text-zinc-100">Быстрая мысль</span>
           </div>
 
@@ -87,7 +87,7 @@ export const QuickComposerWindow: React.FC = () => {
         </div>
 
         {/* Island Body: Full Composer capabilities */}
-        <div className="px-3 pt-1.5 pb-2 !overflow-visible flex flex-col min-h-0">
+        <div className="px-3 pt-2 pb-2.5 !overflow-visible flex flex-col min-h-0">
           <Composer
             key={sessionKey}
             isModal
