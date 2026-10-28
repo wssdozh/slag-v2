@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { X } from 'lucide-react';
+import { useHotkey } from '../../hooks/useHotkeys';
 import { IconButton } from '../UI/IconButton';
 
 export interface BaseModalProps {
@@ -49,19 +50,12 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 }) => {
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!isOpen || !closeOnEsc) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, closeOnEsc, onClose]);
+  useHotkey('escape', onClose, {
+    enabled: isOpen && closeOnEsc,
+    preventDefault: true,
+    stopPropagation: true,
+    allowInInput: true,
+  });
 
   if (!isOpen) return null;
 
@@ -88,10 +82,10 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       >
         {/* Header */}
         {!hideHeader && (
-          <div className="overflow-hidden shrink-0">
+          <div className="rounded-t-[15px] overflow-hidden shrink-0">
             {customHeader || (
               <div
-                className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+                className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e] rounded-t-[15px]"
                 style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -140,7 +134,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0">
+          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0 rounded-b-[15px]">
             {footer}
           </div>
         )}
