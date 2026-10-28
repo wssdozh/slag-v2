@@ -22,7 +22,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
   selectedIndex,
   onSelect,
   placement = 'top',
-  isModal: _isModal = false,
+  isModal = false,
 }) => {
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -37,7 +37,9 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
   const isBottom = placement === 'bottom';
   const positionClasses = isBottom
     ? 'top-full mt-2'
-    : 'bottom-full mb-2';
+    : isModal
+    ? 'bottom-[calc(100%+48px)]'
+    : 'bottom-[calc(100%+10px)]';
   const animationClasses = isBottom ? 'slide-in-from-top-2' : 'slide-in-from-bottom-2';
 
   if (folders.length === 0) {
