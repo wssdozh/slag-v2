@@ -21,11 +21,14 @@ import {
   X,
   Circle,
   Clock,
-  FileText
+  FileText,
+  GitCompare
 } from 'lucide-react';
 import { Select } from '../UI/Select';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { TagChip } from '../UI/TagChip';
+import type { SuggestedAction } from '../../types';
+import { DiffModal, type DiffModalItemEntry } from '../Modals/DiffModal';
 
 interface AssistantChatProps {
   variant?: 'center' | 'sidebar';
@@ -35,6 +38,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   const {
     currentFolder,
     folders,
+    items,
     chatMessages,
     isChatLoading,
     sendChatMessage,
@@ -53,9 +57,62 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   const [expandedReasoningIds, setExpandedReasoningIds] = useState<Set<string>>(new Set());
   const [expandedResultsMap, setExpandedResultsMap] = useState<Record<string, boolean>>({});
   const [batchSelections, setBatchSelections] = useState<Record<string, Record<string, boolean>>>({});
+  const [diffModalData, setDiffModalData] = useState<{
+    action: SuggestedAction;
+    messageId: string;
+    initialIndex?: number;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const prevLoadingRef = useRef(isChatLoading);
+
+  const getDiffEntriesForAction = (action: SuggestedAction): DiffModalItemEntry[] => {
+    if (action.type === 'batch_update' && action.batchUpdateItems && action.batchUpdateItems.length > 0) {
+      return action.batchUpdateItems.map(bItem => {
+        const tId = bItem.targetItemId;
+        const tTitle = (bItem.title || '').toLowerCase().trim();
+        const target = items.find(i =>
+          (tId && i.id === tId) ||
+          (tTitle && (i.title.toLowerCase() === tTitle || i.title.toLowerCase().includes(tTitle) || tTitle.includes(i.title.toLowerCase())))
+        );
+        return {
+          title: bItem.title,
+          targetItem: target,
+          updates: bItem.updates,
+        };
+      });
+    }
+
+    const target = items.find(i =>
+      (action.appliedItemId && i.id === action.appliedItemId) ||
+      (action.title && i.title.toLowerCase() === action.title.toLowerCase())
+    );
+    return [{
+      title: action.title,
+      targetItem: target,
+      updates: action.updates || {
+        content: action.content,
+        appendContent: action.appendContent,
+        dueDate: action.dueDate,
+        priority: action.priority,
+        tags: action.tags,
+        folder: action.folder,
+      },
+    }];
+  };
+
+  const canShowDiff = (action: SuggestedAction): boolean => {
+    if (action.type === 'batch_update' && action.batchUpdateItems && action.batchUpdateItems.length > 0) {
+      return true;
+    }
+    if (action.type === 'update_item' || action.type === 'create_note') {
+      return true;
+    }
+    if (action.updates && Object.keys(action.updates).length > 0) {
+      return true;
+    }
+    return false;
+  };
 
   // Restore focus to composer when AI response finishes
   useEffect(() => {
@@ -674,7 +731,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                   <div key={bIdx} className={`flex items-center justify-between text-xs py-1.5 gap-2 transition-opacity ${
                                     !selected && !isApplied ? 'opacity-40' : ''
                                   }`}>
-                                    <div className="flex items-center gap-2 truncate flex-1">
+                                    <div className="flex items-center gap-2 truncate flex-1 min-w-0">
                                       {!isApplied && !isRejected && (
                                         <input
                                           type="checkbox"
@@ -720,6 +777,28 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                           {up.status}
                                         </span>
                                       )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDiffModalData({ action, messageId: msg.id, initialIndex: bIdx });
+                                        }}
+                                        className="p-1 rounded hover:bg-white/[0.08] text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                                        title="Посмотреть изменения этой заметки (Diff)"
+                                      >
+                                        <GitCompare className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          scrollToItem(item.targetItemId || item.title);
+                                        }}
+                                        className="p-1 rounded hover:bg-white/[0.08] text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                                        title={`Перейти к «${item.title}»`}
+                                      >
+                                        <ArrowUpRight className="w-3 h-3" />
+                                      </button>
                                     </div>
                                   </div>
                                 );
@@ -778,10 +857,10 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                               <span>Действие отклонено</span>
                             </div>
                           ) : isApplied ? (
-                            <div className="mt-1 flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
-                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-300 font-medium whitespace-nowrap shrink-0">
+                            <div className="mt-1 flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04] min-w-0">
+                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-300 font-medium min-w-0 flex-1 truncate">
                                 <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                                <span>
+                                <span className="truncate">
                                   {action.type === 'schedule_task' ? `Запланировано на ${action.dueDate}` :
                                    action.type === 'batch_update' ? (action.actionLabel ? `${action.actionLabel}` : `Применено: ${action.batchUpdateItems?.length || 0}`) :
                                    action.updates?.appendContent || action.appendContent ? 'Дополнено' :
@@ -792,14 +871,26 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                    'Обновлено'}
                                 </span>
                               </div>
-                              <button
-                                onClick={() => scrollToItem(action.appliedItemId || action.title)}
-                                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                                title="Показать запись в ленте"
-                              >
-                                <span>{action.updates?.appendContent || action.appendContent ? 'Открыть' : 'Перейти к записи'}</span>
-                                <ArrowUpRight className="w-3 h-3 text-zinc-400" />
-                              </button>
+                              {action.type !== 'batch_update' ? (
+                                <button
+                                  onClick={() => scrollToItem(action.appliedItemId || action.title)}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
+                                  title="Показать запись в ленте"
+                                >
+                                  <span>{action.updates?.appendContent || action.appendContent ? 'Открыть' : 'Перейти к записи'}</span>
+                                  <ArrowUpRight className="w-3 h-3 text-zinc-400" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setDiffModalData({ action, messageId: msg.id })}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
+                                  title="Посмотреть изменения"
+                                >
+                                  <GitCompare className="w-3 h-3 text-zinc-400" />
+                                  <span>Сравнить</span>
+                                </button>
+                              )}
                             </div>
                           ) : isExecuting ? (
                             <button
@@ -851,6 +942,19 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                   </button>
                                 );
                               })()}
+
+                              {canShowDiff(action) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDiffModalData({ action, messageId: msg.id })}
+                                  className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium border border-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
+                                  title="Сравнить изменения перед подтверждением"
+                                >
+                                  <GitCompare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                  <span>Сравнить</span>
+                                </button>
+                              )}
+
                               <button
                                 onClick={() => rejectAction(msg.id)}
                                 className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs font-medium border border-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
@@ -1042,6 +1146,28 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           />
         </div>
       </div>
+
+      {diffModalData && (
+        <DiffModal
+          isOpen={true}
+          onClose={() => setDiffModalData(null)}
+          title={`Сравнение: ${diffModalData.action.actionLabel || diffModalData.action.title || 'Изменения'}`}
+          items={getDiffEntriesForAction(diffModalData.action)}
+          initialIndex={diffModalData.initialIndex}
+          isApplied={diffModalData.action.actionState === 'applied'}
+          onApply={() => {
+            let finalAction = diffModalData.action;
+            if (finalAction.type === 'batch_update' && finalAction.batchUpdateItems) {
+              const activeItems = finalAction.batchUpdateItems.filter(it => isTaskSelected(diffModalData.messageId, it.targetItemId));
+              finalAction = {
+                ...finalAction,
+                batchUpdateItems: activeItems,
+              };
+            }
+            createNoteFromAction(finalAction, diffModalData.messageId);
+          }}
+        />
+      )}
     </div>
   );
 };

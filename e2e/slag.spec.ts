@@ -4015,4 +4015,88 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       fullPage: false,
     });
   });
+
+  test('57. Assistant Action Diff Modal (Side-by-side) and Batch Navigation & Truncation', async ({ page }) => {
+    // 1. Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // 2. Trigger batch update action via local intent orchestrator
+    await textarea.fill('можешь у всех сегодняшних задач сделать минимум приоритета');
+    await textarea.press('Enter');
+
+    // 3. Verify batch update action card appears
+    const card = page.locator('[data-testid="action-card"], .max-w-xl').last();
+    await expect(card).toBeVisible({ timeout: 5000 });
+
+    // Verify "Сравнить" button is visible in card
+    const compareBtn = card.locator('button', { hasText: 'Сравнить' }).first();
+    await expect(compareBtn).toBeVisible();
+
+    // Verify individual jump and diff icons exist on each row
+    const rowDiffBtn = card.locator('button[title*="Посмотреть изменения"]').first();
+    await expect(rowDiffBtn).toBeVisible();
+    const rowJumpBtn = card.locator('button[title*="Перейти к"]').first();
+    await expect(rowJumpBtn).toBeVisible();
+
+    // 4. Click "Сравнить" to open Side-by-side DiffModal
+    await compareBtn.click();
+    const modal = page.locator('div[role="dialog"]').first();
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('text=Сравнение').first()).toBeVisible();
+    await expect(modal.locator('text=Было (Текущая версия)')).toBeVisible();
+    await expect(modal.locator('text=Стало (Предлагаемая версия)')).toBeVisible();
+
+    // Capture visual screenshot of Side-by-side DiffModal
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-diff-modal-side-by-side.png',
+      fullPage: false,
+    });
+
+    // 5. Close modal
+    await modal.locator('button', { hasText: 'Закрыть' }).click();
+    await expect(modal).not.toBeVisible();
+
+    // 6. Click Apply
+    const applyBtn = card.locator('button', { hasText: /Применить/ }).first();
+    await applyBtn.click();
+
+    // 7. Verify applied state layout
+    // Label is truncated and footer doesn't overflow
+    await expect(card.locator('text=/Приоритет|Применено/').first()).toBeVisible({ timeout: 5000 });
+    const appliedCompareBtn = card.locator('button', { hasText: 'Сравнить' }).last();
+    await expect(appliedCompareBtn).toBeVisible();
+
+    // Capture visual screenshot of applied batch card
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-batch-applied-no-overflow.png',
+      fullPage: false,
+    });
+
+    // 8. Test content addition / line highlighting in DiffModal
+    await textarea.fill('можешь добавить этой таске подробности: требуемые инструменты бритва и пена');
+    await textarea.press('Enter');
+
+    const updateCard = page.locator('[data-testid="action-card"], .max-w-xl').last();
+    await expect(updateCard).toBeVisible({ timeout: 5000 });
+    const contentCompareBtn = updateCard.locator('button', { hasText: 'Сравнить' }).first();
+    await expect(contentCompareBtn).toBeVisible();
+
+    await contentCompareBtn.click();
+    const contentModal = page.locator('div[role="dialog"]').first();
+    await expect(contentModal).toBeVisible();
+    await expect(contentModal.locator('.bg-emerald-500\\/30').first()).toBeVisible();
+
+    // Capture visual screenshot of content diff with green added line highlighting
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-diff-modal-content-lines.png',
+      fullPage: false,
+    });
+
+    await contentModal.locator('button', { hasText: 'Закрыть' }).click();
+    await expect(contentModal).not.toBeVisible();
+  });
 });
