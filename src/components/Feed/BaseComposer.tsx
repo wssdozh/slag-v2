@@ -154,7 +154,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 topRightSlot ? 'pr-8' : 'pr-1'
               } ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } leading-snug ${isFlat ? 'py-0.5 px-0.5' : 'py-0.5 px-1'} outline-none border-none`}
+              } leading-normal ${isFlat ? 'pt-1.5 pb-0.5 px-0.5' : 'pt-1.5 pb-1 px-1'} outline-none border-none`}
               style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
             />
           </div>

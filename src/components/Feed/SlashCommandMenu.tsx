@@ -42,8 +42,8 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
   const positionClasses = isBottom
     ? 'top-full mt-2'
     : isModal
-    ? 'bottom-[calc(100%+51px)]'
-    : 'bottom-[calc(100%+10px)]';
+    ? 'bottom-[calc(100%+55px)]'
+    : 'bottom-[calc(100%+14px)]';
   const animationClasses = isBottom ? 'slide-in-from-top-2' : 'slide-in-from-bottom-2';
 
   if (filteredCommands.length === 0) {
