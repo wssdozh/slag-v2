@@ -272,3 +272,23 @@ export interface WorkspaceState {
   isKanbanMaterialsOpen?: boolean;
 }
 
+export interface BackupSnapshotMeta {
+  id: string;
+  vaultId: string;
+  vaultName: string;
+  createdAt: number;
+  notesCount: number;
+  attachmentsCount: number;
+  sizeBytes: number;
+  trigger: 'auto' | 'manual';
+  filename?: string;
+}
+
+export interface BackupSettings {
+  autoBackupEnabled: boolean;
+  intervalHours: number;
+  retentionCount: number;
+  lastBackupAt?: number;
+}
+
+

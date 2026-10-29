@@ -248,8 +248,9 @@ export const Sidebar: React.FC = () => {
         {/* Settings button */}
         <button
           onClick={() => setIsSettingsOpen(true)}
-          className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors shrink-0"
+          className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer"
           title="Настройки (ИИ, экспорт, тема)"
+          data-testid="sidebar-settings-btn"
         >
           <Settings className="w-4 h-4" />
         </button>

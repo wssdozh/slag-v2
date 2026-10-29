@@ -1133,10 +1133,15 @@ export class StorageService {
     }, null, 2);
   }
 
-  public importVaultFromJson(jsonString: string): boolean {
+  public importVaultData(data: {
+    folders?: FolderMeta[];
+    items?: SlagItem[];
+    assistantHistory?: ChatMessage[];
+    workspaceState?: WorkspaceState;
+    composerDrafts?: Record<string, ComposerDraft>;
+  }): boolean {
     try {
-      const data = JSON.parse(jsonString);
-      if (Array.isArray(data.folders)) {
+      if (Array.isArray(data.folders) && data.folders.length > 0) {
         localStorage.setItem(this.getFoldersKey(), JSON.stringify(data.folders));
       }
       if (Array.isArray(data.items)) {
@@ -1155,8 +1160,18 @@ export class StorageService {
           // ignore
         }
       }
-      fsLog.info(`Imported vault backup: ${data.items?.length || 0} items, ${data.folders?.length || 0} folders`);
+      fsLog.info(`Imported vault data: ${data.items?.length || 0} items, ${data.folders?.length || 0} folders`);
       return true;
+    } catch (err) {
+      fsLog.error('Failed to import vault data:', err);
+      return false;
+    }
+  }
+
+  public importVaultFromJson(jsonString: string): boolean {
+    try {
+      const data = JSON.parse(jsonString);
+      return this.importVaultData(data);
     } catch (err) {
       fsLog.error('Failed to import vault JSON backup:', err);
       return false;

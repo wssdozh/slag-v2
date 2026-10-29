@@ -17,7 +17,7 @@ export interface OpenFolderResult {
  * 3. Browser fallback with informative toast notification
  */
 export async function openAppFolder(
-  target: 'logs' | 'notes' | 'appdata' | string = 'logs'
+  target: 'logs' | 'notes' | 'appdata' | 'backups' | string = 'logs'
 ): Promise<OpenFolderResult> {
   // 1. Desktop native app via Tauri invoke
   if (isTauri()) {
@@ -54,7 +54,7 @@ export async function openAppFolder(
   }
 
   // 3. Fallback for standalone web / browser builds
-  const folderName = target === 'logs' ? 'логов' : target === 'notes' ? 'заметок' : 'приложения';
+  const folderName = target === 'logs' ? 'логов' : target === 'notes' ? 'заметок' : target === 'backups' ? 'резервных копий' : 'приложения';
   return {
     success: false,
     message: `Прямое открытие папки ${folderName} поддерживается в настольной и dev-версии. Используйте скачивание файлов.`,

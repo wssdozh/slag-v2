@@ -20,7 +20,12 @@ import {
   Terminal,
   ArrowLeft,
   FolderOpen,
-  FileText
+  FileText,
+  Archive,
+  Trash2,
+  Clock,
+  HardDrive,
+  RefreshCw
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
 import { Select } from '../UI/Select';
@@ -44,9 +49,20 @@ export const SettingsModal: React.FC = () => {
     revealVaultInExplorer,
     uiConfig,
     updateUiConfig,
-    isMobile
+    isMobile,
+    backupSnapshots,
+    backupSettings,
+    createManualBackup,
+    restoreSnapshot,
+    deleteSnapshot,
+    downloadSnapshot,
+    downloadVaultZip,
+    restoreFromZipFile,
+    updateBackupSettings,
   } = useApp();
 
+  const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<'desktop' | 'mobile'>(isMobile ? 'mobile' : 'desktop');
 
   const [provider, setProvider] = useState<AiProvider>(aiSettings.provider || 'groq');
@@ -97,6 +113,31 @@ export const SettingsModal: React.FC = () => {
     setIsSettingsOpen(false);
   };
 
+  const handleCreateSnapshot = async () => {
+    setIsCreatingSnapshot(true);
+    try {
+      await createManualBackup();
+    } finally {
+      setIsCreatingSnapshot(false);
+    }
+  };
+
+  const handleRestoreSnapshot = async (id: string) => {
+    if (!window.confirm('Восстановить хранилище из этого снимка? Текущие несохраненные данные будут заменены.')) {
+      return;
+    }
+    setIsRestoring(true);
+    try {
+      await restoreSnapshot(id);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  const handleExportZip = async () => {
+    await downloadVaultZip();
+  };
+
   const handleExportJson = () => {
     const jsonStr = storage.exportVaultAsJson();
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -106,47 +147,50 @@ export const SettingsModal: React.FC = () => {
     a.download = `slag_vault_backup_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    addToast('Резервная копия экспортирована', 'success');
+    addToast('Резервная копия экспортирована в JSON', 'success');
   };
 
-  const handleExportMarkdownFiles = () => {
-    const files = storage.exportObsidianBundle();
-    files.forEach((f, idx) => {
-      setTimeout(() => {
-        const blob = new Blob([f.content], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const cleanName = f.path.replace(/\//g, '_');
-        a.download = cleanName;
-        a.click();
-        URL.revokeObjectURL(url);
-      }, idx * 80);
-    });
-    addToast(`Экспортировано ${files.length} .md файлов`, 'success');
-  };
-
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const success = storage.importVaultFromJson(content);
-      if (success) {
-        refreshData();
-        addToast('Хранилище восстановлено', 'success');
-      } else {
-        addToast('Ошибка формата файла', 'error');
+    if (file.name.endsWith('.zip')) {
+      if (!window.confirm(`Восстановить хранилище из архива "${file.name}"? Текущие данные будут заменены.`)) {
+        e.target.value = '';
+        return;
       }
-    };
-    reader.readAsText(file);
+      setIsRestoring(true);
+      try {
+        await restoreFromZipFile(file);
+      } finally {
+        setIsRestoring(false);
+      }
+    } else if (file.name.endsWith('.json')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        const success = storage.importVaultFromJson(content);
+        if (success) {
+          refreshData();
+          addToast('Хранилище восстановлено из JSON', 'success');
+        } else {
+          addToast('Ошибка формата файла', 'error');
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      addToast('Поддерживаются только архивы .zip и файлы .json', 'error');
+    }
     e.target.value = '';
   };
 
   const handleOpenNotesFolder = async () => {
     await revealVaultInExplorer();
+  };
+
+  const handleOpenBackupsFolder = async () => {
+    const res = await openAppFolder('backups');
+    addToast(res.message, res.success ? 'success' : 'info');
   };
 
   const handleOpenLogsFolder = async () => {
@@ -518,22 +562,150 @@ export const SettingsModal: React.FC = () => {
               )}
 
             {activeTab === 'vault' && (
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-semibold text-zinc-200">
-                  Резервное копирование и Obsidian
-                </span>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-zinc-200">
+                    Резервное копирование и точки отката
+                  </span>
+                  <span className="text-[11px] text-zinc-500">
+                    Автоматические снимки состояния и переносимый ZIP-архив хранилища
+                  </span>
+                </div>
 
+                {/* Auto-backup settings card */}
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium text-zinc-200">Автобэкап раз в сутки</span>
+                        <span className="text-[10px] text-zinc-500">Хранятся последние 7 снимков с автоудалением старых</span>
+                      </div>
+                    </div>
+                    <Checkbox
+                      checked={backupSettings.autoBackupEnabled}
+                      onChange={(checked) => updateBackupSettings({ autoBackupEnabled: checked })}
+                      aria-label="Автобэкап раз в сутки"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+                    <span className="text-[11px] font-mono text-zinc-500">
+                      {backupSettings.lastBackupAt
+                        ? `Последний снимок: ${new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}`
+                        : 'Снимков пока нет'}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="btn-create-snapshot"
+                      onClick={handleCreateSnapshot}
+                      disabled={isCreatingSnapshot}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/15 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isCreatingSnapshot ? 'animate-spin' : ''}`} />
+                      <span>{isCreatingSnapshot ? 'Создание...' : 'Создать снимок'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Snapshots list */}
                 <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-zinc-400">
+                      Точки восстановления ({backupSnapshots.length})
+                    </span>
+                  </div>
+
+                  {backupSnapshots.length === 0 ? (
+                    <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] text-center text-xs text-zinc-500">
+                      Точек восстановления пока нет. Создайте первый снимок или дождитесь автобэкапа.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-1">
+                      {backupSnapshots.map((snap) => {
+                        const dateStr = new Date(snap.createdAt).toLocaleString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+                        const sizeKb = Math.round(snap.sizeBytes / 1024);
+                        return (
+                          <div
+                            key={snap.id}
+                            data-testid={`snapshot-item-${snap.id}`}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.05] transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Archive className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-zinc-200 truncate">{dateStr}</span>
+                                  <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
+                                    {snap.trigger === 'auto' ? 'Авто' : 'Ручной'}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] font-mono text-zinc-500">
+                                  {snap.notesCount} зам. · {snap.attachmentsCount} мед. · {sizeKb} КБ
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                data-testid={`btn-restore-snapshot-${snap.id}`}
+                                onClick={() => handleRestoreSnapshot(snap.id)}
+                                disabled={isRestoring}
+                                className="px-2 py-1 rounded text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50 cursor-pointer"
+                                title="Восстановить хранилище из этого снимка"
+                              >
+                                Восстановить
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => downloadSnapshot(snap.id)}
+                                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                                title="Скачать ZIP архива"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteSnapshot(snap.id)}
+                                className="p-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                title="Удалить снимок"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Export & Import actions */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.04]">
+                  <span className="text-[11px] font-medium text-zinc-400">Экспорт и импорт</span>
+
                   <button
                     type="button"
-                    onClick={handleExportMarkdownFiles}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                    data-testid="btn-export-zip"
+                    onClick={handleExportZip}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <Download className="w-4 h-4 text-zinc-400" />
                       <div className="text-left">
-                        <div className="font-medium">Экспорт в .md (Obsidian Vault)</div>
-                        <div className="text-[10px] text-zinc-500">Заметки в чистом Markdown с YAML Frontmatter</div>
+                        <div className="font-medium">Экспорт в ZIP (Obsidian Vault + медиа)</div>
+                        <div className="text-[10px] text-zinc-500">Все .md файлы, папка .attachments/ и манифест в одном архиве</div>
                       </div>
                     </div>
                   </button>
@@ -541,21 +713,42 @@ export const SettingsModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleExportJson}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <Download className="w-4 h-4 text-zinc-400" />
                       <div className="text-left">
-                        <div className="font-medium">Полный бэкап в JSON</div>
-                        <div className="text-[10px] text-zinc-500">Экспорт структуры, заметок и настроек</div>
+                        <div className="font-medium">Экспорт структуры в JSON</div>
+                        <div className="text-[10px] text-zinc-500">Текстовые данные и настройки без медиафайлов</div>
                       </div>
                     </div>
                   </button>
 
+                  <label className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Восстановить из файла (.zip / .json)</div>
+                        <div className="text-[10px] text-zinc-500">Загрузить архив хранилища или JSON-бэкап</div>
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".zip,.json"
+                      className="hidden"
+                      onChange={handleFileImport}
+                    />
+                  </label>
+                </div>
+
+                {/* System folders */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.04]">
+                  <span className="text-[11px] font-medium text-zinc-400">Системные каталоги</span>
+
                   <button
                     type="button"
                     onClick={handleOpenNotesFolder}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <FolderOpen className="w-4 h-4 text-zinc-400" />
@@ -568,8 +761,22 @@ export const SettingsModal: React.FC = () => {
 
                   <button
                     type="button"
+                    onClick={handleOpenBackupsFolder}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <HardDrive className="w-4 h-4 text-zinc-400" />
+                      <div className="text-left">
+                        <div className="font-medium">Открыть папку бэкапов на диске</div>
+                        <div className="text-[10px] text-zinc-500">Показать директорию со снимками AppData/backups/</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handleOpenLogsFolder}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <Terminal className="w-4 h-4 text-zinc-400" />
@@ -583,7 +790,7 @@ export const SettingsModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleDownloadLogFile}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-zinc-400" />
@@ -593,22 +800,6 @@ export const SettingsModal: React.FC = () => {
                       </div>
                     </div>
                   </button>
-
-                  <label className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <Upload className="w-4 h-4 text-zinc-400" />
-                      <div className="text-left">
-                        <div className="font-medium">Восстановить из JSON</div>
-                        <div className="text-[10px] text-zinc-500">Загрузить ранее сохраненный бэкап</div>
-                      </div>
-                    </div>
-                    <input
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={handleImportJson}
-                    />
-                  </label>
                 </div>
               </div>
             )}
