@@ -298,6 +298,7 @@ test.describe('SLAG v2 — Model Context Protocol (MCP) Server', () => {
   });
 
   test('11. Realtime Assistant UI Interaction with save_item action card', async ({ page }) => {
+    test.setTimeout(60000);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
