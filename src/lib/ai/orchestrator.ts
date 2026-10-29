@@ -100,6 +100,46 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
         }
       }
 
+      if (actionKind === 'save_item') {
+        const hasExistingId = parsed.id || parsed.targetItemId;
+        if (hasExistingId) {
+          return {
+            cleanText,
+            suggestedAction: {
+              type: 'update_item',
+              targetItemId: parsed.id || parsed.targetItemId,
+              title: parsed.title || 'Обновление записи',
+              folder: parsed.folder || 'Входящие',
+              content: parsed.content || '',
+              appendContent: parsed.appendContent,
+              tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+              itemType: parsed.itemType || 'note',
+              dueDate: parsed.dueDate,
+              reminder: parsed.reminder,
+              priority: parsed.priority,
+              status: parsed.status,
+              updates: parsed.updates || parsed,
+            },
+          };
+        }
+        return {
+          cleanText,
+          suggestedAction: {
+            type: 'create_note',
+            title: parsed.title || 'Новая запись',
+            folder: parsed.folder || 'Входящие',
+            content: parsed.content || '',
+            appendContent: parsed.appendContent,
+            tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+            itemType: ['note', 'task', 'article'].includes(parsed.itemType) ? parsed.itemType : (parsed.dueDate ? 'task' : 'note'),
+            dueDate: parsed.dueDate,
+            reminder: parsed.reminder,
+            priority: ['none', 'low', 'medium', 'high'].includes(parsed.priority) ? parsed.priority : undefined,
+            status: parsed.status,
+          },
+        };
+      }
+
       if (actionKind === 'create_note' || actionKind === 'schedule_task') {
         return {
           cleanText,
@@ -421,110 +461,144 @@ export class AssistantOrchestrator {
         };
       }
 
-      // Action tools for Read-Only Safety: prepare SuggestedAction cards for UI confirmation
-      if (name === 'create_note') {
-        capturedActions.push({
-          type: 'create_note',
-          title: String(args.title || 'Новая запись').trim(),
-          folder: args.folder || currentFolder,
-          content: args.content || '',
-          tags: Array.isArray(args.tags) ? args.tags : [],
-          itemType: args.itemType || 'note',
-          actionState: 'suggested',
-        });
-        return {
-          status: 'proposed',
-          message: `Черновик ${args.itemType || 'записи'} «${args.title}» подготовлен к сохранению в хранилище. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
-        };
-      }
+      // Action tools for Read-Only Safety: unified save_item + backward compatibility for create_note, schedule_task, update_item
+      if (name === 'save_item' || name === 'create_note' || name === 'schedule_task' || name === 'update_item') {
+        const rawTitle = String(args.title || '').trim();
+        const rawId = String(args.id || args.targetItemId || '').trim();
+        const rawUpdates: ItemUpdates = args.updates || {};
 
-      if (name === 'schedule_task') {
-        let reminder = args.reminder;
-        if (reminder && !reminder.includes('T') && args.dueDate) {
-          reminder = `${args.dueDate}T${reminder}:00`;
+        // Merge flat parameters and nested updates
+        const content = args.content !== undefined ? args.content : rawUpdates.content;
+        const appendContent = args.appendContent || rawUpdates.appendContent;
+        const folder = args.folder || rawUpdates.folder;
+        const itemType = args.itemType || (rawUpdates as any).type || (name === 'schedule_task' ? 'task' : undefined);
+        const tags = args.tags || rawUpdates.tags;
+        let dueDate = args.dueDate !== undefined ? args.dueDate : rawUpdates.dueDate;
+        let reminder = args.reminder !== undefined ? args.reminder : rawUpdates.reminder;
+        let priority = args.priority || rawUpdates.priority;
+        const status = args.status || rawUpdates.status;
+        const subtasks = args.subtasks || rawUpdates.subtasks;
+
+        const dueDateText = args.dueDateText || (rawUpdates as any).dueDateText;
+        if (dueDateText) {
+          const parsed = parseTodoistInput(dueDateText);
+          if (parsed.dueDate) dueDate = parsed.dueDate;
+          if (parsed.reminder) reminder = parsed.reminder;
+          if (parsed.priority) priority = parsed.priority;
         }
-        capturedActions.push({
-          type: 'schedule_task',
-          title: String(args.title || 'Новая задача').trim(),
-          folder: args.folder || currentFolder,
-          content: args.content || '',
-          dueDate: args.dueDate,
-          reminder,
-          priority: args.priority || 'medium',
-          tags: Array.isArray(args.tags) ? args.tags : [],
-          itemType: 'task',
-          actionState: 'suggested',
-        });
-        return {
-          status: 'proposed',
-          message: `Задача «${args.title}» на дату ${args.dueDate} подготовлена к планированию. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
-        };
-      }
 
-      if (name === 'update_item') {
-        const titleQuery = String(args.title || '').trim().toLowerCase();
-        const targetId = String(args.targetItemId || '').trim();
-        const found = allItems.find((i) =>
-          (targetId && i.id === targetId) ||
-          (titleQuery && (i.title.toLowerCase() === titleQuery || i.title.toLowerCase().includes(titleQuery) || titleQuery.includes(i.title.toLowerCase())))
-        );
+        const titleQuery = rawTitle.toLowerCase();
+        // Determine whether target item already exists
+        const found = rawId
+          ? allItems.find((i) => i.id === rawId || i.title.toLowerCase() === rawId.toLowerCase())
+          : (name === 'update_item' || args.actionLabel || (titleQuery && (status || appendContent || (priority && !dueDate))))
+            ? allItems.find((i) => i.title.toLowerCase() === titleQuery || i.title.toLowerCase().includes(titleQuery) || titleQuery.includes(i.title.toLowerCase()))
+            : null;
 
-        if (!found) {
+        if (name === 'update_item' && !found) {
           const available = allItems.slice(0, 5).map(t => `«${t.title}» (id: ${t.id})`);
           return {
-            error: `Запись не найдена по запросу "${args.title || args.targetItemId}". Доступные записи: ${available.join(', ') || 'нет записей'}. Уточните title или targetItemId.`,
+            error: `Запись не найдена по запросу "${args.title || args.targetItemId || args.id}". Доступные записи: ${available.join(', ') || 'нет записей'}. Уточните title или targetItemId.`,
           };
         }
 
-        const rawUpdates: ItemUpdates = args.updates || {};
-        if ((rawUpdates as any).dueDateText) {
-          const parsed = parseTodoistInput((rawUpdates as any).dueDateText);
-          if (parsed.dueDate) rawUpdates.dueDate = parsed.dueDate;
-          if (parsed.reminder) rawUpdates.reminder = parsed.reminder;
-          if (parsed.priority) rawUpdates.priority = parsed.priority;
+        if (found) {
+          // UPDATE BRANCH
+          if (reminder && !reminder.includes('T')) {
+            const effectiveDate = dueDate || found.dueDate || new Date().toISOString().slice(0, 10);
+            dueDate = effectiveDate;
+            const time = reminder.trim();
+            reminder = `${effectiveDate}T${time.length === 5 ? time : time.slice(0, 5)}:00`;
+          }
+
+          let actionLabel = args.actionLabel || (rawUpdates as any).actionLabel;
+          if (!actionLabel) {
+            if (appendContent) actionLabel = 'Дополнение заметки';
+            else if (dueDate !== undefined) actionLabel = dueDate ? 'Перенос срока' : 'Снятие срока';
+            else if (priority) actionLabel = `Приоритет ➔ ${priority.toUpperCase()}`;
+            else if (status) actionLabel = `Статус ➔ ${status}`;
+            else if (folder) actionLabel = 'Перемещение записи';
+            else actionLabel = 'Обновление записи';
+          }
+
+          const resolvedUpdates: ItemUpdates = {
+            ...rawUpdates,
+            title: rawTitle || found.title,
+            content: content !== undefined ? content : undefined,
+            appendContent,
+            folder: folder || found.folder,
+            type: itemType || found.type,
+            dueDate: dueDate !== undefined ? (dueDate || undefined) : undefined,
+            reminder: reminder !== undefined ? (reminder || undefined) : undefined,
+            priority,
+            status,
+            tags: tags || found.tags,
+            subtasks: Array.isArray(subtasks)
+              ? subtasks.map((st: any, idx: number) => typeof st === 'string' ? { id: `st_${Date.now()}_${idx}`, title: st, completed: false } : st)
+              : undefined,
+          };
+
+          const formattedSubtasks = Array.isArray(resolvedUpdates.subtasks)
+            ? resolvedUpdates.subtasks.map((st: any, idx: number) =>
+                typeof st === 'string'
+                  ? { id: `st_${Date.now()}_${idx}`, title: st, completed: false }
+                  : { id: st.id || `st_${Date.now()}_${idx}`, title: st.title || '', completed: Boolean(st.completed) }
+              )
+            : undefined;
+
+          capturedActions.push({
+            type: 'update_item',
+            targetItemId: found.id,
+            title: found.title,
+            actionLabel,
+            folder: resolvedUpdates.folder || found.folder,
+            content: resolvedUpdates.content || '',
+            appendContent: resolvedUpdates.appendContent,
+            tags: resolvedUpdates.tags || found.tags || [],
+            itemType: resolvedUpdates.type || found.type,
+            dueDate: resolvedUpdates.dueDate || undefined,
+            reminder: resolvedUpdates.reminder || undefined,
+            priority: resolvedUpdates.priority,
+            status: resolvedUpdates.status,
+            subtasks: formattedSubtasks,
+            updates: resolvedUpdates,
+            actionState: 'suggested',
+          });
+
+          return {
+            status: 'proposed',
+            message: `Изменения для «${found.title}» подготовлены. В интерфейсе пользователю отображена интерактивная карточка подтверждения. Завершите ответ подтверждением.`,
+          };
         }
 
-        if (rawUpdates.reminder && !rawUpdates.reminder.includes('T')) {
-          const effectiveDate = rawUpdates.dueDate || found.dueDate || new Date().toISOString().slice(0, 10);
-          rawUpdates.dueDate = effectiveDate;
-          const time = rawUpdates.reminder.trim();
-          rawUpdates.reminder = `${effectiveDate}T${time.length === 5 ? time : time.slice(0, 5)}:00`;
+        // CREATE BRANCH
+        if (reminder && !reminder.includes('T') && dueDate) {
+          reminder = `${dueDate}T${reminder}:00`;
         }
 
-        let actionLabel = args.actionLabel || (rawUpdates as any).actionLabel;
-        if (!actionLabel) {
-          if (rawUpdates.appendContent) actionLabel = 'Дополнение заметки';
-          else if (rawUpdates.dueDate !== undefined) actionLabel = rawUpdates.dueDate ? 'Перенос срока' : 'Снятие срока';
-          else if (rawUpdates.priority) actionLabel = `Приоритет ➔ ${rawUpdates.priority.toUpperCase()}`;
-          else if (rawUpdates.status) actionLabel = `Статус ➔ ${rawUpdates.status}`;
-          else if (rawUpdates.folder) actionLabel = 'Перемещение записи';
-          else actionLabel = 'Обновление записи';
-        }
+        const effectiveType = itemType || (name === 'schedule_task' || dueDate ? 'task' : 'note');
 
         capturedActions.push({
-          type: 'update_item',
-          targetItemId: found.id,
-          title: found.title,
-          actionLabel,
-          folder: rawUpdates.folder || found.folder,
-          content: rawUpdates.content || '',
-          appendContent: rawUpdates.appendContent,
-          tags: rawUpdates.tags || found.tags || [],
-          itemType: rawUpdates.type || found.type,
-          dueDate: rawUpdates.dueDate !== undefined ? (rawUpdates.dueDate || undefined) : undefined,
-          reminder: rawUpdates.reminder !== undefined ? (rawUpdates.reminder || undefined) : undefined,
-          priority: rawUpdates.priority,
-          status: rawUpdates.status,
-          subtasks: Array.isArray(rawUpdates.subtasks)
-            ? rawUpdates.subtasks.map((st: any, idx: number) => typeof st === 'string' ? { id: `st_${Date.now()}_${idx}`, title: st, completed: false } : st)
+          type: 'create_note',
+          title: rawTitle || 'Новая запись',
+          folder: folder || currentFolder,
+          content: content || appendContent || '',
+          dueDate,
+          reminder,
+          priority: priority || (effectiveType === 'task' ? 'medium' : undefined),
+          status: status || (effectiveType === 'task' ? 'todo' : undefined),
+          tags: Array.isArray(tags) ? tags : [],
+          itemType: effectiveType,
+          subtasks: Array.isArray(subtasks)
+            ? subtasks.map((st: any, idx: number) => typeof st === 'string' ? { id: `st_${Date.now()}_${idx}`, title: st, completed: false } : st)
             : undefined,
-          updates: rawUpdates,
           actionState: 'suggested',
         });
 
+        const typeLabel = effectiveType === 'task' ? 'задачи' : (effectiveType === 'article' ? 'статьи' : 'заметки');
         return {
           status: 'proposed',
-          message: `Изменения для «${found.title}» подготовлены. В интерфейсе пользователю отображена интерактивная карточка подтверждения. Завершите ответ подтверждением.`,
+          message: `Черновик ${typeLabel} «${rawTitle || 'Новая запись'}» подготовлен к сохранению в хранилище. В интерфейсе пользователю отображена карточка подтверждения. Завершите ответ кратким подтверждением.`,
         };
       }
 
@@ -720,47 +794,27 @@ export class AssistantOrchestrator {
         },
       },
       {
-        name: 'create_note',
-        description: 'Создать или обновить черновик заметки, задачи или статьи в хранилище (с интерактивной кнопкой подтверждения).',
+        name: 'save_item',
+        description: 'Создать новую или обновить существующую заметку, задачу или статью (паттерн save_*). Если передан id (или точный заголовок существующей записи) — запись обновляется. Если id не передан — создается новая.',
         parameters: {
           type: 'object',
           properties: {
+            id: { type: 'string', description: 'ID или точный заголовок существующей записи для обновления. Опусти при создании новой записи.' },
             title: { type: 'string', description: 'Заголовок записи' },
-            content: { type: 'string', description: 'Содержимое/текст записи (включая подробности, шаги, инструменты)' },
-            itemType: { type: 'string', enum: ['note', 'task', 'article'], description: 'Тип записи' },
-            folder: { type: 'string', description: 'Папка для сохранения' },
-            tags: { type: 'array', items: { type: 'string' }, description: 'Теги' },
+            content: { type: 'string', description: 'Содержимое/текст записи в формате Markdown' },
+            appendContent: { type: 'string', description: 'Текст для добавления в конец записи (при обновлении)' },
+            itemType: { type: 'string', enum: ['note', 'task', 'article'], description: 'Тип записи: note (заметка), task (задача), article (статья)' },
+            folder: { type: 'string', description: 'Папка для сохранения или перемещения' },
+            tags: { type: 'array', items: { type: 'string' }, description: 'Список тегов без знака #' },
+            dueDate: { type: 'string', description: 'Срок выполнения задачи в формате YYYY-MM-DD (или пустая строка для сброса)' },
+            dueDateText: { type: 'string', description: 'Естественное описание даты (например, "завтра в 10:00")' },
+            reminder: { type: 'string', description: 'Время напоминания или слот дня (например, "10:00", "14:30" или ISO)' },
+            priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'], description: 'Приоритет задачи' },
+            status: { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'done'], description: 'Статус задачи' },
+            subtasks: { type: 'array', items: { type: 'string' }, description: 'Список подзадач' },
+            actionLabel: { type: 'string', description: 'Краткое название действия в 2-4 слова' },
           },
           required: ['title'],
-        },
-      },
-      {
-        name: 'schedule_task',
-        description: 'Запланировать задачу в календаре на конкретную дату (YYYY-MM-DD).',
-        parameters: {
-          type: 'object',
-          properties: {
-            title: { type: 'string', description: 'Заголовок задачи' },
-            dueDate: { type: 'string', description: 'Дата в формате YYYY-MM-DD' },
-            priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Приоритет задачи' },
-            content: { type: 'string', description: 'Описание или подробности задачи' },
-            folder: { type: 'string', description: 'Папка' },
-          },
-          required: ['title', 'dueDate'],
-        },
-      },
-      {
-        name: 'update_item',
-        description: 'Универсальное изменение любых параметров существующей заметки, задачи или статьи (приоритет, срок, статус, теги, папка, текст, подзадачи, тип).',
-        parameters: {
-          type: 'object',
-          properties: {
-            targetItemId: { type: 'string', description: 'Идентификатор изменяемой записи (приоритет)' },
-            title: { type: 'string', description: 'Заголовок записи для поиска (если targetItemId неизвестен)' },
-            actionLabel: { type: 'string', description: 'Краткое название действия в 2-4 слова (например, "Смена приоритета на HIGH", "Перенос срока на завтра", "Дополнение заметки")' },
-            updates: ITEM_UPDATES_SCHEMA,
-          },
-          required: ['updates'],
         },
       },
       {
@@ -879,10 +933,10 @@ ${isInbox
 
 3. ИНСТРУМЕНТЫ (TOOL CALLING) И ПРАВИЛО READ-ONLY SAFETY:
    - Все действия в приложении (создание, перенос, изменение параметров, декомпозиция) выполняются ИСКЛЮЧИТЕЛЬНО через нативные вызовы инструментов (tool_calls).
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать в текст ответа псевдокод вида action:... или сырой JSON! Вызывай соответствующие функции API (create_note, schedule_task, update_item, batch_update_items, filter_feed).
-   - Для изменения параметров одной записи (приоритет, статус, срок, напоминание, текст, теги, папка) вызывай update_item.
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать в текст ответа псевдокод вида action:... или сырой JSON! Вызывай соответствующие функции API (save_item, batch_update_items, filter_feed).
+   - Для создания новой заметки/задачи или изменения существующей (приоритет, статус, срок, напоминание, текст, теги, папка) вызывай save_item. При создании id не указывай; при обновлении передавай id существующей записи (или точный заголовок).
    - Для группы записей (перенос нескольких задач, распределение по времени, массовая смена приоритетов или статусов) вызывай batch_update_items.
-   - Прямое удаление заметок запрещено политикой безопасности. Если пользователь просит удалить заметку («удали эту заметку»), прямо поясни, что удаление через чат недоступно, но можно предложить перенести её в архив через update_item({ targetItemId, updates: { isArchived: true } }).
+   - Прямое удаление заметок запрещено политикой безопасности. Если пользователь просит удалить заметку («удали эту заметку»), прямо поясни, что удаление через чат недоступно, но можно предложить перенести её в архив через save_item({ id: targetItemId, actionLabel: 'Архивация записи', status: 'backlog' }).
    - Пользователь увидит интерактивную кнопку подтверждения в чате. Никаких прямых мутаций без клика.
 
 ФИЛЬТРАЦИЯ ЛЕНТЫ:
@@ -890,7 +944,7 @@ ${isInbox
 
 ПЛАНИРОВАНИЕ И РАСПРЕДЕЛЕНИЕ ЗАДАЧ:
 - Ты обладаешь полной автономностью (ReAct-подход): ты можешь свободно вызывать get_calendar_agenda или search_notes для анализа текущего расписания, либо сразу опираться на блок «АКТУАЛЬНЫЙ СРЕЗ ЗАДАЧ».
-- Для планирования и переноса задач вызывай batch_update_items (для группы задач) или update_item (для одной).
+- Для планирования и переноса задач вызывай batch_update_items (для группы задач) или save_item (для одной).
 - РАСПРЕДЕЛЕНИЕ В ТЕЧЕНИЕ ДНЯ («разбросай в течении дня», «по часам», «в обед»):
   * Сохраняй целевую дату (например, дату сегодняшнего дня, если пользователь пишет «в обед», или завтрашнего дня в формате YYYY-MM-DD).
   * В updates ОБЯЗАТЕЛЬНО передавай и dueDate (целевую дату), и reminder (время слота, например "12:00", "12:30", "13:00")!
@@ -903,14 +957,14 @@ ${isInbox
 
 4. РЕАКТИВНОСТЬ НА КОРРЕКТИРОВКИ (FOLLOW-UP REFINEMENT):
    - Если пользователь просит изменить, скорректировать, инвертировать порядок, сдвинуть время или состав ранее предложенных задач («нене порядок инвертировать задом на перёд», «сделай наоборот», «не в 10, а в 12», «поменяй местами», «убери одну», «добавь еще», «да теперь предложи»):
-     * ТЫ ОБЯЗАН СРАЗУ ЖЕ ВЫЗВАТЬ соответствующий инструмент (например, batch_update_items или update_item) с обновленными параметрами!
+     * ТЫ ОБЯЗАН СРАЗУ ЖЕ ВЫЗВАТЬ соответствующий инструмент (например, batch_update_items или save_item) с обновленными параметрами!
      * НЕ ограничивайся просто текстовым описанием или списком! Всегда сопровождай ответ вызовом инструмента, чтобы в интерфейсе появилась обновленная карточка с кнопкой «Применить».
      * При запросе «инвертировать задом наперед» — переверни список задач и распредели временные слоты (reminder) в обратном порядке (например, задачи с низким приоритетом на более раннее время).
 
 5. РАБОТА С КОНТЕКСТОМ И ТРАНСФОРМАЦИЯ ЧЕРНОВИКОВ:
    - Если пользователь просит переделать, развить или преобразовать предыдущую запись («сделай из этого статью», «преврати в задачу», «добавь деталей», «добавь этой таске подробности»):
    - Опирайся на тему и текст предыдущего черновика из истории диалога.
-   - Сформируй обновленный вызов инструмента create_note / schedule_task.
+   - Сформируй обновленный вызов инструмента save_item.
    - Если пользователь сообщает дополнительные подробности («требуемые инструменты бритва», «детали:...») — ОБНОВИ черновик задачи/заметки, включив этот текст в поле content.
    - НЕ вызывай search_notes на такие контекстные просьбы и уточнения!`;
 
