@@ -46,7 +46,7 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   isKanbanMaterialsOpen: true,
 };
 
-// Initial default folders (Second Brain taxonomy)
+// Initial default folders (Custom taxonomy aligned with Career, Personal, Projects, Future and Knowledge Base)
 export const DEFAULT_FOLDERS: FolderMeta[] = [
   {
     path: 'Входящие',
@@ -56,9 +56,45 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
     isSystem: true,
   },
   {
+    path: 'Карьера',
+    name: 'Карьера',
+    description: 'Профессиональный рост, карьерные цели, резюме, поиск работы и ключевые навыки.',
+    icon: 'Briefcase',
+  },
+  {
+    path: 'Карьера/Поиск работы',
+    name: 'Поиск работы',
+    description: 'Отклики, вакансии, контакты рекрутеров, резюме и подготовка к собеседованиям.',
+    icon: 'Compass',
+  },
+  {
+    path: 'Карьера/Развитие',
+    name: 'Развитие',
+    description: 'Обучение, курсы, новые технологии, профессиональные книги и менторство.',
+    icon: 'Sparkles',
+  },
+  {
+    path: 'Личное',
+    name: 'Личное',
+    description: 'Личные цели, баланс жизни, здоровье, дом и быт.',
+    icon: 'Bookmark',
+  },
+  {
+    path: 'Личное/Быт',
+    name: 'Быт',
+    description: 'Домашние дела, покупки, счета, мелкий ремонт, бытовая рутина и организация жизни.',
+    icon: 'Coffee',
+  },
+  {
+    path: 'Личное/Здоровье',
+    name: 'Здоровье',
+    description: 'Тренировки, чекапы, врачи, анализы, режим сна, питание и самочувствие.',
+    icon: 'Heart',
+  },
+  {
     path: 'Проекты',
     name: 'Проекты',
-    description: 'Активные проекты, продуктовая разработка, технические спецификации и код.',
+    description: 'Активная продуктовая и техническая разработка, пет-проекты, код и контент.',
     icon: 'Folder',
   },
   {
@@ -68,16 +104,46 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
     icon: 'Layers',
   },
   {
+    path: 'Проекты/медиа',
+    name: 'медиа',
+    description: 'Создание контента, сценарии для видео и блогов, статьи, соцсети и публикации.',
+    icon: 'Book',
+  },
+  {
+    path: 'Проекты/fantazer',
+    name: 'fantazer',
+    description: 'Разработка проекта fantazer, архитектура, задачи и фичи.',
+    icon: 'Cpu',
+  },
+  {
+    path: 'Проекты/block-sorting',
+    name: 'block-sorting',
+    description: 'Проект сортировки блоков block-sorting, алгоритмы, верстка и код.',
+    icon: 'Code2',
+  },
+  {
+    path: 'Будущее',
+    name: 'Будущее',
+    description: 'Инкубатор долгосрочных замыслов, список отложенного и идеи без жестких сроков.',
+    icon: 'Flame',
+  },
+  {
+    path: 'Будущее/Потом',
+    name: 'Потом',
+    description: 'Задачи и идеи «когда-нибудь / может быть», книги на будущее, отложенные планы.',
+    icon: 'Archive',
+  },
+  {
+    path: 'Будущее/Хотелки',
+    name: 'Хотелки',
+    description: 'Вишлист покупок, гаджеты, подарки, развлечения и вдохновляющие хотелки.',
+    icon: 'Sparkles',
+  },
+  {
     path: 'База знаний',
     name: 'База знаний',
     description: 'Вечнозеленые заметки, статьи, документация и референсы.',
     icon: 'Book',
-  },
-  {
-    path: 'Личное',
-    name: 'Личное',
-    description: 'Мысли, книги, бытовые вопросы и личные цели.',
-    icon: 'Bookmark',
   },
 ];
 
@@ -588,9 +654,21 @@ export class StorageService {
     if (!raw) return DEFAULT_FOLDERS;
     try {
       const parsed: FolderMeta[] = JSON.parse(raw);
+      let changed = false;
       // Ensure "Входящие" always exists
       if (!parsed.some(f => f.path === 'Входящие')) {
         parsed.unshift(DEFAULT_FOLDERS[0]);
+        changed = true;
+      }
+      // Ensure default taxonomy folders are present in existing storage
+      for (const def of DEFAULT_FOLDERS) {
+        if (!parsed.some(f => f.path.toLowerCase() === def.path.toLowerCase())) {
+          parsed.push(def);
+          changed = true;
+        }
+      }
+      if (changed) {
+        localStorage.setItem(this.getFoldersKey(), JSON.stringify(parsed));
       }
       return parsed;
     } catch {

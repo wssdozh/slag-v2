@@ -30,9 +30,11 @@ export const FolderTree: React.FC = () => {
   } = useApp();
 
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({
-    'Проекты': true,
-    'База знаний': true,
+    'Карьера': true,
     'Личное': true,
+    'Проекты': true,
+    'Будущее': true,
+    'База знаний': true,
   });
 
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);

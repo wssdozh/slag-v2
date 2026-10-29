@@ -231,4 +231,21 @@ test.describe('Composer @ Folder Selection E2E', () => {
       fullPage: false,
     });
   });
+
+  test('6. New folder structure taxonomy renders with clean tree', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Verify root folders
+    await expect(page.locator('aside span', { hasText: 'Карьера' }).first()).toBeVisible();
+    await expect(page.locator('aside span', { hasText: 'Личное' }).first()).toBeVisible();
+    await expect(page.locator('aside span', { hasText: 'Проекты' }).first()).toBeVisible();
+    await expect(page.locator('aside span', { hasText: 'Будущее' }).first()).toBeVisible();
+    await expect(page.locator('aside span', { hasText: 'База знаний' }).first()).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/new-folder-structure.png',
+      fullPage: false,
+    });
+  });
 });
