@@ -2222,22 +2222,25 @@ ${isInbox
         if (quoted) {
           title = quoted[1];
         } else {
-          const cleaned = lastUserMsg
-            .split('\n')[0]
-            .replace(/^(можешь|пожалуйста|хочу|нужно|надо)\s*/i, '')
-            .replace(/(создай|добавь|сделай|напиши|оформи|преврати|запланируй|новая заметка|новую задачу|таску|задачу|заметку|статью|из этого)\s*/gi, '')
-            .replace(/на\s+(сегодня|завтра|послезавтра)\s*/gi, '')
-            .replace(/^(сделать|создать|добавить|написать|запланировать)\s*/i, '')
-            .trim();
+          let cleaned = lastUserMsg.split('\n')[0].trim();
+          cleaned = cleaned.replace(/^(?:можешь|пожалуйста|хочу|нужно|надо)\s+/i, '');
+          cleaned = cleaned.replace(/^(?:создай|добавь|сделай|напиши|оформи|преврати|запланируй)\s+(?:новую\s+|новый\s+)?(?:таску|задачу|заметку|статью|черновик)?\s*/i, '');
+          cleaned = cleaned.replace(/^(?:таску|задачу|заметку|статью|черновик)\s+/i, '');
+          cleaned = cleaned.replace(/\s+на\s+(?:сегодня|завтра|послезавтра)\s*$/i, '');
+          cleaned = cleaned.replace(/^на\s+(?:сегодня|завтра|послезавтра)\s+/i, '');
+          cleaned = cleaned.replace(/:\s*$/, '').trim();
           title = cleaned || (isArticle ? 'Статья' : isTask ? 'Новая задача' : 'Новая мысль');
         }
       }
+
+      const msgLines = lastUserMsg.split('\n').map(l => l.trim()).filter(Boolean);
+      const extraBody = msgLines.length > 1 ? msgLines.slice(1).join('\n') : '';
 
       const cleanContent = previousDraftContent
         ? (previousDraftContent.startsWith('[Подготовлен черновик')
             ? previousDraftContent.replace(/^\[Подготовлен черновик[^:]*:[^\]]*\]\n?/, '')
             : previousDraftContent)
-        : `Создано через Ассистента: ${lastUserMsg}`;
+        : extraBody;
 
       const suggestedAction: SuggestedAction = {
         type: dueDate ? 'schedule_task' : 'create_note',
