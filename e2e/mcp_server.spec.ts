@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpVault } from '../src/mcp/vault';
 import { registerMcpTools } from '../src/mcp/tools';
@@ -258,5 +259,74 @@ test.describe('SLAG v2 — Model Context Protocol (MCP) Server', () => {
     const prompt = await client.getPrompt({ name: 'daily_plan' });
     expect(prompt.messages.length).toBeGreaterThan(0);
     expect(prompt.messages[0].content.text).toContain('list_tasks');
+  });
+
+  test('10. Live Stdio Subprocess communication test', async () => {
+    const liveVaultDir = path.resolve('.tmp/live-stdio-vault');
+    await fs.mkdir(liveVaultDir, { recursive: true });
+
+    try {
+      const stdioTransport = new StdioClientTransport({
+        command: 'node',
+        args: [path.resolve('dist/mcp/index.js'), '--vault', liveVaultDir],
+      });
+
+      const liveClient = new Client({ name: 'live-stdio-client', version: '1.0.0' });
+      await liveClient.connect(stdioTransport);
+
+      const tools = await liveClient.listTools();
+      expect(tools.tools.length).toBe(11);
+
+      const saveRes = await liveClient.callTool({
+        name: 'save_note',
+        arguments: {
+          title: 'Живая мысль через Stdio',
+          content: 'Проверка вызова внешнего процесса по stdio.',
+          folder: 'Входящие',
+          tags: ['live-stdio'],
+        },
+      });
+
+      expect(saveRes.isError).toBeFalsy();
+      const text = (saveRes.content as any[])[0]?.text || '';
+      expect(text).toContain('Живая мысль через Stdio');
+
+      await liveClient.close();
+    } finally {
+      await fs.rm(liveVaultDir, { recursive: true, force: true });
+    }
+  });
+
+  test('11. Realtime Assistant UI Interaction with save_item action card', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Switch to Assistant tab
+    const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
+    await assistantTab.click();
+
+    const textarea = page.locator('textarea[placeholder*="Спросите"]').first();
+    await expect(textarea).toBeVisible();
+
+    // Ask to save task
+    await textarea.fill('создай таску Написать документацию MCP на завтра');
+    await textarea.press('Enter');
+
+    // Verify card appeared
+    const taskCard = page.locator('text=Написать документацию MCP').first();
+    await expect(taskCard).toBeVisible({ timeout: 10000 });
+
+    const planBtn = page.locator('button', { hasText: /Запланировать|Сохранить|Применить/ }).first();
+    await expect(planBtn).toBeVisible();
+
+    // Take screenshot for visual verification
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-mcp-save-item-live.png',
+      fullPage: false,
+    });
+
+    // Click confirm
+    await planBtn.click();
+    await expect(page.locator('text=сохранена').or(page.locator('text=Обновлено')).first()).toBeVisible({ timeout: 5000 });
   });
 });
