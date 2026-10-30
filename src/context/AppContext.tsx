@@ -1479,6 +1479,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updateItem(updated);
           savedItem = updated;
           updatedCount++;
+        } else if (item.title) {
+          const newItem = saveItem({
+            title: item.title,
+            type: action.itemType || 'task',
+            folder: action.folder || currentFolder,
+            tags: action.tags || [],
+            dueDate: item.updates?.dueDate || undefined,
+            reminder: item.updates?.reminder || undefined,
+            priority: item.updates?.priority || 'none',
+            status: item.updates?.status || 'todo',
+            content: '',
+          });
+          savedItem = newItem;
+          updatedCount++;
         }
       }
 
@@ -1486,10 +1500,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         actionHistoryRef.current.push({
           id: 'hist_' + Date.now(),
           timestamp: Date.now(),
-          description: `Пакетное обновление ${updatedCount} записей`,
+          description: `Пакетное применение ${updatedCount} записей`,
           itemSnapshots: snapshots,
         });
-        addToast(`Перенесено задач: ${updatedCount}`, 'success', {
+        addToast(`Применено задач: ${updatedCount}`, 'success', {
           label: 'Отменить',
           onClick: () => undoLastAction(),
         });
