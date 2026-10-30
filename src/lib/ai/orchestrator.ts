@@ -1,4 +1,4 @@
-import type { SlagItem, FolderMeta, AiSettings, SuggestedAction, ChatToolCall, BatchUpdateItem, ItemUpdates } from '../../types';
+import type { SlagItem, SlagItemType, FolderMeta, AiSettings, SuggestedAction, ChatToolCall, BatchUpdateItem, ItemUpdates } from '../../types';
 import type {
   AssistantToolDefinition,
   AdapterTurnHistoryItem,
@@ -56,7 +56,11 @@ export function cleanSnippetText(text: string, maxLen = 140): string {
 /**
  * Parses embedded action block from assistant response (create_note, schedule_task, reschedule_task, update_task_status, decompose_task, move_note)
  */
-export function extractActionBlock(text: string): { cleanText: string; suggestedAction?: SuggestedAction } {
+export function extractActionBlock(
+  text: string,
+  allItems?: SlagItem[],
+  currentFolder?: string
+): { cleanText: string; suggestedAction?: SuggestedAction } {
   // Matches ```action:name, ```json:name, ```action, ```json or ```\n{...}
   const actionRegex = /```(?:action:?([\w_]+)|json:?([\w_]+)?|([\w_]+))?\s*\n?(\{[\s\S]*?\})\s*```/i;
   const match = text.match(actionRegex);
@@ -247,6 +251,151 @@ export function extractActionBlock(text: string): { cleanText: string; suggested
     } catch {
       // Ignore fallback error
     }
+  }
+
+  // 3. Fallback: Parse markdown code block ```task, ```todo, or ```action:decompose
+  const taskBlockMatch = text.match(/```(?:task|todo|action:task|action:decompose)\s*\n([\s\S]*?)```/i);
+  if (taskBlockMatch) {
+    const rawBlock = taskBlockMatch[1].trim();
+    const lines = rawBlock.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length > 0) {
+      const rawTitle = lines[0].replace(/^[#*-\d.]+\s*/, '').trim();
+      let folder = currentFolder || 'Входящие';
+      let contentStartIndex = 1;
+      const fLine = lines[1] || '';
+      if (fLine.includes('/') || fLine === 'Входящие' || fLine === 'Личное' || fLine === 'Проекты' || fLine === 'Карьера' || fLine === 'Будущее' || fLine === 'База знаний') {
+        folder = fLine;
+        contentStartIndex = 2;
+      }
+
+      const subtasks: Array<{ id: string; title: string; completed: boolean }> = [];
+      const contentLines: string[] = [];
+      for (let i = contentStartIndex; i < lines.length; i++) {
+        const line = lines[i];
+        const numMatch = line.match(/^\d+\.\s+(.*)$/);
+        const checkMatch = line.match(/^[-*]\s*\[([ xX])\]\s*(.*)$/);
+        const bulletMatch = line.match(/^[-*]\s+(.*)$/);
+
+        if (checkMatch) {
+          subtasks.push({
+            id: `st_${Date.now()}_${subtasks.length}`,
+            title: checkMatch[2].trim(),
+            completed: checkMatch[1].toLowerCase() === 'x',
+          });
+        } else if (numMatch) {
+          subtasks.push({
+            id: `st_${Date.now()}_${subtasks.length}`,
+            title: numMatch[1].trim(),
+            completed: false,
+          });
+        } else if (bulletMatch && (contentLines.some(l => /шаги|подзадач|план/i.test(l)) || subtasks.length > 0)) {
+          subtasks.push({
+            id: `st_${Date.now()}_${subtasks.length}`,
+            title: bulletMatch[1].trim(),
+            completed: false,
+          });
+        } else {
+          contentLines.push(line);
+        }
+      }
+
+      const matched = allItems?.find(it =>
+        it.type === 'task' && (
+          it.title.toLowerCase() === rawTitle.toLowerCase() ||
+          contentLines.some(cl => cl.includes(`«${it.title}»`) || cl.includes(`"${it.title}"`))
+        )
+      );
+
+      const title = matched ? matched.title : rawTitle;
+      const cleanText = text.replace(taskBlockMatch[0], '').trim() ||
+        `Подготовил задачу из декомпозиции «${title}». Вы можете подтвердить её сохранение ниже:`;
+
+      return {
+        cleanText,
+        suggestedAction: {
+          type: matched ? 'update_item' : 'create_note',
+          targetItemId: matched ? matched.id : undefined,
+          title,
+          folder: matched ? matched.folder : folder,
+          itemType: 'task',
+          tags: matched?.tags || ['задача', 'декомпозиция'],
+          content: contentLines.join('\n'),
+          subtasks: subtasks.length > 0 ? subtasks : undefined,
+          updates: matched ? {
+            subtasks: subtasks.length > 0 ? subtasks : undefined,
+            content: contentLines.join('\n') || undefined,
+          } : undefined,
+          actionLabel: matched ? 'Декомпозиция задачи' : 'Создать задачу из декомпозиции',
+          actionState: 'suggested',
+        },
+      };
+    }
+  }
+
+  // 4. Fallback: Parse raw note metadata dump
+  // e.g.:
+  // personal_goals
+  // Личные цели и контрольные точки
+  // task
+  // Личное/Быт
+  // ["цели", "планы", "личное"]
+  const pseudoHeaderRegex = /(?:^|\n)([a-zA-Z0-9_-]{3,})\s*\n([^\n]+)\s*\n(task|note|article)\s*\n([^\n]+)\s*\n(\[[^\]]*\]|\S+)\s*\n([\s\S]*)$/i;
+  const pseudoHeaderMatch = text.match(pseudoHeaderRegex);
+  if (pseudoHeaderMatch) {
+    const rawId = pseudoHeaderMatch[1].trim();
+    const rawTitle = pseudoHeaderMatch[2].trim();
+    const rawType = (pseudoHeaderMatch[3].toLowerCase() === 'task' || pseudoHeaderMatch[3].toLowerCase() === 'article')
+      ? pseudoHeaderMatch[3].toLowerCase() as SlagItemType
+      : 'note';
+    const rawFolder = pseudoHeaderMatch[4].trim();
+    const rawTagsStr = pseudoHeaderMatch[5].trim();
+    const rawBody = pseudoHeaderMatch[6].trim();
+
+    let tags: string[] = [];
+    try {
+      if (rawTagsStr.startsWith('[')) {
+        tags = JSON.parse(rawTagsStr);
+      }
+    } catch {
+      tags = rawTagsStr.split(/[,\s]+/).map(t => t.replace(/[#"\][]/g, '')).filter(Boolean);
+    }
+
+    const subtasks: Array<{ id: string; title: string; completed: boolean }> = [];
+    for (const line of rawBody.split('\n')) {
+      const m = line.trim().match(/^[-*]\s*\[([ xX])\]\s*(.*)$/);
+      if (m) {
+        subtasks.push({
+          id: `st_${Date.now()}_${subtasks.length}`,
+          title: m[2].trim(),
+          completed: m[1].toLowerCase() === 'x',
+        });
+      }
+    }
+
+    const matched = allItems?.find(it => it.id === rawId || it.title.toLowerCase() === rawTitle.toLowerCase());
+    const finalTitle = matched ? matched.title : rawTitle;
+    const cleanText = text.replace(pseudoHeaderMatch[0], '').trim() ||
+      `Подготовил обновленную декомпозицию задачи «${finalTitle}» (${subtasks.length} шагов). Вы можете применить шаги к задаче:`;
+
+    return {
+      cleanText,
+      suggestedAction: {
+        type: matched ? 'update_item' : 'create_note',
+        targetItemId: matched ? matched.id : rawId,
+        title: finalTitle,
+        folder: matched ? matched.folder : rawFolder,
+        itemType: rawType,
+        tags: tags.length > 0 ? tags : (matched?.tags || []),
+        subtasks: subtasks.length > 0 ? subtasks : undefined,
+        content: rawBody,
+        updates: matched ? {
+          subtasks: subtasks.length > 0 ? subtasks : undefined,
+          content: rawBody,
+        } : undefined,
+        actionLabel: 'Декомпозиция задачи',
+        actionState: 'suggested',
+      },
+    };
   }
 
   return { cleanText: text };
@@ -955,6 +1104,26 @@ ${isInbox
 - СОСТАВНЫЕ УСЛОВИЯ ПЕРЕНОСА («1. задачу на завтра, остальные две на послезавтра»):
   * СТРОГО вызывай batch_update_items, где каждому объекту в items назначаются свои updates с нужными датами dueDate!
 
+ДЕКОМПОЗИЦИЯ И РАЗБИВКА НА ПОДЗАДАЧИ:
+- Если пользователь просит декомпозировать задачи («сделай декомпоз задач», «декомпозируй», «разбей на шаги/подзадачи», «разбей эту задачу»):
+  * Если в папке или запросе есть конкретная задача (например «Личные цели и контрольные точки»):
+    ТЫ ОБЯЗАН ВЫЗВАТЬ инструмент save_item со следующими параметрами:
+    save_item({
+      id: "<ID или точный заголовок существующей задачи>",
+      actionLabel: "Декомпозиция задачи",
+      subtasks: ["Шаг 1", "Шаг 2", "Шаг 3", ...]
+    })
+  * Если нужно создать новую задачу с чек-листом подзадач:
+    ТЫ ОБЯЗАН ВЫЗВАТЬ инструмент save_item:
+    save_item({
+      title: "<Название задачи>",
+      itemType: "task",
+      folder: "<папка>",
+      subtasks: ["Шаг 1", "Шаг 2", ...]
+    })
+  * КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО выводить списки шагов, метаданные (id, task, folder), псевдокод или блоки \`\`\`task прямо в текст ответа!
+  * Декомпозиция ОБЯЗАТЕЛЬНО должна оформляться через вызов save_item с массивом subtasks, чтобы в интерфейсе SLAG v2 отобразилась интерактивная карточка с кнопкой «Применить»!
+
 4. РЕАКТИВНОСТЬ НА КОРРЕКТИРОВКИ (FOLLOW-UP REFINEMENT):
    - Если пользователь просит изменить, скорректировать, инвертировать порядок, сдвинуть время или состав ранее предложенных задач («нене порядок инвертировать задом на перёд», «сделай наоборот», «не в 10, а в 12», «поменяй местами», «убери одну», «добавь еще», «да теперь предложи»):
      * ТЫ ОБЯЗАН СРАЗУ ЖЕ ВЫЗВАТЬ соответствующий инструмент (например, batch_update_items или save_item) с обновленными параметрами!
@@ -1216,7 +1385,7 @@ ${isInbox
           }
         }
 
-        const { cleanText, suggestedAction: blockAction } = extractActionBlock(finalContent);
+        const { cleanText, suggestedAction: blockAction } = extractActionBlock(finalContent, allItems, currentFolder);
         if (blockAction) {
           capturedActions.push(blockAction);
         }

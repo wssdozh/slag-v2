@@ -332,18 +332,58 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           codeBlockLines = [];
         } else {
           inCodeBlock = false;
-          elements.push(
-            <div key={`cb-${i}`} className="my-2 rounded-lg bg-black/60 border border-white/[0.06] overflow-hidden">
-              {codeBlockLang && (
-                <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 bg-white/[0.02] border-b border-white/[0.04]">
-                  {codeBlockLang}
+          if (codeBlockLang === 'task' || codeBlockLang === 'todo') {
+            const firstLine = codeBlockLines[0] || 'Задача';
+            const restLines = codeBlockLines.slice(1);
+            elements.push(
+              <div key={`cb-${i}`} className="my-2 rounded-xl bg-[#141417] border border-white/[0.08] p-3 text-xs flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-zinc-400 font-medium font-mono text-[10px] uppercase tracking-wider">
+                  <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Задача</span>
                 </div>
-              )}
-              <pre className="p-2.5 overflow-x-auto text-[11px] font-mono text-zinc-300 leading-normal">
-                <code>{codeBlockLines.join('\n')}</code>
-              </pre>
-            </div>
-          );
+                <div className="font-semibold text-zinc-100 text-xs">
+                  {firstLine}
+                </div>
+                {restLines.length > 0 && (
+                  <div className="text-zinc-300 flex flex-col gap-1">
+                    {restLines.map((l, lIdx) => {
+                      const trimmedLine = l.trim();
+                      const checkMatch = trimmedLine.match(/^[-*]\s*\[([ xX])\]\s*(.*)$/);
+                      if (checkMatch) {
+                        const isDone = checkMatch[1].toLowerCase() === 'x';
+                        return (
+                          <div key={lIdx} className="flex items-start gap-2 pl-0.5 my-0.5">
+                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 select-none ${
+                              isDone ? 'bg-white/15 border-white/40 text-zinc-200' : 'border-white/20 bg-white/[0.03] text-transparent'
+                            }`}>
+                              {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                            </span>
+                            <span className={`flex-1 min-w-0 ${isDone ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
+                              {parseInline(checkMatch[2], `${i}-${lIdx}`)}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return <div key={lIdx}>{parseInline(l, `${i}-${lIdx}`)}</div>;
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          } else {
+            elements.push(
+              <div key={`cb-${i}`} className="my-2 rounded-lg bg-black/60 border border-white/[0.06] overflow-hidden">
+                {codeBlockLang && (
+                  <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 bg-white/[0.02] border-b border-white/[0.04]">
+                    {codeBlockLang}
+                  </div>
+                )}
+                <pre className="p-2.5 overflow-x-auto text-[11px] font-mono text-zinc-300 leading-normal">
+                  <code>{codeBlockLines.join('\n')}</code>
+                </pre>
+              </div>
+            );
+          }
         }
         continue;
       }
@@ -393,6 +433,30 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
           );
           continue;
         }
+      }
+
+      // Checkbox task item: - [ ] or - [x] or * [ ] or * [x]
+      const taskCheckMatch = trimmed.match(/^[-*]\s*\[([ xX])\]\s*(.*)$/);
+      if (taskCheckMatch) {
+        const isChecked = taskCheckMatch[1].toLowerCase() === 'x';
+        const taskText = taskCheckMatch[2];
+        elements.push(
+          <div key={`task-item-${i}`} className="flex items-start gap-2 pl-0.5 my-1 leading-relaxed">
+            <span
+              className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 select-none transition-colors ${
+                isChecked
+                  ? 'bg-white/15 border-white/40 text-zinc-200'
+                  : 'border-white/20 bg-white/[0.03] text-transparent'
+              }`}
+            >
+              {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+            </span>
+            <span className={`flex-1 min-w-0 ${isChecked ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
+              {parseInline(taskText, i)}
+            </span>
+          </div>
+        );
+        continue;
       }
 
       // List item: - or *
@@ -669,9 +733,21 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                               }
                             </span>
                           </div>
-                          <span className="text-zinc-500 truncate max-w-[130px]">
-                            {action.folder}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-zinc-500 truncate max-w-[120px]">
+                              {action.folder}
+                            </span>
+                            {canShowDiff(action) && (
+                              <button
+                                type="button"
+                                onClick={() => setDiffModalData({ action, messageId: msg.id })}
+                                className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                                title="Сравнить изменения (Diff)"
+                              >
+                                <GitCompare className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="p-3.5 flex flex-col gap-2.5">
@@ -942,18 +1018,6 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                   </button>
                                 );
                               })()}
-
-                              {canShowDiff(action) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setDiffModalData({ action, messageId: msg.id })}
-                                  className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium border border-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
-                                  title="Сравнить изменения перед подтверждением"
-                                >
-                                  <GitCompare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                                  <span>Сравнить</span>
-                                </button>
-                              )}
 
                               <button
                                 onClick={() => rejectAction(msg.id)}

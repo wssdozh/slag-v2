@@ -180,4 +180,137 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
     expect(todayHit).toBeDefined();
     expect(todayHit.date).toContain('Сегодня');
   });
+
+  test('extractActionBlock recovers ```task decomposition block into action card with subtasks', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const result = await page.evaluate(async () => {
+      const { extractActionBlock } = await import('/src/lib/ai/orchestrator.ts');
+      const text = `
+Вот план:
+\`\`\`task
+Собрать документы и пройти медкомиссию в военкомате
+Личное/Быт
+Часть декомпозиции «Личные цели и контрольные точки».
+
+Шаги:
+1. Записаться к психиатру в ПНД по месту жительства.
+2. Пройти обследование, получить заключение с диагнозом.
+3. Подать заключение в военкомат.
+4. Получить решение призывной комиссии.
+\`\`\`
+Подтвердите сохранение.
+      `.trim();
+
+      return extractActionBlock(text, [], 'Личное/Быт');
+    });
+
+    expect(result.suggestedAction).toBeDefined();
+    expect(result.suggestedAction?.title).toBe('Собрать документы и пройти медкомиссию в военкомате');
+    expect(result.suggestedAction?.folder).toBe('Личное/Быт');
+    expect(result.suggestedAction?.subtasks?.length).toBe(4);
+    expect(result.suggestedAction?.subtasks?.[0].title).toBe('Записаться к психиатру в ПНД по месту жительства.');
+    expect(result.cleanText).not.toContain('```task');
+  });
+
+  test('extractActionBlock recovers raw metadata dump into update_item action card with subtasks', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    const result = await page.evaluate(async () => {
+      const { extractActionBlock } = await import('/src/lib/ai/orchestrator.ts');
+      const text = `
+personal_goals
+Личные цели и контрольные точки
+task
+Личное/Быт
+["цели", "планы", "личное"]
+
+цель 1. Военкомат — закрыть вопрос по здоровью
+- [x] получить направление к психиатру
+- [x] получить направление в дурку
+- [ ] пройти обследование, забрать заключение на руки и сделать копии
+- [ ] бахнуть кровопускание в ванной для вида
+- [ ] подать заключение в военкомат и получить решение на руки
+- [ ] сняться с учёта / закрыть дело
+      `.trim();
+
+      const existingItems: any[] = [
+        {
+          id: 'personal_goals',
+          title: 'Личные цели и контрольные точки',
+          type: 'task',
+          folder: 'Личное/Быт',
+          tags: ['цели', 'планы'],
+        },
+      ];
+
+      return extractActionBlock(text, existingItems, 'Личное/Быт');
+    });
+
+    expect(result.suggestedAction).toBeDefined();
+    expect(result.suggestedAction?.type).toBe('update_item');
+    expect(result.suggestedAction?.targetItemId).toBe('personal_goals');
+    expect(result.suggestedAction?.title).toBe('Личные цели и контрольные точки');
+    expect(result.suggestedAction?.subtasks?.length).toBe(6);
+    expect(result.suggestedAction?.subtasks?.[0].completed).toBe(true);
+    expect(result.suggestedAction?.subtasks?.[2].completed).toBe(false);
+    expect(result.cleanText).not.toContain('personal_goals');
+    expect(result.cleanText).not.toContain('["цели"');
+  });
+
+  test('Assistant chat renders task list checkboxes and action card', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    // Open assistant tab or push messages to assistant history in storage
+    await page.evaluate(() => {
+      const storage = (window as any).storage;
+      storage.saveAssistantHistory([
+        {
+          id: 'msg_1',
+          role: 'user',
+          content: 'декомпоз задач',
+          createdAt: Date.now() - 5000,
+        },
+        {
+          id: 'msg_2',
+          role: 'assistant',
+          content: 'План действий по задаче:\n\n- [x] Первое действие\n- [ ] Второе действие',
+          createdAt: Date.now() - 3000,
+          suggestedAction: {
+            type: 'update_item',
+            targetItemId: 'personal_goals',
+            title: 'Личные цели и контрольные точки',
+            folder: 'Личное/Быт',
+            actionLabel: 'Декомпозиция задачи',
+            tags: ['цели'],
+            itemType: 'task',
+            subtasks: [
+              { id: 'st_1', title: 'Получить направление к психиатру', completed: true },
+              { id: 'st_2', title: 'Пройти обследование', completed: false },
+            ],
+            actionState: 'suggested',
+          },
+        },
+      ]);
+    });
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    // Press Ctrl+J to open Assistant view
+    await page.keyboard.press('Control+j');
+
+    const actionCard = page.locator('[data-testid="action-card"]').first();
+    await expect(actionCard).toBeVisible({ timeout: 5000 });
+    await expect(actionCard.locator('text=Декомпозиция задачи')).toBeVisible();
+    await expect(actionCard.locator('text=Получить направление к психиатру')).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/assistant-task-decomposition-rendered.png',
+      fullPage: false,
+    });
+  });
 });
