@@ -424,6 +424,54 @@ export class StorageService {
     }
   }
 
+  private async deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[]): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      // 1. Move notes to Inbox on disk and remove old note files from deleted folder
+      for (const { item, oldFolder } of movedItems) {
+        await this.flushItemToDisk(item, oldFolder, item.filename);
+      }
+      // 2. Remove deleted folder directory recursively from disk
+      await this.removeFolderFromDisk(path);
+      // 3. Persist updated state.json to disk
+      await this.flushStateToDisk();
+    } catch (err) {
+      fsLog.error(`Failed to complete disk deletion for folder "${path}":`, err);
+    }
+  }
+
+  private async renameFolderOnDisk(oldPath: string, newPath: string, items: SlagItem[]): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      for (const it of items) {
+        if (it.folder === newPath || it.folder.startsWith(newPath + '/')) {
+          const originalSub = it.folder === newPath
+            ? oldPath
+            : oldPath + it.folder.slice(newPath.length);
+          await this.flushItemToDisk(it, originalSub, it.filename);
+        }
+      }
+      await this.removeFolderFromDisk(oldPath);
+      await this.flushStateToDisk();
+    } catch (err) {
+      fsLog.error(`Failed to complete disk rename for folder "${oldPath}" to "${newPath}":`, err);
+    }
+  }
+
+  private async removeFolderFromDisk(folderPath: string): Promise<void> {
+    if (!isTauri() || !folderPath || folderPath === 'Входящие') return;
+    try {
+      const notesBase = this.getVaultNotesPath();
+      const targetDir = `${notesBase}/${folderPath}`;
+      if (await exists(targetDir, { baseDir: BaseDirectory.AppData })) {
+        await remove(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
+        fsLog.info(`Removed folder directory from disk: ${targetDir}`);
+      }
+    } catch (err) {
+      fsLog.warn(`Failed to remove folder directory ${folderPath} from disk:`, err);
+    }
+  }
+
   private initCurrentVault(): VaultMeta {
     const saved = localStorage.getItem(CURRENT_VAULT_KEY);
     if (saved) {
@@ -660,13 +708,6 @@ export class StorageService {
         parsed.unshift(DEFAULT_FOLDERS[0]);
         changed = true;
       }
-      // Ensure default taxonomy folders are present in existing storage
-      for (const def of DEFAULT_FOLDERS) {
-        if (!parsed.some(f => f.path.toLowerCase() === def.path.toLowerCase())) {
-          parsed.push(def);
-          changed = true;
-        }
-      }
       if (changed) {
         localStorage.setItem(this.getFoldersKey(), JSON.stringify(parsed));
       }
@@ -718,7 +759,7 @@ export class StorageService {
 
     fsLog.info(`Renamed folder "${oldPath}" to "${updatedFolder.path}"`);
     if (isTauri()) {
-      void this.flushStateToDisk();
+      void this.renameFolderOnDisk(oldPath, updatedFolder.path, items);
     }
   }
 
@@ -743,9 +784,13 @@ export class StorageService {
 
     // Move orphan items to "Входящие"
     const items = this.getItems();
+    const movedItems: { item: SlagItem; oldFolder: string }[] = [];
     const updatedItems = items.map(it => {
       if (it.folder === path || it.folder.startsWith(path + '/')) {
-        return { ...it, folder: 'Входящие', updatedAt: Date.now() };
+        const oldFolder = it.folder;
+        const updated: SlagItem = { ...it, folder: 'Входящие', updatedAt: Date.now() };
+        movedItems.push({ item: updated, oldFolder });
+        return updated;
       }
       return it;
     });
@@ -769,12 +814,7 @@ export class StorageService {
     }
 
     if (isTauri()) {
-      void this.flushStateToDisk();
-      for (const it of updatedItems) {
-        if (it.folder === 'Входящие') {
-          void this.flushItemToDisk(it);
-        }
-      }
+      void this.deleteFolderOnDisk(path, movedItems);
     }
 
     fsLog.info(`Deleted folder "${path}", items re-routed to Inbox`);
@@ -1191,3 +1231,7 @@ export class StorageService {
 }
 
 export const storage = new StorageService();
+
+if (typeof window !== 'undefined') {
+  (window as any).storage = storage;
+}

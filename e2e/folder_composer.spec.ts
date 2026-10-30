@@ -248,4 +248,56 @@ test.describe('Composer @ Folder Selection E2E', () => {
       fullPage: false,
     });
   });
+
+  test('7. Deleting a folder permanently removes it, re-routes notes to Inbox, and never resurrects or moves down', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Test programmatically via exposed storage
+    const result = await page.evaluate(() => {
+      const storage = (window as any).storage;
+      // 1. Create a note in 'Проекты/fantazer'
+      storage.saveItem({
+        id: 'test_delete_folder_item',
+        type: 'note',
+        title: 'Note to be re-routed',
+        content: 'Content inside fantazer',
+        folder: 'Проекты/fantazer',
+      });
+
+      // 2. Ensure folder was in getFolders
+      const beforeFolders = storage.getFolders().map((f: any) => f.path);
+      const hadFantazer = beforeFolders.includes('Проекты/fantazer');
+
+      // 3. Delete folder
+      storage.deleteFolder('Проекты/fantazer');
+
+      // 4. Repeatedly check getFolders to ensure it does NOT resurrect at bottom
+      const afterFolders1 = storage.getFolders().map((f: any) => f.path);
+      const afterFolders2 = storage.getFolders().map((f: any) => f.path);
+
+      // 5. Check item was moved to 'Входящие'
+      const movedItem = storage.getItemById('test_delete_folder_item');
+
+      return {
+        hadFantazer,
+        hasAfter1: afterFolders1.includes('Проекты/fantazer'),
+        hasAfter2: afterFolders2.includes('Проекты/fantazer'),
+        itemFolder: movedItem ? movedItem.folder : null,
+        lastFolder: afterFolders2[afterFolders2.length - 1],
+      };
+    });
+
+    expect(result.hadFantazer).toBe(true);
+    expect(result.hasAfter1).toBe(false);
+    expect(result.hasAfter2).toBe(false);
+    expect(result.itemFolder).toBe('Входящие');
+    expect(result.lastFolder).not.toBe('Проекты/fantazer');
+
+    // Also take a screenshot of UI
+    await page.screenshot({
+      path: 'test-results/screenshots/folder-deleted-cleanly.png',
+      fullPage: false,
+    });
+  });
 });

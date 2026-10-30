@@ -91,6 +91,10 @@ class LoggerEngine {
   private listeners: Set<LogListener> = new Set();
   private timers: Map<string, number> = new Map();
   private persistTimeout: number | null = null;
+  private diskLogQueue: string[] = [];
+  private isDiskFlushing = false;
+  private diskDirEnsured = false;
+  private diskFlushTimeout: number | null = null;
 
   constructor() {
     // Restore breadcrumbs from previous session if crashed or reloaded
@@ -127,6 +131,18 @@ class LoggerEngine {
           reason: event.reason,
         });
       });
+
+      window.addEventListener('beforeunload', () => {
+        void this.flushToDisk();
+      });
+
+      // If running inside Tauri, write initial session header to disk queue
+      if ('__TAURI_INTERNALS__' in window) {
+        this.diskLogQueue.push(
+          `\n==================== SESSION START: ${new Date().toISOString()} ====================\n`
+        );
+        this.scheduleDiskFlush(500);
+      }
     }
   }
 
@@ -164,6 +180,16 @@ class LoggerEngine {
     // Persist lightweight breadcrumb trail across page reloads
     this.persistToSession();
 
+    // Buffer for desktop file persistence
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      this.diskLogQueue.push(this.formatEntryForDisk(entry));
+      if (entry.level === 'error' || entry.level === 'warn' || this.diskLogQueue.length >= 25) {
+        void this.flushToDisk();
+      } else {
+        this.scheduleDiskFlush(1500);
+      }
+    }
+
     // Notify in-app subscribers
     this.listeners.forEach((listener) => {
       try {
@@ -172,6 +198,82 @@ class LoggerEngine {
         console.error('Error in log listener:', err);
       }
     });
+  }
+
+  private formatEntryForDisk(entry: LogEntry): string {
+    const iso = new Date(entry.timestamp).toISOString();
+    const level = entry.level.toUpperCase().padEnd(5);
+    const scope = entry.scope.padEnd(9);
+    const dur = entry.durationMs !== undefined ? ` (+${Math.round(entry.durationMs)}ms)` : '';
+    let dataPart = '';
+    if (entry.data !== undefined) {
+      try {
+        dataPart = ` | ${JSON.stringify(sanitizeData(entry.data))}`;
+      } catch {
+        dataPart = ` | [unserializable payload]`;
+      }
+    }
+    return `[${iso}] [${level}] [${scope}] ${entry.message}${dur}${dataPart}\n`;
+  }
+
+  private scheduleDiskFlush(delayMs: number): void {
+    if (this.diskFlushTimeout !== null) return;
+    this.diskFlushTimeout = window.setTimeout(() => {
+      this.diskFlushTimeout = null;
+      void this.flushToDisk();
+    }, delayMs);
+  }
+
+  public async flushToDisk(): Promise<void> {
+    if (this.diskLogQueue.length === 0 || this.isDiskFlushing) return;
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+
+    if (this.diskFlushTimeout !== null) {
+      clearTimeout(this.diskFlushTimeout);
+      this.diskFlushTimeout = null;
+    }
+
+    this.isDiskFlushing = true;
+    const batch = this.diskLogQueue.splice(0, this.diskLogQueue.length);
+    const textToAppend = batch.join('');
+
+    try {
+      const { mkdir, writeTextFile, exists, stat, rename, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+      if (!this.diskDirEnsured) {
+        await mkdir('logs', { baseDir: BaseDirectory.AppData, recursive: true });
+        this.diskDirEnsured = true;
+      }
+
+      const logPath = 'logs/slag.log';
+      // Rotate if > 5MB
+      try {
+        if (await exists(logPath, { baseDir: BaseDirectory.AppData })) {
+          const fileInfo = await stat(logPath, { baseDir: BaseDirectory.AppData });
+          if (fileInfo.size > 5 * 1024 * 1024) {
+            await rename(logPath, 'logs/slag.old.log', {
+              oldPathBaseDir: BaseDirectory.AppData,
+              newPathBaseDir: BaseDirectory.AppData,
+            });
+          }
+        }
+      } catch {
+        // ignore rotation errors
+      }
+
+      await writeTextFile(logPath, textToAppend, {
+        baseDir: BaseDirectory.AppData,
+        append: true,
+      });
+    } catch (err) {
+      // Re-queue on failure so logs aren't lost
+      this.diskLogQueue.unshift(...batch);
+      console.error('Failed to flush logs to disk:', err);
+    } finally {
+      this.isDiskFlushing = false;
+      if (this.diskLogQueue.length > 0) {
+        this.scheduleDiskFlush(1000);
+      }
+    }
   }
 
   private printToConsole(entry: LogEntry): void {
@@ -441,6 +543,19 @@ class LoggerEngine {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    // Also persist exported file into desktop AppData/logs directory
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      void (async () => {
+        try {
+          const { mkdir, writeTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+          await mkdir('logs', { baseDir: BaseDirectory.AppData, recursive: true });
+          await writeTextFile(`logs/${filename}`, content, { baseDir: BaseDirectory.AppData });
+        } catch {
+          // ignore disk save error in download
+        }
+      })();
+    }
 
     return filename;
   }

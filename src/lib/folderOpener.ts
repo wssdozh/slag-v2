@@ -19,6 +19,15 @@ export interface OpenFolderResult {
 export async function openAppFolder(
   target: 'logs' | 'notes' | 'appdata' | 'backups' | string = 'logs'
 ): Promise<OpenFolderResult> {
+  // 0. Pre-flush buffered logs to disk before opening logs directory
+  if (target === 'logs') {
+    try {
+      await logger.flushToDisk();
+    } catch {
+      // ignore
+    }
+  }
+
   // 1. Desktop native app via Tauri invoke
   if (isTauri()) {
     try {
