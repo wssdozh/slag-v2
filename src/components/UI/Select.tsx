@@ -44,12 +44,23 @@ export const Select: React.FC<SelectProps> = ({
   showArrow = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [calculatedDirection, setCalculatedDirection] = useState<'down' | 'up'>('down');
   const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
+
+  // Filter options based on typeahead search query
+  const filteredOptions = searchQuery.trim()
+    ? options.filter((opt) =>
+        opt.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        opt.value.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : options;
 
   // Calculate fixed viewport coordinates for portal
   const updatePosition = useCallback(() => {
@@ -87,10 +98,30 @@ export const Select: React.FC<SelectProps> = ({
   const handleToggle = () => {
     if (disabled) return;
     if (!isOpen) {
+      setSearchQuery('');
+      const idx = options.findIndex((opt) => opt.value === value);
+      setHighlightedIndex(idx >= 0 ? idx : 0);
       updatePosition();
     }
     setIsOpen(!isOpen);
   };
+
+  const handleSelect = useCallback((val: string, optDisabled?: boolean) => {
+    if (optDisabled) return;
+    onChange(val);
+    setIsOpen(false);
+  }, [onChange]);
+
+  const safeHighlightedIndex = Math.min(highlightedIndex, Math.max(0, filteredOptions.length - 1));
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (!isOpen || !listRef.current) return;
+    const items = listRef.current.querySelectorAll<HTMLElement>('[role="option"]');
+    if (items[safeHighlightedIndex]) {
+      items[safeHighlightedIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }, [isOpen, safeHighlightedIndex]);
 
   // Re-align on scroll or resize while open
   useEffect(() => {
@@ -109,7 +140,7 @@ export const Select: React.FC<SelectProps> = ({
     };
   }, [isOpen, updatePosition]);
 
-  // Close on outside click or Escape
+  // Keyboard navigation, typeahead search, and click outside
   useEffect(() => {
     if (!isOpen) return;
 
@@ -129,6 +160,34 @@ export const Select: React.FC<SelectProps> = ({
       if (e.key === 'Escape') {
         e.preventDefault();
         setIsOpen(false);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev + 1 < filteredOptions.length ? prev + 1 : 0));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : Math.max(0, filteredOptions.length - 1)));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const targetOpt = filteredOptions[safeHighlightedIndex];
+        if (targetOpt && !targetOpt.disabled) {
+          handleSelect(targetOpt.value, targetOpt.disabled);
+        }
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setSearchQuery((prev) => prev.slice(0, -1));
+        setHighlightedIndex(0);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Typing characters filters options on the fly (typeahead search)
+        e.preventDefault();
+        setSearchQuery((prev) => prev + e.key);
+        setHighlightedIndex(0);
+
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+        searchTimeoutRef.current = setTimeout(() => {
+          setSearchQuery('');
+        }, 1500);
       }
     };
 
@@ -140,14 +199,11 @@ export const Select: React.FC<SelectProps> = ({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('touchstart', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
-  }, [isOpen]);
-
-  const handleSelect = (val: string, optDisabled?: boolean) => {
-    if (optDisabled) return;
-    onChange(val);
-    setIsOpen(false);
-  };
+  }, [isOpen, filteredOptions, safeHighlightedIndex, handleSelect]);
 
   const isSmall = size === 'sm';
 
@@ -163,38 +219,59 @@ export const Select: React.FC<SelectProps> = ({
             bottom: calculatedDirection === 'up' ? `${window.innerHeight - coords.top}px` : undefined,
             minWidth: `${coords.width}px`,
           }}
-          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100 ${
+          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100 flex flex-col gap-0.5 ${
             calculatedDirection === 'up' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
           } ${dropdownClassName}`}
         >
-          {options.map((opt) => {
-            const isSelected = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                disabled={opt.disabled}
-                onClick={() => handleSelect(opt.value, opt.disabled)}
-                className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
-                  opt.disabled
-                    ? 'opacity-40 cursor-not-allowed text-zinc-600'
-                    : isSelected
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                  <span className={`truncate ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>{opt.label}</span>
-                </div>
-                {isSelected && (
-                  <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
-                )}
-              </button>
-            );
-          })}
+          {/* Subtle Search Query Badge when user types */}
+          {searchQuery && (
+            <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-mono text-zinc-400 bg-white/[0.04] rounded-lg border-b border-white/[0.06] mb-0.5">
+              <span className="truncate">Поиск: <span className="text-white font-semibold">«{searchQuery}»</span></span>
+              <span className="text-zinc-500 shrink-0">{filteredOptions.length}</span>
+            </div>
+          )}
+
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-3 text-center text-xs text-zinc-500 font-mono select-none">
+              Ничего не найдено
+            </div>
+          ) : (
+            filteredOptions.map((opt, idx) => {
+              const isSelected = opt.value === value;
+              const isHighlighted = idx === highlightedIndex;
+
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  disabled={opt.disabled}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
+                  onClick={() => handleSelect(opt.value, opt.disabled)}
+                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
+                    opt.disabled
+                      ? 'opacity-40 cursor-not-allowed text-zinc-600'
+                      : isSelected
+                      ? 'bg-white/10 text-white font-medium'
+                      : isHighlighted
+                      ? 'bg-white/[0.06] text-white'
+                      : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {opt.icon && <span className="shrink-0">{opt.icon}</span>}
+                    <span className={`truncate ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>
+                      {opt.label}
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
+                  )}
+                </button>
+              );
+            })
+          )}
         </div>,
         document.body
       )
