@@ -52,13 +52,13 @@ export const TagChip: React.FC<TagChipProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 text-2xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors select-none ${className}`}
+      className={`inline-flex items-center gap-1 text-2xs font-mono text-zinc-500 hover:text-zinc-200 transition-colors select-none ${className}`}
     >
       <span
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onClick={onClick}
-        className={onClick ? 'cursor-pointer hover:underline' : undefined}
+        className={onClick ? 'cursor-pointer hover:underline underline-offset-2' : undefined}
       >
         {prefix}{cleanTag}
       </span>

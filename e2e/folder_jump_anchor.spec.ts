@@ -39,5 +39,11 @@ test.describe('Folder Badge Navigation & Card Anchoring', () => {
       path: 'test-results/screenshots/folder_jump_anchored.png',
       fullPage: false,
     });
+
+    // 7. Verify unified color: tag chip and folder button both use text-zinc-500
+    const cardWithTags = page.locator('[id^="item-"]').filter({ has: page.locator('span[class*="text-zinc-500"]') }).first();
+    await cardWithTags.screenshot({
+      path: 'test-results/screenshots/card_folder_and_tags_unified_color.png',
+    });
   });
 });
