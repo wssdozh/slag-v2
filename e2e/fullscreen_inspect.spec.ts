@@ -20,7 +20,14 @@ test('Capture Fullscreen Editor Refined Zen Experience', async ({ page }) => {
   const titleInput = page.locator('input[placeholder*="Название задачи"], input[placeholder*="Заголовок"]').first();
   await titleInput.click();
   await page.keyboard.press('ControlOrMeta+A');
-  await page.keyboard.type('Запустить новую линейку продуктов до конца Q3');
+  await page.keyboard.type('Карьера: 7 типичных ошибок начинающего разработчика');
+
+  // Add tags
+  const tagInput = page.locator('input[placeholder="+ тег"]').first();
+  for (const tag of ['карьера', 'it', 'советы', 'опыт', 'сакутин', 'вебинар', 'игра', 'игры', 'заработок']) {
+    await tagInput.fill(tag);
+    await page.keyboard.press('Enter');
+  }
 
   // Type subtasks in CodeMirror
   const cmContent = page.locator('.cm-content').first();
