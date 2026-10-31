@@ -5,8 +5,8 @@
 
 export const THEME_COLORS = {
   // Canvas / Base
-  canvas: '#09090b',
-  canvasSubtle: '#050507',
+  canvas: '#0e0e11',
+  canvasSubtle: '#09090c',
 
   // Panels & Sidebars
   panel: '#0c0c0e',

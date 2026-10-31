@@ -13,9 +13,9 @@
  */
 
 @theme {
-  /* Canvas / Base Layer (Classic Linear Dark) */
-  --color-canvas: #09090b;
-  --color-canvas-subtle: #050507;
+  /* Canvas / Base Layer (Lifted Neutral Dark) */
+  --color-canvas: #0e0e11;
+  --color-canvas-subtle: #09090c;
 
   /* Sidebars & Fixed Panels */
   --color-panel: #0c0c0e;
@@ -41,8 +41,8 @@
 
 :root {
   /* Core Raw Hex Tokens for CSS var() consumption */
-  --color-canvas: #09090b;
-  --color-canvas-subtle: #050507;
+  --color-canvas: #0e0e11;
+  --color-canvas-subtle: #09090c;
 
   --color-panel: #0c0c0e;
   --color-panel-header: #0c0c0e;
