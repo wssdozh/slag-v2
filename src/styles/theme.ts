@@ -4,15 +4,15 @@
  */
 
 export const THEME_COLORS = {
-  // Canvas / Base
-  canvas: '#0e0e11',
-  canvasSubtle: '#09090c',
+  // Canvas / Base (Seamless #0c0c0e)
+  canvas: '#0c0c0e',
+  canvasSubtle: '#08080a',
 
   // Panels & Sidebars
   panel: '#0c0c0e',
   panelHeader: '#0c0c0e',
 
-  // Surfaces & Cards
+  // Surfaces & Cards (Classic Relaxed #141417)
   surface: '#141417',
   surfaceHover: '#161619',
   surfaceElevated: '#18181c',

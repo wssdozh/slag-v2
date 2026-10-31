@@ -13,15 +13,15 @@
  */
 
 @theme {
-  /* Canvas / Base Layer (Lifted Neutral Dark) */
-  --color-canvas: #0e0e11;
-  --color-canvas-subtle: #09090c;
+  /* Canvas & Panel Base Layer (Seamless #0c0c0e - No Pitch Black #09090b Voids) */
+  --color-canvas: #0c0c0e;
+  --color-canvas-subtle: #08080a;
 
   /* Sidebars & Fixed Panels */
   --color-panel: #0c0c0e;
   --color-panel-header: #0c0c0e;
 
-  /* Surface Cards & Fullscreen Editor Canvas */
+  /* Surface Cards & Fullscreen Editor Canvas (Classic Relaxed #141417) */
   --color-surface: #141417;
   --color-surface-hover: #161619;
   --color-surface-elevated: #18181c;
@@ -41,8 +41,8 @@
 
 :root {
   /* Core Raw Hex Tokens for CSS var() consumption */
-  --color-canvas: #0e0e11;
-  --color-canvas-subtle: #09090c;
+  --color-canvas: #0c0c0e;
+  --color-canvas-subtle: #08080a;
 
   --color-panel: #0c0c0e;
   --color-panel-header: #0c0c0e;
