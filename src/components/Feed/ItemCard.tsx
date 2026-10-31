@@ -299,7 +299,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             item,
           });
         }}
-        className="text-2xs font-mono text-zinc-400 hover:text-white cursor-pointer transition-colors"
+        className="text-2xs font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer transition-colors hover:underline underline-offset-2"
         title="Сменить тип записи (клик или ПКМ)"
       >
         Статья
@@ -349,7 +349,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             isZero ? 'text-rose-400/80' : 'text-amber-400/90'
           }`}
         />
-        <span className={isZero ? 'text-rose-400/80 font-medium' : 'text-zinc-400 font-medium'}>
+        <span className={isZero ? 'text-rose-400/80 font-medium' : 'text-zinc-500 font-medium'}>
           {streak}
         </span>
       </span>
