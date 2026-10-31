@@ -12,14 +12,14 @@ paths: ["src/components/**/*", "src/App.css", "src/index.css"]
 
 | Токен Tailwind / CSS | Значение | Применение |
 |---|---|---|
-| `bg-canvas` / `--color-canvas` | `#121316` | Основное окно, подложка стрим-ленты, канбан, календарь |
-| `bg-canvas-subtle` / `--color-canvas-subtle` | `#0e0f12` | Фоновая подложка контейнеров, неактивные зоны |
-| `bg-panel` / `--color-panel` | `#16171c` | Левый сайдбар, правая инфо-панель, шапки, тулбары |
-| `bg-surface` / `--color-surface` | `#1c1d23` | Карточки заметок, полноэкранный редактор, композер |
-| `hover:bg-surface-hover` / `--color-surface-hover` | `#22232b` | Подсветка карточек и строк при наведении |
-| `bg-surface-elevated` / `--color-surface-elevated` | `#252630` | Модальные окна, выпадающие меню, поповеры (`backdrop-blur-xl`) |
-| `border-subtle` / `--border-subtle` | `rgba(255, 255, 255, 0.07)` | Разделители панелей (1px), контуры карточек |
-| `border-hover` / `--border-hover` | `rgba(255, 255, 255, 0.14)` | Контур при фокусе или наведении |
+| `bg-canvas` / `--color-canvas` | `#09090b` | Основное окно, подложка стрим-ленты, канбан, календарь |
+| `bg-canvas-subtle` / `--color-canvas-subtle` | `#050507` | Фоновая подложка контейнеров, неактивные зоны |
+| `bg-panel` / `--color-panel` | `#0c0c0e` | Левый сайдбар, правая инфо-панель, шапки, тулбары |
+| `bg-surface` / `--color-surface` | `#141417` | Карточки заметок, полноэкранный редактор, композер |
+| `hover:bg-surface-hover` / `--color-surface-hover` | `#161619` | Подсветка карточек и строк при наведении |
+| `bg-surface-elevated` / `--color-surface-elevated` | `#18181c` | Модальные окна, выпадающие меню, поповеры (`backdrop-blur-xl`) |
+| `border-subtle` / `--border-subtle` | `rgba(255, 255, 255, 0.06)` | Разделители панелей (1px), контуры карточек |
+| `border-hover` / `--border-hover` | `rgba(255, 255, 255, 0.12)` | Контур при фокусе или наведении |
 | `text-fg-primary` / `--color-fg-primary` | `#f4f4f5` (Zinc-100) | Заголовки, текст заметок и статей |
 | `text-fg-secondary` / `--color-fg-secondary` | `#a1a1aa` (Zinc-400) | Подзадачи, описания папок |
 | `text-fg-muted` / `--color-fg-muted` | `#71717a` (Zinc-500) | Даты, тайминги, теги |

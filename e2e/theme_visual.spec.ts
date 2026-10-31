@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('Capture softened slate-gray workspace and fullscreen editor', async ({ page }) => {
+test('Capture classic linear dark workspace and fullscreen editor', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
@@ -8,7 +8,7 @@ test('Capture softened slate-gray workspace and fullscreen editor', async ({ pag
 
   // 1. Capture Main Workspace
   await page.screenshot({
-    path: 'test-results/screenshots/theme_workspace_slate_gray.png',
+    path: 'test-results/screenshots/theme_workspace_classic_dark.png',
     fullPage: false,
   });
 
@@ -21,7 +21,7 @@ test('Capture softened slate-gray workspace and fullscreen editor', async ({ pag
 
   // Capture Fullscreen Editor
   await page.screenshot({
-    path: 'test-results/screenshots/theme_fullscreen_editor_slate_gray.png',
+    path: 'test-results/screenshots/theme_fullscreen_editor_classic_dark.png',
     fullPage: false,
   });
 });

@@ -98,7 +98,7 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     await page.screenshot({ path: 'test-results/screenshots/typography_unified.png' });
   });
 
-  test('Focus Editor matches note palette #1c1d23 and circular checkbox style', async ({ page }) => {
+  test('Focus Editor matches note palette #141417 and circular checkbox style', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
@@ -112,11 +112,11 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     const editorModal = page.locator('[data-testid="fullscreen-editor-modal"]');
     await expect(editorModal).toBeVisible({ timeout: 5000 });
 
-    // 1. Verify Note Palette (#1c1d23 = rgb(28, 29, 35))
+    // 1. Verify Note Palette (#141417 = rgb(20, 20, 23))
     const modalBg = await editorModal.evaluate((el) => {
       return getComputedStyle(el).backgroundColor;
     });
-    expect(modalBg).toBe('rgb(28, 29, 35)');
+    expect(modalBg).toBe('rgb(20, 20, 23)');
 
     // 2. Type task subtasks into editor to test checkbox rendering
     const cmContent = page.locator('.cm-content').first();

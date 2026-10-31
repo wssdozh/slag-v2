@@ -6,26 +6,26 @@
  *   - bg-canvas, bg-canvas-subtle
  *   - bg-panel, bg-panel-header
  *   - bg-surface, bg-surface-hover, bg-surface-elevated, bg-surface-active
- *   - text-primary, text-secondary, text-muted, text-dim
+ *   - text-fg-primary, text-fg-secondary, text-fg-muted, text-fg-dim
  *   - border-subtle, border-hover, border-strong
  *
  * Supports opacity modifiers: `bg-canvas/90`, `bg-panel/95`, `bg-surface/80`, etc.
  */
 
 @theme {
-  /* Canvas / Base Layer (Softened Slate Gray, eliminates harsh black voids) */
-  --color-canvas: #121316;
-  --color-canvas-subtle: #0e0f12;
+  /* Canvas / Base Layer (Classic Linear Dark) */
+  --color-canvas: #09090b;
+  --color-canvas-subtle: #050507;
 
   /* Sidebars & Fixed Panels */
-  --color-panel: #16171c;
-  --color-panel-header: #181920;
+  --color-panel: #0c0c0e;
+  --color-panel-header: #0c0c0e;
 
   /* Surface Cards & Fullscreen Editor Canvas */
-  --color-surface: #1c1d23;
-  --color-surface-hover: #22232b;
-  --color-surface-elevated: #252630;
-  --color-surface-active: #2b2c37;
+  --color-surface: #141417;
+  --color-surface-hover: #161619;
+  --color-surface-elevated: #18181c;
+  --color-surface-active: rgba(255, 255, 255, 0.07);
 
   /* Typography / Text Colors (Linear Zinc Hierarchy) */
   --color-fg-primary: #f4f4f5;    /* Zinc 100 - Main text & titles */
@@ -34,27 +34,27 @@
   --color-fg-dim: #52525b;        /* Zinc 600 - Placeholders & subtle icons */
 
   /* Borders & Dividers */
-  --color-border-subtle: rgba(255, 255, 255, 0.07);
-  --color-border-hover: rgba(255, 255, 255, 0.14);
-  --color-border-strong: rgba(255, 255, 255, 0.22);
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-hover: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
 }
 
 :root {
   /* Core Raw Hex Tokens for CSS var() consumption */
-  --color-canvas: #121316;
-  --color-canvas-subtle: #0e0f12;
+  --color-canvas: #09090b;
+  --color-canvas-subtle: #050507;
 
-  --color-panel: #16171c;
-  --color-panel-header: #181920;
+  --color-panel: #0c0c0e;
+  --color-panel-header: #0c0c0e;
 
-  --color-surface: #1c1d23;
-  --color-surface-hover: #22232b;
-  --color-surface-elevated: #252630;
-  --color-surface-active: #2b2c37;
+  --color-surface: #141417;
+  --color-surface-hover: #161619;
+  --color-surface-elevated: #18181c;
+  --color-surface-active: rgba(255, 255, 255, 0.07);
 
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-hover: rgba(255, 255, 255, 0.14);
-  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
 
   --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;

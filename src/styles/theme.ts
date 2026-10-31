@@ -5,18 +5,18 @@
 
 export const THEME_COLORS = {
   // Canvas / Base
-  canvas: '#121316',
-  canvasSubtle: '#0e0f12',
+  canvas: '#09090b',
+  canvasSubtle: '#050507',
 
   // Panels & Sidebars
-  panel: '#16171c',
-  panelHeader: '#181920',
+  panel: '#0c0c0e',
+  panelHeader: '#0c0c0e',
 
   // Surfaces & Cards
-  surface: '#1c1d23',
-  surfaceHover: '#22232b',
-  surfaceElevated: '#252630',
-  surfaceActive: '#2b2c37',
+  surface: '#141417',
+  surfaceHover: '#161619',
+  surfaceElevated: '#18181c',
+  surfaceActive: 'rgba(255, 255, 255, 0.07)',
 
   // Typography
   fgPrimary: '#f4f4f5',
@@ -25,9 +25,9 @@ export const THEME_COLORS = {
   fgDim: '#52525b',
 
   // Borders
-  borderSubtle: 'rgba(255, 255, 255, 0.07)',
-  borderHover: 'rgba(255, 255, 255, 0.14)',
-  borderStrong: 'rgba(255, 255, 255, 0.22)',
+  borderSubtle: 'rgba(255, 255, 255, 0.06)',
+  borderHover: 'rgba(255, 255, 255, 0.12)',
+  borderStrong: 'rgba(255, 255, 255, 0.2)',
 } as const;
 
 export type ThemeColorKey = keyof typeof THEME_COLORS;
