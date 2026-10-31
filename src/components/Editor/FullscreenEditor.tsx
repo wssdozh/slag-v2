@@ -373,11 +373,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   return (
     <div
+      data-testid="fullscreen-editor-modal"
       onDragOver={handleDragOver}
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="fixed inset-0 z-50 z-[100] bg-[#09090b] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]"
+      className="fixed inset-0 z-50 z-[100] bg-[#141417] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]"
     >
       {/* Hidden File Picker Input */}
       <input
@@ -390,7 +391,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
-        <div className="fixed inset-4 z-[120] rounded-3xl bg-[#09090b]/92 backdrop-blur-md border-2 border-dashed border-[#2a82e4] flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
+        <div className="fixed inset-4 z-[120] rounded-3xl bg-[#141417]/95 backdrop-blur-md border-2 border-dashed border-[#2a82e4] flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
           <UploadCloud className="w-12 h-12 text-[#529ee8] animate-bounce" />
           <span className="text-base font-semibold text-white">
             Перетащите медиафайлы сюда
@@ -494,7 +495,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       </header>
 
       {/* Editor Body */}
-      <div className="flex-1 overflow-y-auto py-4 md:py-8">
+      <div className="flex-1 overflow-y-auto py-4 md:py-8 bg-[#141417]">
         <div className="max-w-4xl mx-auto w-full px-4 md:px-6 flex flex-col gap-5 md:gap-6">
           {/* Title Input with optional task completion toggle */}
           <div className="flex items-center gap-3">
@@ -793,7 +794,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           )}
 
           {/* Desktop Sticky Shortcut Toolbar (PINS TO TOP ON SCROLL) */}
-          <div className="hidden md:flex sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-2 border-b border-white/[0.06] bg-[#09090b]/95 backdrop-blur-md text-zinc-300 items-center justify-between gap-1 overflow-x-auto scrollbar-none shadow-sm">
+          <div className="hidden md:flex sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-2 border-b border-white/[0.06] bg-[#141417]/95 backdrop-blur-md text-zinc-300 items-center justify-between gap-1 overflow-x-auto scrollbar-none shadow-sm">
             <div className="flex items-center gap-1">
               <button
                 type="button"

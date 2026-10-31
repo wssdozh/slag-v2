@@ -97,4 +97,69 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     // 6. Visual verification in main feed
     await page.screenshot({ path: 'test-results/screenshots/typography_unified.png' });
   });
+
+  test('Focus Editor matches note palette #141417 and circular checkbox style', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+
+    // Open Focus Editor via Composer Maximize button
+    const expandBtn = page.locator('button[aria-label="Раскрыть в полноэкранный редактор"]').first();
+    await expect(expandBtn).toBeVisible({ timeout: 5000 });
+    await expandBtn.click();
+
+    // Verify fullscreen editor opened
+    const editorModal = page.locator('[data-testid="fullscreen-editor-modal"]');
+    await expect(editorModal).toBeVisible({ timeout: 5000 });
+
+    // 1. Verify Note Palette (#141417 = rgb(20, 20, 23))
+    const modalBg = await editorModal.evaluate((el) => {
+      return getComputedStyle(el).backgroundColor;
+    });
+    expect(modalBg).toBe('rgb(20, 20, 23)');
+
+    // 2. Type task subtasks into editor to test checkbox rendering
+    const cmContent = page.locator('.cm-content').first();
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('- [ ] Посчитать текущий доход и разрыв до 100к');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Найти 2-3 источника дохода');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Расписать план по месяцам');
+    await page.waitForTimeout(400);
+
+    // 3. Verify Circular Checkbox Style
+    const checkboxes = page.locator('input.cm-atomic-task-checkbox');
+    await expect(checkboxes.first()).toBeVisible({ timeout: 5000 });
+    await expect(checkboxes).toHaveCount(3);
+
+    // Click second checkbox to toggle it into completed state
+    await checkboxes.nth(1).click();
+    await page.waitForTimeout(300);
+
+    const checkboxRadius = await checkboxes.first().evaluate((el) => {
+      return getComputedStyle(el).borderRadius;
+    });
+    // Border-radius 9999px yields a circular value (either '9999px' or computed half-width)
+    expect(checkboxRadius).toMatch(/9999px|\d+px/);
+
+    const isCircular = await checkboxes.first().evaluate((el) => {
+      const style = getComputedStyle(el);
+      const width = parseFloat(style.width);
+      const height = parseFloat(style.height);
+      const radius = parseFloat(style.borderRadius);
+      return Math.abs(width - height) < 2 && radius >= height / 2 - 1;
+    });
+    expect(isCircular).toBe(true);
+
+    // Capture screenshot of Focus Editor matching note palette and circular checkboxes
+    await page.screenshot({ path: 'test-results/screenshots/focus_editor_note_palette.png' });
+
+    // Close Focus Editor
+    await page.locator('header button', { hasText: 'Назад' }).click();
+    await expect(editorModal).not.toBeVisible();
+  });
 });

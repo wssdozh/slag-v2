@@ -320,23 +320,24 @@
 
 /* SLAG v2 Linear/Obsidian Dark Theme overrides for @atomic-editor/editor */
 .atomic-cm-editor {
-  --atomic-editor-bg: transparent;
+  --atomic-editor-bg: #141417;
   --atomic-editor-bg-panel: #141417;
   --atomic-editor-bg-surface: #1e1e24;
   --atomic-editor-fg: #f4f4f5;
   --atomic-editor-fg-muted: #a1a1aa;
   --atomic-editor-fg-faint: #71717a;
   --atomic-editor-border: rgba(255, 255, 255, 0.08);
-  --atomic-editor-accent: #3b82f6;
-  --atomic-editor-accent-bright: #60a5fa;
-  --atomic-editor-accent-soft: rgba(59, 130, 246, 0.2);
+  --atomic-editor-accent: #10b981;
+  --atomic-editor-accent-bright: #34d399;
+  --atomic-editor-accent-soft: rgba(16, 185, 129, 0.15);
   --atomic-editor-link: #60a5fa;
   --atomic-editor-link-hover: #93c5fd;
   --atomic-editor-code-bg: rgba(255, 255, 255, 0.04);
   --atomic-editor-selection-bg: rgba(59, 130, 246, 0.25);
   --atomic-editor-measure: 100%;
-  --atomic-editor-body-size: 14px;
-  --atomic-editor-body-leading: 1.65;
+  --atomic-editor-font: var(--slag-font-sans);
+  --atomic-editor-body-size: calc(0.875rem * var(--slag-font-scale, 1));
+  --atomic-editor-body-leading: 1.6;
 }
 
 .atomic-cm-editor .cm-editor {
@@ -351,6 +352,71 @@
   padding-left: 0 !important;
   padding-right: 0 !important;
   min-height: 420px;
+  font-family: var(--slag-font-sans) !important;
+  color: #d4d4d8 !important;
+}
+
+/* Headings inside Atomic Editor */
+.atomic-cm-editor .cm-line.cm-atomic-h1,
+.atomic-cm-editor .cm-line.cm-atomic-h2,
+.atomic-cm-editor .cm-line.cm-atomic-h3 {
+  color: #f4f4f5 !important;
+  font-family: var(--slag-font-sans) !important;
+}
+
+/* Custom circular task-list checkbox widget matching ItemCard <Circle> and <CheckCircle2> */
+.cm-atomic-task-checkbox {
+  width: 1.05em !important;
+  height: 1.05em !important;
+  border-radius: 9999px !important;
+  border: 1.5px solid #52525b !important; /* zinc-600 */
+  background-color: transparent !important;
+  cursor: pointer !important;
+  position: relative !important;
+  display: inline-grid !important;
+  place-content: center !important;
+  vertical-align: 0.1em !important;
+  margin: 0 0.4em 0 -0.16em !important;
+  transform: translateY(-0.04em) !important;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 100ms ease !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.cm-atomic-task-checkbox:hover {
+  border-color: #a1a1aa !important; /* zinc-400 */
+}
+
+.cm-atomic-task-checkbox:checked {
+  background-color: rgba(16, 185, 129, 0.15) !important; /* emerald-500/15 */
+  border-color: #34d399 !important; /* emerald-400 */
+}
+
+.cm-atomic-task-checkbox::after {
+  content: "" !important;
+  width: 0.26em !important;
+  height: 0.5em !important;
+  border-right: 1.75px solid #34d399 !important; /* emerald-400 */
+  border-bottom: 1.75px solid #34d399 !important;
+  transform: rotate(45deg) translate(-0.02em, -0.04em) !important;
+  opacity: 0 !important;
+  transition: opacity 120ms ease !important;
+}
+
+.cm-atomic-task-checkbox:checked::after {
+  opacity: 1 !important;
+}
+
+.cm-atomic-task-checkbox:focus,
+.cm-atomic-task-checkbox:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Whole-line strike for completed task items matching ItemCard */
+.cm-line.cm-atomic-task-done {
+  color: #71717a !important; /* zinc-500 */
+  text-decoration: line-through !important;
 }
 
 /* Feed card rendering & memory optimization */
