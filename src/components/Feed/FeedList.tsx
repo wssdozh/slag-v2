@@ -10,11 +10,12 @@ import React, {
 import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
 import type { SlagItem, SlagAttachment, LightboxImage } from '../../types';
-import { Inbox, UploadCloud, Sparkles, ChevronDown } from 'lucide-react';
+import { Inbox, UploadCloud, Sparkles, ChevronDown, Pin } from 'lucide-react';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
+import { PinnedBanner } from './PinnedBanner';
 
 const PAGE_SIZE = 35;
 
@@ -43,6 +44,8 @@ export const FeedList: React.FC = () => {
     addToast,
     highlightedItemId,
     openLightbox,
+    isPinnedOnlyFilter,
+    togglePinnedOnlyFilter,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -409,6 +412,7 @@ export const FeedList: React.FC = () => {
 
   return (
     <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
+      <PinnedBanner />
       <div
         ref={containerRef}
         data-testid="feed-list-container"
@@ -435,15 +439,41 @@ export const FeedList: React.FC = () => {
 
         {filteredItems.length === 0 ? (
           <EmptyState
-            icon={items.length === 0 ? <Sparkles className="w-5 h-5 text-amber-400" /> : <Inbox className="w-5 h-5" />}
-            title={items.length === 0 ? 'Хранилище пустое' : 'В этой папке пусто'}
+            icon={
+              isPinnedOnlyFilter ? (
+                <Pin className="w-5 h-5 text-amber-400 rotate-45" />
+              ) : items.length === 0 ? (
+                <Sparkles className="w-5 h-5 text-amber-400" />
+              ) : (
+                <Inbox className="w-5 h-5" />
+              )
+            }
+            title={
+              isPinnedOnlyFilter
+                ? 'Нет закрепленных записей'
+                : items.length === 0
+                ? 'Хранилище пустое'
+                : 'В этой папке пусто'
+            }
             description={
-              items.length === 0
+              isPinnedOnlyFilter
+                ? 'В текущей папке нет закрепленных сообщений.'
+                : items.length === 0
                 ? 'Создайте первую мысль в поле ввода внизу или сгенерируйте стартовые демо-заметки и папки.'
                 : 'Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.'
             }
             action={
-              items.length === 0 ? (
+              isPinnedOnlyFilter ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={togglePinnedOnlyFilter}
+                  className="gap-1.5 text-xs text-zinc-200 hover:text-white"
+                >
+                  Показать все сообщения
+                </Button>
+              ) : items.length === 0 ? (
                 <Button
                   type="button"
                   variant="secondary"

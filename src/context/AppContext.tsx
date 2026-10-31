@@ -76,6 +76,9 @@ interface AppContextType {
   selectedItem: SlagItem | null;
   activeTypeFilter: SlagItemType | 'all';
   activeTagFilter: string | null;
+  isPinnedOnlyFilter: boolean;
+  setIsPinnedOnlyFilter: (active: boolean) => void;
+  togglePinnedOnlyFilter: () => void;
   aiItemFilter: AiItemFilter | null;
   applyAiFilter: (itemIds: string[], queryLabel: string) => void;
   clearAiFilter: () => void;
@@ -361,7 +364,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>(() => initialWorkspace.activeTypeFilter || 'all');
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(() => initialWorkspace.activeTagFilter ?? null);
+  const [isPinnedOnlyFilter, setIsPinnedOnlyFilter] = useState<boolean>(false);
   const [aiItemFilter, setAiItemFilter] = useState<AiItemFilter | null>(null);
+
+  const togglePinnedOnlyFilter = useCallback(() => {
+    setIsPinnedOnlyFilter(prev => !prev);
+  }, []);
+
+  // Reset pinned-only filter whenever switching folders (React pure adjustment pattern)
+  const [prevFolderForPinned, setPrevFolderForPinned] = useState(currentFolder);
+  if (prevFolderForPinned !== currentFolder) {
+    setPrevFolderForPinned(currentFolder);
+    setIsPinnedOnlyFilter(false);
+  }
 
   const applyAiFilter = useCallback((itemIds: string[], queryLabel: string) => {
     setAiItemFilter({ itemIds, queryLabel });
@@ -1153,7 +1168,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    if (currentFolder !== found.folder && !found.folder.startsWith(currentFolder + '/')) {
+    if (currentFolder !== 'Входящие' && currentFolder !== found.folder && !found.folder.startsWith(currentFolder + '/')) {
       setCurrentFolder(found.folder);
     }
 
@@ -1809,19 +1824,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
 
+      if (isPinnedOnlyFilter && !item.isPinned) {
+        return false;
+      }
+
       if (aiItemFilter && !aiItemFilter.itemIds.includes(item.id)) {
         return false;
       }
 
       return true;
-    }).sort((a, b) => {
-      // Pinned items prioritize on top
-      if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
-        return a.isPinned ? -1 : 1;
-      }
-      return a.createdAt - b.createdAt;
-    });
-  }, [items, aiItemFilter, currentFolder, inboxMode, activeTypeFilter, activeTagFilter]);
+    }).sort((a, b) => a.createdAt - b.createdAt);
+  }, [items, aiItemFilter, currentFolder, inboxMode, activeTypeFilter, activeTagFilter, isPinnedOnlyFilter]);
 
   const [backupSnapshots, setBackupSnapshots] = useState<BackupSnapshotMeta[]>([]);
   const [backupSettings, setBackupSettings] = useState<BackupSettings>(() => backupService.getSettings());
@@ -2000,6 +2013,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentFolder,
         setActiveTypeFilter,
         setActiveTagFilter,
+        isPinnedOnlyFilter,
+        setIsPinnedOnlyFilter,
+        togglePinnedOnlyFilter,
         setSelectedItem,
         setIsFullscreenEditorOpen,
         setIsSearchOpen,
