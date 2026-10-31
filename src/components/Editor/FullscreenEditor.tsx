@@ -111,7 +111,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isAttachmentsCollapsed, setIsAttachmentsCollapsed] = useState(false);
-  const [isToolbarVisible, setIsToolbarVisible] = useState(true);
+  const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
+  const [activeTopDropdown, setActiveTopDropdown] = useState<'style' | 'list' | null>(null);
+
+  const selectedAttachment = attachments.find(a => a.id === selectedAttachmentId);
 
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -194,9 +197,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key.toLowerCase() === 'w' || e.code === 'KeyW')) {
         e.preventDefault();
         setIsFullWidth(prev => !prev);
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === '/' || e.code === 'Slash')) {
-        e.preventDefault();
-        setIsToolbarVisible(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -429,8 +429,16 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
         }`}
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
       >
+        {/* Invisible Backdrop to dismiss active top dropdown */}
+        {activeTopDropdown && (
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            onClick={() => setActiveTopDropdown(null)}
+          />
+        )}
+
         <div className="w-full h-full flex items-center justify-between px-4 md:px-6 py-2.5 gap-2 md:gap-3">
-          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <button
               onClick={handleClose}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
@@ -449,16 +457,16 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               value={folder}
               onChange={setFolder}
               options={folders.map(f => ({ value: f.path, label: f.name }))}
-              className="max-w-[140px] md:max-w-[180px] h-7 text-xs bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] rounded-md"
+              className="max-w-[130px] md:max-w-[170px] h-7 text-xs bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] rounded-md"
             />
 
             {/* Item Type Switcher */}
-            <div className="flex items-center p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+            <div className="hidden sm:flex items-center p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
               {(['note', 'task', 'article'] as SlagItemType[]).map(t => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                     type === t ? 'bg-white/10 text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -468,8 +476,311 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             </div>
           </div>
 
+          {/* Teletype Center Utilities: Context-Aware for Selected Object (Text, Image, Audio, File) */}
+          <div className="hidden md:flex items-center justify-center mx-2 z-50">
+            {selectedAttachment ? (
+              /* Selected Object (Media / File) Action Bar */
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/[0.05] border border-white/[0.08] text-xs shadow-sm animate-in fade-in duration-150">
+                <span className="flex items-center gap-1.5 text-zinc-200 font-mono text-[11px] max-w-[180px] truncate pl-0.5">
+                  <span className="text-sm">
+                    {selectedAttachment.type === 'image' ? '🖼' : selectedAttachment.type === 'audio' ? '🎙' : '📎'}
+                  </span>
+                  <span className="truncate font-medium">{selectedAttachment.name}</span>
+                </span>
+
+                <div className="h-3.5 w-px bg-white/[0.1] mx-1" />
+
+                {selectedAttachment.type === 'image' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedAttachment.dataUrl) {
+                        openLightbox([{
+                          id: selectedAttachment.id,
+                          name: selectedAttachment.name,
+                          url: selectedAttachment.dataUrl,
+                          itemId: item.id,
+                        }], 0);
+                      }
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    title="Открыть изображение (Lightbox)"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Просмотр</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => insertAttachmentMarkdown(selectedAttachment.name)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-xs font-mono transition-colors cursor-pointer"
+                  title="Вставить ссылку ![[файл]] в курсор текста"
+                >
+                  <Link2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Вставить</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeAttachment(selectedAttachment.id);
+                    setSelectedAttachmentId(null);
+                  }}
+                  className="p-1 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  title="Удалить файл"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="h-3.5 w-px bg-white/[0.1] mx-0.5" />
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedAttachmentId(null)}
+                  className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  title="Снять выбор (вернуть текст)"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              /* Teletype Text Context Bar */
+              <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 shadow-xs">
+                {/* History: Undo / Redo */}
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-zinc-400"
+                  title="Отменить (Ctrl+Z)"
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRedo}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-zinc-400"
+                  title="Повторить (Ctrl+Y)"
+                >
+                  <Redo2 className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+
+                {/* Aa Text Styles Dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTopDropdown(prev => prev === 'style' ? null : 'style')}
+                    className={`flex items-center gap-0.5 px-2 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      activeTopDropdown === 'style' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                    }`}
+                    title="Стили текста (Aa)"
+                  >
+                    <span className="font-semibold text-sm leading-none">Aa</span>
+                    <ChevronDown className="w-3 h-3 text-zinc-500" />
+                  </button>
+
+                  {activeTopDropdown === 'style' && (
+                    <div className="absolute top-full mt-1.5 left-0 w-44 rounded-xl bg-[#16161a] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('# ', '');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <Heading1 className="w-4 h-4 text-zinc-400" />
+                        <span>Заголовок 1</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('## ', '');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <Heading2 className="w-4 h-4 text-zinc-400" />
+                        <span>Заголовок 2</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('### ', '');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <span className="font-mono text-xs text-zinc-400 font-bold px-0.5">H3</span>
+                        <span>Заголовок 3</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('> ', '');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <Quote className="w-4 h-4 text-zinc-400" />
+                        <span>Цитата</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('```\n', '\n```');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <Code className="w-4 h-4 text-zinc-400" />
+                        <span>Блок кода</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lists & Alignment Dropdown (≡ ▾) */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTopDropdown(prev => prev === 'list' ? null : 'list')}
+                    className={`flex items-center gap-0.5 px-1.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      activeTopDropdown === 'list' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                    }`}
+                    title="Списки и структуры (≡)"
+                  >
+                    <List className="w-4 h-4" />
+                    <ChevronDown className="w-3 h-3 text-zinc-500" />
+                  </button>
+
+                  {activeTopDropdown === 'list' && (
+                    <div className="absolute top-full mt-1.5 left-0 w-48 rounded-xl bg-[#16161a] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('- ', '');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <List className="w-4 h-4 text-zinc-400" />
+                        <span>Маркированный список</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('1. ', '');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <span className="font-mono text-xs text-zinc-400 font-bold px-0.5">1.</span>
+                        <span>Нумерованный список</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          insertMarkdown('- [ ] ', '');
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <CheckSquare className="w-4 h-4 text-zinc-400" />
+                        <span>Чек-лист задач</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleInsertTable();
+                          setActiveTopDropdown(null);
+                        }}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      >
+                        <Table className="w-4 h-4 text-zinc-400" />
+                        <span>Таблица Markdown</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+
+                {/* Inline Formatting: B, I, S, Inline Code */}
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('**', '**')}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer font-bold"
+                  title="Жирный (Ctrl+B)"
+                >
+                  <Bold className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('*', '*')}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer italic"
+                  title="Курсив (Ctrl+I)"
+                >
+                  <Italic className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('~~', '~~')}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  title="Зачёркнутый"
+                >
+                  <Strikethrough className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('`', '`')}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  title="Инлайн-код"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+
+                {/* Anchor / Link (⚓) */}
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown('[[', ']]')}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  title="Ссылка [[заметка]]"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Attachments / Paperclip */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  title="Прикрепить файл, фото или медиа"
+                >
+                  <Paperclip className="w-3.5 h-3.5 text-zinc-400" />
+                </button>
+
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+
+                {/* AI Sparkles */}
+                <button
+                  type="button"
+                  onClick={handleAiDecomposeInline}
+                  className="p-1.5 rounded-md text-zinc-400 hover:text-purple-300 hover:bg-purple-500/10 active:scale-95 transition-all cursor-pointer"
+                  title="Разобрать через ИИ (папка и теги)"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Stats & Actions */}
-          <div className="flex items-center gap-2 md:gap-2.5 text-xs text-zinc-400 ml-auto">
+          <div className="flex items-center gap-2 md:gap-2.5 text-xs text-zinc-400 ml-auto shrink-0">
             {/* Word count & Read time */}
             <div className="hidden lg:flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 pr-1">
               <span>{wordCount} слов</span>
@@ -894,7 +1205,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 {attachments.map((att, idx) => (
                   <div
                     key={att.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg bg-black/40 border border-white/[0.06]"
+                    onClick={() => setSelectedAttachmentId(att.id === selectedAttachmentId ? null : att.id)}
+                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg border transition-all cursor-pointer ${
+                      selectedAttachmentId === att.id
+                        ? 'bg-blue-500/10 border-blue-500/40 ring-1 ring-blue-500/40 shadow-sm'
+                        : 'bg-black/40 border-white/[0.06] hover:border-white/[0.12]'
+                    }`}
                   >
                     {/* Media Rendering */}
                     <div className="flex-1 min-w-0">
@@ -1024,6 +1340,22 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           {/* Main Markdown Editor with Obsidian-style Live Preview */}
           <div
             id="fullscreen-editor-root"
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              const img = target.closest('img');
+              if (img) {
+                const src = img.getAttribute('src');
+                const alt = img.getAttribute('alt');
+                const found = attachments.find(a => a.name === alt || a.dataUrl === src);
+                if (found) {
+                  setSelectedAttachmentId(found.id);
+                  return;
+                }
+              }
+              if (selectedAttachmentId) {
+                setSelectedAttachmentId(null);
+              }
+            }}
             onPaste={handlePaste}
             className="w-full relative min-h-[420px]"
           >
@@ -1323,177 +1655,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           </button>
         </div>
       </div>
-
-      {/* Desktop Floating Formatting Island Dock */}
-      {isToolbarVisible && (
-        <div
-          className={`hidden md:flex fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#16161a]/92 backdrop-blur-xl border border-white/[0.08] shadow-2xl shadow-black/80 rounded-2xl px-2 py-1.5 items-center gap-1 text-zinc-300 animate-in fade-in slide-in-from-bottom-2 duration-150 transition-opacity ${
-            isZenMode ? 'opacity-20 hover:opacity-100' : 'opacity-100'
-          }`}
-        >
-          {/* History */}
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Отменить (Ctrl+Z)"
-          >
-            <Undo2 className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleRedo}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Повторить (Ctrl+Y)"
-          >
-            <Redo2 className="w-4 h-4" />
-          </button>
-
-          <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
-
-          {/* Headings & Text Styles */}
-          <button
-            type="button"
-            onClick={() => insertMarkdown('# ', '')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Заголовок 1"
-          >
-            <Heading1 className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => insertMarkdown('## ', '')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Заголовок 2"
-          >
-            <Heading2 className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => insertMarkdown('**', '**')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer font-bold"
-            title="Жирный (Ctrl+B)"
-          >
-            <Bold className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => insertMarkdown('*', '*')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer italic"
-            title="Курсив (Ctrl+I)"
-          >
-            <Italic className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => insertMarkdown('~~', '~~')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Зачёркнутый"
-          >
-            <Strikethrough className="w-4 h-4" />
-          </button>
-
-          <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
-
-          {/* Lists */}
-          <button
-            type="button"
-            onClick={() => insertMarkdown('- ', '')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Маркированный список"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => insertMarkdown('- [ ] ', '')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Чек-лист задач"
-          >
-            <CheckSquare className="w-4 h-4" />
-          </button>
-
-          <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
-
-          {/* Inserts */}
-          <button
-            type="button"
-            onClick={() => insertMarkdown('> ', '')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Цитата"
-          >
-            <Quote className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => insertMarkdown('```\n', '\n```')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Блок кода"
-          >
-            <Code className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleInsertTable}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Вставить таблицу"
-          >
-            <Table className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => insertMarkdown('[[', ']]')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Ссылка [[заметка]]"
-          >
-            <Link2 className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
-            title="Прикрепить файл или медиа"
-          >
-            <Paperclip className="w-4 h-4 text-zinc-400" />
-          </button>
-
-          <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
-
-          {/* AI Decomposition */}
-          <button
-            type="button"
-            onClick={handleAiDecomposeInline}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-purple-300 hover:bg-purple-500/10 active:scale-95 transition-all cursor-pointer"
-            title="Разобрать через ИИ (определить папку и теги)"
-          >
-            <Sparkles className="w-4 h-4" />
-          </button>
-
-          <div className="h-4 w-px bg-white/[0.08] mx-0.5" />
-
-          {/* Dismiss dock */}
-          <button
-            type="button"
-            onClick={() => setIsToolbarVisible(false)}
-            className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Скрыть панель (Ctrl+/)"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* Minimized Dock Trigger */}
-      {!isToolbarVisible && (
-        <button
-          type="button"
-          onClick={() => setIsToolbarVisible(true)}
-          className="hidden md:flex fixed bottom-6 right-6 z-40 p-2 rounded-xl bg-[#16161a]/90 backdrop-blur-xl border border-white/[0.08] shadow-lg text-zinc-400 hover:text-white hover:bg-white/[0.1] active:scale-95 transition-all cursor-pointer"
-          title="Показать панель форматирования (Ctrl+/)"
-        >
-          <Sparkles className="w-4 h-4 text-zinc-400" />
-        </button>
-      )}
     </div>
   );
 };
