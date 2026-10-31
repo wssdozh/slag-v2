@@ -283,8 +283,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Verify UI settings panel opened
     await expect(page.locator('span', { hasText: 'Внешний вид, масштабы и плотность' })).toBeVisible();
 
-    // Switch Font scale to "Крупный (115%)"
-    const largeFontBtn = page.getByRole('button', { name: 'Крупный (115%)' });
+    // Switch Font scale to "Крупный (120%)"
+    const largeFontBtn = page.getByRole('button', { name: 'Крупный (120%)' });
     await expect(largeFontBtn).toBeVisible();
     await largeFontBtn.click();
 
@@ -292,10 +292,10 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const rootFontScale = await page.evaluate(() => {
       return document.documentElement.style.getPropertyValue('--slag-font-scale');
     });
-    expect(rootFontScale).toBe('1.15');
+    expect(rootFontScale).toBe('1.2');
 
     // Switch Density to "Компактный"
-    const compactDensityBtn = page.getByRole('button', { name: 'Компактный' });
+    const compactDensityBtn = page.getByRole('button', { name: 'Компактный', exact: true });
     await expect(compactDensityBtn).toBeVisible();
     await compactDensityBtn.click();
 
