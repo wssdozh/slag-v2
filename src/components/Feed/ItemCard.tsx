@@ -91,6 +91,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     openContextMenu,
     setReplyTarget,
     scrollToItem,
+    navigateToFolder,
+    currentFolder,
     openLightbox,
     isMobile,
     setMobileActionSheetItem,
@@ -256,15 +258,27 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const folderDisplayName =
     item.folder !== 'Входящие'
       ? item.folder.split('/').filter(Boolean).pop() || item.folder
-      : '';
+      : currentFolder !== 'Входящие'
+        ? 'Входящие'
+        : '';
 
   const metaElements: React.ReactNode[] = [];
 
   if (folderDisplayName) {
     metaElements.push(
-      <span key="folder" className="text-2xs text-zinc-500 font-mono" title={item.folder}>
+      <button
+        key="folder"
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          navigateToFolder(item.folder, item.id);
+        }}
+        className="text-2xs text-zinc-500 hover:text-zinc-200 font-mono transition-colors cursor-pointer hover:underline underline-offset-2 truncate max-w-[140px] text-left leading-none inline-flex items-center"
+        title={`Перейти в папку «${item.folder}» и перейти к этой записи`}
+      >
         {folderDisplayName}
-      </span>
+      </button>
     );
   }
 

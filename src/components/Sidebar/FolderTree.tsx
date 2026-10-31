@@ -37,6 +37,28 @@ export const FolderTree: React.FC = () => {
     'База знаний': true,
   });
 
+  // Auto-expand parent folders when navigating to a nested folder (React pure adjustment pattern)
+  const [prevFolder, setPrevFolder] = useState(currentFolder);
+  if (prevFolder !== currentFolder) {
+    setPrevFolder(currentFolder);
+    if (currentFolder && currentFolder !== 'Входящие') {
+      const parts = currentFolder.split('/');
+      if (parts.length > 1) {
+        let pathAcc = '';
+        const toExpand: Record<string, boolean> = {};
+        for (let i = 0; i < parts.length - 1; i++) {
+          pathAcc = pathAcc ? `${pathAcc}/${parts[i]}` : parts[i];
+          if (!expandedPaths[pathAcc]) {
+            toExpand[pathAcc] = true;
+          }
+        }
+        if (Object.keys(toExpand).length > 0) {
+          setExpandedPaths(prev => ({ ...prev, ...toExpand }));
+        }
+      }
+    }
+  }
+
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
 
   const buildTree = (): TreeNode[] => {

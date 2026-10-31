@@ -126,6 +126,7 @@ interface AppContextType {
   setReplyTarget: (item: SlagItem | null) => void;
   highlightedItemId: string | null;
   scrollToItem: (idOrTitle: string) => void;
+  navigateToFolder: (folder: string, itemId?: string) => void;
 
   // Actions
   setCurrentFolder: (folder: string) => void;
@@ -1181,6 +1182,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 2400);
   }, [items, currentFolder, addToast]);
 
+  const navigateToFolder = useCallback((folder: string, itemId?: string) => {
+    if (currentFolder !== folder) {
+      setCurrentFolder(folder);
+    }
+    if (isMobile) {
+      setMobileActiveFolder(folder);
+      setActiveMobileTab('folders');
+    }
+    setFeedViewMode('feed');
+    setIsPinnedOnlyFilter(false);
+    clearAiFilter();
+
+    if (itemId) {
+      const it = items.find(i => i.id === itemId);
+      if (it) {
+        if (activeTypeFilter !== 'all' && it.type !== activeTypeFilter) {
+          setActiveTypeFilter('all');
+        }
+        if (activeTagFilter && !it.tags?.includes(activeTagFilter)) {
+          setActiveTagFilter(null);
+        }
+      }
+      setHighlightedItemId(null);
+      requestAnimationFrame(() => {
+        setHighlightedItemId(itemId);
+      });
+      setTimeout(() => {
+        setHighlightedItemId(prev => (prev === itemId ? null : prev));
+      }, 2400);
+    }
+  }, [
+    currentFolder,
+    isMobile,
+    setMobileActiveFolder,
+    setActiveMobileTab,
+    setFeedViewMode,
+    setIsPinnedOnlyFilter,
+    clearAiFilter,
+    items,
+    activeTypeFilter,
+    setActiveTypeFilter,
+    activeTagFilter,
+    setActiveTagFilter,
+  ]);
+
   // Global click outside for Context Menu
   useEffect(() => {
     if (!contextMenu) return;
@@ -2010,6 +2056,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setReplyTarget,
         highlightedItemId,
         scrollToItem,
+        navigateToFolder,
         setCurrentFolder,
         setActiveTypeFilter,
         setActiveTagFilter,

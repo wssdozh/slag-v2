@@ -20,6 +20,7 @@ export const MobileActionSheet: React.FC = () => {
   const {
     mobileActionSheetItem,
     setMobileActionSheetItem,
+    navigateToFolder,
   } = useApp();
 
   const handleClose = () => {
@@ -55,9 +56,17 @@ export const MobileActionSheet: React.FC = () => {
               {item.title || item.content.slice(0, 40) || 'Без названия'}
             </span>
           </div>
-          <span className="text-[10px] font-mono text-zinc-500 shrink-0 ml-2">
+          <button
+            type="button"
+            onClick={() => {
+              handleClose();
+              navigateToFolder(item.folder, item.id);
+            }}
+            className="text-[10px] font-mono text-zinc-500 hover:text-zinc-200 hover:underline transition-colors cursor-pointer shrink-0 ml-2"
+            title={`Перейти в папку «${item.folder}» и перейти к этой записи`}
+          >
             {item.folder}
-          </span>
+          </button>
         </div>
 
         {/* Quick Type Switcher (Segmented Control) */}

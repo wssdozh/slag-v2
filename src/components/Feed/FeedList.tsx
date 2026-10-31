@@ -104,9 +104,10 @@ export const FeedList: React.FC = () => {
   }
 
   // Permanently expand visibleCount during render when an item is targeted (React pure pattern)
-  const [prevHighlightedId, setPrevHighlightedId] = useState(highlightedItemId);
-  if (prevHighlightedId !== highlightedItemId) {
-    setPrevHighlightedId(highlightedItemId);
+  const highlightKey = `${filterKey}:${highlightedItemId || ''}`;
+  const [prevHighlightKey, setPrevHighlightKey] = useState(highlightKey);
+  if (prevHighlightKey !== highlightKey) {
+    setPrevHighlightKey(highlightKey);
     if (highlightedItemId) {
       const targetIdx = filteredItems.findIndex(i => i.id === highlightedItemId);
       if (targetIdx !== -1) {
@@ -194,7 +195,7 @@ export const FeedList: React.FC = () => {
     const tryScrollToTarget = (attempt = 0) => {
       const el = document.getElementById(`item-${highlightedItemId}`);
       if (!el || !container) {
-        if (attempt < 6) {
+        if (attempt < 15) {
           timerId = setTimeout(() => tryScrollToTarget(attempt + 1), 35);
         }
         return;
@@ -231,7 +232,7 @@ export const FeedList: React.FC = () => {
       cancelAnimationFrame(rafId);
       clearTimeout(timerId);
     };
-  }, [highlightedItemId]);
+  }, [highlightedItemId, currentFolder]);
 
   // Top sentinel intersection observer to auto-load older items when scrolling up
   useEffect(() => {
