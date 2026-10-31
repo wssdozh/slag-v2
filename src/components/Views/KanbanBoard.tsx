@@ -235,7 +235,7 @@ export const KanbanBoard: React.FC = () => {
             <div className="flex items-center gap-1.5 truncate">
               <BookOpen className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <span className="truncate">Материалы папки</span>
-              <span className="text-[11px] font-mono text-zinc-500">
+              <span className="text-2xs font-mono text-zinc-500">
                 ({materialsSearchQuery ? filteredMaterials.length : folderMaterials.length})
               </span>
             </div>
@@ -304,14 +304,14 @@ export const KanbanBoard: React.FC = () => {
                       ) : (
                         <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                       )}
-                      <span className="text-[12px] font-medium text-zinc-200 truncate">
+                      <span className="text-sm font-medium text-zinc-200 truncate">
                         {mat.title || 'Без названия'}
                       </span>
                     </div>
                   </div>
 
                   {mat.content && (
-                    <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
                       {mat.content.slice(0, 100)}
                     </p>
                   )}
@@ -369,7 +369,7 @@ export const KanbanBoard: React.FC = () => {
                   <h3 className="text-xs font-semibold text-zinc-200 tracking-tight truncate">
                     {column.title}
                   </h3>
-                  <span className="text-[11px] font-mono text-zinc-500 shrink-0">
+                  <span className="text-2xs font-mono text-zinc-500 shrink-0">
                     ({colTasks.length})
                   </span>
                 </div>
@@ -489,7 +489,7 @@ export const KanbanBoard: React.FC = () => {
                             </div>
 
                             {/* Linear Task Key (e.g. TSK-12) */}
-                            <span className="text-[11px] font-mono text-zinc-500 font-medium">
+                            <span className="text-2xs font-mono text-zinc-500 font-medium">
                               {taskKey}
                             </span>
                           </div>
@@ -500,9 +500,9 @@ export const KanbanBoard: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Title (13px, font-medium, #f4f4f5) */}
+                        {/* Title (14px, font-medium, #f4f4f5) */}
                         <div
-                          className={`text-[13px] font-medium leading-snug line-clamp-2 ${
+                          className={`text-sm font-medium leading-snug line-clamp-2 ${
                             task.status === 'done'
                               ? 'line-through text-zinc-500'
                               : 'text-[#f4f4f5]'
@@ -526,12 +526,12 @@ export const KanbanBoard: React.FC = () => {
                         )}
 
                         {/* Card Footer: Subtasks, Due Date, Attachments */}
-                        <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 pt-1 border-t border-white/[0.04]">
+                        <div className="flex items-center justify-between text-2xs font-mono text-zinc-500 pt-1 border-t border-white/[0.04]">
                           <div className="flex items-center gap-2">
                             {/* Subtasks Progress Badge */}
                             {totalSubtasks > 0 && (
                               <span
-                                className={`flex items-center gap-1 text-[10px] ${
+                                className={`flex items-center gap-1 text-2xs ${
                                   completedSubtasks === totalSubtasks
                                     ? 'text-emerald-400'
                                     : 'text-zinc-400'
@@ -548,7 +548,7 @@ export const KanbanBoard: React.FC = () => {
                             {/* Attachments */}
                             {task.attachments && task.attachments.length > 0 && (
                               <span
-                                className="flex items-center gap-1 text-[10px] text-zinc-400"
+                                className="flex items-center gap-1 text-2xs text-zinc-400"
                                 title={`Файлы: ${task.attachments.length}`}
                               >
                                 <Paperclip className="w-3 h-3" />
@@ -560,7 +560,7 @@ export const KanbanBoard: React.FC = () => {
                           {/* Due Date or Created Date */}
                           {task.dueDate ? (
                             <span
-                              className={`flex items-center gap-1 text-[10px] font-mono ${
+                              className={`flex items-center gap-1 text-2xs font-mono ${
                                 overdue ? 'text-rose-400 font-semibold' : 'text-zinc-400'
                               }`}
                               title={overdue ? 'Просрочено!' : 'Срок выполнения'}
@@ -569,7 +569,7 @@ export const KanbanBoard: React.FC = () => {
                               <span>{task.dueDate}</span>
                             </span>
                           ) : (
-                            <span className="text-[10px] text-zinc-600 font-mono">
+                            <span className="text-2xs text-zinc-600 font-mono">
                               {new Date(task.createdAt).toLocaleDateString([], {
                                 month: 'short',
                                 day: 'numeric',

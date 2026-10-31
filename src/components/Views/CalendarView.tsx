@@ -499,7 +499,7 @@ export const CalendarView: React.FC = () => {
         </button>
 
         <span
-          className={`truncate font-medium text-[11px] leading-tight select-none flex-1 min-w-[20px] ${
+          className={`truncate font-medium text-xs leading-tight select-none flex-1 min-w-[20px] ${
             isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
           }`}
         >
@@ -507,7 +507,7 @@ export const CalendarView: React.FC = () => {
         </span>
 
         {task.tags && task.tags.length > 0 && (
-          <span className="hidden xl:inline text-[9px] font-mono text-zinc-500 shrink-0">
+          <span className="hidden xl:inline text-2xs font-mono text-zinc-500 shrink-0">
             #{task.tags[0]}
           </span>
         )}
@@ -833,7 +833,7 @@ export const CalendarView: React.FC = () => {
                     : slot.timeLabel}
                 </span>
                 {totalSubtasks > 0 && (
-                  <span className="flex items-center gap-0.5 text-[9px]">
+                  <span className="flex items-center gap-0.5 text-2xs font-mono">
                     <ListTodo className="w-2.5 h-2.5" />
                     <span>{completedSubtasks}/{totalSubtasks}</span>
                   </span>
@@ -1164,10 +1164,10 @@ export const CalendarView: React.FC = () => {
                               isLastSub ? 'border-white/[0.04]' : 'border-white/[0.025] border-dashed'
                             } pr-2 text-right font-mono pt-0.5 select-none flex items-start justify-end transition-colors cursor-ns-resize ${
                               isTop
-                                ? 'text-[10px] text-zinc-400 font-medium'
+                                ? 'text-2xs text-zinc-400 font-medium'
                                 : isHalf
-                                ? 'text-[9px] text-zinc-500 font-normal'
-                                : 'text-[8px] text-zinc-600 font-normal'
+                                ? 'text-2xs text-zinc-500 font-normal opacity-90'
+                                : 'text-2xs text-zinc-600 font-normal opacity-70'
                             }`}
                           >
                             <span className="hover:text-blue-300 transition-colors pointer-events-none">
@@ -1421,7 +1421,7 @@ export const CalendarView: React.FC = () => {
                                 </span>
                               )}
                               {!slot.isAllDay && (
-                                <span className="text-[9px] font-mono text-zinc-500 shrink-0">
+                                <span className="text-2xs font-mono text-zinc-500 shrink-0">
                                   {String(slot.startHour).padStart(2, '0')}:{String(slot.startMinute).padStart(2, '0')}
                                 </span>
                               )}
@@ -1437,7 +1437,7 @@ export const CalendarView: React.FC = () => {
                             e.stopPropagation();
                             setExpandedDayDateStr(cell.dateStr);
                           }}
-                          className="text-[9px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors text-right cursor-pointer"
+                          className="text-2xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors text-right cursor-pointer"
                         >
                           +{dayTasks.length - 3} еще
                         </div>

@@ -52,7 +52,7 @@ export const TagChip: React.FC<TagChipProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors select-none ${className}`}
+      className={`inline-flex items-center gap-1 text-2xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors select-none ${className}`}
     >
       <span
         role={onClick ? 'button' : undefined}

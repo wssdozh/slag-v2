@@ -516,7 +516,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
             <div className="flex-1 min-w-0 pr-14 sm:pr-16">
               <h3
-                className={`text-sm font-medium leading-snug tracking-tight ${
+                className={`text-base font-medium leading-snug tracking-tight ${
                   item.status === 'done'
                     ? 'line-through text-zinc-500'
                     : 'text-zinc-100'
@@ -531,7 +531,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               </h3>
 
               {taskBodyContent && (
-                <div className="mt-1 text-xs text-zinc-400 leading-relaxed font-normal">
+                <div className="mt-1 text-sm text-zinc-300 leading-relaxed font-normal">
                   <MarkdownRenderer content={taskBodyContent} onWikiLinkClick={scrollToItem} />
                 </div>
               )}
@@ -558,7 +558,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     <div
                       key={st.id}
                       onClick={() => toggleTaskComplete(item.id, st.id)}
-                      className="flex items-center gap-2 cursor-pointer text-xs group/sub select-none"
+                      className="flex items-center gap-2 cursor-pointer text-xs sm:text-ui group/sub select-none"
                     >
                       <button
                         type="button"
@@ -572,7 +572,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                         )}
                       </button>
                       <span
-                        className={`text-xs flex-1 min-w-0 ${
+                        className={`text-xs sm:text-ui flex-1 min-w-0 ${
                           st.completed ? 'line-through text-zinc-500' : 'text-zinc-300'
                         }`}
                       >
@@ -595,7 +595,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <div className="flex flex-col gap-1.5 pt-0.5">
           <h3
             onClick={handleOpenArticle}
-            className="text-sm font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-14 sm:pr-20"
+            className="text-base font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-14 sm:pr-20"
           >
             <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>{item.title}</span>
@@ -603,7 +603,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
           <p
             onClick={handleOpenArticle}
-            className="text-xs text-zinc-400 line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-zinc-300 transition-colors"
+            className="text-sm text-zinc-300 line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-zinc-100 transition-colors"
           >
             {item.summary || item.content.slice(0, 200)}
           </p>
@@ -621,7 +621,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
           return (
             <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-              <div className="text-xs text-zinc-300 leading-relaxed font-normal whitespace-pre-wrap">
+              <div className="text-sm text-zinc-200 leading-relaxed font-normal whitespace-pre-wrap">
                 <MarkdownRenderer content={textToRender} onWikiLinkClick={scrollToItem} />
               </div>
             </div>
@@ -679,7 +679,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       e.stopPropagation();
                       toggleOcr(imageAttachments[0].id);
                     }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-mono shadow-md active:scale-95 z-10"
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md active:scale-95 z-10"
                     title={expandedOcrIds.has(imageAttachments[0].id) ? 'Скрыть текст' : 'Показать текст с фото'}
                   >
                     <FileText className="w-3.5 h-3.5 text-zinc-300" />
@@ -687,7 +687,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${expandedOcrIds.has(imageAttachments[0].id) ? 'rotate-180' : ''}`} />
                   </button>
                 ) : imageAttachments[0].enrichmentStatus === 'processing' ? (
-                  <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md border border-white/15 text-zinc-300 text-[11px] font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
+                  <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md border border-white/15 text-zinc-300 text-2xs font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
                     <span>Анализ...</span>
                   </div>
@@ -699,7 +699,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       e.stopPropagation();
                       handleEnrichAttachment(imageAttachments[0]);
                     }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-mono shadow-md active:scale-95 z-10"
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md active:scale-95 z-10"
                     title="Распознать текст на изображении"
                   >
                     <Sparkles className="w-3 h-3 text-zinc-400" />
@@ -747,13 +747,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                           e.stopPropagation();
                           toggleOcr(img.id);
                         }}
-                        className="text-[9px] text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-0.5 cursor-pointer select-none font-mono"
+                        className="text-2xs text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-0.5 cursor-pointer select-none font-mono"
                       >
                         <span>{expandedOcrIds.has(img.id) ? 'Скрыть текст' : 'Текст'}</span>
                         <ChevronDown className={`w-2.5 h-2.5 transition-transform ${expandedOcrIds.has(img.id) ? 'rotate-180' : ''}`} />
                       </button>
                       {expandedOcrIds.has(img.id) && (
-                        <div className="mt-0.5 pt-0.5 pl-2 border-l border-white/10 text-[11px] font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+                        <div className="mt-0.5 pt-0.5 pl-2 border-l border-white/10 text-2xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
                           {img.extractedText}
                         </div>
                       )}
@@ -786,12 +786,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               {/* Filename & Info */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
                   <span
-                    className="text-xs sm:text-[13px] font-medium text-zinc-200 group-hover/file:text-white truncate font-sans"
+                    className="text-sm font-medium text-zinc-200 group-hover/file:text-white truncate font-sans"
                     title={file.name}
                   >
                     {file.name}
                   </span>
-                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-sans truncate">
+                  <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-sans truncate">
                     <span className="font-mono text-zinc-400">{formatBytes(file.size)}</span>
                     {file.summary && (
                       <>
@@ -807,7 +807,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 {/* Right Action: Timestamp + Download for pure file, or Download icon */}
                 <div className="flex items-center gap-2 shrink-0 ml-1">
                   {isPureFile && (
-                    <span className="text-[11px] font-mono text-zinc-500 select-none leading-none">
+                    <span className="text-2xs font-mono text-zinc-500 select-none leading-none">
                       {formattedTime}
                     </span>
                   )}
@@ -864,7 +864,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                           e.stopPropagation();
                           setIsTagsExpanded(prev => !prev);
                         }}
-                        className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer px-1 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.05] select-none leading-none"
+                        className="text-2xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer px-1 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.05] select-none leading-none"
                         title={isTagsExpanded ? 'Свернуть теги' : `Показать ещё ${hiddenCount} тегов`}
                       >
                         {isTagsExpanded ? 'свернуть' : `+${hiddenCount}`}
@@ -879,7 +879,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           )}
 
           {!isPureVoice && (
-            <span className="text-[11px] font-mono text-zinc-500 select-none ml-auto shrink-0 leading-none">
+            <span className="text-2xs font-mono text-zinc-500 select-none ml-auto shrink-0 leading-none">
               {formattedTime}
             </span>
           )}
@@ -892,7 +892,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           onClick={() => {
             if (firstReplyId) scrollToItem(firstReplyId);
           }}
-          className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 hover:text-blue-400 transition-colors pt-1 select-none w-fit"
+          className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500 hover:text-blue-400 transition-colors pt-1 select-none w-fit"
         >
           <CornerUpLeft className="w-3 h-3 rotate-180 text-zinc-500" />
           <span>{repliesCount} {repliesCount === 1 ? 'ответ' : repliesCount < 5 ? 'ответа' : 'ответов'}</span>

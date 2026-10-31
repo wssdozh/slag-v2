@@ -89,7 +89,7 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
           return (
             <React.Fragment key={cmd.id}>
               {isNewCategory && !cleanQuery && (
-                <div className="px-2.5 pt-1.5 pb-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                <div className="px-2.5 pt-1.5 pb-0.5 text-2xs font-mono uppercase tracking-wider text-zinc-500">
                   {CATEGORY_LABELS[cmd.category]}
                 </div>
               )}

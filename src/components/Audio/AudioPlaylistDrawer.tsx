@@ -218,7 +218,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
                     >
                       {track.name}
                     </span>
-                    <span className="truncate text-[10px] text-zinc-500">
+                    <span className="truncate text-2xs text-zinc-500">
                       {track.itemTitle}
                     </span>
                   </div>
@@ -226,11 +226,11 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
 
                 {/* Right: Badge, Duration, Jump to note */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-500 uppercase">
+                  <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-500 uppercase">
                     {track.format}
                   </span>
 
-                  <span className="text-[10px] font-mono text-zinc-500 w-10 text-right">
+                  <span className="text-2xs font-mono text-zinc-500 w-10 text-right">
                     {formatAudioDuration(track.duration)}
                   </span>
 

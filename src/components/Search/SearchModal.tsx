@@ -270,12 +270,12 @@ const SearchDialog: React.FC = () => {
                         <span className="text-xs font-medium truncate text-zinc-100">
                           {cmd.title}
                         </span>
-                        <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.06] text-zinc-400 shrink-0">
+                        <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-400 shrink-0">
                           {cmd.category}
                         </span>
                       </div>
                       {cmd.description && (
-                        <span className="text-[11px] text-zinc-500 truncate">
+                        <span className="text-xs text-zinc-400 truncate">
                           {cmd.description}
                         </span>
                       )}
@@ -284,7 +284,7 @@ const SearchDialog: React.FC = () => {
 
                   <div className="flex items-center gap-2 shrink-0">
                     {cmd.shortcut && (
-                      <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-300 border border-white/[0.06]">
+                      <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-2xs text-zinc-300 border border-white/[0.06]">
                         {formatShortcut(cmd.shortcut)}
                       </kbd>
                     )}
@@ -332,7 +332,7 @@ const SearchDialog: React.FC = () => {
                         {item.title}
                       </span>
                       {matchedAtt && (matchedAtt.summary || matchedAtt.extractedText) && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.06] text-zinc-400 shrink-0">
+                        <span className="inline-flex items-center gap-0.5 text-2xs font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-400 shrink-0">
                           {matchedAtt.type === 'audio' && <Mic className="w-2.5 h-2.5" />}
                           {matchedAtt.type === 'image' && <ImageIcon className="w-2.5 h-2.5" />}
                           {matchedAtt.type === 'file' && <Paperclip className="w-2.5 h-2.5" />}
@@ -340,14 +340,14 @@ const SearchDialog: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-zinc-500 truncate">
+                    <span className="text-xs text-zinc-400 truncate">
                       {snippet}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500">
+                  <span className="flex items-center gap-1 text-2xs font-mono text-zinc-500">
                     <Folder className="w-3 h-3" />
                     {item.folder}
                   </span>

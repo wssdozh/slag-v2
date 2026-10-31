@@ -791,7 +791,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
 
           {/* All Day Row (Chips for tasks without specific time slot) */}
           <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/50 shrink-0 min-h-[36px]">
-            <div className="w-11 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[9px] font-mono text-zinc-500 uppercase p-1">
+            <div className="w-11 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-2xs font-mono text-zinc-500 uppercase p-1">
               Весь день
             </div>
             <div className="flex-1 grid grid-cols-3 divide-x divide-white/[0.04] p-1 gap-1">
@@ -966,7 +966,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                             )}
                           </div>
 
-                          <div className="flex items-center justify-between text-[9px] font-mono text-zinc-500 mt-0.5">
+                          <div className="flex items-center justify-between text-2xs font-mono text-zinc-500 mt-0.5">
                             <span>{slot.timeLabel.split('-')[0].trim()}</span>
                             {task.folder && (
                               <span className="truncate max-w-[50px] opacity-75">{task.folder}</span>

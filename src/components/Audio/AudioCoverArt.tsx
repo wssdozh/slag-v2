@@ -418,7 +418,7 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({
             isPlaying ? 'scale-105' : 'scale-100'
           }`}
         />
-        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[9px] font-mono tracking-wider text-zinc-300 uppercase">
+        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-2xs font-mono tracking-wider text-zinc-300 uppercase">
           {track.format}
         </div>
       </div>

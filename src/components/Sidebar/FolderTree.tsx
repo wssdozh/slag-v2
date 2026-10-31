@@ -179,7 +179,7 @@ export const FolderTree: React.FC = () => {
 
           <div className="flex items-center gap-1 shrink-0">
             {itemCount > 0 && (
-              <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-400 px-1">
+              <span className="text-2xs font-mono text-zinc-500 group-hover:text-zinc-400 px-1">
                 {itemCount}
               </span>
             )}

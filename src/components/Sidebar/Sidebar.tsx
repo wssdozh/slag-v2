@@ -100,7 +100,7 @@ export const Sidebar: React.FC = () => {
               <span>Входящие</span>
             </div>
             {inboxItemsCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/10 text-zinc-200">
+              <span className="px-1.5 py-0.2 rounded-full text-2xs font-mono bg-white/10 text-zinc-200">
                 {inboxItemsCount}
               </span>
             )}
@@ -109,7 +109,7 @@ export const Sidebar: React.FC = () => {
 
         {/* Folders Section Header */}
         <div className="pt-2">
-          <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-medium text-zinc-500 tracking-wider uppercase">
+          <div className="flex items-center justify-between px-2.5 py-1 text-2xs font-mono font-medium text-zinc-500 tracking-wider uppercase">
             <span>Папки</span>
             <button
               onClick={() => openCreateFolderModal()}
@@ -151,7 +151,7 @@ export const Sidebar: React.FC = () => {
         {/* Vault Switcher Dropdown */}
         {isVaultDropdownOpen && (
           <div className="absolute bottom-full left-2 right-2 mb-1.5 rounded-xl bg-[#141416] border border-white/[0.08] shadow-2xl p-1.5 z-40 flex flex-col gap-0.5 text-xs animate-in fade-in duration-100">
-            <div className="px-2.5 py-1 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+            <div className="px-2.5 py-1 text-2xs font-mono font-medium text-zinc-500 uppercase tracking-wider">
               Хранилища (Vaults)
             </div>
 
@@ -176,7 +176,7 @@ export const Sidebar: React.FC = () => {
                     >
                       <span className="truncate">{v.name}</span>
                       {v.path && (
-                        <span className="text-[10px] text-zinc-500 truncate font-mono">
+                        <span className="text-2xs text-zinc-500 truncate font-mono">
                           {v.path}
                         </span>
                       )}

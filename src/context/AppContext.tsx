@@ -27,6 +27,7 @@ import { logger } from '../lib/logger';
 import { openAppFolder } from '../lib/folderOpener';
 import { listenDesktopEvents, isDesktopApp } from '../lib/windowControls';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
   evaluateRecurringTasks,
   getISODateString,
@@ -215,10 +216,12 @@ const DEFAULT_UI_CONFIG: AppUiConfig = {
   desktop: {
     fontScale: 'normal',
     density: 'normal',
+    fontFamily: 'inter',
   },
   mobile: {
     fontScale: 'normal',
     density: 'spacious',
+    fontFamily: 'inter',
   },
 };
 
@@ -542,7 +545,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
-  // Dynamically apply density and font scale CSS properties to document root
+  // Dynamically apply density, font scale and font family CSS properties to document root
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const currentDevice = isMobile ? 'mobile' : 'desktop';
@@ -550,8 +553,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     document.documentElement.dataset.density = cfg.density;
 
-    const scaleNum = cfg.fontScale === 'small' ? 0.9 : cfg.fontScale === 'large' ? 1.15 : 1.0;
+    const scaleNum = getFontScaleMultiplier(cfg.fontScale);
     document.documentElement.style.setProperty('--slag-font-scale', String(scaleNum));
+
+    const fontCfg = getFontFamilyConfig(cfg.fontFamily);
+    document.documentElement.style.setProperty('--slag-font-sans', fontCfg.cssSans);
+    document.documentElement.style.setProperty('--slag-font-mono', fontCfg.cssMono);
   }, [isMobile, uiConfig]);
 
   // Action History Stack for Undo capability (up to 20 snapshots)

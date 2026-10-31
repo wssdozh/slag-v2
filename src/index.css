@@ -3,11 +3,18 @@
 @import "@atomic-editor/editor/styles.css";
 
 @theme {
-  --text-2xs: calc(0.6875rem * var(--slag-font-scale, 1));
-  --text-xs:  calc(0.75rem * var(--slag-font-scale, 1));
-  --text-sm:  calc(0.875rem * var(--slag-font-scale, 1));
-  --text-base:calc(1rem * var(--slag-font-scale, 1));
-  --text-lg:  calc(1.125rem * var(--slag-font-scale, 1));
+  --font-sans: var(--slag-font-sans);
+  --font-mono: var(--slag-font-mono);
+
+  --text-2xs: calc(0.6875rem * var(--slag-font-scale, 1));  /* 11px - P4 (Метаданные, бейджи, хоткеи) */
+  --text-xs:  calc(0.75rem * var(--slag-font-scale, 1));    /* 12px - P3 (Контекст, папки, теги) */
+  --text-ui:  calc(0.8125rem * var(--slag-font-scale, 1));  /* 13px - P2 (Чекбоксы подзадач, сайдбар, кнопки) */
+  --text-sm:  calc(0.875rem * var(--slag-font-scale, 1));   /* 14px - P2 (Основной текст заметок, чат, инпуты) */
+  --text-base:calc(0.9375rem * var(--slag-font-scale, 1));  /* 15px - P1 (Заголовки карточек в ленте) */
+  --text-md:  calc(1rem * var(--slag-font-scale, 1));       /* 16px - P1 (Заголовки секций) */
+  --text-lg:  calc(1.125rem * var(--slag-font-scale, 1));   /* 18px - P1 (Заголовки модальных окон) */
+  --text-xl:  calc(1.375rem * var(--slag-font-scale, 1));   /* 22px - P1 (Заголовки экранов и страниц) */
+  --text-2xl: calc(1.625rem * var(--slag-font-scale, 1));   /* 26px - P1 (Фокус-редактор) */
 }
 
 @layer base {
@@ -31,8 +38,10 @@
     --sar: env(safe-area-inset-right, 0px);
     --keyboard-inset-bottom: 0px;
 
-    /* SLAG Control Matrix Tokens */
+    /* SLAG Typography & Control Matrix Tokens */
     --slag-font-scale: 1;
+    --slag-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    --slag-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace;
     --slag-ctrl-xs: 24px;
     --slag-ctrl-sm: 28px;
     --slag-ctrl-md: 32px;
@@ -110,10 +119,18 @@
   }
 
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--slag-font-sans);
+    font-feature-settings: "cv01", "cv02", "cv03", "cv04", "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     background-color: var(--bg-main);
     color: var(--text-primary);
     user-select: none;
+  }
+
+  code, kbd, samp, pre, .font-mono {
+    font-family: var(--slag-font-mono);
   }
 
   input, textarea, [contenteditable="true"] {

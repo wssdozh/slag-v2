@@ -234,7 +234,7 @@ export const MobileTasksView: React.FC = () => {
 
                     {task.priority && task.priority !== 'none' && (
                       <span
-                        className={`text-[9px] uppercase font-mono font-medium ${
+                        className={`text-2xs uppercase font-mono font-medium ${
                           task.priority === 'high'
                             ? 'text-rose-400'
                             : task.priority === 'medium'

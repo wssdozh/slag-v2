@@ -33,6 +33,7 @@ import { Checkbox } from '../UI/Checkbox';
 import { NumberInput } from '../UI/NumberInput';
 import { BaseModal } from './BaseModal';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
+import { FONT_SCALE_OPTIONS, FONT_FAMILY_OPTIONS } from '../../config/typography';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -841,48 +842,105 @@ export const SettingsModal: React.FC = () => {
                 <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-zinc-300">Масштаб шрифтов и типографики:</span>
-                    <span className="text-2xs font-mono text-zinc-500">
-                      {uiConfig[selectedDevice].fontScale === 'small' ? '90%' : uiConfig[selectedDevice].fontScale === 'large' ? '115%' : '100%'}
+                    <span className="text-2xs font-mono text-zinc-400">
+                      {FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.label} ({FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.percentage})
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {(Object.keys(FONT_SCALE_OPTIONS) as Array<keyof typeof FONT_SCALE_OPTIONS>).map((scaleKey) => {
+                      const opt = FONT_SCALE_OPTIONS[scaleKey];
+                      const isSelected = uiConfig[selectedDevice].fontScale === scaleKey;
+                      return (
+                        <button
+                          key={scaleKey}
+                          type="button"
+                          onClick={() => updateUiConfig(selectedDevice, { fontScale: scaleKey })}
+                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-white/10 text-white border-white/20 shadow-sm'
+                              : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          {opt.label} ({opt.percentage})
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="text-2xs text-zinc-500 leading-relaxed">
+                    Масштабирует шрифт заметок, карточек и интерфейса пропорционально модульной шкале (база 14px, P1 фокус 15–16px, P4 минимум 11px).
+                  </span>
+                </div>
+
+                {/* Font Family Control */}
+                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-zinc-300">Гарнитура шрифта (Семейство):</span>
+                    <span className="text-2xs font-mono text-zinc-400">
+                      {FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.label}
                     </span>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => updateUiConfig(selectedDevice, { fontScale: 'small' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
-                        uiConfig[selectedDevice].fontScale === 'small'
-                          ? 'bg-white/10 text-white border-white/20'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                      }`}
-                    >
-                      Мелкий (90%)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateUiConfig(selectedDevice, { fontScale: 'normal' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
-                        uiConfig[selectedDevice].fontScale === 'normal'
-                          ? 'bg-white/10 text-white border-white/20'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                      }`}
-                    >
-                      Обычный (100%)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateUiConfig(selectedDevice, { fontScale: 'large' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
-                        uiConfig[selectedDevice].fontScale === 'large'
-                          ? 'bg-white/10 text-white border-white/20'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                      }`}
-                    >
-                      Крупный (115%)
-                    </button>
+                    {(Object.keys(FONT_FAMILY_OPTIONS) as Array<keyof typeof FONT_FAMILY_OPTIONS>).map((famKey) => {
+                      const opt = FONT_FAMILY_OPTIONS[famKey];
+                      const isSelected = (uiConfig[selectedDevice].fontFamily || 'inter') === famKey;
+                      return (
+                        <button
+                          key={famKey}
+                          type="button"
+                          onClick={() => updateUiConfig(selectedDevice, { fontFamily: famKey })}
+                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-white/10 text-white border-white/20 shadow-sm'
+                              : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
                   </div>
                   <span className="text-2xs text-zinc-500 leading-relaxed">
-                    Масштабирует базовый шрифт заметок, карточек и интерфейса без искажения пропорций.
+                    {FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.description}
                   </span>
+                </div>
+
+                {/* Live Interactive Hierarchy Preview Card */}
+                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-[#141417] border border-white/[0.08] shadow-inner select-none">
+                  <div className="flex items-center justify-between border-b border-white/[0.05] pb-2">
+                    <span className="text-2xs font-mono uppercase tracking-wider text-zinc-500">
+                      Интерактивный образец иерархии внимания
+                    </span>
+                    <span className="text-2xs font-mono text-blue-400/90">
+                      Live Preview
+                    </span>
+                  </div>
+
+                  {/* Sample Card */}
+                  <div className="flex flex-col gap-1.5 pt-1">
+                    {/* P1 Focus */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-base font-medium text-zinc-100 tracking-tight">
+                        P1: Заголовок заметки или текст ключевой задачи
+                      </span>
+                    </div>
+
+                    {/* P2 Body */}
+                    <p className="text-sm text-zinc-300 leading-relaxed font-normal">
+                      P2: Человек читает этот текст вторым. Комфортный размер 14px и увеличенный интерлиньяж защищают зрение при долгой работе.
+                    </p>
+
+                    {/* P3 & P4 Bottom Info */}
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400">
+                          P3: Входящие • #дизайн #типографика
+                        </span>
+                      </div>
+                      <span className="text-2xs font-mono text-zinc-500">
+                        P4: 14:30 • Статья
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Density Control */}
@@ -1099,8 +1157,8 @@ export const SettingsModal: React.FC = () => {
       isOpen={isSettingsOpen}
       onClose={() => setIsSettingsOpen(false)}
       hideHeader
-      maxWidth="md:max-w-[720px]"
-      maxHeight="h-full md:h-[670px]"
+      maxWidth="md:max-w-[740px]"
+      maxHeight="h-full md:h-[720px] md:max-h-[88vh]"
       contentClassName="flex flex-col h-full overflow-hidden"
       containerClassName="rounded-none md:rounded-2xl border-0 md:border md:border-white/[0.08]"
     >

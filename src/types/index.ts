@@ -236,11 +236,13 @@ export interface LogEntry {
 }
 
 export type UiDensity = 'compact' | 'normal' | 'spacious';
-export type UiFontScale = 'small' | 'normal' | 'large';
+export type UiFontScale = 'small' | 'normal' | 'comfortable' | 'large';
+export type UiFontFamily = 'inter' | 'system' | 'mono';
 
 export interface DeviceUiConfig {
   fontScale: UiFontScale;
   density: UiDensity;
+  fontFamily?: UiFontFamily;
 }
 
 export interface AppUiConfig {

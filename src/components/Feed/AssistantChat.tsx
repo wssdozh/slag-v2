@@ -301,7 +301,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
         // `Code`
         if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
           return (
-            <code key={key} className="font-mono text-[11px] px-1 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/[0.04]">
+            <code key={key} className="font-mono text-xs px-1 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/[0.04]">
               {part.slice(1, -1)}
             </code>
           );
@@ -310,7 +310,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
         // #Tag
         if (part.startsWith('#') && part.length > 1 && !part.includes(' ')) {
           return (
-            <span key={key} className="text-zinc-400 font-mono text-[11px]">
+            <span key={key} className="text-zinc-400 font-mono text-2xs">
               {part}
             </span>
           );
@@ -337,7 +337,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             const restLines = codeBlockLines.slice(1);
             elements.push(
               <div key={`cb-${i}`} className="my-2 rounded-xl bg-[#141417] border border-white/[0.08] p-3 text-xs flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-zinc-400 font-medium font-mono text-[10px] uppercase tracking-wider">
+                <div className="flex items-center gap-1.5 text-zinc-400 font-medium font-mono text-2xs uppercase tracking-wider">
                   <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Задача</span>
                 </div>
@@ -374,11 +374,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             elements.push(
               <div key={`cb-${i}`} className="my-2 rounded-lg bg-black/60 border border-white/[0.06] overflow-hidden">
                 {codeBlockLang && (
-                  <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 bg-white/[0.02] border-b border-white/[0.04]">
+                  <div className="px-2.5 py-1 text-2xs font-mono text-zinc-500 bg-white/[0.02] border-b border-white/[0.04]">
                     {codeBlockLang}
                   </div>
                 )}
-                <pre className="p-2.5 overflow-x-auto text-[11px] font-mono text-zinc-300 leading-normal">
+                <pre className="p-2.5 overflow-x-auto text-xs font-mono text-zinc-300 leading-normal">
                   <code>{codeBlockLines.join('\n')}</code>
                 </pre>
               </div>
@@ -477,7 +477,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
         if (match) {
           elements.push(
             <div key={`ol-${i}`} className="flex items-start gap-1.5 pl-0.5 my-0.5 leading-relaxed">
-              <span className="text-[10px] font-mono text-zinc-500 shrink-0 mt-0.5 select-none">{match[1]}</span>
+              <span className="text-2xs font-mono text-zinc-500 shrink-0 mt-0.5 select-none">{match[1]}</span>
               <span className="flex-1 min-w-0">{parseInline(match[2], i)}</span>
             </div>
           );
@@ -495,7 +495,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
     if (inCodeBlock && codeBlockLines.length > 0) {
       elements.push(
-        <div key="cb-unclosed" className="my-2 rounded-lg bg-black/60 border border-white/[0.06] p-2.5 overflow-x-auto text-[11px] font-mono text-zinc-300">
+        <div key="cb-unclosed" className="my-2 rounded-lg bg-black/60 border border-white/[0.06] p-2.5 overflow-x-auto text-xs font-mono text-zinc-300">
           <code>{codeBlockLines.join('\n')}</code>
         </div>
       );
@@ -527,7 +527,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
         {chatMessages.length > 0 && !isMobile && (
           <button
             onClick={clearChatMessages}
-            className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.04] shrink-0"
+            className="flex items-center gap-1 text-2xs text-zinc-500 hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.04] shrink-0"
             title="Очистить диалог"
           >
             <Trash2 className="w-3 h-3" />
@@ -537,60 +537,60 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       </div>
 
       {/* Messages Stream */}
-      <div className={`flex-1 min-h-0 overflow-y-auto p-3 flex flex-col ${isSidebar ? 'text-[11px]' : 'p-4'}`}>
+      <div className={`flex-1 min-h-0 overflow-y-auto p-3 flex flex-col ${isSidebar ? 'text-xs' : 'p-4 text-sm'}`}>
         <div className={`w-full flex-1 flex flex-col gap-3.5 ${isSidebar ? '' : 'max-w-2xl mx-auto'}`}>
           {chatMessages.length === 0 ? (
             <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
               <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-300 mb-2.5">
                 <Sparkles className="w-4 h-4 text-zinc-300" />
               </div>
-              <h3 className="text-xs font-semibold text-zinc-200 mb-1">
+              <h3 className="text-sm font-semibold text-zinc-200 mb-1">
                 {isInbox ? 'Ассистент по всем заметкам' : `Ассистент «${folderMeta?.name || currentFolder}»`}
               </h3>
-              <p className="text-[11px] text-zinc-500 mb-4 leading-relaxed">
+              <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
                 Задайте вопрос, найдите записи или попросите создать задачу.
               </p>
 
               <div className="flex flex-col gap-1.5 w-full">
                 <button
                   onClick={() => handleQuickPrompt('Покажи план на сегодня и календарную повестку')}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                     <span>План на сегодня</span>
                   </span>
-                  <span className="text-[10px] text-zinc-600 font-mono">agenda</span>
+                  <span className="text-2xs text-zinc-500 font-mono">agenda</span>
                 </button>
                 <button
                   onClick={() => handleQuickPrompt('Найди ключевые заметки')}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
                     <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                     <span>Поиск заметок</span>
                   </span>
-                  <span className="text-[10px] text-zinc-600 font-mono">search</span>
+                  <span className="text-2xs text-zinc-500 font-mono">search</span>
                 </button>
                 <button
                   onClick={() => handleQuickPrompt('Создай новую задачу: Проверить синхронизацию заметок')}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
                     <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                     <span>Создать задачу</span>
                   </span>
-                  <span className="text-[10px] text-zinc-600 font-mono">task</span>
+                  <span className="text-2xs text-zinc-500 font-mono">task</span>
                 </button>
                 <button
                   onClick={() => handleQuickPrompt('Сколько заметок и задач в хранилище?')}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-[11px] text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
                     <BarChart3 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                     <span>Сводка хранилища</span>
                   </span>
-                  <span className="text-[10px] text-zinc-600 font-mono">stats</span>
+                  <span className="text-2xs text-zinc-500 font-mono">stats</span>
                 </button>
               </div>
             </div>
@@ -617,7 +617,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 className={`flex flex-col gap-1.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 {/* Message Header */}
-                <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono px-1">
+                <div className="flex items-center gap-1.5 text-2xs text-zinc-500 font-mono px-1">
                   {msg.role === 'assistant' ? (
                     <>
                       <Sparkles className="w-3 h-3 text-zinc-400" />
@@ -636,7 +636,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     {msg.toolCalls.map((tc, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500"
+                        className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500"
                       >
                         <Terminal className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
                         <span className="text-zinc-400">{tc.name}</span>
@@ -653,7 +653,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   <div className="flex flex-col gap-1 px-1 -mt-0.5 mb-1 max-w-[92%] select-text">
                     <button
                       onClick={() => toggleReasoning(msg.id)}
-                      className="flex items-center gap-1 text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer w-fit"
+                      className="flex items-center gap-1 text-2xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer w-fit"
                     >
                       {expandedReasoningIds.has(msg.id) ? (
                         <ChevronDown className="w-3 h-3 text-amber-400" />
@@ -664,7 +664,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     </button>
 
                     {expandedReasoningIds.has(msg.id) && (
-                      <div className="pl-3 py-0.5 text-[10px] font-mono text-zinc-500 whitespace-pre-wrap leading-relaxed select-text">
+                      <div className="pl-3 py-0.5 text-2xs font-mono text-zinc-500 whitespace-pre-wrap leading-relaxed select-text">
                         {msg.reasoning}
                       </div>
                     )}
@@ -674,13 +674,13 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 {/* Message Bubble - pure text bubble, no embedded action card */}
                 {Boolean(msg.content && !msg.content.startsWith('[Подготовлен черновик')) && (
                   <div
-                    className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                    className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-white/10 text-zinc-100 border border-white/[0.08]'
                         : 'bg-[#141416] text-zinc-200 border border-white/[0.06] shadow-sm'
                     }`}
                   >
-                    <div className="font-sans text-xs flex flex-col gap-1">
+                    <div className="font-sans text-sm flex flex-col gap-1.5">
                       {renderRichContent(msg.content)}
                     </div>
                   </div>
@@ -760,7 +760,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                               {(action.updates?.priority || action.priority) && !isRejected && (
                                 <span className="flex items-center gap-1 shrink-0">
                                   <LinearSignalBars priority={(action.updates?.priority || action.priority)!} className="w-3 h-3" />
-                                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
+                                  <span className={`text-2xs font-mono px-1.5 py-0.5 rounded font-semibold ${
                                     (action.updates?.priority || action.priority) === 'high' ? 'bg-rose-500/15 text-rose-300' :
                                     (action.updates?.priority || action.priority) === 'medium' ? 'bg-amber-500/15 text-amber-300' :
                                     'bg-blue-500/15 text-blue-300'
@@ -840,7 +840,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                         </span>
                                       )}
                                       {up.priority && up.priority !== 'none' && (
-                                        <span className={`px-1 py-0.5 rounded text-[9px] font-semibold ${
+                                        <span className={`px-1.5 py-0.5 rounded text-2xs font-mono font-semibold ${
                                           up.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
                                           up.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
                                           'bg-blue-500/15 text-blue-300'
@@ -849,7 +849,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                         </span>
                                       )}
                                       {up.status && (
-                                        <span className="px-1 py-0.5 rounded text-[9px] font-semibold bg-white/[0.06] text-zinc-300">
+                                        <span className="px-1.5 py-0.5 rounded text-2xs font-mono font-semibold bg-white/[0.06] text-zinc-300">
                                           {up.status}
                                         </span>
                                       )}
@@ -891,7 +891,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
                           {/* Content snippet */}
                           {!action.updates?.appendContent && !action.appendContent && action.content && (
-                            <p className="text-[11px] text-zinc-400 line-clamp-2">
+                            <p className="text-xs text-zinc-400 line-clamp-2">
                               {action.content}
                             </p>
                           )}
@@ -928,13 +928,13 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
                           {/* Action Lifecycle Controls */}
                           {isRejected ? (
-                            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 py-0.5">
+                            <div className="mt-1 flex items-center gap-1.5 text-xs font-mono text-zinc-500 py-0.5">
                               <X className="w-3.5 h-3.5 text-zinc-600" />
                               <span>Действие отклонено</span>
                             </div>
                           ) : isApplied ? (
                             <div className="mt-1 flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04] min-w-0">
-                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-300 font-medium min-w-0 flex-1 truncate">
+                              <div className="flex items-center gap-1.5 text-xs text-zinc-300 font-medium min-w-0 flex-1 truncate">
                                 <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                                 <span className="truncate">
                                   {action.type === 'schedule_task' ? `Запланировано на ${action.dueDate}` :
@@ -950,7 +950,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                               {action.type !== 'batch_update' ? (
                                 <button
                                   onClick={() => scrollToItem(action.appliedItemId || action.title)}
-                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
                                   title="Показать запись в ленте"
                                 >
                                   <span>{action.updates?.appendContent || action.appendContent ? 'Открыть' : 'Перейти к записи'}</span>
@@ -960,7 +960,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                 <button
                                   type="button"
                                   onClick={() => setDiffModalData({ action, messageId: msg.id })}
-                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-[11px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
                                   title="Посмотреть изменения"
                                 >
                                   <GitCompare className="w-3 h-3 text-zinc-400" />
@@ -1053,7 +1053,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             <Search className="w-3.5 h-3.5 text-zinc-400" />
                             <span>Найдено {count} в хранилище</span>
                           </div>
-                          <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-500">
+                          <div className="flex items-center gap-1 text-2xs font-mono text-zinc-500">
                             {isExpanded ? (
                               <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
                             ) : (
@@ -1079,11 +1079,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                 ) : (
                                   <FileText className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                                 )}
-                                <span className="text-zinc-200 group-hover:text-white truncate font-medium">
+                                <span className="text-zinc-200 group-hover:text-white truncate font-medium text-xs">
                                   {res.title}
                                 </span>
                                 {res.folder && (
-                                  <span className="text-[10px] font-mono text-zinc-500 shrink-0 truncate max-w-[120px]">
+                                  <span className="text-2xs font-mono text-zinc-500 shrink-0 truncate max-w-[120px]">
                                     {res.folder}
                                   </span>
                                 )}
@@ -1096,7 +1096,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                           {showFilterButton && (
                             <button
                               onClick={() => applyAiFilter(filterItemIds, filterQuery)}
-                              className="flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer text-[11px] font-medium"
+                              className="flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer text-xs font-medium"
                               title="Отобразить только эти найденные записи в центральной ленте"
                             >
                               <div className="flex items-center gap-1.5">
