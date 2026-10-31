@@ -502,6 +502,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               aria-label="Назад к ленте"
             >
               <ArrowLeft className="w-4 h-4" />
+              <span className="sr-only">Назад</span>
             </button>
 
             {/* Vertical Divider */}

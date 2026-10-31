@@ -438,19 +438,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
           </button>
 
-          {/* Article Focus Editor Button in top-right corner */}
-          {isArticle && (
-            <button
-              type="button"
-              onClick={handleOpenArticle}
-              className="w-6 h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
-              title="Открыть в фокус-редакторе (⌘E)"
-              aria-label="Открыть в фокус-редакторе"
-            >
-              <Maximize2 className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          )}
-
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -472,6 +459,19 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           >
             <MoreVertical className="w-3.5 h-3.5 shrink-0" />
           </button>
+
+          {/* Article Focus Editor Button in top-right corner - kept in place on the far right */}
+          {isArticle && (
+            <button
+              type="button"
+              onClick={handleOpenArticle}
+              className="w-6 h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              title="Открыть в фокус-редакторе (⌘E)"
+              aria-label="Открыть в фокус-редакторе"
+            >
+              <Maximize2 className="w-3.5 h-3.5 shrink-0" />
+            </button>
+          )}
         </div>
 
       {/* Reply Parent Quote Banner */}
