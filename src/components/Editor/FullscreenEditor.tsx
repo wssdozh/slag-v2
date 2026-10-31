@@ -656,57 +656,54 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
             {/* Due Date Trigger */}
             {type === 'task' && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-[11px] font-mono text-zinc-500 hidden sm:inline">Срок выполнения:</span>
-                <div className="relative shrink-0">
-                  {dueDate ? (
-                    <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs transition-colors shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setIsDatePickerOpen(prev => !prev)}
-                        className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
-                        title="Изменить срок"
-                      >
-                        <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDueDate('')}
-                        className="p-0.5 text-blue-400 hover:text-rose-400 transition-colors cursor-pointer"
-                        title="Снять срок"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
+              <div className="relative shrink-0">
+                {dueDate ? (
+                  <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs transition-colors shrink-0">
                     <button
                       type="button"
                       onClick={() => setIsDatePickerOpen(prev => !prev)}
-                      className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                      title="Установить срок задачи"
+                      className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                      title="Изменить срок"
                     >
-                      <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                      <span>Срок</span>
+                      <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setDueDate('')}
+                      className="p-0.5 text-blue-400 hover:text-rose-400 transition-colors cursor-pointer"
+                      title="Снять срок"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsDatePickerOpen(prev => !prev)}
+                    className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                    title="Установить срок задачи"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <span>Срок</span>
+                  </button>
+                )}
 
-                  {isDatePickerOpen && (
-                    <DatePickerPopover
-                      value={dueDate}
-                      onChange={(newDate) => {
-                        setDueDate(newDate);
-                        setIsDatePickerOpen(false);
-                      }}
-                      onClear={() => {
-                        setDueDate('');
-                        setIsDatePickerOpen(false);
-                      }}
-                      onClose={() => setIsDatePickerOpen(false)}
-                      direction="down"
-                    />
-                  )}
-                </div>
+                {isDatePickerOpen && (
+                  <DatePickerPopover
+                    value={dueDate}
+                    onChange={(newDate) => {
+                      setDueDate(newDate);
+                      setIsDatePickerOpen(false);
+                    }}
+                    onClear={() => {
+                      setDueDate('');
+                      setIsDatePickerOpen(false);
+                    }}
+                    onClose={() => setIsDatePickerOpen(false)}
+                    direction="down"
+                  />
+                )}
               </div>
             )}
 
@@ -1463,11 +1460,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           <button
             type="button"
             onClick={handleAiDecomposeInline}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium border border-white/[0.06] active:scale-95 transition-all cursor-pointer"
-            title="Определить папку и теги через ИИ"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-purple-300 hover:bg-purple-500/10 active:scale-95 transition-all cursor-pointer"
+            title="Разобрать через ИИ (определить папку и теги)"
           >
-            <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Разобрать ИИ</span>
+            <Sparkles className="w-4 h-4" />
           </button>
 
           <div className="h-4 w-px bg-white/[0.08] mx-0.5" />

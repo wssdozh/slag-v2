@@ -670,14 +670,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const taskCard = page.locator('text=Купить хороший зеленый чай').first();
     if (await taskCard.isVisible()) {
       await taskCard.click();
-      await expect(page.locator('text=Срок выполнения')).toBeVisible();
+      await expect(page.locator('[data-testid="fullscreen-editor-modal"]')).toBeVisible();
       await page.screenshot({
         path: 'test-results/screenshots/calendar-task-popover.png',
         fullPage: false,
       });
       // Close popover via Escape
       await page.keyboard.press('Escape');
-      await expect(page.locator('text=Срок выполнения')).not.toBeVisible();
+      await expect(page.locator('[data-testid="fullscreen-editor-modal"]')).not.toBeVisible();
     }
 
     // 7. Switch to Month View
