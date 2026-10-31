@@ -864,7 +864,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                           e.stopPropagation();
                           setIsTagsExpanded(prev => !prev);
                         }}
-                        className="text-2xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer px-1 py-0.5 rounded bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.05] select-none leading-none"
+                        className="text-2xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer select-none leading-none"
                         title={isTagsExpanded ? 'Свернуть теги' : `Показать ещё ${hiddenCount} тегов`}
                       >
                         {isTagsExpanded ? 'свернуть' : `+${hiddenCount}`}
