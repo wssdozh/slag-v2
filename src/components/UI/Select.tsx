@@ -8,6 +8,7 @@ export interface SelectOption {
   icon?: React.ReactNode;
   color?: string;
   disabled?: boolean;
+  dividerBefore?: boolean;
 }
 
 export interface SelectProps {
@@ -238,37 +239,42 @@ export const Select: React.FC<SelectProps> = ({
           ) : (
             filteredOptions.map((opt, idx) => {
               const isSelected = opt.value === value;
-              const isHighlighted = idx === highlightedIndex;
+              const isHighlighted = idx === safeHighlightedIndex;
+              const showDivider = Boolean(opt.dividerBefore && idx > 0);
 
               return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  disabled={opt.disabled}
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  onClick={() => handleSelect(opt.value, opt.disabled)}
-                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
-                    opt.disabled
-                      ? 'opacity-40 cursor-not-allowed text-zinc-600'
-                      : isSelected
-                      ? 'bg-white/10 text-white font-medium'
-                      : isHighlighted
-                      ? 'bg-white/[0.06] text-white'
-                      : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                    <span className={`truncate ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>
-                      {opt.label}
-                    </span>
-                  </div>
-                  {isSelected && (
-                    <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
+                <React.Fragment key={opt.value}>
+                  {showDivider && (
+                    <div className="h-px bg-white/[0.08] my-1 mx-1 shrink-0" />
                   )}
-                </button>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={opt.disabled}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    onClick={() => handleSelect(opt.value, opt.disabled)}
+                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
+                      opt.disabled
+                        ? 'opacity-40 cursor-not-allowed text-zinc-600'
+                        : isSelected
+                        ? 'bg-white/10 text-white font-medium'
+                        : isHighlighted
+                        ? 'bg-white/[0.06] text-white'
+                        : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      {opt.icon && <span className="shrink-0">{opt.icon}</span>}
+                      <span className={`truncate ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>
+                        {opt.label}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
+                    )}
+                  </button>
+                </React.Fragment>
               );
             })
           )}

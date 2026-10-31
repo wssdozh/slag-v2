@@ -144,6 +144,62 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     storage.saveFullscreenWidth(isFullWidth);
   }, [isFullWidth]);
 
+  const folderOptions = React.useMemo(() => {
+    // Collect non-inbox folders
+    const regularFolders = folders.filter(f => f.path !== 'Входящие');
+
+    // Hierarchy tree to sort exactly by root and nested paths
+    interface Node {
+      path: string;
+      children: Node[];
+    }
+    const rootMap: Map<string, Node> = new Map();
+
+    regularFolders.forEach(f => {
+      const parts = f.path.split('/');
+      let current = '';
+      let parentNode: Node | null = null;
+
+      parts.forEach((part, idx) => {
+        current = current ? `${current}/${part}` : part;
+        if (idx === 0) {
+          if (!rootMap.has(part)) {
+            rootMap.set(part, { path: current, children: [] });
+          }
+          parentNode = rootMap.get(part)!;
+        } else if (parentNode) {
+          let child = parentNode.children.find(c => c.path === current);
+          if (!child) {
+            child = { path: current, children: [] };
+            parentNode.children.push(child);
+          }
+          parentNode = child;
+        }
+      });
+    });
+
+    const orderedPaths: { path: string; isRoot: boolean }[] = [];
+    const traverse = (node: Node, isRoot: boolean) => {
+      orderedPaths.push({ path: node.path, isRoot });
+      // Sort children alphabetically
+      node.children.sort((a, b) => a.path.localeCompare(b.path, 'ru'));
+      node.children.forEach(c => traverse(c, false));
+    };
+
+    // Sort root nodes alphabetically
+    const roots = Array.from(rootMap.values()).sort((a, b) => a.path.localeCompare(b.path, 'ru'));
+    roots.forEach(r => traverse(r, true));
+
+    return [
+      { value: 'Входящие', label: 'Входящие' },
+      ...orderedPaths.map((item) => ({
+        value: item.path,
+        label: item.path,
+        dividerBefore: item.isRoot,
+      })),
+    ];
+  }, [folders]);
+
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -524,7 +580,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               variant="ghost"
               value={folder}
               onChange={setFolder}
-              options={folders.map(f => ({ value: f.path, label: f.path }))}
+              options={folderOptions}
               className="max-w-[150px] md:max-w-[220px] h-7 text-xs font-mono"
             />
 
