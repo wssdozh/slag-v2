@@ -80,7 +80,20 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
 
   const handleChangeType = (newType: SlagItemType) => {
     if (!item) return;
-    updateItem({ ...item, type: newType });
+    if (item.type === newType) {
+      onDone?.();
+      return;
+    }
+    const updated: SlagItem = {
+      ...item,
+      type: newType,
+      status: newType === 'task' ? (item.status || 'todo') : item.status,
+      priority: newType === 'task' ? (item.priority || 'none') : item.priority,
+      readingTimeMinutes: newType === 'article'
+        ? (item.readingTimeMinutes || Math.max(1, Math.round((item.content || '').split(/\s+/).length / 200)))
+        : item.readingTimeMinutes,
+    };
+    updateItem(updated);
     addToast(`Превращено в: ${TYPE_LABELS[newType].toLowerCase()}`, 'success');
     onDone?.();
   };

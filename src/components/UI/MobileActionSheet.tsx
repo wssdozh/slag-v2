@@ -60,6 +60,46 @@ export const MobileActionSheet: React.FC = () => {
           </span>
         </div>
 
+        {/* Quick Type Switcher (Segmented Control) */}
+        <div className="grid grid-cols-3 p-0.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs gap-1">
+          <button
+            type="button"
+            onClick={() => actions.handleChangeType('note')}
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
+              item.type === 'note'
+                ? 'bg-white/10 text-white shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <span>Заметка</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => actions.handleChangeType('task')}
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
+              item.type === 'task'
+                ? 'bg-amber-400/20 text-amber-300 shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Таска</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => actions.handleChangeType('article')}
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
+              item.type === 'article'
+                ? 'bg-blue-400/20 text-blue-300 shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <span>Статья</span>
+          </button>
+        </div>
+
         {/* Top 4 Quick Actions (Unified Segmented Row, No Clunky Podlozhki) */}
         <div className="grid grid-cols-4 rounded-xl border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden bg-transparent">
           <button

@@ -977,7 +977,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           !isFullscreenEditorOpen &&
           !isComposerModalOpen &&
           !isSearchOpen &&
-          !isSettingsOpen
+          !isSettingsOpen &&
+          !contextMenu
         ) {
           if (e.code === 'KeyC' || e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'с') {
             e.preventDefault();
@@ -1004,6 +1005,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isComposerModalOpen,
     isSearchOpen,
     isSettingsOpen,
+    contextMenu,
   ]);
 
   // Navigation & Layer Depth Calculation (LIFO Stack)

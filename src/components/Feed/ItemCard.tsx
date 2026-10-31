@@ -270,7 +270,24 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
   if (isArticle) {
     metaElements.push(
-      <span key="article" className="text-2xs font-mono text-zinc-400 font-medium">
+      <span
+        key="article"
+        role="button"
+        tabIndex={0}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          openContextMenu({
+            x: rect.left,
+            y: rect.bottom + 4,
+            type: 'item',
+            item,
+          });
+        }}
+        className="text-2xs font-mono text-zinc-400 hover:text-white cursor-pointer transition-colors"
+        title="Сменить тип записи (клик или ПКМ)"
+      >
         Статья
       </span>
     );
