@@ -52,6 +52,7 @@ import { TagChip } from '../UI/TagChip';
 import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../lib/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
+import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/windowControls';
 
 let activeEditorView: EditorView | null = null;
 
@@ -77,7 +78,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     setIsFullscreenEditorOpen,
     saveItem,
     updateItem,
-    deleteItem,
     setSelectedItem,
     folders,
     addToast,
@@ -479,7 +479,17 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       )}
       {/* Top Floating Control Bar - Seamless Note Palette #141417 & Edge-to-Edge */}
       <header
-        className={`min-h-14 border-b border-white/[0.04] bg-[#141417]/90 backdrop-blur-md shrink-0 sticky top-0 z-30 transition-opacity duration-200 ${
+        onMouseDown={(e) => {
+          if (e.button === 0 && !(e.target as HTMLElement).closest('button, input, [role="button"], [role="listbox"], a')) {
+            startDraggingWindow();
+          }
+        }}
+        onDoubleClick={(e) => {
+          if (!(e.target as HTMLElement).closest('button, input, [role="button"], [role="listbox"], a')) {
+            toggleMaximizeWindow();
+          }
+        }}
+        className={`min-h-14 border-b border-white/[0.04] bg-[#141417]/90 backdrop-blur-md shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
           isZenMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'
         }`}
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
@@ -508,14 +518,14 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             {/* Vertical Divider */}
             <div className="h-4 w-px bg-white/[0.08] shrink-0" />
 
-            {/* Folder Selector: ghost droplist without podlozhka */}
+            {/* Folder Selector: ghost droplist without podlozhka, showing full hierarchical path */}
             <Select
               size="sm"
               variant="ghost"
               value={folder}
               onChange={setFolder}
-              options={folders.map(f => ({ value: f.path, label: f.name }))}
-              className="max-w-[130px] md:max-w-[170px] h-7 text-xs"
+              options={folders.map(f => ({ value: f.path, label: f.path }))}
+              className="max-w-[150px] md:max-w-[220px] h-7 text-xs font-mono"
             />
 
             {/* Vertical Divider */}
@@ -889,20 +899,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             >
               <Save className="w-4 h-4 text-zinc-300" />
               <span>Сохранить</span>
-            </button>
-
-            {/* Delete button */}
-            <button
-              onClick={() => {
-                storage.clearFullscreenDraft(item.id);
-                deleteItem(item.id);
-                setIsFullscreenEditorOpen(false);
-                setSelectedItem(null);
-              }}
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-              title="Удалить запись"
-            >
-              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -31,6 +31,16 @@ export const toggleMaximizeWindow = async (): Promise<void> => {
   }
 };
 
+export const startDraggingWindow = async (): Promise<void> => {
+  if (!isTauri()) return;
+  try {
+    const appWindow = getCurrentWindow();
+    await appWindow.startDragging();
+  } catch (err) {
+    wsLog.debug('startDragging failed or interrupted', err);
+  }
+};
+
 const DETACHED_WINDOWS_KEY = 'slag_detached_windows_v2';
 
 export interface SavedDetachedWindow {
