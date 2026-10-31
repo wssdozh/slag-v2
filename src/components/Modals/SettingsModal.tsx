@@ -219,7 +219,7 @@ export const SettingsModal: React.FC = () => {
   const settingsBody = (
     <div className="flex-1 flex flex-col md:flex-row min-h-0">
       {/* Tabs Nav: Hidden on mobile (single section subview), vertical left column on desktop */}
-      <div className="hidden md:flex md:flex-col md:w-48 border-r border-white/[0.06] bg-[#0c0c0e] p-2 gap-1 select-none shrink-0">
+      <div className="hidden md:flex md:flex-col md:w-48 border-r border-white/[0.06] bg-panel p-2 gap-1 select-none shrink-0">
         <button
           type="button"
           onClick={() => setActiveTab('ai')}
@@ -288,12 +288,12 @@ export const SettingsModal: React.FC = () => {
       </div>
 
           {/* Right Tab Content */}
-          <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-[#141416]">
+          <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-surface">
             <div className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4">
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
                   {/* Section 1: Выбор провайдера ИИ (Groq & KIE.AI) */}
-                  <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-2.5">
+                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
                         Провайдер ИИ
@@ -334,7 +334,7 @@ export const SettingsModal: React.FC = () => {
 
                   {/* Section 2: Настройки Groq */}
                   {provider === 'groq' && (
-                    <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
+                    <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
                       <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
                         <span className="text-xs font-semibold text-zinc-100">Groq Cloud API</span>
                         <a
@@ -401,7 +401,7 @@ export const SettingsModal: React.FC = () => {
 
                   {/* Section 2: Настройки KIE.AI */}
                   {provider === 'kie' && (
-                    <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
+                    <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
                       <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
@@ -480,7 +480,7 @@ export const SettingsModal: React.FC = () => {
                   )}
 
                   {/* Section 3: Автоматизация и интеллектуальные сервисы */}
-                  <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
                     <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
                         Автоматизация и поиск
@@ -509,7 +509,7 @@ export const SettingsModal: React.FC = () => {
                   </div>
 
                   {/* Section 4: Норма таксономии и правила тегирования */}
-                  <div className="bg-[#101114] border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
                     <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
                         Норма таксономии и правила тегирования
@@ -812,7 +812,7 @@ export const SettingsModal: React.FC = () => {
                     Внешний вид, масштабы и плотность
                   </span>
                   {/* Device profile switcher */}
-                  <div className="flex items-center h-ctrl-sm bg-[#09090b] p-0.5 rounded-lg border border-white/[0.08]">
+                  <div className="flex items-center h-ctrl-sm bg-canvas p-0.5 rounded-lg border border-white/[0.08]">
                     <button
                       type="button"
                       onClick={() => setSelectedDevice('desktop')}
@@ -905,7 +905,7 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 {/* Live Interactive Hierarchy Preview Card */}
-                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-[#141417] border border-white/[0.08] shadow-inner select-none">
+                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-surface border border-white/[0.08] shadow-inner select-none">
                   <div className="flex items-center justify-between border-b border-white/[0.05] pb-2">
                     <span className="text-2xs font-mono uppercase tracking-wider text-zinc-500">
                       Интерактивный образец иерархии внимания
@@ -1092,7 +1092,7 @@ export const SettingsModal: React.FC = () => {
 
             {/* Bottom Form Actions */}
             <div
-              className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0"
+              className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06] bg-panel shrink-0"
               style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
             >
               <button
@@ -1117,10 +1117,10 @@ export const SettingsModal: React.FC = () => {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col select-none animate-in slide-in-from-right duration-200 overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-canvas flex flex-col select-none animate-in slide-in-from-right duration-200 overflow-hidden">
         {/* Top Header */}
         <div
-          className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+          className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
           style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
         >
           <div className="flex items-center gap-2">
@@ -1164,7 +1164,7 @@ export const SettingsModal: React.FC = () => {
     >
       {/* Top Header */}
       <div
-        className="px-4 md:px-5 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+        className="px-4 md:px-5 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
         style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
       >
         <div className="flex items-center gap-2">

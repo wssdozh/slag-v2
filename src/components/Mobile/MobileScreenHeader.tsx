@@ -28,7 +28,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
 }) => {
   return (
     <header
-      className={`h-14 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-3 md:px-4 flex items-center justify-between shrink-0 z-10 ${className}`}
+      className={`h-14 border-b border-white/[0.06] bg-panel/95 backdrop-blur-md px-3 md:px-4 flex items-center justify-between shrink-0 z-10 ${className}`}
       style={{ paddingTop: 'max(var(--sat), 0px)' }}
     >
       {/* Left Slot: custom, back button, or icon + title */}

@@ -83,7 +83,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none ${className}`}
     >
       <div
-        className={`w-full ${maxWidth} ${maxHeight || 'max-h-[calc(100dvh-2rem)]'} rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 ${containerClassName}`}
+        className={`w-full ${maxWidth} ${maxHeight || 'max-h-[calc(100dvh-2rem)]'} rounded-2xl bg-surface border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 ${containerClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -91,7 +91,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
           <div className="rounded-t-[15px] overflow-hidden shrink-0">
             {customHeader || (
               <div
-                className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e] rounded-t-[15px]"
+                className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel rounded-t-[15px]"
                 style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -140,7 +140,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-[#0c0c0e] shrink-0 rounded-b-[15px]">
+          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-panel shrink-0 rounded-b-[15px]">
             {footer}
           </div>
         )}

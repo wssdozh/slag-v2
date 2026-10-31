@@ -8,7 +8,7 @@ export const MobileAudioView: React.FC = () => {
   const { currentFolder } = useApp();
 
   return (
-    <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none relative">
+    <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative">
       {/* Top Header */}
       <MobileScreenHeader
         title="Плеер"

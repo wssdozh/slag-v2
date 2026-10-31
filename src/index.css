@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/theme.css";
 @import "./styles/dockview-theme-slag.css";
 @import "@atomic-editor/editor/styles.css";
 
@@ -19,17 +20,17 @@
 
 @layer base {
   :root {
-    --bg-main: #09090b;
-    --bg-sidebar: #0f0f11;
-    --bg-surface: #141416;
-    --bg-hover: rgba(255, 255, 255, 0.04);
-    --bg-active: rgba(255, 255, 255, 0.07);
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-hover: rgba(255, 255, 255, 0.1);
-    --text-primary: #f4f4f5;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
-    --text-dim: #52525b;
+    --bg-main: var(--color-canvas);
+    --bg-sidebar: var(--color-panel);
+    --bg-surface: var(--color-surface);
+    --bg-hover: var(--color-surface-hover);
+    --bg-active: var(--color-surface-active);
+    --border-subtle: var(--color-border-subtle);
+    --border-hover: var(--color-border-hover);
+    --text-primary: var(--color-fg-primary);
+    --text-secondary: var(--color-fg-secondary);
+    --text-muted: var(--color-fg-muted);
+    --text-dim: var(--color-fg-dim);
 
     /* Mobile Safe Area Insets & Dynamic Keyboard */
     --sat: env(safe-area-inset-top, 0px);
@@ -320,13 +321,13 @@
 
 /* SLAG v2 Linear/Obsidian Dark Theme overrides for @atomic-editor/editor */
 .atomic-cm-editor {
-  --atomic-editor-bg: #141417;
-  --atomic-editor-bg-panel: #141417;
-  --atomic-editor-bg-surface: #1e1e24;
-  --atomic-editor-fg: #f4f4f5;
-  --atomic-editor-fg-muted: #a1a1aa;
-  --atomic-editor-fg-faint: #71717a;
-  --atomic-editor-border: rgba(255, 255, 255, 0.08);
+  --atomic-editor-bg: var(--color-surface);
+  --atomic-editor-bg-panel: var(--color-surface);
+  --atomic-editor-bg-surface: var(--color-surface-elevated);
+  --atomic-editor-fg: var(--color-fg-primary);
+  --atomic-editor-fg-muted: var(--color-fg-secondary);
+  --atomic-editor-fg-faint: var(--color-fg-muted);
+  --atomic-editor-border: var(--border-subtle);
   --atomic-editor-accent: #71717a; /* zinc-500 neutral linear */
   --atomic-editor-accent-bright: #a1a1aa; /* zinc-400 */
   --atomic-editor-accent-soft: rgba(255, 255, 255, 0.06);

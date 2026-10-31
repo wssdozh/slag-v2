@@ -39,7 +39,7 @@ export const MobileActionSheet: React.FC = () => {
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full bg-[#121215] border-t border-white/[0.08] rounded-t-2xl p-3 flex flex-col gap-2 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
+        className="w-full bg-surface-elevated border-t border-white/[0.08] rounded-t-2xl p-3 flex flex-col gap-2 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
         style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
       >
         {/* Drag handle */}

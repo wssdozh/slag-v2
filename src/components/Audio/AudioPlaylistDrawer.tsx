@@ -54,7 +54,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute inset-0 z-30 bg-[#0c0c0e]/95 backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <div className="absolute inset-0 z-30 bg-panel/95 backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in duration-150">
       {/* Drawer Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
         <div className="flex items-center gap-2">
@@ -114,7 +114,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
               <span className="max-w-[100px] truncate">{pinnedFolder}</span>
             </button>
             {isFolderSelectOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto">
                 {Array.from(new Set(['Входящие', ...folders.map((f) => f.path).filter(Boolean)])).map(
                   (folderPath) => (
                     <button

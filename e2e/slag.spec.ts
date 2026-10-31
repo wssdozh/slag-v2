@@ -652,7 +652,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Сегодня')).toBeVisible();
 
     // 3. Verify Today date indicator in week header and All-Day row
-    const todayBadge = page.locator('.bg-white.text-\\[\\#09090b\\]');
+    const todayBadge = page.locator('.bg-white.text-canvas, .bg-white.text-\\[\\#09090b\\]');
     await expect(todayBadge.first()).toBeVisible();
     await expect(page.locator('text=Весь день').first()).toBeVisible();
 
@@ -685,7 +685,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('button', { hasText: 'Месяц' })).toHaveClass(/bg-white\/10/);
 
     // Test Month day click directly opens ComposerModal
-    const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
+    const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-canvas, .grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
     if (await monthTodayBadge.isVisible()) {
       await monthTodayBadge.click();
       await page.waitForTimeout(100);
@@ -1362,7 +1362,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const applyBtn = page.locator('button', { hasText: /Применить/ }).last();
     await expect(applyBtn).toBeVisible();
     await applyBtn.click();
-    await expect(page.locator('text=Перенесено задач:').or(page.locator('text=Перенесено')).last()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Применено задач:').or(page.locator('text=Перенесено задач:')).or(page.locator('text=Перенесено')).last()).toBeVisible({ timeout: 5000 });
 
     // 4. Switch to Calendar view
     const calendarBtn = page.locator('header button[title*="Календарь"]').first();
@@ -2292,7 +2292,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 8. Verify Month View day card directly spawns ComposerModal on click
     await page.locator('button', { hasText: 'Месяц' }).click();
     await page.waitForTimeout(200);
-    const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
+    const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-canvas, .grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();
     if (await monthTodayBadge.isVisible()) {
       await monthTodayBadge.click();
       await page.waitForTimeout(200);

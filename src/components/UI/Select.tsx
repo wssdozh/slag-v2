@@ -220,7 +220,7 @@ export const Select: React.FC<SelectProps> = ({
             bottom: calculatedDirection === 'up' ? `${window.innerHeight - coords.top}px` : undefined,
             minWidth: `${coords.width}px`,
           }}
-          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100 flex flex-col gap-0.5 ${
+          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100 flex flex-col gap-0.5 ${
             calculatedDirection === 'up' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
           } ${dropdownClassName}`}
         >

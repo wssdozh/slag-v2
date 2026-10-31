@@ -205,7 +205,7 @@ export const KanbanBoard: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative">
+    <div className="flex-1 flex overflow-hidden bg-canvas text-fg-primary select-none relative">
       {/* ============================================================== */}
       {/* TRIZ Dock on the left: [ 📚 Материалы папки ] (collapsible)   */}
       {/* ============================================================== */}
@@ -221,10 +221,10 @@ export const KanbanBoard: React.FC = () => {
       <div
         className={`${
           isMobile
-            ? `absolute inset-y-0 left-0 z-40 w-72 bg-[#0c0c0e] shadow-2xl border-r border-white/[0.08] transition-transform duration-200 ${
+            ? `absolute inset-y-0 left-0 z-40 w-72 bg-panel shadow-2xl border-r border-white/[0.08] transition-transform duration-200 ${
                 isKanbanMaterialsOpen ? 'translate-x-0' : '-translate-x-full'
               }`
-            : `bg-[#0c0c0e]/95 flex flex-col transition-all duration-200 shrink-0 overflow-hidden ${
+            : `bg-panel/95 flex flex-col transition-all duration-200 shrink-0 overflow-hidden ${
                 isKanbanMaterialsOpen ? 'w-60 sm:w-64 border-r border-white/[0.06]' : 'w-0 border-r-0'
               }`
         }`}
@@ -256,7 +256,7 @@ export const KanbanBoard: React.FC = () => {
               value={materialsSearchQuery}
               onChange={e => setMaterialsSearchQuery(e.target.value)}
               placeholder="Поиск по материалам..."
-              className="w-full bg-[#141417] border border-white/[0.06] rounded-md pl-8 pr-7 py-1 text-xs text-zinc-200 placeholder-zinc-500 outline-none focus:border-white/20 transition-colors ring-0"
+              className="w-full bg-surface border border-white/[0.06] rounded-md pl-8 pr-7 py-1 text-xs text-zinc-200 placeholder-zinc-500 outline-none focus:border-white/20 transition-colors ring-0"
             />
             {materialsSearchQuery && (
               <button
@@ -291,7 +291,7 @@ export const KanbanBoard: React.FC = () => {
                     setSelectedItem(mat);
                     setIsFullscreenEditorOpen(true);
                   }}
-                  className={`group p-2.5 rounded-lg bg-[#141417]/80 hover:bg-[#18181c] border border-white/[0.05] hover:border-white/[0.12] transition-all text-left space-y-1.5 shadow-sm touch-none ${
+                  className={`group p-2.5 rounded-lg bg-surface/80 hover:bg-surface-elevated border border-white/[0.05] hover:border-white/[0.12] transition-all text-left space-y-1.5 shadow-sm touch-none ${
                     isDragging && draggingPayload?.id === mat.id
                       ? 'opacity-40 scale-[0.98] ring-1 ring-blue-500/50'
                       : 'cursor-grab active:cursor-grabbing'
@@ -342,7 +342,7 @@ export const KanbanBoard: React.FC = () => {
       <div
         ref={kanbanBoardRef}
         data-testid="kanban-columns-container"
-        className={`flex-1 flex overflow-x-auto gap-3.5 p-3 sm:p-4 bg-[#09090b] min-w-0 h-full cursor-grab pb-20 sm:pb-4 ${
+        className={`flex-1 flex overflow-x-auto gap-3.5 p-3 sm:p-4 bg-canvas min-w-0 h-full cursor-grab pb-20 sm:pb-4 ${
           isMobile ? 'snap-x snap-mandatory scroll-smooth' : ''
         }`}
       >
@@ -363,7 +363,7 @@ export const KanbanBoard: React.FC = () => {
               }`}
             >
               {/* Column Header */}
-              <div className="h-10 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]/60 cursor-grab">
+              <div className="h-10 px-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel/60 cursor-grab">
                 <div className="flex items-center gap-2 min-w-0">
                   {renderColumnIcon(column.iconType, column.iconColor)}
                   <h3 className="text-xs font-semibold text-zinc-200 tracking-tight truncate">
@@ -437,7 +437,7 @@ export const KanbanBoard: React.FC = () => {
                           });
                         }}
                         data-testid="kanban-card"
-                        className={`group relative p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.14] transition-all text-left space-y-2 shadow-sm select-none touch-none ${
+                        className={`group relative p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-white/[0.06] hover:border-white/[0.14] transition-all text-left space-y-2 shadow-sm select-none touch-none ${
                           isDragging && draggingPayload?.id === task.id
                             ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
                             : 'cursor-grab active:cursor-grabbing'
@@ -463,7 +463,7 @@ export const KanbanBoard: React.FC = () => {
                               {isMenuOpen && (
                                 <div
                                   onClick={e => e.stopPropagation()}
-                                  className="absolute left-0 top-full mt-1 w-36 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-xl py-1 z-30 space-y-0.5"
+                                  className="absolute left-0 top-full mt-1 w-36 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-xl py-1 z-30 space-y-0.5"
                                 >
                                   {COLUMNS.map(col => (
                                     <button
@@ -500,12 +500,12 @@ export const KanbanBoard: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Title (14px, font-medium, #f4f4f5) */}
+                        {/* Title (14px, font-medium) */}
                         <div
                           className={`text-sm font-medium leading-snug line-clamp-2 ${
                             task.status === 'done'
                               ? 'line-through text-zinc-500'
-                              : 'text-[#f4f4f5]'
+                              : 'text-fg-primary'
                           }`}
                         >
                           {task.title || 'Безымянная задача'}
@@ -601,7 +601,7 @@ export const KanbanBoard: React.FC = () => {
       {/* Floating Drag Ghost Overlay */}
       {isDragging && dragPos && draggingPayload && (
         <div
-          className="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-[#18181c] border border-blue-500/40 text-xs font-medium text-white shadow-2xl flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 opacity-90 scale-105"
+          className="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-surface-elevated border border-blue-500/40 text-xs font-medium text-white shadow-2xl flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 opacity-90 scale-105"
           style={{
             left: `${dragPos.x}px`,
             top: `${dragPos.y}px`,

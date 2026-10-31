@@ -66,7 +66,7 @@ export const MobileFloatingDock: React.FC = () => {
       {/* Main Linear-style Floating Capsule Dock */}
       <nav
         aria-label="Мобильная навигация"
-        className="pointer-events-auto h-12 bg-[#141417]/92 backdrop-blur-xl border border-white/[0.08] rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xl shadow-black/80"
+        className="pointer-events-auto h-12 bg-surface/92 backdrop-blur-xl border border-white/[0.08] rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xl shadow-black/80"
       >
         {mobileDockTabs.map(tabId => {
           const tab = ALL_TABS[tabId];
@@ -91,7 +91,7 @@ export const MobileFloatingDock: React.FC = () => {
                 <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-zinc-400'}`} />
                 {hasDot && (
                   <span
-                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-[#141417]"
+                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-surface"
                     title={`${unsortedCount} неразобранных записей`}
                   />
                 )}
@@ -104,7 +104,7 @@ export const MobileFloatingDock: React.FC = () => {
       {/* Floating Action Button (FAB) matching Linear circular pill */}
       <button
         onClick={handleFabClick}
-        className="pointer-events-auto w-12 h-12 rounded-full bg-[#18181c]/95 backdrop-blur-xl border border-white/[0.12] flex items-center justify-center text-white shadow-2xl shadow-black/80 hover:bg-white/10 active:scale-90 transition-all cursor-pointer shrink-0"
+        className="pointer-events-auto w-12 h-12 rounded-full bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.12] flex items-center justify-center text-white shadow-2xl shadow-black/80 hover:bg-white/10 active:scale-90 transition-all cursor-pointer shrink-0"
         title="Новая запись"
         aria-label="Создать новую запись"
       >

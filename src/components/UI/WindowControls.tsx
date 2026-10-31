@@ -9,7 +9,7 @@ export const WindowControls: React.FC = () => {
   return (
     <div
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      className="fixed top-0 right-0 h-[34px] z-50 flex items-center pr-1 pl-2 select-none bg-[#0c0c0e] border-b border-white/[0.06] pointer-events-auto"
+      className="fixed top-0 right-0 h-[34px] z-50 flex items-center pr-1 pl-2 select-none bg-panel border-b border-white/[0.06] pointer-events-auto"
     >
       <button
         type="button"

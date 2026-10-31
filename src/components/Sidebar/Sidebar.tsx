@@ -81,7 +81,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className="w-full h-full flex flex-col bg-[#0c0c0e] select-none text-[#a1a1aa] overflow-hidden"
+      className="w-full h-full flex flex-col bg-panel select-none text-fg-secondary overflow-hidden"
     >
       {/* Main Folder Navigation */}
       <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-3">
@@ -128,7 +128,7 @@ export const Sidebar: React.FC = () => {
       {/* Bottom Vault Switcher & Settings */}
       <div
         ref={bottomBarRef}
-        className="p-2 border-t border-white/[0.06] flex items-center justify-between gap-1 relative bg-[#0c0c0e]"
+        className="p-2 border-t border-white/[0.06] flex items-center justify-between gap-1 relative bg-panel"
       >
         {/* Vault Switcher Trigger */}
         <div className="flex-1 min-w-0">
@@ -150,7 +150,7 @@ export const Sidebar: React.FC = () => {
 
         {/* Vault Switcher Dropdown */}
         {isVaultDropdownOpen && (
-          <div className="absolute bottom-full left-2 right-2 mb-1.5 rounded-xl bg-[#141416] border border-white/[0.08] shadow-2xl p-1.5 z-40 flex flex-col gap-0.5 text-xs animate-in fade-in duration-100">
+          <div className="absolute bottom-full left-2 right-2 mb-1.5 rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1.5 z-40 flex flex-col gap-0.5 text-xs animate-in fade-in duration-100">
             <div className="px-2.5 py-1 text-2xs font-mono font-medium text-zinc-500 uppercase tracking-wider">
               Хранилища (Vaults)
             </div>

@@ -336,7 +336,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
             const firstLine = codeBlockLines[0] || 'Задача';
             const restLines = codeBlockLines.slice(1);
             elements.push(
-              <div key={`cb-${i}`} className="my-2 rounded-xl bg-[#141417] border border-white/[0.08] p-3 text-xs flex flex-col gap-2">
+              <div key={`cb-${i}`} className="my-2 rounded-xl bg-surface border border-white/[0.08] p-3 text-xs flex flex-col gap-2">
                 <div className="flex items-center gap-1.5 text-zinc-400 font-medium font-mono text-2xs uppercase tracking-wider">
                   <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Задача</span>
@@ -510,7 +510,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     (aiSettings.provider === 'gemini' && Boolean(aiSettings.geminiApiKey));
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 bg-[#09090b] relative select-text overflow-hidden">
+    <div className="flex-1 flex flex-col h-full min-h-0 bg-canvas relative select-text overflow-hidden">
       {/* Scope Context Header Banner */}
       <div className={`px-3 py-2 border-b border-white/[0.04] bg-white/[0.01] flex items-center justify-between text-xs text-zinc-400 shrink-0 ${isSidebar ? 'gap-1' : ''}`}>
         <div className="flex items-center gap-2 truncate min-w-0">
@@ -677,7 +677,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-white/10 text-zinc-100 border border-white/[0.08]'
-                        : 'bg-[#141416] text-zinc-200 border border-white/[0.06] shadow-sm'
+                        : 'bg-surface text-zinc-200 border border-white/[0.06] shadow-sm'
                     }`}
                   >
                     <div className="font-sans text-sm flex flex-col gap-1.5">
@@ -703,7 +703,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                       <div
                         key={`act-${actIdx}-${action.type}`}
                         data-testid="action-card"
-                        className={`w-full ${isSidebar ? 'max-w-full' : 'max-w-xl'} rounded-xl bg-[#141416] border border-white/[0.08] overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
+                        className={`w-full ${isSidebar ? 'max-w-full' : 'max-w-xl'} rounded-xl bg-surface border border-white/[0.08] overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
                           isRejected ? 'opacity-50' : ''
                         }`}
                       >
@@ -1042,7 +1042,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   const showFilterButton = count > 1;
 
                   return (
-                    <div className="max-w-[92%] w-full rounded-xl bg-[#141416] border border-white/[0.08] overflow-hidden mt-0.5 text-xs shadow-sm">
+                    <div className="max-w-[92%] w-full rounded-xl bg-surface border border-white/[0.08] overflow-hidden mt-0.5 text-xs shadow-sm">
                       {/* Header trigger only when more than 3 results */}
                       {showHeader && (
                         <button

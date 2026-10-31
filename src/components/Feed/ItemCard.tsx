@@ -419,7 +419,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         } p-2.5 sm:p-3 rounded-xl transition-all cursor-default select-none ${
           isHighlighted
             ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
-            : 'bg-[#141417]/80 hover:bg-[#161619] border border-white/[0.05]'
+            : 'bg-surface/80 hover:bg-surface-hover border border-white/[0.05]'
         }`}
       >
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}

@@ -178,12 +178,12 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
   return (
     <div
       data-testid="log-viewer"
-      className={`flex flex-col h-full w-full bg-[#0a0a0c] text-zinc-300 select-text font-sans ${
+      className={`flex flex-col h-full w-full bg-canvas text-zinc-300 select-text font-sans ${
         variant === 'modal' ? 'rounded-lg border border-white/[0.08] shadow-2xl overflow-hidden' : ''
       }`}
     >
       {/* Flat Unified Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 border-b border-white/[0.06] bg-[#0c0c0e] shrink-0 select-none">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 border-b border-white/[0.06] bg-panel shrink-0 select-none">
         {/* Title and stats */}
         <div className="flex items-center gap-2">
           <Terminal className="w-3.5 h-3.5 text-zinc-500" />
@@ -298,7 +298,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
       </div>
 
       {/* Flat Single-line Filters (No Chips-on-Chips, pure text buttons) */}
-      <div className="flex flex-wrap items-center gap-1 px-3 py-1 border-b border-white/[0.04] bg-[#0c0c0e]/50 text-[11px] font-mono shrink-0 select-none">
+      <div className="flex flex-wrap items-center gap-1 px-3 py-1 border-b border-white/[0.04] bg-panel/50 text-[11px] font-mono shrink-0 select-none">
         <span className="text-zinc-600 text-[10px] mr-1">LEVEL:</span>
         <button
           onClick={() => setSelectedLevel('ALL')}

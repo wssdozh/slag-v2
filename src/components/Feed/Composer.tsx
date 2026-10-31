@@ -1315,7 +1315,7 @@ export const Composer: React.FC<ComposerProps> = ({
         />
       )}
       {wikiQuery !== null && matchingWikiItems.length > 0 && (
-        <div className={`absolute left-0 ${isModal ? 'bottom-[calc(100%+55px)]' : 'bottom-[calc(100%+14px)]'} w-72 max-h-52 overflow-y-auto rounded-xl bg-[#18181b] border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto`}>
+        <div className={`absolute left-0 ${isModal ? 'bottom-[calc(100%+55px)]' : 'bottom-[calc(100%+14px)]'} w-72 max-h-52 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto`}>
           <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
             Связать заметку [[...]]
           </div>
@@ -1409,7 +1409,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <div className="flex items-center gap-1 shrink-0 relative">
       {/* Lock Hint Banner when holding mic/video button */}
       {lockHint && recordMode === 'holding' && (
-        <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-[#141417] border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
+        <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-surface border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
           <Lock className="w-3.5 h-3.5 text-[#529ee8] animate-bounce" />
           <span>Потяните вверх для фиксации</span>
         </div>

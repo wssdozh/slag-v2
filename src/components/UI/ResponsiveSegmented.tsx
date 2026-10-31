@@ -134,7 +134,7 @@ export function ResponsiveSegmented<T extends string = string>({
                 ...(coords.bottom !== undefined ? { bottom: `${coords.bottom}px` } : {}),
                 left: `${coords.left}px`,
               }}
-              className="z-[9999] min-w-[150px] rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100"
+              className="z-[9999] min-w-[150px] rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100"
             >
               {options.map((opt) => {
                 const isSelected = opt.value === value;

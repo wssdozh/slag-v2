@@ -75,7 +75,7 @@ export const MobileFoldersView: React.FC = () => {
     const unsortedCount = items.filter(i => i.folder === 'Входящие').length;
 
     return (
-      <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none">
+      <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
         {/* Top Header */}
         <MobileScreenHeader
           title="Заметки"
@@ -107,7 +107,7 @@ export const MobileFoldersView: React.FC = () => {
         {/* Scrollable Root Folders List (Telegram Grouped Style) */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
           {/* Pinned "Входящие" Card */}
-          <div className="rounded-2xl bg-[#141417]/80 border border-white/[0.06] overflow-hidden">
+          <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden">
             <button
               onClick={() => setMobileActiveFolder('Входящие')}
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
@@ -136,7 +136,7 @@ export const MobileFoldersView: React.FC = () => {
               Папки
             </div>
 
-            <div className="rounded-2xl bg-[#141417]/80 border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
+            <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
               {directSubfolders
                 .filter(f => f.path !== 'Входящие')
                 .map(folder => {
@@ -177,7 +177,7 @@ export const MobileFoldersView: React.FC = () => {
   const isInbox = mobileActiveFolder === 'Входящие';
 
   return (
-    <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none relative">
+    <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative">
       {/* Top Header */}
       <MobileScreenHeader
         onBack={handleBack}
@@ -213,7 +213,7 @@ export const MobileFoldersView: React.FC = () => {
 
       {/* Subfolders Quick Ribbon (If folder has subfolders) */}
       {directSubfolders.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.04] bg-[#0c0c0e]/60 overflow-x-auto scrollbar-none shrink-0 z-10">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.04] bg-panel/60 overflow-x-auto scrollbar-none shrink-0 z-10">
           {directSubfolders.map(sub => {
             const subItemsCount = items.filter(i => i.folder === sub.path).length;
             return (
@@ -241,7 +241,7 @@ export const MobileFoldersView: React.FC = () => {
 
       {/* 1-Row Horizontally Scrollable Filters Strip - Matching Desktop FeedHeader (Hidden in Calendar Mode) */}
       {feedViewMode !== 'calendar' && (
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] bg-[#0c0c0e]/40 overflow-x-auto scrollbar-none shrink-0 z-10 text-xs">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] bg-panel/40 overflow-x-auto scrollbar-none shrink-0 z-10 text-xs">
           {/* Kanban Materials Dock Toggle */}
           {feedViewMode === 'kanban' && (
             <button

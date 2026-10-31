@@ -87,7 +87,7 @@ export const MobileTasksView: React.FC = () => {
   const currentColumnTasks = tasksByStatus[activeStatusTab] || [];
 
   const switcher = (
-    <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
+    <div className="flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.08] shrink-0">
       <button
         type="button"
         onClick={() => setViewMode('tasks')}
@@ -121,7 +121,7 @@ export const MobileTasksView: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none">
+    <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
       {/* Top Header */}
       <MobileScreenHeader
         title="Задачи"
@@ -140,8 +140,8 @@ export const MobileTasksView: React.FC = () => {
       />
 
       {/* Segmented Status Tabs (Pills style matching MobileFolderInfoView) */}
-      <div className="px-3 py-2 bg-[#0c0c0e]/60 border-b border-white/[0.04] shrink-0">
-        <div className="flex items-center justify-between gap-1 bg-[#141417]/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+      <div className="px-3 py-2 bg-panel/60 border-b border-white/[0.04] shrink-0">
+        <div className="flex items-center justify-between gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
           {COLUMNS.map(col => {
             const count = (tasksByStatus[col.id] || []).length;
             const isActive = activeStatusTab === col.id;
@@ -189,7 +189,7 @@ export const MobileTasksView: React.FC = () => {
                   setSelectedItem(task);
                   setIsFullscreenEditorOpen(true);
                 }}
-                className="flex items-start justify-between p-3.5 rounded-2xl bg-[#141417]/80 hover:bg-[#18181c] border border-white/[0.05] active:scale-[0.99] transition-all cursor-pointer shadow-sm gap-3"
+                className="flex items-start justify-between p-3.5 rounded-2xl bg-surface/80 hover:bg-surface-elevated border border-white/[0.05] active:scale-[0.99] transition-all cursor-pointer shadow-sm gap-3"
               >
                 {/* Left: Checkbox */}
                 <button

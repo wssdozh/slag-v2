@@ -72,7 +72,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   return (
     <header
       ref={headerRef}
-      className="h-12 px-3 sm:px-4 border-b border-white/[0.06] bg-[#0c0c0e] grid grid-cols-[1fr_auto_1fr] items-center gap-2 select-none shrink-0 relative"
+      className="h-12 px-3 sm:px-4 border-b border-white/[0.06] bg-panel grid grid-cols-[1fr_auto_1fr] items-center gap-2 select-none shrink-0 relative"
     >
       {/* Left Column: Filter Controls & Chips */}
       <div className="flex items-center gap-1.5 justify-self-start min-w-0 z-10">

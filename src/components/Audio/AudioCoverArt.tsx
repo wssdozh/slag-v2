@@ -409,7 +409,7 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({
   if (track?.coverUrl) {
     return (
       <div
-        className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl bg-[#131316] flex items-center justify-center select-none ${className}`}
+        className={`relative aspect-square w-52 h-52 sm:w-64 sm:h-64 rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl bg-surface flex items-center justify-center select-none ${className}`}
       >
         <img
           src={track.coverUrl}

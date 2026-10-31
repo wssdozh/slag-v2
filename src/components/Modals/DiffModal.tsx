@@ -172,11 +172,11 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Сравнение изменений"
-      className="fixed inset-0 z-[100] bg-[#09090b] flex flex-col text-[#f4f4f5] animate-in fade-in duration-150 select-none overflow-hidden"
+      className="fixed inset-0 z-[100] bg-canvas flex flex-col text-fg-primary animate-in fade-in duration-150 select-none overflow-hidden"
     >
       {/* Top Control Bar */}
       <header
-        className="min-h-14 border-b border-white/[0.06] bg-[#0c0c0e] shrink-0 flex items-center"
+        className="min-h-14 border-b border-white/[0.06] bg-panel shrink-0 flex items-center"
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
       >
         <div className="max-w-6xl mx-auto w-full flex items-center justify-between px-4 md:px-8 gap-4">
@@ -253,7 +253,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
 
       {/* Sub-bar: Existing-style borderless rounded tabs & flat metadata */}
       {(items.length > 1 || metaDiff.length > 0) && (
-        <div className="border-b border-white/[0.06] bg-[#0c0c0e]/70 shrink-0">
+        <div className="border-b border-white/[0.06] bg-panel/70 shrink-0">
           <div className="max-w-6xl mx-auto w-full px-4 md:px-8 py-2.5 flex flex-col gap-2.5">
             {/* Existing Tab Style: Borderless rounded tabs matching dockview-theme-slag.css & FolderMediaTabs */}
             {items.length > 1 && (
@@ -316,7 +316,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       )}
 
       {/* Editor Subheaders: Flat single plane with hairline divider */}
-      <div className="border-b border-white/[0.06] bg-[#0c0c0e] shrink-0 select-none">
+      <div className="border-b border-white/[0.06] bg-panel shrink-0 select-none">
         <div className="max-w-6xl mx-auto w-full px-4 md:px-8">
           <div className="grid grid-cols-2 divide-x divide-white/[0.06] py-2">
             {/* Left Column Header */}
@@ -349,7 +349,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       </div>
 
       {/* Flat Editor Canvas: No cards, no box-in-a-box, full height with rich contrast */}
-      <div className="flex-1 min-h-0 overflow-y-auto bg-[#09090b]">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-canvas">
         <div className="max-w-6xl mx-auto w-full min-h-full px-4 md:px-8 flex flex-col">
           {diffResult.rows.length === 0 ? (
             <div className="grid grid-cols-2 divide-x divide-white/[0.06] flex-1 min-h-[300px]">

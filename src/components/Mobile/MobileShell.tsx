@@ -21,7 +21,7 @@ export const MobileShell: React.FC = () => {
   const isFloatingDockVisible = !isInsideFolderFeed && activeMobileTab !== 'assistant';
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden relative">
+    <div className="w-full h-full flex flex-col bg-canvas text-fg-primary overflow-hidden relative">
       {/* Active Tab Screen */}
       <main className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
         {activeMobileTab === 'folders' && <MobileFoldersView />}

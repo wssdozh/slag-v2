@@ -111,7 +111,7 @@ export const MobileSettingsView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none">
+    <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
       {/* Top Header */}
       <MobileScreenHeader
         title="Настройки"
@@ -121,7 +121,7 @@ export const MobileSettingsView: React.FC = () => {
       {/* Main Settings List (Matching iOS/Telegram grouped style) */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">
         {/* Profile / Vault Card (Horizontal, Compact) */}
-        <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#141417]/80 border border-white/[0.06] shadow-sm">
+        <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-surface/80 border border-white/[0.06] shadow-sm">
           <div className="w-12 h-12 rounded-full bg-white/[0.06] border border-white/[0.1] flex items-center justify-center text-white text-base font-bold font-mono shrink-0 shadow-inner">
             {vault.name ? vault.name.slice(0, 2).toUpperCase() : 'SL'}
           </div>
@@ -144,7 +144,7 @@ export const MobileSettingsView: React.FC = () => {
           <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
             Параметры
           </div>
-          <div className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]">
+          <div className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]">
             <button
               onClick={() => openSettingsModal('ai')}
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
@@ -213,7 +213,7 @@ export const MobileSettingsView: React.FC = () => {
           </div>
 
           <div
-            className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]"
+            className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]"
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
@@ -301,7 +301,7 @@ export const MobileSettingsView: React.FC = () => {
           <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
             Отладка & Диагностика
           </div>
-          <div className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]">
+          <div className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]">
             <button
               onClick={() => setIsLogViewerOpen(true)}
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"

@@ -45,7 +45,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
   if (folders.length === 0) {
     return (
       <div
-        className={`absolute left-0 right-0 ${positionClasses} w-full rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-3 z-50 animate-in ${animationClasses} fade-in duration-150 ease-out select-none`}
+        className={`absolute left-0 right-0 ${positionClasses} w-full rounded-2xl bg-surface-elevated border border-white/[0.12] shadow-2xl shadow-black/90 p-3 z-50 animate-in ${animationClasses} fade-in duration-150 ease-out select-none`}
       >
         <div className="flex items-center gap-2 text-xs text-zinc-400">
           <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
@@ -57,7 +57,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
 
   return (
     <div
-      className={`absolute left-0 right-0 ${positionClasses} w-full rounded-2xl bg-[#141416] border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none overflow-hidden`}
+      className={`absolute left-0 right-0 ${positionClasses} w-full rounded-2xl bg-surface-elevated border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none overflow-hidden`}
     >
       {/* Шапка меню папок — фиксированная */}
       <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider shrink-0">

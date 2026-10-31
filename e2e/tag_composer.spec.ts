@@ -39,7 +39,7 @@ test.describe('Composer # Tag Selection E2E', () => {
     expect(value).toContain('#дизайн ');
 
     // Tag chip should be visible in properties preview slot
-    const tagChip = page.locator('button', { hasText: '#дизайн' }).first();
+    const tagChip = page.locator('text=#дизайн').first();
     await expect(tagChip).toBeVisible();
 
     // Visual screenshot of composer with tag chip
@@ -74,7 +74,7 @@ test.describe('Composer # Tag Selection E2E', () => {
     expect(val).toContain('#покупки ');
 
     // Tag chip appears
-    const shoppingChip = page.locator('button', { hasText: '#покупки' }).first();
+    const shoppingChip = page.locator('text=#покупки').first();
     await expect(shoppingChip).toBeVisible();
   });
 });

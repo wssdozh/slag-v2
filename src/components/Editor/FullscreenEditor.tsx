@@ -510,7 +510,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="fixed inset-0 z-50 z-[100] bg-[#141417] flex flex-col animate-in fade-in duration-150 text-[#f4f4f5]"
+      className="fixed inset-0 z-50 z-[100] bg-surface flex flex-col animate-in fade-in duration-150 text-fg-primary"
     >
       {/* Hidden File Picker Input */}
       <input
@@ -523,7 +523,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
-        <div className="fixed inset-4 z-[120] rounded-3xl bg-[#141417]/95 backdrop-blur-md border-2 border-dashed border-[#2a82e4] flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
+        <div className="fixed inset-4 z-[120] rounded-3xl bg-surface/95 backdrop-blur-md border-2 border-dashed border-[#2a82e4] flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
           <UploadCloud className="w-12 h-12 text-[#529ee8] animate-bounce" />
           <span className="text-base font-semibold text-white">
             Перетащите медиафайлы сюда
@@ -533,7 +533,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           </span>
         </div>
       )}
-      {/* Top Floating Control Bar - Seamless Note Palette #141417 & Edge-to-Edge */}
+      {/* Top Floating Control Bar - Seamless Note Palette & Edge-to-Edge */}
       <header
         onMouseDown={(e) => {
           if (e.button === 0 && !(e.target as HTMLElement).closest('button, input, [role="button"], [role="listbox"], a')) {
@@ -545,7 +545,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             toggleMaximizeWindow();
           }
         }}
-        className={`min-h-14 border-b border-white/[0.04] bg-[#141417]/90 backdrop-blur-md shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
+        className={`min-h-14 border-b border-white/[0.04] bg-surface/90 backdrop-blur-md shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
           isZenMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'
         }`}
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
@@ -717,7 +717,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   </button>
 
                   {activeTopDropdown === 'style' && (
-                    <div className="absolute top-full mt-1.5 left-0 w-44 rounded-xl bg-[#16161a] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
+                    <div className="absolute top-full mt-1.5 left-0 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
                       <button
                         type="button"
                         onClick={() => {
@@ -792,7 +792,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   </button>
 
                   {activeTopDropdown === 'list' && (
-                    <div className="absolute top-full mt-1.5 left-0 w-48 rounded-xl bg-[#16161a] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
+                    <div className="absolute top-full mt-1.5 left-0 w-48 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
                       <button
                         type="button"
                         onClick={() => {
@@ -961,7 +961,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       </header>
 
       {/* Editor Body */}
-      <div className="flex-1 overflow-y-auto py-6 md:py-8 bg-[#141417]">
+      <div className="flex-1 overflow-y-auto py-6 md:py-8 bg-surface">
         <div
           className={`mx-auto w-full px-4 md:px-6 flex flex-col gap-4 pb-28 transition-all duration-200 ${
             isFullWidth ? 'max-w-5xl' : 'max-w-3xl'
@@ -1169,7 +1169,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   )}
 
                   {isDurationDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                    <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
                       {[15, 30, 45, 60, 90, 120].map(mins => (
                         <button
                           key={mins}
@@ -1226,7 +1226,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   )}
 
                   {isRecurrenceDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-[#141417] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                    <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
                       {RECURRENCE_PRESETS.map(opt => (
                         <button
                           key={opt.label}
@@ -1503,7 +1503,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
         {/* Floating Popovers */}
         {activeMobilePopover === 'formatting' && (
           <div className="relative z-40 px-3 pb-2">
-            <div className="max-w-xs mx-auto rounded-2xl bg-[#18181c] border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
               <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
                 <span>Стили текста</span>
                 <span className="font-mono text-[10px] text-zinc-500">Aa</span>
@@ -1580,7 +1580,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
         {activeMobilePopover === 'lists' && (
           <div className="relative z-40 px-3 pb-2">
-            <div className="max-w-xs mx-auto rounded-2xl bg-[#18181c] border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
               <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
                 <span>Списки и блоки</span>
                 <span className="font-mono text-[10px] text-zinc-500">:=</span>
@@ -1657,7 +1657,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
         {activeMobilePopover === 'ai' && (
           <div className="relative z-40 px-3 pb-2">
-            <div className="max-w-xs mx-auto rounded-2xl bg-[#18181c] border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
               <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
                 <span>ИИ-Помощник</span>
                 <span className="font-mono text-[10px] text-zinc-400">AI</span>
@@ -1690,7 +1690,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
         {/* Bottom Bar Container */}
         <div
-          className="relative z-40 bg-[#141417]/95 backdrop-blur-xl border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
+          className="relative z-40 bg-surface/95 backdrop-blur-xl border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
           style={{ paddingBottom: 'max(var(--sab), 0.5rem)' }}
         >
           <div className="flex items-center gap-1.5 sm:gap-2">

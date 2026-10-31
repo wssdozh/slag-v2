@@ -53,7 +53,7 @@ export const FolderInfoPanel: React.FC = () => {
 
   return (
     <aside
-      className="w-full h-full flex flex-col bg-[#0c0c0e] select-none text-[#a1a1aa] overflow-hidden"
+      className="w-full h-full flex flex-col bg-panel select-none text-fg-secondary overflow-hidden"
     >
       {/* Top Header: Folder info */}
       <div className="h-12 px-3 flex items-center justify-between border-b border-white/[0.04] gap-2 shrink-0">

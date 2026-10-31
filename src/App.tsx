@@ -90,7 +90,7 @@ const AppContent: React.FC = () => {
 
   if (standalonePanelId) {
     return (
-      <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative">
+      <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative">
         <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
       </div>
     );
@@ -98,7 +98,7 @@ const AppContent: React.FC = () => {
 
   if (isMobile && forceMobileMode && isDesktopWidth) {
     return (
-      <div className="w-screen h-screen overflow-hidden bg-[#050507] flex flex-col items-center justify-center p-4 relative select-none">
+      <div className="w-screen h-screen overflow-hidden bg-canvas-subtle flex flex-col items-center justify-center p-4 relative select-none">
         {/* Top Banner with Toggle Back */}
         <div className="absolute top-3 inset-x-0 flex items-center justify-center pointer-events-none z-50">
           <button
@@ -110,7 +110,7 @@ const AppContent: React.FC = () => {
           </button>
         </div>
 
-        <div className="w-full max-w-[390px] h-[844px] max-h-[92vh] bg-[#09090b] rounded-[40px] border-4 border-white/[0.12] shadow-2xl flex flex-col overflow-hidden relative">
+        <div className="w-full max-w-[390px] h-[844px] max-h-[92vh] bg-canvas rounded-[40px] border-4 border-white/[0.12] shadow-2xl flex flex-col overflow-hidden relative">
           <MobileShell />
         </div>
 
@@ -138,7 +138,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative">
+    <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative">
       {isMobile ? <MobileShell /> : <WorkspaceShell />}
 
       {/* Global Right-Click Context Menu (Desktop) & Mobile Action Sheet (Touch) */}

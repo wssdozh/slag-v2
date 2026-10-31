@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, RefreshCw, Trash2 } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger';
+import { THEME_COLORS } from '../../styles/theme';
 
 const mediaLog = logger.scope('MEDIA');
 
@@ -106,7 +107,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
             canvas.height = 480;
             const ctx = canvas.getContext('2d');
             if (ctx) {
-              ctx.fillStyle = '#18181c';
+              ctx.fillStyle = THEME_COLORS.surfaceElevated;
               ctx.fillRect(0, 0, 480, 480);
             }
             stream = canvas.captureStream(15);

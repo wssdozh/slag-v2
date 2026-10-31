@@ -76,7 +76,7 @@ const WorkspaceContentPanel: React.FC<{
   );
 
   return (
-    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-[320px]">
+    <main className="w-full h-full bg-canvas flex flex-col overflow-hidden min-w-[320px]">
       <FeedHeader viewMode={activeMode} onViewModeChange={handleModeChange} />
       {activeMode === 'kanban' ? (
         <KanbanBoard />
@@ -100,7 +100,7 @@ const WorkspaceContentPanel: React.FC<{
 // Panel components registry for Dockview
 const components: Record<string, React.FC<IDockviewPanelProps>> = {
   sidebar: () => (
-    <aside className="w-full h-full bg-[#0c0c0e] overflow-hidden flex flex-col">
+    <aside className="w-full h-full bg-panel overflow-hidden flex flex-col">
       <Sidebar />
     </aside>
   ),
@@ -124,22 +124,22 @@ const components: Record<string, React.FC<IDockviewPanelProps>> = {
     />
   ),
   assistant: () => (
-    <main className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+    <main className="w-full h-full bg-canvas flex flex-col overflow-hidden min-w-0">
       <AssistantChat variant="center" />
     </main>
   ),
   'folder-info': () => (
-    <aside className="w-full h-full bg-[#0c0c0e] flex flex-col overflow-hidden min-w-0">
+    <aside className="w-full h-full bg-panel flex flex-col overflow-hidden min-w-0">
       <FolderInfoPanel />
     </aside>
   ),
   logs: () => (
-    <div className="w-full h-full bg-[#08090a] flex flex-col overflow-hidden min-w-0">
+    <div className="w-full h-full bg-canvas flex flex-col overflow-hidden min-w-0">
       <LogViewer variant="dock" />
     </div>
   ),
   audio: () => (
-    <div className="w-full h-full bg-[#09090b] flex flex-col overflow-hidden min-w-0">
+    <div className="w-full h-full bg-canvas flex flex-col overflow-hidden min-w-0">
       <AudioPanel />
     </div>
   ),
@@ -388,7 +388,7 @@ const GroupHeaderActions: React.FC<any> = (props) => {
       {isOpen && (
         <div
           ref={menuRef}
-          className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-[#18181c] border border-white/[0.12] shadow-2xl py-1 z-50 animate-in fade-in duration-100"
+          className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-50 animate-in fade-in duration-100"
         >
           <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04]">
             Добавить вкладку
@@ -1287,7 +1287,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
   }, [effectiveInitialPanel]);
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-[#09090b] text-[#f4f4f5] select-none relative z-0 isolate">
+    <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative z-0 isolate">
       <WindowControls />
 
       {/* Sleek Minimal Blue Drop Highlight (Zero Slop / No Badges) */}

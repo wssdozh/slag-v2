@@ -378,10 +378,10 @@ const TriageModalDialog: React.FC = () => {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col select-none animate-in slide-in-from-bottom duration-200 overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-canvas flex flex-col select-none animate-in slide-in-from-bottom duration-200 overflow-hidden">
         {/* Mobile Header */}
         <div
-          className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-[#0c0c0e]"
+          className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
           style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
         >
           <div className="flex items-center gap-2 min-w-0">
@@ -411,7 +411,7 @@ const TriageModalDialog: React.FC = () => {
 
         {/* Fixed Mobile Footer */}
         <div
-          className="px-4 py-3 border-t border-white/[0.08] bg-[#0c0c0e] shrink-0 flex items-center justify-between"
+          className="px-4 py-3 border-t border-white/[0.08] bg-panel shrink-0 flex items-center justify-between"
           style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
         >
           <span className="text-xs text-zinc-500 font-mono">

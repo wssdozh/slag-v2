@@ -75,7 +75,7 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
       };
     default:
       return {
-        bg: 'bg-[#18181c] hover:bg-[#202024]',
+        bg: 'bg-surface-elevated hover:bg-[#202024]',
         border: 'border-white/[0.08]',
         text: 'text-zinc-200',
         dot: 'bg-zinc-500',
@@ -923,11 +923,11 @@ export const CalendarView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#09090b] text-[#f4f4f5] select-none overflow-hidden relative">
+    <div className="flex-1 flex flex-col h-full bg-canvas text-fg-primary select-none overflow-hidden relative">
       {/* ============================================================== */}
       {/* 1. Header Toolbar (Todoist Upcoming Style)                     */}
       {/* ============================================================== */}
-      <div className="h-12 px-4 border-b border-white/[0.06] bg-[#0c0c0e] flex items-center justify-between gap-3 shrink-0">
+      <div className="h-12 px-4 border-b border-white/[0.06] bg-panel flex items-center justify-between gap-3 shrink-0">
         {/* Left: Upcoming Title + Month/Year */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
@@ -966,7 +966,7 @@ export const CalendarView: React.FC = () => {
         {/* Right: View Switcher [ Неделя | Месяц ] & Overdue/Unscheduled Drawer Toggle */}
         <div className="flex items-center gap-2">
           {/* View Mode Switcher: Linear-grade segmented control */}
-          <div aria-label="Режим календаря" className="flex items-center h-8 bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
+          <div aria-label="Режим календаря" className="flex items-center h-8 bg-surface p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
             <button
               onClick={() => setViewMode('week')}
               className={`h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
@@ -1032,12 +1032,12 @@ export const CalendarView: React.FC = () => {
             >
               <div className="flex-1 flex flex-col min-w-[896px] h-full">
                 {/* Day Headers (ПН 10, ВТ 11...) */}
-                <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/90 shrink-0 cursor-grab">
+                <div className="flex border-b border-white/[0.06] bg-panel/90 shrink-0 cursor-grab">
                   <div
                     data-resize-handle="timeline"
                     title="Масштаб времени (двойной клик — сброс к 52px)"
                     onDoubleClick={handleTimelineDoubleClick}
-                    className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-[#0c0c0e] select-none hover:text-zinc-400 transition-colors cursor-pointer"
+                    className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-panel select-none hover:text-zinc-400 transition-colors cursor-pointer"
                   >
                     {hourHeight !== DEFAULT_HOUR_HEIGHT ? `${hourHeight}px` : 'UTC'}
                   </div>
@@ -1057,7 +1057,7 @@ export const CalendarView: React.FC = () => {
                           {weekdayName}
                         </span>
                         {isToday ? (
-                          <span className="w-6 h-6 rounded-full bg-white text-[#09090b] text-xs font-bold flex items-center justify-center shadow-sm">
+                          <span className="w-6 h-6 rounded-full bg-white text-canvas text-xs font-bold flex items-center justify-center shadow-sm">
                             {dayNum}
                           </span>
                         ) : (
@@ -1070,13 +1070,13 @@ export const CalendarView: React.FC = () => {
                   })}
                   </div>
                   {gridScrollbarWidth > 0 && (
-                    <div style={{ width: gridScrollbarWidth }} className="shrink-0 bg-[#0c0c0e]" />
+                    <div style={{ width: gridScrollbarWidth }} className="shrink-0 bg-panel" />
                   )}
                 </div>
 
               {/* All-Day (Весь день) Section */}
-              <div className="flex border-b border-white/[0.06] bg-[#09090b] shrink-0 max-h-36 overflow-y-auto scrollbar-thin">
-                <div className="w-14 shrink-0 border-r border-white/[0.04] px-1.5 py-2 flex items-start justify-end text-[10px] font-mono text-zinc-500 select-none sticky left-0 z-20 bg-[#09090b]">
+              <div className="flex border-b border-white/[0.06] bg-canvas shrink-0 max-h-36 overflow-y-auto scrollbar-thin">
+                <div className="w-14 shrink-0 border-r border-white/[0.04] px-1.5 py-2 flex items-start justify-end text-[10px] font-mono text-zinc-500 select-none sticky left-0 z-20 bg-canvas">
                   Весь день
                 </div>
                 <div className="flex-1 grid grid-cols-7 min-h-[44px]">
@@ -1122,7 +1122,7 @@ export const CalendarView: React.FC = () => {
                   })}
                 </div>
                 {gridScrollbarWidth > 0 && (
-                  <div style={{ width: gridScrollbarWidth }} className="shrink-0 bg-[#09090b]" />
+                  <div style={{ width: gridScrollbarWidth }} className="shrink-0 bg-canvas" />
                 )}
               </div>
 
@@ -1130,7 +1130,7 @@ export const CalendarView: React.FC = () => {
               <div
                 ref={timeGridRef}
                 data-testid="calendar-time-grid"
-                className="flex-1 overflow-y-auto scrollbar-thin relative bg-[#09090b] flex"
+                className="flex-1 overflow-y-auto scrollbar-thin relative bg-canvas flex"
               >
                 {/* Time markers column (After Effects style time ruler) */}
                 <div
@@ -1140,7 +1140,7 @@ export const CalendarView: React.FC = () => {
                   onDoubleClick={handleTimelineDoubleClick}
                   onWheel={handleTimelineRulerWheel}
                   title={`Шкала времени: зажмите и тяните для приближения делений (сейчас шаг ${slotStepMinutes}м). Двойной клик — сброс.`}
-                  className="w-14 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e] select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-ns-resize hover:bg-[#101014] transition-colors"
+                  className="w-14 shrink-0 border-r border-white/[0.04] bg-panel select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-ns-resize hover:bg-[#101014] transition-colors"
                 >
                   {HOURS.map(hour => (
                     <div
@@ -1247,7 +1247,7 @@ export const CalendarView: React.FC = () => {
                                 >
                                   {isOver ? (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                                      <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-blue-300 bg-[#141418] px-2 py-0.5 rounded border border-blue-500/40 shadow-sm">
+                                      <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-blue-300 bg-surface-elevated px-2 py-0.5 rounded border border-blue-500/40 shadow-sm">
                                         <Clock className="w-2.5 h-2.5 text-blue-400" />
                                         <span>
                                           {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
@@ -1257,7 +1257,7 @@ export const CalendarView: React.FC = () => {
                                   ) : (
                                     /* Hover indicator with time */
                                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
-                                      <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 bg-[#18181c] px-2 py-0.5 rounded border border-white/[0.06] shadow-sm">
+                                      <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 bg-surface-elevated px-2 py-0.5 rounded border border-white/[0.06] shadow-sm">
                                         <Plus className="w-2.5 h-2.5 text-zinc-400" />
                                         <span>
                                           {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
@@ -1301,11 +1301,11 @@ export const CalendarView: React.FC = () => {
             /* ========================================================== */
             <div
               ref={monthHorizontalScrollRef}
-              className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin bg-[#09090b] cursor-grab"
+              className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin bg-canvas cursor-grab"
             >
               <div className="flex-1 flex flex-col min-w-[700px] h-full">
                 {/* Day Header Row */}
-                <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0 cursor-grab">
+                <div className="flex border-b border-white/[0.06] bg-panel/80 shrink-0 cursor-grab">
                   <div className="flex-1 grid grid-cols-7">
                     {RUSSIAN_WEEKDAYS.map(day => (
                       <div
@@ -1317,7 +1317,7 @@ export const CalendarView: React.FC = () => {
                     ))}
                   </div>
                   {monthGridScrollbarWidth > 0 && (
-                    <div style={{ width: monthGridScrollbarWidth }} className="shrink-0 bg-[#0c0c0e]" />
+                    <div style={{ width: monthGridScrollbarWidth }} className="shrink-0 bg-panel" />
                   )}
                 </div>
 
@@ -1344,7 +1344,7 @@ export const CalendarView: React.FC = () => {
                         });
                       }}
                       className={`min-h-[96px] p-1.5 border-b border-r border-white/[0.04] flex flex-col justify-between transition-colors cursor-pointer group ${
-                        cell.isCurrentMonth ? 'bg-[#09090b] hover:bg-[#0c0c0e]' : 'bg-[#070709] text-zinc-600'
+                        cell.isCurrentMonth ? 'bg-canvas hover:bg-panel' : 'bg-[#070709] text-zinc-600'
                       } ${isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 border-blue-500/30' : ''}`}
                     >
                       {/* Cell Header: Day Number */}
@@ -1352,7 +1352,7 @@ export const CalendarView: React.FC = () => {
                         <span
                           className={`text-xs font-mono ${
                             isToday
-                              ? 'w-5 h-5 rounded-full bg-white text-[#09090b] font-bold text-xs flex items-center justify-center shadow-sm'
+                              ? 'w-5 h-5 rounded-full bg-white text-canvas font-bold text-xs flex items-center justify-center shadow-sm'
                               : cell.isCurrentMonth
                               ? 'text-zinc-300 font-medium'
                               : 'text-zinc-600'
@@ -1483,9 +1483,9 @@ export const CalendarView: React.FC = () => {
         {/* 3. Side Drawer: Overdue and Unscheduled Tasks                 */}
         {/* ============================================================== */}
         {isDrawerOpen && (
-          <div className="w-72 sm:w-80 border-l border-white/[0.06] bg-[#0c0c0e]/95 flex flex-col shrink-0 transition-all duration-200 z-20">
+          <div className="w-72 sm:w-80 border-l border-white/[0.06] bg-panel/95 flex flex-col shrink-0 transition-all duration-200 z-20">
             {/* Drawer Tabs */}
-            <div className="h-10 px-2 border-b border-white/[0.06] flex items-center justify-between bg-[#121215]">
+            <div className="h-10 px-2 border-b border-white/[0.06] flex items-center justify-between bg-panel">
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setDrawerTab('overdue')}
@@ -1563,7 +1563,7 @@ export const CalendarView: React.FC = () => {
                           setSelectedItem(task);
                           setIsFullscreenEditorOpen(true);
                         }}
-                        className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
+                        className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
                           isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                         }`}
                       >
@@ -1640,7 +1640,7 @@ export const CalendarView: React.FC = () => {
                         setSelectedItem(task);
                         setIsFullscreenEditorOpen(true);
                       }}
-                      className={`p-2.5 rounded-lg bg-[#141417] hover:bg-[#18181c] border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
+                      className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
                         isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                       }`}
                     >
@@ -1708,10 +1708,10 @@ export const CalendarView: React.FC = () => {
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-[#141417] border border-white/[0.1] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            className="w-full max-w-md rounded-2xl bg-surface border border-white/[0.1] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
           >
             {/* Header */}
-            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-[#18181c]">
+            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-surface-elevated">
               <div className="flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4 text-zinc-300" />
                 <h3 className="text-sm font-semibold text-zinc-100">
@@ -1805,7 +1805,7 @@ export const CalendarView: React.FC = () => {
             </div>
 
             {/* Quick Add at bottom */}
-            <div className="p-3 border-t border-white/[0.06] bg-[#18181c]">
+            <div className="p-3 border-t border-white/[0.06] bg-surface-elevated">
               <button
                 onClick={() => {
                   if (!expandedDayDateStr) return;
@@ -1815,7 +1815,7 @@ export const CalendarView: React.FC = () => {
                     folder: currentFolder,
                   });
                 }}
-                className="w-full flex items-center justify-center gap-2 bg-[#09090b] hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 bg-canvas hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Добавить задачу...</span>
@@ -1827,7 +1827,7 @@ export const CalendarView: React.FC = () => {
       {/* Floating Drag Ghost Overlay */}
       {isDragging && dragPos && draggingPayload && (
         <div
-          className="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-[#18181c] border border-blue-500/40 text-xs font-medium text-white shadow-2xl flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 opacity-90 scale-105"
+          className="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-surface-elevated border border-blue-500/40 text-xs font-medium text-white shadow-2xl flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 opacity-90 scale-105"
           style={{
             left: `${dragPos.x}px`,
             top: `${dragPos.y}px`,

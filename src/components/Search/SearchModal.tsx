@@ -163,7 +163,7 @@ const SearchDialog: React.FC = () => {
 
   const customHeader = (
     <div
-      className="flex items-center gap-2.5 px-4 py-3.5 border-b border-white/[0.06] bg-[#0c0c0e] rounded-t-[15px]"
+      className="flex items-center gap-2.5 px-4 py-3.5 border-b border-white/[0.06] bg-panel rounded-t-[15px]"
       style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
     >
       <button
@@ -213,7 +213,7 @@ const SearchDialog: React.FC = () => {
   const searchBody = (
     <>
       {/* Filter Pills */}
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/[0.04] bg-[#0f0f11] text-[11px] shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/[0.04] bg-panel text-[11px] shrink-0 overflow-x-auto">
         <span className="text-zinc-500 mr-1 shrink-0">Фильтр:</span>
         {(
           [
@@ -365,7 +365,7 @@ const SearchDialog: React.FC = () => {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col select-none animate-in fade-in duration-150">
+      <div className="fixed inset-0 z-50 bg-canvas flex flex-col select-none animate-in fade-in duration-150">
         {customHeader}
         {searchBody}
       </div>

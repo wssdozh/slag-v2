@@ -382,7 +382,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         {isTextPanelOpen && (
           <aside
             onClick={e => e.stopPropagation()}
-            className="w-full sm:w-80 md:w-96 border-l border-white/[0.08] bg-[#0c0d0e]/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 animate-in slide-in-from-right-4 duration-200 min-h-0 select-text"
+            className="w-full sm:w-80 md:w-96 border-l border-white/[0.08] bg-panel/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 animate-in slide-in-from-right-4 duration-200 min-h-0 select-text"
           >
             {/* Header */}
             <div className="h-12 px-5 border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">

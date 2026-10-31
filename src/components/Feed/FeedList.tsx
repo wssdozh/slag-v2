@@ -422,7 +422,7 @@ export const FeedList: React.FC = () => {
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
-          <div className="absolute inset-2 z-30 rounded-2xl bg-[#09090b]/92 backdrop-blur-md border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none animate-in fade-in duration-100">
+          <div className="absolute inset-2 z-30 rounded-2xl bg-canvas/92 backdrop-blur-md border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none animate-in fade-in duration-100">
             <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
             <span className="text-sm font-medium text-zinc-200">
               Перетащите файлы сюда для создания заметки
@@ -469,7 +469,7 @@ export const FeedList: React.FC = () => {
                 <button
                   type="button"
                   onClick={loadMoreOlder}
-                  className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded-full bg-[#141417] border border-white/[0.04] cursor-pointer"
+                  className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded-full bg-surface border border-white/[0.04] cursor-pointer"
                 >
                   Показать более ранние записи...
                 </button>
@@ -480,7 +480,7 @@ export const FeedList: React.FC = () => {
               <div key={group.dateLabel} className="flex flex-col gap-2">
                 {/* Telegram-style date bubble */}
                 <div className="flex justify-center py-1 select-none">
-                  <span className="px-3 py-0.5 rounded-full bg-[#18181b] border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
+                  <span className="px-3 py-0.5 rounded-full bg-surface-elevated border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
                     {group.dateLabel}
                   </span>
                 </div>
@@ -515,7 +515,7 @@ export const FeedList: React.FC = () => {
           <button
             type="button"
             onClick={scrollToBottom}
-            className="pointer-events-auto w-10 h-10 rounded-full aspect-square shrink-0 bg-[#18181b]/95 hover:bg-[#27272a] active:bg-[#323238] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer transition-all active:scale-90 animate-in fade-in zoom-in-95 group"
+            className="pointer-events-auto w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-[#27272a] active:bg-[#323238] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer transition-all active:scale-90 animate-in fade-in zoom-in-95 group"
             title="К последним заметкам"
             aria-label="Прокрутить к последним заметкам"
           >

@@ -329,7 +329,7 @@ export const AudioPanel: React.FC = () => {
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative w-full h-full bg-[#09090b] text-zinc-100 flex flex-col justify-between overflow-hidden select-none outline-none"
+      className="relative w-full h-full bg-canvas text-zinc-100 flex flex-col justify-between overflow-hidden select-none outline-none"
     >
       {/* Hidden HTML5 Audio Element */}
       <audio ref={audioRef} preload="metadata" />
@@ -618,7 +618,7 @@ export const AudioPanel: React.FC = () => {
 
           {/* Folder Picker Popover */}
           {isFolderPickerOpen && (
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 rounded-xl bg-[#18181c] border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-52 overflow-y-auto">
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 rounded-xl bg-surface-elevated border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-52 overflow-y-auto">
               <div className="px-3 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04] mb-1">
                 Закрепить папку
               </div>

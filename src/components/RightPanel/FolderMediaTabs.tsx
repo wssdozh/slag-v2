@@ -54,7 +54,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
     <div className={`flex flex-col gap-3 ${className}`}>
       {/* Tabs Header */}
       {isMobile ? (
-        <div className="flex items-center gap-1 bg-[#141417]/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
           {tabDefs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -143,7 +143,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
               {allAudio.map(aud => (
                 <div
                   key={aud.id}
-                  className={isMobile ? 'p-3 rounded-xl bg-[#141417] border border-white/[0.06]' : 'p-1'}
+                  className={isMobile ? 'p-3 rounded-xl bg-surface border border-white/[0.06]' : 'p-1'}
                 >
                   {isMobile && <div className="text-xs text-zinc-300 font-medium mb-1.5">{aud.name}</div>}
                   <AudioPlayer
@@ -171,7 +171,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                   href={file.url}
                   download={file.name}
                   className={`flex items-center justify-between p-2 rounded bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] text-xs transition-colors ${
-                    isMobile ? 'p-3 rounded-xl bg-[#141417] border-white/[0.06]' : ''
+                    isMobile ? 'p-3 rounded-xl bg-surface border-white/[0.06]' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
@@ -202,7 +202,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`flex items-center gap-2 p-2 rounded bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] text-xs text-zinc-300 transition-colors group ${
-                    isMobile ? 'justify-between p-3 rounded-xl bg-[#141417] border-white/[0.06]' : ''
+                    isMobile ? 'justify-between p-3 rounded-xl bg-surface border-white/[0.06]' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">

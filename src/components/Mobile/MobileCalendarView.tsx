@@ -423,10 +423,10 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
   });
 
   return (
-    <div className="flex-1 flex flex-col bg-[#09090b] text-[#f4f4f5] overflow-hidden select-none relative">
+    <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative">
       {/* 1. Unified Mobile Calendar Header (Single Bar, 44px) */}
       <header
-        className="h-11 border-b border-white/[0.06] bg-[#0c0c0e]/95 backdrop-blur-md px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
+        className="h-11 border-b border-white/[0.06] bg-panel/95 backdrop-blur-md px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
       >
         {/* Left: Month Dropdown Button & Today shortcut */}
@@ -463,7 +463,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
         </div>
 
         {/* Center: Layout toggle [Список | 3 дня] */}
-        <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.08] shrink-0">
+        <div className="flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.08] shrink-0">
           <button
             type="button"
             onClick={() => setCalendarLayout('agenda')}
@@ -509,7 +509,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           <div
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="px-3 py-2 border-b border-white/[0.06] bg-[#0c0c0e]/80 shrink-0"
+            className="px-3 py-2 border-b border-white/[0.06] bg-panel/80 shrink-0"
           >
             <div className="grid grid-cols-7 gap-1">
               {weekDays.map(day => {
@@ -562,7 +562,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                   <span className="text-[10px] font-mono opacity-80">({overdueTasks.length})</span>
                 </div>
 
-                <div className="rounded-2xl bg-[#141417]/80 border border-rose-500/20 overflow-hidden divide-y divide-white/[0.04]">
+                <div className="rounded-2xl bg-surface/80 border border-rose-500/20 overflow-hidden divide-y divide-white/[0.04]">
                   {overdueTasks.map(task => (
                     <MobileCalendarTaskRow
                       key={task.id}
@@ -626,7 +626,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                     )}
                   </div>
 
-                  <div className="rounded-2xl bg-[#141417]/70 border border-white/[0.05] overflow-hidden">
+                  <div className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden">
                     {sortedDayTasks.length > 0 ? (
                       <div className="divide-y divide-white/[0.04]">
                         {(() => {
@@ -756,10 +756,10 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
         <div
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="flex-1 flex flex-col overflow-hidden select-none bg-[#09090b]"
+          className="flex-1 flex flex-col overflow-hidden select-none bg-canvas"
         >
           {/* 3-Day Column Headers (Sticky Top) */}
-          <div className="flex border-b border-white/[0.06] bg-[#0c0c0e] shrink-0">
+          <div className="flex border-b border-white/[0.06] bg-panel shrink-0">
             {/* Time label left spacer */}
             <div className="w-11 shrink-0 border-r border-white/[0.04]" />
 
@@ -790,7 +790,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           </div>
 
           {/* All Day Row (Chips for tasks without specific time slot) */}
-          <div className="flex border-b border-white/[0.06] bg-[#0c0c0e]/50 shrink-0 min-h-[36px]">
+          <div className="flex border-b border-white/[0.06] bg-panel/50 shrink-0 min-h-[36px]">
             <div className="w-11 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-2xs font-mono text-zinc-500 uppercase p-1">
               Весь день
             </div>
@@ -830,10 +830,10 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
           {/* 24-Hour Scrollable Grid (00:00 - 23:00) */}
           <div
             ref={timeGridScrollRef}
-            className="flex-1 overflow-y-auto scrollbar-thin relative bg-[#09090b] flex pb-24"
+            className="flex-1 overflow-y-auto scrollbar-thin relative bg-canvas flex pb-24"
           >
             {/* Time rail left column */}
-            <div className="w-11 shrink-0 border-r border-white/[0.04] bg-[#0c0c0e]/30 select-none">
+            <div className="w-11 shrink-0 border-r border-white/[0.04] bg-panel/30 select-none">
               {HOURS_24.map(h => (
                 <div
                   key={h}
@@ -875,7 +875,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                           {isAddingThis && (
                             <div
                               onClick={e => e.stopPropagation()}
-                              className="absolute inset-x-1 top-1 z-30 bg-[#18181c] border border-white/20 rounded-xl p-1.5 shadow-2xl flex flex-col gap-1.5 animate-in fade-in"
+                              className="absolute inset-x-1 top-1 z-30 bg-surface-elevated border border-white/20 rounded-xl p-1.5 shadow-2xl flex flex-col gap-1.5 animate-in fade-in"
                             >
                               <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
                                 <span>{String(hour).padStart(2, '0')}:00</span>
@@ -940,7 +940,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                             left: `${left}%`,
                             width: `${width}%`
                           }}
-                          className="absolute rounded-lg p-1.5 border border-white/[0.08] bg-[#141417]/95 hover:bg-[#18181c] flex flex-col justify-between select-none cursor-pointer transition-all z-10 shadow-sm active:scale-[0.98]"
+                          className="absolute rounded-lg p-1.5 border border-white/[0.08] bg-surface/95 hover:bg-surface-elevated flex flex-col justify-between select-none cursor-pointer transition-all z-10 shadow-sm active:scale-[0.98]"
                         >
                           <div className="flex items-start gap-1 min-w-0">
                             {task.priority && task.priority !== 'none' && (
@@ -989,7 +989,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
       {isMonthPickerOpen && (
         <div data-testid="month-picker-sheet" className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs animate-in fade-in select-none">
           <div
-            className="w-full max-h-[85vh] bg-[#141417] border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200"
+            className="w-full max-h-[85vh] bg-surface border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200"
             style={{ paddingBottom: 'max(var(--sab), 1rem)' }}
           >
             {/* Handle & Header */}
