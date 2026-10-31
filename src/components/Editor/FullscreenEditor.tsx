@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
+import { storage } from '../../lib/storage';
 import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
@@ -86,35 +87,62 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   const [activeMobilePopover, setActiveMobilePopover] = useState<'formatting' | 'lists' | 'ai' | null>(null);
 
-  const [title, setTitle] = useState(item.title || '');
-  const [content, setContent] = useState(() =>
-    item.type === 'task'
+  const initialDraft = storage.getFullscreenDraft(item.id);
+  const initialFullWidth = storage.getFullscreenWidth();
+
+  const [title, setTitle] = useState(() => initialDraft?.title ?? (item.title || ''));
+  const [content, setContent] = useState(() => {
+    if (initialDraft?.content !== undefined) return initialDraft.content;
+    return item.type === 'task'
       ? migrateLegacySubtasksToContent(item.content || '', item.subtasks)
-      : item.content || ''
-  );
-  const [type, setType] = useState<SlagItemType>(item.type || 'article');
-  const [folder, setFolder] = useState(item.folder || 'Входящие');
-  const [tags, setTags] = useState<string[]>(item.tags || []);
+      : item.content || '';
+  });
+  const [type, setType] = useState<SlagItemType>(() => initialDraft?.type ?? (item.type || 'article'));
+  const [folder, setFolder] = useState(() => initialDraft?.folder ?? (item.folder || 'Входящие'));
+  const [tags, setTags] = useState<string[]>(() => initialDraft?.tags ?? (item.tags || []));
   const [newTagInput, setNewTagInput] = useState('');
-  const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(item.priority || 'none');
-  const [status, setStatus] = useState<SlagItemStatus>(item.status || 'todo');
-  const [dueDate, setDueDate] = useState(item.dueDate || '');
+  const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(() => initialDraft?.priority ?? (item.priority || 'none'));
+  const [status, setStatus] = useState<SlagItemStatus>(() => initialDraft?.status ?? (item.status || 'todo'));
+  const [dueDate, setDueDate] = useState(() => initialDraft?.dueDate ?? (item.dueDate || ''));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [duration, setDuration] = useState<number | undefined>(item.duration);
+  const [duration, setDuration] = useState<number | undefined>(() => initialDraft?.duration ?? item.duration);
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
-  const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(item.recurrence);
+  const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(() => initialDraft?.recurrence ?? item.recurrence);
   const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
   const [attachments, setAttachments] = useState<SlagAttachment[]>(item.attachments || []);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Zen mode & layout controls
-  const [isFullWidth, setIsFullWidth] = useState(false);
+  // Zen mode & layout controls (persisting user's width preference)
+  const [isFullWidth, setIsFullWidth] = useState(() => initialFullWidth);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isAttachmentsCollapsed, setIsAttachmentsCollapsed] = useState(false);
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
   const [activeTopDropdown, setActiveTopDropdown] = useState<'style' | 'list' | null>(null);
 
   const selectedAttachment = attachments.find(a => a.id === selectedAttachmentId);
+
+  // Auto-save in-flight edits to crash-proof draft storage
+  useEffect(() => {
+    storage.saveFullscreenDraft(item.id, {
+      itemId: item.id,
+      title,
+      content,
+      tags,
+      folder,
+      type,
+      priority: type === 'task' ? priority : undefined,
+      status: type === 'task' ? status : undefined,
+      dueDate: type === 'task' ? dueDate : undefined,
+      duration: type === 'task' ? duration : undefined,
+      recurrence: type === 'task' ? recurrence : undefined,
+      updatedAt: Date.now(),
+    });
+  }, [item.id, title, content, tags, folder, type, priority, status, dueDate, duration, recurrence]);
+
+  // Persist width preference
+  useEffect(() => {
+    storage.saveFullscreenWidth(isFullWidth);
+  }, [isFullWidth]);
 
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -156,9 +184,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     };
 
     if (isNewDraft) {
+      storage.clearFullscreenDraft(item.id);
       saveItem(updated);
       addToast('Запись создана и сохранена', 'success');
     } else {
+      storage.clearFullscreenDraft(item.id);
       updateItem(updated);
       addToast('Изменения сохранены', 'success');
     }
@@ -832,6 +862,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             {/* Delete button */}
             <button
               onClick={() => {
+                storage.clearFullscreenDraft(item.id);
                 deleteItem(item.id);
                 setIsFullscreenEditorOpen(false);
                 setSelectedItem(null);

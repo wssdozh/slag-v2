@@ -337,7 +337,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return rawItems;
   });
-  const [selectedItem, setSelectedItem] = useState<SlagItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<SlagItem | null>(() => {
+    const fsState = initialWorkspace.fullscreenEditorState;
+    if (fsState?.isOpen && fsState.itemId) {
+      const rawItems = storage.getItems();
+      const found = rawItems.find(it => it.id === fsState.itemId);
+      if (found) return found;
+      if (fsState.itemId.startsWith('draft_')) {
+        return {
+          id: fsState.itemId,
+          title: '',
+          content: '',
+          type: 'note',
+          folder: initialWorkspace.currentFolder || 'Входящие',
+          tags: [],
+          attachments: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+      }
+    }
+    return null;
+  });
   const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>(() => initialWorkspace.activeTypeFilter || 'all');
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(() => initialWorkspace.activeTagFilter ?? null);
   const [aiItemFilter, setAiItemFilter] = useState<AiItemFilter | null>(null);
@@ -372,7 +393,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLightboxImages(prev => prev.map(img => img.id === id ? { ...img, ...updates } : img));
   }, []);
   
-  const [isFullscreenEditorOpen, setIsFullscreenEditorOpen] = useState<boolean>(false);
+  const [isFullscreenEditorOpen, setIsFullscreenEditorOpen] = useState<boolean>(() => {
+    const fsState = initialWorkspace.fullscreenEditorState;
+    if (fsState?.isOpen && fsState.itemId) {
+      const rawItems = storage.getItems();
+      return rawItems.some(it => it.id === fsState.itemId) || fsState.itemId.startsWith('draft_');
+    }
+    return false;
+  });
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [settingsTab, setSettingsTab] = useState<'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs'>('ai');
@@ -726,8 +754,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activeTagFilter,
       activeMobileTab,
       isKanbanMaterialsOpen,
+      fullscreenEditorState: {
+        isOpen: isFullscreenEditorOpen,
+        itemId: isFullscreenEditorOpen && selectedItem ? selectedItem.id : null,
+      },
     });
-  }, [currentFolder, feedViewMode, inboxMode, activeTypeFilter, activeTagFilter, activeMobileTab, isKanbanMaterialsOpen]);
+  }, [
+    currentFolder,
+    feedViewMode,
+    inboxMode,
+    activeTypeFilter,
+    activeTagFilter,
+    activeMobileTab,
+    isKanbanMaterialsOpen,
+    isFullscreenEditorOpen,
+    selectedItem,
+  ]);
 
   // Assistant history persistence in Vault
   useEffect(() => {

@@ -263,6 +263,27 @@ export interface ComposerDraft {
   updatedAt: number;
 }
 
+export interface FullscreenDraft {
+  itemId: string;
+  title: string;
+  content: string;
+  tags: string[];
+  folder: string;
+  type: SlagItemType;
+  priority?: 'none' | 'low' | 'medium' | 'high';
+  status?: SlagItemStatus;
+  dueDate?: string;
+  duration?: number;
+  recurrence?: RecurrenceRule;
+  updatedAt: number;
+}
+
+export interface FullscreenEditorWorkspaceState {
+  isOpen: boolean;
+  itemId: string | null;
+  isFullWidth?: boolean;
+}
+
 export interface WorkspaceState {
   currentFolder: string;
   feedViewMode: FeedViewMode;
@@ -272,6 +293,7 @@ export interface WorkspaceState {
   activeMobileTab: MobileTabId;
   folderMediaTab?: FolderMediaTabId;
   isKanbanMaterialsOpen?: boolean;
+  fullscreenEditorState?: FullscreenEditorWorkspaceState;
 }
 
 export interface BackupSnapshotMeta {

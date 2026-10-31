@@ -4,6 +4,7 @@ import type {
   VaultMeta,
   SlagAttachment,
   ComposerDraft,
+  FullscreenDraft,
   WorkspaceState,
   ChatMessage,
 } from '../types';
@@ -34,6 +35,8 @@ const TRASH_STORAGE_PREFIX = 'slag_trash_';
 const DRAFTS_STORAGE_PREFIX = 'slag_drafts_';
 const ASSISTANT_STORAGE_PREFIX = 'slag_assistant_';
 const WORKSPACE_STATE_PREFIX = 'slag_workspace_state_';
+const FULLSCREEN_DRAFTS_PREFIX = 'slag_fullscreen_draft_';
+const FULLSCREEN_WIDTH_KEY = 'slag_fullscreen_is_full_width';
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   currentFolder: 'Входящие',
@@ -1108,6 +1111,48 @@ export class StorageService {
     } catch (err) {
       fsLog.warn('Failed to delete composer draft from localStorage', { folderPath, err });
     }
+  }
+
+  // Fullscreen Editor Drafts (per-item auto-saved in-flight edits)
+  private getFullscreenDraftsKey(): string {
+    return `${FULLSCREEN_DRAFTS_PREFIX}${this.currentVault.id}`;
+  }
+
+  public getFullscreenDraft(itemId: string): FullscreenDraft | null {
+    try {
+      const raw = localStorage.getItem(`${this.getFullscreenDraftsKey()}_${itemId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  public saveFullscreenDraft(itemId: string, draft: FullscreenDraft): void {
+    try {
+      localStorage.setItem(`${this.getFullscreenDraftsKey()}_${itemId}`, JSON.stringify(draft));
+    } catch (err) {
+      fsLog.warn('Failed to save fullscreen draft to localStorage', { itemId, err });
+    }
+  }
+
+  public clearFullscreenDraft(itemId: string): void {
+    try {
+      localStorage.removeItem(`${this.getFullscreenDraftsKey()}_${itemId}`);
+    } catch {}
+  }
+
+  public getFullscreenWidth(): boolean {
+    try {
+      return localStorage.getItem(FULLSCREEN_WIDTH_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  public saveFullscreenWidth(isFullWidth: boolean): void {
+    try {
+      localStorage.setItem(FULLSCREEN_WIDTH_KEY, String(isFullWidth));
+    } catch {}
   }
 
   // Assistant History (Vault-scoped, Obsidian Local-First)

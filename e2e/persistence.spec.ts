@@ -176,4 +176,59 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     // Verify recording stopped and composer returned to normal input
     await expect(page.locator('main textarea')).toBeVisible();
   });
+
+  test('Fullscreen Focus Editor open state, draft content, and width persistence across reload', async ({ page }) => {
+    // 1. Open Fullscreen Editor from Composer
+    const expandBtn = page.locator('button[aria-label="Раскрыть в полноэкранный редактор"]').first();
+    await expect(expandBtn).toBeVisible({ timeout: 5000 });
+    await expandBtn.click();
+
+    const editorModal = page.locator('[data-testid="fullscreen-editor-modal"]');
+    await expect(editorModal).toBeVisible({ timeout: 5000 });
+
+    // 2. Type unique title and in-flight draft content
+    const titleInput = page.locator('header ~ div input[placeholder*="Заголовок"], header ~ div input[placeholder*="Название"]').first();
+    await titleInput.click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.type('Персистентный черновик фуллсайза');
+
+    const cmContent = page.locator('.cm-content').first();
+    await cmContent.click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.type('Этот текст должен пережить перезагрузку страницы без нажатия кнопки сохранить.');
+
+    // 3. Switch width to Wide mode
+    const widthBtn = page.locator('header button[title*="Широкая"]').first();
+    await widthBtn.click();
+    await page.waitForTimeout(400);
+
+    // 4. Reload page (simulating browser reload / app restart)
+    await page.reload();
+    await page.waitForTimeout(400);
+
+    // 5. Verify Fullscreen Editor reopened automatically on the same note
+    await expect(editorModal).toBeVisible({ timeout: 5000 });
+
+    // 6. Verify in-flight draft title and content were restored
+    const reloadedTitle = page.locator('header ~ div input[placeholder*="Заголовок"], header ~ div input[placeholder*="Название"]').first();
+    await expect(reloadedTitle).toHaveValue('Персистентный черновик фуллсайза');
+
+    const reloadedCm = page.locator('.cm-content').first();
+    await expect(reloadedCm).toContainText('Этот текст должен пережить перезагрузку');
+
+    // 7. Verify width was persisted
+    const resetWidthBtn = page.locator('header button[title*="Стандартная ширина"]').first();
+    await expect(resetWidthBtn).toBeVisible();
+
+    // Take screenshot of restored fullscreen editor
+    await page.screenshot({ path: 'test-results/screenshots/fullscreen_restored_after_reload.png' });
+
+    // 8. Save and close
+    await page.locator('header button', { hasText: 'Сохранить' }).click();
+    await expect(editorModal).not.toBeVisible();
+
+    // 9. Reload again - editor should stay closed
+    await page.reload();
+    await expect(editorModal).not.toBeVisible({ timeout: 2000 });
+  });
 });
