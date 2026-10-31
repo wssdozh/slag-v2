@@ -327,12 +327,13 @@
   --atomic-editor-fg-muted: #a1a1aa;
   --atomic-editor-fg-faint: #71717a;
   --atomic-editor-border: rgba(255, 255, 255, 0.08);
-  --atomic-editor-accent: #10b981;
-  --atomic-editor-accent-bright: #34d399;
-  --atomic-editor-accent-soft: rgba(16, 185, 129, 0.15);
+  --atomic-editor-accent: #71717a; /* zinc-500 neutral linear */
+  --atomic-editor-accent-bright: #a1a1aa; /* zinc-400 */
+  --atomic-editor-accent-soft: rgba(255, 255, 255, 0.06);
+  --atomic-editor-code-rail: rgba(255, 255, 255, 0.12); /* clean neutral monochrome rail */
   --atomic-editor-link: #60a5fa;
   --atomic-editor-link-hover: #93c5fd;
-  --atomic-editor-code-bg: rgba(255, 255, 255, 0.04);
+  --atomic-editor-code-bg: rgba(255, 255, 255, 0.03);
   --atomic-editor-selection-bg: rgba(59, 130, 246, 0.25);
   --atomic-editor-measure: 100%;
   --atomic-editor-font: var(--slag-font-sans);
