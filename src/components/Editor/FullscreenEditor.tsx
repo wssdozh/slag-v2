@@ -233,13 +233,38 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleClose, handleSave]);
 
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && newTagInput.trim()) {
-      e.preventDefault();
-      const cleaned = newTagInput.trim().replace(/^#/, '');
-      if (!tags.includes(cleaned)) {
-        setTags([...tags, cleaned]);
+  const tagInputRef = useRef<HTMLInputElement | null>(null);
+
+  const addTagValue = (raw: string) => {
+    const parts = raw.split(/[\s,]+/).map(p => p.trim().replace(/^#/, '')).filter(Boolean);
+    if (parts.length === 0) return;
+    setTags(prev => {
+      const next = [...prev];
+      for (const p of parts) {
+        if (!next.includes(p)) {
+          next.push(p);
+        }
       }
+      return next;
+    });
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+      e.preventDefault();
+      if (newTagInput.trim()) {
+        addTagValue(newTagInput);
+        setNewTagInput('');
+      }
+    } else if (e.key === 'Backspace' && !newTagInput && tags.length > 0) {
+      e.preventDefault();
+      setTags(tags.slice(0, -1));
+    }
+  };
+
+  const handleTagBlur = () => {
+    if (newTagInput.trim()) {
+      addTagValue(newTagInput);
       setNewTagInput('');
     }
   };
@@ -467,37 +492,43 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           />
         )}
 
-        <div className="w-full h-full flex items-center justify-between px-4 md:px-6 py-2.5 gap-2 md:gap-3">
-          <div className="flex items-center gap-2 md:gap-3 shrink-0">
+        <div className="relative w-full h-full flex items-center justify-between px-4 md:px-6 py-2.5 gap-2 md:gap-3">
+          <div className="flex items-center gap-2 md:gap-2.5 shrink-0 z-10">
+            {/* Back Button: pure icon */}
             <button
               onClick={handleClose}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
               title="Назад к ленте (Escape)"
+              aria-label="Назад к ленте"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Назад</span>
             </button>
 
-            <span className="text-zinc-700 hidden sm:inline select-none">/</span>
+            {/* Vertical Divider */}
+            <div className="h-4 w-px bg-white/[0.08] shrink-0" />
 
-            {/* Folder Selector */}
+            {/* Folder Selector: ghost droplist without podlozhka */}
             <Select
               size="sm"
               variant="ghost"
               value={folder}
               onChange={setFolder}
               options={folders.map(f => ({ value: f.path, label: f.name }))}
-              className="max-w-[130px] md:max-w-[170px] h-7 text-xs bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] rounded-md"
+              className="max-w-[130px] md:max-w-[170px] h-7 text-xs"
             />
 
-            {/* Item Type Switcher */}
-            <div className="hidden sm:flex items-center p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+            {/* Vertical Divider */}
+            <div className="h-4 w-px bg-white/[0.08] shrink-0 hidden sm:block" />
+
+            {/* Item Type Switcher: flat radio buttons without container podlozhka */}
+            <div className="hidden sm:flex items-center gap-0.5">
               {(['note', 'task', 'article'] as SlagItemType[]).map(t => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => setType(t)}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                    type === t ? 'bg-white/10 text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
+                  className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                    type === t ? 'bg-white/10 text-white font-medium' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
                   }`}
                 >
                   {t === 'note' ? 'Заметка' : t === 'task' ? 'Таска' : 'Статья'}
@@ -506,19 +537,21 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             </div>
           </div>
 
-          {/* Teletype Center Utilities: Context-Aware for Selected Object (Text, Image, Audio, File) */}
-          <div className="hidden md:flex items-center justify-center mx-2 z-50">
+          {/* Teletype Center Utilities: Context-Aware for Selected Object (Text, Image, Audio, File) - Centered & Scaled */}
+          <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-50">
             {selectedAttachment ? (
               /* Selected Object (Media / File) Action Bar */
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/[0.05] border border-white/[0.08] text-xs shadow-sm animate-in fade-in duration-150">
-                <span className="flex items-center gap-1.5 text-zinc-200 font-mono text-[11px] max-w-[180px] truncate pl-0.5">
+              <div className="flex items-center gap-1.5 text-xs text-zinc-300">
+                <div className="h-4 w-px bg-white/[0.08] shrink-0" />
+
+                <span className="flex items-center gap-1.5 text-zinc-200 font-mono text-xs max-w-[180px] truncate pl-0.5">
                   <span className="text-sm">
                     {selectedAttachment.type === 'image' ? '🖼' : selectedAttachment.type === 'audio' ? '🎙' : '📎'}
                   </span>
                   <span className="truncate font-medium">{selectedAttachment.name}</span>
                 </span>
 
-                <div className="h-3.5 w-px bg-white/[0.1] mx-1" />
+                <div className="h-4 w-px bg-white/[0.08] mx-0.5 shrink-0" />
 
                 {selectedAttachment.type === 'image' && (
                   <button
@@ -533,10 +566,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                         }], 0);
                       }
                     }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
                     title="Открыть изображение (Lightbox)"
                   >
-                    <Eye className="w-3.5 h-3.5 text-blue-400" />
+                    <Eye className="w-4 h-4 text-blue-400" />
                     <span>Просмотр</span>
                   </button>
                 )}
@@ -544,10 +577,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={() => insertAttachmentMarkdown(selectedAttachment.name)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-xs font-mono transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-zinc-300 hover:text-white hover:bg-white/[0.08] text-xs font-mono transition-colors cursor-pointer"
                   title="Вставить ссылку ![[файл]] в курсор текста"
                 >
-                  <Link2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <Link2 className="w-4 h-4 text-emerald-400" />
                   <span>Вставить</span>
                 </button>
 
@@ -557,26 +590,31 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                     removeAttachment(selectedAttachment.id);
                     setSelectedAttachmentId(null);
                   }}
-                  className="p-1 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                   title="Удалить файл"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
 
-                <div className="h-3.5 w-px bg-white/[0.1] mx-0.5" />
+                <div className="h-4 w-px bg-white/[0.08] mx-0.5 shrink-0" />
 
                 <button
                   type="button"
                   onClick={() => setSelectedAttachmentId(null)}
-                  className="p-1 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer"
                   title="Снять выбор (вернуть текст)"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
+
+                <div className="h-4 w-px bg-white/[0.08] shrink-0" />
               </div>
             ) : (
-              /* Teletype Text Context Bar */
-              <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-zinc-300 shadow-xs">
+              /* Teletype Text Context Bar - Scaled, Centered, No Podlozhka, Edge Dividers */
+              <div className="flex items-center gap-1 text-xs text-zinc-300">
+                {/* Left Edge Divider */}
+                <div className="h-4 w-px bg-white/[0.08] shrink-0" />
+
                 {/* History: Undo / Redo */}
                 <button
                   type="button"
@@ -584,7 +622,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-zinc-400"
                   title="Отменить (Ctrl+Z)"
                 >
-                  <Undo2 className="w-3.5 h-3.5" />
+                  <Undo2 className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
@@ -592,23 +630,23 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-zinc-400"
                   title="Повторить (Ctrl+Y)"
                 >
-                  <Redo2 className="w-3.5 h-3.5" />
+                  <Redo2 className="w-4 h-4" />
                 </button>
 
-                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5 shrink-0" />
 
                 {/* Aa Text Styles Dropdown */}
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setActiveTopDropdown(prev => prev === 'style' ? null : 'style')}
-                    className={`flex items-center gap-0.5 px-2 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                       activeTopDropdown === 'style' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
                     }`}
                     title="Стили текста (Aa)"
                   >
                     <span className="font-semibold text-sm leading-none">Aa</span>
-                    <ChevronDown className="w-3 h-3 text-zinc-500" />
+                    <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
                   </button>
 
                   {activeTopDropdown === 'style' && (
@@ -677,13 +715,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   <button
                     type="button"
                     onClick={() => setActiveTopDropdown(prev => prev === 'list' ? null : 'list')}
-                    className={`flex items-center gap-0.5 px-1.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                       activeTopDropdown === 'list' ? 'bg-white/10 text-white' : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
                     }`}
                     title="Списки и структуры (≡)"
                   >
                     <List className="w-4 h-4" />
-                    <ChevronDown className="w-3 h-3 text-zinc-500" />
+                    <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
                   </button>
 
                   {activeTopDropdown === 'list' && (
@@ -736,7 +774,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   )}
                 </div>
 
-                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5 shrink-0" />
 
                 {/* Inline Formatting: B, I, S, Inline Code */}
                 <button
@@ -745,7 +783,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer font-bold"
                   title="Жирный (Ctrl+B)"
                 >
-                  <Bold className="w-3.5 h-3.5" />
+                  <Bold className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
@@ -753,7 +791,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer italic"
                   title="Курсив (Ctrl+I)"
                 >
-                  <Italic className="w-3.5 h-3.5" />
+                  <Italic className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
@@ -761,7 +799,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
                   title="Зачёркнутый"
                 >
-                  <Strikethrough className="w-3.5 h-3.5" />
+                  <Strikethrough className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
@@ -769,10 +807,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
                   title="Инлайн-код"
                 >
-                  <Code className="w-3.5 h-3.5" />
+                  <Code className="w-4 h-4" />
                 </button>
 
-                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5 shrink-0" />
 
                 {/* Anchor / Link (⚓) */}
                 <button
@@ -781,7 +819,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
                   title="Ссылка [[заметка]]"
                 >
-                  <Link2 className="w-3.5 h-3.5" />
+                  <Link2 className="w-4 h-4" />
                 </button>
 
                 {/* Attachments / Paperclip */}
@@ -791,10 +829,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
                   title="Прикрепить файл, фото или медиа"
                 >
-                  <Paperclip className="w-3.5 h-3.5 text-zinc-400" />
+                  <Paperclip className="w-4 h-4 text-zinc-400" />
                 </button>
 
-                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5" />
+                <div className="h-3.5 w-px bg-white/[0.08] mx-0.5 shrink-0" />
 
                 {/* AI Sparkles */}
                 <button
@@ -803,21 +841,17 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   className="p-1.5 rounded-md text-zinc-400 hover:text-purple-300 hover:bg-purple-500/10 active:scale-95 transition-all cursor-pointer"
                   title="Разобрать через ИИ (папка и теги)"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-4 h-4" />
                 </button>
+
+                {/* Right Edge Divider */}
+                <div className="h-4 w-px bg-white/[0.08] shrink-0" />
               </div>
             )}
           </div>
 
           {/* Stats & Actions */}
-          <div className="flex items-center gap-2 md:gap-2.5 text-xs text-zinc-400 ml-auto shrink-0">
-            {/* Word count & Read time */}
-            <div className="hidden lg:flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 pr-1">
-              <span>{wordCount} слов</span>
-              <span className="text-zinc-700">•</span>
-              <span>~{readTime} мин</span>
-            </div>
-
+          <div className="flex items-center gap-2 md:gap-2.5 text-xs text-zinc-400 ml-auto shrink-0 z-10">
             {/* Reading measure / width toggle: Focus (768px) vs Wide (1024px) */}
             <button
               type="button"
@@ -846,17 +880,14 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               <Eye className="w-4 h-4" />
             </button>
 
-            {/* Linear Dark Save Button */}
+            {/* Linear Dark Save Button (no kbd badge) */}
             <button
               onClick={handleSave}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-xs font-medium border border-white/[0.08] hover:border-white/[0.16] shadow-sm transition-all cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-xs font-medium border border-white/[0.08] hover:border-white/[0.16] shadow-sm transition-all cursor-pointer active:scale-95"
               title="Сохранить изменения (Ctrl+S / ⌘S)"
             >
-              <Save className="w-3.5 h-3.5 text-zinc-300" />
+              <Save className="w-4 h-4 text-zinc-300" />
               <span>Сохранить</span>
-              <kbd className="hidden sm:inline font-mono text-[10px] text-zinc-400 bg-black/40 px-1.5 py-0.5 rounded border border-white/[0.06] leading-none">
-                ⌘S
-              </kbd>
             </button>
 
             {/* Delete button */}
@@ -1167,8 +1198,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               <div className="h-px bg-white/[0.06] w-full" />
             )}
 
-            {/* Tags Ribbon Row */}
-            <div className="flex items-center gap-1.5 flex-wrap text-xs">
+            {/* Tags Ribbon Row - Seamless Flat Textarea-Like Area */}
+            <div
+              onClick={() => tagInputRef.current?.focus()}
+              className="flex items-center gap-1.5 flex-wrap min-h-7 py-0.5 cursor-text text-xs"
+            >
               {tags.map(t => (
                 <TagChip
                   key={t}
@@ -1177,17 +1211,16 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   onRemove={() => setTags(tags.filter(tag => tag !== t))}
                 />
               ))}
-              <div className="h-7 px-2 rounded-md bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] flex items-center gap-1 transition-colors">
-                <Tag className="w-3 h-3 text-zinc-500 shrink-0" />
-                <input
-                  type="text"
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  onKeyDown={handleAddTag}
-                  placeholder="+ тег"
-                  className="bg-transparent text-xs font-mono text-zinc-300 placeholder-zinc-500 w-16 outline-none"
-                />
-              </div>
+              <input
+                ref={tagInputRef}
+                type="text"
+                value={newTagInput}
+                onChange={(e) => setNewTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                onBlur={handleTagBlur}
+                placeholder={tags.length === 0 ? 'добавьте теги...' : ''}
+                className="bg-transparent text-xs font-mono text-zinc-300 placeholder-zinc-600 outline-none min-w-[70px] flex-1 py-0.5"
+              />
             </div>
 
             {/* Subtle Divider between Properties/Tags and Content */}

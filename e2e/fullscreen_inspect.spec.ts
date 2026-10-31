@@ -22,8 +22,8 @@ test('Capture Fullscreen Editor Teletype Top Utilities and Object Context', asyn
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.type('Карьера: 7 типичных ошибок начинающего разработчика');
 
-  // Add tags
-  const tagInput = page.locator('input[placeholder="+ тег"]').first();
+  // Add tags via seamless textarea-like input
+  const tagInput = page.locator('header ~ div input[placeholder*="тег"]').or(page.locator('header ~ div input[type="text"]').nth(1));
   for (const tag of ['карьера', 'it', 'советы', 'опыт', 'сакутин', 'вебинар', 'игра', 'игры', 'заработок']) {
     await tagInput.fill(tag);
     await page.keyboard.press('Enter');
