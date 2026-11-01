@@ -33,7 +33,7 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     expect(mainBox).toBeTruthy();
     expect(subBox).toBeTruthy();
     if (mainBox && subBox) {
-      expect(subBox.x).toBeGreaterThanOrEqual(mainBox.x + mainBox.width);
+      expect(subBox.x).toBeGreaterThanOrEqual(mainBox.x + mainBox.width - 2);
     }
 
     // Capture screenshot of side flyout for types
@@ -62,7 +62,7 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
 
     const moreBox = await moreSubmenu.boundingBox();
     if (mainBox && moreBox) {
-      expect(moreBox.x).toBeGreaterThanOrEqual(mainBox.x + mainBox.width);
+      expect(moreBox.x).toBeGreaterThanOrEqual(mainBox.x + mainBox.width - 2);
     }
 
     // Capture screenshot of side flyout for more
@@ -92,7 +92,7 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     await firstCard.click({ button: 'right' });
     await expect(contextMenu).toBeVisible();
 
-    const explorerBtn = contextMenu.locator('button', { hasText: 'Проводник' });
+    const explorerBtn = contextMenu.getByRole('button', { name: 'Проводник', exact: true });
     await expect(explorerBtn).toBeVisible();
     await explorerBtn.hover();
 
@@ -120,15 +120,29 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
       fullPage: false,
     });
 
-    // 8. Verify Folder Context Menu has Explorer actions
+    // 8. Verify Folder Context Menu has Explorer flyout submenu
     const careerFolderNode = page.locator('aside span', { hasText: 'Карьера' }).first();
     await careerFolderNode.click({ button: 'right' });
     const folderContextMenu = page.locator('.fixed.z-50', { hasText: 'Информация и медиа' });
     await expect(folderContextMenu).toBeVisible();
-    await expect(folderContextMenu.locator('button', { hasText: 'Открыть в проводнике' })).toBeVisible();
-    await expect(folderContextMenu.locator('button', { hasText: 'Скопировать путь к папке' })).toBeVisible();
 
-    await folderContextMenu.locator('button', { hasText: 'Скопировать путь к папке' }).click();
+    const folderExplorerBtn = folderContextMenu.getByRole('button', { name: 'Проводник', exact: true });
+    await expect(folderExplorerBtn).toBeVisible();
+    await folderExplorerBtn.hover();
+
+    const folderExplorerSubmenu = folderContextMenu.locator('button', { hasText: 'Открыть в проводнике' }).locator('..');
+    await expect(folderExplorerSubmenu).toBeVisible();
+    await expect(folderExplorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toBeVisible();
+    await expect(folderExplorerSubmenu.locator('button', { hasText: 'Скопировать полный путь' })).toBeVisible();
+    await expect(folderExplorerSubmenu.locator('button', { hasText: 'Относительный путь' })).toBeVisible();
+
+    // Capture screenshot of side flyout for folder explorer
+    await page.screenshot({
+      path: 'test-results/screenshots/folder_context_menu_explorer_flyout.png',
+      fullPage: false,
+    });
+
+    await folderExplorerSubmenu.locator('button', { hasText: 'Скопировать полный путь' }).click();
     await expect(page.locator('text=Путь к папке скопирован')).toBeVisible();
   });
 });

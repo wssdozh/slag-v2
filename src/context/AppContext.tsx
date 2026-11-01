@@ -668,7 +668,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     action?: { label: string; onClick: () => void }
   ) => {
     const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
-    setToasts(prev => [...prev, { id, text, type, action }]);
+    setToasts(prev => [...prev.slice(-2), { id, text, type, action }]);
     logger.log(type === 'error' ? 'error' : 'info', 'UI', `Toast: ${text}`);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));

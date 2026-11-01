@@ -42,7 +42,15 @@ export const ContextMenu: React.FC = () => {
 
   const [activeSubmenu, setActiveSubmenu] = useState<'more' | 'type' | 'explorer' | null>(null);
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+  const [prevContextMenu, setPrevContextMenu] = useState(contextMenu);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Synchronously reset submenu state when the menu target changes
+  if (contextMenu !== prevContextMenu) {
+    setPrevContextMenu(contextMenu);
+    setActiveSubmenu(null);
+    setTriggerRect(null);
+  }
 
   const actions = useItemActions(contextMenu?.item, closeContextMenu);
 
@@ -191,19 +199,34 @@ export const ContextMenu: React.FC = () => {
   const clampedX = Math.min(Math.max(8, x), window.innerWidth - menuWidth - 8);
   const clampedY = Math.min(Math.max(8, y), window.innerHeight - menuHeight - 8);
 
-  // Submenu geometry calculation
-  const submenuWidth = 192;
+  // Submenu geometry calculation based on active trigger button rect
+  let submenuWidth = 192;
+  let submenuHeight = 120;
+  if (activeSubmenu === 'explorer') {
+    submenuWidth = 256;
+    submenuHeight = 156;
+  } else if (activeSubmenu === 'type') {
+    submenuWidth = 176;
+    submenuHeight = 116;
+  } else if (activeSubmenu === 'more') {
+    submenuWidth = 192;
+    submenuHeight = 116;
+  }
+
   const gap = 4;
   const margin = 8;
-  const spaceRight = window.innerWidth - (clampedX + menuWidth + gap + margin);
-  const submenuDirection: 'right' | 'left' = spaceRight >= submenuWidth ? 'right' : 'left';
-  const submenuX = submenuDirection === 'right' ? menuWidth + gap : -(submenuWidth + gap);
+  let submenuX = 0;
+  let submenuY = 0;
+  let submenuDirection: 'right' | 'left' = 'right';
 
-  // Vertical alignment clamped to screen
-  const rawTop = triggerRect ? triggerRect.top - clampedY : 0;
-  const submenuHeight = 120;
-  const maxTop = window.innerHeight - margin - clampedY - submenuHeight;
-  const submenuY = Math.max(0, Math.min(rawTop, maxTop));
+  if (triggerRect) {
+    const spaceRight = window.innerWidth - (triggerRect.right + gap + margin);
+    submenuDirection = spaceRight >= submenuWidth ? 'right' : 'left';
+    submenuX = submenuDirection === 'right' ? triggerRect.right + gap : triggerRect.left - submenuWidth - gap;
+    // Align top with the trigger button (with a 4px optical inset)
+    const idealY = triggerRect.top - 4;
+    submenuY = Math.max(margin, Math.min(idealY, window.innerHeight - submenuHeight - margin));
+  }
 
   return (
     <div
@@ -406,41 +429,20 @@ export const ContextMenu: React.FC = () => {
 
             <div className="my-0.5 border-t border-white/[0.06]" />
 
+            {/* Explorer Flyout Submenu for Folder */}
             <button
-              onClick={() => {
-                openFolderInExplorer(folder.path);
-                closeContextMenu();
-              }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+              onMouseEnter={(e) => handleTriggerMouseEnter('explorer', e)}
+              onMouseLeave={handleTriggerMouseLeave}
+              onClick={(e) => handleTriggerClick('explorer', e)}
+              className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-colors text-left cursor-pointer ${
+                activeSubmenu === 'explorer' ? 'bg-white/[0.08] text-white' : 'hover:bg-white/[0.06] hover:text-white'
+              }`}
             >
-              <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Открыть в проводнике</span>
-            </button>
-
-            <button
-              onClick={async () => {
-                const fullPath = await storage.getFolderAbsolutePath(folder.path);
-                navigator.clipboard.writeText(fullPath);
-                addToast('Путь к папке скопирован', 'success');
-                closeContextMenu();
-              }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
-            >
-              <Copy className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Скопировать путь к папке</span>
-            </button>
-
-            <button
-              onClick={() => {
-                const fullLink = `slag://folder/${folder.path}`;
-                navigator.clipboard.writeText(fullLink);
-                addToast(`Скопирована ссылка: ${fullLink}`, 'success');
-                closeContextMenu();
-              }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
-            >
-              <Link2 className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Скопировать ссылку на папку</span>
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Проводник</span>
+              </div>
+              <ChevronRight className="w-3 h-3 text-zinc-500" />
             </button>
 
             {folder.path !== 'Входящие' && (
@@ -527,12 +529,12 @@ export const ContextMenu: React.FC = () => {
       </div>
 
       {/* Side Submenu Panel: Quick Type Change */}
-      {type === 'item' && item && activeSubmenu === 'type' && (
+      {type === 'item' && item && activeSubmenu === 'type' && triggerRect && (
         <div
           style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
-          className="absolute z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
         >
           {/* Bridge hit-area */}
           <div
@@ -592,12 +594,12 @@ export const ContextMenu: React.FC = () => {
       )}
 
       {/* Side Submenu Panel: Explorer / File System */}
-      {type === 'item' && item && activeSubmenu === 'explorer' && (
+      {((type === 'item' && item) || (type === 'folder' && folder)) && activeSubmenu === 'explorer' && triggerRect && (
         <div
           style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
-          className="absolute z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
         >
           {/* Bridge hit-area */}
           <div
@@ -607,7 +609,14 @@ export const ContextMenu: React.FC = () => {
           />
 
           <button
-            onClick={actions.handleOpenInExplorer}
+            onClick={() => {
+              if (type === 'item') {
+                actions.handleOpenInExplorer();
+              } else if (folder) {
+                openFolderInExplorer(folder.path);
+                closeContextMenu();
+              }
+            }}
             className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
           >
             <div className="flex items-center gap-2">
@@ -618,7 +627,16 @@ export const ContextMenu: React.FC = () => {
           </button>
 
           <button
-            onClick={actions.handleCopyFullLink}
+            onClick={async () => {
+              if (type === 'item') {
+                actions.handleCopyFullLink();
+              } else if (folder) {
+                const fullLink = `slag://folder/${folder.path}`;
+                navigator.clipboard.writeText(fullLink);
+                addToast(`Скопирована ссылка: ${fullLink}`, 'success');
+                closeContextMenu();
+              }
+            }}
             className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
           >
             <div className="flex items-center gap-2">
@@ -629,7 +647,16 @@ export const ContextMenu: React.FC = () => {
           </button>
 
           <button
-            onClick={actions.handleCopyFullPath}
+            onClick={async () => {
+              if (type === 'item') {
+                actions.handleCopyFullPath();
+              } else if (folder) {
+                const fullPath = await storage.getFolderAbsolutePath(folder.path);
+                navigator.clipboard.writeText(fullPath);
+                addToast('Путь к папке скопирован', 'success');
+                closeContextMenu();
+              }
+            }}
             className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
           >
             <div className="flex items-center gap-2">
@@ -639,7 +666,15 @@ export const ContextMenu: React.FC = () => {
           </button>
 
           <button
-            onClick={actions.handleCopyRelativePath}
+            onClick={() => {
+              if (type === 'item') {
+                actions.handleCopyRelativePath();
+              } else if (folder) {
+                navigator.clipboard.writeText(folder.path);
+                addToast(`Путь скопирован: ${folder.path}`, 'success');
+                closeContextMenu();
+              }
+            }}
             className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
           >
             <div className="flex items-center gap-2">
@@ -651,12 +686,12 @@ export const ContextMenu: React.FC = () => {
       )}
 
       {/* Side Submenu Panel: Additional Utilities */}
-      {type === 'item' && item && activeSubmenu === 'more' && (
+      {type === 'item' && item && activeSubmenu === 'more' && triggerRect && (
         <div
           style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
-          className="absolute z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
         >
           {/* Bridge hit-area */}
           <div
