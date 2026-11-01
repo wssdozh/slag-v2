@@ -1,4 +1,4 @@
-import React, { useCallback, lazy, Suspense } from 'react';
+import React, { useCallback, useState, useEffect, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
@@ -29,6 +29,12 @@ const TriageModal = lazy(() =>
 );
 const LogModal = lazy(() =>
   import('./components/Logs/LogModal').then((m) => ({ default: m.LogModal }))
+);
+const LandingPage = lazy(() =>
+  import('./components/Landing/LandingPage').then((m) => ({ default: m.LandingPage }))
+);
+const AccountCabinet = lazy(() =>
+  import('./components/Account/AccountCabinet').then((m) => ({ default: m.AccountCabinet }))
 );
 
 const AppContent: React.FC = () => {
@@ -77,6 +83,30 @@ const AppContent: React.FC = () => {
 
   useVisualViewport();
 
+  const [currentPage, setCurrentPage] = useState<string | null>(() => {
+    return typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('page') : null;
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search).get('page');
+      setCurrentPage(p);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigatePage = (page: string | null) => {
+    const u = new URL(window.location.href);
+    if (page) {
+      u.searchParams.set('page', page);
+    } else {
+      u.searchParams.delete('page');
+    }
+    window.history.pushState({}, '', u.toString());
+    setCurrentPage(page);
+  };
+
   const isDesktopWidth = typeof window !== 'undefined' && window.innerWidth >= 768;
 
   // Standalone Native Popout & Quick Composer Window Router
@@ -84,6 +114,22 @@ const AppContent: React.FC = () => {
   const isQuickComposer = urlParams?.get('window') === 'quick-composer';
   if (isQuickComposer) {
     return <QuickComposerWindow />;
+  }
+
+  if (currentPage === 'landing') {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+        <LandingPage onNavigateToAccount={() => navigatePage('account')} />
+      </Suspense>
+    );
+  }
+
+  if (currentPage === 'account') {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+        <AccountCabinet onBackToLanding={() => navigatePage('landing')} />
+      </Suspense>
+    );
   }
 
   const standalonePanelId = urlParams?.get('panel');
