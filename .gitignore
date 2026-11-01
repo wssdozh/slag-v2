@@ -44,3 +44,9 @@ Thumbs.db
 test-results/
 playwright-report/
 coverage/
+
+# Python & Relay
+__pycache__/
+*.py[cod]
+*$py.class
+relay/data/

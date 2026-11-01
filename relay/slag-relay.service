@@ -1,0 +1,15 @@
+[Unit]
+Description=SLAG v2 Zero-Knowledge Relay Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/slag-relay
+ExecStart=/usr/bin/python3 /opt/slag-relay/server.py --port 8320 --db /opt/slag-relay/data/relay.db
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
