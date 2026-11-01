@@ -96,26 +96,10 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   return (
     <header
       ref={headerRef}
-      className="h-12 px-3 sm:px-4 border-b border-white/[0.06] bg-panel flex items-center justify-between gap-3 select-none shrink-0 relative"
+      className="h-12 px-3 sm:px-4 border-b border-white/[0.06] bg-panel grid grid-cols-[1fr_auto_1fr] items-center gap-2 select-none shrink-0 relative"
     >
-      {/* Left side: Folder Title Button & Active Filter Chips */}
-      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none py-1">
-        <button
-          type="button"
-          onClick={() => openFolderInfoModal(currentFolder)}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none shrink-0"
-          title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
-        >
-          {folderIconComp}
-          <h2 className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors truncate max-w-[200px]">
-            {folderMeta?.name || currentFolder}
-          </h2>
-          <span className="text-2xs sm:text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors shrink-0">
-            ({filteredItems.length})
-          </span>
-        </button>
-
-        {/* Active Filter Badges with 1-click dismiss */}
+      {/* Left Column: Active Filter Badges */}
+      <div className="flex items-center gap-1.5 justify-self-start min-w-0 z-10 overflow-x-auto scrollbar-none py-1">
         {activeTypeFilter !== 'all' && (
           <div className="flex items-center gap-1 px-2 h-6 rounded-md bg-white/[0.06] border border-white/[0.08] text-zinc-300 text-[11px] font-mono shrink-0">
             {activeTypeFilter === 'note' && <StickyNote className="w-3 h-3 text-zinc-400" />}
@@ -213,8 +197,26 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
         )}
       </div>
 
-      {/* Right side: Materials button, AI triage, and the 3-dots Folder View Modal button */}
-      <div className="flex items-center gap-1.5 shrink-0 z-10">
+      {/* Center Column: Prominent Folder Title Button */}
+      <div className="flex items-center justify-center justify-self-center min-w-0 max-w-full px-1 z-0">
+        <button
+          type="button"
+          onClick={() => openFolderInfoModal(currentFolder)}
+          className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none min-w-0"
+          title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
+        >
+          {folderIconComp}
+          <h2 className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors truncate max-w-[240px]">
+            {folderMeta?.name || currentFolder}
+          </h2>
+          <span className="text-2xs sm:text-xs font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors shrink-0">
+            ({filteredItems.length})
+          </span>
+        </button>
+      </div>
+
+      {/* Right Column: Actions (Materials, AI triage, 3-dots popover button) */}
+      <div className="flex items-center gap-1.5 justify-self-end min-w-0 shrink-0 z-10">
         {/* Kanban Materials Dock Toggle */}
         {activeViewMode === 'kanban' && (
           <button
