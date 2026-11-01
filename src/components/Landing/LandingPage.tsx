@@ -198,10 +198,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
         <div className="max-w-2xl mb-12">
           <span className="text-xs font-mono uppercase tracking-wider text-zinc-500">Архитектура</span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-2">
-            Построено на принципах локального суверенитета
+            Локальные файлы и сквозной релей
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400 mt-2">
-            Никаких проприетарных форматов баз данных. Никакой привязки к серверам разработчика.
+            Никаких проприетарных баз данных и привязки к чужим серверам.
           </p>
         </div>
 
@@ -246,7 +246,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
         <div className="max-w-2xl mb-12">
           <span className="text-xs font-mono uppercase tracking-wider text-zinc-500">Сравнение</span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-2">
-            Честное сравнение без рекламного тумана
+            Отличия от Obsidian, Telegram и Notion
           </h2>
         </div>
 
@@ -307,7 +307,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
         <div className="max-w-2xl mb-12">
           <span className="text-xs font-mono uppercase tracking-wider text-zinc-500">Тарифы</span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-2">
-            Простая модель без скрытых комиссий
+            Бесплатный self-host или готовый релей
           </h2>
         </div>
 

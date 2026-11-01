@@ -35,7 +35,7 @@ test.describe('Landing Showcase & Minimal Account Cabinet Flow', () => {
     // Scroll to Architecture & Comparison
     const compSection = page.locator('#comparison');
     await compSection.scrollIntoViewIfNeeded();
-    await expect(page.locator('text=Честное сравнение без рекламного тумана')).toBeVisible();
+    await expect(page.locator('text=Отличия от Obsidian, Telegram и Notion')).toBeVisible();
     await expect(page.locator('table')).toBeVisible();
 
     // Take screenshot of Landing Comparison & Architecture

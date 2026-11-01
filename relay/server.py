@@ -358,6 +358,15 @@ class SlagRelayServer:
         body = json.dumps(data).encode("utf-8")
         return self._http_response(status, "OK" if status == 200 else "Error", "application/json", body)
 
+    async def _send_response(self, writer: asyncio.StreamWriter, resp_bytes: bytes) -> None:
+        try:
+            writer.write(resp_bytes)
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
+
     async def handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         # Read HTTP request line and headers
         try:
@@ -432,9 +441,7 @@ class SlagRelayServer:
                 "activeRooms": len(self.rooms),
                 "timestamp": int(time.time())
             })
-            writer.write(resp)
-            await writer.drain()
-            writer.close()
+            await self._send_response(writer, resp)
             return
 
         if method == "POST" and path == "/api/pair/create":
@@ -442,9 +449,7 @@ class SlagRelayServer:
             host_pk = body_json.get("publicKey", "")
             host_nonce = body_json.get("clientNonce", secrets.token_hex(16))
             pair_data = self.db.create_pairing_session(host_device, host_pk, host_nonce)
-            writer.write(self._json_response(pair_data))
-            await writer.drain()
-            writer.close()
+            await self._send_response(writer, self._json_response(pair_data))
             return
 
         if method == "POST" and path == "/api/pair/claim":
@@ -452,48 +457,38 @@ class SlagRelayServer:
             guest_pk = body_json.get("publicKey", secrets.token_hex(16))
             claim_result = self.db.claim_pairing_session(pin, guest_pk)
             if claim_result:
-                writer.write(self._json_response(claim_result))
+                await self._send_response(writer, self._json_response(claim_result))
             else:
-                writer.write(self._json_response({"error": "invalid_or_expired_pin"}, status=404))
-            await writer.drain()
-            writer.close()
+                await self._send_response(writer, self._json_response({"error": "invalid_or_expired_pin"}, status=404))
             return
 
         if method == "POST" and path == "/api/pair/approve":
             session_id = body_json.get("sessionId", "")
             payload = body_json.get("encryptedPayload", "")
             ok = self.db.approve_pairing_session(session_id, payload)
-            writer.write(self._json_response({"status": "approved" if ok else "failed"}, status=200 if ok else 400))
-            await writer.drain()
-            writer.close()
+            await self._send_response(writer, self._json_response({"status": "approved" if ok else "failed"}, status=200 if ok else 400))
             return
 
         if method == "POST" and path == "/api/pair/reject":
             session_id = body_json.get("sessionId", "")
             ok = self.db.reject_pairing_session(session_id)
-            writer.write(self._json_response({"status": "rejected" if ok else "failed"}, status=200 if ok else 400))
-            await writer.drain()
-            writer.close()
+            await self._send_response(writer, self._json_response({"status": "rejected" if ok else "failed"}, status=200 if ok else 400))
             return
 
         if method == "POST" and path == "/api/pair/exchange":
             session_id = body_json.get("sessionId", "")
             payload = body_json.get("encryptedPayload", "")
             ok = self.db.approve_pairing_session(session_id, payload)
-            writer.write(self._json_response({"status": "ok" if ok else "failed"}, status=200 if ok else 400))
-            await writer.drain()
-            writer.close()
+            await self._send_response(writer, self._json_response({"status": "ok" if ok else "failed"}, status=200 if ok else 400))
             return
 
         if method == "GET" and path == "/api/pair/poll":
             session_id = query.get("session", "")
             status = self.db.poll_pairing_session(session_id)
             if status:
-                writer.write(self._json_response(status))
+                await self._send_response(writer, self._json_response(status))
             else:
-                writer.write(self._json_response({"error": "session_not_found"}, status=404))
-            await writer.drain()
-            writer.close()
+                await self._send_response(writer, self._json_response({"error": "session_not_found"}, status=404))
             return
 
         # Room HTTP endpoints (for environments where WebSocket is blocked or fallback)
