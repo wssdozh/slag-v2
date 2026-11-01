@@ -1,0 +1,288 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Radial Ambient Glow -->
+    <radialGradient id="bgGlow" cx="50%" cy="54%" r="50%">
+      <stop offset="0%" stop-color="#1f2347" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#111326" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#08090a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Berry Body Volumetric Shading: Rich Royal Indigo to Midnight Navy -->
+    <radialGradient id="berryBody" cx="36%" cy="28%" r="72%">
+      <stop offset="0%" stop-color="#4654a3"/>
+      <stop offset="28%" stop-color="#313c7a"/>
+      <stop offset="62%" stop-color="#1c224c"/>
+      <stop offset="90%" stop-color="#10132e"/>
+      <stop offset="100%" stop-color="#090a1a"/>
+    </radialGradient>
+
+    <!-- Epicuticular Wax Bloom (Soft Velvety Light Diffusion) -->
+    <radialGradient id="berryBloom" cx="34%" cy="26%" r="48%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.4"/>
+      <stop offset="45%" stop-color="#6366f1" stop-opacity="0.18"/>
+      <stop offset="85%" stop-color="#313c7a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Crisp Outer Rim Backlight (Linear Neon Edge) -->
+    <linearGradient id="rimGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5b4fc" stop-opacity="0.6"/>
+      <stop offset="30%" stop-color="#6366f1" stop-opacity="0.15"/>
+      <stop offset="70%" stop-color="#4f46e5" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.5"/>
+    </linearGradient>
+
+    <!-- Bottom Bounce Light (Ambient Underglow) -->
+    <radialGradient id="bounceGlow" cx="50%" cy="98%" r="45%">
+      <stop offset="0%" stop-color="#4338ca" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#090a1a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Crown Crater Interior Depth Shadow -->
+    <radialGradient id="craterShadow" cx="50%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#06060e"/>
+      <stop offset="70%" stop-color="#0f1024"/>
+      <stop offset="100%" stop-color="#1f1a42"/>
+    </radialGradient>
+
+    <!-- Faceted Crown Gradients -->
+    <linearGradient id="petalLitL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="50%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+
+    <linearGradient id="petalLitR" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a5b4fc"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#3730a3"/>
+    </linearGradient>
+
+    <linearGradient id="petalShade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#28225e"/>
+      <stop offset="100%" stop-color="#110d29"/>
+    </linearGradient>
+
+    <!-- Eye Gradient (Glossy Obsidian Button) -->
+    <radialGradient id="eyeBase" cx="35%" cy="28%" r="70%">
+      <stop offset="0%" stop-color="#181a29"/>
+      <stop offset="40%" stop-color="#0c0d17"/>
+      <stop offset="100%" stop-color="#040408"/>
+    </radialGradient>
+
+    <!-- Eye Bottom Cyan Ambient Glint -->
+    <linearGradient id="eyeCyanRim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="55%" stop-color="#38bdf8" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.45"/>
+    </linearGradient>
+
+    <!-- Eye Depth Shadow -->
+    <filter id="eyeSocketShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="0" dy="4"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.6"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Subtle Tech Lavender Blush Glow (Not cartoon pink!) -->
+    <radialGradient id="subtleBlush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Deep Graphite Canvas -->
+  <rect width="512" height="512" fill="#08090a"/>
+  <circle cx="256" cy="300" r="230" fill="url(#bgGlow)"/>
+
+  <!-- ==================== 1. MAIN BERRY BODY ==================== -->
+  <g id="berry-body">
+    <!-- Natural Oblate Flattened Silhouette with Top Dimple and Bottom Pip -->
+    <path
+      d="
+        M 256 166
+        C 290 166, 345 172, 392 208
+        C 440 246, 448 304, 432 352
+        C 416 400, 372 436, 310 448
+        C 285 453, 268 455, 256 455
+        C 244 455, 227 453, 202 448
+        C 140 436,  96 400,  80 352
+        C  64 304,  72 246, 120 208
+        C 167 172, 222 166, 256 166
+        Z
+      "
+      fill="url(#berryBody)"
+    />
+
+    <!-- Velvety Bloom Light Diffusion Layer -->
+    <path
+      d="
+        M 256 166
+        C 290 166, 345 172, 392 208
+        C 440 246, 448 304, 432 352
+        C 416 400, 372 436, 310 448
+        C 285 453, 268 455, 256 455
+        C 244 455, 227 453, 202 448
+        C 140 436,  96 400,  80 352
+        C  64 304,  72 246, 120 208
+        C 167 172, 222 166, 256 166
+        Z
+      "
+      fill="url(#berryBloom)"
+    />
+
+    <!-- Bottom Ambient Bounce Light -->
+    <path
+      d="
+        M 256 166
+        C 290 166, 345 172, 392 208
+        C 440 246, 448 304, 432 352
+        C 416 400, 372 436, 310 448
+        C 285 453, 268 455, 256 455
+        C 244 455, 227 453, 202 448
+        C 140 436,  96 400,  80 352
+        C  64 304,  72 246, 120 208
+        C 167 172, 222 166, 256 166
+        Z
+      "
+      fill="url(#bounceGlow)"
+    />
+
+    <!-- Clean Linear Dark Rim Light -->
+    <path
+      d="
+        M 256 166
+        C 290 166, 345 172, 392 208
+        C 440 246, 448 304, 432 352
+        C 416 400, 372 436, 310 448
+        C 285 453, 268 455, 256 455
+        C 244 455, 227 453, 202 448
+        C 140 436,  96 400,  80 352
+        C  64 304,  72 246, 120 208
+        C 167 172, 222 166, 256 166
+        Z
+      "
+      fill="none"
+      stroke="url(#rimGlow)"
+      stroke-width="2"
+      opacity="0.8"
+    />
+
+    <!-- Bottom Stem Pip Nub (The natural organic anchor) -->
+    <ellipse cx="256" cy="455" rx="16" ry="6" fill="#13102b"/>
+    <ellipse cx="256" cy="455" rx="9" ry="3" fill="#080714"/>
+  </g>
+
+  <!-- ==================== 2. NATURAL CALYX CROWN ==================== -->
+  <g id="berry-crown">
+    <!-- Indented Top Crater Cavity Shadow -->
+    <ellipse cx="256" cy="162" rx="64" ry="26" fill="url(#craterShadow)"/>
+
+    <!-- Back Left Sepal -->
+    <g>
+      <polygon points="175,128 220,154 200,166 160,144" fill="url(#petalShade)"/>
+      <polygon points="175,128 220,154 206,140" fill="url(#petalLitL)" opacity="0.6"/>
+    </g>
+
+    <!-- Back Right Sepal -->
+    <g>
+      <polygon points="337,128 312,140 292,154 352,144" fill="url(#petalShade)"/>
+      <polygon points="337,128 292,154 312,140" fill="url(#petalLitR)" opacity="0.7"/>
+    </g>
+
+    <!-- Top Center Sepal (Peak) -->
+    <g>
+      <polygon points="256,104 240,148 256,156 272,148" fill="url(#petalShade)"/>
+      <polygon points="256,104 256,156 272,148" fill="url(#petalLitL)" opacity="0.5"/>
+      <polygon points="256,104 240,148 256,156" fill="url(#petalLitR)" opacity="0.8"/>
+      <line x1="256" y1="104" x2="256" y2="156" stroke="#c7d2fe" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+    </g>
+
+    <!-- Front Left Crown Flange (Sculpted Leaf) -->
+    <g>
+      <!-- Left Shaded Facet -->
+      <polygon points="188,172 232,142 256,168 214,182" fill="url(#petalLitL)"/>
+      <!-- Right Shaded Facet -->
+      <polygon points="188,172 256,168 256,188 214,182" fill="url(#petalShade)"/>
+      <!-- Crisp Facet Ridge -->
+      <line x1="188" y1="172" x2="256" y2="168" stroke="#a5b4fc" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+    </g>
+
+    <!-- Front Right Crown Flange (Sculpted Leaf) -->
+    <g>
+      <!-- Left Shaded Facet -->
+      <polygon points="324,172 256,168 256,188 298,182" fill="url(#petalShade)"/>
+      <!-- Right Lit Facet -->
+      <polygon points="324,172 280,142 256,168 298,182" fill="url(#petalLitR)"/>
+      <!-- Crisp Facet Ridge -->
+      <line x1="324" y1="172" x2="256" y2="168" stroke="#c7d2fe" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    </g>
+
+    <!-- Front Center Crown Lip Rim -->
+    <path
+      d="
+        M 214 182
+        Q 256 192 298 182
+        Q 256 176 214 182
+        Z
+      "
+      fill="#1d1942"
+      stroke="#4f46e5"
+      stroke-width="1"
+    />
+  </g>
+
+  <!-- ==================== 3. EXPRESSIVE TECH FACE ==================== -->
+  <g id="berry-face">
+    <!-- Subtle Ambient Lavender Cheeks (Gentle Life Pulse, NOT pink makeup) -->
+    <ellipse cx="168" cy="328" rx="28" ry="16" fill="url(#subtleBlush)"/>
+    <ellipse cx="344" cy="328" rx="28" ry="16" fill="url(#subtleBlush)"/>
+
+    <!-- LEFT EYE (Deep Obsidian Button Eye with High-Tech Lense Depth) -->
+    <g filter="url(#eyeSocketShadow)">
+      <!-- Base Curved Obsidian Button -->
+      <ellipse cx="196" cy="306" rx="28" ry="32" fill="url(#eyeBase)"/>
+      <!-- Inner Ambient Cyan Reflection -->
+      <ellipse cx="196" cy="306" rx="28" ry="32" fill="url(#eyeCyanRim)"/>
+      <!-- Primary White Catchlight Pip -->
+      <circle cx="187" cy="295" r="9.5" fill="#ffffff"/>
+      <!-- Secondary Depth Catchlight Pip -->
+      <circle cx="207" cy="318" r="4" fill="#ffffff" opacity="0.8"/>
+    </g>
+
+    <!-- RIGHT EYE (Deep Obsidian Button Eye with High-Tech Lense Depth) -->
+    <g filter="url(#eyeSocketShadow)">
+      <!-- Base Curved Obsidian Button -->
+      <ellipse cx="316" cy="306" rx="28" ry="32" fill="url(#eyeBase)"/>
+      <!-- Inner Ambient Cyan Reflection -->
+      <ellipse cx="316" cy="306" rx="28" ry="32" fill="url(#eyeCyanRim)"/>
+      <!-- Primary White Catchlight Pip -->
+      <circle cx="307" cy="295" r="9.5" fill="#ffffff"/>
+      <!-- Secondary Depth Catchlight Pip -->
+      <circle cx="327" cy="318" r="4" fill="#ffffff" opacity="0.8"/>
+    </g>
+
+    <!-- SCULPTED SMILE CREASE (Volumetric surface indent) -->
+    <g id="berry-mouth">
+      <!-- Shadow Recess -->
+      <path
+        d="M 243 322 Q 256 333 269 322"
+        fill="none"
+        stroke="#070814"
+        stroke-width="3.5"
+        stroke-linecap="round"
+      />
+      <!-- Lower Lip Specular Volume Highlight -->
+      <path
+        d="M 245 324 Q 256 335 267 324"
+        fill="none"
+        stroke="#5562aa"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        opacity="0.6"
+      />
+    </g>
+  </g>
+</svg>
