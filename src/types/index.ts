@@ -120,6 +120,27 @@ export type InboxMode = 'unsorted' | 'all' | 'sorted';
 export type FeedViewMode = 'feed' | 'kanban' | 'calendar';
 export type MobileTabId = 'folders' | 'tasks' | 'assistant' | 'settings' | 'calendar' | 'audio';
 
+export type SortField = 'createdAt' | 'updatedAt' | 'title' | 'dueDate';
+export type SortOrder = 'asc' | 'desc';
+
+export interface FolderViewSettings {
+  viewMode: FeedViewMode;
+  typeFilter: SlagItemType | 'all';
+  inboxMode?: InboxMode;
+  sortBy: SortField;
+  sortOrder: SortOrder;
+  hideCompletedTasks?: boolean;
+}
+
+export const DEFAULT_FOLDER_VIEW_SETTINGS: FolderViewSettings = {
+  viewMode: 'feed',
+  typeFilter: 'all',
+  inboxMode: 'all',
+  sortBy: 'createdAt',
+  sortOrder: 'asc',
+  hideCompletedTasks: false,
+};
+
 export interface AiItemFilter {
   itemIds: string[];
   queryLabel: string;
@@ -294,6 +315,10 @@ export interface WorkspaceState {
   folderMediaTab?: FolderMediaTabId;
   isKanbanMaterialsOpen?: boolean;
   fullscreenEditorState?: FullscreenEditorWorkspaceState;
+  sortBy?: SortField;
+  sortOrder?: SortOrder;
+  hideCompletedTasks?: boolean;
+  folderSettings?: Record<string, FolderViewSettings>;
 }
 
 export interface BackupSnapshotMeta {

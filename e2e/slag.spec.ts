@@ -1,5 +1,21 @@
 import { test, expect } from '@playwright/test';
 
+async function openViewModal(page: any) {
+  const dotsBtn = page.locator('header button[aria-label="Вид и фильтры папки"]').first();
+  await dotsBtn.click();
+  const modal = page.locator('[role="dialog"]').filter({ hasText: 'Вид и фильтры' });
+  await expect(modal).toBeVisible();
+  return modal;
+}
+
+async function switchToView(page: any, mode: 'feed' | 'kanban' | 'calendar') {
+  const modal = await openViewModal(page);
+  const label = mode === 'kanban' ? 'Канбан' : mode === 'calendar' ? 'Календарь' : 'Лента';
+  await modal.locator('button', { hasText: label }).click();
+  await modal.locator('button', { hasText: 'Готово' }).click();
+  await expect(modal).not.toBeVisible();
+}
+
 test.describe('SLAG v2 Specification E2E Verification', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -57,10 +73,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Navigate to Inbox
     await page.locator('button', { hasText: 'Входящие' }).first().click();
 
-    // Verify the three buttons exist in header
-    const unsortedBtn = page.locator('header button[title*="Только неразобранные"]');
-    const allBtn = page.locator('header button[title*="Все заметки хранилища"]');
-    const sortedBtn = page.locator('header button[title*="Только распределенные"]');
+    // Verify view modal allows switching inbox modes
+    const modal = await openViewModal(page);
+
+    const unsortedBtn = modal.locator('button', { hasText: 'Неразобранные' });
+    const allBtn = modal.locator('button', { hasText: 'Все' }).last();
+    const sortedBtn = modal.locator('button').filter({ hasText: /^Разобранные$/ });
 
     await expect(unsortedBtn).toBeVisible();
     await expect(allBtn).toBeVisible();
@@ -80,11 +98,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Switch back to "Все"
     await allBtn.click();
     await expect(allBtn).toHaveClass(/bg-white\/10/);
+    await modal.locator('button', { hasText: 'Готово' }).click();
   });
 
   test('4. Article teaser card and opening in Focus Editor', async ({ page }) => {
     // Switch to "Все" to see all demo articles or navigate to design
-    await page.locator('header button[title*="Все заметки хранилища"]').click();
+    const modal = await openViewModal(page);
+    await modal.locator('button', { hasText: 'Все' }).last().click();
+    await modal.locator('button', { hasText: 'Готово' }).click();
 
     const taskCard = page.locator('.group', { hasText: 'Синхронизация по архитектуре баз данных' }).first();
     if (await taskCard.isVisible()) {
@@ -565,9 +586,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('17. Linear-style Kanban Board with Inline Task Button and Orama Materials Search', async ({ page }) => {
     // 1. Switch to Kanban view in header
-    const kanbanBtn = page.locator('header button[title*="Канбан"]');
-    await expect(kanbanBtn).toBeVisible();
-    await kanbanBtn.click();
+    await switchToView(page, 'kanban');
 
     // 2. Verify TRIZ Materials Dock exists and test Orama live search
     const materialsHeader = page.locator('text=Материалы папки');
@@ -642,9 +661,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('18. Todoist Upcoming Calendar with Week/Month Views and Overdue Drawer', async ({ page }) => {
     // 1. Switch to Calendar view in header
-    const calendarBtn = page.locator('header button[title*="Календарь"]');
-    await expect(calendarBtn).toBeVisible();
-    await calendarBtn.click();
+    await switchToView(page, 'calendar');
 
     // 2. Verify Week view by default
     await expect(page.locator('text=Неделя')).toBeVisible();
@@ -1365,8 +1382,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('text=Применено задач:').or(page.locator('text=Перенесено задач:')).or(page.locator('text=Перенесено')).last()).toBeVisible({ timeout: 5000 });
 
     // 4. Switch to Calendar view
-    const calendarBtn = page.locator('header button[title*="Календарь"]').first();
-    await calendarBtn.click();
+    await switchToView(page, 'calendar');
 
     // 5. Verify week view
     await expect(page.locator('text=Неделя')).toBeVisible();
@@ -1550,7 +1566,9 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // 3. Verify AudioPlayer and VideoCirclePlayer in Feed
     // Switch to "Все" to ensure demo items are visible
-    await page.locator('header button[title*="Все заметки хранилища"]').click();
+    const viewModal = await openViewModal(page);
+    await viewModal.locator('button', { hasText: 'Все' }).last().click();
+    await viewModal.locator('button', { hasText: 'Готово' }).click();
 
     // Create a note with voice attachment to test feed player
     await page.evaluate(() => {
@@ -2178,9 +2196,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('33. Unified Task Creation via ComposerModal and FullscreenEditor Inspection from Kanban and Calendar', async ({ page }) => {
     // 1. Switch to Kanban view
-    const kanbanBtn = page.locator('header button[title*="Канбан"]');
-    await expect(kanbanBtn).toBeVisible();
-    await kanbanBtn.click();
+    await switchToView(page, 'kanban');
     await page.waitForTimeout(200);
 
     // 2. Open ComposerModal via "+ Новая задача" button under cards
@@ -2261,9 +2277,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(200);
 
     // 6. Switch to Calendar view and verify inspecting task opens FullscreenEditor
-    const calendarBtn = page.locator('header button[title*="Календарь"]');
-    await expect(calendarBtn).toBeVisible();
-    await calendarBtn.click();
+    await switchToView(page, 'calendar');
     await page.waitForTimeout(300);
 
     // Click task in calendar if visible or any task card in calendar
@@ -2307,9 +2321,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('34. Calendar Drag and Drop including Untimed and Unscheduled Tasks', async ({ page }) => {
     // 1. Switch to Calendar view
-    const calendarBtn = page.locator('header button[title*="Календарь"]');
-    await expect(calendarBtn).toBeVisible();
-    await calendarBtn.click();
+    await switchToView(page, 'calendar');
     await page.waitForTimeout(300);
 
     // 2. Create an untimed task directly in All-Day ("Весь день") section via ComposerModal
@@ -2409,9 +2421,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('35. Kanban Drag and Drop without Dockview Tab Interference', async ({ page }) => {
     // 1. Switch to Kanban view
-    const kanbanBtn = page.locator('header button[title*="Канбан"]');
-    await expect(kanbanBtn).toBeVisible();
-    await kanbanBtn.click();
+    await switchToView(page, 'kanban');
     await page.waitForTimeout(300);
 
     // 2. Locate existing task "Купить хороший зеленый чай" in "К выполнению"
@@ -2471,9 +2481,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(400);
 
     // 3. Switch to Calendar view
-    const calendarBtn = page.locator('header button[title*="Календарь"]');
-    await expect(calendarBtn).toBeVisible();
-    await calendarBtn.click();
+    await switchToView(page, 'calendar');
     await page.waitForTimeout(400);
 
     // 4. Inject an overlapping task on today's date to test Anti-Overlap column partitioning
@@ -2596,7 +2604,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(500);
 
     // Switch to Calendar view after reload
-    await page.locator('header button[title*="Календарь"]').click();
+    await switchToView(page, 'calendar');
     await page.waitForTimeout(400);
 
     // 5. Verify Anti-Overlap: both overlapping tasks are rendered side-by-side
@@ -3482,26 +3490,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(300);
 
     // 2. Locate FeedHeader
-    const header = page.locator('header.grid').first();
+    const header = page.locator('header').first();
     await expect(header).toBeVisible();
 
-    // 3. Locate type filter compact button
-    const typeFilter = page.locator('div[aria-label="Фильтр по типу"] button').first();
-    await expect(typeFilter).toBeVisible();
-
-    // Verify it doesn't have boxy background pill classes
-    const classList = await typeFilter.getAttribute('class');
-    expect(classList).not.toContain('bg-white/[0.04]');
-    expect(classList).not.toContain('border-white/[0.08]');
-
-    // 4. Click type filter dropdown and select "Таски"
-    await typeFilter.click();
-    const taskOption = page.locator('body > div button', { hasText: 'Таски' });
+    // 3. Open FolderViewModal to set Type Filter to "Таски"
+    const modal = await openViewModal(page);
+    const taskOption = modal.locator('button', { hasText: 'Таски' });
     await expect(taskOption).toBeVisible();
     await taskOption.click();
+    await modal.locator('button', { hasText: 'Готово' }).click();
 
-    // 5. Verify the button now displays the CheckSquare task icon without pill
-    await expect(typeFilter.locator('svg.lucide-check-square')).toBeVisible();
+    // 4. Verify the active type filter badge appears in the header
+    const taskBadge = page.locator('header span', { hasText: 'Таски' }).first();
+    await expect(taskBadge).toBeVisible();
 
     // 6. Verify Composer new layout: top-right expand button, icon-only type selectors, TG-style mic/circle
     const expandBtn = page.locator('button[title*="Раскрыть в полноэкранный редактор"]').first();
@@ -3590,9 +3591,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
   test('49. Calendar Week View timeline hour height resize ("опоп чутка") and Month View direct composer', async ({ page }) => {
     // 1. Switch to Calendar view
-    const calendarBtn = page.locator('header button[title*="Календарь"]').first();
-    await expect(calendarBtn).toBeVisible();
-    await calendarBtn.click();
+    await switchToView(page, 'calendar');
     await page.waitForTimeout(300);
 
     // 2. Ensure Week view is active

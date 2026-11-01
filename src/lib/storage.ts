@@ -7,7 +7,9 @@ import type {
   FullscreenDraft,
   WorkspaceState,
   ChatMessage,
+  FolderViewSettings,
 } from '../types';
+import { DEFAULT_FOLDER_VIEW_SETTINGS } from '../types';
 import { serializeItemToMarkdown, parseMarkdownToItem } from './markdownSerializer';
 import { generateDemoItems } from './demoVault';
 import { logger } from './logger';
@@ -47,6 +49,10 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   activeMobileTab: 'folders',
   folderMediaTab: 'media',
   isKanbanMaterialsOpen: true,
+  sortBy: 'createdAt',
+  sortOrder: 'asc',
+  hideCompletedTasks: false,
+  folderSettings: {},
 };
 
 // Initial default folders (Custom taxonomy aligned with Career, Personal, Projects, Future and Knowledge Base)
@@ -1203,6 +1209,26 @@ export class StorageService {
     } catch (err) {
       fsLog.warn('Failed to save workspace state to localStorage', err);
     }
+  }
+
+  public getFolderViewSettings(folderPath: string): FolderViewSettings {
+    const ws = this.getWorkspaceState();
+    return ws.folderSettings?.[folderPath] || {
+      ...DEFAULT_FOLDER_VIEW_SETTINGS,
+      viewMode: ws.feedViewMode || DEFAULT_FOLDER_VIEW_SETTINGS.viewMode,
+      typeFilter: ws.activeTypeFilter || DEFAULT_FOLDER_VIEW_SETTINGS.typeFilter,
+      sortBy: ws.sortBy || DEFAULT_FOLDER_VIEW_SETTINGS.sortBy,
+      sortOrder: ws.sortOrder || DEFAULT_FOLDER_VIEW_SETTINGS.sortOrder,
+      hideCompletedTasks: ws.hideCompletedTasks ?? DEFAULT_FOLDER_VIEW_SETTINGS.hideCompletedTasks,
+    };
+  }
+
+  public saveFolderViewSettings(folderPath: string, settings: Partial<FolderViewSettings>): void {
+    const ws = this.getWorkspaceState();
+    const currentSettings = ws.folderSettings?.[folderPath] || { ...DEFAULT_FOLDER_VIEW_SETTINGS };
+    const updatedSettings = { ...currentSettings, ...settings };
+    const folderSettings = { ...(ws.folderSettings || {}), [folderPath]: updatedSettings };
+    this.saveWorkspaceState({ folderSettings });
   }
 
   // Export current vault as Markdown files (ZIP or downloadable Blob)

@@ -14,7 +14,8 @@ import {
   Search,
   Inbox,
   Plus,
-  BookOpen
+  BookOpen,
+  MoreHorizontal
 } from 'lucide-react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { MobileScreenHeader } from './MobileScreenHeader';
@@ -29,6 +30,7 @@ export const MobileFoldersView: React.FC = () => {
     setMobileFolderInfoOpen,
     setIsSearchOpen,
     openCreateFolderModal,
+    openFolderViewModal,
     feedViewMode,
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
@@ -199,15 +201,26 @@ export const MobileFoldersView: React.FC = () => {
           </>
         }
         rightSlot={
-          <button
-            type="button"
-            onClick={() => setMobileFolderInfoOpen(true)}
-            className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
-            title="Инфо папки и медиа"
-            aria-label="Информация о папке"
-          >
-            <Info className="w-5 h-5" />
-          </button>
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={openFolderViewModal}
+              className="w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              title="Вид и фильтры папки"
+              aria-label="Вид и фильтры папки"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileFolderInfoOpen(true)}
+              className="w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              title="Инфо папки и медиа"
+              aria-label="Информация о папке"
+            >
+              <Info className="w-5 h-5" />
+            </button>
+          </div>
         }
       />
 

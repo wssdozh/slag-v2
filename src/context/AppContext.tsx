@@ -19,6 +19,9 @@ import type {
   DeviceUiConfig,
   BackupSnapshotMeta,
   BackupSettings,
+  SortField,
+  SortOrder,
+  FolderViewSettings,
 } from '../types';
 import { storage } from '../lib/storage';
 import { backupService } from '../lib/backupService';
@@ -153,6 +156,21 @@ interface AppContextType {
   composerModalOptions: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string } | null;
   openComposerModal: (options?: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string }) => void;
   closeComposerModal: () => void;
+
+  // Folder View & Filter Settings (Todoist / Linear style)
+  isFolderViewModalOpen: boolean;
+  setIsFolderViewModalOpen: (open: boolean) => void;
+  openFolderViewModal: () => void;
+  closeFolderViewModal: () => void;
+  sortBy: SortField;
+  setSortBy: (sort: SortField) => void;
+  sortOrder: SortOrder;
+  setSortOrder: (order: SortOrder) => void;
+  hideCompletedTasks: boolean;
+  setHideCompletedTasks: (hide: boolean) => void;
+  folderSettings: Record<string, FolderViewSettings>;
+  updateCurrentFolderViewSettings: (partial: Partial<FolderViewSettings>) => void;
+  resetCurrentFolderViewSettings: () => void;
   
   // Storage operations
   saveItem: (item: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }) => SlagItem;
@@ -317,12 +335,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [vault, setVault] = useState<VaultMeta>(storage.getCurrentVault());
   const [vaults, setVaults] = useState<VaultMeta[]>(storage.getVaults());
   const [folders, setFolders] = useState<FolderMeta[]>(() => storage.getFolders());
-  const [currentFolder, setCurrentFolder] = useState<string>(() => {
-    const valid = storage.getFolders().some(f => f.path === initialWorkspace.currentFolder);
-    return valid ? initialWorkspace.currentFolder : 'Входящие';
-  });
-  const [inboxMode, setInboxMode] = useState<InboxMode>(() => initialWorkspace.inboxMode || 'all');
-  const [feedViewMode, setFeedViewMode] = useState<FeedViewMode>(() => initialWorkspace.feedViewMode || 'feed');
+  const initialCurFolder = storage.getFolders().some(f => f.path === initialWorkspace.currentFolder)
+    ? initialWorkspace.currentFolder
+    : 'Входящие';
+  const initialFolderSetting = (initialWorkspace.folderSettings || {})[initialCurFolder];
+
+  const [currentFolder, setCurrentFolder] = useState<string>(initialCurFolder);
+  const [inboxMode, setInboxMode] = useState<InboxMode>(() => initialFolderSetting?.inboxMode || initialWorkspace.inboxMode || 'all');
+  const [feedViewMode, setFeedViewMode] = useState<FeedViewMode>(() => initialFolderSetting?.viewMode || initialWorkspace.feedViewMode || 'feed');
   const [isKanbanMaterialsOpen, setIsKanbanMaterialsOpen] = useState<boolean>(() => {
     if (typeof initialWorkspace.isKanbanMaterialsOpen === 'boolean') {
       return initialWorkspace.isKanbanMaterialsOpen;
@@ -363,20 +383,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return null;
   });
-  const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>(() => initialWorkspace.activeTypeFilter || 'all');
+  const [folderSettings, setFolderSettings] = useState<Record<string, FolderViewSettings>>(
+    () => initialWorkspace.folderSettings || {}
+  );
+
+  const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>(() => initialFolderSetting?.typeFilter || initialWorkspace.activeTypeFilter || 'all');
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(() => initialWorkspace.activeTagFilter ?? null);
   const [isPinnedOnlyFilter, setIsPinnedOnlyFilter] = useState<boolean>(false);
+  const [sortBy, setSortBy] = useState<SortField>(() => initialFolderSetting?.sortBy || initialWorkspace.sortBy || 'createdAt');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => initialFolderSetting?.sortOrder || initialWorkspace.sortOrder || 'asc');
+  const [hideCompletedTasks, setHideCompletedTasks] = useState<boolean>(() => initialFolderSetting?.hideCompletedTasks ?? initialWorkspace.hideCompletedTasks ?? false);
+  const [isFolderViewModalOpen, setIsFolderViewModalOpen] = useState(false);
   const [aiItemFilter, setAiItemFilter] = useState<AiItemFilter | null>(null);
 
   const togglePinnedOnlyFilter = useCallback(() => {
     setIsPinnedOnlyFilter(prev => !prev);
   }, []);
 
-  // Reset pinned-only filter whenever switching folders (React pure adjustment pattern)
-  const [prevFolderForPinned, setPrevFolderForPinned] = useState(currentFolder);
-  if (prevFolderForPinned !== currentFolder) {
-    setPrevFolderForPinned(currentFolder);
+  // Restore folder-specific view settings & reset ephemeral pinned filter whenever switching folders (React pure adjustment pattern)
+  const [prevFolderForFolderSettings, setPrevFolderForFolderSettings] = useState(currentFolder);
+  if (prevFolderForFolderSettings !== currentFolder) {
+    setPrevFolderForFolderSettings(currentFolder);
     setIsPinnedOnlyFilter(false);
+
+    const saved = folderSettings[currentFolder];
+    if (saved) {
+      setFeedViewMode(saved.viewMode);
+      setActiveTypeFilter(saved.typeFilter);
+      if (saved.inboxMode) setInboxMode(saved.inboxMode);
+      setSortBy(saved.sortBy);
+      setSortOrder(saved.sortOrder);
+      setHideCompletedTasks(saved.hideCompletedTasks ?? false);
+    } else {
+      setFeedViewMode('feed');
+      setActiveTypeFilter('all');
+      if (currentFolder === 'Входящие') {
+        setInboxMode('all');
+      }
+      setSortBy('createdAt');
+      setSortOrder('asc');
+      setHideCompletedTasks(false);
+    }
   }
 
   const applyAiFilter = useCallback((itemIds: string[], queryLabel: string) => {
@@ -774,6 +821,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isOpen: isFullscreenEditorOpen,
         itemId: isFullscreenEditorOpen && selectedItem ? selectedItem.id : null,
       },
+      sortBy,
+      sortOrder,
+      hideCompletedTasks,
+      folderSettings,
     });
   }, [
     currentFolder,
@@ -785,6 +836,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isKanbanMaterialsOpen,
     isFullscreenEditorOpen,
     selectedItem,
+    sortBy,
+    sortOrder,
+    hideCompletedTasks,
+    folderSettings,
   ]);
 
   // Assistant history persistence in Vault
@@ -855,6 +910,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setEditingFolder(null);
       return true;
     }
+    if (isFolderViewModalOpen) {
+      setIsFolderViewModalOpen(false);
+      return true;
+    }
     if (isVaultModalOpen) {
       setIsVaultModalOpen(false);
       return true;
@@ -915,6 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     closeContextMenu,
     isLogViewerOpen,
     isFolderModalOpen,
+    isFolderViewModalOpen,
     isVaultModalOpen,
     isFolderInfoModalOpen,
     isTriageModalOpen,
@@ -1190,11 +1250,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setMobileActiveFolder(folder);
       setActiveMobileTab('folders');
     }
-    setFeedViewMode('feed');
     setIsPinnedOnlyFilter(false);
     clearAiFilter();
 
     if (itemId) {
+      setFeedViewMode('feed');
       const it = items.find(i => i.id === itemId);
       if (it) {
         if (activeTypeFilter !== 'all' && it.type !== activeTypeFilter) {
@@ -1202,6 +1262,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         if (activeTagFilter && !it.tags?.includes(activeTagFilter)) {
           setActiveTagFilter(null);
+        }
+        if (hideCompletedTasks && it.type === 'task' && it.status === 'done') {
+          setHideCompletedTasks(false);
         }
       }
       setHighlightedItemId(null);
@@ -1225,6 +1288,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveTypeFilter,
     activeTagFilter,
     setActiveTagFilter,
+    hideCompletedTasks,
+    setHideCompletedTasks,
   ]);
 
   // Global click outside for Context Menu
@@ -1778,6 +1843,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveTagFilter(newWs.activeTagFilter || null);
     setActiveMobileTab(newWs.activeMobileTab || 'folders');
     setIsKanbanMaterialsOpen(typeof newWs.isKanbanMaterialsOpen === 'boolean' ? newWs.isKanbanMaterialsOpen : true);
+    setSortBy(newWs.sortBy || 'createdAt');
+    setSortOrder(newWs.sortOrder || 'asc');
+    setHideCompletedTasks(newWs.hideCompletedTasks ?? false);
+    setFolderSettings(newWs.folderSettings || {});
     setChatMessages(storage.getAssistantHistory());
     setSelectedItem(null);
     refreshData();
@@ -1842,7 +1911,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEditingFolder(null);
   };
 
-  // Filter items by current folder, hybrid inbox mode, type filter, and tag filter (memoized to prevent layout churn)
+  const openFolderViewModal = useCallback(() => {
+    setIsFolderViewModalOpen(true);
+  }, []);
+
+  const closeFolderViewModal = useCallback(() => {
+    setIsFolderViewModalOpen(false);
+  }, []);
+
+  const updateCurrentFolderViewSettings = useCallback(
+    (partial: Partial<FolderViewSettings>) => {
+      if (partial.viewMode !== undefined) setFeedViewMode(partial.viewMode);
+      if (partial.typeFilter !== undefined) setActiveTypeFilter(partial.typeFilter);
+      if (partial.inboxMode !== undefined) setInboxMode(partial.inboxMode);
+      if (partial.sortBy !== undefined) setSortBy(partial.sortBy);
+      if (partial.sortOrder !== undefined) setSortOrder(partial.sortOrder);
+      if (partial.hideCompletedTasks !== undefined) setHideCompletedTasks(partial.hideCompletedTasks);
+
+      setFolderSettings(prev => {
+        const current = prev[currentFolder] || {
+          viewMode: partial.viewMode ?? feedViewMode,
+          typeFilter: partial.typeFilter ?? activeTypeFilter,
+          inboxMode: partial.inboxMode ?? inboxMode,
+          sortBy: partial.sortBy ?? sortBy,
+          sortOrder: partial.sortOrder ?? sortOrder,
+          hideCompletedTasks: partial.hideCompletedTasks ?? hideCompletedTasks,
+        };
+        const updated: FolderViewSettings = { ...current, ...partial };
+        const next = { ...prev, [currentFolder]: updated };
+        storage.saveFolderViewSettings(currentFolder, updated);
+        return next;
+      });
+    },
+    [currentFolder, feedViewMode, activeTypeFilter, inboxMode, sortBy, sortOrder, hideCompletedTasks]
+  );
+
+  const resetCurrentFolderViewSettings = useCallback(() => {
+    setFeedViewMode('feed');
+    setActiveTypeFilter('all');
+    if (currentFolder === 'Входящие') setInboxMode('all');
+    setSortBy('createdAt');
+    setSortOrder('asc');
+    setHideCompletedTasks(false);
+
+    setFolderSettings(prev => {
+      const next = { ...prev };
+      delete next[currentFolder];
+      const ws = storage.getWorkspaceState();
+      const updatedFolderSettings = { ...(ws.folderSettings || {}) };
+      delete updatedFolderSettings[currentFolder];
+      storage.saveWorkspaceState({ folderSettings: updatedFolderSettings });
+      return next;
+    });
+  }, [currentFolder]);
+
+  // Filter items by current folder, hybrid inbox mode, type filter, tag filter, and sort (memoized to prevent layout churn)
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       let matchesFolder = false;
@@ -1878,9 +2001,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
 
+      if (hideCompletedTasks && item.type === 'task' && item.status === 'done') {
+        return false;
+      }
+
       return true;
-    }).sort((a, b) => a.createdAt - b.createdAt);
-  }, [items, aiItemFilter, currentFolder, inboxMode, activeTypeFilter, activeTagFilter, isPinnedOnlyFilter]);
+    }).sort((a, b) => {
+      let cmp = 0;
+      switch (sortBy) {
+        case 'updatedAt':
+          cmp = (a.updatedAt || a.createdAt) - (b.updatedAt || b.createdAt);
+          break;
+        case 'title': {
+          const titleA = a.title || a.content || '';
+          const titleB = b.title || b.content || '';
+          cmp = titleA.localeCompare(titleB, 'ru', { numeric: true, sensitivity: 'base' });
+          break;
+        }
+        case 'dueDate': {
+          const dueA = a.dueDate ? new Date(a.dueDate).getTime() : (sortOrder === 'asc' ? Infinity : -Infinity);
+          const dueB = b.dueDate ? new Date(b.dueDate).getTime() : (sortOrder === 'asc' ? Infinity : -Infinity);
+          cmp = dueA - dueB;
+          break;
+        }
+        case 'createdAt':
+        default:
+          cmp = a.createdAt - b.createdAt;
+          break;
+      }
+      if (cmp === 0) {
+        cmp = a.createdAt - b.createdAt;
+      }
+      return sortOrder === 'desc' ? -cmp : cmp;
+    });
+  }, [
+    items,
+    aiItemFilter,
+    currentFolder,
+    inboxMode,
+    activeTypeFilter,
+    activeTagFilter,
+    isPinnedOnlyFilter,
+    hideCompletedTasks,
+    sortBy,
+    sortOrder,
+  ]);
 
   const [backupSnapshots, setBackupSnapshots] = useState<BackupSnapshotMeta[]>([]);
   const [backupSettings, setBackupSettings] = useState<BackupSettings>(() => backupService.getSettings());
@@ -2081,6 +2246,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         composerModalOptions,
         openComposerModal,
         closeComposerModal,
+        isFolderViewModalOpen,
+        setIsFolderViewModalOpen,
+        openFolderViewModal,
+        closeFolderViewModal,
+        sortBy,
+        setSortBy,
+        sortOrder,
+        setSortOrder,
+        hideCompletedTasks,
+        setHideCompletedTasks,
+        folderSettings,
+        updateCurrentFolderViewSettings,
+        resetCurrentFolderViewSettings,
         saveItem,
         updateItem,
         deleteItem,
