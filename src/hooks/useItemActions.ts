@@ -151,7 +151,8 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
     if (!item) return;
     const notesBase = storage.getVaultNotesPath();
     const folder = item.folder || 'Входящие';
-    const target = `${notesBase}/${folder}`;
+    const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+    const target = `${notesBase}/${folder}/${filename}`;
     const res = await openAppFolder(target);
     addToast(res.message, res.success ? 'success' : 'info');
     onDone?.();

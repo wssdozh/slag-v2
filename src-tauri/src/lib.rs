@@ -167,43 +167,75 @@ fn configure_window_border(window: &tauri::Window) {
 #[tauri::command]
 fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, String> {
     let base_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let target_dir = match target.as_str() {
-        "logs" => base_dir.join("logs"),
-        "notes" => base_dir.join("vaults").join("main").join("notes"),
+    let (target_path, is_file) = match target.as_str() {
+        "logs" => (base_dir.join("logs"), false),
+        "notes" => (base_dir.join("vaults").join("main").join("notes"), false),
         other => {
-            let clean = other.trim_start_matches(|c| c == '/' || c == '\\');
+            let normalized = other.replace('/', "\\");
+            let clean = normalized.trim_start_matches('\\');
+            let is_file = clean.ends_with(".md");
             if clean.is_empty() {
-                base_dir
+                (base_dir, false)
             } else {
-                base_dir.join(clean)
+                let mut path = base_dir;
+                for part in clean.split('\\') {
+                    if !part.is_empty() {
+                        path.push(part);
+                    }
+                }
+                (path, is_file)
             }
         }
     };
-    let _ = std::fs::create_dir_all(&target_dir);
+
+    if is_file {
+        if let Some(parent) = target_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+    } else {
+        let _ = std::fs::create_dir_all(&target_path);
+    }
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(&target_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let win_path = target_path.to_string_lossy().replace('/', "\\");
+        let mut cmd = std::process::Command::new("explorer");
+        if is_file && target_path.exists() {
+            cmd.arg(format!("/select,{}", win_path));
+        } else {
+            cmd.arg(&win_path);
+        }
+        cmd.spawn().map_err(|e| e.to_string())?;
     }
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
-            .arg(&target_dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        if is_file && target_path.exists() {
+            std::process::Command::new("open")
+                .arg("-R")
+                .arg(&target_path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            std::process::Command::new("open")
+                .arg(&target_path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
     }
     #[cfg(target_os = "linux")]
     {
+        let open_target = if is_file {
+            target_path.parent().unwrap_or(&target_path)
+        } else {
+            &target_path
+        };
         std::process::Command::new("xdg-open")
-            .arg(&target_dir)
+            .arg(open_target)
             .spawn()
             .map_err(|e| e.to_string())?;
     }
 
-    Ok(target_dir.to_string_lossy().to_string())
+    Ok(target_path.to_string_lossy().replace('/', "\\"))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -111,7 +111,14 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
 
     // Click "Скопировать фулл ссылку"
     await explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' }).click();
-    await expect(page.locator('text=Скопирована ссылка: slag://note/')).toBeVisible();
+    const toast = page.locator('text=Скопирована ссылка: slag://note/');
+    await expect(toast).toBeVisible();
+
+    // Capture screenshot verifying toast position at top-center
+    await page.screenshot({
+      path: 'test-results/screenshots/toast_top_center.png',
+      fullPage: false,
+    });
 
     // 8. Verify Folder Context Menu has Explorer actions
     const careerFolderNode = page.locator('aside span', { hasText: 'Карьера' }).first();

@@ -44,11 +44,18 @@ function devFolderOpenerPlugin() {
 
           const platform = os.platform();
           if (platform === 'win32') {
-            spawn('explorer.exe', [targetDir], { detached: true, stdio: 'ignore' }).unref();
+            const winTarget = targetDir.replace(/\//g, '\\');
+            const isFile = winTarget.endsWith('.md') && fs.existsSync(winTarget);
+            const args = isFile ? [`/select,${winTarget}`] : [winTarget];
+            spawn('explorer.exe', args, { detached: true, stdio: 'ignore' }).unref();
           } else if (platform === 'darwin') {
-            spawn('open', [targetDir], { detached: true, stdio: 'ignore' }).unref();
+            const isFile = targetDir.endsWith('.md') && fs.existsSync(targetDir);
+            const args = isFile ? ['-R', targetDir] : [targetDir];
+            spawn('open', args, { detached: true, stdio: 'ignore' }).unref();
           } else {
-            spawn('xdg-open', [targetDir], { detached: true, stdio: 'ignore' }).unref();
+            const isFile = targetDir.endsWith('.md') && fs.existsSync(targetDir);
+            const openPath = isFile ? path.dirname(targetDir) : targetDir;
+            spawn('xdg-open', [openPath], { detached: true, stdio: 'ignore' }).unref();
           }
 
           res.setHeader('Content-Type', 'application/json');
