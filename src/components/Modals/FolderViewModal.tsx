@@ -6,14 +6,9 @@ import {
   Layers,
   Kanban,
   Calendar,
-  Clock,
-  CalendarClock,
   ArrowDownAZ,
   ArrowUpZA,
-  Pin,
-  EyeOff,
   RotateCcw,
-  Check,
   X,
 } from 'lucide-react';
 
@@ -83,11 +78,11 @@ export const FolderViewModal: React.FC = () => {
     { id: 'calendar', label: 'Календарь', icon: <Calendar className="w-3.5 h-3.5 shrink-0" /> },
   ];
 
-  const sortFields: { id: SortField; label: string; icon: React.ReactNode }[] = [
-    { id: 'createdAt', label: 'По созданию', icon: <Clock className="w-3 h-3" /> },
-    { id: 'updatedAt', label: 'По изменению', icon: <Clock className="w-3 h-3" /> },
-    { id: 'title', label: 'По названию', icon: <ArrowDownAZ className="w-3 h-3" /> },
-    { id: 'dueDate', label: 'По дедлайну', icon: <CalendarClock className="w-3 h-3" /> },
+  const sortFields: { id: SortField; label: string }[] = [
+    { id: 'createdAt', label: 'Создание' },
+    { id: 'updatedAt', label: 'Изменение' },
+    { id: 'title', label: 'Название' },
+    { id: 'dueDate', label: 'Дедлайн' },
   ];
 
   const typeOptions: { id: SlagItemType | 'all'; label: string }[] = [
@@ -103,8 +98,14 @@ export const FolderViewModal: React.FC = () => {
     { id: 'unsorted', label: 'Неразобранные' },
   ];
 
-  const ascLabel = sortBy === 'title' ? 'А → Я' : 'Старые';
-  const descLabel = sortBy === 'title' ? 'Я → А' : 'Новые';
+  const directionLabel =
+    sortBy === 'title'
+      ? sortOrder === 'asc'
+        ? 'А → Я'
+        : 'Я → А'
+      : sortOrder === 'asc'
+        ? 'Старые'
+        : 'Новые';
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none select-none">
@@ -114,7 +115,7 @@ export const FolderViewModal: React.FC = () => {
         onClick={closeFolderViewModal}
       />
 
-      {/* Lightweight dropdown popover attached to the button */}
+      {/* Lightweight Linear Dark dropdown popover */}
       <div
         role="dialog"
         aria-label="Вид и фильтры"
@@ -124,30 +125,33 @@ export const FolderViewModal: React.FC = () => {
           top: coords ? `${coords.top}px` : '56px',
           right: coords ? `${coords.right}px` : '16px',
         }}
-        className="pointer-events-auto w-[270px] max-h-[calc(100dvh-70px)] overflow-y-auto scrollbar-none rounded-xl bg-[#121215]/95 border border-white/[0.1] shadow-2xl shadow-black/90 backdrop-blur-xl p-2.5 space-y-2.5 animate-in fade-in zoom-in-95 duration-100 text-xs text-zinc-200"
+        className="pointer-events-auto w-[310px] rounded-2xl bg-[#121215]/98 border border-white/[0.08] shadow-2xl shadow-black/90 backdrop-blur-xl p-3 space-y-3 animate-in fade-in zoom-in-95 duration-100 text-xs text-zinc-200"
       >
         {/* Header row */}
-        <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.06]">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2 min-w-0">
             <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-            <span className="font-semibold text-xs text-white truncate">Вид и фильтры</span>
+            <span className="font-semibold text-xs text-zinc-100">Вид и фильтры</span>
+            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[130px]">
+              {currentFolder}
+            </span>
           </div>
           <button
             type="button"
             onClick={closeFolderViewModal}
-            className="p-1 rounded-md text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="p-1 -mr-1 rounded-md text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             aria-label="Закрыть"
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Section 1: View Modes (Segmented Row) */}
+        {/* Section 1: View Modes (Capsule Segmented Bar) */}
         <div>
-          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1.5">
             Режим отображения
           </span>
-          <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg bg-panel/60 border border-white/[0.04]">
+          <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
             {viewModes.map((m) => {
               const isActive = feedViewMode === m.id;
               return (
@@ -155,10 +159,10 @@ export const FolderViewModal: React.FC = () => {
                   key={m.id}
                   type="button"
                   onClick={() => updateCurrentFolderViewSettings({ viewMode: m.id })}
-                  className={`flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md text-xs transition-colors cursor-pointer ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-white/10 text-white font-medium shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+                      ? 'bg-white/10 text-white shadow-sm'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   {m.icon}
@@ -170,11 +174,27 @@ export const FolderViewModal: React.FC = () => {
         </div>
 
         {/* Section 2: Sorting */}
-        <div className="pt-1.5 border-t border-white/[0.06]">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">
-            Сортировка
-          </span>
-          <div className="grid grid-cols-2 gap-1 mb-1">
+        <div className="space-y-1.5 pt-0.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+              Сортировка
+            </span>
+            <button
+              type="button"
+              onClick={() => updateCurrentFolderViewSettings({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-white/[0.06] text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              title="Переключить направление сортировки"
+            >
+              <span>{directionLabel}</span>
+              {sortOrder === 'asc' ? (
+                <ArrowDownAZ className="w-3.5 h-3.5 text-zinc-400" />
+              ) : (
+                <ArrowUpZA className="w-3.5 h-3.5 text-zinc-400" />
+              )}
+            </button>
+          </div>
+
+          <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
             {sortFields.map((sf) => {
               const isActive = sortBy === sf.id;
               return (
@@ -182,149 +202,119 @@ export const FolderViewModal: React.FC = () => {
                   key={sf.id}
                   type="button"
                   onClick={() => updateCurrentFolderViewSettings({ sortBy: sf.id })}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-[11px] transition-colors cursor-pointer ${
+                  className={`flex-1 py-1 rounded-md text-[11px] text-center transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-white/10 text-white border-white/20 font-medium'
-                      : 'bg-panel/40 text-zinc-400 border-white/[0.04] hover:bg-white/[0.04] hover:text-zinc-200'
+                      ? 'bg-white/10 text-white font-medium shadow-sm'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
-                  <span className={isActive ? 'text-white' : 'text-zinc-500'}>
-                    {sf.icon}
-                  </span>
-                  <span className="truncate">{sf.label}</span>
+                  {sf.label}
                 </button>
               );
             })}
-          </div>
-
-          {/* Direction */}
-          <div className="grid grid-cols-2 gap-1">
-            <button
-              type="button"
-              onClick={() => updateCurrentFolderViewSettings({ sortOrder: 'asc' })}
-              className={`flex items-center justify-center gap-1 px-1.5 py-1 rounded-md border text-[11px] transition-colors cursor-pointer ${
-                sortOrder === 'asc'
-                  ? 'bg-white/10 text-white border-white/20 font-medium'
-                  : 'bg-panel/40 text-zinc-400 border-white/[0.04] hover:text-zinc-200 hover:bg-white/[0.04]'
-              }`}
-            >
-              <ArrowDownAZ className="w-3 h-3" />
-              <span className="truncate">{ascLabel}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => updateCurrentFolderViewSettings({ sortOrder: 'desc' })}
-              className={`flex items-center justify-center gap-1 px-1.5 py-1 rounded-md border text-[11px] transition-colors cursor-pointer ${
-                sortOrder === 'desc'
-                  ? 'bg-white/10 text-white border-white/20 font-medium'
-                  : 'bg-panel/40 text-zinc-400 border-white/[0.04] hover:text-zinc-200 hover:bg-white/[0.04]'
-              }`}
-            >
-              <ArrowUpZA className="w-3 h-3" />
-              <span className="truncate">{descLabel}</span>
-            </button>
           </div>
         </div>
 
         {/* Section 3: Filters */}
-        <div className="pt-1.5 border-t border-white/[0.06]">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">
-            Фильтрация записей
-          </span>
-
-          {/* Type filter */}
-          <div className="grid grid-cols-4 gap-1 mb-1">
-            {typeOptions.map((opt) => {
-              const isActive = activeTypeFilter === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => updateCurrentFolderViewSettings({ typeFilter: opt.id })}
-                  className={`flex items-center justify-center py-1 px-1 rounded-md border text-[11px] text-center transition-colors cursor-pointer ${
-                    isActive
-                      ? 'bg-white/10 text-white border-white/20 font-medium'
-                      : 'bg-panel/40 text-zinc-400 border-white/[0.04] hover:bg-white/[0.04] hover:text-zinc-200'
-                  }`}
-                >
-                  <span className="truncate">{opt.label}</span>
-                </button>
-              );
-            })}
+        <div className="space-y-2 pt-0.5">
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1.5">
+              Фильтрация записей
+            </span>
+            <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
+              {typeOptions.map((opt) => {
+                const isActive = activeTypeFilter === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => updateCurrentFolderViewSettings({ typeFilter: opt.id })}
+                    className={`flex-1 py-1 rounded-md text-[11px] text-center transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-white/10 text-white font-medium shadow-sm'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Inbox mode filter */}
           {isInbox && (
-            <div className="mt-1.5">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">
-                Статус разбора
-              </span>
-              <div className="grid grid-cols-3 gap-1">
-                {inboxOptions.map((opt) => {
-                  const isActive = inboxMode === opt.id;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => updateCurrentFolderViewSettings({ inboxMode: opt.id })}
-                      className={`flex items-center justify-center py-1 px-1 rounded-md border text-[11px] text-center transition-colors cursor-pointer ${
-                        isActive
-                          ? 'bg-white/10 text-white border-white/20 font-medium'
-                          : 'bg-panel/40 text-zinc-400 border-white/[0.04] hover:bg-white/[0.04] hover:text-zinc-200'
-                      }`}
-                    >
-                      <span className="truncate">{opt.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
+              {inboxOptions.map((opt) => {
+                const isActive = inboxMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => updateCurrentFolderViewSettings({ inboxMode: opt.id })}
+                    className={`flex-1 py-1 px-1 rounded-md text-[11px] text-center transition-all cursor-pointer whitespace-nowrap truncate ${
+                      isActive
+                        ? 'bg-white/10 text-white font-medium shadow-sm'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Section 4: Toggles */}
-        <div className="space-y-1 pt-1.5 border-t border-white/[0.06]">
+        {/* Section 4: iOS / Linear Switches */}
+        <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
           <div
             onClick={() => updateCurrentFolderViewSettings({ hideCompletedTasks: !hideCompletedTasks })}
-            className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-white/[0.04] cursor-pointer transition-colors"
+            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-white/[0.04] cursor-pointer transition-colors group"
           >
-            <div className="flex items-center gap-1.5 text-zinc-300 text-[11px]">
-              <EyeOff className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Скрыть выполненные</span>
-            </div>
+            <span className="text-zinc-300 group-hover:text-white transition-colors text-xs">
+              Скрыть выполненные
+            </span>
             <div
-              className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-                hideCompletedTasks ? 'bg-white border-white text-black' : 'border-white/20'
+              className={`w-7 h-4 rounded-full transition-colors relative shrink-0 ${
+                hideCompletedTasks ? 'bg-white' : 'bg-white/[0.12] group-hover:bg-white/[0.18]'
               }`}
             >
-              {hideCompletedTasks && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+              <div
+                className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-transform ${
+                  hideCompletedTasks ? 'translate-x-3 bg-black' : 'translate-x-0 bg-zinc-400'
+                }`}
+              />
             </div>
           </div>
 
           <div
             onClick={() => setIsPinnedOnlyFilter(!isPinnedOnlyFilter)}
-            className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-white/[0.04] cursor-pointer transition-colors"
+            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-white/[0.04] cursor-pointer transition-colors group"
           >
-            <div className="flex items-center gap-1.5 text-zinc-300 text-[11px]">
-              <Pin className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Только закрепленные</span>
-            </div>
+            <span className="text-zinc-300 group-hover:text-white transition-colors text-xs">
+              Только закрепленные
+            </span>
             <div
-              className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-                isPinnedOnlyFilter ? 'bg-white border-white text-black' : 'border-white/20'
+              className={`w-7 h-4 rounded-full transition-colors relative shrink-0 ${
+                isPinnedOnlyFilter ? 'bg-white' : 'bg-white/[0.12] group-hover:bg-white/[0.18]'
               }`}
             >
-              {isPinnedOnlyFilter && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+              <div
+                className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-transform ${
+                  isPinnedOnlyFilter ? 'translate-x-3 bg-black' : 'translate-x-0 bg-zinc-400'
+                }`}
+              />
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between">
+        <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between">
           <button
             type="button"
             onClick={resetCurrentFolderViewSettings}
-            className="flex items-center gap-1 px-1.5 py-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
             title="Вернуть стандартный вид"
           >
             <RotateCcw className="w-3 h-3" />
@@ -333,7 +323,7 @@ export const FolderViewModal: React.FC = () => {
           <button
             type="button"
             onClick={closeFolderViewModal}
-            className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white font-medium text-[11px] transition-colors cursor-pointer"
+            className="px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/[0.16] text-zinc-200 hover:text-white text-xs font-medium transition-all active:scale-95 cursor-pointer"
           >
             Готово
           </button>
