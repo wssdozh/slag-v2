@@ -29,6 +29,7 @@ import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { openAppFolder } from '../lib/folderOpener';
 import { listenDesktopEvents, isDesktopApp } from '../lib/windowControls';
+import { syncEngine } from '../lib/sync';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
@@ -139,9 +140,9 @@ interface AppContextType {
   setIsFullscreenEditorOpen: (open: boolean) => void;
   setIsSearchOpen: (open: boolean) => void;
   setIsSettingsOpen: (open: boolean) => void;
-  settingsTab: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs';
-  setSettingsTab: (tab: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs') => void;
-  openSettingsModal: (tab?: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs') => void;
+  settingsTab: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs';
+  setSettingsTab: (tab: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs') => void;
+  openSettingsModal: (tab?: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs') => void;
   setIsLogViewerOpen: (open: boolean) => void;
   openCreateFolderModal: (parentPath?: string) => void;
   openEditFolderModal: (folder: FolderMeta) => void;
@@ -467,9 +468,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [settingsTab, setSettingsTab] = useState<'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs'>('ai');
+  const [settingsTab, setSettingsTab] = useState<'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs'>('ai');
 
-  const openSettingsModal = useCallback((tab?: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs') => {
+  const openSettingsModal = useCallback((tab?: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs') => {
     if (tab) setSettingsTab(tab);
     setIsSettingsOpen(true);
   }, []);
@@ -766,6 +767,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    void syncEngine.init();
+    const handleSyncUpdate = () => {
+      refreshData();
+    };
+    window.addEventListener('slag-sync-updated', handleSyncUpdate);
+
     const cleanupDesktop = listenDesktopEvents({
       onOpenComposer: () => {
         openComposerModal();
@@ -777,6 +784,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => {
       cleanupDesktop();
+      window.removeEventListener('slag-sync-updated', handleSyncUpdate);
     };
   }, [refreshData, openComposerModal]);
 
@@ -1338,6 +1346,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const saved = storage.saveItem(newItem);
     refreshData();
+    void syncEngine.pushLocalChanges();
     return saved;
   }, [currentFolder, refreshData]);
 
@@ -1347,6 +1356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItem(item);
     }
     refreshData();
+    void syncEngine.pushLocalChanges();
   }, [selectedItem, refreshData]);
 
   const deleteItem = useCallback((id: string) => {
@@ -1355,6 +1365,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItem(null);
     }
     refreshData();
+    void syncEngine.pushLocalChanges();
     addToast('Запись перемещена в корзину .trash', 'info');
   }, [selectedItem, refreshData, addToast]);
 

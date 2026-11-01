@@ -32,6 +32,7 @@ import { Select } from '../UI/Select';
 import { Checkbox } from '../UI/Checkbox';
 import { NumberInput } from '../UI/NumberInput';
 import { BaseModal } from './BaseModal';
+import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
 import { FONT_SCALE_OPTIONS, FONT_FAMILY_OPTIONS } from '../../config/typography';
 
@@ -218,8 +219,8 @@ export const SettingsModal: React.FC = () => {
 
   const settingsBody = (
     <div className="flex-1 flex flex-col md:flex-row min-h-0">
-      {/* Tabs Nav: Hidden on mobile (single section subview), vertical left column on desktop */}
-      <div className="hidden md:flex md:flex-col md:w-48 border-r border-white/[0.06] bg-panel p-2 gap-1 select-none shrink-0">
+      {/* Tabs Nav: Horizontal scroll on mobile, vertical left column on desktop */}
+      <div className="flex md:flex-col overflow-x-auto md:overflow-visible md:w-48 border-b md:border-b-0 md:border-r border-white/[0.06] bg-panel p-2 gap-1 select-none shrink-0 scrollbar-none">
         <button
           type="button"
           onClick={() => setActiveTab('ai')}
@@ -244,6 +245,20 @@ export const SettingsModal: React.FC = () => {
         >
           <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span>Хранилище & Бэкап</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('sync')}
+          data-testid="settings-tab-sync"
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+            activeTab === 'sync'
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span>Синхронизация</span>
         </button>
 
         <button
@@ -805,6 +820,10 @@ export const SettingsModal: React.FC = () => {
               </div>
             )}
 
+            {activeTab === 'sync' && (
+              <SyncSettingsTab addToast={addToast} />
+            )}
+
             {activeTab === 'ui' && (
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
@@ -1137,6 +1156,7 @@ export const SettingsModal: React.FC = () => {
                 / {
                   activeTab === 'ai' ? 'ИИ & Провайдеры' :
                   activeTab === 'vault' ? 'Хранилище & Бэкап' :
+                  activeTab === 'sync' ? 'Синхронизация' :
                   activeTab === 'ui' ? 'Интерфейс & Панели' :
                   activeTab === 'shortcuts' ? 'Горячие клавиши' :
                   'Логи & Диагностика'
