@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
+import { storage } from '../../lib/storage';
 import {
   Maximize2,
   Trash2,
   Copy,
   FolderPlus,
+  FolderOpen,
   Edit2,
   Search,
   CheckSquare,
@@ -30,13 +32,15 @@ export const ContextMenu: React.FC = () => {
     openCreateFolderModal,
     openEditFolderModal,
     openFolderInfoModal,
+    openFolderInExplorer,
     deleteFolder,
     setIsSearchOpen,
     saveItem,
+    addToast,
     currentFolder,
   } = useApp();
 
-  const [activeSubmenu, setActiveSubmenu] = useState<'more' | 'type' | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<'more' | 'type' | 'explorer' | null>(null);
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -100,8 +104,23 @@ export const ContextMenu: React.FC = () => {
           actions.handleTogglePin();
           return;
         }
+        if (e.code === 'KeyO' || e.key.toLowerCase() === 'o' || e.key.toLowerCase() === 'щ') {
+          e.preventDefault();
+          actions.handleOpenInExplorer();
+          return;
+        }
       }
 
+      if (mod && (e.code === 'KeyO' || e.key.toLowerCase() === 'o' || e.key.toLowerCase() === 'щ')) {
+        e.preventDefault();
+        actions.handleOpenInExplorer();
+        return;
+      }
+      if (mod && e.shiftKey && (e.code === 'KeyL' || e.key.toLowerCase() === 'l' || e.key.toLowerCase() === 'д')) {
+        e.preventDefault();
+        actions.handleCopyFullLink();
+        return;
+      }
       if (mod && (e.code === 'KeyE' || e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'у')) {
         e.preventDefault();
         actions.handleOpenFocus();
@@ -128,7 +147,7 @@ export const ContextMenu: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [contextMenu, actions]);
 
-  const handleTriggerMouseEnter = useCallback((name: 'more' | 'type', e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleTriggerMouseEnter = useCallback((name: 'more' | 'type' | 'explorer', e: React.MouseEvent<HTMLButtonElement>) => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     setTriggerRect(e.currentTarget.getBoundingClientRect());
     setActiveSubmenu(name);
@@ -140,7 +159,7 @@ export const ContextMenu: React.FC = () => {
     }, 150);
   }, []);
 
-  const handleTriggerClick = useCallback((name: 'more' | 'type', e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleTriggerClick = useCallback((name: 'more' | 'type' | 'explorer', e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     setTriggerRect(e.currentTarget.getBoundingClientRect());
@@ -288,6 +307,22 @@ export const ContextMenu: React.FC = () => {
               </div>
             </button>
 
+            {/* Explorer Flyout Submenu */}
+            <button
+              onMouseEnter={(e) => handleTriggerMouseEnter('explorer', e)}
+              onMouseLeave={handleTriggerMouseLeave}
+              onClick={(e) => handleTriggerClick('explorer', e)}
+              className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-colors text-left cursor-pointer ${
+                activeSubmenu === 'explorer' ? 'bg-white/[0.08] text-white' : 'hover:bg-white/[0.06] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Проводник</span>
+              </div>
+              <ChevronRight className="w-3 h-3 text-zinc-500" />
+            </button>
+
             {/* Clipboard */}
             <button
               onMouseEnter={handleOtherItemMouseEnter}
@@ -369,6 +404,45 @@ export const ContextMenu: React.FC = () => {
               <span>Иконка и описание</span>
             </button>
 
+            <div className="my-0.5 border-t border-white/[0.06]" />
+
+            <button
+              onClick={() => {
+                openFolderInExplorer(folder.path);
+                closeContextMenu();
+              }}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Открыть в проводнике</span>
+            </button>
+
+            <button
+              onClick={async () => {
+                const fullPath = await storage.getFolderAbsolutePath(folder.path);
+                navigator.clipboard.writeText(fullPath);
+                addToast('Путь к папке скопирован', 'success');
+                closeContextMenu();
+              }}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+            >
+              <Copy className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Скопировать путь к папке</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const fullLink = `slag://folder/${folder.path}`;
+                navigator.clipboard.writeText(fullLink);
+                addToast(`Скопирована ссылка: ${fullLink}`, 'success');
+                closeContextMenu();
+              }}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+            >
+              <Link2 className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Скопировать ссылку на папку</span>
+            </button>
+
             {folder.path !== 'Входящие' && (
               <>
                 <div className="my-0.5 border-t border-white/[0.06]" />
@@ -423,6 +497,17 @@ export const ContextMenu: React.FC = () => {
             </button>
 
             <div className="my-0.5 border-t border-white/[0.06]" />
+
+            <button
+              onClick={() => {
+                openFolderInExplorer(currentFolder);
+                closeContextMenu();
+              }}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Открыть папку в проводнике</span>
+            </button>
 
             <button
               onClick={() => {
@@ -501,6 +586,65 @@ export const ContextMenu: React.FC = () => {
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-zinc-500 font-mono">3</span>
               {item.type === 'article' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Side Submenu Panel: Explorer / File System */}
+      {type === 'item' && item && activeSubmenu === 'explorer' && (
+        <div
+          style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+          onMouseEnter={handleSubmenuMouseEnter}
+          onMouseLeave={handleSubmenuMouseLeave}
+          className="absolute z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+        >
+          {/* Bridge hit-area */}
+          <div
+            className={`absolute top-0 bottom-0 w-3 pointer-events-auto ${
+              submenuDirection === 'right' ? '-left-2' : '-right-2'
+            }`}
+          />
+
+          <button
+            onClick={actions.handleOpenInExplorer}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="whitespace-nowrap">Открыть в проводнике</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono">⌘O</span>
+          </button>
+
+          <button
+            onClick={actions.handleCopyFullLink}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Link2 className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="whitespace-nowrap">Скопировать фулл ссылку</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono">slag://</span>
+          </button>
+
+          <button
+            onClick={actions.handleCopyFullPath}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="whitespace-nowrap">Скопировать полный путь</span>
+            </div>
+          </button>
+
+          <button
+            onClick={actions.handleCopyRelativePath}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Copy className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="whitespace-nowrap">Относительный путь</span>
             </div>
           </button>
         </div>

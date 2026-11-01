@@ -4,6 +4,7 @@ import {
   Maximize2,
   Trash2,
   Copy,
+  FolderOpen,
   CheckSquare,
   FileText,
   StickyNote,
@@ -169,10 +170,26 @@ export const MobileActionSheet: React.FC = () => {
           </button>
 
           <button
-            onClick={actions.handleCopyLink}
+            onClick={actions.handleOpenInExplorer}
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+          >
+            <FolderOpen className="w-4 h-4 text-zinc-400 shrink-0" />
+            <span>Открыть в проводнике</span>
+          </button>
+
+          <button
+            onClick={actions.handleCopyFullLink}
             className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
           >
             <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
+            <span>Скопировать фулл ссылку</span>
+          </button>
+
+          <button
+            onClick={actions.handleCopyLink}
+            className="w-full h-10 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors cursor-pointer text-left"
+          >
+            <Copy className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>Копировать [[линк]]</span>
           </button>
 

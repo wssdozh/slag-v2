@@ -86,5 +86,42 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     // Press '1' to turn back into Note
     await page.keyboard.press('1');
     await expect(page.locator('text=Превращено в: заметка')).toBeVisible();
+
+    // 7. Verify "Проводник" flyout submenu (Open in Explorer, Copy Full Link, Copy Full Path)
+    await page.waitForTimeout(400);
+    await firstCard.click({ button: 'right' });
+    await expect(contextMenu).toBeVisible();
+
+    const explorerBtn = contextMenu.locator('button', { hasText: 'Проводник' });
+    await expect(explorerBtn).toBeVisible();
+    await explorerBtn.hover();
+
+    const explorerSubmenu = contextMenu.locator('button', { hasText: 'Открыть в проводнике' }).locator('..');
+    await expect(explorerSubmenu).toBeVisible();
+    await expect(explorerSubmenu.locator('button', { hasText: 'Открыть в проводнике' })).toBeVisible();
+    await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toBeVisible();
+    await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать полный путь' })).toBeVisible();
+    await expect(explorerSubmenu.locator('button', { hasText: 'Относительный путь' })).toBeVisible();
+
+    // Capture screenshot of side flyout for explorer
+    await page.screenshot({
+      path: 'test-results/screenshots/context_menu_side_flyout_explorer.png',
+      fullPage: false,
+    });
+
+    // Click "Скопировать фулл ссылку"
+    await explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' }).click();
+    await expect(page.locator('text=Скопирована ссылка: slag://note/')).toBeVisible();
+
+    // 8. Verify Folder Context Menu has Explorer actions
+    const careerFolderNode = page.locator('aside span', { hasText: 'Карьера' }).first();
+    await careerFolderNode.click({ button: 'right' });
+    const folderContextMenu = page.locator('.fixed.z-50', { hasText: 'Информация и медиа' });
+    await expect(folderContextMenu).toBeVisible();
+    await expect(folderContextMenu.locator('button', { hasText: 'Открыть в проводнике' })).toBeVisible();
+    await expect(folderContextMenu.locator('button', { hasText: 'Скопировать путь к папке' })).toBeVisible();
+
+    await folderContextMenu.locator('button', { hasText: 'Скопировать путь к папке' }).click();
+    await expect(page.locator('text=Путь к папке скопирован')).toBeVisible();
   });
 });

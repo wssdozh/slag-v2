@@ -203,6 +203,43 @@ export class StorageService {
     return `${this.getVaultDir(vault)}/state.json`;
   }
 
+  public async getNoteAbsolutePath(item: SlagItem): Promise<string> {
+    const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+    const folder = item.folder || 'Входящие';
+    const relativePath = `${this.getVaultNotesPath()}/${folder}/${filename}`;
+
+    if (isTauri()) {
+      try {
+        const { appDataDir } = await import('@tauri-apps/api/path');
+        const base = await appDataDir();
+        const cleanBase = base.replace(/[/\\]+$/, '');
+        const cleanRel = relativePath.replace(/^[/\\]+/, '');
+        const sep = navigator.userAgent.includes('Windows') ? '\\' : '/';
+        return `${cleanBase}${sep}${cleanRel.split('/').join(sep)}`;
+      } catch (err) {
+        fsLog.warn('Failed to resolve absolute note path via Tauri API', err);
+      }
+    }
+    return relativePath;
+  }
+
+  public async getFolderAbsolutePath(folderPath: string): Promise<string> {
+    const relativePath = `${this.getVaultNotesPath()}/${folderPath || 'Входящие'}`;
+    if (isTauri()) {
+      try {
+        const { appDataDir } = await import('@tauri-apps/api/path');
+        const base = await appDataDir();
+        const cleanBase = base.replace(/[/\\]+$/, '');
+        const cleanRel = relativePath.replace(/^[/\\]+/, '');
+        const sep = navigator.userAgent.includes('Windows') ? '\\' : '/';
+        return `${cleanBase}${sep}${cleanRel.split('/').join(sep)}`;
+      } catch (err) {
+        fsLog.warn('Failed to resolve absolute folder path via Tauri API', err);
+      }
+    }
+    return relativePath;
+  }
+
   private async copyDirRecursive(src: string, dest: string): Promise<void> {
     await mkdir(dest, { baseDir: BaseDirectory.AppData, recursive: true });
     const entries = await readDir(src, { baseDir: BaseDirectory.AppData });

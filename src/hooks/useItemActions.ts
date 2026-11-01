@@ -1,5 +1,7 @@
 import { useApp } from '../context/AppContext';
 import { categorizeDraft, generateSmartTags } from '../lib/aiService';
+import { storage, getSafeNoteFilename } from '../lib/storage';
+import { openAppFolder } from '../lib/folderOpener';
 import type { SlagItem, SlagItemType } from '../types';
 
 export const PRIORITY_LABELS: Record<'none' | 'low' | 'medium' | 'high', string> = {
@@ -120,6 +122,41 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
     onDone?.();
   };
 
+  const handleCopyFullLink = () => {
+    if (!item) return;
+    const fullLink = `slag://note/${item.id}`;
+    navigator.clipboard.writeText(fullLink);
+    addToast(`Скопирована ссылка: ${fullLink}`, 'success');
+    onDone?.();
+  };
+
+  const handleCopyFullPath = async () => {
+    if (!item) return;
+    const fullPath = await storage.getNoteAbsolutePath(item);
+    navigator.clipboard.writeText(fullPath);
+    addToast(`Путь к файлу скопирован`, 'success');
+    onDone?.();
+  };
+
+  const handleCopyRelativePath = () => {
+    if (!item) return;
+    const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+    const relPath = `${item.folder || 'Входящие'}/${filename}`;
+    navigator.clipboard.writeText(relPath);
+    addToast(`Путь скопирован: ${relPath}`, 'success');
+    onDone?.();
+  };
+
+  const handleOpenInExplorer = async () => {
+    if (!item) return;
+    const notesBase = storage.getVaultNotesPath();
+    const folder = item.folder || 'Входящие';
+    const target = `${notesBase}/${folder}`;
+    const res = await openAppFolder(target);
+    addToast(res.message, res.success ? 'success' : 'info');
+    onDone?.();
+  };
+
   const handleDuplicate = () => {
     if (!item) return;
     const copy: Partial<SlagItem> & { title: string; content: string; type: SlagItemType } = {
@@ -225,6 +262,10 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
     handleMoveFolder,
     handleCopyMarkdown,
     handleCopyLink,
+    handleCopyFullLink,
+    handleCopyFullPath,
+    handleCopyRelativePath,
+    handleOpenInExplorer,
     handleDuplicate,
     handleToggleArchive,
     handleDelete,

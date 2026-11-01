@@ -187,6 +187,7 @@ interface AppContextType {
   deleteVault: (vaultId: string) => void;
   pickVaultDirectory: () => Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null>;
   revealVaultInExplorer: () => Promise<void>;
+  openFolderInExplorer: (folderPath: string) => Promise<void>;
   seedDemoData: () => void;
   isVaultModalOpen: boolean;
   openVaultModal: () => void;
@@ -1890,6 +1891,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast(res.message, res.success ? 'success' : 'info');
   }, [addToast]);
 
+  const openFolderInExplorer = useCallback(async (folderPath: string) => {
+    const notesBase = storage.getVaultNotesPath();
+    const target = `${notesBase}/${folderPath || 'Входящие'}`;
+    const res = await openAppFolder(target);
+    addToast(res.message, res.success ? 'success' : 'info');
+  }, [addToast]);
+
   const seedDemoData = useCallback(() => {
     storage.seedDemoData();
     refreshData();
@@ -2273,6 +2281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteVault,
         pickVaultDirectory,
         revealVaultInExplorer,
+        openFolderInExplorer,
         seedDemoData,
         isVaultModalOpen,
         openVaultModal,
