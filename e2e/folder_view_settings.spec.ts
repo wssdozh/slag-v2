@@ -17,7 +17,7 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     // 2. Click 3-dots button to open Todoist-style FolderViewModal
     await dotsBtn.click();
 
-    const modal = page.locator('[role="dialog"]').filter({ hasText: 'Вид и фильтры' });
+    const modal = page.locator('[role="dialog"][aria-label="Вид и фильтры"]');
     await expect(modal).toBeVisible();
 
     // Verify sections inside the modal
@@ -36,9 +36,8 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     await expect(kanbanModalBtn).toBeVisible();
     await kanbanModalBtn.click();
 
-    // Close modal via "Готово" button
-    const doneBtn = modal.locator('button', { hasText: 'Готово' });
-    await doneBtn.click();
+    // Close modal via Escape
+    await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
 
     // Verify Kanban board columns are now rendered
@@ -54,7 +53,7 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     const taskFilterBtn = modal.locator('button', { hasText: 'Таски' });
     await taskFilterBtn.click();
 
-    await doneBtn.click();
+    await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
 
     // Verify active filter chip appears in the header with 1-click dismiss button
@@ -78,7 +77,7 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     await dotsBtn.click();
     await expect(modal).toBeVisible();
     await kanbanModalBtn.click();
-    await doneBtn.click();
+    await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
 
     // Verify Kanban is displayed for "Карьера"
@@ -97,12 +96,12 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     // Verify "Карьера" remembered and auto-restored Kanban view!
     await expect(page.locator('h3', { hasText: 'Бэклог' }).or(page.locator('h3', { hasText: 'К выполнению' })).first()).toBeVisible();
 
-    // Reset settings for "Карьера" via "Сбросить вид"
+    // Reset settings for "Карьера" via "Сбросить вид" icon
     await dotsBtn.click();
     await expect(modal).toBeVisible();
-    const resetBtn = modal.locator('button', { hasText: 'Сбросить вид' });
+    const resetBtn = modal.locator('button[aria-label="Сбросить вид"]');
     await resetBtn.click();
-    await doneBtn.click();
+    await page.keyboard.press('Escape');
 
     // Verify "Карьера" reverted to default Feed view
     await expect(page.locator('h3', { hasText: 'Бэклог' })).not.toBeVisible();

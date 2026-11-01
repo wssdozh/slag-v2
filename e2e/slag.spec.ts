@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 async function openViewModal(page: any) {
   const dotsBtn = page.locator('header button[aria-label="Вид и фильтры папки"]').first();
   await dotsBtn.click();
-  const modal = page.locator('[role="dialog"]').filter({ hasText: 'Вид и фильтры' });
+  const modal = page.locator('[role="dialog"][aria-label="Вид и фильтры"]');
   await expect(modal).toBeVisible();
   return modal;
 }
@@ -12,7 +12,7 @@ async function switchToView(page: any, mode: 'feed' | 'kanban' | 'calendar') {
   const modal = await openViewModal(page);
   const label = mode === 'kanban' ? 'Канбан' : mode === 'calendar' ? 'Календарь' : 'Лента';
   await modal.locator('button', { hasText: label }).click();
-  await modal.locator('button', { hasText: 'Готово' }).click();
+  await page.keyboard.press('Escape');
   await expect(modal).not.toBeVisible();
 }
 
@@ -98,14 +98,14 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Switch back to "Все"
     await allBtn.click();
     await expect(allBtn).toHaveClass(/bg-white\/10/);
-    await modal.locator('button', { hasText: 'Готово' }).click();
+    await page.keyboard.press('Escape');
   });
 
   test('4. Article teaser card and opening in Focus Editor', async ({ page }) => {
     // Switch to "Все" to see all demo articles or navigate to design
     const modal = await openViewModal(page);
     await modal.locator('button', { hasText: 'Все' }).last().click();
-    await modal.locator('button', { hasText: 'Готово' }).click();
+    await page.keyboard.press('Escape');
 
     const taskCard = page.locator('.group', { hasText: 'Синхронизация по архитектуре баз данных' }).first();
     if (await taskCard.isVisible()) {
@@ -1568,7 +1568,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Switch to "Все" to ensure demo items are visible
     const viewModal = await openViewModal(page);
     await viewModal.locator('button', { hasText: 'Все' }).last().click();
-    await viewModal.locator('button', { hasText: 'Готово' }).click();
+    await page.keyboard.press('Escape');
 
     // Create a note with voice attachment to test feed player
     await page.evaluate(() => {
@@ -3498,7 +3498,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const taskOption = modal.locator('button', { hasText: 'Таски' });
     await expect(taskOption).toBeVisible();
     await taskOption.click();
-    await modal.locator('button', { hasText: 'Готово' }).click();
+    await page.keyboard.press('Escape');
 
     // 4. Verify the active type filter badge appears in the header
     const taskBadge = page.locator('header span', { hasText: 'Таски' }).first();
