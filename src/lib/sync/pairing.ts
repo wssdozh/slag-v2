@@ -58,6 +58,24 @@ export async function claimPairingSession(
   return res.json();
 }
 
+function utf8ToBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToUtf8(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 /** Host approves pairing session and sends encrypted vault key */
 export async function approvePairingSession(
   serverUrl: string,
@@ -70,7 +88,7 @@ export async function approvePairingSession(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       sessionId,
-      encryptedPayload: btoa(payloadText),
+      encryptedPayload: utf8ToBase64(payloadText),
     }),
   });
   return res.ok;
@@ -130,7 +148,7 @@ export async function pollPairingPayload(
         throw new Error('Подключение отклонено на основном устройстве');
       }
       if (data.status === 'approved' && data.exchangePayload) {
-        return atob(data.exchangePayload);
+        return base64ToUtf8(data.exchangePayload);
       }
     } catch (e: unknown) {
       if (e instanceof Error && e.message.includes('отклонено')) {
