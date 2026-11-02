@@ -322,46 +322,40 @@ export const SettingsModal: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4">
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
-                  {/* Top Switcher: ИИ из подписки vs Свои API-ключи (BYOK) */}
-                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-2.5">
+                  {/* Top Switcher: Подписка vs Свой ключ */}
+                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                        Источник ИИ
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        {sourceMode === 'subscription' && !isFreePlan
-                          ? `● Подписка ${syncStatus.subscription.planLabel}`
-                          : '○ Свои API-ключи'}
-                      </span>
+                      <span className="text-xs font-semibold text-zinc-200">Источник моделей</span>
+                      {isFreePlan ? (
+                        <span className="text-[11px] font-mono text-zinc-500">Free · только свой ключ</span>
+                      ) : (
+                        <span className="text-[11px] font-mono text-emerald-400">Тариф {syncStatus.subscription.planLabel}</span>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-lg border border-white/[0.04]">
+                    <div className="grid grid-cols-2 gap-1.5 bg-[#0c0c0e] p-1 rounded-lg border border-white/[0.06]">
                       <button
                         type="button"
                         data-testid="ai-source-subscription"
                         disabled={isFreePlan}
                         onClick={() => setSourceMode('subscription')}
-                        className={`py-2 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        className={`py-1.5 px-3 rounded-md text-xs font-medium transition-all cursor-pointer ${
                           sourceMode === 'subscription' && !isFreePlan
-                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm font-semibold'
+                            ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                             : isFreePlan
                             ? 'opacity-40 text-zinc-600 cursor-not-allowed border border-transparent'
                             : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
                         }`}
                         title={
                           isFreePlan
-                            ? 'На тарифе Free облачный ИИ релея недоступен. Используйте свои ключи (BYOK).'
+                            ? 'На тарифе Free облачный ИИ релея недоступен. Используйте свои ключи.'
                             : 'Использовать ИИ из подписки SLAG'
                         }
                       >
-                        <span>ИИ из подписки SLAG</span>
-                        {isFreePlan ? (
-                          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.04] text-zinc-500">
-                            Free (заблокировано)
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300">
-                            {syncStatus.subscription.planLabel.replace('SLAG ', '')}
+                        <span>Подписка SLAG</span>
+                        {isFreePlan && (
+                          <span className="text-[9px] font-mono ml-1.5 text-zinc-500">
+                            (заблокировано)
                           </span>
                         )}
                       </button>
@@ -370,135 +364,114 @@ export const SettingsModal: React.FC = () => {
                         type="button"
                         data-testid="ai-source-byok"
                         onClick={() => setSourceMode('byok')}
-                        className={`py-2 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        className={`py-1.5 px-3 rounded-md text-xs font-medium transition-all cursor-pointer ${
                           sourceMode === 'byok' || isFreePlan
                             ? 'bg-white/10 text-white shadow-sm font-semibold border border-white/[0.08]'
                             : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
                         }`}
                       >
-                        <span>Свои API-ключи (BYOK)</span>
+                        <span>Свой API-ключ</span>
                       </button>
                     </div>
 
                     {isFreePlan && (
-                      <p className="text-2xs text-zinc-500 mt-0.5 leading-relaxed">
-                        На бесплатном тарифе облачный ИИ релея не входит в квоту. Введите свой личный ключ Groq или KIE.AI во вкладке «Свои API-ключи».
-                      </p>
+                      <span className="text-2xs text-zinc-500">
+                        На бесплатном тарифе доступен ввод личных ключей Groq или KIE.
+                      </span>
                     )}
                   </div>
 
                   {/* Mode A: Subscription Gateway Mode (No API keys needed) */}
                   {sourceMode === 'subscription' && !isFreePlan ? (
                     <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-white">Релей-шлюз SLAG</span>
-                          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
-                            Без логов в памяти
-                          </span>
-                        </div>
-                        <span className="text-2xs text-zinc-500 font-mono">
-                          {syncEngine.getConfig().serverUrl.replace(/https?:\/\//, '')}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-zinc-200">Режим обработки</span>
+                        <span className="text-[11px] font-mono text-zinc-500">
+                          Шлюз: {syncEngine.getConfig().serverUrl.replace(/https?:\/\//, '')}
                         </span>
                       </div>
 
-                      <p className="text-xs text-zinc-400 leading-relaxed">
-                        Ваш личный ключ не требуется — расход покрывается вашей подпиской {syncStatus.subscription.planLabel}. Трафик пролетает сквозь защищённый сокет релея в оперативной памяти без записи на диск.
-                      </p>
-
-                      <div className="flex flex-col gap-2 pt-1">
-                        <label className="text-[11px] font-medium text-zinc-300">
-                          Предустановка модели
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setSubscriptionModel('fast')}
-                            className={`p-2.5 rounded-lg border text-left flex flex-col gap-0.5 transition-all cursor-pointer ${
-                              subscriptionModel === 'fast'
-                                ? 'bg-white/[0.08] border-white/20 text-white'
-                                : 'bg-white/[0.02] border-white/[0.04] text-zinc-400 hover:text-zinc-200'
-                            }`}
-                          >
-                            <span className="text-xs font-semibold text-zinc-200">Быстрый (Flash)</span>
-                            <span className="text-2xs text-zinc-500">Автотеги и мгновенные ответы</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setSubscriptionModel('smart')}
-                            className={`p-2.5 rounded-lg border text-left flex flex-col gap-0.5 transition-all cursor-pointer ${
-                              subscriptionModel === 'smart'
-                                ? 'bg-white/[0.08] border-white/20 text-white'
-                                : 'bg-white/[0.02] border-white/[0.04] text-zinc-400 hover:text-zinc-200'
-                            }`}
-                          >
-                            <span className="text-xs font-semibold text-zinc-200">Умный (Smart)</span>
-                            <span className="text-2xs text-zinc-500">Чат-ассистент и структурирование</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setSubscriptionModel('deep')}
-                            className={`p-2.5 rounded-lg border text-left flex flex-col gap-0.5 transition-all cursor-pointer ${
-                              subscriptionModel === 'deep'
-                                ? 'bg-white/[0.08] border-white/20 text-white'
-                                : 'bg-white/[0.02] border-white/[0.04] text-zinc-400 hover:text-zinc-200'
-                            }`}
-                          >
-                            <span className="text-xs font-semibold text-zinc-200">Глубокий (Deep)</span>
-                            <span className="text-2xs text-zinc-500">DeepSeek размышления и логика</span>
-                          </button>
-                        </div>
+                      <div className="grid grid-cols-3 gap-1 bg-[#0c0c0e] p-1 rounded-lg border border-white/[0.06]">
+                        <button
+                          type="button"
+                          onClick={() => setSubscriptionModel('fast')}
+                          className={`py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                            subscriptionModel === 'fast'
+                              ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          Flash (быстрый)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubscriptionModel('smart')}
+                          className={`py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                            subscriptionModel === 'smart'
+                              ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          Smart (умный)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubscriptionModel('deep')}
+                          className={`py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                            subscriptionModel === 'deep'
+                              ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          Deep (логика)
+                        </button>
                       </div>
                     </div>
                   ) : (
                     /* Mode B: BYOK (Bring Your Own Key) Settings */
                     <>
                       {/* Section 1: Выбор провайдера ИИ (Groq & KIE.AI) */}
-                      <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-2.5">
+                      <div className="bg-panel border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                            Провайдер ИИ
-                          </span>
-                          <span className="text-[10px] font-mono text-zinc-500">
+                          <span className="text-xs font-semibold text-zinc-200">Провайдер</span>
+                          <span className="text-[11px] font-mono text-zinc-500">
                             {provider === 'groq'
-                              ? (groqApiKey ? '● Подключен к LPU' : '○ Ключ не указан')
-                              : (kieApiKey ? '● Подключен к KIE' : '○ Ключ не указан')}
+                              ? (groqApiKey ? '● Groq подключен' : '○ Ключ не указан')
+                              : (kieApiKey ? '● KIE подключен' : '○ Ключ не указан')}
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-lg border border-white/[0.04]">
+                        <div className="grid grid-cols-2 gap-1.5 bg-[#0c0c0e] p-1 rounded-lg border border-white/[0.06]">
                           <button
                             type="button"
                             onClick={() => handleProviderChange('groq')}
-                            className={`py-2 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            className={`py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                               provider === 'groq'
-                                ? 'bg-white/10 text-white shadow-sm font-semibold'
+                                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                                 : 'text-zinc-400 hover:text-zinc-200'
                             }`}
                           >
-                            <span>Groq</span>
+                            Groq
                           </button>
 
                           <button
                             type="button"
                             onClick={() => handleProviderChange('kie')}
-                            className={`py-2 px-3 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            className={`py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                               provider === 'kie'
-                                ? 'bg-white/10 text-white shadow-sm font-semibold'
+                                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                                 : 'text-zinc-400 hover:text-zinc-200'
                             }`}
                           >
-                            <span>KIE.AI</span>
+                            KIE.AI
                           </button>
                         </div>
                       </div>
 
                       {/* Section 2: Настройки Groq */}
                       {provider === 'groq' && (
-                        <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
-                          <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                        <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
                             <span className="text-xs font-semibold text-zinc-100">Groq Cloud API</span>
                             <a
                               href="https://console.groq.com/keys"
@@ -506,13 +479,13 @@ export const SettingsModal: React.FC = () => {
                               rel="noreferrer"
                               className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
                             >
-                              <span>Получить API ключ</span>
+                              <span>Получить ключ</span>
                               <ExternalLink className="w-3 h-3 text-zinc-500" />
                             </a>
                           </div>
 
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-medium text-zinc-300">Groq API Key</label>
+                            <label className="text-[11px] font-medium text-zinc-300">API Key</label>
                             <div className="relative">
                               <input
                                 type={showKey ? 'text' : 'password'}
@@ -538,9 +511,9 @@ export const SettingsModal: React.FC = () => {
                                 value={model}
                                 onChange={(val) => setModel(val)}
                                 options={[
-                                  { value: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B' },
-                                  { value: 'openai/gpt-oss-20b', label: 'OpenAI GPT-OSS 20B (Быстрая)' },
-                                  { value: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B' },
+                                  { value: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B (LPU)' },
+                                  { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile' },
+                                  { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant' },
                                 ]}
                               />
                             </div>
@@ -564,25 +537,22 @@ export const SettingsModal: React.FC = () => {
 
                       {/* Section 2: Настройки KIE.AI */}
                       {provider === 'kie' && (
-                        <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3.5">
-                          <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
-                              <span className="text-[10px] text-zinc-500 font-mono">Anthropic & OpenAI</span>
-                            </div>
+                        <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
+                            <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
                             <a
                               href="https://kie.ai/api-key"
                               target="_blank"
                               rel="noreferrer"
                               className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
                             >
-                              <span>Получить API ключ</span>
+                              <span>Получить ключ</span>
                               <ExternalLink className="w-3 h-3 text-zinc-500" />
                             </a>
                           </div>
 
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-medium text-zinc-300">KIE.AI API Key / Token</label>
+                            <label className="text-[11px] font-medium text-zinc-300">API Key</label>
                             <div className="relative">
                               <input
                                 type={showKey ? 'text' : 'password'}
@@ -629,7 +599,7 @@ export const SettingsModal: React.FC = () => {
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-[11px] font-medium text-zinc-300">Base URL эндпоинта</label>
+                              <label className="text-[11px] font-medium text-zinc-300">Base URL</label>
                               <input
                                 type="text"
                                 value={kieBaseUrl}
@@ -646,50 +616,50 @@ export const SettingsModal: React.FC = () => {
 
                   {/* Section 3: Автоматизация и интеллектуальные сервисы */}
                   <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
-                        Автоматизация и поиск
+                        Автоматизация
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-2">
                       <Checkbox
                         checked={autoTagging}
                         onChange={setAutoTagging}
-                        label="Автоматический подбор тегов"
+                        label="Автотегирование новых заметок"
                       />
 
                       <Checkbox
                         checked={autoTriage}
                         onChange={setAutoTriage}
-                        label="Интеллектуальная диспетчеризация (AI Triage)"
+                        label="AI-триаж (папки, задачи, приоритеты)"
                       />
 
                       <Checkbox
                         checked={webSearchEnabled}
                         onChange={setWebSearchEnabled}
-                        label="Поиск в реальном времени (Web Search)"
+                        label="Веб-поиск при ответах"
                       />
                     </div>
                   </div>
 
                   {/* Section 4: Норма таксономии и правила тегирования */}
                   <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.04]">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
-                        Норма таксономии и правила тегирования
+                        Правила тегов
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-medium text-zinc-300">Максимум тегов на запись</label>
+                        <label className="text-[11px] font-medium text-zinc-300">Лимит тегов на запись</label>
                         <NumberInput
                           min={1}
                           max={8}
                           value={maxTags}
                           onChange={setMaxTags}
-                          aria-label="Максимум тегов на запись"
+                          aria-label="Лимит тегов на запись"
                         />
                       </div>
 

@@ -27,14 +27,14 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
     const aiTabBtn = settingsModal.locator('button', { hasText: 'ИИ & Провайдеры' });
     await aiTabBtn.click();
 
-    // 4. Verify that default Smile subscriber sees 'ИИ из подписки SLAG' active
+    // 4. Verify that default Smile subscriber sees 'Подписка SLAG' active
     const subAiBtn = settingsModal.locator('[data-testid="ai-source-subscription"]');
     await expect(subAiBtn).toBeVisible();
-    await expect(subAiBtn).toHaveClass(/border-emerald-500/);
+    await expect(subAiBtn).toHaveClass(/border-white/);
 
     // Verify key inputs are hidden in subscription mode (clean UI)
-    await expect(settingsModal.locator('text=Релей-шлюз SLAG')).toBeVisible();
-    await expect(settingsModal.locator('text=Без логов в памяти')).toBeVisible();
+    await expect(settingsModal.locator('text=Режим обработки')).toBeVisible();
+    await expect(settingsModal.locator('button', { hasText: 'Flash (быстрый)' })).toBeVisible();
     await expect(settingsModal.locator('input[placeholder="gsk_..."]')).not.toBeVisible();
     await expect(settingsModal.locator('input[placeholder*="sk-kie-..."]')).not.toBeVisible();
 
@@ -77,11 +77,11 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
     await settingsBtn.click();
     await aiTabBtn.click();
 
-    // 9. Verify that on Free plan, 'ИИ из подписки' is disabled and locked
+    // 9. Verify that on Free plan, 'Подписка SLAG' is disabled and locked
     const lockedSubAiBtn = settingsModal.locator('[data-testid="ai-source-subscription"]');
     await expect(lockedSubAiBtn).toBeDisabled();
-    await expect(lockedSubAiBtn).toContainText('Free (заблокировано)');
-    await expect(settingsModal.locator('text=На бесплатном тарифе облачный ИИ релея не входит в квоту')).toBeVisible();
+    await expect(lockedSubAiBtn).toContainText('(заблокировано)');
+    await expect(settingsModal.locator('text=На бесплатном тарифе доступен ввод личных ключей')).toBeVisible();
 
     // Capture screenshot of Free Tier Locked AI Gate
     await page.screenshot({
