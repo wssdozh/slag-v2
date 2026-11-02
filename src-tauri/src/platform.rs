@@ -147,7 +147,7 @@ pub fn install_gnome_shortcut(binding: Option<&str>) -> Result<(), String> {
         .map_err(|e| format!("Failed to get current executable path: {e}"))?;
     let exe_str = exe_path.to_string_lossy();
     let exec_cmd = format!("{exe_str} --quick");
-    let key_binding = binding.unwrap_or("<Primary><Shift>space");
+    let key_binding = binding.unwrap_or("<Control><Shift>space");
 
     let reloc_schema = format!("org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:{}", SLAG_BINDING_PATH);
 
