@@ -437,12 +437,31 @@ export class SyncEngine {
         return; // ignore self echo
       }
 
-      const sender = this.config.trustedDevices.find((d) => d.id === bundle.fromDeviceId);
-      if (sender?.syncMode === 'receive-only') {
+      let sender = this.config.trustedDevices.find((d) => d.id === bundle.fromDeviceId);
+      if (!sender) {
+        sender = {
+          id: bundle.fromDeviceId,
+          name: `Устройство ${bundle.fromDeviceId.replace('slag-', '').slice(0, 8)}`,
+          platform: 'desktop',
+          isCurrent: false,
+          syncMode: 'read-write',
+          canRunAiLease: false,
+          pairedAt: new Date().toISOString(),
+          lastSeenAt: 'Только что',
+          allowedVaults: [this.currentVaultId],
+        };
+        this.addTrustedDevice(sender);
+      } else {
+        const updatedList = this.config.trustedDevices.map((d) =>
+          d.id === bundle.fromDeviceId ? { ...d, lastSeenAt: 'Только что' } : d
+        );
+        this.saveConfig({ trustedDevices: updatedList });
+      }
+      if (sender.syncMode === 'receive-only') {
         syncLog.warn(`Ignored mutation bundle from receive-only device: ${bundle.fromDeviceId}`);
         return;
       }
-      if (sender?.allowedVaults && sender.allowedVaults.length > 0 && !sender.allowedVaults.includes(this.currentVaultId)) {
+      if (sender.allowedVaults && sender.allowedVaults.length > 0 && !sender.allowedVaults.includes(this.currentVaultId)) {
         syncLog.warn(`Ignored bundle for vault ${this.currentVaultId} from device without access: ${bundle.fromDeviceId}`);
         return;
       }
