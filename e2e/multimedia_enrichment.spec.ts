@@ -270,7 +270,7 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
       const searchResVoice = await assistantOrchestrator.runChat({
         messages: [{ role: 'user', content: 'креатин' }],
         currentFolder: 'Входящие',
-        settings: { provider: 'local', groqApiKey: '', kieApiKey: '', model: 'auto', reasoningEffort: 'none', webSearchEnabled: false } as any,
+        settings: { sourceMode: 'byok', provider: 'local', groqApiKey: '', kieApiKey: '', model: 'auto', reasoningEffort: 'none', webSearchEnabled: false } as any,
         folders: [{ id: 'inbox', name: 'Входящие', path: 'Входящие', order: 0, icon: 'Inbox' }],
         allItems: items,
       });
@@ -278,7 +278,7 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
       const searchResInvoice = await assistantOrchestrator.runChat({
         messages: [{ role: 'user', content: 'Hetzner' }],
         currentFolder: 'Входящие',
-        settings: { provider: 'local', groqApiKey: '', kieApiKey: '', model: 'auto', reasoningEffort: 'none', webSearchEnabled: false } as any,
+        settings: { sourceMode: 'byok', provider: 'local', groqApiKey: '', kieApiKey: '', model: 'auto', reasoningEffort: 'none', webSearchEnabled: false } as any,
         folders: [{ id: 'inbox', name: 'Входящие', path: 'Входящие', order: 0, icon: 'Inbox' }],
         allItems: items,
       });

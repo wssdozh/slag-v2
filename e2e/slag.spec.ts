@@ -17,7 +17,12 @@ async function switchToView(page: any, mode: 'feed' | 'kanban' | 'calendar') {
 }
 
 test.describe('SLAG v2 Specification E2E Verification', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    if (/^(?:11|12|13|16|23|24|25(?:\.[1-7])?|57)\. |Unified AI Categorization/.test(testInfo.title)) {
+      await page.addInitScript(() => {
+        localStorage.setItem('slag_ai_settings_v2', JSON.stringify({ sourceMode: 'byok' }));
+      });
+    }
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Wait for the app main feed to be visible
     await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
@@ -485,6 +490,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
+
+    await settingsModal.getByTestId('ai-source-byok').click();
 
     // Verify Groq provider is selectable and default recommended
     const groqProviderBtn = settingsModal.locator('button', { hasText: 'Groq' }).first();
@@ -1400,6 +1407,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
 
+    await settingsModal.getByTestId('ai-source-byok').click();
+
     // 2. Select KIE.AI
     const kieBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
     await kieBtn.click();
@@ -1441,6 +1450,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.locator('button[title*="Настройки"]').first().click();
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
+
+    await settingsModal.getByTestId('ai-source-byok').click();
 
     await expect(settingsModal.locator('text=Глубина рассуждений').first()).toBeVisible();
     await expect(settingsModal.locator('text=Автоматизация и поиск')).toBeVisible();
