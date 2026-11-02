@@ -306,7 +306,14 @@ export class StorageService {
             const fallbackId = entry.name.replace(/\.md$/, '');
             const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
             parsed.filename = entry.name;
-            items.push(parsed);
+            const existingIdx = items.findIndex(i => i.id === parsed.id);
+            if (existingIdx >= 0) {
+              if ((parsed.updatedAt || 0) > (items[existingIdx].updatedAt || 0)) {
+                items[existingIdx] = parsed;
+              }
+            } else {
+              items.push(parsed);
+            }
           } catch (e) {
             fsLog.warn(`Failed to read note file ${subPath}:`, e);
           }
@@ -866,7 +873,8 @@ export class StorageService {
     }
 
     if (isTauri()) {
-      void this.flushItemToDisk(updatedItem, oldItem?.folder, oldItem?.filename);
+      const oldFilename = oldItem?.filename || (oldItem ? getSafeNoteFilename(oldItem.title, oldItem.id) : undefined);
+      void this.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
     }
 
     return updatedItem;
@@ -896,7 +904,8 @@ export class StorageService {
     if (isTauri()) {
       for (const it of saveMap.values()) {
         const old = oldItemsMap.get(it.id);
-        void this.flushItemToDisk(it, old?.folder, old?.filename);
+        const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
+        void this.flushItemToDisk(it, old?.folder, oldFilename);
       }
     }
   }
@@ -1255,13 +1264,27 @@ export class StorageService {
     }
     if (isTauri()) {
       if (data.items) {
+        const usedPaths = new Map<string, string>();
+        for (const item of data.items) {
+          let filename = item.filename || getSafeNoteFilename(item.title, item.id);
+          const folder = item.folder || 'Входящие';
+          let noteRelPath = `${this.getVaultNotesPath(vault)}/${folder}/${filename}`;
+          if (usedPaths.has(noteRelPath) && usedPaths.get(noteRelPath) !== item.id) {
+            const shortId = item.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(-8) || 'dup';
+            const base = filename.replace(/\.md$/, '');
+            filename = `${base} (${shortId}).md`;
+            item.filename = filename;
+            noteRelPath = `${this.getVaultNotesPath(vault)}/${folder}/${filename}`;
+          }
+          usedPaths.set(noteRelPath, item.id);
+        }
         const nextIds = new Set(data.items.map(item => item.id));
         const notePath = (item: SlagItem) => `${this.getVaultNotesPath(vault)}/${item.folder || 'Входящие'}/${item.filename || getSafeNoteFilename(item.title, item.id)}`;
         const nextPaths = new Set(data.items.map(notePath));
-        if (nextPaths.size !== data.items.length) throw new Error('Synced notes have conflicting filenames');
         for (const item of data.items) {
           const old = previous.find(candidate => candidate.id === item.id);
-          await this.flushItemToDisk(item, old?.folder, old?.filename, vault, true, nextPaths);
+          const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
+          await this.flushItemToDisk(item, old?.folder, oldFilename, vault, true, nextPaths);
         }
         for (const item of previous) {
           if (!nextIds.has(item.id) && !nextPaths.has(notePath(item))) await this.removeItemFromDisk(item, vault, true);

@@ -1,4 +1,5 @@
 import { storage } from '../storage';
+export { storage };
 import { logger } from '../logger';
 import {
   deriveVaultKey,
