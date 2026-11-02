@@ -326,6 +326,17 @@ pub fn run() {
             .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
                 let is_quick = args.iter().any(|arg| arg == "--quick" || arg == "--composer" || arg == "-q");
                 if is_quick {
+                    #[cfg(target_os = "linux")]
+                    {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                            let _ = window.emit("slag://open-composer", ());
+                            return;
+                        }
+                    }
+                    #[cfg(not(target_os = "linux"))]
                     if let Some(quick_win) = app.get_webview_window("quick-composer") {
                         let _ = quick_win.show();
                         let _ = quick_win.unminimize();
@@ -434,14 +445,26 @@ pub fn run() {
 
                 let is_cold_quick = std::env::args().any(|a| a == "--quick" || a == "-q" || a == "--composer");
                 if is_cold_quick {
-                    if let Some(main_win) = app.get_webview_window("main") {
-                        let _ = main_win.hide();
+                    #[cfg(target_os = "linux")]
+                    {
+                        if let Some(main_win) = app.get_webview_window("main") {
+                            let _ = main_win.show();
+                            let _ = main_win.unminimize();
+                            let _ = main_win.set_focus();
+                            let _ = main_win.emit("slag://open-composer", ());
+                        }
                     }
-                    if let Some(quick_win) = app.get_webview_window("quick-composer") {
-                        let _ = quick_win.show();
-                        let _ = quick_win.unminimize();
-                        let _ = quick_win.set_focus();
-                        let _ = quick_win.emit("slag://focus-composer", ());
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        if let Some(main_win) = app.get_webview_window("main") {
+                            let _ = main_win.hide();
+                        }
+                        if let Some(quick_win) = app.get_webview_window("quick-composer") {
+                            let _ = quick_win.show();
+                            let _ = quick_win.unminimize();
+                            let _ = quick_win.set_focus();
+                            let _ = quick_win.emit("slag://focus-composer", ());
+                        }
                     }
                 }
 
@@ -487,6 +510,17 @@ pub fn run() {
                                 }
                             }
                             "quick_note" => {
+                                #[cfg(target_os = "linux")]
+                                {
+                                    if let Some(window) = app.get_webview_window("main") {
+                                        let _ = window.show();
+                                        let _ = window.unminimize();
+                                        let _ = window.set_focus();
+                                        let _ = window.emit("slag://open-composer", ());
+                                        return;
+                                    }
+                                }
+                                #[cfg(not(target_os = "linux"))]
                                 if let Some(quick_win) = app.get_webview_window("quick-composer") {
                                     let _ = quick_win.show();
                                     let _ = quick_win.unminimize();
