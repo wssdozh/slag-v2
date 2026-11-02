@@ -17,6 +17,7 @@ import type {
   SyncChangeItem,
   EncryptedBundle,
   DeviceProfile,
+  DeviceSyncMode,
 } from './types';
 import type { SlagItem, FolderMeta, WorkspaceState } from '../../types';
 
@@ -113,6 +114,8 @@ export class SyncEngine {
           deviceName: parsed.deviceName || 'Это устройство',
           seedPhrase: parsed.seedPhrase || generateMnemonic(12),
           autoSync: parsed.autoSync ?? true,
+          localSyncMode: parsed.localSyncMode || 'read-write',
+          canRunAiLease: parsed.canRunAiLease ?? true,
           trustedDevices: parsed.trustedDevices || [],
         };
       }
@@ -127,6 +130,8 @@ export class SyncEngine {
       deviceName: 'Мой ПК',
       seedPhrase: generateMnemonic(12),
       autoSync: true,
+      localSyncMode: 'read-write',
+      canRunAiLease: true,
       trustedDevices: [],
     };
     this.saveConfig(initial);
@@ -275,6 +280,12 @@ export class SyncEngine {
         return; // ignore self echo
       }
 
+      const sender = this.config.trustedDevices.find((d) => d.id === bundle.fromDeviceId);
+      if (sender?.syncMode === 'receive-only') {
+        syncLog.warn(`Ignored mutation bundle from receive-only device: ${bundle.fromDeviceId}`);
+        return;
+      }
+
       syncLog.info(`Applying bundle ${bundle.bundleId} with ${bundle.changes.length} changes`);
 
       let hasItemsChanged = false;
@@ -350,6 +361,10 @@ export class SyncEngine {
   }
 
   public async pushLocalChanges(): Promise<void> {
+    if (this.config.localSyncMode === 'receive-only') {
+      syncLog.info('Skipping pushLocalChanges: device is in receive-only mode');
+      return;
+    }
     if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) return;
     this.isProcessingSync = true;
 
@@ -482,13 +497,60 @@ export class SyncEngine {
 
   public addTrustedDevice(device: DeviceProfile): void {
     const list = this.config.trustedDevices.filter((d) => d.id !== device.id);
-    list.push(device);
+    list.push({ ...device, syncMode: device.syncMode || 'read-write', canRunAiLease: device.canRunAiLease ?? false });
     this.saveConfig({ trustedDevices: list });
   }
 
   public removeTrustedDevice(deviceId: string): void {
     const list = this.config.trustedDevices.filter((d) => d.id !== deviceId);
     this.saveConfig({ trustedDevices: list });
+  }
+
+  public renameDevice(deviceId: string, newName: string): void {
+    const clean = newName.trim();
+    if (deviceId === this.config.deviceId) {
+      this.saveConfig({ deviceName: clean || 'Это устройство' });
+      return;
+    }
+    const list = this.config.trustedDevices.map((d) =>
+      d.id === deviceId ? { ...d, name: clean || d.name } : d
+    );
+    this.saveConfig({ trustedDevices: list });
+  }
+
+  public setDeviceSyncMode(deviceId: string, mode: DeviceSyncMode): void {
+    if (deviceId === this.config.deviceId) {
+      this.saveConfig({ localSyncMode: mode });
+      return;
+    }
+    const list = this.config.trustedDevices.map((d) =>
+      d.id === deviceId ? { ...d, syncMode: mode } : d
+    );
+    this.saveConfig({ trustedDevices: list });
+  }
+
+  public setDeviceAiLease(deviceId: string, canRun: boolean): void {
+    if (deviceId === this.config.deviceId) {
+      this.saveConfig({ canRunAiLease: canRun });
+      return;
+    }
+    const list = this.config.trustedDevices.map((d) =>
+      d.id === deviceId ? { ...d, canRunAiLease: canRun } : d
+    );
+    this.saveConfig({ trustedDevices: list });
+  }
+
+  public async rotateVaultKey(): Promise<string> {
+    const newSeed = generateMnemonic(12);
+    syncLog.warn('Rotating vault key: resetting trusted devices and migrating to new room');
+    this.saveConfig({
+      seedPhrase: newSeed,
+      trustedDevices: [],
+    });
+    this.disconnect();
+    localStorage.removeItem(LAST_STATE_HASH_KEY);
+    await this.init();
+    return newSeed;
   }
 }
 

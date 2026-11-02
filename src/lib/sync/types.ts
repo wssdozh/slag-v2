@@ -1,8 +1,12 @@
+export type DeviceSyncMode = 'read-write' | 'receive-only';
+
 export interface DeviceProfile {
   id: string;
   name: string;
   platform: 'desktop' | 'mobile' | 'web';
   isCurrent: boolean;
+  syncMode?: DeviceSyncMode;
+  canRunAiLease?: boolean;
   publicKey?: string;
   pairedAt: string;
   lastSeenAt: string;
@@ -38,6 +42,8 @@ export interface SyncConfig {
   deviceName: string;
   seedPhrase: string;
   autoSync: boolean;
+  localSyncMode?: DeviceSyncMode;
+  canRunAiLease?: boolean;
   trustedDevices: DeviceProfile[];
 }
 

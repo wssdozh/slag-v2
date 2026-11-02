@@ -118,17 +118,21 @@ const AppContent: React.FC = () => {
 
   if (currentPage === 'landing') {
     return (
-      <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
-        <LandingPage onNavigateToAccount={() => navigatePage('account')} />
-      </Suspense>
+      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
+        <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+          <LandingPage onNavigateToAccount={() => navigatePage('account')} />
+        </Suspense>
+      </div>
     );
   }
 
   if (currentPage === 'account') {
     return (
-      <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
-        <AccountCabinet onBackToLanding={() => navigatePage('landing')} />
-      </Suspense>
+      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
+        <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+          <AccountCabinet onBackToLanding={() => navigatePage('landing')} />
+        </Suspense>
+      </div>
     );
   }
 

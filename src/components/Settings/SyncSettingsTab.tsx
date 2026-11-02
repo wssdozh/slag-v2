@@ -10,6 +10,9 @@ import {
   Shield,
   Loader2,
   X,
+  Edit2,
+  KeyRound,
+  Bot,
 } from 'lucide-react';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import {
@@ -21,7 +24,7 @@ import {
   pollPairingPayload,
 } from '../../lib/sync/pairing';
 import { validateMnemonic } from '../../lib/sync/crypto';
-import type { SyncStatus, SyncConfig } from '../../lib/sync/types';
+import type { SyncStatus, SyncConfig, DeviceSyncMode } from '../../lib/sync/types';
 
 interface SyncSettingsTabProps {
   addToast?: (text: string, type?: 'info' | 'success' | 'error') => void;
@@ -51,6 +54,10 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   const [isClaimingPin, setIsClaimingPin] = useState(false);
   const [isGuestWaitingApproval, setIsGuestWaitingApproval] = useState(false);
 
+  // Inline device rename state
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [editingDeviceName, setEditingDeviceName] = useState('');
+
   // Server state
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isTestingServer, setIsTestingServer] = useState(false);
@@ -62,7 +69,10 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   const isPollingRef = useRef(false);
 
   useEffect(() => {
-    const unsub = syncEngine.subscribe((st) => setStatus(st));
+    const unsub = syncEngine.subscribe((st) => {
+      setStatus(st);
+      setConfig(syncEngine.getConfig());
+    });
     return unsub;
   }, []);
 
@@ -139,19 +149,19 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
 
   const handleApprovePairing = async () => {
     if (!hostSessionId || !pendingApprovalSas) {
-      console.log('APPROVE_ABORT_MISSING_IDS:', { hostSessionId, pendingApprovalSas });
       return;
     }
     setIsApproving(true);
     try {
       const ok = await approvePairingSession(config.serverUrl, hostSessionId, config.seedPhrase);
-      console.log('APPROVE_PAIRING_RESULT:', { ok });
       if (ok) {
         syncEngine.addTrustedDevice({
           id: `slag-guest-${pendingApprovalSas}`,
           name: `Устройство ${pendingApprovalSas}`,
           platform: 'mobile',
           isCurrent: false,
+          syncMode: 'read-write',
+          canRunAiLease: false,
           pairedAt: new Date().toISOString(),
           lastSeenAt: 'Только что',
         });
@@ -164,7 +174,6 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         throw new Error('Сервер отклонил подтверждение');
       }
     } catch (err: unknown) {
-      console.error('APPROVE_PAIRING_ERROR:', err);
       const msg = err instanceof Error ? err.message : String(err);
       addToast?.(`Ошибка подтверждения: ${msg}`, 'error');
     } finally {
@@ -247,6 +256,51 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
     }
   };
 
+  const handleStartRename = (id: string, currentName: string) => {
+    setEditingDeviceId(id);
+    setEditingDeviceName(currentName);
+  };
+
+  const handleSaveRename = () => {
+    if (!editingDeviceId) return;
+    syncEngine.renameDevice(editingDeviceId, editingDeviceName);
+    setConfig(syncEngine.getConfig());
+    setEditingDeviceId(null);
+    addToast?.('Имя устройства обновлено', 'info');
+  };
+
+  const handleToggleSyncMode = (id: string, currentMode?: DeviceSyncMode) => {
+    const next: DeviceSyncMode = currentMode === 'receive-only' ? 'read-write' : 'receive-only';
+    syncEngine.setDeviceSyncMode(id, next);
+    setConfig(syncEngine.getConfig());
+    addToast?.(`Режим синхронизации: ${next === 'read-write' ? 'Полный доступ' : 'Только чтение'}`, 'info');
+  };
+
+  const handleToggleAiLease = (id: string, currentCanRun?: boolean) => {
+    const next = !currentCanRun;
+    syncEngine.setDeviceAiLease(id, next);
+    setConfig(syncEngine.getConfig());
+    addToast?.(`AI-воркер: ${next ? 'включен' : 'отключен'}`, 'info');
+  };
+
+  const handleRotateKey = async () => {
+    const confirmed = window.confirm(
+      'Внимание! Будет сгенерирован новый ключ шифрования и создана новая комната на релее.\n' +
+      'Все другие устройства потеряют доступ к синхронизации, пока не будут заново сопряжены по новому PIN-коду.\n\n' +
+      'Выполнить ротацию ключа?'
+    );
+    if (!confirmed) return;
+
+    try {
+      await syncEngine.rotateVaultKey();
+      setConfig(syncEngine.getConfig());
+      addToast?.('Ключ хранилища ротирован, создана новая чистая комната', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast?.(`Ошибка ротации: ${msg}`, 'error');
+    }
+  };
+
   const formatTtl = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
@@ -291,7 +345,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               addToast?.(`Подписка активна до ${sub.expiresFormatted}. Продление доступно на сайте.`, 'info');
             }
           }}
-          className="px-2.5 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer"
+          className="px-2.5 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer active:scale-[0.96]"
         >
           {sub.plan === 'self-hosted' ? 'Инфо' : 'Управление'}
         </button>
@@ -495,46 +549,157 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         )}
       </div>
 
-      {/* 4. Flat Trusted Devices List */}
+      {/* 4. Flat Trusted Devices List with In-Place Actions */}
       <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <span className="text-xs font-semibold text-zinc-200">Доверенные устройства</span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-zinc-200">Доверенные устройства</span>
+          <span className="text-[10px] text-zinc-500">Имена хранятся строго локально</span>
+        </div>
 
         <div className="divide-y divide-white/[0.04]">
-          {/* Current Device */}
-          <div className="py-2 flex items-center justify-between gap-3">
+          {/* Current Device Row */}
+          <div className="py-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-200">{config.deviceName}</span>
-                <span className="font-mono text-2xs text-zinc-500">({config.deviceId})</span>
-                <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.2 rounded">
-                  текущее
-                </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  {editingDeviceId === config.deviceId ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={editingDeviceName}
+                      onChange={(e) => setEditingDeviceName(e.target.value)}
+                      onBlur={handleSaveRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveRename();
+                        if (e.key === 'Escape') setEditingDeviceId(null);
+                      }}
+                      className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none font-medium"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleStartRename(config.deviceId, config.deviceName)}
+                      className="text-xs text-zinc-200 font-medium hover:underline text-left cursor-pointer flex items-center gap-1 group"
+                      title="Кликните для переименования"
+                    >
+                      <span>{config.deviceName}</span>
+                      <Edit2 className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                    </button>
+                  )}
+                  <span className="font-mono text-2xs text-zinc-500">({config.deviceId})</span>
+                  <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.2 rounded">
+                    текущее
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-2xs text-zinc-400">Онлайн</span>
+
+            <div className="flex items-center gap-2">
+              {/* Local Sync Mode Badge */}
+              <button
+                type="button"
+                onClick={() => handleToggleSyncMode(config.deviceId, config.localSyncMode)}
+                className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
+                  config.localSyncMode === 'receive-only'
+                    ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                    : 'bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]'
+                }`}
+                title="Переключить режим синхронизации"
+              >
+                {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
+              </button>
+
+              {/* Local AI Worker Badge */}
+              <button
+                type="button"
+                onClick={() => handleToggleAiLease(config.deviceId, config.canRunAiLease)}
+                className={`p-1 rounded transition-colors cursor-pointer ${
+                  config.canRunAiLease !== false
+                    ? 'text-emerald-400 hover:bg-emerald-500/10'
+                    : 'text-zinc-600 hover:text-zinc-400'
+                }`}
+                title={config.canRunAiLease !== false ? 'AI-воркер активен' : 'AI-воркер отключен'}
+              >
+                <Bot className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="flex items-center gap-1.5 ml-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-2xs text-zinc-400">Онлайн</span>
+              </div>
             </div>
           </div>
 
           {/* Trusted Devices from Config */}
           {config.trustedDevices.map((dev) => (
-            <div key={dev.id} className="py-2 flex items-center justify-between gap-3">
+            <div key={dev.id} className="py-2.5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 {dev.platform === 'mobile' ? (
                   <Smartphone className="w-4 h-4 text-zinc-400 shrink-0" />
                 ) : (
                   <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
                 )}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-200">{dev.name}</span>
-                  <span className="font-mono text-2xs text-zinc-500">({dev.id})</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    {editingDeviceId === dev.id ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={editingDeviceName}
+                        onChange={(e) => setEditingDeviceName(e.target.value)}
+                        onBlur={handleSaveRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename();
+                          if (e.key === 'Escape') setEditingDeviceId(null);
+                        }}
+                        className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none font-medium"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStartRename(dev.id, dev.name)}
+                        className="text-xs text-zinc-200 font-medium hover:underline text-left cursor-pointer flex items-center gap-1 group"
+                        title="Кликните для переименования"
+                      >
+                        <span>{dev.name}</span>
+                        <Edit2 className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                      </button>
+                    )}
+                    <span className="font-mono text-2xs text-zinc-500">({dev.id})</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-2xs text-zinc-500">{dev.lastSeenAt || 'Синхронизировано'}</span>
+              <div className="flex items-center gap-2">
+                {/* Sync Mode Toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSyncMode(dev.id, dev.syncMode)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
+                    dev.syncMode === 'receive-only'
+                      ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                      : 'bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]'
+                  }`}
+                  title="Переключить режим синхронизации"
+                >
+                  {dev.syncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
+                </button>
+
+                {/* AI Lease Toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleAiLease(dev.id, dev.canRunAiLease)}
+                  className={`p-1 rounded transition-colors cursor-pointer ${
+                    dev.canRunAiLease
+                      ? 'text-emerald-400 hover:bg-emerald-500/10'
+                      : 'text-zinc-600 hover:text-zinc-400'
+                  }`}
+                  title={dev.canRunAiLease ? 'AI-воркер разрешен' : 'AI-воркер запрещен'}
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -542,7 +707,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                     setConfig(syncEngine.getConfig());
                     addToast?.('Устройство удалено', 'info');
                   }}
-                  className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                  className="p-1 text-zinc-500 hover:text-rose-400 rounded transition-colors cursor-pointer ml-1"
                   title="Удалить"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -595,6 +760,27 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
             className="w-3.5 h-3.5 accent-white cursor-pointer"
           />
         </label>
+      </div>
+
+      {/* 6. Security & Panic Re-keying (Key Rotation) */}
+      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <KeyRound className="w-4 h-4 text-rose-400 shrink-0" />
+          <div>
+            <span className="text-xs font-semibold text-zinc-200">Ротация ключа (Panic Re-keying)</span>
+            <p className="text-2xs text-zinc-500">
+              Если девайс утерян или украден, создайте новый ключ. Все старые устройства будут мгновенно отключены.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleRotateKey}
+          className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap active:scale-[0.96]"
+        >
+          Сменить ключ
+        </button>
       </div>
     </div>
   );

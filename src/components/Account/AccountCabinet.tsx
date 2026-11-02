@@ -9,10 +9,13 @@ import {
   Download,
   ArrowLeft,
   Plus,
+  Edit2,
+  KeyRound,
+  Bot,
 } from 'lucide-react';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { createPairingSession } from '../../lib/sync/pairing';
-import type { SyncStatus, SyncConfig } from '../../lib/sync/types';
+import type { SyncStatus, SyncConfig, DeviceSyncMode } from '../../lib/sync/types';
 
 interface AccountCabinetProps {
   onBackToLanding?: () => void;
@@ -32,6 +35,10 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
   const [isGeneratingPin, setIsGeneratingPin] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Inline device rename state
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [editingDeviceName, setEditingDeviceName] = useState('');
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -40,7 +47,10 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
   };
 
   useEffect(() => {
-    const unsub = syncEngine.subscribe((st) => setStatus(st));
+    const unsub = syncEngine.subscribe((st) => {
+      setStatus(st);
+      setConfig(syncEngine.getConfig());
+    });
     return unsub;
   }, []);
 
@@ -91,6 +101,51 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
     syncEngine.removeTrustedDevice(deviceId);
     setConfig(syncEngine.getConfig());
     showToast('Устройство удалено из списка');
+  };
+
+  const handleStartRename = (id: string, currentName: string) => {
+    setEditingDeviceId(id);
+    setEditingDeviceName(currentName);
+  };
+
+  const handleSaveRename = () => {
+    if (!editingDeviceId) return;
+    syncEngine.renameDevice(editingDeviceId, editingDeviceName);
+    setConfig(syncEngine.getConfig());
+    setEditingDeviceId(null);
+    showToast('Имя устройства обновлено');
+  };
+
+  const handleToggleSyncMode = (id: string, currentMode?: DeviceSyncMode) => {
+    const next: DeviceSyncMode = currentMode === 'receive-only' ? 'read-write' : 'receive-only';
+    syncEngine.setDeviceSyncMode(id, next);
+    setConfig(syncEngine.getConfig());
+    showToast(`Режим: ${next === 'read-write' ? 'Полный доступ' : 'Только чтение'}`);
+  };
+
+  const handleToggleAiLease = (id: string, currentCanRun?: boolean) => {
+    const next = !currentCanRun;
+    syncEngine.setDeviceAiLease(id, next);
+    setConfig(syncEngine.getConfig());
+    showToast(`AI-воркер: ${next ? 'включен' : 'отключен'}`);
+  };
+
+  const handleRotateKey = async () => {
+    const confirmed = window.confirm(
+      'Внимание! Будет сгенерирован новый ключ шифрования и создана новая комната на релее.\n' +
+      'Все другие устройства потеряют доступ, пока не будут заново сопряжены по новому PIN-коду.\n\n' +
+      'Выполнить ротацию ключа?'
+    );
+    if (!confirmed) return;
+
+    try {
+      await syncEngine.rotateVaultKey();
+      setConfig(syncEngine.getConfig());
+      showToast('Ключ хранилища ротирован, создана новая комната');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Ошибка ротации: ${msg}`);
+    }
   };
 
   const sub = status.subscription;
@@ -295,9 +350,12 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
               )}
             </div>
 
-            {/* 4. Active Devices List */}
+            {/* 4. Active Devices List with In-Place Actions */}
             <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] space-y-3">
-              <span className="text-xs font-semibold text-zinc-200">Активные устройства</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-200">Активные устройства</span>
+                <span className="text-[10px] text-zinc-500">Имена хранятся строго локально</span>
+              </div>
 
               <div className="divide-y divide-white/[0.04]">
                 {/* Host device */}
@@ -306,17 +364,69 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
                     <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-200 font-medium">{config.deviceName}</span>
+                        {editingDeviceId === config.deviceId ? (
+                          <input
+                            type="text"
+                            autoFocus
+                            value={editingDeviceName}
+                            onChange={(e) => setEditingDeviceName(e.target.value)}
+                            onBlur={handleSaveRename}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRename();
+                              if (e.key === 'Escape') setEditingDeviceId(null);
+                            }}
+                            className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none font-medium"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleStartRename(config.deviceId, config.deviceName)}
+                            className="text-xs text-zinc-200 font-medium hover:underline text-left cursor-pointer flex items-center gap-1 group"
+                            title="Кликните для переименования"
+                          >
+                            <span>{config.deviceName}</span>
+                            <Edit2 className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                          </button>
+                        )}
+                        <span className="font-mono text-2xs text-zinc-500">({config.deviceId})</span>
                         <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.2 rounded">
                           основное
                         </span>
                       </div>
-                      <span className="font-mono text-2xs text-zinc-500">{config.deviceId}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-2xs text-zinc-400">Онлайн</span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSyncMode(config.deviceId, config.localSyncMode)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
+                        config.localSyncMode === 'receive-only'
+                          ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                          : 'bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]'
+                      }`}
+                      title="Переключить режим синхронизации"
+                    >
+                      {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAiLease(config.deviceId, config.canRunAiLease)}
+                      className={`p-1 rounded transition-colors cursor-pointer ${
+                        config.canRunAiLease !== false
+                          ? 'text-emerald-400 hover:bg-emerald-500/10'
+                          : 'text-zinc-600 hover:text-zinc-400'
+                      }`}
+                      title={config.canRunAiLease !== false ? 'AI-воркер активен' : 'AI-воркер отключен'}
+                    >
+                      <Bot className="w-3.5 h-3.5" />
+                    </button>
+
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-2xs text-zinc-400">Онлайн</span>
+                    </div>
                   </div>
                 </div>
 
@@ -330,17 +440,67 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
                         <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
                       )}
                       <div>
-                        <span className="text-xs text-zinc-200 font-medium">{dev.name}</span>
-                        <p className="font-mono text-2xs text-zinc-500">{dev.id}</p>
+                        <div className="flex items-center gap-2">
+                          {editingDeviceId === dev.id ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingDeviceName}
+                              onChange={(e) => setEditingDeviceName(e.target.value)}
+                              onBlur={handleSaveRename}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveRename();
+                                if (e.key === 'Escape') setEditingDeviceId(null);
+                              }}
+                              className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none font-medium"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleStartRename(dev.id, dev.name)}
+                              className="text-xs text-zinc-200 font-medium hover:underline text-left cursor-pointer flex items-center gap-1 group"
+                              title="Кликните для переименования"
+                            >
+                              <span>{dev.name}</span>
+                              <Edit2 className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                            </button>
+                          )}
+                          <span className="font-mono text-2xs text-zinc-500">({dev.id})</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xs text-zinc-500">{dev.lastSeenAt || 'Синхронизировано'}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSyncMode(dev.id, dev.syncMode)}
+                        className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
+                          dev.syncMode === 'receive-only'
+                            ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                            : 'bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]'
+                        }`}
+                        title="Переключить режим синхронизации"
+                      >
+                        {dev.syncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAiLease(dev.id, dev.canRunAiLease)}
+                        className={`p-1 rounded transition-colors cursor-pointer ${
+                          dev.canRunAiLease
+                            ? 'text-emerald-400 hover:bg-emerald-500/10'
+                            : 'text-zinc-600 hover:text-zinc-400'
+                        }`}
+                        title={dev.canRunAiLease ? 'AI-воркер разрешен' : 'AI-воркер запрещен'}
+                      >
+                        <Bot className="w-3.5 h-3.5" />
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => handleRevokeDevice(dev.id)}
-                        className="p-1 text-zinc-500 hover:text-rose-400 rounded transition-colors cursor-pointer"
+                        className="p-1 text-zinc-500 hover:text-rose-400 rounded transition-colors cursor-pointer ml-1"
                         title="Отозвать доступ"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -349,6 +509,27 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* 5. Security & Panic Re-keying in Cabinet */}
+            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <KeyRound className="w-4 h-4 text-rose-400 shrink-0" />
+                <div>
+                  <span className="text-xs font-semibold text-zinc-200">Ротация ключа (Panic Re-keying)</span>
+                  <p className="text-2xs text-zinc-500">
+                    Смените мастер-ключ хранилища. Все сторонние девайсы мгновенно потеряют доступ.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRotateKey}
+                className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap active:scale-[0.96]"
+              >
+                Сменить ключ
+              </button>
             </div>
           </>
         )}
