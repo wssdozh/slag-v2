@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 import { logger } from '../../lib/logger';
 import { openAppFolder } from '../../lib/folderOpener';
+import { getPlatformInfo, setupSystemHotkey, removeSystemHotkey, type PlatformInfo } from '../../lib/platform';
 import type { AiProvider } from '../../types';
 import {
   Settings,
@@ -95,6 +96,44 @@ export const SettingsModal: React.FC = () => {
   const [tagCaseStyle, setTagCaseStyle] = useState(aiSettings.tagCaseStyle || 'lowercase');
   const [customTagRules, setCustomTagRules] = useState(aiSettings.customTagRules || '');
   const [showKey, setShowKey] = useState(false);
+  const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
+  const [isUpdatingHotkey, setIsUpdatingHotkey] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'shortcuts') {
+      void getPlatformInfo().then(setPlatformInfo);
+    }
+  }, [activeTab]);
+
+  const handleSetupHotkey = async () => {
+    setIsUpdatingHotkey(true);
+    try {
+      const updated = await setupSystemHotkey();
+      if (updated) {
+        setPlatformInfo(updated);
+        addToast('Системный хоткей успешно привязан!', 'success');
+      }
+    } catch {
+      addToast('Не удалось привязать хоткей', 'error');
+    } finally {
+      setIsUpdatingHotkey(false);
+    }
+  };
+
+  const handleRemoveHotkey = async () => {
+    setIsUpdatingHotkey(true);
+    try {
+      const updated = await removeSystemHotkey();
+      if (updated) {
+        setPlatformInfo(updated);
+        addToast('Системный хоткей отключен', 'info');
+      }
+    } catch {
+      addToast('Не удалось отключить хоткей', 'error');
+    } finally {
+      setIsUpdatingHotkey(false);
+    }
+  };
 
   if (!isSettingsOpen) return null;
 
@@ -1152,6 +1191,70 @@ export const SettingsModal: React.FC = () => {
 
             {activeTab === 'shortcuts' && (
               <div className="flex flex-col gap-4">
+                {/* System-level OS Integration Card */}
+                {platformInfo && (
+                  <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-zinc-200">
+                          Глобальный вызов в операционной системе
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase bg-white/5 border border-white/[0.08] text-zinc-400">
+                          {platformInfo.os} • {platformInfo.desktopEnvironment} ({platformInfo.sessionType})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            platformInfo.isHotkeyRegistered ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                          }`}
+                        />
+                        <span className="text-[11px] font-mono text-zinc-300">
+                          {platformInfo.shortcut}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      {platformInfo.details}
+                    </p>
+
+                    {platformInfo.hotkeyBackend === 'gnome_gsettings' && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={isUpdatingHotkey}
+                          onClick={handleSetupHotkey}
+                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-zinc-200 transition-colors cursor-pointer active:scale-95 disabled:opacity-50"
+                        >
+                          {platformInfo.isHotkeyRegistered ? 'Актуализировать путь' : 'Привязать хоткей в GNOME'}
+                        </button>
+                        {platformInfo.isHotkeyRegistered && (
+                          <button
+                            type="button"
+                            disabled={isUpdatingHotkey}
+                            onClick={handleRemoveHotkey}
+                            className="px-2.5 py-1 rounded-lg hover:bg-red-500/10 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer active:scale-95 disabled:opacity-50"
+                          >
+                            Отвязать
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {platformInfo.hotkeyBackend === 'custom_launcher' && (
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          Команда для вызова в конфиге вашего WM (Hyprland / Sway / i3):
+                        </span>
+                        <code className="text-[11px] font-mono p-1.5 rounded bg-black/40 text-emerald-400 border border-white/[0.05] select-all">
+                          {platformInfo.executablePath} --quick
+                        </code>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold text-zinc-200">
                     Глобальные команды и шорткаты

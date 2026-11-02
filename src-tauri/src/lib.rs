@@ -167,6 +167,35 @@ fn configure_window_border(window: &tauri::Window) {
 #[allow(dead_code)]
 fn configure_window_border(_window: &tauri::Window) {}
 
+mod platform;
+
+#[cfg(desktop)]
+#[tauri::command]
+fn get_platform_info() -> Result<platform::PlatformInfo, String> {
+    Ok(platform::detect_platform())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn setup_system_hotkey(binding: Option<String>) -> Result<platform::PlatformInfo, String> {
+    #[cfg(target_os = "linux")]
+    {
+        platform::install_gnome_shortcut(binding.as_deref())?;
+        let _ = platform::ensure_desktop_entry();
+    }
+    Ok(platform::detect_platform())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn remove_system_hotkey() -> Result<platform::PlatformInfo, String> {
+    #[cfg(target_os = "linux")]
+    {
+        platform::remove_gnome_shortcut()?;
+    }
+    Ok(platform::detect_platform())
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, String> {
@@ -245,11 +274,43 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--install-system") {
+        #[cfg(target_os = "linux")]
+        {
+            if let Err(e) = platform::ensure_desktop_entry() {
+                eprintln!("Failed to install desktop entry: {e}");
+            }
+            if let Err(e) = platform::install_gnome_shortcut(None) {
+                eprintln!("Failed to install GNOME shortcut: {e}");
+            } else {
+                println!("SLAG system integration installed successfully.");
+            }
+            return;
+        }
+    }
+    if args.iter().any(|a| a == "--uninstall-system") {
+        #[cfg(target_os = "linux")]
+        {
+            if let Err(e) = platform::remove_gnome_shortcut() {
+                eprintln!("Failed to remove GNOME shortcut: {e}");
+            } else {
+                println!("SLAG system integration uninstalled successfully.");
+            }
+            return;
+        }
+    }
+
     let mut builder = tauri::Builder::default();
 
     #[cfg(desktop)]
     {
-        builder = builder.invoke_handler(tauri::generate_handler![open_in_folder]);
+        builder = builder.invoke_handler(tauri::generate_handler![
+            open_in_folder,
+            get_platform_info,
+            setup_system_hotkey,
+            remove_system_hotkey
+        ]);
     }
 
     #[cfg(desktop)]
@@ -326,6 +387,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                platform::auto_adapt_system();
+
                 if let Some(main_window) = app.get_webview_window("main") {
                     #[cfg(target_os = "windows")]
                     configure_window_border(&main_window.as_ref().window());

@@ -105,3 +105,23 @@ cargo build --release --manifest-path src-tauri/Cargo.toml
 ### Ошибка 4: «forbidden path: .../.trash» на Linux
 - **Первопричина**: На Unix системы glob-шаблоны Tauri по умолчанию требуют явного совпадения точки (`requireLiteralLeadingDot: true`).
 - **Решение**: В `tauri.conf.json` в секции `plugins.fs` настроено `"requireLiteralLeadingDot": false`.
+
+---
+
+## 6. Кроссплатформенная Адаптация и Системные Хоткеи
+
+SLAG v2 автоматически определяет платформу при запуске и установке:
+
+1. **Linux (Wayland + GNOME)**:
+   - Из-за ограничений безопасности Wayland глобальные шорткаты регистрируются через системный демон GNOME Media Keys (`org.gnome.settings-daemon.plugins.media-keys`).
+   - При первом запуске автоматически прописывается биндинг `Ctrl+Shift+Space` -> `<path_to_binary> --quick`.
+   - Автоматически генерируется десктоп-файл `~/.local/share/applications/com.slag.notes.desktop` с Actions `QuickComposer` и устанавливается иконка `~/.local/share/icons/hicolor/128x128/apps/com.slag.notes.png`.
+2. **Linux (Wayland non-GNOME / Hyprland / Sway)**:
+   - В настройках («Горячие клавиши») отображается готовая строка биндинга для конфигурационного файла тайлингового менеджера (`bind = CTRL SHIFT, SPACE, exec, <path> --quick`).
+3. **Windows / macOS / Linux X11**:
+   - Автоматически используется нативный глобальный хук `tauri-plugin-global-shortcut`.
+
+### Сервисные CLI-флаги бинарника:
+- `./slag-v2 --quick`: мгновенно открывает окно быстрой мысли через IPC одиночного инстанса.
+- `./slag-v2 --install-system`: генерирует `.desktop`-файл и привязывает хоткей в GNOME без запуска окна GUI (идеально для инсталляторов и пакетов).
+- `./slag-v2 --uninstall-system`: отвязывает шорткат из GNOME.
