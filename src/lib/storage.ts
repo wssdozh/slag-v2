@@ -679,7 +679,7 @@ export class StorageService {
 
     const itemsKey = this.getItemsKey();
     if (!localStorage.getItem(itemsKey)) {
-      const initialItems = generateDemoItems();
+      const initialItems = this.currentVault.id === 'default_vault' ? generateDemoItems() : [];
       localStorage.setItem(itemsKey, JSON.stringify(initialItems));
     } else {
       // Auto-prune obsolete demo items from existing storage
