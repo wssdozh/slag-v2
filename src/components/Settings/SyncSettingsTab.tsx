@@ -942,7 +942,22 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                         autoFocus
                         placeholder="123-456"
                         value={guestInputPin}
-                        onChange={(e) => setGuestInputPin(e.target.value)}
+                        onChange={(e) => {
+                          let val = e.target.value.replace(/[^0-9-]/g, '');
+                          if (val.length === 6 && !val.includes('-')) {
+                            val = `${val.slice(0, 3)}-${val.slice(3)}`;
+                          }
+                          setGuestInputPin(val);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!isClaimingPin && guestInputPin.trim()) {
+                              handleClaimGuestPin();
+                            }
+                          }
+                        }}
                         maxLength={8}
                         className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-3 py-2 text-center font-mono text-lg tracking-widest text-white placeholder-zinc-700 outline-none focus:border-white/20"
                       />

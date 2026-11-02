@@ -223,10 +223,34 @@ const AppContent: React.FC = () => {
   );
 };
 
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err: unknown) { console.warn('App recovered from runtime error:', err); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-screen h-screen flex flex-col items-center justify-center bg-canvas text-fg-primary gap-4 font-mono">
+          <p className="text-sm text-zinc-400">Произошла ошибка интерфейса</p>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs cursor-pointer transition-colors"
+          >
+            Восстановить
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function App() {
   return (
     <AppProvider>
-      <AppContent />
+      <AppErrorBoundary>
+        <AppContent />
+      </AppErrorBoundary>
     </AppProvider>
   );
 }

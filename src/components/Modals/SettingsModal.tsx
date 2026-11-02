@@ -148,6 +148,7 @@ export const SettingsModal: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (activeTab !== 'ai') return;
     saveAiSettings({
       sourceMode,
       subscriptionModel,
