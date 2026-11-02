@@ -55,7 +55,7 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   folderSettings: {},
 };
 
-// Initial default folders (Custom taxonomy aligned with Career, Personal, Projects, Future and Knowledge Base)
+// Initial default folders: clean, top-level categories without arbitrary pet-projects
 export const DEFAULT_FOLDERS: FolderMeta[] = [
   {
     path: 'Входящие',
@@ -67,92 +67,32 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
   {
     path: 'Карьера',
     name: 'Карьера',
-    description: 'Профессиональный рост, карьерные цели, резюме, поиск работы и ключевые навыки.',
+    description: 'Профессиональный рост, рабочие цели, компетенции и проекты.',
     icon: 'Briefcase',
-  },
-  {
-    path: 'Карьера/Поиск работы',
-    name: 'Поиск работы',
-    description: 'Отклики, вакансии, контакты рекрутеров, резюме и подготовка к собеседованиям.',
-    icon: 'Compass',
-  },
-  {
-    path: 'Карьера/Развитие',
-    name: 'Развитие',
-    description: 'Обучение, курсы, новые технологии, профессиональные книги и менторство.',
-    icon: 'Sparkles',
-  },
-  {
-    path: 'Личное',
-    name: 'Личное',
-    description: 'Личные цели, баланс жизни, здоровье, дом и быт.',
-    icon: 'Bookmark',
-  },
-  {
-    path: 'Личное/Быт',
-    name: 'Быт',
-    description: 'Домашние дела, покупки, счета, мелкий ремонт, бытовая рутина и организация жизни.',
-    icon: 'Coffee',
-  },
-  {
-    path: 'Личное/Здоровье',
-    name: 'Здоровье',
-    description: 'Тренировки, чекапы, врачи, анализы, режим сна, питание и самочувствие.',
-    icon: 'Heart',
   },
   {
     path: 'Проекты',
     name: 'Проекты',
-    description: 'Активная продуктовая и техническая разработка, пет-проекты, код и контент.',
+    description: 'Активные рабочие и технические проекты, задачи и код.',
     icon: 'Folder',
   },
   {
-    path: 'Проекты/Дизайн',
-    name: 'Дизайн',
-    description: 'Интерфейсы, типографика Inter, референсы Linear и Vercel.',
-    icon: 'Layers',
-  },
-  {
-    path: 'Проекты/медиа',
-    name: 'медиа',
-    description: 'Создание контента, сценарии для видео и блогов, статьи, соцсети и публикации.',
-    icon: 'Book',
-  },
-  {
-    path: 'Проекты/fantazer',
-    name: 'fantazer',
-    description: 'Разработка проекта fantazer, архитектура, задачи и фичи.',
-    icon: 'Cpu',
-  },
-  {
-    path: 'Проекты/block-sorting',
-    name: 'block-sorting',
-    description: 'Проект сортировки блоков block-sorting, алгоритмы, верстка и код.',
-    icon: 'Code2',
-  },
-  {
-    path: 'Будущее',
-    name: 'Будущее',
-    description: 'Инкубатор долгосрочных замыслов, список отложенного и идеи без жестких сроков.',
-    icon: 'Flame',
-  },
-  {
-    path: 'Будущее/Потом',
-    name: 'Потом',
-    description: 'Задачи и идеи «когда-нибудь / может быть», книги на будущее, отложенные планы.',
-    icon: 'Archive',
-  },
-  {
-    path: 'Будущее/Хотелки',
-    name: 'Хотелки',
-    description: 'Вишлист покупок, гаджеты, подарки, развлечения и вдохновляющие хотелки.',
-    icon: 'Sparkles',
+    path: 'Личное',
+    name: 'Личное',
+    description: 'Личные цели, планы, здоровье и повседневные дела.',
+    icon: 'Bookmark',
   },
   {
     path: 'База знаний',
     name: 'База знаний',
-    description: 'Вечнозеленые заметки, статьи, документация и референсы.',
+    description: 'Вечнозеленые заметки, статьи, документация и полезные материалы.',
     icon: 'Book',
+  },
+  {
+    path: 'Архив',
+    name: 'Архив',
+    description: 'Завершенные задачи, старые заметки и архивные материалы.',
+    icon: 'Archive',
   },
 ];
 

@@ -21,12 +21,12 @@ test.describe('Composer @ Folder Selection E2E', () => {
     // Visual screenshot of the open @ folder menu
     await page.screenshot({ path: 'test-results/screenshots/folder_menu_open.png' });
 
-    // Filter by typing 'диз'
-    await textarea.pressSequentially('диз');
+    // Filter by typing 'про'
+    await textarea.pressSequentially('про');
 
-    // The item 'Дизайн' should be visible
-    const designItem = page.locator('button', { hasText: 'Дизайн' }).first();
-    await expect(designItem).toBeVisible();
+    // The item 'Проекты' should be visible
+    const projectItem = page.locator('button', { hasText: 'Проекты' }).first();
+    await expect(projectItem).toBeVisible();
 
     // Press Enter to select the folder
     await textarea.press('Enter');
@@ -34,14 +34,14 @@ test.describe('Composer @ Folder Selection E2E', () => {
     // Menu should disappear
     await expect(folderMenuHeader).toBeHidden();
 
-    // Text in textarea should no longer contain '@диз'
+    // Text in textarea should no longer contain '@про'
     const value = await textarea.inputValue();
     expect(value.trim()).toBe('Тестовая таска');
 
     // Target folder chip should be visible in composer properties
     const folderChip = page.locator('span[title*="Целевая папка для сохранения"]');
     await expect(folderChip).toBeVisible();
-    await expect(folderChip).toContainText('Проекты/Дизайн');
+    await expect(folderChip).toContainText('Проекты');
 
     // Visual screenshot of composer with folder chip
     await page.screenshot({ path: 'test-results/screenshots/folder_chip_active.png' });
@@ -50,7 +50,7 @@ test.describe('Composer @ Folder Selection E2E', () => {
     await textarea.press('Enter');
 
     // Toast or note created
-    await expect(page.locator('text=Папка «Дизайн» выбрана')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('text=Папка «Проекты» выбрана')).toBeVisible({ timeout: 3000 });
   });
 
   test('2. Folder button is permanently absent from toolbar, typing @ opens menu', async ({ page }) => {
@@ -240,8 +240,8 @@ test.describe('Composer @ Folder Selection E2E', () => {
     await expect(page.locator('aside span', { hasText: 'Карьера' }).first()).toBeVisible();
     await expect(page.locator('aside span', { hasText: 'Личное' }).first()).toBeVisible();
     await expect(page.locator('aside span', { hasText: 'Проекты' }).first()).toBeVisible();
-    await expect(page.locator('aside span', { hasText: 'Будущее' }).first()).toBeVisible();
     await expect(page.locator('aside span', { hasText: 'База знаний' }).first()).toBeVisible();
+    await expect(page.locator('aside span', { hasText: 'Архив' }).first()).toBeVisible();
 
     await page.screenshot({
       path: 'test-results/screenshots/new-folder-structure.png',
@@ -256,21 +256,22 @@ test.describe('Composer @ Folder Selection E2E', () => {
     // Test programmatically via exposed storage
     const result = await page.evaluate(() => {
       const storage = (window as any).storage;
-      // 1. Create a note in 'Проекты/fantazer'
+      // 1. Create a custom folder and a note in it
+      storage.saveFolder({ path: 'Временная', name: 'Временная' });
       storage.saveItem({
         id: 'test_delete_folder_item',
         type: 'note',
         title: 'Note to be re-routed',
-        content: 'Content inside fantazer',
-        folder: 'Проекты/fantazer',
+        content: 'Content inside temporary folder',
+        folder: 'Временная',
       });
 
       // 2. Ensure folder was in getFolders
       const beforeFolders = storage.getFolders().map((f: any) => f.path);
-      const hadFantazer = beforeFolders.includes('Проекты/fantazer');
+      const hadFolder = beforeFolders.includes('Временная');
 
       // 3. Delete folder
-      storage.deleteFolder('Проекты/fantazer');
+      storage.deleteFolder('Временная');
 
       // 4. Repeatedly check getFolders to ensure it does NOT resurrect at bottom
       const afterFolders1 = storage.getFolders().map((f: any) => f.path);
@@ -280,19 +281,19 @@ test.describe('Composer @ Folder Selection E2E', () => {
       const movedItem = storage.getItemById('test_delete_folder_item');
 
       return {
-        hadFantazer,
-        hasAfter1: afterFolders1.includes('Проекты/fantazer'),
-        hasAfter2: afterFolders2.includes('Проекты/fantazer'),
+        hadFolder,
+        hasAfter1: afterFolders1.includes('Временная'),
+        hasAfter2: afterFolders2.includes('Временная'),
         itemFolder: movedItem ? movedItem.folder : null,
         lastFolder: afterFolders2[afterFolders2.length - 1],
       };
     });
 
-    expect(result.hadFantazer).toBe(true);
+    expect(result.hadFolder).toBe(true);
     expect(result.hasAfter1).toBe(false);
     expect(result.hasAfter2).toBe(false);
     expect(result.itemFolder).toBe('Входящие');
-    expect(result.lastFolder).not.toBe('Проекты/fantazer');
+    expect(result.lastFolder).not.toBe('Временная');
 
     // Also take a screenshot of UI
     await page.screenshot({

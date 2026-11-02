@@ -30,7 +30,7 @@ export function generateDemoItems(): SlagItem[] {
       attachments: [],
     },
 
-    // Карьера / Поиск работы
+    // Карьера
     {
       id: uid('demo_career_job'),
       type: 'task',
@@ -40,7 +40,7 @@ export function generateDemoItems(): SlagItem[] {
         '- [x] Выписать стек технологий и последние достижения\n' +
         '- [ ] Оформить PDF и страницу на GitHub\n' +
         '- [ ] Собрать список целевых компаний',
-      folder: 'Карьера/Поиск работы',
+      folder: 'Карьера',
       tags: ['карьера', 'резюме', 'работа'],
       createdAt: now - 3600000 * 3,
       updatedAt: now - 3600000 * 3,
@@ -55,33 +55,13 @@ export function generateDemoItems(): SlagItem[] {
       attachments: [],
     },
 
-    // Карьера / Развитие
-    {
-      id: 'demo_article_2',
-      type: 'article',
-      title: '12 правил эффективности',
-      content:
-        '# 12 правил эффективности\n\n' +
-        'Кратко: Личная заметка с правилами эффективности. #продуктивность #эффективность #делегирование #планирование #таймменеджмент #фокус #саморазвитие #приоритеты #работа #заработок #review\n\n' +
-        '1. Фокус на главном и отсечение лишнего.\n' +
-        '2. Делегирование рутинных задач.\n' +
-        '3. Четкое планирование повестки на день и недельный спринт.',
-      folder: 'Карьера/Развитие',
-      tags: ['продуктивность', 'эффективность', 'планирование', 'саморазвитие'],
-      createdAt: now - 3600000,
-      updatedAt: now - 3600000,
-      readingTimeMinutes: 1,
-      summary: 'Личная заметка с правилами эффективности: фокус, делегирование, планирование.',
-      attachments: [],
-    },
-
-    // Личное / Быт
+    // Личное
     {
       id: uid('demo_personal'),
       type: 'task',
       title: 'Купить хороший зеленый чай',
       content: 'Сенча или Габа для работы по вечерам.\n\n- [ ] Заглянуть в чайную лавку у дома',
-      folder: 'Личное/Быт',
+      folder: 'Личное',
       tags: ['быт', 'покупки'],
       createdAt: now - 900000,
       updatedAt: now - 900000,
@@ -98,7 +78,7 @@ export function generateDemoItems(): SlagItem[] {
       type: 'task',
       title: 'Полить цветы в кабинете',
       content: 'Еженедельный уход за растениями.',
-      folder: 'Личное/Быт',
+      folder: 'Личное',
       tags: ['быт'],
       createdAt: now - 700000,
       updatedAt: now - 700000,
@@ -107,14 +87,12 @@ export function generateDemoItems(): SlagItem[] {
       dueDate: new Date(now + 86400000).toISOString().slice(0, 10),
       attachments: [],
     },
-
-    // Личное / Здоровье
     {
       id: uid('demo_health'),
       type: 'task',
       title: 'Записаться на ежегодный чекап и анализы',
       content: 'Проверить витамин D, общий анализ крови и записаться к терапевту.',
-      folder: 'Личное/Здоровье',
+      folder: 'Личное',
       tags: ['здоровье', 'чекап'],
       createdAt: now - 1200000,
       updatedAt: now - 1200000,
@@ -124,18 +102,18 @@ export function generateDemoItems(): SlagItem[] {
       attachments: [],
     },
 
-    // Проекты / fantazer
+    // Проекты
     {
       id: uid('demo_project'),
       type: 'task',
       title: 'План работы над проектом',
       content:
-        'Ключевые этапы и контрольные точки разработки fantazer.\n\n' +
+        'Ключевые этапы и контрольные точки разработки проекта.\n\n' +
         '- [x] Определить цели и ограничения\n' +
         '- [ ] Собрать базовую структуру заметок\n' +
         '- [ ] Проверить сохранение файлов на диске',
-      folder: 'Проекты/fantazer',
-      tags: ['проект', 'план', 'fantazer'],
+      folder: 'Проекты',
+      tags: ['проект', 'план'],
       createdAt: now - 3600000,
       updatedAt: now - 3600000,
       status: 'todo',
@@ -148,18 +126,16 @@ export function generateDemoItems(): SlagItem[] {
       ],
       attachments: [],
     },
-
-    // Проекты / block-sorting
     {
       id: 'demo_task_3',
       type: 'task',
       title: 'Синхронизация по архитектуре баз данных',
       content:
-        'Обсудить сортировку блоков в block-sorting и SQLite vs Markdown хранилище в 14:00-15:30.\n\n' +
+        'Обсудить сортировку блоков и SQLite vs Markdown хранилище в 14:00-15:30.\n\n' +
         '- [x] Подготовить схему таблиц\n' +
         '- [ ] Сравнить скорость поиска Orama',
-      folder: 'Проекты/block-sorting',
-      tags: ['architecture', 'meeting', 'block-sorting'],
+      folder: 'Проекты',
+      tags: ['architecture', 'meeting'],
       createdAt: now - 800000,
       updatedAt: now - 800000,
       status: 'todo',
@@ -172,8 +148,6 @@ export function generateDemoItems(): SlagItem[] {
       ],
       attachments: [],
     },
-
-    // Проекты / медиа
     {
       id: uid('demo_media'),
       type: 'note',
@@ -183,14 +157,12 @@ export function generateDemoItems(): SlagItem[] {
         '• Разбор архитектуры Local-First приложений\n' +
         '• Пост-сравнение SQLite vs чистого Markdown\n' +
         '• Видеодемонстрация MCP-сервера в Claude и Cursor',
-      folder: 'Проекты/медиа',
-      tags: ['медиа', 'контент', 'видео'],
+      folder: 'Проекты',
+      tags: ['контент', 'заметки'],
       createdAt: now - 2400000,
       updatedAt: now - 2400000,
       attachments: [],
     },
-
-    // Проекты / Дизайн
     {
       id: 'demo_reply_1',
       type: 'note',
@@ -198,44 +170,10 @@ export function generateDemoItems(): SlagItem[] {
       content:
         'Сверил требования со статьёй [[Манифест ультра-минимализма: почему интерфейс не должен орать]].\n\n' +
         'Теги и структура должны подбираться тихо, без визуального шума.',
-      folder: 'Проекты/Дизайн',
+      folder: 'Проекты',
       tags: ['дизайн', 'архитектура'],
       createdAt: now - 3600000,
       updatedAt: now - 3600000,
-      attachments: [],
-    },
-
-    // Будущее / Потом
-    {
-      id: uid('demo_future_later'),
-      type: 'note',
-      title: 'Список лонгридов и тем на изучение',
-      content:
-        '# Отложенное на будущее\n\n' +
-        '• Изучить спецификацию WebAssembly Component Model\n' +
-        '• Почитать про CRDT и Yjs для P2P синхронизации\n' +
-        '• Попробовать локальные модели через Ollama',
-      folder: 'Будущее/Потом',
-      tags: ['потом', 'изучение'],
-      createdAt: now - 4000000,
-      updatedAt: now - 4000000,
-      attachments: [],
-    },
-
-    // Будущее / Хотелки
-    {
-      id: uid('demo_future_wishlist'),
-      type: 'note',
-      title: 'Гаджеты и сетап мечты для стола',
-      content:
-        '# Вишлист и хотелки\n\n' +
-        '• Механическая клавиатура с тихими свитчами\n' +
-        '• Кронштейн для двух мониторов\n' +
-        '• Увлажнитель воздуха в кабинет',
-      folder: 'Будущее/Хотелки',
-      tags: ['хотелки', 'сетап'],
-      createdAt: now - 3800000,
-      updatedAt: now - 3800000,
       attachments: [],
     },
 
@@ -274,6 +212,24 @@ export function generateDemoItems(): SlagItem[] {
       updatedAt: now - 86400000 * 1,
       readingTimeMinutes: 2,
       summary: 'Философия интерфейса в стиле Linear и Vercel: отсутствие визуального мусора и честное хранение в Markdown.',
+      attachments: [],
+    },
+    {
+      id: 'demo_article_2',
+      type: 'article',
+      title: '12 правил эффективности',
+      content:
+        '# 12 правил эффективности\n\n' +
+        'Кратко: Личная заметка с правилами эффективности. #продуктивность #эффективность #планирование #фокус\n\n' +
+        '1. Фокус на главном и отсечение лишнего.\n' +
+        '2. Делегирование рутинных задач.\n' +
+        '3. Четкое планирование повестки на день и недельный спринт.',
+      folder: 'База знаний',
+      tags: ['продуктивность', 'эффективность', 'планирование'],
+      createdAt: now - 3600000,
+      updatedAt: now - 3600000,
+      readingTimeMinutes: 1,
+      summary: 'Личная заметка с правилами эффективности: фокус, делегирование, планирование.',
       attachments: [],
     },
   ];
