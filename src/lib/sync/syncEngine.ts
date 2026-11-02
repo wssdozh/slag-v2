@@ -399,9 +399,22 @@ export class SyncEngine {
     }
   }
 
-  private async applyIncomingBundle(bundlePayload: unknown): Promise<void> {
+  private incomingQueue: Promise<void> = Promise.resolve();
+
+  private applyIncomingBundle(bundlePayload: unknown): Promise<void> {
+    const generation = this.initGeneration;
+    this.incomingQueue = this.incomingQueue.then(async () => {
+      if (generation === this.initGeneration) await this.persistIncomingBundle(bundlePayload);
+    });
+    return this.incomingQueue;
+  }
+
+  private async persistIncomingBundle(bundlePayload: unknown): Promise<void> {
     if (!this.activeVaultKey) return;
     const generation = this.initGeneration;
+    const roomId = this.activeRoomId;
+    const deviceId = this.config.deviceId;
+    const serverUrl = this.config.serverUrl.replace(/\/+$/, '');
 
     try {
       this.status.state = 'syncing';
@@ -436,6 +449,7 @@ export class SyncEngine {
       let hasItemsChanged = false;
       let hasFoldersChanged = false;
       let hasWorkspaceChanged = false;
+      let workspaceState: WorkspaceState | undefined;
 
       const currentItems: SlagItem[] = [...storage.getItems()];
       const currentFolders: FolderMeta[] = [...storage.getFolders()];
@@ -470,23 +484,33 @@ export class SyncEngine {
             hasFoldersChanged = true;
           }
         } else if (ch.type === 'workspace' && ch.payload) {
-          storage.saveWorkspaceState(ch.payload as WorkspaceState);
+          workspaceState = ch.payload as WorkspaceState;
           hasWorkspaceChanged = true;
         }
       }
 
-      if (hasItemsChanged || hasFoldersChanged) {
-        storage.importVaultData({
+      if (hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged) {
+        await storage.importSyncedVaultData({
           items: hasItemsChanged ? currentItems : undefined,
           folders: hasFoldersChanged ? currentFolders : undefined,
+          workspaceState,
         });
       }
+      if (generation !== this.initGeneration) return;
 
-      // Send ACK back
+      // Send ACK only after persistence succeeds.
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ type: 'ack', bundleId: bundle.bundleId }));
         syncLog.info(`ACK sent for bundle ${bundle.bundleId}`);
+      } else {
+        const response = await fetch(`${serverUrl}/api/rooms/${roomId}/ack`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId, bundleIds: [bundle.bundleId] }),
+        });
+        if (!response.ok) throw new Error(`Sync ACK failed: HTTP ${response.status}`);
       }
+      if (generation !== this.initGeneration) return;
 
       this.status.lastSyncTime = new Date().toLocaleTimeString();
       this.status.state = 'connected';
@@ -500,8 +524,9 @@ export class SyncEngine {
       );
     } catch (err) {
       syncLog.error('Error applying incoming bundle:', err);
+      if (generation !== this.initGeneration) return;
       this.status.state = 'error';
-      this.status.error = 'Ошибка расшифровки дельты';
+      this.status.error = 'Не удалось расшифровать или сохранить изменения';
       this.notify();
     }
   }
@@ -655,6 +680,7 @@ export class SyncEngine {
 
   public async fetchPendingBundlesHttp(): Promise<void> {
     if (!this.activeRoomId || !this.activeVaultKey) return;
+    const generation = this.initGeneration;
     try {
       const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
       const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?device=${encodeURIComponent(this.config.deviceId)}`);
@@ -662,6 +688,7 @@ export class SyncEngine {
       const data = await res.json();
       if (Array.isArray(data.bundles)) {
         for (const item of data.bundles) {
+          if (generation !== this.initGeneration) return;
           if (item.payload) {
             await this.applyIncomingBundle(item.payload);
           }

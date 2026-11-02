@@ -318,10 +318,10 @@ export class StorageService {
     return items;
   }
 
-  private async flushItemToDisk(item: SlagItem, oldFolder?: string, oldFilename?: string): Promise<void> {
+  private async flushItemToDisk(item: SlagItem, oldFolder?: string, oldFilename?: string, vault: VaultMeta = this.currentVault, strict = false): Promise<void> {
     if (!isTauri()) return;
     try {
-      const notesBase = this.getVaultNotesPath();
+      const notesBase = this.getVaultNotesPath(vault);
       const folder = item.folder || 'Входящие';
       const targetDir = `${notesBase}/${folder}`;
       await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
@@ -335,6 +335,10 @@ export class StorageService {
       const legacyOldPath = `${notesBase}/${prevFolder}/${item.id}.md`;
       const legacyTargetPath = `${targetDir}/${item.id}.md`;
 
+      // Write the replacement before removing the previous filename.
+      const content = serializeItemToMarkdown(item);
+      await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
+
       if (oldPath !== newPath && await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
         await remove(oldPath, { baseDir: BaseDirectory.AppData });
       }
@@ -345,18 +349,17 @@ export class StorageService {
         await remove(legacyTargetPath, { baseDir: BaseDirectory.AppData });
       }
 
-      const content = serializeItemToMarkdown(item);
-      await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
     } catch (err) {
       fsLog.error(`Failed to flush note ${item.id} to disk:`, err);
+      if (strict) throw err;
     }
   }
 
-  private async removeItemFromDisk(item: SlagItem): Promise<void> {
+  private async removeItemFromDisk(item: SlagItem, vault: VaultMeta = this.currentVault, strict = false): Promise<void> {
     if (!isTauri()) return;
     try {
-      const notesBase = this.getVaultNotesPath();
-      const trashBase = this.getVaultTrashPath();
+      const notesBase = this.getVaultNotesPath(vault);
+      const trashBase = this.getVaultTrashPath(vault);
       const targetFolder = item.folder || 'Входящие';
       const filename = item.filename || getSafeNoteFilename(item.title, item.id);
       const notePath = `${notesBase}/${targetFolder}/${filename}`;
@@ -374,6 +377,7 @@ export class StorageService {
       }
     } catch (err) {
       fsLog.error(`Failed to remove note ${item.id} from disk:`, err);
+      if (strict) throw err;
     }
   }
 
@@ -1224,6 +1228,51 @@ export class StorageService {
       composerDrafts: this.getAllComposerDrafts(),
       exportedAt: new Date().toISOString(),
     }, null, 2);
+  }
+
+  /** Persist received state before the relay can discard its only pending copy. */
+  public async importSyncedVaultData(data: {
+    items?: SlagItem[];
+    folders?: FolderMeta[];
+    workspaceState?: WorkspaceState;
+  }): Promise<void> {
+    const vault = this.currentVault;
+    const previous = this.getItems();
+    const folders = data.folders ?? this.getFolders();
+    const workspace = { ...this.getWorkspaceState(), ...data.workspaceState };
+    const safeRelativePath = (path: string) => path.length > 0 && !path.startsWith('/') && !path.includes('\\') && !path.includes(':') && path.split('/').every(part => part !== '..' && part !== '.' && part !== '');
+    for (const folder of folders) {
+      if (!safeRelativePath(folder.path)) throw new Error('Invalid synced folder path');
+    }
+    for (const item of data.items ?? []) {
+      const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+      if (!safeRelativePath(item.folder || 'Входящие') || !safeRelativePath(filename) || filename.includes('/') || !safeRelativePath(item.id) || item.id.includes('/')) {
+        throw new Error('Invalid synced note path');
+      }
+    }
+    if (isTauri()) {
+      if (data.items) {
+        const nextIds = new Set(data.items.map(item => item.id));
+        for (const item of data.items) {
+          const old = previous.find(candidate => candidate.id === item.id);
+          await this.flushItemToDisk(item, old?.folder, old?.filename, vault, true);
+        }
+        for (const item of previous) {
+          if (!nextIds.has(item.id)) await this.removeItemFromDisk(item, vault, true);
+        }
+      }
+      const notesPath = this.getVaultNotesPath(vault);
+      await mkdir(notesPath, { baseDir: BaseDirectory.AppData, recursive: true });
+      for (const folder of folders) {
+        await mkdir(`${notesPath}/${folder.path}`, { baseDir: BaseDirectory.AppData, recursive: true });
+      }
+      await writeTextFile(this.getVaultStatePath(vault), JSON.stringify({ folders, workspace, updatedAt: Date.now() }), { baseDir: BaseDirectory.AppData });
+    }
+    if (this.currentVault.id !== vault.id) throw new Error('Vault changed while persisting sync');
+    if (!this.importVaultData({ items: data.items, folders: data.folders })) {
+      throw new Error('Failed to store received vault data');
+    }
+    localStorage.setItem(this.getWorkspaceStateKey(), JSON.stringify(workspace));
   }
 
   public importVaultData(data: {
