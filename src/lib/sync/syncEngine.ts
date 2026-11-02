@@ -32,12 +32,14 @@ export class SyncEngine {
   private status: SyncStatus;
   private listeners = new Set<(status: SyncStatus) => void>();
   private ws: WebSocket | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   private activeVaultKey: CryptoKey | null = null;
   private activeRoomId: string | null = null;
   private isProcessingSync = false;
   private sequence = 1;
+  private initGeneration = 0;
   private currentVaultId: string = 'default_vault';
 
   constructor() {
@@ -269,6 +271,8 @@ export class SyncEngine {
   }
 
   public async init(): Promise<void> {
+    const generation = ++this.initGeneration;
+    const seedPhrase = this.config.seedPhrase;
     if (!this.config.enabled) {
       this.status.state = 'idle';
       this.notify();
@@ -279,14 +283,20 @@ export class SyncEngine {
       this.status.state = 'syncing';
       this.notify();
 
-      this.activeVaultKey = await deriveVaultKey(this.config.seedPhrase);
-      this.activeRoomId = await deriveRoomId(this.config.seedPhrase);
-      this.status.currentRoomId = this.activeRoomId;
+      const [vaultKey, roomId] = await Promise.all([
+        deriveVaultKey(seedPhrase),
+        deriveRoomId(seedPhrase),
+      ]);
+      if (generation !== this.initGeneration) return;
+      this.activeVaultKey = vaultKey;
+      this.activeRoomId = roomId;
+      this.status.currentRoomId = roomId;
 
       this.connectWebSocket();
       this.startIntervals();
       await this.pushLocalChanges();
     } catch (err: unknown) {
+      if (generation !== this.initGeneration) return;
       const msg = err instanceof Error ? err.message : String(err);
       syncLog.error('Sync init error:', msg);
       this.status.state = 'error';
@@ -308,7 +318,12 @@ export class SyncEngine {
   }
 
   private connectWebSocket(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.ws) {
+      this.ws.onclose = null;
       this.ws.close();
       this.ws = null;
     }
@@ -343,11 +358,13 @@ export class SyncEngine {
         this.notify();
       };
 
-      this.ws.onclose = () => {
-        syncLog.info('Sync WebSocket closed, retrying in 5s');
+      this.ws.onclose = (event) => {
+        syncLog.info(`Sync WebSocket closed (code ${event.code}), retrying in 5s`);
+        this.ws = null;
         this.status.state = 'offline';
         this.notify();
-        setTimeout(() => {
+        this.reconnectTimeout = setTimeout(() => {
+          this.reconnectTimeout = null;
           if (this.config.enabled) this.connectWebSocket();
         }, 5000);
       };
@@ -380,6 +397,7 @@ export class SyncEngine {
 
   private async applyIncomingBundle(bundlePayload: unknown): Promise<void> {
     if (!this.activeVaultKey) return;
+    const generation = this.initGeneration;
 
     try {
       this.status.state = 'syncing';
@@ -396,6 +414,7 @@ export class SyncEngine {
         bundle = bundlePayload as SyncBundle;
       }
 
+      if (generation !== this.initGeneration) return;
       if (bundle.fromDeviceId === this.config.deviceId) {
         return; // ignore self echo
       }
@@ -490,6 +509,10 @@ export class SyncEngine {
     }
     if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) return;
     this.isProcessingSync = true;
+    const generation = this.initGeneration;
+    const roomId = this.activeRoomId;
+    const vaultKey = this.activeVaultKey;
+    const hashKey = this.getStateHashKey();
 
     try {
       const items = storage.getItems();
@@ -497,7 +520,7 @@ export class SyncEngine {
       const workspaceState = storage.getWorkspaceState();
 
       const stateHash = await computeStateRootHash(items, folders);
-      const hashKey = this.getStateHashKey();
+      if (generation !== this.initGeneration) return;
       const lastSyncedHash =
         localStorage.getItem(hashKey) ||
         (this.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
@@ -553,7 +576,7 @@ export class SyncEngine {
 
       const bundle: SyncBundle = {
         bundleId: `bnd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        roomId: this.activeRoomId,
+        roomId,
         fromDeviceId: this.config.deviceId,
         sequence: this.sequence++,
         stateRootHash: stateHash,
@@ -561,18 +584,20 @@ export class SyncEngine {
         changes,
       };
 
-      const encrypted = await encryptBundle(bundle, this.activeVaultKey);
+      const encrypted = await encryptBundle(bundle, vaultKey);
+      if (generation !== this.initGeneration) return;
 
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ type: 'bundle', bundle: encrypted }));
       } else {
         // Fallback HTTP push
         const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
-        await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle`, {
+        const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(encrypted),
         });
+        if (!response.ok) throw new Error(`Sync push failed: HTTP ${response.status}`);
       }
 
       syncLog.info(
@@ -653,9 +678,15 @@ export class SyncEngine {
   }
 
   public disconnect(): void {
+    ++this.initGeneration;
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.ws) {
+      this.ws.onclose = null;
       this.ws.close();
       this.ws = null;
     }
