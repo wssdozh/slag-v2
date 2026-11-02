@@ -163,6 +163,10 @@ fn configure_window_border(window: &tauri::Window) {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
+#[allow(dead_code)]
+fn configure_window_border(_window: &tauri::Window) {}
+
 #[cfg(desktop)]
 #[tauri::command]
 fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, String> {
@@ -171,14 +175,14 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
         "logs" => (base_dir.join("logs"), false),
         "notes" => (base_dir.join("vaults").join("main").join("notes"), false),
         other => {
-            let normalized = other.replace('/', "\\");
-            let clean = normalized.trim_start_matches('\\');
+            let normalized = other.replace('\\', "/");
+            let clean = normalized.trim_start_matches('/');
             let is_file = clean.ends_with(".md");
             if clean.is_empty() {
                 (base_dir, false)
             } else {
                 let mut path = base_dir;
-                for part in clean.split('\\') {
+                for part in clean.split('/') {
                     if !part.is_empty() {
                         path.push(part);
                     }
@@ -206,6 +210,7 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
             cmd.arg(&win_path);
         }
         cmd.spawn().map_err(|e| e.to_string())?;
+        Ok(win_path)
     }
     #[cfg(target_os = "macos")]
     {
@@ -221,6 +226,7 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
                 .spawn()
                 .map_err(|e| e.to_string())?;
         }
+        Ok(target_path.to_string_lossy().to_string())
     }
     #[cfg(target_os = "linux")]
     {
@@ -233,9 +239,8 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
             .arg(open_target)
             .spawn()
             .map_err(|e| e.to_string())?;
+        Ok(target_path.to_string_lossy().to_string())
     }
-
-    Ok(target_path.to_string_lossy().replace('/', "\\"))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -310,6 +315,7 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 if let Some(main_window) = app.get_webview_window("main") {
+                    #[cfg(target_os = "windows")]
                     configure_window_border(&main_window.as_ref().window());
                     let win = main_window.clone();
                     main_window.on_window_event(move |event| {
