@@ -6,7 +6,8 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/slag-relay
-ExecStart=/usr/bin/python3 /opt/slag-relay/server.py --port 8320 --db /opt/slag-relay/data/relay.db
+Environment=SLAG_REQUIRE_ACCOUNT_AUTH=false
+ExecStart=/opt/slag-relay/.venv/bin/python /opt/slag-relay/server.py --port 8320 --db /opt/slag-relay/data/relay.db
 Restart=always
 RestartSec=3
 LimitNOFILE=65535
