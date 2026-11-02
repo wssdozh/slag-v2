@@ -66,17 +66,27 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
       fullPage: false,
     });
 
-    // 7. Test PIN Generation
-    const genPinBtn = settingsModal.locator('button', { hasText: 'Сгенерировать PIN' });
-    await expect(genPinBtn).toBeVisible();
-    await genPinBtn.click();
+    // 7. Test Pairing Modal & PIN Display
+    const pairBtn = settingsModal.locator('button', { hasText: 'Привязать устройство' });
+    await expect(pairBtn).toBeVisible();
+    await pairBtn.click();
 
-    const pinDisplay = settingsModal.locator('.font-mono.text-base.font-semibold');
+    const pairModal = page.locator('[data-testid="pair-device-modal"]');
+    await expect(pairModal).toBeVisible({ timeout: 5000 });
+
+    const pinDisplay = pairModal.locator('.font-mono.text-2xl.font-bold');
     await expect(pinDisplay).toBeVisible({ timeout: 15000 });
+    await expect(pinDisplay).toHaveText(/^\d{3}-\d{3}$/, { timeout: 15000 });
     const pinText = (await pinDisplay.textContent())?.trim();
     expect(pinText).toMatch(/^\d{3}-\d{3}$/);
 
-    // 7. Simulate guest claiming PIN over relay API (without sending device name or OS)
+    // Capture screenshot of clean pair device modal with ready PIN
+    await page.screenshot({
+      path: 'test-results/screenshots/pair_device_modal_clean.png',
+      fullPage: false,
+    });
+
+    // 8. Simulate guest claiming PIN over relay API (without sending device name or OS)
     const claimRes = await fetch('http://152.53.199.71:8320/api/pair/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -90,19 +100,19 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     expect(claimData.status).toBe('pending_approval');
     expect(claimData.sasCode).toMatch(/^\d{4}$/);
 
-    // 8. Host should detect the claim and show Approval Card with matching SAS code
-    const approvalCard = settingsModal.locator('text=Запрос на подключение устройства');
+    // 9. Host should detect the claim and show Approval Card with matching SAS code
+    const approvalCard = pairModal.locator('text=Запрос на подключение');
     await expect(approvalCard).toBeVisible({ timeout: 10000 });
 
-    const sasBadge = settingsModal.locator(`strong:has-text("${claimData.sasCode}")`);
+    const sasBadge = pairModal.locator(`strong:has-text("${claimData.sasCode}")`);
     await expect(sasBadge).toBeVisible();
 
-    const approveBtn = settingsModal.locator('button', { hasText: 'Разрешить доступ' });
-    const rejectBtn = settingsModal.locator('button', { hasText: 'Отклонить' });
+    const approveBtn = pairModal.locator('button', { hasText: 'Разрешить доступ' });
+    const rejectBtn = pairModal.locator('button', { hasText: 'Отклонить' });
     await expect(approveBtn).toBeVisible();
     await expect(rejectBtn).toBeVisible();
 
-    // Screenshot of Human-in-the-Loop Consent Request Card
+    // Screenshot of Human-in-the-Loop Consent Request Card inside modal
     await page.screenshot({
       path: 'test-results/screenshots/sync_approval_request.png',
       fullPage: false,

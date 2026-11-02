@@ -12,6 +12,7 @@ import {
   Edit2,
   KeyRound,
   Bot,
+  Plus,
 } from 'lucide-react';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import {
@@ -32,6 +33,9 @@ interface SyncSettingsTabProps {
 export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) => {
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
+
+  // Pair modal dialog state
+  const [isPairModalOpen, setIsPairModalOpen] = useState(false);
 
   // Pair mode: 'host' (get PIN) vs 'guest' (enter PIN)
   const [pairMode, setPairMode] = useState<'host' | 'guest'>('host');
@@ -66,6 +70,17 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const isPollingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isPairModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsPairModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPairModalOpen]);
 
   useEffect(() => {
     const unsub = syncEngine.subscribe((st) => {
@@ -104,6 +119,8 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         const res = await pollPairingSession(config.serverUrl, hostSessionId);
         if (active && res.status === 'pending_approval' && res.sasCode) {
           setPendingApprovalSas(res.sasCode);
+          setIsPairModalOpen(true);
+          setPairMode('host');
         }
       } catch {
         // silent transient poll error
@@ -146,6 +163,15 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
     }
   };
 
+  const handleOpenPairModal = () => {
+    setIsPairModalOpen(true);
+    setPairMode('host');
+    setPendingApprovalSas(null);
+    if (!hostPin) {
+      void handleGeneratePin();
+    }
+  };
+
   const handleApprovePairing = async () => {
     if (!hostSessionId || !pendingApprovalSas) {
       return;
@@ -169,6 +195,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         setHostPin(null);
         setHostSessionId(null);
         setPendingApprovalSas(null);
+        setIsPairModalOpen(false);
       } else {
         throw new Error('Сервер отклонил подтверждение');
       }
@@ -189,6 +216,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       setHostPin(null);
       setHostSessionId(null);
       setPendingApprovalSas(null);
+      setIsPairModalOpen(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast?.(`Ошибка: ${msg}`, 'error');
@@ -217,6 +245,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         setGuestInputPin('');
         setGuestSasCode(null);
         setIsGuestWaitingApproval(false);
+        setIsPairModalOpen(false);
       } else {
         throw new Error('Получен некорректный ключ');
       }
@@ -397,167 +426,25 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         </div>
       </div>
 
-      {/* 3. Flat Device Pairing Section with Human-in-the-Loop Consent */}
-      <div className="flex flex-col gap-2.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-zinc-200">Связывание устройств</span>
-          <div className="flex items-center h-7 bg-canvas p-0.5 rounded-lg border border-white/[0.08]">
-            <button
-              type="button"
-              onClick={() => {
-                setPairMode('host');
-                setPendingApprovalSas(null);
-              }}
-              className={`h-full px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                pairMode === 'host'
-                  ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-              }`}
-            >
-              Получить PIN
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPairMode('guest');
-                setHostPin(null);
-                setPendingApprovalSas(null);
-              }}
-              className={`h-full px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                pairMode === 'guest'
-                  ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-              }`}
-            >
-              Ввести PIN
-            </button>
-          </div>
-        </div>
-
-        {pairMode === 'host' ? (
-          <div className="flex flex-col gap-2 pt-1">
-            {/* Case A: Guest entered PIN -> Host sees Approval Request Card */}
-            {pendingApprovalSas ? (
-              <div className="flex flex-col gap-2.5 p-3 bg-[#0c0c0e] border border-white/20 rounded-lg animate-in fade-in duration-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-white">
-                    Запрос на подключение устройства
-                  </span>
-                  <div className="flex items-center gap-1.5 font-mono text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                    <span>Код проверки:</span>
-                    <strong className="tracking-wider">{pendingApprovalSas}</strong>
-                  </div>
-                </div>
-
-                <p className="text-2xs text-zinc-400">
-                  Сверьте 4 цифры на втором экране. Разрешить доступ к заметкам?
-                </p>
-
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleRejectPairing}
-                    disabled={isRejecting || isApproving}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 text-xs text-zinc-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Отклонить</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleApprovePairing}
-                    disabled={isApproving || isRejecting}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black font-semibold text-xs hover:bg-zinc-200 active:scale-95 rounded-lg transition-colors cursor-pointer"
-                  >
-                    {isApproving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>Разрешить доступ</span>
-                  </button>
-                </div>
-              </div>
-            ) : hostPin ? (
-              /* Case B: PIN generated, waiting for guest */
-              <div className="flex items-center justify-between gap-3 py-2 px-3 bg-[#0c0c0e] border border-white/[0.06] rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-400">PIN:</span>
-                  <span className="font-mono text-base font-semibold tracking-wider text-white">
-                    {hostPin}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-2xs text-zinc-500">
-                    {formatTtl(hostPinTtl)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(hostPin, 'hostPin')}
-                    className="p-1 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                    title="Скопировать"
-                  >
-                    {copiedKey === 'hostPin' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Case C: Idle host, button to generate */
-              <div className="flex items-center justify-between">
-                <span className="text-2xs text-zinc-500">
-                  Код действует 5 минут. Передаёт ключ напрямую, без серверов и аккаунтов.
-                </span>
-                <button
-                  type="button"
-                  onClick={handleGeneratePin}
-                  disabled={isGeneratingPin}
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/15 active:scale-95 text-xs font-medium text-white rounded-lg transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
-                >
-                  {isGeneratingPin ? 'Генерация...' : 'Сгенерировать PIN'}
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Guest mode: enter PIN or show waiting status */
-          <div className="flex flex-col gap-2 pt-1">
-            {isGuestWaitingApproval && guestSasCode ? (
-              <div className="flex items-center justify-between p-2.5 bg-[#0c0c0e] border border-white/[0.08] rounded-lg animate-in fade-in">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 text-zinc-400 animate-spin" />
-                  <span className="text-xs text-zinc-300">
-                    Код проверки: <strong className="font-mono text-emerald-400">{guestSasCode}</strong>
-                  </span>
-                </div>
-                <span className="text-2xs text-zinc-500">Подтвердите подключение на первом устройстве...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="123-456"
-                  value={guestInputPin}
-                  onChange={(e) => setGuestInputPin(e.target.value)}
-                  maxLength={8}
-                  className="flex-1 bg-[#0c0c0e] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs font-mono text-white placeholder-zinc-600 outline-none focus:border-white/20"
-                />
-                <button
-                  type="button"
-                  onClick={handleClaimGuestPin}
-                  disabled={isClaimingPin || !guestInputPin.trim()}
-                  className="px-3.5 py-1.5 bg-white/10 hover:bg-white/15 active:scale-95 text-xs font-medium text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isClaimingPin ? 'Связывание...' : 'Подключить'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 4. Trusted Devices List (Linear Dark: flat rows, 2-line typography, no chips clutter) */}
+      {/* 2. Trusted Devices List (Linear Dark: flat rows, 2-line typography, with '+ Привязать устройство' action) */}
       <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
         <div className="flex items-center justify-between pb-1">
-          <span className="text-xs font-semibold text-zinc-200">Доверенные устройства</span>
-          <span className="text-[11px] font-mono text-zinc-500">
-            {1 + config.trustedDevices.length} / {sub.maxDevices}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-zinc-200">Доверенные устройства</span>
+            <span className="text-[11px] font-mono text-zinc-500">
+              {1 + config.trustedDevices.length} / {sub.maxDevices}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            data-testid="btn-open-pair-modal"
+            onClick={handleOpenPairModal}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-2xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.96] border border-white/[0.06] rounded-md transition-all cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Привязать устройство</span>
+          </button>
         </div>
 
         <div className="divide-y divide-white/[0.04]">
@@ -848,6 +735,186 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           Сменить ключ
         </button>
       </div>
+
+      {/* Pair Device Modal Dialog */}
+      {isPairModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsPairModalOpen(false);
+          }}
+        >
+          <div
+            data-testid="pair-device-modal"
+            className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150 select-none"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-white">Привязка устройства</span>
+                <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.2 rounded">
+                  E2EE
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPairModalOpen(false)}
+                className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 flex flex-col gap-4">
+              {/* Segmented Mode Selector */}
+              <div className="grid grid-cols-2 gap-1 bg-[#0c0c0e] p-1 rounded-xl border border-white/[0.06]">
+                <button
+                  type="button"
+                  data-testid="pair-modal-tab-host"
+                  onClick={() => {
+                    setPairMode('host');
+                    setPendingApprovalSas(null);
+                    if (!hostPin) void handleGeneratePin();
+                  }}
+                  className={`py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    pairMode === 'host'
+                      ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Показать PIN
+                </button>
+                <button
+                  type="button"
+                  data-testid="pair-modal-tab-guest"
+                  onClick={() => {
+                    setPairMode('guest');
+                    setPendingApprovalSas(null);
+                  }}
+                  className={`py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    pairMode === 'guest'
+                      ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Ввести PIN
+                </button>
+              </div>
+
+              {pairMode === 'host' ? (
+                /* Host View */
+                pendingApprovalSas ? (
+                  /* Case A: Host sees Approval Request */
+                  <div className="flex flex-col gap-3 p-4 bg-white/[0.02] border border-white/20 rounded-xl animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-white">Запрос на подключение</span>
+                      <div className="flex items-center gap-1.5 font-mono text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                        <span>Код проверки:</span>
+                        <strong className="tracking-wider">{pendingApprovalSas}</strong>
+                      </div>
+                    </div>
+                    <p className="text-2xs text-zinc-400">
+                      Сверьте 4 цифры на втором экране. Разрешить доступ к заметкам?
+                    </p>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleRejectPairing}
+                        disabled={isRejecting || isApproving}
+                        className="px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 text-xs text-zinc-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Отклонить
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApprovePairing}
+                        disabled={isApproving || isRejecting}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black font-semibold text-xs hover:bg-zinc-200 active:scale-95 rounded-lg transition-colors cursor-pointer"
+                      >
+                        {isApproving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        <span>Разрешить доступ</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Case B: Ready PIN */
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    <div className="w-full flex flex-col items-center justify-center gap-2.5 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                      <span className="text-2xs text-zinc-500 font-mono uppercase tracking-wider">
+                        Одноразовый код
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-2xl font-bold tracking-widest text-white">
+                          {isGeneratingPin ? '...' : hostPin || '000-000'}
+                        </span>
+                        {hostPin && (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(hostPin, 'hostPin')}
+                            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors cursor-pointer"
+                            title="Скопировать"
+                          >
+                            {copiedKey === 'hostPin' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                      <span className="font-mono text-2xs text-zinc-500">
+                        {isGeneratingPin ? 'генерация...' : `Действует: ${formatTtl(hostPinTtl)}`}
+                      </span>
+                    </div>
+
+                    <p className="text-2xs text-zinc-500 text-center leading-relaxed">
+                      Введите этот 6-значный код на втором устройстве для мгновенной привязки.
+                    </p>
+                  </div>
+                )
+              ) : (
+                /* Guest View */
+                isGuestWaitingApproval && guestSasCode ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-6 px-4 bg-white/[0.02] border border-white/[0.08] rounded-xl animate-in fade-in">
+                    <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+                    <div className="flex flex-col items-center gap-1 text-center">
+                      <span className="text-xs text-zinc-200">
+                        Код проверки: <strong className="font-mono text-emerald-400">{guestSasCode}</strong>
+                      </span>
+                      <span className="text-2xs text-zinc-500">
+                        Подтвердите подключение на первом устройстве...
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 py-1">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-2xs text-zinc-400">PIN с первого устройства</label>
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="123-456"
+                        value={guestInputPin}
+                        onChange={(e) => setGuestInputPin(e.target.value)}
+                        maxLength={8}
+                        className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-3 py-2 text-center font-mono text-lg tracking-widest text-white placeholder-zinc-700 outline-none focus:border-white/20"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClaimGuestPin}
+                      disabled={isClaimingPin || !guestInputPin.trim()}
+                      className="w-full py-2 bg-white text-black font-semibold text-xs hover:bg-zinc-200 active:scale-95 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {isClaimingPin ? 'Связывание...' : 'Подключить устройство'}
+                    </button>
+                    <p className="text-2xs text-zinc-500 text-center">
+                      Нажмите «Показать PIN» на основном устройстве и перепишите 6 цифр сюда.
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
