@@ -406,7 +406,9 @@ export class SyncEngine {
         return;
       }
 
-      syncLog.info(`Applying bundle ${bundle.bundleId} with ${bundle.changes.length} changes`);
+      syncLog.info(
+        `Received bundle ${bundle.bundleId} from ${bundle.fromDeviceId} (${bundle.changes.length} changes)`
+      );
 
       let hasItemsChanged = false;
       let hasFoldersChanged = false;
@@ -460,6 +462,7 @@ export class SyncEngine {
       // Send ACK back
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ type: 'ack', bundleId: bundle.bundleId }));
+        syncLog.info(`ACK sent for bundle ${bundle.bundleId}`);
       }
 
       this.status.lastSyncTime = new Date().toLocaleTimeString();
@@ -571,6 +574,10 @@ export class SyncEngine {
           body: JSON.stringify(encrypted),
         });
       }
+
+      syncLog.info(
+        `Pushed bundle ${bundle.bundleId} (${changes.length} changes, ${encrypted.ciphertext.length} B) -> room ${this.activeRoomId?.slice(0, 10)}...`
+      );
 
       localStorage.setItem(hashKey, stateHash);
       if (this.currentVaultId === 'default_vault') {

@@ -505,10 +505,12 @@ class SlagRelayServer:
             claim_result = self.db.claim_pairing_session(pin, guest_pk)
             if claim_result:
                 self.failed_claim_attempts.pop(client_ip, None)
+                logger.info(f"Pairing claim: session [{claim_result['sessionId'][:8]}] SAS [{claim_result.get('sasCode')}] from [{client_ip}]")
                 await self._send_response(writer, self._json_response(claim_result))
             else:
                 attempts.append(now)
                 self.failed_claim_attempts[client_ip] = attempts
+                logger.warning(f"Pairing claim failed for pin from [{client_ip}]")
                 await self._send_response(writer, self._json_response({"error": "invalid_or_expired_pin"}, status=404))
             return
 
@@ -516,12 +518,14 @@ class SlagRelayServer:
             session_id = body_json.get("sessionId", "")
             payload = body_json.get("encryptedPayload", "")
             ok = self.db.approve_pairing_session(session_id, payload)
+            logger.info(f"Pairing approve: session [{session_id[:8]}] ok={ok}")
             await self._send_response(writer, self._json_response({"status": "approved" if ok else "failed"}, status=200 if ok else 400))
             return
 
         if method == "POST" and path == "/api/pair/reject":
             session_id = body_json.get("sessionId", "")
             ok = self.db.reject_pairing_session(session_id)
+            logger.info(f"Pairing reject: session [{session_id[:8]}] ok={ok}")
             await self._send_response(writer, self._json_response({"status": "rejected" if ok else "failed"}, status=200 if ok else 400))
             return
 
@@ -551,6 +555,7 @@ class SlagRelayServer:
             ts = bundle.get("timestamp", str(time.time()))
 
             payload_str = json.dumps(bundle)
+            logger.info(f"HTTP Bundle [{bundle_id[:8]}] received from [{from_device}] in [{room_id[:10]}...] ({len(payload_str)} B)")
             saved = self.db.save_bundle(room_id, bundle_id, from_device, seq, ts, payload_str)
             if not saved:
                 await self._send_response(writer, self._json_response({
@@ -767,7 +772,8 @@ class SlagRelayServer:
         if msg_type == "ack":
             bundle_ids = msg.get("bundleIds") or ([msg.get("bundleId")] if msg.get("bundleId") else [])
             if bundle_ids:
-                self.db.record_acks(conn.device_id, bundle_ids)
+                purged = self.db.record_acks(conn.device_id, bundle_ids)
+                logger.info(f"ACK recorded from [{conn.device_id}] for {len(bundle_ids)} bundles ({purged} purged)")
             return
 
         if msg_type == "bundle":
@@ -778,6 +784,7 @@ class SlagRelayServer:
             ts = bundle.get("timestamp", str(time.time()))
 
             payload_str = json.dumps(bundle)
+            logger.info(f"WS Bundle [{bundle_id[:8]}] received from [{from_device}] in [{conn.room_id[:10]}...] ({len(payload_str)} B)")
             saved = self.db.save_bundle(conn.room_id, bundle_id, from_device, seq, ts, payload_str)
             if not saved:
                 await conn.send_text(json.dumps({
@@ -802,13 +809,17 @@ class SlagRelayServer:
 
     async def _broadcast_to_room(self, room_id: str, message_str: str, exclude_device: Optional[str] = None) -> None:
         conns = list(self.rooms.get(room_id, set()))
+        sent = 0
         for client in conns:
             if exclude_device and client.device_id == exclude_device:
                 continue
             try:
                 await client.send_text(message_str)
+                sent += 1
             except Exception:
                 pass
+        if sent > 0:
+            logger.info(f"Broadcasted to {sent} peers in [{room_id[:10]}...] ({len(message_str)} B)")
 
     async def background_cleanup_loop(self) -> None:
         while True:
