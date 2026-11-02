@@ -414,7 +414,6 @@ pub fn run() {
                                 api.prevent_close();
                                 let _ = qwin.hide();
                             }
-                            #[cfg(target_os = "windows")]
                             WindowEvent::Focused(focused) => {
                                 if !focused {
                                     let _ = qwin.hide();
