@@ -353,7 +353,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               onClick={handleManualSync}
               disabled={status.state === 'syncing'}
               className="flex items-center gap-1.5 px-2.5 py-1 text-2xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.96] border border-white/[0.06] rounded-md transition-all cursor-pointer disabled:opacity-50"
-              title="Запустить синхронизацию дельт сейчас"
+              title="Синхронизировать сейчас"
             >
               <RefreshCw className={`w-3 h-3 ${status.state === 'syncing' ? 'animate-spin text-amber-400' : 'text-zinc-400'}`} />
               <span>{status.state === 'syncing' ? 'Синхронизация...' : 'Синхронизировать'}</span>
@@ -365,7 +365,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                 if (sub.plan === 'self-hosted') {
                   addToast?.('Self-hosted релей работает без ограничений', 'info');
                 } else {
-                  addToast?.(`Тариф ${sub.planLabel}: кеш недоставленного до ${sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}, очищается сразу по получению.`, 'info');
+                  addToast?.(`Тариф ${sub.planLabel}: кеш до ${sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}, очищается сразу после синхронизации.`, 'info');
                 }
               }}
               className="px-2 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer active:scale-[0.96]"
@@ -450,7 +450,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                 </div>
 
                 <p className="text-2xs text-zinc-400">
-                  Убедитесь, что 4 цифры совпадают на подключаемом устройстве. Разрешить доступ к хранилищу?
+                  Сверьте 4 цифры на втором экране. Разрешить доступ к заметкам?
                 </p>
 
                 <div className="flex items-center justify-end gap-2 pt-1">
@@ -501,7 +501,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               /* Case C: Idle host, button to generate */
               <div className="flex items-center justify-between">
                 <span className="text-2xs text-zinc-500">
-                  Одноразовый 6-значный код для безопасного сопряжения без передачи метаданных.
+                  Код действует 5 минут. Передаёт ключ напрямую, без серверов и аккаунтов.
                 </span>
                 <button
                   type="button"
@@ -525,7 +525,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                     Код проверки: <strong className="font-mono text-emerald-400">{guestSasCode}</strong>
                   </span>
                 </div>
-                <span className="text-2xs text-zinc-500">Ожидание подтверждения на хосте...</span>
+                <span className="text-2xs text-zinc-500">Подтвердите подключение на первом устройстве...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -773,7 +773,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         {/* Battery Saver & Background Interval */}
         <div className="flex flex-col gap-1.5 pt-2 border-t border-white/[0.04]">
           <div className="flex items-center justify-between">
-            <span className="text-2xs text-zinc-400">Периодичность синхронизации (экономия батареи)</span>
+            <span className="text-2xs text-zinc-400">Фоновая синхронизация</span>
             <span className="text-2xs text-zinc-500 font-mono">
               {config.bgSyncIntervalMinutes ? `${config.bgSyncIntervalMinutes} мин` : 'в реальном времени'}
             </span>
@@ -833,9 +833,9 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         <div className="flex items-center gap-2.5">
           <KeyRound className="w-4 h-4 text-rose-400 shrink-0" />
           <div>
-            <span className="text-xs font-semibold text-zinc-200">Ротация ключа (Panic Re-keying)</span>
+            <span className="text-xs font-semibold text-zinc-200">Смена ключа (Panic Re-keying)</span>
             <p className="text-2xs text-zinc-500">
-              Если девайс утерян или украден, создайте новый ключ. Все старые устройства будут мгновенно отключены.
+              Генерирует новую сид-фразу и пересоздаёт комнату. Все остальные девайсы потеряют доступ.
             </p>
           </div>
         </div>
