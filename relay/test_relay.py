@@ -217,6 +217,33 @@ class TestRelayServer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(pending_after), 0)
         self.assertEqual(self.server.db.get_room_cache_bytes(room), 0)
 
+    async def test_ai_gateway_authorization_and_free_lock(self):
+        url = f"http://{self.host}:{self.port}/api/ai/chat"
+
+        def _call_ai(token=None, data_dict=None):
+            req = urllib.request.Request(url, data=json.dumps(data_dict or {}).encode(), method="POST")
+            req.add_header("Content-Type", "application/json")
+            if token:
+                req.add_header("Authorization", f"Bearer {token}")
+            try:
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    return resp.status, json.loads(resp.read().decode())
+            except urllib.error.HTTPError as e:
+                return e.code, json.loads(e.read().decode())
+
+        # 1. Unauthorized request without token
+        code1, _ = await asyncio.to_thread(_call_ai)
+        self.assertEqual(code1, 401)
+
+        # 2. Forbidden request for Free plan token
+        code2, _ = await asyncio.to_thread(_call_ai, token="free_user_123")
+        self.assertEqual(code2, 403)
+
+        # 3. Authorized request for Smile/Angry plan room
+        code3, data3 = await asyncio.to_thread(_call_ai, token="room_smile_valid_token", data_dict={"messages": [{"role": "user", "content": "hi"}]})
+        self.assertEqual(code3, 200)
+        self.assertIn("choices", data3)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -68,6 +68,7 @@ export class SyncEngine {
         maxCacheMb: 999999,
         usedCacheMb: 14,
         allowAttachments: true,
+        hasAiLease: true,
         isExpiringSoon: false,
       };
     }
@@ -84,6 +85,7 @@ export class SyncEngine {
         maxCacheMb: 1024,
         usedCacheMb: 8,
         allowAttachments: false,
+        hasAiLease: false,
         isExpiringSoon: false,
       };
     }
@@ -99,6 +101,7 @@ export class SyncEngine {
         maxCacheMb: 51200,
         usedCacheMb: 42,
         allowAttachments: true,
+        hasAiLease: true,
         isExpiringSoon: false,
       };
     }
@@ -114,6 +117,7 @@ export class SyncEngine {
       maxCacheMb: 10240,
       usedCacheMb: 14,
       allowAttachments: true,
+      hasAiLease: true,
       isExpiringSoon: false,
     };
   }

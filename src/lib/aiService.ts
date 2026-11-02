@@ -1,5 +1,6 @@
 import type { SlagItem, FolderMeta, AiSettings } from '../types';
 import { storage } from './storage';
+import { syncEngine } from './sync/syncEngine';
 import { logger } from './logger';
 import {
   assistantOrchestrator,
@@ -195,6 +196,53 @@ async function callJsonLlm<T>(
   temperature = 0.1
 ): Promise<T | null> {
   const promptLength = systemPrompt.length + userPrompt.length;
+
+  // 0. SLAG Subscription Relay Gateway Mode
+  const syncSub = syncEngine.getStatus().subscription;
+  const isSubscriptionAllowed = syncSub.plan !== 'free';
+  const isSubscriptionMode = (settings.sourceMode === 'subscription' || !settings.sourceMode) && isSubscriptionAllowed;
+
+  if (isSubscriptionMode) {
+    const start = performance.now();
+    try {
+      const cleanServer = syncEngine.getConfig().serverUrl.replace(/\/+$/, '');
+      const endpoint = `${cleanServer}/api/ai/chat`;
+      const roomId = syncEngine.getStatus().currentRoomId || 'slag-relay-room';
+      aiLog.debug(`Calling Subscription Relay AI Gateway`, { promptChars: promptLength, endpoint });
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${roomId}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-v4-1-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature,
+        }),
+      });
+
+      const durationMs = performance.now() - start;
+      if (res.ok) {
+        const data = await res.json();
+        const raw = data.choices?.[0]?.message?.content;
+        aiLog.info(`Subscription AI Gateway response received (${Math.round(durationMs)}ms)`, {
+          status: res.status,
+          durationMs,
+          replyChars: raw?.length || 0,
+        }, durationMs);
+        if (raw) return parseJsonContent<T>(raw);
+      } else {
+        aiLog.warn(`Subscription AI Gateway returned HTTP ${res.status}`);
+      }
+    } catch (err) {
+      aiLog.warn(`Subscription AI Gateway call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
+    }
+  }
 
   // 1. Groq Provider
   if (settings.provider === 'groq' && settings.groqApiKey) {

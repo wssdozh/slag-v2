@@ -98,8 +98,12 @@ export interface VaultMeta {
 }
 
 export type AiProvider = 'groq' | 'kie' | 'gemini';
+export type AiSourceMode = 'subscription' | 'byok';
+export type SubscriptionAiTier = 'fast' | 'smart' | 'deep';
 
 export interface AiSettings {
+  sourceMode?: AiSourceMode;
+  subscriptionModel?: SubscriptionAiTier;
   provider: AiProvider;
   groqApiKey: string;
   kieApiKey: string;

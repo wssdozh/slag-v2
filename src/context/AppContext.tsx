@@ -252,6 +252,8 @@ const DEFAULT_UI_CONFIG: AppUiConfig = {
 const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
 
 const DEFAULT_AI_SETTINGS: AiSettings = {
+  sourceMode: 'subscription',
+  subscriptionModel: 'fast',
   provider: 'groq',
   groqApiKey: '',
   kieApiKey: '',

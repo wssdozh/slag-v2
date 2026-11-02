@@ -9,6 +9,7 @@ import { OpenAiChatAdapter } from './adapters/openAiAdapter';
 import { AnthropicMessagesAdapter } from './adapters/anthropicAdapter';
 import { OpenAiResponsesAdapter } from './adapters/openAiResponsesAdapter';
 import { storage } from '../storage';
+import { syncEngine } from '../sync/syncEngine';
 import { querySearch, getSearchableAttachmentText } from '../searchService';
 import { serializeItemToMarkdown } from '../markdownSerializer';
 import { logger } from '../logger';
@@ -1142,38 +1143,55 @@ ${isInbox
    - НЕ вызывай search_notes на такие контекстные просьбы и уточнения!`;
 
     // Protocol Adapter & Endpoint Resolution
+    const syncSub = syncEngine.getStatus().subscription;
+    const isSubscriptionAllowed = syncSub.plan !== 'free';
+    const isSubscriptionMode = (settings.sourceMode === 'subscription' || !settings.sourceMode) && isSubscriptionAllowed;
+
     const isGroq = settings.provider === 'groq' && Boolean(settings.groqApiKey);
     const isKie = settings.provider === 'kie' && Boolean(settings.kieApiKey);
     const isGemini = settings.provider === 'gemini' && Boolean(settings.geminiApiKey);
 
     let fallbackReason: string | undefined = undefined;
 
-    if (isGroq || isKie || isGemini) {
-      const providerName = isGroq ? 'Groq' : isKie ? 'KIE.AI' : 'Gemini';
-      const apiKey = isGroq ? settings.groqApiKey : isKie ? settings.kieApiKey : settings.geminiApiKey;
-      const defaultModel = isGroq ? 'openai/gpt-oss-120b' : isKie ? 'deepseek-v4-1-flash' : 'gemini-2.0-flash';
-      const model = settings.model || defaultModel;
-
+    if (isSubscriptionMode || isGroq || isKie || isGemini) {
+      let providerName: string;
+      let apiKey: string;
+      let model: string;
       let adapter: LlmProtocolAdapter;
       let endpointUrl: string;
 
-      const isClaudeOnKie = isKie && model.toLowerCase().startsWith('claude-');
-      const isResponsesOnKie = isKie && model.toLowerCase().includes('deepseek');
-      if (isClaudeOnKie) {
-        adapter = new AnthropicMessagesAdapter();
-        endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
-      } else if (isResponsesOnKie) {
-        adapter = new OpenAiResponsesAdapter();
-        endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
-      } else if (isGroq) {
+      if (isSubscriptionMode) {
+        providerName = 'SLAG Relay AI Gateway';
+        apiKey = syncEngine.getStatus().currentRoomId || 'slag-relay-room';
+        const tier = settings.subscriptionModel || 'fast';
+        model = tier === 'deep' ? 'deepseek-v4-1-flash' : tier === 'smart' ? 'claude-haiku-5-5' : 'gemini-2.0-flash';
         adapter = new OpenAiChatAdapter();
-        endpointUrl = 'https://api.groq.com/openai/v1/chat/completions';
-      } else if (isKie) {
-        adapter = new OpenAiChatAdapter();
-        endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
+        const cleanServer = syncEngine.getConfig().serverUrl.replace(/\/+$/, '');
+        endpointUrl = `${cleanServer}/api/ai/chat`;
       } else {
-        adapter = new OpenAiChatAdapter();
-        endpointUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+        providerName = isGroq ? 'Groq' : isKie ? 'KIE.AI' : 'Gemini';
+        apiKey = isGroq ? settings.groqApiKey : isKie ? settings.kieApiKey : settings.geminiApiKey;
+        const defaultModel = isGroq ? 'openai/gpt-oss-120b' : isKie ? 'deepseek-v4-1-flash' : 'gemini-2.0-flash';
+        model = settings.model || defaultModel;
+
+        const isClaudeOnKie = isKie && model.toLowerCase().startsWith('claude-');
+        const isResponsesOnKie = isKie && model.toLowerCase().includes('deepseek');
+        if (isClaudeOnKie) {
+          adapter = new AnthropicMessagesAdapter();
+          endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
+        } else if (isResponsesOnKie) {
+          adapter = new OpenAiResponsesAdapter();
+          endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
+        } else if (isGroq) {
+          adapter = new OpenAiChatAdapter();
+          endpointUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        } else if (isKie) {
+          adapter = new OpenAiChatAdapter();
+          endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
+        } else {
+          adapter = new OpenAiChatAdapter();
+          endpointUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+        }
       }
 
       try {
