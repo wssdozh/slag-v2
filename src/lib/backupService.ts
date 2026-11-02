@@ -102,6 +102,8 @@ function guessMimeType(filename: string): string {
 }
 
 export class BackupService {
+  private inFlightBackup: Promise<BackupSnapshotMeta> | null = null;
+
   public getSettings(): BackupSettings {
     try {
       const raw = localStorage.getItem(BACKUP_SETTINGS_KEY);
@@ -228,71 +230,132 @@ export class BackupService {
     return { bytes: zipBytes, filename: zipFilename, meta };
   }
 
+  private async cleanupDesktopFile(target: BackupSnapshotMeta): Promise<void> {
+    if (isTauri() && target.filename) {
+      try {
+        const vaultDir = target.vaultId === 'default_vault' ? 'main' : target.vaultId;
+        const filePath = `backups/${vaultDir}/${target.filename}`;
+        if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
+          await remove(filePath, { baseDir: BaseDirectory.AppData });
+        }
+      } catch {
+        // ignore cleanup failure
+      }
+    }
+  }
+
   /**
    * Creates an auto or manual snapshot, saves it to IndexedDB (and disk in Tauri),
    * applies retention policy pruning, and updates lastBackupAt.
    */
   public async createSnapshot(trigger: 'auto' | 'manual' = 'manual'): Promise<BackupSnapshotMeta> {
-    const vault = storage.getCurrentVault();
-    const { bytes, filename, meta: baseMeta } = await this.createVaultZip(vault);
-    const meta: BackupSnapshotMeta = { ...baseMeta, trigger };
+    if (this.inFlightBackup) {
+      backupLog.info('Backup snapshot already in progress, returning active task');
+      return this.inFlightBackup;
+    }
 
-    // 1. Save to IndexedDB
-    await idbSaveSnapshot(meta, bytes);
-
-    // 2. If in Tauri desktop, also write to AppData/backups/<vaultDir>/<filename>
-    if (isTauri()) {
+    this.inFlightBackup = (async () => {
       try {
-        const vaultDir = vault.id === 'default_vault' ? 'main' : vault.id;
-        const backupDir = `backups/${vaultDir}`;
-        await mkdir(backupDir, { baseDir: BaseDirectory.AppData, recursive: true });
-        await writeFile(`${backupDir}/${filename}`, bytes, { baseDir: BaseDirectory.AppData });
-        backupLog.info(`Saved desktop backup snapshot to AppData/${backupDir}/${filename}`);
-      } catch (err) {
-        backupLog.warn('Failed writing backup snapshot to desktop disk:', err);
+        const vault = storage.getCurrentVault();
+        const { bytes, filename, meta: baseMeta } = await this.createVaultZip(vault);
+        const meta: BackupSnapshotMeta = { ...baseMeta, trigger };
+
+        // 1. Save to IndexedDB
+        await idbSaveSnapshot(meta, bytes);
+
+        // 2. If in Tauri desktop, also write to AppData/backups/<vaultDir>/<filename>
+        if (isTauri()) {
+          try {
+            const vaultDir = vault.id === 'default_vault' ? 'main' : vault.id;
+            const backupDir = `backups/${vaultDir}`;
+            await mkdir(backupDir, { baseDir: BaseDirectory.AppData, recursive: true });
+            await writeFile(`${backupDir}/${filename}`, bytes, { baseDir: BaseDirectory.AppData });
+            backupLog.info(`Saved desktop backup snapshot to AppData/${backupDir}/${filename}`);
+          } catch (err) {
+            backupLog.warn('Failed writing backup snapshot to desktop disk:', err);
+          }
+        }
+
+        // 3. Update lastBackupAt
+        this.saveSettings({ lastBackupAt: Date.now() });
+
+        // 4. Prune old snapshots & duplicates according to retentionCount
+        await this.pruneSnapshots();
+
+        backupLog.info(`Backup snapshot created (${trigger}): ${meta.notesCount} notes, ${Math.round(meta.sizeBytes / 1024)} KB`);
+        return meta;
+      } finally {
+        this.inFlightBackup = null;
+      }
+    })();
+
+    return this.inFlightBackup;
+  }
+
+  /**
+   * Retrieves all snapshots sorted newest first, transparently deduplicating twin snapshots.
+   */
+  public async getSnapshots(): Promise<BackupSnapshotMeta[]> {
+    const raw = await idbGetSnapshots();
+    const unique: BackupSnapshotMeta[] = [];
+    const duplicates: BackupSnapshotMeta[] = [];
+
+    for (const snap of raw) {
+      const isDup = unique.some(existing =>
+        existing.vaultId === snap.vaultId &&
+        existing.notesCount === snap.notesCount &&
+        existing.attachmentsCount === snap.attachmentsCount &&
+        Math.abs(existing.createdAt - snap.createdAt) <= 120_000
+      );
+      if (isDup) {
+        duplicates.push(snap);
+      } else {
+        unique.push(snap);
       }
     }
 
-    // 3. Prune old snapshots according to retentionCount
-    await this.pruneSnapshots();
+    if (duplicates.length > 0) {
+      void Promise.all(duplicates.map(dup => this.deleteSnapshot(dup.id))).catch(() => {});
+    }
 
-    // 4. Update lastBackupAt
-    this.saveSettings({ lastBackupAt: Date.now() });
-
-    backupLog.info(`Backup snapshot created (${trigger}): ${meta.notesCount} notes, ${Math.round(meta.sizeBytes / 1024)} KB`);
-    return meta;
+    return unique;
   }
 
   /**
-   * Retrieves all snapshots sorted newest first.
-   */
-  public async getSnapshots(): Promise<BackupSnapshotMeta[]> {
-    return await idbGetSnapshots();
-  }
-
-  /**
-   * Enforces retention policy: keeps at most retentionCount snapshots.
+   * Enforces retention policy: removes duplicate twins and keeps at most retentionCount snapshots.
    */
   public async pruneSnapshots(): Promise<void> {
     const settings = this.getSettings();
     const snapshots = await idbGetSnapshots();
     const max = Math.max(1, settings.retentionCount || 7);
 
-    if (snapshots.length > max) {
-      const toDelete = snapshots.slice(max);
+    const unique: BackupSnapshotMeta[] = [];
+    const duplicates: BackupSnapshotMeta[] = [];
+
+    for (const snap of snapshots) {
+      const isDup = unique.some(existing =>
+        existing.vaultId === snap.vaultId &&
+        existing.notesCount === snap.notesCount &&
+        existing.attachmentsCount === snap.attachmentsCount &&
+        Math.abs(existing.createdAt - snap.createdAt) <= 120_000
+      );
+      if (isDup) {
+        duplicates.push(snap);
+      } else {
+        unique.push(snap);
+      }
+    }
+
+    for (const dup of duplicates) {
+      await idbDeleteSnapshot(dup.id);
+      await this.cleanupDesktopFile(dup);
+    }
+
+    if (unique.length > max) {
+      const toDelete = unique.slice(max);
       for (const snap of toDelete) {
         await idbDeleteSnapshot(snap.id);
-        if (isTauri() && snap.filename) {
-          try {
-            const vaultDir = snap.vaultId === 'default_vault' ? 'main' : snap.vaultId;
-            const filePath = `backups/${vaultDir}/${snap.filename}`;
-            if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
-              await remove(filePath, { baseDir: BaseDirectory.AppData });
-            }
-          } catch {
-            // ignore cleanup failure
-          }
-        }
+        await this.cleanupDesktopFile(snap);
       }
       backupLog.info(`Pruned ${toDelete.length} old backup snapshots`);
     }
@@ -306,16 +369,8 @@ export class BackupService {
     const target = snapshots.find(s => s.id === snapshotId);
     await idbDeleteSnapshot(snapshotId);
 
-    if (isTauri() && target?.filename) {
-      try {
-        const vaultDir = target.vaultId === 'default_vault' ? 'main' : target.vaultId;
-        const filePath = `backups/${vaultDir}/${target.filename}`;
-        if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
-          await remove(filePath, { baseDir: BaseDirectory.AppData });
-        }
-      } catch {
-        // ignore
-      }
+    if (target) {
+      await this.cleanupDesktopFile(target);
     }
   }
 
@@ -507,17 +562,22 @@ export class BackupService {
   public async checkAndRunAutoBackup(): Promise<boolean> {
     const settings = this.getSettings();
     if (!settings.autoBackupEnabled) return false;
+    if (this.inFlightBackup) return false;
 
     const intervalMs = (settings.intervalHours || 24) * 60 * 60 * 1000;
     const last = settings.lastBackupAt || 0;
     const now = Date.now();
 
     if (now - last >= intervalMs) {
+      // Optimistically record attempt timestamp so fast double-mounts/tabs don't double-trigger
+      this.saveSettings({ lastBackupAt: now });
       try {
         backupLog.info('Running scheduled automatic backup snapshot...');
         await this.createSnapshot('auto');
         return true;
       } catch (err) {
+        // Rollback on failure so it can retry next time
+        this.saveSettings({ lastBackupAt: last });
         backupLog.error('Auto backup snapshot failed:', err);
       }
     }
