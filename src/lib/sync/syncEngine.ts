@@ -442,6 +442,10 @@ export class SyncEngine {
         syncLog.warn(`Ignored mutation bundle from receive-only device: ${bundle.fromDeviceId}`);
         return;
       }
+      if (sender?.allowedVaults && sender.allowedVaults.length > 0 && !sender.allowedVaults.includes(this.currentVaultId)) {
+        syncLog.warn(`Ignored bundle for vault ${this.currentVaultId} from device without access: ${bundle.fromDeviceId}`);
+        return;
+      }
 
       syncLog.info(
         `Received bundle ${bundle.bundleId} from ${bundle.fromDeviceId} (${bundle.changes.length} changes)`
@@ -728,7 +732,19 @@ export class SyncEngine {
 
   public addTrustedDevice(device: DeviceProfile): void {
     const list = this.config.trustedDevices.filter((d) => d.id !== device.id);
-    list.push({ ...device, syncMode: device.syncMode || 'read-write', canRunAiLease: device.canRunAiLease ?? false });
+    list.push({
+      ...device,
+      syncMode: device.syncMode || 'read-write',
+      canRunAiLease: device.canRunAiLease ?? false,
+      allowedVaults: device.allowedVaults,
+    });
+    this.saveConfig({ trustedDevices: list });
+  }
+
+  public setDeviceAllowedVaults(deviceId: string, allowedVaults: string[]): void {
+    const list = this.config.trustedDevices.map((d) =>
+      d.id === deviceId ? { ...d, allowedVaults } : d
+    );
     this.saveConfig({ trustedDevices: list });
   }
 

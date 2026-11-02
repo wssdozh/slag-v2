@@ -26,7 +26,7 @@ try {
   if (role === 'host') {
     const result = await page.evaluate(async ({ testVaultId, testVaultName, server, runId }) => {
       const { syncEngine, storage } = await import('/src/lib/sync/syncEngine.ts');
-      const { createPairingSession, pollPairingSession, approvePairingSession } = await import('/src/lib/sync/pairing.ts');
+      const { createPairingSession } = await import('/src/lib/sync/pairing.ts');
 
       // 1. Check main vault count
       storage.switchVault('default_vault');
@@ -117,7 +117,6 @@ try {
 
     // Verify main vault was never contaminated
     const finalCheck = await page.evaluate(({ testVaultId, runId }) => {
-      const { storage, syncEngine } = window;
       // Get storage
       const rawMain = localStorage.getItem('slag_items_default_vault');
       const mainItems = rawMain ? JSON.parse(rawMain) : [];
@@ -141,7 +140,7 @@ try {
     const pin = process.argv[4];
     assert(pin && /^\d{3}-?\d{3}$/.test(pin), `Valid PIN required, got: ${pin}`);
 
-    const guestResult = await page.evaluate(async ({ pin, server, runId }) => {
+    await page.evaluate(async ({ pin, server, runId }) => {
       const { syncEngine, storage } = await import('/src/lib/sync/syncEngine.ts');
       const { claimPairingSession, pollPairingPayload } = await import('/src/lib/sync/pairing.ts');
       const { validateMnemonic } = await import('/src/lib/sync/crypto.ts');

@@ -10,6 +10,7 @@ export interface DeviceProfile {
   publicKey?: string;
   pairedAt: string;
   lastSeenAt: string;
+  allowedVaults?: string[];
 }
 
 export type SyncConnectionState = 'idle' | 'syncing' | 'connected' | 'error' | 'offline';
@@ -100,6 +101,10 @@ export interface PairingExchangePayload {
   seedPhrase: string;
   vaultId: string;
   vaultName: string;
+  hostDeviceId?: string;
+  hostDeviceName?: string;
+  hostPlatform?: 'desktop' | 'mobile' | 'web';
+  allowedVaults?: string[];
 }
 
 export interface PairingPollResult {

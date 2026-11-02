@@ -13,6 +13,7 @@ import {
   KeyRound,
   Bot,
   Plus,
+  Shield,
 } from 'lucide-react';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import {
@@ -24,7 +25,7 @@ import {
   pollPairingPayload,
 } from '../../lib/sync/pairing';
 import { validateMnemonic } from '../../lib/sync/crypto';
-import type { SyncStatus, SyncConfig, DeviceSyncMode, PairingExchangePayload } from '../../lib/sync/types';
+import type { SyncStatus, SyncConfig, DeviceSyncMode, PairingExchangePayload, DeviceProfile } from '../../lib/sync/types';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 
@@ -63,6 +64,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   // Inline device rename state
   const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
   const [editingDeviceName, setEditingDeviceName] = useState('');
+  const [managingDevice, setManagingDevice] = useState<DeviceProfile | null>(null);
 
   // Server state
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
@@ -186,6 +188,10 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         seedPhrase: config.seedPhrase,
         vaultId: currentVault.id,
         vaultName: currentVault.name,
+        hostDeviceId: config.deviceId,
+        hostDeviceName: config.deviceName || 'Основное устройство',
+        hostPlatform: (typeof window !== 'undefined' && Boolean((window as unknown as { isTauri?: boolean }).isTauri)) ? 'desktop' : 'web',
+        allowedVaults: [currentVault.id],
       };
       const ok = await approvePairingSession(
         config.serverUrl,
@@ -196,12 +202,13 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         syncEngine.addTrustedDevice({
           id: `slag-guest-${pendingApprovalSas}`,
           name: `Устройство ${pendingApprovalSas}`,
-          platform: 'mobile',
+          platform: 'desktop',
           isCurrent: false,
           syncMode: 'read-write',
           canRunAiLease: false,
           pairedAt: new Date().toISOString(),
           lastSeenAt: 'Только что',
+          allowedVaults: [currentVault.id],
         });
         setConfig(syncEngine.getConfig());
         addToast?.('Устройство успешно подтверждено и добавлено', 'success');
@@ -236,6 +243,20 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
     } finally {
       setIsRejecting(false);
     }
+  };
+
+  const handleToggleVaultAccess = (vaultId: string) => {
+    if (!managingDevice) return;
+    const currentVaultId = storage.getCurrentVault().id;
+    const current = managingDevice.allowedVaults ?? [currentVaultId];
+    const next = current.includes(vaultId)
+      ? current.filter((id: string) => id !== vaultId)
+      : [...current, vaultId];
+    syncEngine.setDeviceAllowedVaults(managingDevice.id, next);
+    setManagingDevice({ ...managingDevice, allowedVaults: next });
+    setConfig(syncEngine.getConfig());
+    const vName = storage.getVaults().find(v => v.id === vaultId)?.name || vaultId;
+    addToast?.(`Доступ к «${vName}» обновлён`, 'info');
   };
 
   const handleClaimGuestPin = async () => {
@@ -293,6 +314,25 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         await syncEngine.updateSeedPhrase(receivedSeed);
         addToast?.(`Создано отдельное хранилище «${targetVaultName}»`, 'success');
       }
+
+      // Guest adds Host to trusted devices
+      let parsedObj: PairingExchangePayload | null = null;
+      try { parsedObj = JSON.parse(rawPayload); } catch {}
+      const hostDevId = parsedObj?.hostDeviceId || `slag-host-${claimed.sasCode || 'master'}`;
+      const hostDevName = parsedObj?.hostDeviceName || `Основное устройство (${claimed.sasCode || 'Хост'})`;
+      const hostPlatform = parsedObj?.hostPlatform || 'desktop';
+
+      syncEngine.addTrustedDevice({
+        id: hostDevId,
+        name: hostDevName,
+        platform: hostPlatform,
+        isCurrent: false,
+        syncMode: 'read-write',
+        canRunAiLease: false,
+        pairedAt: new Date().toISOString(),
+        lastSeenAt: 'Только что',
+        allowedVaults: [targetVaultId],
+      });
 
       setConfig(syncEngine.getConfig());
       setGuestInputPin('');
@@ -441,15 +481,17 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
             <button
               type="button"
               onClick={() => {
-                if (sub.plan === 'self-hosted') {
+                if (config.trustedDevices.length > 0) {
+                  setManagingDevice(config.trustedDevices[0]);
+                } else if (sub.plan === 'self-hosted') {
                   addToast?.('Self-hosted релей работает без ограничений', 'info');
                 } else {
-                  addToast?.(`Тариф ${sub.planLabel}: кеш до ${sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}, очищается сразу после синхронизации.`, 'info');
+                  addToast?.('Привяжите устройство, чтобы управлять доступом к хранилищам', 'info');
                 }
               }}
               className="px-2 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer active:scale-[0.96]"
             >
-              {sub.plan === 'self-hosted' ? 'Инфо' : 'Управление'}
+              Управление
             </button>
           </div>
         </div>
@@ -644,6 +686,16 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                   title={dev.canRunAiLease ? 'AI-воркер разрешен' : 'AI-воркер запрещен'}
                 >
                   <Bot className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Vault Access Management Button */}
+                <button
+                  type="button"
+                  onClick={() => setManagingDevice(dev)}
+                  className="p-1 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  title="Управление доступом к хранилищам"
+                >
+                  <Shield className="w-3.5 h-3.5" />
                 </button>
 
                 <button
@@ -976,6 +1028,81 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                   </div>
                 )
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Vault Access Management Modal */}
+      {managingDevice && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setManagingDevice(null);
+          }}
+        >
+          <div className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-semibold text-white">Доступ к хранилищам</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManagingDevice(null)}
+                className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between py-1 border-b border-white/[0.04]">
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-white">{managingDevice.name}</span>
+                  <span className="font-mono text-2xs text-zinc-500">{managingDevice.id}</span>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                  {managingDevice.syncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
+                </span>
+              </div>
+
+              <span className="text-2xs text-zinc-400 font-medium">Выберите доступные хранилища:</span>
+
+              <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                {storage.getVaults().map((v) => {
+                  const allowed = (managingDevice.allowedVaults ?? [storage.getCurrentVault().id, 'default_vault']).includes(v.id);
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => handleToggleVaultAccess(v.id)}
+                      className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] cursor-pointer transition-colors"
+                    >
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-xs text-white truncate font-medium">{v.name}</span>
+                        <span className="font-mono text-2xs text-zinc-500 truncate">{v.id}</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
+                          allowed
+                            ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+                            : 'text-zinc-500 bg-white/[0.02] border border-white/[0.04]'
+                        }`}
+                      >
+                        {allowed ? 'Разрешено' : 'Запрещено'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-2xs text-zinc-500 text-center pt-1 leading-relaxed">
+                Устройство будет синхронизировать только те хранилища, к которым открыт доступ.
+              </p>
             </div>
           </div>
         </div>
