@@ -45,6 +45,7 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
         messages: [{ role: 'user', content: 'идеи для роликов' }],
         currentFolder: 'Входящие',
         settings: {
+          sourceMode: 'byok',
           provider: 'groq',
           groqApiKey: '', // empty key forces local agent fallback
           model: 'openai/gpt-oss-120b',
@@ -91,6 +92,7 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
         ],
         currentFolder: 'Проекты/Идеи',
         settings: {
+          sourceMode: 'byok',
           provider: 'groq',
           groqApiKey: '',
           model: 'openai/gpt-oss-120b',
@@ -117,6 +119,7 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
         messages: [{ role: 'user', content: 'Привет' }],
         currentFolder: 'Входящие',
         settings: {
+          sourceMode: 'byok',
           provider: 'groq',
           groqApiKey: 'dummy_invalid_key_for_test',
           model: 'openai/gpt-oss-120b',
@@ -166,6 +169,7 @@ test.describe('Assistant Search Sanitization & Fallback Formatting', () => {
         messages: [{ role: 'user', content: 'игры' }],
         currentFolder: 'Входящие',
         settings: {
+          sourceMode: 'byok',
           provider: 'groq',
           groqApiKey: '',
           model: 'openai/gpt-oss-120b',
