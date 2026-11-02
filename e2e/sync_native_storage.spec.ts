@@ -8,10 +8,12 @@ test('synced native notes survive disk reload and disk failures reject', async (
     const files = new Map<string, string>();
     const dirs = new Set<string>();
     let failWrites = false;
+    let duringWrite: (() => void) | undefined;
     window.__TAURI_INTERNALS__ = { invoke: async (cmd: string, args: any, options: any) => {
       if (cmd === 'plugin:fs|write_text_file') {
         if (failWrites) throw new Error('disk full');
         files.set(decodeURIComponent(options.headers.path), new TextDecoder().decode(args));
+        if (duringWrite) { const mutate = duringWrite; duringWrite = undefined; mutate(); }
       } else if (cmd === 'plugin:fs|mkdir') dirs.add(args.path);
       else if (cmd === 'plugin:fs|exists') return files.has(args.path) || dirs.has(args.path);
       else if (cmd === 'plugin:fs|remove') files.delete(args.path);
@@ -41,13 +43,19 @@ test('synced native notes survive disk reload and disk failures reject', async (
       let rejected = false;
       try { await storage.importSyncedVaultData({ items: [{ ...note, title: 'failed' }] }); } catch { rejected = true; }
       failWrites = false;
+      await storage.importSyncedVaultData({ items: [{ ...note, id: 'replacement', filename: 'сохранено 🔒.md' }] });
+      const replacementOnDisk = [...files.values()].some(text => text.includes('id: replacement'));
+      duringWrite = () => storage.importVaultData({ items: [{ ...note, id: 'local-edit', title: 'local concurrent edit' }] });
+      let concurrentRejected = false;
+      try { await storage.importSyncedVaultData({ items: [{ ...note, id: 'remote-edit' }] }); } catch { concurrentRejected = true; }
+      const localPreserved = !!storage.getItemById('local-edit') && [...files.values()].some(text => text.includes('id: local-edit'));
       let unsafeRejected = false;
       try { await storage.importSyncedVaultData({ items: [{ ...note, folder: '../escape' }] }); } catch { unsafeRejected = true; }
       await storage.importSyncedVaultData({ items: [] });
-      return { restored: { title: restored.title, updatedAt: restored.updatedAt }, rejected, unsafeRejected, trashed: [...files.keys()].some(path => path.includes('/.trash/')), markdownFiles: [...files.keys()].filter(path => path.includes('/notes/') && path.endsWith('.md')).length };
+      return { restored: { title: restored.title, updatedAt: restored.updatedAt }, rejected, replacementOnDisk, concurrentRejected, localPreserved, unsafeRejected, trashed: [...files.keys()].some(path => path.includes('/.trash/')), markdownFiles: [...files.keys()].filter(path => path.includes('/notes/') && path.endsWith('.md')).length };
     } finally { delete window.__TAURI_INTERNALS__; delete window.isTauri; }
   });
-  expect(result).toEqual({ restored: { title: 'сохранено 🔒', updatedAt: 456 }, rejected: true, unsafeRejected: true, trashed: true, markdownFiles: 0 });
+  expect(result).toEqual({ restored: { title: 'сохранено 🔒', updatedAt: 456 }, rejected: true, replacementOnDisk: true, concurrentRejected: true, localPreserved: true, unsafeRejected: true, trashed: true, markdownFiles: 0 });
   await page.evaluate(proof => {
     const panel = document.createElement('pre');
     panel.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#08090a;color:#f4f4f5;padding:48px;font:20px monospace';

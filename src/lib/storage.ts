@@ -318,7 +318,7 @@ export class StorageService {
     return items;
   }
 
-  private async flushItemToDisk(item: SlagItem, oldFolder?: string, oldFilename?: string, vault: VaultMeta = this.currentVault, strict = false): Promise<void> {
+  private async flushItemToDisk(item: SlagItem, oldFolder?: string, oldFilename?: string, vault: VaultMeta = this.currentVault, strict = false, protectedPaths = new Set<string>()): Promise<void> {
     if (!isTauri()) return;
     try {
       const notesBase = this.getVaultNotesPath(vault);
@@ -339,13 +339,13 @@ export class StorageService {
       const content = serializeItemToMarkdown(item);
       await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
 
-      if (oldPath !== newPath && await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
+      if (oldPath !== newPath && !protectedPaths.has(oldPath) && await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
         await remove(oldPath, { baseDir: BaseDirectory.AppData });
       }
-      if (legacyOldPath !== newPath && await exists(legacyOldPath, { baseDir: BaseDirectory.AppData })) {
+      if (legacyOldPath !== newPath && !protectedPaths.has(legacyOldPath) && await exists(legacyOldPath, { baseDir: BaseDirectory.AppData })) {
         await remove(legacyOldPath, { baseDir: BaseDirectory.AppData });
       }
-      if (legacyTargetPath !== newPath && await exists(legacyTargetPath, { baseDir: BaseDirectory.AppData })) {
+      if (legacyTargetPath !== newPath && !protectedPaths.has(legacyTargetPath) && await exists(legacyTargetPath, { baseDir: BaseDirectory.AppData })) {
         await remove(legacyTargetPath, { baseDir: BaseDirectory.AppData });
       }
 
@@ -1238,6 +1238,9 @@ export class StorageService {
   }): Promise<void> {
     const vault = this.currentVault;
     const previous = this.getItems();
+    const previousItems = JSON.stringify(previous);
+    const previousFolders = JSON.stringify(this.getFolders());
+    const previousWorkspace = JSON.stringify(this.getWorkspaceState());
     const folders = data.folders ?? this.getFolders();
     const workspace = { ...this.getWorkspaceState(), ...data.workspaceState };
     const safeRelativePath = (path: string) => path.length > 0 && !path.startsWith('/') && !path.includes('\\') && !path.includes(':') && path.split('/').every(part => part !== '..' && part !== '.' && part !== '');
@@ -1253,12 +1256,15 @@ export class StorageService {
     if (isTauri()) {
       if (data.items) {
         const nextIds = new Set(data.items.map(item => item.id));
+        const notePath = (item: SlagItem) => `${this.getVaultNotesPath(vault)}/${item.folder || 'Входящие'}/${item.filename || getSafeNoteFilename(item.title, item.id)}`;
+        const nextPaths = new Set(data.items.map(notePath));
+        if (nextPaths.size !== data.items.length) throw new Error('Synced notes have conflicting filenames');
         for (const item of data.items) {
           const old = previous.find(candidate => candidate.id === item.id);
-          await this.flushItemToDisk(item, old?.folder, old?.filename, vault, true);
+          await this.flushItemToDisk(item, old?.folder, old?.filename, vault, true, nextPaths);
         }
         for (const item of previous) {
-          if (!nextIds.has(item.id)) await this.removeItemFromDisk(item, vault, true);
+          if (!nextIds.has(item.id) && !nextPaths.has(notePath(item))) await this.removeItemFromDisk(item, vault, true);
         }
       }
       const notesPath = this.getVaultNotesPath(vault);
@@ -1269,6 +1275,16 @@ export class StorageService {
       await writeTextFile(this.getVaultStatePath(vault), JSON.stringify({ folders, workspace, updatedAt: Date.now() }), { baseDir: BaseDirectory.AppData });
     }
     if (this.currentVault.id !== vault.id) throw new Error('Vault changed while persisting sync');
+    if (JSON.stringify(this.getItems()) !== previousItems || JSON.stringify(this.getFolders()) !== previousFolders || JSON.stringify(this.getWorkspaceState()) !== previousWorkspace) {
+      // Re-persist the latest local state so an in-flight remote write cannot win on disk.
+      const latest = this.getItems();
+      const latestPaths = new Set(latest.map(item => `${item.folder || 'Входящие'}/${item.filename || getSafeNoteFilename(item.title, item.id)}`));
+      for (const item of data.items ?? []) {
+        if (!latestPaths.has(`${item.folder || 'Входящие'}/${item.filename || getSafeNoteFilename(item.title, item.id)}`)) await this.removeItemFromDisk(item, vault, true);
+      }
+      await this.importSyncedVaultData({ items: this.getItems(), folders: this.getFolders(), workspaceState: this.getWorkspaceState() });
+      throw new Error('Local state changed while persisting sync; bundle remains pending');
+    }
     if (!this.importVaultData({ items: data.items, folders: data.folders })) {
       throw new Error('Failed to store received vault data');
     }
