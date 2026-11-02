@@ -255,7 +255,19 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder
-            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+                let is_quick = args.iter().any(|arg| arg == "--quick" || arg == "--composer" || arg == "-q");
+                if is_quick {
+                    if let Some(quick_win) = app.get_webview_window("quick-composer") {
+                        let _ = quick_win.show();
+                        let _ = quick_win.unminimize();
+                        let _ = quick_win.set_focus();
+                        #[cfg(target_os = "windows")]
+                        set_webview_memory_level(&quick_win, false);
+                        let _ = quick_win.emit("slag://focus-composer", ());
+                        return;
+                    }
+                }
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.unminimize();
