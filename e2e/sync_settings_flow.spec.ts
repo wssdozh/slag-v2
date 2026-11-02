@@ -41,7 +41,7 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     await expect(settingsModal.locator('text=Управление')).toBeVisible();
 
     // 5. Verify current device item
-    await expect(settingsModal.locator('text=текущее')).toBeVisible();
+    await expect(settingsModal.locator('text=это устройство')).toBeVisible();
 
     // Screenshot of Unified Header Card & Clean Sync Tab
     await page.screenshot({

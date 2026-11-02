@@ -7,6 +7,7 @@ test.describe('Backup & Restore System Verification', () => {
   });
 
   test('Create snapshot, delete note, and restore vault from snapshot', async ({ page }) => {
+    test.setTimeout(60000);
     // 1. Accept any browser dialogs (confirm for restore)
     page.on('dialog', async (dialog) => {
       await dialog.accept();

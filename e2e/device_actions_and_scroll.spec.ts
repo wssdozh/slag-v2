@@ -46,7 +46,8 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
 
     const syncTabBtn = settingsModal.locator('button[data-testid="settings-tab-sync"]');
     await syncTabBtn.click();
-    await expect(settingsModal.locator('text=Синхронизация активна')).toBeVisible({ timeout: 10000 });
+    await expect(settingsModal.locator('text=SLAG Smile')).toBeVisible({ timeout: 10000 });
+    await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
 
     // 3. Test Inline Device Renaming
     const deviceNameBtn = settingsModal.locator('button[title*="Кликните для переименования"]').first();
