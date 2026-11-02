@@ -18,32 +18,34 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    // 2. Open Settings modal
-    const settingsBtn = page.locator('button[title*="Настройки"]').first();
-    await expect(settingsBtn).toBeVisible({ timeout: 10000 });
-    await settingsBtn.click();
+    // 2. Verify sidebar footer live sync status button (next to main vault, terminal, settings)
+    const sidebarSyncBtn = page.locator('[data-testid="sidebar-sync-btn"]');
+    await expect(sidebarSyncBtn).toBeVisible({ timeout: 10000 });
 
+    // Capture screenshot of sidebar footer with live sync indicator
+    await page.screenshot({
+      path: 'test-results/screenshots/sidebar_footer_sync_indicator.png',
+      fullPage: false,
+    });
+
+    // 3. Clicking sidebar-sync-btn directly opens Settings on "Синхронизация" tab
+    await sidebarSyncBtn.click();
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
 
-    // 3. Switch to "Синхронизация" tab
-    const syncTabBtn = settingsModal.locator('button[data-testid="settings-tab-sync"]');
-    await expect(syncTabBtn).toBeVisible();
-    await syncTabBtn.click();
-
-    // 4. Verify Subscription Banner with Smile Tier & Cache Quota
+    // 4. Verify Unified Single Card (Subscription + Sync Status + Manual Sync button)
     await expect(settingsModal.locator('text=SLAG Smile')).toBeVisible();
     await expect(settingsModal.locator('text=активен до 12 ноября 2027')).toBeVisible();
     await expect(settingsModal.locator('text=кеш')).toBeVisible();
+    await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
     await expect(settingsModal.locator('text=Управление')).toBeVisible();
 
-    // 5. Verify Relay status & current device
-    await expect(settingsModal.locator('text=Синхронизация активна')).toBeVisible({ timeout: 10000 });
+    // 5. Verify current device item
     await expect(settingsModal.locator('text=текущее')).toBeVisible();
 
-    // Screenshot of Subscription Banner & Clean Sync Tab with Cache
+    // Screenshot of Unified Header Card & Clean Sync Tab
     await page.screenshot({
-      path: 'test-results/screenshots/sync_settings_subscription_banner.png',
+      path: 'test-results/screenshots/sync_settings_unified_header_card.png',
       fullPage: false,
     });
 

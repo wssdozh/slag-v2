@@ -7,7 +7,6 @@ import {
   Check,
   Trash2,
   Server,
-  Shield,
   Loader2,
   X,
   Edit2,
@@ -311,96 +310,91 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
 
   return (
     <div className="flex flex-col gap-3 text-zinc-100">
-      {/* 1. Subscription & Account Status Card (Variant A) */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <div className="flex items-center gap-2.5">
-          <Shield className="w-4 h-4 text-zinc-400 shrink-0" />
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
+      {/* 1. Unified Subscription & Relay Connection Card */}
+      <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+        {/* Top: Plan Badge + Status Indicator + Quick Actions */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  status.state === 'connected'
+                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                    : status.state === 'syncing'
+                    ? 'bg-amber-400 animate-pulse'
+                    : 'bg-zinc-600'
+                }`}
+              />
               <span className="text-xs font-semibold text-white tracking-wide">
                 {sub.planLabel}
               </span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-                  sub.plan === 'angry'
-                    ? 'text-amber-400 bg-amber-500/10'
-                    : sub.plan === 'smile' || sub.plan === 'pro'
-                    ? 'text-emerald-400 bg-emerald-500/10'
-                    : 'text-zinc-400 bg-white/[0.04]'
-                }`}
-              >
-                E2EE · {sub.plan === 'angry' ? '50 ГБ' : sub.plan === 'smile' || sub.plan === 'pro' ? '10 ГБ' : '1 ГБ'}
-              </span>
             </div>
-            <span className="text-2xs text-zinc-400 mt-0.5">
-              {sub.plan === 'self-hosted' ? (
-                'без ограничений по сроку и устройствам'
-              ) : (
-                <>
-                  активен до {sub.expiresFormatted} · {sub.activeDevices} из {sub.maxDevices} устройств · кеш {sub.usedCacheMb} МБ / {sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}
-                </>
-              )}
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
+                sub.plan === 'angry'
+                  ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                  : sub.plan === 'smile' || sub.plan === 'pro'
+                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
+                  : 'text-zinc-400 bg-white/[0.04] border border-white/[0.06]'
+              }`}
+            >
+              E2EE · {sub.plan === 'angry' ? '50 ГБ' : sub.plan === 'smile' || sub.plan === 'pro' ? '10 ГБ' : '1 ГБ'}
             </span>
+            {status.pingMs !== null && status.state === 'connected' && (
+              <span className="font-mono text-2xs text-zinc-500 hidden sm:inline">
+                {status.pingMs} ms
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={status.state === 'syncing'}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-2xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.96] border border-white/[0.06] rounded-md transition-all cursor-pointer disabled:opacity-50"
+              title="Запустить синхронизацию дельт сейчас"
+            >
+              <RefreshCw className={`w-3 h-3 ${status.state === 'syncing' ? 'animate-spin text-amber-400' : 'text-zinc-400'}`} />
+              <span>{status.state === 'syncing' ? 'Синхронизация...' : 'Синхронизировать'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (sub.plan === 'self-hosted') {
+                  addToast?.('Self-hosted релей работает без ограничений', 'info');
+                } else {
+                  addToast?.(`Тариф ${sub.planLabel}: кеш недоставленного до ${sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}, очищается сразу по получению.`, 'info');
+                }
+              }}
+              className="px-2 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer active:scale-[0.96]"
+            >
+              {sub.plan === 'self-hosted' ? 'Инфо' : 'Управление'}
+            </button>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (sub.plan === 'self-hosted') {
-              addToast?.('Self-hosted релей работает без ограничений', 'info');
-            } else {
-              addToast?.(`Тариф ${sub.planLabel}: кеш недоставленного до ${sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}, очищается сразу по получению.`, 'info');
-            }
-          }}
-          className="px-2.5 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer active:scale-[0.96]"
-        >
-          {sub.plan === 'self-hosted' ? 'Инфо' : 'Управление'}
-        </button>
-      </div>
-
-      {/* 2. Flat Relay Connection Bar */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <div className="flex items-center gap-2.5">
-          <span
-            className={`w-2 h-2 rounded-full shrink-0 ${
-              status.state === 'connected'
-                ? 'bg-emerald-500'
-                : status.state === 'syncing'
-                ? 'bg-amber-400 animate-pulse'
-                : 'bg-zinc-600'
-            }`}
-          />
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-zinc-200">
-                {status.state === 'connected'
-                  ? 'Синхронизация активна'
-                  : status.state === 'syncing'
-                  ? 'Синхронизация дельт...'
-                  : 'Офлайн (локальный режим)'}
-              </span>
-              {status.pingMs !== null && (
-                <span className="font-mono text-2xs text-zinc-500">
-                  {status.pingMs} ms
-                </span>
-              )}
-            </div>
-            <span className="text-2xs text-zinc-500">
-              {status.lastSyncTime ? `Сверка: ${status.lastSyncTime}` : 'Готов к подключению'}
-            </span>
-          </div>
+        {/* Bottom Details: Devices, Cache, Last Sync */}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xs text-zinc-400 border-t border-white/[0.04] pt-2">
+          <span>
+            {sub.plan === 'self-hosted'
+              ? 'Свой сервер'
+              : `активен до ${sub.expiresFormatted}`}
+          </span>
+          <span className="text-zinc-600">·</span>
+          <span>{sub.activeDevices} из {sub.maxDevices} устройств</span>
+          <span className="text-zinc-600">·</span>
+          <span className="font-mono text-zinc-300">
+            кеш {sub.usedCacheMb} МБ / {sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}
+          </span>
+          {status.lastSyncTime && (
+            <>
+              <span className="text-zinc-600">·</span>
+              <span className="text-zinc-500">сверка: {status.lastSyncTime}</span>
+            </>
+          )}
         </div>
-
-        <button
-          type="button"
-          onClick={handleManualSync}
-          disabled={status.state === 'syncing'}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 text-xs text-zinc-300 hover:text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
-          <span>Синхронизировать</span>
-        </button>
       </div>
 
       {/* 3. Flat Device Pairing Section with Human-in-the-Loop Consent */}

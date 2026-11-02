@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
+import { syncEngine } from '../../lib/sync/syncEngine';
+import type { SyncStatus } from '../../lib/sync/types';
 import {
   Inbox,
   FolderPlus,
@@ -13,6 +15,7 @@ import {
   FolderOpen,
   Terminal,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -23,6 +26,7 @@ export const Sidebar: React.FC = () => {
     setCurrentFolder,
     items,
     setIsSettingsOpen,
+    openSettingsModal,
     setIsLogViewerOpen,
     openCreateFolderModal,
     switchVault,
@@ -34,8 +38,13 @@ export const Sidebar: React.FC = () => {
     addToast
   } = useApp();
 
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => syncEngine.getStatus());
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
   const bottomBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return syncEngine.subscribe(setSyncStatus);
+  }, []);
 
   useEffect(() => {
     if (!isVaultDropdownOpen) return;
@@ -234,6 +243,39 @@ export const Sidebar: React.FC = () => {
             </button>
           </div>
         )}
+
+        {/* Sync Status button */}
+        <button
+          onClick={() => openSettingsModal('sync')}
+          className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer relative group"
+          title={
+            syncStatus.state === 'connected'
+              ? `Синхронизация активна (${syncStatus.pingMs ?? 1} ms) · Клик: открыть настройки`
+              : syncStatus.state === 'syncing'
+              ? 'Синхронизация дельт...'
+              : 'Синхронизация: офлайн · Клик: открыть настройки'
+          }
+          data-testid="sidebar-sync-btn"
+        >
+          <RefreshCw
+            className={`w-4 h-4 transition-transform ${
+              syncStatus.state === 'syncing'
+                ? 'animate-spin text-amber-400'
+                : syncStatus.state === 'connected'
+                ? 'text-zinc-400 group-hover:text-white'
+                : 'text-zinc-600'
+            }`}
+          />
+          <span
+            className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${
+              syncStatus.state === 'connected'
+                ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
+                : syncStatus.state === 'syncing'
+                ? 'bg-amber-400 animate-pulse'
+                : 'bg-zinc-600'
+            }`}
+          />
+        </button>
 
         {/* Logs HUD button */}
         <button
