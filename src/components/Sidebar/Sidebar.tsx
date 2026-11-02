@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
 import { syncEngine } from '../../lib/sync/syncEngine';
+import { getVaultDisplayName } from '../../lib/vaultDisplay';
 import type { SyncStatus } from '../../lib/sync/types';
 import {
   Inbox,
@@ -147,7 +148,7 @@ export const Sidebar: React.FC = () => {
           >
             <div className="flex items-center gap-2 truncate">
               <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span className="truncate text-xs font-medium">{vault.name}</span>
+              <span className="truncate text-xs font-medium">{getVaultDisplayName(vault, vaults)}</span>
             </div>
             <ChevronDown
               className={`w-3 h-3 text-zinc-500 shrink-0 ml-1 transition-transform duration-150 ${
@@ -183,7 +184,7 @@ export const Sidebar: React.FC = () => {
                       }}
                       className="flex-1 min-w-0 text-left cursor-pointer flex flex-col"
                     >
-                      <span className="truncate">{v.name}</span>
+                      <span className="truncate">{getVaultDisplayName(v, vaults)}</span>
                       {v.path && (
                         <span className="text-2xs text-zinc-500 truncate font-mono">
                           {v.path}
@@ -249,7 +250,9 @@ export const Sidebar: React.FC = () => {
           onClick={() => openSettingsModal('sync')}
           className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer relative group"
           title={
-            syncStatus.state === 'connected'
+            syncStatus.authRequired && !syncStatus.isAuthenticated
+              ? 'Синхронизация: войдите в SLAG ID'
+              : syncStatus.state === 'connected'
               ? `Синхронизация активна (${syncStatus.pingMs ?? 1} ms) · Клик: открыть настройки`
               : syncStatus.state === 'syncing'
               ? 'Синхронизация дельт...'

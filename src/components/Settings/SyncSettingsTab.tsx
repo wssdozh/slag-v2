@@ -1,168 +1,165 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  RefreshCw,
-  Laptop,
-  Smartphone,
-  Copy,
   Check,
-  Trash2,
-  Server,
-  Loader2,
-  X,
+  Copy,
+  Database,
   Edit2,
   KeyRound,
-  Bot,
+  Laptop,
+  Loader2,
   Plus,
+  RefreshCw,
+  Server,
   Shield,
+  Smartphone,
+  Trash2,
+  X,
 } from 'lucide-react';
-import { syncEngine } from '../../lib/sync/syncEngine';
-import {
-  createPairingSession,
-  claimPairingSession,
-  approvePairingSession,
-  rejectPairingSession,
-  pollPairingSession,
-  pollPairingPayload,
-} from '../../lib/sync/pairing';
-import { validateMnemonic } from '../../lib/sync/crypto';
-import type { SyncStatus, SyncConfig, DeviceSyncMode, PairingExchangePayload, DeviceProfile } from '../../lib/sync/types';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
+import { accountClient } from '../../lib/sync/account';
+import { encryptVaultKeyForDevice } from '../../lib/sync/accountCrypto';
+import type { AccountDevice } from '../../lib/sync/accountTypes';
+import { validateMnemonic } from '../../lib/sync/crypto';
+import {
+  approveAccountPairingSession,
+  approvePairingSession,
+  claimPairingSession,
+  createPairingSession,
+  pollPairingPayload,
+  pollPairingSession,
+  rejectPairingSession,
+} from '../../lib/sync/pairing';
+import { syncEngine } from '../../lib/sync/syncEngine';
+import type {
+  DeviceProfile,
+  DeviceSyncMode,
+  PairingExchangePayload,
+  SyncConfig,
+  SyncStatus,
+} from '../../lib/sync/types';
+import { getLocalVaultId, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
+import { getVaultDisplayName } from '../../lib/vaultDisplay';
 
 interface SyncSettingsTabProps {
   addToast?: (text: string, type?: 'info' | 'success' | 'error') => void;
 }
 
 export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) => {
-  const { switchVault, createVault } = useApp();
+  const { switchVault, createVault, vaults } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
-
-  // Pair modal dialog state
+  const [accountState, setAccountState] = useState(accountClient.getState());
   const [isPairModalOpen, setIsPairModalOpen] = useState(false);
-
-  // Pair mode: 'host' (get PIN) vs 'guest' (enter PIN)
   const [pairMode, setPairMode] = useState<'host' | 'guest'>('host');
-
-  // PIN host state
+  const [pairError, setPairError] = useState<string | null>(null);
   const [hostPin, setHostPin] = useState<string | null>(null);
   const [hostSessionId, setHostSessionId] = useState<string | null>(null);
-  const [hostPinTtl, setHostPinTtl] = useState<number>(300);
+  const [hostPinTtl, setHostPinTtl] = useState(300);
   const [isGeneratingPin, setIsGeneratingPin] = useState(false);
-
-  // Host approval request state (when a guest enters PIN)
-  const [pendingApprovalSas, setPendingApprovalSas] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<{ sas: string; guestDeviceId?: string } | null>(null);
   const [isApproving, setIsApproving] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
-
-  // PIN guest state
   const [guestInputPin, setGuestInputPin] = useState('');
   const [guestSasCode, setGuestSasCode] = useState<string | null>(null);
   const [isClaimingPin, setIsClaimingPin] = useState(false);
-  const [isGuestWaitingApproval, setIsGuestWaitingApproval] = useState(false);
-
-  // Inline device rename state
   const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
   const [editingDeviceName, setEditingDeviceName] = useState('');
-  const [managingDevice, setManagingDevice] = useState<DeviceProfile | null>(null);
-
-  // Server state
+  const [managingDevice, setManagingDevice] = useState<AccountDevice | DeviceProfile | null>(null);
+  const [grantMode, setGrantMode] = useState<DeviceSyncMode>('read-write');
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isTestingServer, setIsTestingServer] = useState(false);
   const [serverStatusMessage, setServerStatusMessage] = useState<string | null>(null);
-
-  // Clipboard copy tracker
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
+  const [busyVaultId, setBusyVaultId] = useState<string | null>(null);
   const isPollingRef = useRef(false);
 
+  const hosted = status.authRequired || accountClient.isAuthenticated();
+  const locked = status.authRequired && !accountClient.isAuthenticated();
+  const account = accountState.account;
+  const sub = status.subscription;
+
+  useEffect(() => syncEngine.subscribe((next) => {
+    setStatus(next);
+    setConfig(syncEngine.getConfig());
+  }), []);
+
+  useEffect(() => accountClient.subscribe(setAccountState), []);
+
   useEffect(() => {
-    if (!isPairModalOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsPairModalOpen(false);
-      }
+    void accountClient.detectServer(config.serverUrl);
+  }, [config.serverUrl]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (managingDevice) setManagingDevice(null);
+      else if (isPairModalOpen) setIsPairModalOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPairModalOpen]);
+  }, [isPairModalOpen, managingDevice]);
 
-  useEffect(() => {
-    const unsub = syncEngine.subscribe((st) => {
-      setStatus(st);
-      setConfig(syncEngine.getConfig());
-    });
-    return unsub;
-  }, []);
-
-  // Countdown timer for host PIN
   useEffect(() => {
     if (!hostPin || hostPinTtl <= 0) return;
     const interval = setInterval(() => {
-      setHostPinTtl((prev) => {
-        if (prev <= 1) {
+      setHostPinTtl((current) => {
+        if (current <= 1) {
           setHostPin(null);
           setHostSessionId(null);
-          setPendingApprovalSas(null);
+          setPendingApproval(null);
           return 0;
         }
-        return prev - 1;
+        return current - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, [hostPin, hostPinTtl]);
 
-  // Host background polling for guest claim -> triggers approval card
   useEffect(() => {
-    if (!hostSessionId || pendingApprovalSas) return;
-
+    if (!hostSessionId || pendingApproval) return;
     let active = true;
-    const pollInterval = setInterval(async () => {
+    const interval = setInterval(async () => {
       if (!active || isPollingRef.current) return;
       isPollingRef.current = true;
       try {
-        const res = await pollPairingSession(config.serverUrl, hostSessionId);
-        if (active && res.status === 'pending_approval' && res.sasCode) {
-          setPendingApprovalSas(res.sasCode);
+        const result = await pollPairingSession(config.serverUrl, hostSessionId);
+        if (active && result.status === 'pending_approval' && result.sasCode) {
+          setPendingApproval({ sas: result.sasCode, guestDeviceId: result.guestDeviceId });
           setIsPairModalOpen(true);
           setPairMode('host');
         }
-      } catch {
-        // silent transient poll error
+      } catch (error) {
+        if (active) setPairError(error instanceof Error ? error.message : String(error));
       } finally {
         isPollingRef.current = false;
       }
     }, 1500);
-
     return () => {
       active = false;
-      clearInterval(pollInterval);
+      clearInterval(interval);
     };
-  }, [hostSessionId, pendingApprovalSas, config.serverUrl]);
+  }, [config.serverUrl, hostSessionId, pendingApproval]);
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string, key: string) => {
+    await navigator.clipboard.writeText(text);
     setCopiedKey(key);
     addToast?.('Скопировано в буфер обмена', 'success');
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const handleManualSync = async () => {
-    addToast?.('Запуск синхронизации...', 'info');
-    await syncEngine.pushLocalChanges();
   };
 
   const handleGeneratePin = async () => {
+    if (locked) return;
     setIsGeneratingPin(true);
-    setPendingApprovalSas(null);
+    setPendingApproval(null);
+    setPairError(null);
     try {
       const session = await createPairingSession(config.serverUrl, config.deviceId);
       setHostPin(session.pin);
       setHostSessionId(session.sessionId);
       setHostPinTtl(session.expiresIn);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast?.(`Ошибка генерации: ${msg}`, 'error');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setPairError(message);
+      addToast?.(`Ошибка генерации: ${message}`, 'error');
     } finally {
       setIsGeneratingPin(false);
     }
@@ -171,37 +168,49 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   const handleOpenPairModal = () => {
     setIsPairModalOpen(true);
     setPairMode('host');
-    setPendingApprovalSas(null);
-    if (!hostPin) {
-      void handleGeneratePin();
-    }
+    setPairError(null);
+    if (!hostPin) void handleGeneratePin();
   };
 
   const handleApprovePairing = async () => {
-    if (!hostSessionId || !pendingApprovalSas) {
-      return;
-    }
+    if (!hostSessionId || !pendingApproval) return;
     setIsApproving(true);
+    setPairError(null);
     try {
       const currentVault = storage.getCurrentVault();
-      const payload: PairingExchangePayload = {
-        seedPhrase: config.seedPhrase,
-        vaultId: currentVault.id,
-        vaultName: currentVault.name,
-        hostDeviceId: config.deviceId,
-        hostDeviceName: config.deviceName || 'Основное устройство',
-        hostPlatform: (typeof window !== 'undefined' && Boolean((window as unknown as { isTauri?: boolean }).isTauri)) ? 'desktop' : 'web',
-        allowedVaults: [currentVault.id],
-      };
-      const ok = await approvePairingSession(
-        config.serverUrl,
-        hostSessionId,
-        JSON.stringify(payload)
-      );
-      if (ok) {
+      let ok: boolean;
+      if (hosted) {
+        const guest = accountState.devices.find((device) => device.id === pendingApproval.guestDeviceId);
+        if (!guest) throw new Error('Гостевое устройство не найдено в аккаунте');
+        const seedPhrase = syncEngine.getVaultSeedPhrase(currentVault.id);
+        if (!seedPhrase) throw new Error('Ключ текущего хранилища недоступен');
+        const encryptedKey = await encryptVaultKeyForDevice(seedPhrase, guest.publicKey);
+        const syncId = storage.ensureVaultSyncId(currentVault.id);
+        await accountClient.registerVault(syncId, currentVault.name);
+        ok = await approveAccountPairingSession(config.serverUrl, hostSessionId, {
+          vaultId: syncId,
+          vaultName: currentVault.name,
+          mode: 'read-write',
+          encryptedKey,
+        });
+      } else {
+        const payload: PairingExchangePayload = {
+          seedPhrase: config.seedPhrase,
+          vaultId: currentVault.id,
+          vaultName: currentVault.name,
+          hostDeviceId: config.deviceId,
+          hostDeviceName: config.deviceName,
+          hostPlatform: 'desktop',
+          allowedVaults: [currentVault.id],
+        };
+        ok = await approvePairingSession(config.serverUrl, hostSessionId, JSON.stringify(payload));
+      }
+      if (!ok) throw new Error('Сервер отклонил подтверждение');
+
+      if (!hosted) {
         syncEngine.addTrustedDevice({
-          id: `slag-guest-${pendingApprovalSas}`,
-          name: `Устройство ${pendingApprovalSas}`,
+          id: `slag-guest-${pendingApproval.sas}`,
+          name: `Устройство ${pendingApproval.sas}`,
           platform: 'desktop',
           isCurrent: false,
           syncMode: 'read-write',
@@ -210,18 +219,18 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           lastSeenAt: 'Только что',
           allowedVaults: [currentVault.id],
         });
-        setConfig(syncEngine.getConfig());
-        addToast?.('Устройство успешно подтверждено и добавлено', 'success');
-        setHostPin(null);
-        setHostSessionId(null);
-        setPendingApprovalSas(null);
-        setIsPairModalOpen(false);
       } else {
-        throw new Error('Сервер отклонил подтверждение');
+        await accountClient.refresh();
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast?.(`Ошибка подтверждения: ${msg}`, 'error');
+      addToast?.(`Устройство подключено к «${currentVault.name}»`, 'success');
+      setHostPin(null);
+      setHostSessionId(null);
+      setPendingApproval(null);
+      setIsPairModalOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setPairError(message);
+      addToast?.(`Ошибка подтверждения: ${message}`, 'error');
     } finally {
       setIsApproving(false);
     }
@@ -229,123 +238,118 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
 
   const handleRejectPairing = async () => {
     if (!hostSessionId) return;
-    setIsRejecting(true);
     try {
       await rejectPairingSession(config.serverUrl, hostSessionId);
-      addToast?.('Запрос на сопряжение отклонен', 'info');
       setHostPin(null);
       setHostSessionId(null);
-      setPendingApprovalSas(null);
+      setPendingApproval(null);
       setIsPairModalOpen(false);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast?.(`Ошибка: ${msg}`, 'error');
-    } finally {
-      setIsRejecting(false);
+    } catch (error) {
+      setPairError(error instanceof Error ? error.message : String(error));
     }
   };
 
-  const handleToggleVaultAccess = (vaultId: string) => {
-    if (!managingDevice) return;
-    const currentVaultId = storage.getCurrentVault().id;
-    const current = managingDevice.allowedVaults ?? [currentVaultId];
-    const next = current.includes(vaultId)
-      ? current.filter((id: string) => id !== vaultId)
-      : [...current, vaultId];
-    syncEngine.setDeviceAllowedVaults(managingDevice.id, next);
-    setManagingDevice({ ...managingDevice, allowedVaults: next });
-    setConfig(syncEngine.getConfig());
-    const vName = storage.getVaults().find(v => v.id === vaultId)?.name || vaultId;
-    addToast?.(`Доступ к «${vName}» обновлён`, 'info');
-  };
-
   const handleClaimGuestPin = async () => {
-    if (!guestInputPin.trim()) return;
+    if (!guestInputPin.trim() || locked) return;
     setIsClaimingPin(true);
     setGuestSasCode(null);
+    setPairError(null);
     try {
-      const ephemeralPk = `pk_eph_${Math.random().toString(36).slice(2, 10)}`;
-      const claimed = await claimPairingSession(config.serverUrl, guestInputPin.trim(), ephemeralPk);
+      const ephemeralPk = `pk_eph_${crypto.getRandomValues(new Uint32Array(2)).join('')}`;
+      const claimed = await claimPairingSession(config.serverUrl, guestInputPin.trim(), ephemeralPk, config.deviceId);
       setGuestSasCode(claimed.sasCode);
-      setIsGuestWaitingApproval(true);
-      addToast?.(`Код проверки: ${claimed.sasCode}. Подтвердите на основном устройстве.`, 'info');
-
-      // Poll until host approves or rejects
       const rawPayload = await pollPairingPayload(
         config.serverUrl,
         claimed.sessionId,
         config.deviceId,
         60_000,
-        1500
+        1500,
       );
+      const parsed = JSON.parse(rawPayload) as PairingExchangePayload;
 
-      let receivedSeed = '';
-      let targetVaultId = 'default_vault';
-      let targetVaultName = 'main';
-
-      try {
-        const parsed = JSON.parse(rawPayload);
-        if (parsed && typeof parsed === 'object' && parsed.seedPhrase) {
-          receivedSeed = parsed.seedPhrase;
-          targetVaultId = parsed.vaultId || 'default_vault';
-          targetVaultName = parsed.vaultName || 'main';
-        } else {
-          receivedSeed = rawPayload;
-        }
-      } catch {
-        receivedSeed = rawPayload;
-      }
-
-      if (!receivedSeed || !validateMnemonic(receivedSeed)) {
-        throw new Error('Получен некорректный ключ');
-      }
-
-      const allVaults = storage.getVaults();
-      const existingVault = allVaults.find((v) => v.id === targetVaultId);
-
-      if (existingVault) {
-        // Merge with existing matching vault
-        switchVault(existingVault.id);
-        await syncEngine.updateSeedPhrase(receivedSeed);
-        addToast?.(`Слияние с хранилищем «${existingVault.name}»`, 'success');
+      if (parsed.encryptedKey) {
+        const result = await installSharedVault({
+          vaultId: parsed.vaultId,
+          vaultName: parsed.vaultName,
+          encryptedKey: parsed.encryptedKey,
+        }, config.deviceId, { createVault, switchVault });
+        addToast?.(
+          `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${parsed.vaultName}»`,
+          'success',
+        );
       } else {
-        // Create an isolated separate vault with this exact vault ID
-        createVault(targetVaultName, 'indexeddb', undefined, targetVaultId);
-        await syncEngine.updateSeedPhrase(receivedSeed);
-        addToast?.(`Создано отдельное хранилище «${targetVaultName}»`, 'success');
+        const receivedSeed = parsed.seedPhrase || rawPayload;
+        if (!validateMnemonic(receivedSeed)) throw new Error('Получен некорректный ключ хранилища');
+        syncEngine.setVaultSeedPhrase(parsed.vaultId, receivedSeed);
+        const existing = storage.getVaults().find((vault) => vault.id === parsed.vaultId);
+        if (existing) switchVault(existing.id);
+        else {
+          createVault(parsed.vaultName, 'indexeddb', undefined, parsed.vaultId);
+          await syncEngine.switchVault(parsed.vaultId);
+        }
+        addToast?.(`Хранилище «${parsed.vaultName}» подключено`, 'success');
       }
 
-      // Guest adds Host to trusted devices
-      let parsedObj: PairingExchangePayload | null = null;
-      try { parsedObj = JSON.parse(rawPayload); } catch {}
-      const hostDevId = parsedObj?.hostDeviceId || `slag-host-${claimed.sasCode || 'master'}`;
-      const hostDevName = parsedObj?.hostDeviceName || `Основное устройство (${claimed.sasCode || 'Хост'})`;
-      const hostPlatform = parsedObj?.hostPlatform || 'desktop';
-
-      syncEngine.addTrustedDevice({
-        id: hostDevId,
-        name: hostDevName,
-        platform: hostPlatform,
-        isCurrent: false,
-        syncMode: 'read-write',
-        canRunAiLease: false,
-        pairedAt: new Date().toISOString(),
-        lastSeenAt: 'Только что',
-        allowedVaults: [targetVaultId],
-      });
-
-      setConfig(syncEngine.getConfig());
+      if (!hosted && parsed.hostDeviceId) {
+        syncEngine.addTrustedDevice({
+          id: parsed.hostDeviceId,
+          name: parsed.hostDeviceName || 'Основное устройство',
+          platform: parsed.hostPlatform || 'desktop',
+          isCurrent: false,
+          syncMode: 'read-write',
+          canRunAiLease: false,
+          pairedAt: new Date().toISOString(),
+          lastSeenAt: 'Только что',
+          allowedVaults: [parsed.vaultId],
+        });
+      }
+      await accountClient.refresh();
       setGuestInputPin('');
       setGuestSasCode(null);
-      setIsGuestWaitingApproval(false);
       setIsPairModalOpen(false);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast?.(`${msg}`, 'error');
-      setIsGuestWaitingApproval(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setPairError(message);
+      addToast?.(message, 'error');
       setGuestSasCode(null);
     } finally {
       setIsClaimingPin(false);
+    }
+  };
+
+  const handleAcceptInvitation = async (vaultId: string) => {
+    const invitation = accountState.invitations.find((item) => item.vaultId === vaultId);
+    if (!invitation) return;
+    setBusyVaultId(vaultId);
+    try {
+      const result = await installSharedVault({
+        vaultId,
+        vaultName: invitation.vaultName || vaultId,
+        encryptedKey: invitation.encryptedKey,
+      }, config.deviceId, { createVault, switchVault }, false);
+      await accountClient.acceptVault(vaultId);
+      switchVault(getLocalVaultId(vaultId));
+      await syncEngine.switchVault(getLocalVaultId(vaultId));
+      addToast?.(
+        `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${invitation.vaultName || vaultId}»`,
+        'success',
+      );
+    } catch (error) {
+      addToast?.(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setBusyVaultId(null);
+    }
+  };
+
+  const handleDeclineInvitation = async (vaultId: string) => {
+    setBusyVaultId(vaultId);
+    try {
+      await accountClient.declineVault(vaultId);
+      addToast?.('Приглашение скрыто', 'info');
+    } catch (error) {
+      addToast?.(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setBusyVaultId(null);
     }
   };
 
@@ -354,755 +358,336 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
     setServerStatusMessage(null);
     try {
       const cleanUrl = serverUrlInput.replace(/\/+$/, '');
-      const start = Date.now();
-      const res = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(4000) });
-      const elapsed = Date.now() - start;
-      if (res.ok) {
-        const data = await res.json();
-        setServerStatusMessage(`${data.service} v${data.version || '0.1.0'} (${elapsed} ms)`);
-        await syncEngine.updateServerUrl(cleanUrl);
-        setConfig(syncEngine.getConfig());
-        addToast?.('Сервер синхронизации сохранен', 'success');
-      } else {
-        setServerStatusMessage(`HTTP ${res.status}`);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setServerStatusMessage(`Ошибка: ${msg}`);
+      const started = Date.now();
+      const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(4000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const health = await response.json();
+      await accountClient.detectServer(cleanUrl);
+      await syncEngine.updateServerUrl(cleanUrl);
+      accountClient.startPolling(cleanUrl);
+      setServerStatusMessage(`${health.service} · ${Date.now() - started} мс · ${health.authRequired ? 'SLAG ID' : 'без ЛК'}`);
+      addToast?.('Сервер синхронизации сохранён', 'success');
+    } catch (error) {
+      setServerStatusMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setIsTestingServer(false);
     }
   };
 
-  const handleStartRename = (id: string, currentName: string) => {
-    setEditingDeviceId(id);
-    setEditingDeviceName(currentName);
-  };
-
-  const handleSaveRename = () => {
+  const handleSaveRename = async () => {
     if (!editingDeviceId) return;
-    syncEngine.renameDevice(editingDeviceId, editingDeviceName);
-    setConfig(syncEngine.getConfig());
+    const name = editingDeviceName.trim();
+    if (hosted) await accountClient.renameDevice(editingDeviceId, name);
+    else syncEngine.renameDevice(editingDeviceId, name);
     setEditingDeviceId(null);
-    addToast?.('Имя устройства обновлено', 'info');
-  };
-
-  const handleToggleSyncMode = (id: string, currentMode?: DeviceSyncMode) => {
-    const next: DeviceSyncMode = currentMode === 'receive-only' ? 'read-write' : 'receive-only';
-    syncEngine.setDeviceSyncMode(id, next);
     setConfig(syncEngine.getConfig());
-    addToast?.(`Режим синхронизации: ${next === 'read-write' ? 'Полный доступ' : 'Только чтение'}`, 'info');
   };
 
-  const handleToggleAiLease = (id: string, currentCanRun?: boolean) => {
-    const next = !currentCanRun;
-    syncEngine.setDeviceAiLease(id, next);
-    setConfig(syncEngine.getConfig());
-    addToast?.(`AI-воркер: ${next ? 'включен' : 'отключен'}`, 'info');
-  };
-
-  const handleRotateKey = async () => {
-    const confirmed = window.confirm(
-      'Внимание! Будет сгенерирован новый ключ шифрования и создана новая комната на релее.\n' +
-      'Все другие устройства потеряют доступ к синхронизации, пока не будут заново сопряжены по новому PIN-коду.\n\n' +
-      'Выполнить ротацию ключа?'
-    );
-    if (!confirmed) return;
-
+  const handleToggleVaultAccess = async (vaultId: string) => {
+    if (!managingDevice) return;
     try {
-      await syncEngine.rotateVaultKey();
-      setConfig(syncEngine.getConfig());
-      addToast?.('Ключ хранилища ротирован, создана новая чистая комната', 'success');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addToast?.(`Ошибка ротации: ${msg}`, 'error');
+      if ('status' in managingDevice) {
+        const vault = vaults.find((item) => item.id === vaultId);
+        if (!vault) throw new Error('Хранилище не найдено на этом устройстве');
+        const grant = accountState.vaults.find((item) => item.id === (vault.syncId || vault.id))?.grants
+          .find((item) => item.deviceId === managingDevice.id);
+        if (grant && grant.status !== 'revoked') {
+          await accountClient.revokeVaultGrant(vault.syncId || vault.id, managingDevice.id);
+          addToast?.('Доступ отозван. Локальная копия на другом устройстве не удалена', 'info');
+        } else {
+          await shareVaultWithDevice(vault, managingDevice, grantMode);
+          addToast?.('Приглашение отправлено. На другом устройстве нужно принять доступ', 'success');
+        }
+      } else {
+        const current = managingDevice.allowedVaults ?? [];
+        const next = current.includes(vaultId)
+          ? current.filter((id) => id !== vaultId)
+          : [...current, vaultId];
+        syncEngine.setDeviceAllowedVaults(managingDevice.id, next);
+        setManagingDevice({ ...managingDevice, allowedVaults: next });
+        setConfig(syncEngine.getConfig());
+      }
+    } catch (error) {
+      addToast?.(error instanceof Error ? error.message : String(error), 'error');
     }
   };
 
-  const formatTtl = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const sub = status.subscription;
+  const formatTtl = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const activeDevices = account
+    ? accountState.devices.filter((device) => device.status === 'active').length
+    : 1 + config.trustedDevices.length;
+  const planLabel = account?.planLabel || sub.planLabel;
+  const maxDevices = account?.maxDevices ?? sub.maxDevices;
+  const usedCacheMb = account?.usedCacheMb ?? sub.usedCacheMb;
+  const maxCacheMb = account?.maxCacheMb ?? sub.maxCacheMb;
 
   return (
     <div className="flex flex-col gap-3 text-zinc-100">
-      {/* 1. Unified Subscription & Relay Connection Card */}
-      <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        {/* Top: Plan Badge + Status Indicator + Quick Actions */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span
-                className={`w-2 h-2 rounded-full shrink-0 ${
-                  status.state === 'connected'
-                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                    : status.state === 'syncing'
-                    ? 'bg-amber-400 animate-pulse'
-                    : 'bg-zinc-600'
-                }`}
-              />
-              <span className="text-xs font-semibold text-white tracking-wide">
-                {sub.planLabel}
-              </span>
-            </div>
-            <span
-              className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
-                sub.plan === 'angry'
-                  ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
-                  : sub.plan === 'smile' || sub.plan === 'pro'
-                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
-                  : 'text-zinc-400 bg-white/[0.04] border border-white/[0.06]'
-              }`}
-            >
-              E2EE · {sub.plan === 'angry' ? '50 ГБ' : sub.plan === 'smile' || sub.plan === 'pro' ? '10 ГБ' : '1 ГБ'}
-            </span>
-            {status.pingMs !== null && status.state === 'connected' && (
-              <span className="font-mono text-2xs text-zinc-500 hidden sm:inline">
-                {status.pingMs} ms
-              </span>
-            )}
+      {locked && (
+        <section className="p-4 rounded-xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xs font-semibold text-white">Для синхронизации нужен SLAG ID</h3>
+            <p className="text-2xs text-zinc-400 mt-1">Войдите по seed-фразе или создайте аккаунт. Локальные заметки останутся доступны.</p>
           </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleManualSync}
-              disabled={status.state === 'syncing'}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-2xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.96] border border-white/[0.06] rounded-md transition-all cursor-pointer disabled:opacity-50"
-              title="Синхронизировать сейчас"
-            >
-              <RefreshCw className={`w-3 h-3 ${status.state === 'syncing' ? 'animate-spin text-amber-400' : 'text-zinc-400'}`} />
-              <span>{status.state === 'syncing' ? 'Синхронизация...' : 'Синхронизировать'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (config.trustedDevices.length > 0) {
-                  setManagingDevice(config.trustedDevices[0]);
-                } else if (sub.plan === 'self-hosted') {
-                  addToast?.('Self-hosted релей работает без ограничений', 'info');
-                } else {
-                  addToast?.('Привяжите устройство, чтобы управлять доступом к хранилищам', 'info');
-                }
-              }}
-              className="px-2 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer active:scale-[0.96]"
-            >
-              Управление
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom Details: Devices, Cache, Last Sync */}
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xs text-zinc-400 border-t border-white/[0.04] pt-2">
-          <span>
-            {sub.plan === 'self-hosted'
-              ? 'Свой сервер'
-              : `активен до ${sub.expiresFormatted}`}
-          </span>
-          <span className="text-zinc-600">·</span>
-          <span>{sub.activeDevices} из {sub.maxDevices} устройств</span>
-          <span className="text-zinc-600">·</span>
-          <span className="font-mono text-zinc-300">
-            кеш {sub.usedCacheMb} МБ / {sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}
-          </span>
-          {status.lastSyncTime && (
-            <>
-              <span className="text-zinc-600">·</span>
-              <span className="text-zinc-500">сверка: {status.lastSyncTime}</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Trusted Devices List (Linear Dark: flat rows, 2-line typography, with '+ Привязать устройство' action) */}
-      <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <div className="flex items-center justify-between pb-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-zinc-200">Доверенные устройства</span>
-            <span className="text-[11px] font-mono text-zinc-500">
-              {1 + config.trustedDevices.length} / {sub.maxDevices}
-            </span>
-          </div>
-
           <button
             type="button"
-            data-testid="btn-open-pair-modal"
-            onClick={handleOpenPairModal}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-2xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.96] border border-white/[0.06] rounded-md transition-all cursor-pointer"
+            data-testid="sync-open-account"
+            onClick={() => { window.location.search = '?page=account'; }}
+            className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold whitespace-nowrap"
           >
-            <Plus className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Привязать устройство</span>
+            Войти в ЛК
           </button>
-        </div>
+        </section>
+      )}
 
-        <div className="divide-y divide-white/[0.04]">
-          {/* Current Device Row */}
-          <div className="py-2.5 flex items-center justify-between gap-3 group/dev">
-            <div className="flex items-center gap-3 min-w-0">
-              <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  {editingDeviceId === config.deviceId ? (
-                    <input
-                      type="text"
-                      autoFocus
-                      value={editingDeviceName}
-                      onChange={(e) => setEditingDeviceName(e.target.value)}
-                      onBlur={handleSaveRename}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveRename();
-                        if (e.key === 'Escape') setEditingDeviceId(null);
-                      }}
-                      className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none font-medium"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleStartRename(config.deviceId, config.deviceName)}
-                      className="text-xs text-zinc-200 font-medium hover:text-white text-left cursor-pointer flex items-center gap-1.5 truncate group"
-                      title="Кликните для переименования"
-                    >
-                      <span className="truncate">{config.deviceName}</span>
-                      <Edit2 className="w-3 h-3 text-zinc-600 opacity-0 group-hover/dev:opacity-100 group-hover:text-zinc-300 transition-all shrink-0" />
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 mt-0.5">
-                  <span>{config.deviceId}</span>
-                  <span>·</span>
-                  <span className="text-zinc-400">это устройство</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1 text-emerald-400/90">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                    <span>онлайн</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 shrink-0">
-              {/* Sync Mode Toggle - Clean text link, no bulky chip */}
-              <button
-                type="button"
-                onClick={() => handleToggleSyncMode(config.deviceId, config.localSyncMode)}
-                className={`text-[11px] font-mono transition-colors cursor-pointer ${
-                  config.localSyncMode === 'receive-only'
-                    ? 'text-amber-400 hover:text-amber-300'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Переключить режим синхронизации"
-              >
-                {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
-              </button>
-
-              {/* AI Worker Toggle - Minimal monochrome icon */}
-              <button
-                type="button"
-                onClick={() => handleToggleAiLease(config.deviceId, config.canRunAiLease)}
-                className={`p-1 transition-colors cursor-pointer ${
-                  config.canRunAiLease !== false
-                    ? 'text-zinc-300 hover:text-white'
-                    : 'text-zinc-600 hover:text-zinc-400'
-                }`}
-                title={config.canRunAiLease !== false ? 'AI-воркер активен' : 'AI-воркер отключен'}
-              >
-                <Bot className="w-3.5 h-3.5" />
-              </button>
-            </div>
+      <section className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`w-2 h-2 rounded-full ${status.state === 'connected' ? 'bg-emerald-500' : status.state === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-zinc-600'}`} />
+            <span className="text-xs font-semibold text-white">{planLabel}</span>
+            <span className="text-[10px] font-mono text-zinc-500">E2EE</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => void syncEngine.pushLocalChanges()}
+              disabled={locked || status.state === 'syncing'}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-2xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-md disabled:opacity-40"
+            >
+              <RefreshCw className={`w-3 h-3 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
+              Синхронизировать
+            </button>
+            <button
+              type="button"
+              onClick={() => { window.location.search = '?page=account'; }}
+              className="px-2 py-1 text-2xs text-zinc-400 bg-white/[0.03] border border-white/[0.06] rounded-md"
+            >
+              {hosted ? 'Личный кабинет' : 'Управление'}
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-x-2.5 text-2xs text-zinc-500 border-t border-white/[0.04] pt-2">
+          <span>{hosted ? (account ? `тариф до ${account.expiresAt ? new Date(account.expiresAt).toLocaleDateString('ru-RU') : 'бессрочно'}` : 'требуется вход') : 'свой сервер'}</span>
+          <span>·</span>
+          <span>{activeDevices} из {maxDevices} устройств</span>
+          <span>·</span>
+          <span className="font-mono">кеш {usedCacheMb} / {maxCacheMb >= 1024 ? `${Math.round(maxCacheMb / 1024)} ГБ` : `${maxCacheMb} МБ`}</span>
+        </div>
+      </section>
 
-          {/* Trusted Devices from Config */}
-          {config.trustedDevices.map((dev) => (
-            <div key={dev.id} className="py-2.5 flex items-center justify-between gap-3 group/dev">
-              <div className="flex items-center gap-3 min-w-0">
-                {dev.platform === 'mobile' ? (
-                  <Smartphone className="w-4 h-4 text-zinc-400 shrink-0" />
-                ) : (
-                  <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
-                )}
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {editingDeviceId === dev.id ? (
-                      <input
-                        type="text"
-                        autoFocus
-                        value={editingDeviceName}
-                        onChange={(e) => setEditingDeviceName(e.target.value)}
-                        onBlur={handleSaveRename}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveRename();
-                          if (e.key === 'Escape') setEditingDeviceId(null);
-                        }}
-                        className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none font-medium"
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleStartRename(dev.id, dev.name)}
-                        className="text-xs text-zinc-200 font-medium hover:text-white text-left cursor-pointer flex items-center gap-1.5 truncate group"
-                        title="Кликните для переименования"
-                      >
-                        <span className="truncate">{dev.name}</span>
-                        <Edit2 className="w-3 h-3 text-zinc-600 opacity-0 group-hover/dev:opacity-100 group-hover:text-zinc-300 transition-all shrink-0" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 mt-0.5">
-                    <span>{dev.id}</span>
-                    <span>·</span>
-                    <span className="text-zinc-500">{dev.lastSeenAt ? `активность ${dev.lastSeenAt.split('T')[0]}` : 'сопряжено'}</span>
-                  </div>
-                </div>
+      {hosted && accountState.invitations.length > 0 && (
+        <section className="p-3.5 rounded-xl bg-white/[0.02] border border-emerald-500/20 flex flex-col gap-2">
+          <h3 className="text-xs font-semibold text-zinc-200">Приглашения в хранилища</h3>
+          {accountState.invitations.map((invitation) => (
+            <div key={invitation.vaultId} className="flex items-center justify-between gap-3 py-1.5 border-t border-white/[0.04]">
+              <div className="min-w-0">
+                <div className="text-xs text-white truncate">{invitation.vaultName || invitation.vaultId}</div>
+                <div className="text-2xs text-zinc-500">{invitation.mode === 'receive-only' ? 'только чтение' : 'чтение и изменение'}</div>
               </div>
-
-              <div className="flex items-center gap-2.5 shrink-0">
-                {/* Sync Mode Toggle */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleSyncMode(dev.id, dev.syncMode)}
-                  className={`text-[11px] font-mono transition-colors cursor-pointer ${
-                    dev.syncMode === 'receive-only'
-                      ? 'text-amber-400 hover:text-amber-300'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
-                  title="Переключить режим синхронизации"
-                >
-                  {dev.syncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
-                </button>
-
-                {/* AI Lease Toggle */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleAiLease(dev.id, dev.canRunAiLease)}
-                  className={`p-1 transition-colors cursor-pointer ${
-                    dev.canRunAiLease
-                      ? 'text-zinc-300 hover:text-white'
-                      : 'text-zinc-600 hover:text-zinc-400'
-                  }`}
-                  title={dev.canRunAiLease ? 'AI-воркер разрешен' : 'AI-воркер запрещен'}
-                >
-                  <Bot className="w-3.5 h-3.5" />
-                </button>
-
-                {/* Vault Access Management Button */}
-                <button
-                  type="button"
-                  onClick={() => setManagingDevice(dev)}
-                  className="p-1 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  title="Управление доступом к хранилищам"
-                >
-                  <Shield className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    syncEngine.removeTrustedDevice(dev.id);
-                    setConfig(syncEngine.getConfig());
-                    addToast?.('Устройство удалено', 'info');
-                  }}
-                  className="p-1 text-zinc-600 hover:text-rose-400 transition-colors cursor-pointer"
-                  title="Удалить"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
+              <div className="flex gap-1.5 shrink-0">
+                <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleDeclineInvitation(invitation.vaultId)} className="px-2 py-1 text-2xs text-zinc-400">Скрыть</button>
+                <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleAcceptInvitation(invitation.vaultId)} className="px-2.5 py-1 text-2xs bg-white text-black rounded-md font-medium disabled:opacity-50">
+                  {busyVaultId === invitation.vaultId ? 'Подключение…' : 'Подключить'}
                 </button>
               </div>
             </div>
           ))}
-        </div>
-      </div>
+        </section>
+      )}
 
-      {/* 5. Flat Relay Server Settings */}
-      <div className="flex flex-col gap-2.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-zinc-200">Сервер ретрансляции</span>
-          {serverStatusMessage && (
-            <span className="font-mono text-2xs text-zinc-400">{serverStatusMessage}</span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Server className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={serverUrlInput}
-              onChange={(e) => setServerUrlInput(e.target.value)}
-              placeholder="http://152.53.199.71:8320"
-              className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-mono text-white placeholder-zinc-600 outline-none focus:border-white/20"
-            />
+      <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2">
+        <div className="flex items-center justify-between pb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-zinc-200">Устройства</span>
+            <span className="text-[11px] font-mono text-zinc-500">{activeDevices} / {maxDevices}</span>
           </div>
-          <button
-            type="button"
-            onClick={handleTestServerConnection}
-            disabled={isTestingServer}
-            className="px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] active:scale-95 text-xs text-zinc-300 hover:text-white rounded-lg transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
-          >
-            {isTestingServer ? 'Тест...' : 'Проверить'}
+          <button type="button" data-testid="btn-open-pair-modal" disabled={locked} onClick={handleOpenPairModal} className="flex items-center gap-1.5 px-2.5 py-1 text-2xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-md disabled:opacity-40">
+            <Plus className="w-3.5 h-3.5" /> Привязать устройство
           </button>
         </div>
 
-        <label className="flex items-center justify-between cursor-pointer pt-1">
-          <span className="text-2xs text-zinc-400">Автоматическая синхронизация при сохранении</span>
-          <input
-            type="checkbox"
-            checked={config.autoSync}
-            onChange={(e) => {
-              syncEngine.saveConfig({ autoSync: e.target.checked });
+        <div className="divide-y divide-white/[0.04]">
+          <div className="py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs text-zinc-200">{config.deviceName}</div>
+                <div className="text-[11px] font-mono text-zinc-500 truncate">{config.deviceId} · это устройство</div>
+              </div>
+            </div>
+            <button type="button" onClick={() => {
+              const next = config.localSyncMode === 'receive-only' ? 'read-write' : 'receive-only';
+              syncEngine.setDeviceSyncMode(config.deviceId, next);
               setConfig(syncEngine.getConfig());
-            }}
-            className="w-3.5 h-3.5 accent-white cursor-pointer"
-          />
-        </label>
-
-        {/* Battery Saver & Background Interval */}
-        <div className="flex flex-col gap-1.5 pt-2 border-t border-white/[0.04]">
-          <div className="flex items-center justify-between">
-            <span className="text-2xs text-zinc-400">Фоновая синхронизация</span>
-            <span className="text-2xs text-zinc-500 font-mono">
-              {config.bgSyncIntervalMinutes ? `${config.bgSyncIntervalMinutes} мин` : 'в реальном времени'}
-            </span>
+            }} className="text-[11px] font-mono text-zinc-400">
+              {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
+            </button>
           </div>
+
+          {(hosted ? accountState.devices.filter((device) => device.id !== config.deviceId && device.status !== 'revoked') : config.trustedDevices).map((device) => {
+            const isAccountDevice = 'status' in device;
+            return (
+              <div key={device.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {device.platform === 'mobile' ? <Smartphone className="w-4 h-4 text-zinc-400 shrink-0" /> : <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />}
+                  <div className="min-w-0">
+                    {editingDeviceId === device.id ? (
+                      <input autoFocus value={editingDeviceName} onChange={(event) => setEditingDeviceName(event.target.value)} onBlur={() => void handleSaveRename()} onKeyDown={(event) => { if (event.key === 'Enter') void handleSaveRename(); }} className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none" />
+                    ) : (
+                      <button type="button" onClick={() => { setEditingDeviceId(device.id); setEditingDeviceName(device.name); }} className="text-xs text-zinc-200 flex items-center gap-1.5">
+                        <span className="truncate">{device.name}</span><Edit2 className="w-3 h-3 text-zinc-600" />
+                      </button>
+                    )}
+                    <div className="text-[11px] font-mono text-zinc-500 truncate">
+                      {device.id}{isAccountDevice && device.status === 'pending' ? ' · ожидает подтверждения' : ''}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isAccountDevice && device.status === 'pending' ? (
+                    <button type="button" onClick={() => void accountClient.approveDevice(device.id)} className="text-[11px] text-emerald-400">Подтвердить</button>
+                  ) : (
+                    <button type="button" onClick={() => setManagingDevice(device)} title="Доступ к хранилищам" aria-label={`Доступ ${device.name} к хранилищам`} className="p-1 text-zinc-400 hover:text-white">
+                      <Shield className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => {
+                    if (isAccountDevice) void accountClient.revokeDevice(device.id);
+                    else {
+                      syncEngine.removeTrustedDevice(device.id);
+                      setConfig(syncEngine.getConfig());
+                    }
+                  }} title="Отозвать устройство" aria-label={`Отозвать ${device.name}`} className="p-1 text-zinc-600 hover:text-rose-400">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-zinc-200">Сервер ретрансляции</span>
+          {serverStatusMessage && <span className="font-mono text-2xs text-zinc-400">{serverStatusMessage}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Server className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-mono text-white outline-none" />
+          </div>
+          <button type="button" onClick={() => void handleTestServerConnection()} disabled={isTestingServer} className="px-3 py-1.5 bg-white/[0.06] text-xs text-zinc-300 rounded-lg disabled:opacity-50">{isTestingServer ? 'Тест…' : 'Проверить'}</button>
+        </div>
+        <label className="flex items-center justify-between text-2xs text-zinc-400">
+          Автоматическая синхронизация при сохранении
+          <input type="checkbox" checked={config.autoSync} onChange={(event) => { syncEngine.saveConfig({ autoSync: event.target.checked }); setConfig(syncEngine.getConfig()); }} className="w-3.5 h-3.5 accent-white" />
+        </label>
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-white/[0.04]">
+          <div className="flex justify-between text-2xs text-zinc-400"><span>Фоновая синхронизация</span><span>{config.bgSyncIntervalMinutes ? `${config.bgSyncIntervalMinutes} мин` : 'в реальном времени'}</span></div>
           <div className="grid grid-cols-3 gap-1 bg-[#0c0c0e] p-0.5 rounded-lg border border-white/[0.08]">
-            <button
-              type="button"
-              data-testid="sync-interval-0"
-              onClick={() => {
-                syncEngine.setBgSyncInterval(0);
-                setConfig(syncEngine.getConfig());
-              }}
-              className={`py-1 text-2xs font-medium rounded-md transition-all cursor-pointer ${
-                !config.bgSyncIntervalMinutes
-                  ? 'bg-white/10 text-white border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              Мгновенно
-            </button>
-            <button
-              type="button"
-              data-testid="sync-interval-10"
-              onClick={() => {
-                syncEngine.setBgSyncInterval(10);
-                setConfig(syncEngine.getConfig());
-              }}
-              className={`py-1 text-2xs font-medium rounded-md transition-all cursor-pointer ${
-                config.bgSyncIntervalMinutes === 10
-                  ? 'bg-white/10 text-white border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              10 минут
-            </button>
-            <button
-              type="button"
-              data-testid="sync-interval-30"
-              onClick={() => {
-                syncEngine.setBgSyncInterval(30);
-                setConfig(syncEngine.getConfig());
-              }}
-              className={`py-1 text-2xs font-medium rounded-md transition-all cursor-pointer ${
-                config.bgSyncIntervalMinutes === 30
-                  ? 'bg-white/10 text-white border border-white/[0.08]'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              30 минут (батарея)
-            </button>
+            {([0, 10, 30] as const).map((minutes) => (
+              <button key={minutes} type="button" data-testid={`sync-interval-${minutes}`} onClick={() => { syncEngine.setBgSyncInterval(minutes); setConfig(syncEngine.getConfig()); }} className={`py-1 text-2xs rounded-md ${config.bgSyncIntervalMinutes === minutes ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>
+                {minutes === 0 ? 'Мгновенно' : minutes === 10 ? '10 минут' : '30 минут (батарея)'}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 6. Security & Panic Re-keying (Key Rotation) */}
-      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+      <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <KeyRound className="w-4 h-4 text-rose-400 shrink-0" />
-          <div>
-            <span className="text-xs font-semibold text-zinc-200">Смена ключа (Panic Re-keying)</span>
-            <p className="text-2xs text-zinc-500">
-              Генерирует новую сид-фразу и пересоздаёт комнату. Все остальные девайсы потеряют доступ.
-            </p>
-          </div>
+          <div><div className="text-xs font-semibold text-zinc-200">Смена ключа хранилища</div><p className="text-2xs text-zinc-500">Все устройства потребуют нового приглашения.</p></div>
         </div>
+        <button type="button" disabled={locked} onClick={() => {
+          if (!window.confirm('Сменить ключ хранилища? Доступ остальных устройств будет остановлен.')) return;
+          void syncEngine.rotateVaultKey().then(() => addToast?.('Ключ хранилища изменён', 'success'));
+        }} className="px-3 py-1.5 bg-rose-500/10 text-rose-300 border border-rose-500/20 text-xs rounded-lg disabled:opacity-40">Сменить ключ</button>
+      </section>
 
-        <button
-          type="button"
-          onClick={handleRotateKey}
-          className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap active:scale-[0.96]"
-        >
-          Сменить ключ
-        </button>
-      </div>
-
-      {/* Pair Device Modal Dialog */}
       {isPairModalOpen && (
-        <div
-          className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsPairModalOpen(false);
-          }}
-        >
-          <div
-            data-testid="pair-device-modal"
-            className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150 select-none"
-          >
-            {/* Modal Header */}
+        <div className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
+          <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-white">Привязка устройства</span>
-                <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.2 rounded">
-                  E2EE
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPairModalOpen(false)}
-                className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <span className="text-xs font-semibold text-white">Привязка устройства</span>
+              <button type="button" aria-label="Закрыть привязку" onClick={() => setIsPairModalOpen(false)} className="p-1 text-zinc-400"><X className="w-4 h-4" /></button>
             </div>
-
-            {/* Modal Body */}
             <div className="p-4 flex flex-col gap-4">
-              {/* Segmented Mode Selector */}
               <div className="grid grid-cols-2 gap-1 bg-[#0c0c0e] p-1 rounded-xl border border-white/[0.06]">
-                <button
-                  type="button"
-                  data-testid="pair-modal-tab-host"
-                  onClick={() => {
-                    setPairMode('host');
-                    setPendingApprovalSas(null);
-                    if (!hostPin) void handleGeneratePin();
-                  }}
-                  className={`py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    pairMode === 'host'
-                      ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  Показать PIN
-                </button>
-                <button
-                  type="button"
-                  data-testid="pair-modal-tab-guest"
-                  onClick={() => {
-                    setPairMode('guest');
-                    setPendingApprovalSas(null);
-                  }}
-                  className={`py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    pairMode === 'guest'
-                      ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  Ввести PIN
-                </button>
+                <button type="button" data-testid="pair-modal-tab-host" onClick={() => { setPairMode('host'); if (!hostPin) void handleGeneratePin(); }} className={`py-1.5 rounded-lg text-xs ${pairMode === 'host' ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>Показать PIN</button>
+                <button type="button" data-testid="pair-modal-tab-guest" onClick={() => { setPairMode('guest'); setPendingApproval(null); }} className={`py-1.5 rounded-lg text-xs ${pairMode === 'guest' ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>Ввести PIN</button>
               </div>
-
+              {pairError && <p className="text-2xs text-rose-400">{pairError}</p>}
               {pairMode === 'host' ? (
-                /* Host View */
-                pendingApprovalSas ? (
-                  /* Case A: Host sees Approval Request */
-                  <div className="flex flex-col gap-3 p-4 bg-white/[0.02] border border-white/20 rounded-xl animate-in fade-in">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-white">Запрос на подключение</span>
-                      <div className="flex items-center gap-1.5 font-mono text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                        <span>Код проверки:</span>
-                        <strong className="tracking-wider">{pendingApprovalSas}</strong>
-                      </div>
-                    </div>
-                    <p className="text-2xs text-zinc-400">
-                      Сверьте 4 цифры на втором экране. Разрешить доступ к заметкам?
-                    </p>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={handleRejectPairing}
-                        disabled={isRejecting || isApproving}
-                        className="px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 text-xs text-zinc-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
-                      >
-                        Отклонить
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleApprovePairing}
-                        disabled={isApproving || isRejecting}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black font-semibold text-xs hover:bg-zinc-200 active:scale-95 rounded-lg transition-colors cursor-pointer"
-                      >
-                        {isApproving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                        <span>Разрешить доступ</span>
-                      </button>
+                pendingApproval ? (
+                  <div className="flex flex-col gap-3 py-2">
+                    <div className="text-xs text-white">Запрос на подключение</div>
+                    <div className="font-mono text-lg text-emerald-400">Код проверки: <strong>{pendingApproval.sas}</strong></div>
+                    <p className="text-2xs text-zinc-400">Сверьте код на втором устройстве. Будет открыт доступ только к текущему хранилищу.</p>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => void handleRejectPairing()} className="px-3 py-1.5 text-xs text-zinc-400">Отклонить</button>
+                      <button type="button" disabled={isApproving} onClick={() => void handleApprovePairing()} className="px-3.5 py-1.5 bg-white text-black font-semibold text-xs rounded-lg disabled:opacity-50">{isApproving ? 'Подтверждение…' : 'Разрешить доступ'}</button>
                     </div>
                   </div>
                 ) : (
-                  /* Case B: Ready PIN */
-                  <div className="flex flex-col items-center gap-3 py-2">
-                    <div className="w-full flex flex-col items-center justify-center gap-2.5 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                      <span className="text-2xs text-zinc-500 font-mono uppercase tracking-wider">
-                        Одноразовый код
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-2xl font-bold tracking-widest text-white">
-                          {isGeneratingPin ? '...' : hostPin || '000-000'}
-                        </span>
-                        {hostPin && (
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(hostPin, 'hostPin')}
-                            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors cursor-pointer"
-                            title="Скопировать"
-                          >
-                            {copiedKey === 'hostPin' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-                      </div>
-                      <span className="font-mono text-2xs text-zinc-500">
-                        {isGeneratingPin ? 'генерация...' : `Действует: ${formatTtl(hostPinTtl)}`}
-                      </span>
+                  <div className="flex flex-col items-center gap-3 py-3">
+                    <span className="text-2xs text-zinc-500 font-mono">ОДНОРАЗОВЫЙ КОД</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-2xl font-bold tracking-widest text-white">{isGeneratingPin ? '…' : hostPin || '000-000'}</span>
+                      {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin, 'pin')} className="p-1.5 text-zinc-400">{copiedKey === 'pin' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}</button>}
                     </div>
-
-                    <p className="text-2xs text-zinc-500 text-center leading-relaxed">
-                      Введите этот 6-значный код на втором устройстве для мгновенной привязки.
-                    </p>
+                    <span className="font-mono text-2xs text-zinc-500">Действует: {formatTtl(hostPinTtl)}</span>
                   </div>
                 )
+              ) : guestSasCode ? (
+                <div className="flex flex-col items-center gap-3 py-6"><Loader2 className="w-6 h-6 text-emerald-400 animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-emerald-400">{guestSasCode}</strong></span><span className="text-2xs text-zinc-500">Подтвердите подключение на первом устройстве</span></div>
               ) : (
-                /* Guest View */
-                isGuestWaitingApproval && guestSasCode ? (
-                  <div className="flex flex-col items-center justify-center gap-3 py-6 px-4 bg-white/[0.02] border border-white/[0.08] rounded-xl animate-in fade-in">
-                    <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
-                    <div className="flex flex-col items-center gap-1 text-center">
-                      <span className="text-xs text-zinc-200">
-                        Код проверки: <strong className="font-mono text-emerald-400">{guestSasCode}</strong>
-                      </span>
-                      <span className="text-2xs text-zinc-500">
-                        Подтвердите подключение на первом устройстве...
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3 py-1">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-2xs text-zinc-400">PIN с первого устройства</label>
-                      <input
-                        type="text"
-                        autoFocus
-                        placeholder="123-456"
-                        value={guestInputPin}
-                        onChange={(e) => {
-                          let val = e.target.value.replace(/[^0-9-]/g, '');
-                          if (val.length === 6 && !val.includes('-')) {
-                            val = `${val.slice(0, 3)}-${val.slice(3)}`;
-                          }
-                          setGuestInputPin(val);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!isClaimingPin && guestInputPin.trim()) {
-                              handleClaimGuestPin();
-                            }
-                          }
-                        }}
-                        maxLength={8}
-                        className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-3 py-2 text-center font-mono text-lg tracking-widest text-white placeholder-zinc-700 outline-none focus:border-white/20"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleClaimGuestPin}
-                      disabled={isClaimingPin || !guestInputPin.trim()}
-                      className="w-full py-2 bg-white text-black font-semibold text-xs hover:bg-zinc-200 active:scale-95 rounded-xl transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {isClaimingPin ? 'Связывание...' : 'Подключить устройство'}
-                    </button>
-                    <p className="text-2xs text-zinc-500 text-center">
-                      Нажмите «Показать PIN» на основном устройстве и перепишите 6 цифр сюда.
-                    </p>
-                  </div>
-                )
+                <div className="flex flex-col gap-3">
+                  <label className="text-2xs text-zinc-400">PIN с первого устройства</label>
+                  <input autoFocus placeholder="123-456" value={guestInputPin} onChange={(event) => {
+                    const digits = event.target.value.replace(/\D/g, '').slice(0, 6);
+                    setGuestInputPin(digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
+                  }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleClaimGuestPin(); } }} maxLength={7} className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-3 py-2 text-center font-mono text-lg tracking-widest text-white outline-none" />
+                  <button type="button" disabled={isClaimingPin || guestInputPin.length !== 7} onClick={() => void handleClaimGuestPin()} className="w-full py-2 bg-white text-black font-semibold text-xs rounded-xl disabled:opacity-50">{isClaimingPin ? 'Связывание…' : 'Подключить устройство'}</button>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 4. Vault Access Management Modal */}
       {managingDevice && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setManagingDevice(null);
-          }}
-        >
-          <div className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Modal Header */}
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setManagingDevice(null); }}>
+          <div className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-semibold text-white">Доступ к хранилищам</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setManagingDevice(null)}
-                className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-emerald-400" /><span className="text-xs font-semibold">Доступ к хранилищам</span></div>
+              <button type="button" aria-label="Закрыть доступ" onClick={() => setManagingDevice(null)} className="p-1 text-zinc-400"><X className="w-4 h-4" /></button>
             </div>
-
-            {/* Modal Body */}
             <div className="p-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between py-1 border-b border-white/[0.04]">
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-white">{managingDevice.name}</span>
-                  <span className="font-mono text-2xs text-zinc-500">{managingDevice.id}</span>
+              <div><div className="text-xs text-white">{managingDevice.name}</div><div className="font-mono text-2xs text-zinc-500">{managingDevice.id}</div></div>
+              {'status' in managingDevice && (
+                <div className="flex gap-1 bg-[#0c0c0e] p-0.5 rounded-lg border border-white/[0.06]">
+                  {(['read-write', 'receive-only'] as const).map((mode) => <button key={mode} type="button" onClick={() => setGrantMode(mode)} className={`flex-1 py-1 text-2xs rounded ${grantMode === mode ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{mode === 'read-write' ? 'Чтение и изменение' : 'Только чтение'}</button>)}
                 </div>
-                <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.5 rounded">
-                  {managingDevice.syncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
-                </span>
-              </div>
-
-              <span className="text-2xs text-zinc-400 font-medium">Выберите доступные хранилища:</span>
-
-              <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-                {storage.getVaults().map((v) => {
-                  const allowed = (managingDevice.allowedVaults ?? [storage.getCurrentVault().id, 'default_vault']).includes(v.id);
+              )}
+              <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
+                {vaults.map((vault) => {
+                  const grant = 'status' in managingDevice
+                    ? accountState.vaults.find((item) => item.id === (vault.syncId || vault.id))?.grants.find((item) => item.deviceId === managingDevice.id)
+                    : undefined;
+                  const allowed = 'status' in managingDevice
+                    ? Boolean(grant && grant.status !== 'revoked')
+                    : Boolean(managingDevice.allowedVaults?.includes(vault.id));
                   return (
-                    <div
-                      key={v.id}
-                      onClick={() => handleToggleVaultAccess(v.id)}
-                      className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] cursor-pointer transition-colors"
-                    >
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <span className="text-xs text-white truncate font-medium">{v.name}</span>
-                        <span className="font-mono text-2xs text-zinc-500 truncate">{v.id}</span>
-                      </div>
-                      <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
-                          allowed
-                            ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
-                            : 'text-zinc-500 bg-white/[0.02] border border-white/[0.04]'
-                        }`}
-                      >
-                        {allowed ? 'Разрешено' : 'Запрещено'}
-                      </span>
-                    </div>
+                    <button key={vault.id} type="button" onClick={() => void handleToggleVaultAccess(vault.id)} className="flex items-center justify-between py-2 border-t border-white/[0.04] text-left">
+                      <div className="flex items-center gap-2 min-w-0"><Database className="w-3.5 h-3.5 text-zinc-500" /><span className="text-xs text-white truncate">{getVaultDisplayName(vault, vaults)}</span></div>
+                      <span className={`text-[10px] font-mono ${allowed ? 'text-emerald-400' : 'text-zinc-500'}`}>{grant?.status === 'pending' ? 'Ожидает' : grant?.status === 'accepted' ? (grant.mode === 'receive-only' ? 'Только чтение' : 'Подключено') : allowed ? 'Разрешено' : 'Запрещено'}</span>
+                    </button>
                   );
                 })}
               </div>
-
-              <p className="text-2xs text-zinc-500 text-center pt-1 leading-relaxed">
-                Устройство будет синхронизировать только те хранилища, к которым открыт доступ.
-              </p>
+              <p className="text-2xs text-zinc-500 text-center">Новый доступ появится на другом устройстве как приглашение. Отзыв не удаляет локальную копию.</p>
             </div>
           </div>
         </div>

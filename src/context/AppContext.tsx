@@ -30,6 +30,7 @@ import { logger } from '../lib/logger';
 import { openAppFolder } from '../lib/folderOpener';
 import { listenDesktopEvents, isDesktopApp } from '../lib/windowControls';
 import { syncEngine } from '../lib/sync';
+import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
@@ -769,7 +770,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    accountClient.startPolling(syncEngine.getConfig().serverUrl);
     void syncEngine.init();
+    let wasAuthenticated = accountClient.isAuthenticated();
+    const unsubscribeAccount = accountClient.subscribe(() => {
+      const isAuthenticated = accountClient.isAuthenticated();
+      if (isAuthenticated === wasAuthenticated) return;
+      wasAuthenticated = isAuthenticated;
+      if (isAuthenticated) {
+        accountClient.startPolling(syncEngine.getConfig().serverUrl);
+        void syncEngine.init();
+      } else {
+        accountClient.stopPolling();
+        syncEngine.disconnect();
+      }
+    });
     const handleSyncUpdate = () => {
       refreshData();
     };
@@ -785,6 +800,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     return () => {
+      unsubscribeAccount();
+      accountClient.stopPolling();
       cleanupDesktop();
       window.removeEventListener('slag-sync-updated', handleSyncUpdate);
     };
@@ -1870,7 +1887,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createVault = (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => {
     const newMeta = storage.createVault(name, mode, path, id);
-    void syncEngine.switchVault(newMeta.id);
+    if (!id && accountClient.isAuthenticated()) {
+      void accountClient.registerVault(storage.ensureVaultSyncId(newMeta.id), newMeta.name)
+        .then(() => syncEngine.switchVault(newMeta.id))
+        .catch((error) => addToast(`Хранилище создано локально, но не зарегистрировано: ${error.message}`, 'error'));
+    } else if (!id) {
+      void syncEngine.switchVault(newMeta.id);
+    }
     setCurrentFolder('Входящие');
     setSelectedItem(null);
     refreshData();

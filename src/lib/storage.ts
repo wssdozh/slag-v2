@@ -530,6 +530,20 @@ export class StorageService {
     }
   }
 
+  public ensureVaultSyncId(vaultId: string): string {
+    const vault = this.getVaults().find((entry) => entry.id === vaultId);
+    if (!vault) throw new Error('Хранилище не найдено');
+    if (vault.syncId) return vault.syncId;
+    const syncId = vault.id === 'default_vault' ? `vault_${crypto.randomUUID()}` : vault.id;
+    const updated = { ...vault, syncId };
+    this.saveVaultMeta(updated);
+    if (this.currentVault.id === vaultId) {
+      this.currentVault = { ...this.currentVault, syncId };
+      localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(this.currentVault));
+    }
+    return syncId;
+  }
+
   public saveVaultMeta(vault: VaultMeta): void {
     if (!vault || !vault.id) return;
     const list = this.getVaults().filter(v => v && v.id !== vault.id);
@@ -561,7 +575,7 @@ export class StorageService {
   ): VaultMeta {
     const resolvedMode = isTauri() && mode === 'indexeddb' ? 'tauri' : mode;
     const newVault: VaultMeta = {
-      id: id?.trim() || ('vault_' + Date.now()),
+      id: id?.trim() || `vault_${crypto.randomUUID()}`,
       name,
       mode: resolvedMode,
       path,

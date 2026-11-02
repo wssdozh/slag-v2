@@ -31,6 +31,8 @@ export interface SubscriptionInfo {
 
 export interface SyncStatus {
   state: SyncConnectionState;
+  authRequired: boolean;
+  isAuthenticated: boolean;
   lastSyncTime: string | null;
   pingMs: number | null;
   error: string | null;
@@ -98,7 +100,10 @@ export interface PairingClaimResult {
 }
 
 export interface PairingExchangePayload {
-  seedPhrase: string;
+  /** Legacy self-hosted pairing only. Account pairing never sends the account seed. */
+  seedPhrase?: string;
+  encryptedKey?: string;
+  mode?: DeviceSyncMode;
   vaultId: string;
   vaultName: string;
   hostDeviceId?: string;
@@ -111,6 +116,7 @@ export interface PairingPollResult {
   sessionId: string;
   status: 'pending_guest' | 'pending_approval' | 'approved' | 'rejected';
   sasCode?: string;
+  guestDeviceId?: string;
   exchangePayload?: string;
   expiresIn: number;
 }

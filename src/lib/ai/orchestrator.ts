@@ -10,6 +10,7 @@ import { AnthropicMessagesAdapter } from './adapters/anthropicAdapter';
 import { OpenAiResponsesAdapter } from './adapters/openAiResponsesAdapter';
 import { storage } from '../storage';
 import { syncEngine } from '../sync/syncEngine';
+import { accountClient } from '../sync/account';
 import { querySearch, getSearchableAttachmentText } from '../searchService';
 import { serializeItemToMarkdown } from '../markdownSerializer';
 import { logger } from '../logger';
@@ -1144,7 +1145,7 @@ ${isInbox
 
     // Protocol Adapter & Endpoint Resolution
     const syncSub = syncEngine.getStatus().subscription;
-    const isSubscriptionAllowed = syncSub.plan !== 'free';
+    const isSubscriptionAllowed = syncSub.hasAiLease;
     const isSubscriptionMode = (settings.sourceMode === 'subscription' || !settings.sourceMode) && isSubscriptionAllowed;
 
     const isGroq = settings.provider === 'groq' && Boolean(settings.groqApiKey);
@@ -1162,7 +1163,7 @@ ${isInbox
 
       if (isSubscriptionMode) {
         providerName = 'SLAG Relay AI Gateway';
-        apiKey = syncEngine.getStatus().currentRoomId || 'slag-relay-room';
+        apiKey = accountClient.getToken() || syncEngine.getStatus().currentRoomId || 'slag-relay-room';
         const tier = settings.subscriptionModel || 'fast';
         model = tier === 'deep' ? 'deepseek-v4-1-flash' : tier === 'smart' ? 'claude-haiku-5-5' : 'gemini-2.0-flash';
         adapter = new OpenAiChatAdapter();

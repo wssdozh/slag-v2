@@ -91,6 +91,8 @@ export interface FolderMeta {
 
 export interface VaultMeta {
   id: string;
+  /** Global sync identity; legacy local IDs such as default_vault are not globally unique. */
+  syncId?: string;
   name: string;
   path?: string;
   mode: 'indexeddb' | 'fsa' | 'tauri';

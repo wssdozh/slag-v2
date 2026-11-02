@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
 import { Database, FolderSync, HardDrive, Check, Trash2, Sparkles } from 'lucide-react';
+import { getVaultDisplayName } from '../../lib/vaultDisplay';
 
 export const VaultModal: React.FC = () => {
   const {
@@ -127,7 +128,7 @@ export const VaultModal: React.FC = () => {
                       </div>
                       <div className="min-w-0 flex flex-col">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-medium truncate">{v.name}</span>
+                          <span className="text-xs font-medium truncate">{getVaultDisplayName(v, vaults)}</span>
                           {isCurrent && (
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 font-mono">
                               активно
@@ -268,7 +269,7 @@ export const VaultModal: React.FC = () => {
           />
           <p className="text-[11px] text-zinc-500 flex items-center gap-1.5 mt-0.5 select-none">
             <Sparkles className="w-3 h-3 text-amber-400/80 shrink-0" />
-            <span>В новом хранилище будут созданы системные папки и демо-заметки</span>
+            <span>В новом хранилище будут созданы только системные папки</span>
           </p>
         </div>
       </form>

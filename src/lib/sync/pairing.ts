@@ -1,4 +1,13 @@
-import type { PairingSessionData, PairingClaimResult, PairingPollResult } from './types';
+import type { DeviceSyncMode, PairingSessionData, PairingClaimResult, PairingPollResult } from './types';
+import { accountClient } from './account';
+
+function pairingHeaders(serverUrl: string, includeJson = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeJson) headers['Content-Type'] = 'application/json';
+  const token = accountClient.getToken(serverUrl);
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
 
 /** Creates a new 5-minute pairing session with a 6-digit PIN on the relay server */
 export async function createPairingSession(
@@ -8,7 +17,7 @@ export async function createPairingSession(
   const cleanUrl = serverUrl.replace(/\/+$/, '');
   const res = await fetch(`${cleanUrl}/api/pair/create`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: pairingHeaders(serverUrl),
     body: JSON.stringify({ deviceId, publicKey: `pk_${deviceId}` }),
   });
 
@@ -38,15 +47,17 @@ export async function createPairingSession(
 export async function claimPairingSession(
   serverUrl: string,
   pin: string,
-  guestEphemeralPk: string
+  guestEphemeralPk: string,
+  deviceId?: string
 ): Promise<PairingClaimResult> {
   const cleanUrl = serverUrl.replace(/\/+$/, '');
   const res = await fetch(`${cleanUrl}/api/pair/claim`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: pairingHeaders(serverUrl),
     body: JSON.stringify({
       pin: pin.trim(),
       publicKey: guestEphemeralPk,
+      deviceId,
     }),
   });
 
@@ -85,11 +96,26 @@ export async function approvePairingSession(
   const cleanUrl = serverUrl.replace(/\/+$/, '');
   const res = await fetch(`${cleanUrl}/api/pair/approve`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: pairingHeaders(serverUrl),
     body: JSON.stringify({
       sessionId,
       encryptedPayload: utf8ToBase64(payloadText),
     }),
+  });
+  return res.ok;
+}
+
+/** Approves account pairing with a vault key encrypted for the guest device. */
+export async function approveAccountPairingSession(
+  serverUrl: string,
+  sessionId: string,
+  payload: { vaultId: string; vaultName: string; mode: DeviceSyncMode; encryptedKey: string }
+): Promise<boolean> {
+  const cleanUrl = serverUrl.replace(/\/+$/, '');
+  const res = await fetch(`${cleanUrl}/api/pair/approve`, {
+    method: 'POST',
+    headers: pairingHeaders(serverUrl),
+    body: JSON.stringify({ sessionId, ...payload }),
   });
   return res.ok;
 }
@@ -102,7 +128,7 @@ export async function rejectPairingSession(
   const cleanUrl = serverUrl.replace(/\/+$/, '');
   const res = await fetch(`${cleanUrl}/api/pair/reject`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: pairingHeaders(serverUrl),
     body: JSON.stringify({ sessionId }),
   });
   return res.ok;
@@ -114,7 +140,9 @@ export async function pollPairingSession(
   sessionId: string
 ): Promise<PairingPollResult> {
   const cleanUrl = serverUrl.replace(/\/+$/, '');
-  const res = await fetch(`${cleanUrl}/api/pair/poll?session=${encodeURIComponent(sessionId)}`);
+  const res = await fetch(`${cleanUrl}/api/pair/poll?session=${encodeURIComponent(sessionId)}`, {
+    headers: pairingHeaders(serverUrl, false),
+  });
   if (!res.ok) {
     throw new Error(`Failed to poll pairing session: ${res.statusText}`);
   }

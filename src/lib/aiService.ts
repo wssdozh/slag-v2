@@ -1,6 +1,7 @@
 import type { SlagItem, FolderMeta, AiSettings } from '../types';
 import { storage } from './storage';
 import { syncEngine } from './sync/syncEngine';
+import { accountClient } from './sync/account';
 import { logger } from './logger';
 import {
   assistantOrchestrator,
@@ -199,7 +200,7 @@ async function callJsonLlm<T>(
 
   // 0. SLAG Subscription Relay Gateway Mode
   const syncSub = syncEngine.getStatus().subscription;
-  const isSubscriptionAllowed = syncSub.plan !== 'free';
+  const isSubscriptionAllowed = syncSub.hasAiLease;
   const isSubscriptionMode = (settings.sourceMode === 'subscription' || !settings.sourceMode) && isSubscriptionAllowed;
 
   if (isSubscriptionMode) {
@@ -207,7 +208,7 @@ async function callJsonLlm<T>(
     try {
       const cleanServer = syncEngine.getConfig().serverUrl.replace(/\/+$/, '');
       const endpoint = `${cleanServer}/api/ai/chat`;
-      const roomId = syncEngine.getStatus().currentRoomId || 'slag-relay-room';
+      const roomId = accountClient.getToken() || syncEngine.getStatus().currentRoomId || 'slag-relay-room';
       aiLog.debug(`Calling Subscription Relay AI Gateway`, { promptChars: promptLength, endpoint });
 
       const res = await fetch(endpoint, {
