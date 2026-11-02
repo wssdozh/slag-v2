@@ -38,9 +38,13 @@ export class SyncEngine {
   private activeRoomId: string | null = null;
   private isProcessingSync = false;
   private sequence = 1;
+  private currentVaultId: string = 'default_vault';
 
   constructor() {
-    this.config = this.loadConfig();
+    this.currentVaultId =
+      (typeof storage !== 'undefined' && storage.getCurrentVault
+        ? storage.getCurrentVault()?.id
+        : 'default_vault') || 'default_vault';
     this.status = {
       state: 'idle',
       lastSyncTime: null,
@@ -49,8 +53,22 @@ export class SyncEngine {
       pendingCount: 0,
       connectedDevicesCount: 1,
       currentRoomId: null,
-      subscription: this.computeSubscription(this.config),
+      subscription: {
+        plan: 'smile',
+        planLabel: 'SLAG Smile',
+        expiresAt: null,
+        expiresFormatted: 'Бессрочно',
+        maxDevices: 5,
+        activeDevices: 1,
+        maxCacheMb: 10240,
+        usedCacheMb: 12,
+        allowAttachments: true,
+        hasAiLease: true,
+        isExpiringSoon: false,
+      },
     };
+    this.config = this.loadConfig(this.currentVaultId);
+    this.status.subscription = this.computeSubscription(this.config);
   }
 
   private computeSubscription(cfg: SyncConfig): SyncStatus['subscription'] {
@@ -144,9 +162,24 @@ export class SyncEngine {
     this.listeners.forEach((fn) => fn(current));
   }
 
-  private loadConfig(): SyncConfig {
+  private getStateHashKey(vaultId?: string): string {
+    const vid = vaultId || this.currentVaultId;
+    return `${LAST_STATE_HASH_KEY}_${vid}`;
+  }
+
+  public getCurrentVaultId(): string {
+    return this.currentVaultId;
+  }
+
+  private loadConfig(targetVaultId?: string): SyncConfig {
+    const vid = targetVaultId || (typeof storage !== 'undefined' && storage.getCurrentVault ? storage.getCurrentVault()?.id : 'default_vault') || 'default_vault';
+    this.currentVaultId = vid;
+    const key = `${SYNC_CONFIG_KEY}_${vid}`;
     try {
-      const raw = localStorage.getItem(SYNC_CONFIG_KEY);
+      let raw = localStorage.getItem(key);
+      if (!raw && vid === 'default_vault') {
+        raw = localStorage.getItem(SYNC_CONFIG_KEY);
+      }
       if (raw) {
         const parsed = JSON.parse(raw);
         return {
@@ -167,15 +200,35 @@ export class SyncEngine {
       // fallback
     }
 
+    let inheritedDeviceId = generateDeviceId();
+    let inheritedDeviceName = 'Мой ПК';
+    let inheritedServerUrl = DEFAULT_SERVER_URL;
+    let inheritedPlan: 'free' | 'smile' | 'angry' = 'smile';
+    let inheritedBgSync: 0 | 10 | 30 = 0;
+
+    const baseRaw = localStorage.getItem(SYNC_CONFIG_KEY) || localStorage.getItem(`${SYNC_CONFIG_KEY}_default_vault`);
+    if (baseRaw) {
+      try {
+        const base = JSON.parse(baseRaw);
+        if (base.deviceId) inheritedDeviceId = base.deviceId;
+        if (base.deviceName) inheritedDeviceName = base.deviceName;
+        if (base.serverUrl) inheritedServerUrl = base.serverUrl;
+        if (base.subscriptionPlan) inheritedPlan = base.subscriptionPlan;
+        if (typeof base.bgSyncIntervalMinutes === 'number') inheritedBgSync = base.bgSyncIntervalMinutes;
+      } catch {
+        // ignore
+      }
+    }
+
     const initial: SyncConfig = {
       enabled: true,
-      serverUrl: DEFAULT_SERVER_URL,
-      deviceId: generateDeviceId(),
-      deviceName: 'Мой ПК',
+      serverUrl: inheritedServerUrl,
+      deviceId: inheritedDeviceId,
+      deviceName: inheritedDeviceName,
       seedPhrase: generateMnemonic(12),
       autoSync: true,
-      subscriptionPlan: 'smile',
-      bgSyncIntervalMinutes: 0,
+      subscriptionPlan: inheritedPlan,
+      bgSyncIntervalMinutes: inheritedBgSync,
       localSyncMode: 'read-write',
       canRunAiLease: true,
       trustedDevices: [],
@@ -187,11 +240,32 @@ export class SyncEngine {
   public saveConfig(newConfig: Partial<SyncConfig>): void {
     this.config = { ...this.config, ...newConfig };
     try {
-      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(this.config));
+      const key = `${SYNC_CONFIG_KEY}_${this.currentVaultId}`;
+      localStorage.setItem(key, JSON.stringify(this.config));
+      if (this.currentVaultId === 'default_vault') {
+        localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(this.config));
+      }
     } catch (e) {
       syncLog.error('Failed to save sync config:', e);
     }
+    if (this.status) {
+      this.status.subscription = this.computeSubscription(this.config);
+      this.notify();
+    }
+  }
+
+  public async switchVault(vaultId: string): Promise<void> {
+    if (this.currentVaultId === vaultId && this.status.state !== 'idle' && this.status.state !== 'error') {
+      return;
+    }
+    syncLog.info(`SyncEngine switching to vault: ${vaultId}`);
+    this.disconnect();
+    this.currentVaultId = vaultId;
+    this.config = this.loadConfig(vaultId);
+    this.status.subscription = this.computeSubscription(this.config);
+    this.status.currentRoomId = null;
     this.notify();
+    await this.init();
   }
 
   public async init(): Promise<void> {
@@ -420,7 +494,10 @@ export class SyncEngine {
       const workspaceState = storage.getWorkspaceState();
 
       const stateHash = await computeStateRootHash(items, folders);
-      const lastSyncedHash = localStorage.getItem(LAST_STATE_HASH_KEY);
+      const hashKey = this.getStateHashKey();
+      const lastSyncedHash =
+        localStorage.getItem(hashKey) ||
+        (this.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
 
       if (lastSyncedHash === stateHash) {
         // Nothing changed
@@ -495,7 +572,10 @@ export class SyncEngine {
         });
       }
 
-      localStorage.setItem(LAST_STATE_HASH_KEY, stateHash);
+      localStorage.setItem(hashKey, stateHash);
+      if (this.currentVaultId === 'default_vault') {
+        localStorage.setItem(LAST_STATE_HASH_KEY, stateHash);
+      }
       this.status.lastSyncTime = new Date().toLocaleTimeString();
       this.status.state = 'connected';
       this.status.error = null;
@@ -629,7 +709,10 @@ export class SyncEngine {
       trustedDevices: [],
     });
     this.disconnect();
-    localStorage.removeItem(LAST_STATE_HASH_KEY);
+    localStorage.removeItem(this.getStateHashKey());
+    if (this.currentVaultId === 'default_vault') {
+      localStorage.removeItem(LAST_STATE_HASH_KEY);
+    }
     await this.init();
     return newSeed;
   }

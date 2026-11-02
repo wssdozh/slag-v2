@@ -96,6 +96,12 @@ export interface PairingClaimResult {
   status: 'pending_approval' | 'approved' | 'rejected';
 }
 
+export interface PairingExchangePayload {
+  seedPhrase: string;
+  vaultId: string;
+  vaultName: string;
+}
+
 export interface PairingPollResult {
   sessionId: string;
   status: 'pending_guest' | 'pending_approval' | 'approved' | 'rejected';

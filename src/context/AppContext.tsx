@@ -184,7 +184,7 @@ interface AppContextType {
   saveFolder: (folder: FolderMeta) => void;
   deleteFolder: (path: string) => void;
   switchVault: (vaultId: string) => void;
-  createVault: (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string) => void;
+  createVault: (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => void;
   deleteVault: (vaultId: string) => void;
   pickVaultDirectory: () => Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null>;
   revealVaultInExplorer: () => Promise<void>;
@@ -1849,6 +1849,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const switchVault = (vaultId: string) => {
     storage.switchVault(vaultId);
+    void syncEngine.switchVault(vaultId);
     const newWs = storage.getWorkspaceState();
     setCurrentFolder(newWs.currentFolder || 'Входящие');
     setFeedViewMode(newWs.feedViewMode || 'feed');
@@ -1867,8 +1868,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('Хранилище переключено', 'info');
   };
 
-  const createVault = (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string) => {
-    storage.createVault(name, mode, path);
+  const createVault = (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => {
+    const newMeta = storage.createVault(name, mode, path, id);
+    void syncEngine.switchVault(newMeta.id);
     setCurrentFolder('Входящие');
     setSelectedItem(null);
     refreshData();
@@ -1880,6 +1882,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const success = storage.deleteVault(vaultId);
     if (success) {
       if (wasCurrent) {
+        void syncEngine.switchVault('default_vault');
         setVault(storage.getCurrentVault());
         setFolders(storage.getFolders());
         setItems(storage.getItems());

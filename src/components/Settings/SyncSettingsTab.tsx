@@ -24,13 +24,16 @@ import {
   pollPairingPayload,
 } from '../../lib/sync/pairing';
 import { validateMnemonic } from '../../lib/sync/crypto';
-import type { SyncStatus, SyncConfig, DeviceSyncMode } from '../../lib/sync/types';
+import type { SyncStatus, SyncConfig, DeviceSyncMode, PairingExchangePayload } from '../../lib/sync/types';
+import { useApp } from '../../context/AppContext';
+import { storage } from '../../lib/storage';
 
 interface SyncSettingsTabProps {
   addToast?: (text: string, type?: 'info' | 'success' | 'error') => void;
 }
 
 export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) => {
+  const { switchVault, createVault } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
 
@@ -178,7 +181,17 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
     }
     setIsApproving(true);
     try {
-      const ok = await approvePairingSession(config.serverUrl, hostSessionId, config.seedPhrase);
+      const currentVault = storage.getCurrentVault();
+      const payload: PairingExchangePayload = {
+        seedPhrase: config.seedPhrase,
+        vaultId: currentVault.id,
+        vaultName: currentVault.name,
+      };
+      const ok = await approvePairingSession(
+        config.serverUrl,
+        hostSessionId,
+        JSON.stringify(payload)
+      );
       if (ok) {
         syncEngine.addTrustedDevice({
           id: `slag-guest-${pendingApprovalSas}`,
@@ -237,18 +250,55 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       addToast?.(`Код проверки: ${claimed.sasCode}. Подтвердите на основном устройстве.`, 'info');
 
       // Poll until host approves or rejects
-      const receivedSeed = await pollPairingPayload(config.serverUrl, claimed.sessionId, config.deviceId, 60_000, 1500);
-      if (receivedSeed && validateMnemonic(receivedSeed)) {
-        await syncEngine.updateSeedPhrase(receivedSeed);
-        setConfig(syncEngine.getConfig());
-        addToast?.('Устройство синхронизировано с хранилищем', 'success');
-        setGuestInputPin('');
-        setGuestSasCode(null);
-        setIsGuestWaitingApproval(false);
-        setIsPairModalOpen(false);
-      } else {
+      const rawPayload = await pollPairingPayload(
+        config.serverUrl,
+        claimed.sessionId,
+        config.deviceId,
+        60_000,
+        1500
+      );
+
+      let receivedSeed = '';
+      let targetVaultId = 'default_vault';
+      let targetVaultName = 'main';
+
+      try {
+        const parsed = JSON.parse(rawPayload);
+        if (parsed && typeof parsed === 'object' && parsed.seedPhrase) {
+          receivedSeed = parsed.seedPhrase;
+          targetVaultId = parsed.vaultId || 'default_vault';
+          targetVaultName = parsed.vaultName || 'main';
+        } else {
+          receivedSeed = rawPayload;
+        }
+      } catch {
+        receivedSeed = rawPayload;
+      }
+
+      if (!receivedSeed || !validateMnemonic(receivedSeed)) {
         throw new Error('Получен некорректный ключ');
       }
+
+      const allVaults = storage.getVaults();
+      const existingVault = allVaults.find((v) => v.id === targetVaultId);
+
+      if (existingVault) {
+        // Merge with existing matching vault
+        switchVault(existingVault.id);
+        await syncEngine.updateSeedPhrase(receivedSeed);
+        addToast?.(`Слияние с хранилищем «${existingVault.name}»`, 'success');
+      } else {
+        // Create an isolated separate vault with this exact vault ID
+        createVault(targetVaultName, 'indexeddb', undefined, targetVaultId);
+        await syncEngine.updateSeedPhrase(receivedSeed);
+        addToast?.(`Создано отдельное хранилище «${targetVaultName}»`, 'success');
+      }
+
+      setConfig(syncEngine.getConfig());
+      setGuestInputPin('');
+      setGuestSasCode(null);
+      setIsGuestWaitingApproval(false);
+      setIsPairModalOpen(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast?.(`${msg}`, 'error');

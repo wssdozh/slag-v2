@@ -542,17 +542,22 @@ export class StorageService {
     return this.currentVault;
   }
 
-  public createVault(name: string, mode: 'indexeddb' | 'fsa' | 'tauri' = isTauri() ? 'tauri' : 'indexeddb', path?: string): VaultMeta {
+  public createVault(
+    name: string,
+    mode: 'indexeddb' | 'fsa' | 'tauri' = isTauri() ? 'tauri' : 'indexeddb',
+    path?: string,
+    id?: string
+  ): VaultMeta {
     const resolvedMode = isTauri() && mode === 'indexeddb' ? 'tauri' : mode;
     const newVault: VaultMeta = {
-      id: 'vault_' + Date.now(),
+      id: id?.trim() || ('vault_' + Date.now()),
       name,
       mode: resolvedMode,
       path,
       isCurrent: true,
     };
     this.saveVaultMeta(newVault);
-    fsLog.info(`Created new vault "${name}" [${resolvedMode}]${path ? ` at ${path}` : ''}`);
+    fsLog.info(`Created new vault "${name}" (${newVault.id}) [${resolvedMode}]${path ? ` at ${path}` : ''}`);
     return this.switchVault(newVault.id);
   }
 
