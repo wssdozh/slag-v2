@@ -57,25 +57,63 @@ export class SyncEngine {
     const isOfficial = cfg.serverUrl.includes('152.53.199.71') || cfg.serverUrl.includes('slag.app');
     const activeCount = 1 + (cfg.trustedDevices?.length || 0);
 
-    if (isOfficial) {
+    if (!isOfficial) {
       return {
-        plan: 'pro',
-        planLabel: 'SLAG Pro',
-        expiresAt: '2027-11-12T00:00:00Z',
-        expiresFormatted: '12 ноября 2027',
-        maxDevices: 5,
+        plan: 'self-hosted',
+        planLabel: 'Self-hosted релей',
+        expiresAt: null,
+        expiresFormatted: 'Бессрочно',
+        maxDevices: 999,
         activeDevices: activeCount,
+        maxCacheMb: 999999,
+        usedCacheMb: 14,
+        allowAttachments: true,
         isExpiringSoon: false,
       };
     }
 
+    const plan = cfg.subscriptionPlan || 'smile';
+    if (plan === 'free') {
+      return {
+        plan: 'free',
+        planLabel: 'SLAG Free',
+        expiresAt: null,
+        expiresFormatted: 'Бессрочно',
+        maxDevices: 2,
+        activeDevices: activeCount,
+        maxCacheMb: 1024,
+        usedCacheMb: 8,
+        allowAttachments: false,
+        isExpiringSoon: false,
+      };
+    }
+
+    if (plan === 'angry') {
+      return {
+        plan: 'angry',
+        planLabel: 'SLAG Angry',
+        expiresAt: '2027-11-12T00:00:00Z',
+        expiresFormatted: '12 ноября 2027',
+        maxDevices: 15,
+        activeDevices: activeCount,
+        maxCacheMb: 51200,
+        usedCacheMb: 42,
+        allowAttachments: true,
+        isExpiringSoon: false,
+      };
+    }
+
+    // Default official plan: 'smile' (our current Pro)
     return {
-      plan: 'self-hosted',
-      planLabel: 'Self-hosted релей',
-      expiresAt: null,
-      expiresFormatted: 'Бессрочно',
-      maxDevices: 999,
+      plan: 'smile',
+      planLabel: 'SLAG Smile',
+      expiresAt: '2027-11-12T00:00:00Z',
+      expiresFormatted: '12 ноября 2027',
+      maxDevices: 5,
       activeDevices: activeCount,
+      maxCacheMb: 10240,
+      usedCacheMb: 14,
+      allowAttachments: true,
       isExpiringSoon: false,
     };
   }
@@ -114,6 +152,8 @@ export class SyncEngine {
           deviceName: parsed.deviceName || 'Это устройство',
           seedPhrase: parsed.seedPhrase || generateMnemonic(12),
           autoSync: parsed.autoSync ?? true,
+          subscriptionPlan: parsed.subscriptionPlan || 'smile',
+          bgSyncIntervalMinutes: parsed.bgSyncIntervalMinutes ?? 0,
           localSyncMode: parsed.localSyncMode || 'read-write',
           canRunAiLease: parsed.canRunAiLease ?? true,
           trustedDevices: parsed.trustedDevices || [],
@@ -130,6 +170,8 @@ export class SyncEngine {
       deviceName: 'Мой ПК',
       seedPhrase: generateMnemonic(12),
       autoSync: true,
+      subscriptionPlan: 'smile',
+      bgSyncIntervalMinutes: 0,
       localSyncMode: 'read-write',
       canRunAiLease: true,
       trustedDevices: [],
@@ -476,12 +518,47 @@ export class SyncEngine {
       }
     }, 25000);
 
-    // Auto sync check every 15 seconds
+    // Auto sync check: 15s for realtime (0), or periodic for battery saver
     if (this.config.autoSync) {
+      const intervalMs = (this.config.bgSyncIntervalMinutes && this.config.bgSyncIntervalMinutes > 0)
+        ? this.config.bgSyncIntervalMinutes * 60 * 1000
+        : 15000;
+
       this.autoSyncInterval = setInterval(() => {
         void this.pushLocalChanges();
-      }, 15000);
+        if (this.config.bgSyncIntervalMinutes && this.config.bgSyncIntervalMinutes > 0) {
+          void this.fetchPendingBundlesHttp();
+        }
+      }, intervalMs);
     }
+  }
+
+  public async fetchPendingBundlesHttp(): Promise<void> {
+    if (!this.activeRoomId || !this.activeVaultKey) return;
+    try {
+      const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
+      const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?device=${encodeURIComponent(this.config.deviceId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.bundles)) {
+        for (const item of data.bundles) {
+          if (item.payload) {
+            await this.applyIncomingBundle(item.payload);
+          }
+        }
+      }
+    } catch (e) {
+      syncLog.warn('HTTP bundles fetch failed:', e);
+    }
+  }
+
+  public setSubscriptionPlan(plan: 'free' | 'smile' | 'angry'): void {
+    this.saveConfig({ subscriptionPlan: plan });
+  }
+
+  public setBgSyncInterval(minutes: 0 | 10 | 30): void {
+    this.saveConfig({ bgSyncIntervalMinutes: minutes });
+    this.startIntervals();
   }
 
   public disconnect(): void {

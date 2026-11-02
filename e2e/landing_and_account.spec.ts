@@ -44,11 +44,19 @@ test.describe('Landing Showcase & Minimal Account Cabinet Flow', () => {
       fullPage: false,
     });
 
-    // Scroll to Pricing
+    // Scroll to Pricing (3 Tiers: Free / Smile / Angry + Self-hosted)
     const pricingSection = page.locator('#pricing');
     await pricingSection.scrollIntoViewIfNeeded();
-    await expect(page.locator('text=Self-hosted')).toBeVisible();
-    await expect(page.locator('text=SLAG Pro')).toBeVisible();
+    await expect(page.locator('text=Free').first()).toBeVisible();
+    await expect(page.locator('text=Smile').first()).toBeVisible();
+    await expect(page.locator('text=Angry').first()).toBeVisible();
+    await expect(page.locator('text=Self-hosted релей — 0 ₽ навсегда')).toBeVisible();
+
+    // Take screenshot of 3-tier pricing on landing
+    await page.screenshot({
+      path: 'test-results/screenshots/landing_pricing_3_tiers.png',
+      fullPage: false,
+    });
 
     // 2. Navigate to Account Cabinet via Header
     const cabinetNavBtn = page.locator('header button', { hasText: 'Кабинет' });
@@ -59,10 +67,22 @@ test.describe('Landing Showcase & Minimal Account Cabinet Flow', () => {
     await expect(page.locator('header span', { hasText: 'Личный кабинет' })).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=SLAG ID')).toBeVisible();
     await expect(page.locator('text=E2EE Активен')).toBeVisible();
+    await expect(page.locator('text=Кеш недоставленного на релее')).toBeVisible();
+
+    // Test tier switcher in cabinet
+    const angryTierBtn = page.locator('[data-testid="tier-btn-angry"]');
+    await expect(angryTierBtn).toBeVisible();
+    await angryTierBtn.click();
+    await expect(page.locator('text=SLAG Angry')).toBeVisible();
+    await expect(page.locator('span', { hasText: '50 ГБ' }).first()).toBeVisible();
+
+    const smileTierBtn = page.locator('[data-testid="tier-btn-smile"]');
+    await smileTierBtn.click();
+    await expect(page.locator('text=SLAG Smile')).toBeVisible();
 
     // Take screenshot of Account Cabinet
     await page.screenshot({
-      path: 'test-results/screenshots/account_cabinet.png',
+      path: 'test-results/screenshots/account_cabinet_smile_tier.png',
       fullPage: false,
     });
 

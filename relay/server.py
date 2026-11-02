@@ -169,6 +169,8 @@ class RelayDatabase:
                 );
             """)
 
+    DEFAULT_MAX_CACHE_BYTES = 1024 * 1024 * 1024  # 1 GB default cache limit per room
+
     def touch_room(self, room_id: str) -> None:
         now = time.time()
         with self.conn:
@@ -178,7 +180,23 @@ class RelayDatabase:
                 ON CONFLICT(room_id) DO UPDATE SET last_active_at = ?
             """, (room_id, now, now, now))
 
-    def save_bundle(self, room_id: str, bundle_id: str, from_device: str, seq: int, ts: str, payload_json: str, ttl: int = DEFAULT_TTL_SECONDS) -> None:
+    def get_room_cache_bytes(self, room_id: str) -> int:
+        with self.conn:
+            cursor = self.conn.execute("""
+                SELECT COALESCE(SUM(LENGTH(payload)), 0) as total_bytes
+                FROM bundles
+                WHERE room_id = ? AND expires_at > ?
+            """, (room_id, time.time()))
+            row = cursor.fetchone()
+            return int(row["total_bytes"]) if row else 0
+
+    def save_bundle(self, room_id: str, bundle_id: str, from_device: str, seq: int, ts: str, payload_json: str, ttl: int = DEFAULT_TTL_SECONDS, max_cache_bytes: int = 1024 * 1024 * 1024) -> bool:
+        payload_len = len(payload_json.encode("utf-8"))
+        current_cache = self.get_room_cache_bytes(room_id)
+        if current_cache + payload_len > max_cache_bytes:
+            logger.warning(f"Room {room_id} cache limit exceeded: {current_cache + payload_len} > {max_cache_bytes}")
+            return False
+
         now = time.time()
         expires_at = now + ttl
         self.touch_room(room_id)
@@ -188,6 +206,7 @@ class RelayDatabase:
                 (bundle_id, room_id, from_device_id, sequence, timestamp, payload, created_at, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (bundle_id, room_id, from_device, seq, ts, payload_json, now, expires_at))
+        return True
 
     def get_pending_bundles(self, room_id: str, device_id: str, limit: int = 100) -> list[dict]:
         with self.conn:
@@ -226,20 +245,32 @@ class RelayDatabase:
                 """, (bid, device_id, now))
                 if res.rowcount > 0:
                     count += 1
+                # Instant deletion on ACK to prevent cache buildup on server
+                self.conn.execute("DELETE FROM bundles WHERE bundle_id = ?", (bid,))
+                self.conn.execute("DELETE FROM bundle_acks WHERE bundle_id = ?", (bid,))
         return count
 
     def create_pairing_session(self, host_device_id: str, host_public_key: str, host_nonce: str) -> dict:
         session_id = secrets.token_hex(16)
-        # 6-digit pin like "842-195"
-        pin_num = secrets.randbelow(1000000)
-        pin = f"{pin_num:06d}"
-        formatted_pin = f"{pin[:3]}-{pin[3:]}"
         now = time.time()
         expires_at = now + PAIRING_TTL_SECONDS
 
+        formatted_pin = ""
         with self.conn:
+            for _ in range(10):
+                pin_num = secrets.randbelow(1000000)
+                pin = f"{pin_num:06d}"
+                candidate_pin = f"{pin[:3]}-{pin[3:]}"
+                cur = self.conn.execute("SELECT 1 FROM pairing_sessions WHERE pin = ? AND expires_at > ?", (candidate_pin, now))
+                if not cur.fetchone():
+                    formatted_pin = candidate_pin
+                    break
+            if not formatted_pin:
+                pin = f"{secrets.randbelow(1000000):06d}"
+                formatted_pin = f"{pin[:3]}-{pin[3:]}"
+
             self.conn.execute("""
-                INSERT INTO pairing_sessions
+                INSERT OR REPLACE INTO pairing_sessions
                 (pin, session_id, host_device_id, host_public_key, host_nonce, status, created_at, expires_at)
                 VALUES (?, ?, ?, ?, ?, 'pending_guest', ?, ?)
             """, (formatted_pin, session_id, host_device_id, host_public_key, host_nonce, now, expires_at))
@@ -334,6 +365,8 @@ class SlagRelayServer:
         self.start_time = time.time()
         # Active connections: room_id -> set of WebSocketConnection
         self.rooms: Dict[str, Set[WebSocketConnection]] = {}
+        # Rate-limiting for pairing PIN claims: IP -> list of failed attempt timestamps
+        self.failed_claim_attempts: Dict[str, list[float]] = {}
 
     def _cors_headers(self) -> str:
         return (
@@ -430,6 +463,9 @@ class SlagRelayServer:
             except Exception:
                 pass
 
+        peername = writer.get_extra_info("peername")
+        client_ip = peername[0] if peername else "unknown"
+
         # Routes
         if method == "GET" and path == "/health":
             uptime = int(time.time() - self.start_time)
@@ -453,12 +489,24 @@ class SlagRelayServer:
             return
 
         if method == "POST" and path == "/api/pair/claim":
+            now = time.time()
+            attempts = [t for t in self.failed_claim_attempts.get(client_ip, []) if now - t < 300]
+            if len(attempts) >= 5:
+                await self._send_response(writer, self._json_response({
+                    "error": "too_many_attempts_retry_later",
+                    "message": "Слишком много попыток ввода PIN. Подождите 5 минут."
+                }, status=429))
+                return
+
             pin = body_json.get("pin", "")
             guest_pk = body_json.get("publicKey", secrets.token_hex(16))
             claim_result = self.db.claim_pairing_session(pin, guest_pk)
             if claim_result:
+                self.failed_claim_attempts.pop(client_ip, None)
                 await self._send_response(writer, self._json_response(claim_result))
             else:
+                attempts.append(now)
+                self.failed_claim_attempts[client_ip] = attempts
                 await self._send_response(writer, self._json_response({"error": "invalid_or_expired_pin"}, status=404))
             return
 
@@ -501,7 +549,13 @@ class SlagRelayServer:
             ts = bundle.get("timestamp", str(time.time()))
 
             payload_str = json.dumps(bundle)
-            self.db.save_bundle(room_id, bundle_id, from_device, seq, ts, payload_str)
+            saved = self.db.save_bundle(room_id, bundle_id, from_device, seq, ts, payload_str)
+            if not saved:
+                await self._send_response(writer, self._json_response({
+                    "error": "cache_limit_exceeded",
+                    "message": "Кеш синхронизации комнаты (1 ГБ) переполнен. Дождитесь подтверждения от других устройств."
+                }, status=413))
+                return
 
             # Broadcast to live WS connections in room
             await self._broadcast_to_room(room_id, json.dumps({
@@ -641,7 +695,14 @@ class SlagRelayServer:
             ts = bundle.get("timestamp", str(time.time()))
 
             payload_str = json.dumps(bundle)
-            self.db.save_bundle(conn.room_id, bundle_id, from_device, seq, ts, payload_str)
+            saved = self.db.save_bundle(conn.room_id, bundle_id, from_device, seq, ts, payload_str)
+            if not saved:
+                await conn.send_text(json.dumps({
+                    "type": "error",
+                    "code": "cache_limit_exceeded",
+                    "message": "Кеш синхронизации комнаты (1 ГБ) переполнен"
+                }))
+                return
 
             # Broadcast to peers in the same room
             await self._broadcast_to_room(conn.room_id, json.dumps({

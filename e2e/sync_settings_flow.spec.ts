@@ -31,22 +31,40 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     await expect(syncTabBtn).toBeVisible();
     await syncTabBtn.click();
 
-    // 4. Verify Subscription Banner (Variant A)
-    await expect(settingsModal.locator('text=SLAG Pro')).toBeVisible();
+    // 4. Verify Subscription Banner with Smile Tier & Cache Quota
+    await expect(settingsModal.locator('text=SLAG Smile')).toBeVisible();
     await expect(settingsModal.locator('text=активен до 12 ноября 2027')).toBeVisible();
+    await expect(settingsModal.locator('text=кеш')).toBeVisible();
     await expect(settingsModal.locator('text=Управление')).toBeVisible();
 
     // 5. Verify Relay status & current device
     await expect(settingsModal.locator('text=Синхронизация активна')).toBeVisible({ timeout: 10000 });
     await expect(settingsModal.locator('text=текущее')).toBeVisible();
 
-    // Screenshot of Subscription Banner & Clean Sync Tab
+    // Screenshot of Subscription Banner & Clean Sync Tab with Cache
     await page.screenshot({
-      path: 'test-results/screenshots/sync_subscription_banner.png',
+      path: 'test-results/screenshots/sync_settings_subscription_banner.png',
       fullPage: false,
     });
 
-    // 6. Test PIN Generation
+    // 6. Test Background Sync Interval (Battery Saver)
+    const interval30Btn = settingsModal.locator('[data-testid="sync-interval-30"]');
+    await expect(interval30Btn).toBeVisible();
+    await interval30Btn.scrollIntoViewIfNeeded();
+    await interval30Btn.click();
+    await expect(settingsModal.locator('span', { hasText: '30 мин' })).toBeVisible();
+
+    const intervalRealtimeBtn = settingsModal.locator('[data-testid="sync-interval-0"]');
+    await intervalRealtimeBtn.click();
+    await expect(settingsModal.locator('span', { hasText: 'в реальном времени' })).toBeVisible();
+
+    // Screenshot of Battery Saver & Server section
+    await page.screenshot({
+      path: 'test-results/screenshots/sync_settings_cache_and_battery.png',
+      fullPage: false,
+    });
+
+    // 7. Test PIN Generation
     const genPinBtn = settingsModal.locator('button', { hasText: 'Сгенерировать PIN' });
     await expect(genPinBtn).toBeVisible();
     await genPinBtn.click();

@@ -15,12 +15,15 @@ export interface DeviceProfile {
 export type SyncConnectionState = 'idle' | 'syncing' | 'connected' | 'error' | 'offline';
 
 export interface SubscriptionInfo {
-  plan: 'pro' | 'free' | 'self-hosted';
+  plan: 'free' | 'smile' | 'angry' | 'self-hosted' | 'pro';
   planLabel: string;
   expiresAt: string | null;
   expiresFormatted: string;
   maxDevices: number;
   activeDevices: number;
+  maxCacheMb: number;
+  usedCacheMb: number;
+  allowAttachments: boolean;
   isExpiringSoon?: boolean;
 }
 
@@ -42,6 +45,8 @@ export interface SyncConfig {
   deviceName: string;
   seedPhrase: string;
   autoSync: boolean;
+  subscriptionPlan?: 'free' | 'smile' | 'angry';
+  bgSyncIntervalMinutes?: 0 | 10 | 30;
   localSyncMode?: DeviceSyncMode;
   canRunAiLease?: boolean;
   trustedDevices: DeviceProfile[];

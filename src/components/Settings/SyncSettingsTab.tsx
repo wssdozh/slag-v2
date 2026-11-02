@@ -320,8 +320,16 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               <span className="text-xs font-semibold text-white tracking-wide">
                 {sub.planLabel}
               </span>
-              <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.04] px-1.5 py-0.2 rounded">
-                E2EE
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                  sub.plan === 'angry'
+                    ? 'text-amber-400 bg-amber-500/10'
+                    : sub.plan === 'smile' || sub.plan === 'pro'
+                    ? 'text-emerald-400 bg-emerald-500/10'
+                    : 'text-zinc-400 bg-white/[0.04]'
+                }`}
+              >
+                E2EE · {sub.plan === 'angry' ? '50 ГБ' : sub.plan === 'smile' || sub.plan === 'pro' ? '10 ГБ' : '1 ГБ'}
               </span>
             </div>
             <span className="text-2xs text-zinc-400 mt-0.5">
@@ -329,7 +337,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
                 'без ограничений по сроку и устройствам'
               ) : (
                 <>
-                  активен до {sub.expiresFormatted} · {sub.activeDevices} из {sub.maxDevices} устройств
+                  активен до {sub.expiresFormatted} · {sub.activeDevices} из {sub.maxDevices} устройств · кеш {sub.usedCacheMb} МБ / {sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}
                 </>
               )}
             </span>
@@ -342,7 +350,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
             if (sub.plan === 'self-hosted') {
               addToast?.('Self-hosted релей работает без ограничений', 'info');
             } else {
-              addToast?.(`Подписка активна до ${sub.expiresFormatted}. Продление доступно на сайте.`, 'info');
+              addToast?.(`Тариф ${sub.planLabel}: кеш недоставленного до ${sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}, очищается сразу по получению.`, 'info');
             }
           }}
           className="px-2.5 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-md transition-colors cursor-pointer active:scale-[0.96]"
@@ -760,6 +768,63 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
             className="w-3.5 h-3.5 accent-white cursor-pointer"
           />
         </label>
+
+        {/* Battery Saver & Background Interval */}
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-white/[0.04]">
+          <div className="flex items-center justify-between">
+            <span className="text-2xs text-zinc-400">Периодичность синхронизации (экономия батареи)</span>
+            <span className="text-2xs text-zinc-500 font-mono">
+              {config.bgSyncIntervalMinutes ? `${config.bgSyncIntervalMinutes} мин` : 'в реальном времени'}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1 bg-[#0c0c0e] p-0.5 rounded-lg border border-white/[0.08]">
+            <button
+              type="button"
+              data-testid="sync-interval-0"
+              onClick={() => {
+                syncEngine.setBgSyncInterval(0);
+                setConfig(syncEngine.getConfig());
+              }}
+              className={`py-1 text-2xs font-medium rounded-md transition-all cursor-pointer ${
+                !config.bgSyncIntervalMinutes
+                  ? 'bg-white/10 text-white border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              Мгновенно
+            </button>
+            <button
+              type="button"
+              data-testid="sync-interval-10"
+              onClick={() => {
+                syncEngine.setBgSyncInterval(10);
+                setConfig(syncEngine.getConfig());
+              }}
+              className={`py-1 text-2xs font-medium rounded-md transition-all cursor-pointer ${
+                config.bgSyncIntervalMinutes === 10
+                  ? 'bg-white/10 text-white border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              10 минут
+            </button>
+            <button
+              type="button"
+              data-testid="sync-interval-30"
+              onClick={() => {
+                syncEngine.setBgSyncInterval(30);
+                setConfig(syncEngine.getConfig());
+              }}
+              className={`py-1 text-2xs font-medium rounded-md transition-all cursor-pointer ${
+                config.bgSyncIntervalMinutes === 30
+                  ? 'bg-white/10 text-white border border-white/[0.08]'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              30 минут (батарея)
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 6. Security & Panic Re-keying (Key Rotation) */}

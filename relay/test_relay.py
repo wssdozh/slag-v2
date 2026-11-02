@@ -195,6 +195,28 @@ class TestRelayServer(unittest.IsolatedAsyncioTestCase):
         await w1.wait_closed()
         await w2.wait_closed()
 
+    async def test_cache_limit_and_ack_deletion(self):
+        # 1. Test cache quota limit in RelayDatabase
+        room = "test-cache-room"
+        small_limit = 200  # 200 bytes limit
+        saved = self.server.db.save_bundle(room, "b1", "dev-1", 1, "ts", json.dumps({"note": "hello"}), max_cache_bytes=small_limit)
+        self.assertTrue(saved)
+
+        # Huge payload should be rejected due to cache limit
+        huge_payload = json.dumps({"large": "x" * 300})
+        saved_huge = self.server.db.save_bundle(room, "b2", "dev-1", 2, "ts", huge_payload, max_cache_bytes=small_limit)
+        self.assertFalse(saved_huge)
+
+        # 2. Test instant ACK deletion
+        pending_before = self.server.db.get_pending_bundles(room, "dev-2")
+        self.assertEqual(len(pending_before), 1)
+
+        # dev-2 acks b1 -> should be immediately deleted from cache
+        self.server.db.record_acks("dev-2", ["b1"])
+        pending_after = self.server.db.get_pending_bundles(room, "dev-2")
+        self.assertEqual(len(pending_after), 0)
+        self.assertEqual(self.server.db.get_room_cache_bytes(room), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

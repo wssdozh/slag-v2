@@ -252,7 +252,15 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-white">{sub.planLabel}</span>
-                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                        sub.plan === 'angry'
+                          ? 'text-amber-400 bg-amber-500/10'
+                          : sub.plan === 'smile' || sub.plan === 'pro'
+                          ? 'text-emerald-400 bg-emerald-500/10'
+                          : 'text-zinc-400 bg-white/[0.04]'
+                      }`}
+                    >
                       E2EE Активен
                     </span>
                   </div>
@@ -260,19 +268,63 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
                     {sub.plan === 'self-hosted' ? (
                       'Подключен к вашему серверу'
                     ) : (
-                      <>Срок действия: до {sub.expiresFormatted} · {sub.activeDevices} из {sub.maxDevices} устройств</>
+                      <>
+                        Срок действия: до {sub.expiresFormatted} · {sub.activeDevices} из {sub.maxDevices} устройств · кеш {sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}
+                      </>
                     )}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Tier Selector / Switcher */}
+              <div className="flex items-center gap-1 bg-[#0c0c0e] p-1 rounded-lg border border-white/[0.08]">
                 <button
                   type="button"
-                  onClick={() => showToast('Продление подписки будет доступно через платежный шлюз')}
-                  className="px-3 py-1.5 text-xs font-medium text-zinc-200 bg-white/[0.06] hover:bg-white/[0.1] active:scale-[0.96] border border-white/[0.08] rounded-lg transition-all cursor-pointer"
+                  data-testid="tier-btn-free"
+                  onClick={() => {
+                    syncEngine.setSubscriptionPlan('free');
+                    setStatus(syncEngine.getStatus());
+                    showToast('Тариф переключен на Free (1 ГБ кеша)');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                    sub.plan === 'free'
+                      ? 'bg-white/10 text-white border border-white/[0.08]'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
                 >
-                  Продлить тариф
+                  Free
+                </button>
+                <button
+                  type="button"
+                  data-testid="tier-btn-smile"
+                  onClick={() => {
+                    syncEngine.setSubscriptionPlan('smile');
+                    setStatus(syncEngine.getStatus());
+                    showToast('Тариф переключен на Smile (10 ГБ кеша)');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                    sub.plan === 'smile' || sub.plan === 'pro'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Smile
+                </button>
+                <button
+                  type="button"
+                  data-testid="tier-btn-angry"
+                  onClick={() => {
+                    syncEngine.setSubscriptionPlan('angry');
+                    setStatus(syncEngine.getStatus());
+                    showToast('Тариф переключен на Angry (50 ГБ кеша)');
+                  }}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                    sub.plan === 'angry'
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Angry
                 </button>
               </div>
             </div>
@@ -294,11 +346,16 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
 
               <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-400">Буфер вложений на релее</span>
-                  <span className="font-mono text-white font-medium">14.2 МБ / 10 ГБ</span>
+                  <span className="text-zinc-400">Кеш недоставленного на релее</span>
+                  <span className="font-mono text-white font-medium">
+                    {sub.usedCacheMb} МБ / {sub.maxCacheMb >= 1024 ? `${sub.maxCacheMb / 1024} ГБ` : `${sub.maxCacheMb} МБ`}
+                  </span>
                 </div>
                 <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                  <div className="h-full bg-zinc-400 rounded-full" style={{ width: '1.4%' }} />
+                  <div
+                    className="h-full bg-zinc-400 rounded-full"
+                    style={{ width: `${Math.max(1, Math.min(100, (sub.usedCacheMb / sub.maxCacheMb) * 100))}%` }}
+                  />
                 </div>
               </div>
             </div>

@@ -7,6 +7,7 @@ import {
   Check,
   ExternalLink,
   Terminal,
+  Server,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -307,88 +308,170 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
         <div className="max-w-2xl mb-12">
           <span className="text-xs font-mono uppercase tracking-wider text-zinc-500">Тарифы</span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-2">
-            Бесплатный self-host или готовый релей
+            Прозрачные тарифы под любые задачи
           </h2>
+          <p className="text-xs text-zinc-400 mt-2">
+            Кеш недоставленных пакетов автоматически удаляется с сервера сразу после синхронизации устройств.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl">
-          {/* Self-hosted */}
+        {/* 3 Tiers Grid: Free / Smile / Angry */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 1. Free */}
           <div className="p-6 rounded-2xl bg-[#141417] border border-white/[0.06] flex flex-col justify-between gap-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">Self-hosted</span>
+                <span className="text-sm font-semibold text-white">Free</span>
                 <span className="font-mono text-xs text-zinc-400">0 ₽ навсегда</span>
               </div>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Для тех, кто хочет полный контроль. Запускайте свой релей в одну строчку через Docker на собственном сервере.
+                Для текстовых заметок на телефоне и компьютере. Без вложений и лишней нагрузки.
               </p>
               <ul className="space-y-2 text-xs text-zinc-300">
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Полный открытый исходный код</span>
+                  <span>2 устройства (ПК + Телефон)</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Неограниченное число устройств</span>
+                  <span>1 ГБ кеша заметок на релее</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Свои API-ключи для ИИ</span>
+                  <span>Только текст (без медиа-файлов)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Сквозное E2EE шифрование</span>
                 </li>
               </ul>
             </div>
             <a
-              href="https://github.com/wssdozh/slag-v2"
-              target="_blank"
-              rel="noreferrer"
+              href="#download"
               className="w-full py-2.5 text-center text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all cursor-pointer active:scale-[0.96]"
             >
-              Инструкция Docker на GitHub
+              Начать бесплатно
             </a>
           </div>
 
-          {/* SLAG Pro */}
-          <div className="p-6 rounded-2xl bg-[#141417] border border-white/20 flex flex-col justify-between gap-6 relative overflow-hidden">
+          {/* 2. Smile (Hit / Former Pro) */}
+          <div className="p-6 rounded-2xl bg-[#141417] border border-emerald-500/30 flex flex-col justify-between gap-6 relative overflow-hidden shadow-lg shadow-emerald-950/20">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-white">SLAG Pro</span>
+                  <span className="text-sm font-semibold text-white">Smile</span>
                   <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
-                    Официальный релей
+                    Популярный
                   </span>
                 </div>
                 <span className="font-mono text-xs text-white">199 ₽ / мес</span>
               </div>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Работает сразу из коробки. Не нужно настраивать VPS или держать домашний сервер включенным.
+                Полноценная синхронизация со всеми медиа-файлами, умным ИИ-разбором и скоростным релеем.
               </p>
               <ul className="space-y-2 text-xs text-zinc-300">
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Скоростной релей 24/7 (задержка &lt; 20 мс)</span>
+                  <span>До 5 устройств на аккаунт</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>До 5 устройств на одну лицензию</span>
+                  <span>10 ГБ кеша заметок, картинок и аудио</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>10 ГБ буфера под вложения и медиа</span>
+                  <span>AI-триаж и межплатформенный Lease</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Сопряжение без почты и паролей</span>
+                  <span>Окно хранения кеша 7 дней</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Скорость передачи &lt; 20 мс</span>
                 </li>
               </ul>
             </div>
             <button
               type="button"
+              data-testid="landing-btn-choose-smile"
               onClick={navigateToAccount}
               className="w-full py-2.5 text-center text-xs font-semibold text-black bg-white hover:bg-zinc-200 rounded-xl transition-all cursor-pointer active:scale-[0.96] shadow-sm"
             >
-              Войти в личный кабинет
+              Выбрать Smile
             </button>
           </div>
+
+          {/* 3. Angry */}
+          <div className="p-6 rounded-2xl bg-[#141417] border border-amber-500/20 flex flex-col justify-between gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-white">Angry</span>
+                  <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded">
+                    Максимум
+                  </span>
+                </div>
+                <span className="font-mono text-xs text-white">499 ₽ / мес</span>
+              </div>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Для массивных баз знаний, десятков устройств и непрерывной фоновой репликации.
+              </p>
+              <ul className="space-y-2 text-xs text-zinc-300">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-400" />
+                  <span>До 15 устройств</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-400" />
+                  <span>50 ГБ кеша под любые вложения</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Приоритетный выделенный AI Lease</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Расширенное окно кеша (30 дней)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Приоритетные каналы релея</span>
+                </li>
+              </ul>
+            </div>
+            <button
+              type="button"
+              data-testid="landing-btn-choose-angry"
+              onClick={navigateToAccount}
+              className="w-full py-2.5 text-center text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all cursor-pointer active:scale-[0.96]"
+            >
+              Выбрать Angry
+            </button>
+          </div>
+        </div>
+
+        {/* Self-hosted Option Banner */}
+        <div className="mt-6 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-300">
+              <Server className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-semibold text-white">Self-hosted релей — 0 ₽ навсегда</span>
+              <p className="text-2xs text-zinc-400">
+                Запускайте собственный релей на домашнем сервере или VPS в одну команду через Docker без лимитов.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://github.com/wssdozh/slag-v2"
+            target="_blank"
+            rel="noreferrer"
+            className="px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg transition-all text-center whitespace-nowrap active:scale-[0.96]"
+          >
+            Docker на GitHub ↗
+          </a>
         </div>
       </section>
 
