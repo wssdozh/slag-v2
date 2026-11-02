@@ -207,7 +207,9 @@ export class SyncEngine {
         return {
           enabled: parsed.enabled ?? true,
           serverUrl: parsed.serverUrl || DEFAULT_SERVER_URL,
-          deviceId: parsed.deviceId || generateDeviceId(),
+          deviceId: accountClient.getToken(parsed.serverUrl || DEFAULT_SERVER_URL)
+            ? accountClient.getSession()!.deviceId
+            : parsed.deviceId || generateDeviceId(),
           deviceName: parsed.deviceName || 'Это устройство',
           seedPhrase: parsed.seedPhrase || generateMnemonic(12),
           autoSync: parsed.autoSync ?? true,
@@ -245,7 +247,9 @@ export class SyncEngine {
     const initial: SyncConfig = {
       enabled: true,
       serverUrl: inheritedServerUrl,
-      deviceId: inheritedDeviceId,
+      deviceId: accountClient.getToken(inheritedServerUrl)
+        ? accountClient.getSession()!.deviceId
+        : inheritedDeviceId,
       deviceName: inheritedDeviceName,
       seedPhrase: generateMnemonic(12),
       autoSync: true,
