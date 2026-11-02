@@ -306,6 +306,10 @@ export class SyncEngine {
   }
 
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
+    if (newPhrase !== this.config.seedPhrase) {
+      localStorage.removeItem(this.getStateHashKey());
+      if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
+    }
     this.saveConfig({ seedPhrase: newPhrase });
     this.disconnect();
     await this.init();

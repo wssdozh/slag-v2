@@ -6,6 +6,10 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
   test.beforeEach(async ({ page }) => {
     page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
     page.on('pageerror', (err) => console.log('PAGE ERROR:', err));
+    await page.route('**/api/rooms/**', route => route.fulfill({ json: { bundles: [] } }));
+    await page.routeWebSocket(/\/ws\//, socket => {
+      socket.send(JSON.stringify({ type: 'welcome', connectedDevices: 1 }));
+    });
     const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots');
     if (!fs.existsSync(screenshotDir)) {
       fs.mkdirSync(screenshotDir, { recursive: true });
@@ -23,7 +27,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     // Mock relay endpoints for pairing as Guest
     const validSeed = 'apple banana cherry dog elephant fox grape horse ice jaguar kite lemon';
     const testVaultId = 'vault_remote_projects';
-    const testVaultName = 'Remote Projects';
+    const testVaultName = 'Удалённые проекты 🔒';
 
     await page.route('**/api/pair/claim', async (route) => {
       await route.fulfill({
@@ -86,7 +90,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
 
     // 5. Verify isolated vault creation
     // Toast should report creation of separate vault
-    await expect(page.locator('text=Создано отдельное хранилище «Remote Projects»')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Создано отдельное хранилище «Удалённые проекты 🔒»')).toBeVisible({ timeout: 10000 });
 
     // Modal should be closed
     await expect(pairModal).not.toBeVisible();
@@ -95,8 +99,8 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     const closeSettingsBtn = settingsModal.locator('button').first();
     await closeSettingsBtn.click();
 
-    // Verify current vault name in sidebar is now 'Remote Projects'
-    await expect(page.locator('text=Remote Projects').first()).toBeVisible({ timeout: 5000 });
+    // Verify current vault name in sidebar is now 'Удалённые проекты 🔒'
+    await expect(page.locator('text=Удалённые проекты 🔒').first()).toBeVisible({ timeout: 5000 });
 
     // Take screenshot of isolated vault in sidebar
     await page.screenshot({
@@ -114,10 +118,10 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     await pinInput.fill('789-012');
     await connectBtn.click();
 
-    // Toast should now say "Слияние с хранилищем «Remote Projects»"
-    await expect(page.locator('text=Слияние с хранилищем «Remote Projects»')).toBeVisible({ timeout: 10000 });
+    // Toast should now say "Слияние с хранилищем «Удалённые проекты 🔒»"
+    await expect(page.locator('text=Слияние с хранилищем «Удалённые проекты 🔒»')).toBeVisible({ timeout: 10000 });
 
-    // Verify total vaults in storage: should still be 2 (main + Remote Projects)
+    // Verify total vaults in storage: should still be 2 (main + Удалённые проекты 🔒)
     const vaultsCount = await page.evaluate(() => {
       const raw = localStorage.getItem('slag_vaults_v2');
       return raw ? JSON.parse(raw).length : 1;
@@ -137,7 +141,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
 
     let approvedPayload: any = null;
 
-    await page.route('**/api/pair/init', async (route) => {
+    await page.route('**/api/pair/create', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

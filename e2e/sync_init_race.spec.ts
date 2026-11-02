@@ -29,6 +29,8 @@ test('latest init owns both key and room when earlier derivation finishes last',
       engine.saveConfig({ enabled: true, seedPhrase: 'old synthetic seed' });
       const oldInit = engine.init();
       await started;
+      localStorage.setItem('slag_sync_last_state_hash_default_vault', 'old-room-hash');
+      localStorage.setItem('slag_sync_last_state_hash', 'old-room-hash');
       await engine.updateSeedPhrase('new synthetic seed');
       releaseFirst();
       await oldInit;
@@ -37,11 +39,12 @@ test('latest init owns both key and room when earlier derivation finishes last',
       return {
         keysMatch: [...new Uint8Array(actual)].join() === [...new Uint8Array(expected)].join(),
         roomMatches: engine.activeRoomId === await deriveRoomId('new synthetic seed'),
+        oldRoomHashCleared: localStorage.getItem('slag_sync_last_state_hash_default_vault') === null && localStorage.getItem('slag_sync_last_state_hash') === null,
       };
     } finally {
       crypto.subtle.deriveKey = realDeriveKey;
       engine.disconnect();
     }
   });
-  expect(result).toEqual({ keysMatch: true, roomMatches: true });
+  expect(result).toEqual({ keysMatch: true, roomMatches: true, oldRoomHashCleared: true });
 });
