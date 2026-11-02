@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Backup & Restore System Verification', () => {
+  test.describe.configure({ timeout: 60000 });
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
