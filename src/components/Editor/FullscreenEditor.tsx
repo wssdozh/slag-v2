@@ -121,8 +121,47 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   const selectedAttachment = attachments.find(a => a.id === selectedAttachmentId);
 
-  // Auto-save in-flight edits to crash-proof draft storage
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const readTime = Math.max(1, Math.round(wordCount / 200));
+
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstMountRef = useRef(true);
+
+  // Function to persist changes for existing item to disk and sync
+  const flushAutosave = useCallback(() => {
+    if (item.id.startsWith('draft_')) return;
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    const parsedSubtasks = type === 'task' ? parseSubtasksFromContent(content) : undefined;
+    const updated: SlagItem = {
+      ...item,
+      title: title.trim() || 'Без названия',
+      content: content.trim(),
+      type,
+      folder,
+      tags,
+      attachments,
+      status: type === 'task' ? status : undefined,
+      priority: type === 'task' ? priority : undefined,
+      dueDate: type === 'task' ? dueDate : undefined,
+      reminder: type === 'task' ? item.reminder : undefined,
+      duration: type === 'task' ? duration : undefined,
+      recurrence: type === 'task' ? recurrence : undefined,
+      subtasks: parsedSubtasks && parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
+      readingTimeMinutes: type === 'article' ? readTime : undefined,
+      updatedAt: Date.now(),
+    };
+    storage.saveItem(updated);
+    storage.clearFullscreenDraft(item.id);
+    setSaveStatus('saved');
+  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, readTime]);
+
+  // Auto-save in-flight edits to crash-proof draft storage & live autosave for existing notes
   useEffect(() => {
+    // Always persist to local/remote draft cache
     storage.saveFullscreenDraft(item.id, {
       itemId: item.id,
       title,
@@ -137,7 +176,43 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       recurrence: type === 'task' ? recurrence : undefined,
       updatedAt: Date.now(),
     });
-  }, [item.id, title, content, tags, folder, type, priority, status, dueDate, duration, recurrence]);
+
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+
+    if (item.id.startsWith('draft_')) {
+      return;
+    }
+
+    const noticeTimer = setTimeout(() => {
+      setSaveStatus('saving');
+    }, 0);
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+    const timer = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      flushAutosave();
+    }, 800);
+    autosaveTimerRef.current = timer;
+
+    return () => {
+      clearTimeout(noticeTimer);
+      clearTimeout(timer);
+    };
+  }, [item.id, title, content, tags, folder, type, priority, status, dueDate, duration, recurrence, flushAutosave]);
+
+  // Flush on unmount if pending
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) {
+        flushAutosave();
+      }
+    };
+  }, [flushAutosave]);
 
   // Persist width preference
   useEffect(() => {
@@ -203,9 +278,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
-  const readTime = Math.max(1, Math.round(wordCount / 200));
-
   const getEditorView = useCallback((): EditorView | null => activeEditorView, []);
 
   useEffect(() => {
@@ -217,6 +289,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   }, []);
 
   const handleSave = useCallback(() => {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
     const isNewDraft = item.id.startsWith('draft_');
     const parsedSubtasks = type === 'task' ? parseSubtasksFromContent(content) : undefined;
     const updated: SlagItem = {
@@ -248,15 +324,18 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       updateItem(updated);
       addToast('Изменения сохранены', 'success');
     }
+    setSaveStatus('saved');
     setIsFullscreenEditorOpen(false);
     setSelectedItem(null);
   }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, readTime, saveItem, updateItem, addToast, setIsFullscreenEditorOpen, setSelectedItem]);
 
   const handleClose = useCallback(() => {
-    // Pure back / cancel: DO NOT save or publish note to feed
+    if (!item.id.startsWith('draft_')) {
+      flushAutosave();
+    }
     setIsFullscreenEditorOpen(false);
     setSelectedItem(null);
-  }, [setIsFullscreenEditorOpen, setSelectedItem]);
+  }, [item.id, flushAutosave, setIsFullscreenEditorOpen, setSelectedItem]);
 
   const handleUndo = useCallback(() => {
     const view = getEditorView();
@@ -919,6 +998,18 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
           {/* Stats & Actions */}
           <div className="flex items-center gap-2 md:gap-2.5 text-xs text-zinc-400 ml-auto shrink-0 z-10">
+            {/* Live Autosave Status Indicator */}
+            {saveStatus === 'saving' && (
+              <span className="text-[11px] font-mono text-zinc-500 transition-opacity">
+                сохранение...
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-[11px] font-mono text-emerald-500/80 transition-opacity">
+                сохранено
+              </span>
+            )}
+
             {/* Reading measure / width toggle: Focus (768px) vs Wide (1024px) */}
             <button
               type="button"
@@ -954,7 +1045,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               title="Сохранить изменения (Ctrl+S / ⌘S)"
             >
               <Save className="w-4 h-4 text-zinc-300" />
-              <span>Сохранить</span>
+              <span>{item.id.startsWith('draft_') ? 'Создать' : 'Готово'}</span>
             </button>
           </div>
         </div>

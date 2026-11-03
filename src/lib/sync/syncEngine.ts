@@ -24,7 +24,7 @@ import type {
   DeviceProfile,
   DeviceSyncMode,
 } from './types';
-import type { SlagItem, FolderMeta, WorkspaceState } from '../../types';
+import type { SlagItem, FolderMeta, WorkspaceState, ComposerDraft, FullscreenDraft } from '../../types';
 
 const SYNC_CONFIG_KEY = 'slag_sync_config_v2';
 const LAST_STATE_HASH_KEY = 'slag_sync_last_state_hash';
@@ -654,6 +654,7 @@ export class SyncEngine {
       let hasItemsChanged = false;
       let hasFoldersChanged = false;
       let hasWorkspaceChanged = false;
+      let hasDraftsChanged = false;
       let workspaceState: WorkspaceState | undefined;
 
       const currentItems: SlagItem[] = [...storage.getItems()];
@@ -763,6 +764,34 @@ export class SyncEngine {
         } else if (ch.type === 'workspace' && ch.payload) {
           workspaceState = ch.payload as WorkspaceState;
           hasWorkspaceChanged = true;
+        } else if (ch.type === 'draft') {
+          if (ch.id.startsWith('composer:')) {
+            const folder = ch.id.slice('composer:'.length);
+            if (ch.action === 'upsert' && ch.payload) {
+              const incoming = ch.payload as ComposerDraft;
+              const existing = storage.getComposerDraft(folder);
+              if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
+                storage.saveComposerDraft(folder, incoming, 'remote');
+                hasDraftsChanged = true;
+              }
+            } else if (ch.action === 'delete') {
+              storage.deleteComposerDraft(folder, 'remote');
+              hasDraftsChanged = true;
+            }
+          } else if (ch.id.startsWith('fullscreen:')) {
+            const itemId = ch.id.slice('fullscreen:'.length);
+            if (ch.action === 'upsert' && ch.payload) {
+              const incoming = ch.payload as FullscreenDraft;
+              const existing = storage.getFullscreenDraft(itemId);
+              if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
+                storage.saveFullscreenDraft(itemId, incoming, 'remote');
+                hasDraftsChanged = true;
+              }
+            } else if (ch.action === 'delete') {
+              storage.clearFullscreenDraft(itemId, 'remote');
+              hasDraftsChanged = true;
+            }
+          }
         }
       }
 
@@ -790,7 +819,7 @@ export class SyncEngine {
       // Dispatch global window event so React UI re-renders cleanly
       window.dispatchEvent(
         new CustomEvent('slag-sync-updated', {
-          detail: { hasItemsChanged, hasFoldersChanged, hasWorkspaceChanged },
+          detail: { hasItemsChanged, hasFoldersChanged, hasWorkspaceChanged, hasDraftsChanged },
         })
       );
     } catch (err) {
@@ -843,6 +872,7 @@ export class SyncEngine {
       const items = storage.getItems();
       const folders = storage.getFolders();
       const workspaceState = storage.getWorkspaceState();
+      const pendingOps = this.getOutbox().pending();
 
       const stateHash = await computeStateRootHash(items, folders);
       if (generation !== this.initGeneration) return;
@@ -850,7 +880,7 @@ export class SyncEngine {
         localStorage.getItem(hashKey) ||
         (!this.usesAccountSync() && this.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
 
-      if (lastSyncedHash === stateHash) {
+      if (lastSyncedHash === stateHash && pendingOps.length === 0) {
         // Nothing changed
         this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
         this.isProcessingSync = false;
@@ -900,7 +930,6 @@ export class SyncEngine {
       });
 
       // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
-      const pendingOps = this.getOutbox().pending();
       const syncedIds = this.loadSyncedIds();
       const currentIds = new Set(items.map((it) => it.id));
       const tombstones = this.loadTombstones();
@@ -921,7 +950,7 @@ export class SyncEngine {
         delete tombstones[id];
       }
 
-      // Pack folder mutations and trash operations from Outbox
+      // Pack folder mutations, trash operations, and drafts from Outbox
       for (const op of pendingOps) {
         if (op.kind === 'folder') {
           if (op.action === 'delete') {
@@ -948,6 +977,15 @@ export class SyncEngine {
             id: op.id,
             type: 'trash',
             action: 'restore',
+            version: 1,
+            hash: String(op.timestamp),
+            payload: op.payload,
+          });
+        } else if (op.kind === 'draft') {
+          changes.push({
+            id: op.id,
+            type: 'draft',
+            action: op.action,
             version: 1,
             hash: String(op.timestamp),
             payload: op.payload,

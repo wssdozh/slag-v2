@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, FolderMeta } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, FolderMeta, ComposerDraft } from '../../types';
 import { storage } from '../../lib/storage';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
@@ -167,7 +167,7 @@ export const Composer: React.FC<ComposerProps> = ({
     draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget };
   }, [content, itemType, priority, dueDate, tags, attachments, replyTarget]);
 
-  const resetDraftState = () => {
+  const resetDraftState = useCallback(() => {
     draftRef.current = {
       content: '',
       itemType: 'note',
@@ -202,7 +202,7 @@ export const Composer: React.FC<ComposerProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  };
+  }, [setReplyTarget]);
 
   // Focus textarea when replying or when mounted in modal
   useEffect(() => {
@@ -281,6 +281,35 @@ export const Composer: React.FC<ComposerProps> = ({
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeFolder]);
+
+  // Listen to remote draft changes (e.g. typing on another device or remote submit)
+  useEffect(() => {
+    const unsubscribe = storage.subscribeChanges((event) => {
+      if (event.kind === 'draft' && event.origin === 'remote') {
+        if (event.id === `composer:${activeFolder}`) {
+          if (event.action === 'upsert' && event.payload) {
+            const remoteDraft = event.payload as ComposerDraft;
+            // Only adopt if local composer is not currently holding unsubmitted text or attachments
+            if (!draftRef.current.content.trim() && draftRef.current.attachments.length === 0) {
+              setContent(remoteDraft.content || '');
+              setItemType(remoteDraft.itemType || 'note');
+              setPriority(remoteDraft.priority || 'none');
+              setDueDate(remoteDraft.dueDate || '');
+              setTags(remoteDraft.tags || []);
+              setAttachments(remoteDraft.attachments || []);
+              if (remoteDraft.replyTarget) setReplyTarget(remoteDraft.replyTarget as any);
+            }
+          } else if (event.action === 'delete') {
+            const current = storage.getComposerDraft(activeFolder);
+            if (!current) {
+              resetDraftState();
+            }
+          }
+        }
+      }
+    });
+    return unsubscribe;
+  }, [activeFolder, resetDraftState, setReplyTarget]);
 
   // All unique tags in vault with usage counts, sorted by frequency
   const allVaultTags = useMemo<TagMeta[]>(() => {

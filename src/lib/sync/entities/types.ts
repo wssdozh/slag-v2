@@ -1,6 +1,6 @@
 import type { SlagItem, FolderMeta, WorkspaceState, SlagAttachment } from '../../../types';
 
-export type SyncEntityKind = 'item' | 'folder' | 'workspace' | 'trash' | 'attachment_meta';
+export type SyncEntityKind = 'item' | 'folder' | 'workspace' | 'trash' | 'attachment_meta' | 'draft';
 
 export type SyncAction = 'upsert' | 'delete' | 'rename' | 'restore' | 'purge';
 

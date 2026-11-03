@@ -60,7 +60,8 @@ export type StorageChangeEvent =
   | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: 'local' | 'remote' }
   | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: 'local' | 'remote' }
   | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: 'local' | 'remote' }
-  | { kind: 'trash'; action: 'restore' | 'purge'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' };
+  | { kind: 'trash'; action: 'restore' | 'purge'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' }
+  | { kind: 'draft'; action: 'upsert' | 'delete'; id: string; payload?: ComposerDraft | FullscreenDraft; origin?: 'local' | 'remote' };
 
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
 
@@ -1147,22 +1148,39 @@ export class StorageService {
     return all[folderPath] || null;
   }
 
-  public saveComposerDraft(folderPath: string, draft: ComposerDraft): void {
+  public saveComposerDraft(folderPath: string, draft: ComposerDraft, origin: 'local' | 'remote' = 'local'): void {
     try {
       const all = this.getAllComposerDrafts();
       all[folderPath] = draft;
       localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
+      if (origin === 'local') {
+        this.emitChange({
+          kind: 'draft',
+          action: 'upsert',
+          id: `composer:${folderPath}`,
+          payload: draft,
+          origin: 'local',
+        });
+      }
     } catch (err) {
       fsLog.warn('Failed to save composer draft to localStorage', { folderPath, err });
     }
   }
 
-  public deleteComposerDraft(folderPath: string): void {
+  public deleteComposerDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
     try {
       const all = this.getAllComposerDrafts();
       if (folderPath in all) {
         delete all[folderPath];
         localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
+        if (origin === 'local') {
+          this.emitChange({
+            kind: 'draft',
+            action: 'delete',
+            id: `composer:${folderPath}`,
+            origin: 'local',
+          });
+        }
       }
     } catch (err) {
       fsLog.warn('Failed to delete composer draft from localStorage', { folderPath, err });
@@ -1183,17 +1201,34 @@ export class StorageService {
     }
   }
 
-  public saveFullscreenDraft(itemId: string, draft: FullscreenDraft): void {
+  public saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin: 'local' | 'remote' = 'local'): void {
     try {
       localStorage.setItem(`${this.getFullscreenDraftsKey()}_${itemId}`, JSON.stringify(draft));
+      if (origin === 'local') {
+        this.emitChange({
+          kind: 'draft',
+          action: 'upsert',
+          id: `fullscreen:${itemId}`,
+          payload: draft,
+          origin: 'local',
+        });
+      }
     } catch (err) {
       fsLog.warn('Failed to save fullscreen draft to localStorage', { itemId, err });
     }
   }
 
-  public clearFullscreenDraft(itemId: string): void {
+  public clearFullscreenDraft(itemId: string, origin: 'local' | 'remote' = 'local'): void {
     try {
       localStorage.removeItem(`${this.getFullscreenDraftsKey()}_${itemId}`);
+      if (origin === 'local') {
+        this.emitChange({
+          kind: 'draft',
+          action: 'delete',
+          id: `fullscreen:${itemId}`,
+          origin: 'local',
+        });
+      }
     } catch {}
   }
 
