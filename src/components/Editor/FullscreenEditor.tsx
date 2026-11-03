@@ -332,10 +332,27 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const handleClose = useCallback(() => {
     if (!item.id.startsWith('draft_')) {
       flushAutosave();
+    } else {
+      // Sync back to composer draft when closing a newly created draft
+      const targetFolderVal = folder !== 'Входящие' ? folder : undefined;
+      storage.saveComposerDraft(folder || 'Входящие', {
+        content: content.trim(),
+        itemType: type,
+        priority: type === 'task' ? priority : 'none',
+        dueDate: type === 'task' ? (dueDate || '') : '',
+        tags,
+        attachments,
+        replyTarget: item.replyToId ? { id: item.replyToId, title: '' } : null,
+        targetFolder: targetFolderVal,
+        duration: type === 'task' ? duration : undefined,
+        recurrence: type === 'task' ? recurrence : undefined,
+        updatedAt: Date.now(),
+      });
+      storage.clearFullscreenDraft(item.id);
     }
     setIsFullscreenEditorOpen(false);
     setSelectedItem(null);
-  }, [item.id, flushAutosave, setIsFullscreenEditorOpen, setSelectedItem]);
+  }, [item, content, type, priority, dueDate, tags, attachments, folder, duration, recurrence, flushAutosave, setIsFullscreenEditorOpen, setSelectedItem]);
 
   const handleUndo = useCallback(() => {
     const view = getEditorView();
