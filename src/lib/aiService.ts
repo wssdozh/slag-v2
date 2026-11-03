@@ -260,12 +260,17 @@ ${settings.customTagRules ? `Пользовательские правила: ${
 
   const userPrompt = `Текст заметки:\n${content.slice(0, 2000)}`;
 
+  aiLog.info(`Draft classification requested: len=${content.length} chars, folder="${currentFolder}", folders=${eligibleFolders.length}, tags=${existingTags.length}`);
+  const startTime = performance.now();
+
   const parsed = await callJsonLlm<{
     suggestedTitle?: string;
     targetFolder?: string;
     tags?: string[];
     reason?: string;
   }>(systemPrompt, userPrompt, settings, 0.2);
+
+  const durationMs = Math.round(performance.now() - startTime);
 
   if (parsed) {
     const rawTags: string[] = Array.isArray(parsed.tags) ? parsed.tags : [];
@@ -286,7 +291,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
       reason: parsed.reason?.trim() || 'По смыслу заметки',
       suggestedTitle: parsed.suggestedTitle?.trim() || undefined,
     };
-    aiLog.info(`Draft categorized: -> "${finalResult.targetFolder}" [${finalResult.tags.map(t => '#' + t).join(' ')}]`);
+    aiLog.info(`Draft categorized in ${durationMs}ms: title="${finalResult.suggestedTitle || ''}" -> "${finalResult.targetFolder}" [${finalResult.tags.map(t => '#' + t).join(' ')}]`);
     return finalResult;
   }
 

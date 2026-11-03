@@ -1153,15 +1153,13 @@ export class StorageService {
       const all = this.getAllComposerDrafts();
       all[folderPath] = draft;
       localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
-      if (origin === 'local') {
-        this.emitChange({
-          kind: 'draft',
-          action: 'upsert',
-          id: `composer:${folderPath}`,
-          payload: draft,
-          origin: 'local',
-        });
-      }
+      this.emitChange({
+        kind: 'draft',
+        action: 'upsert',
+        id: `composer:${folderPath}`,
+        payload: draft,
+        origin,
+      });
     } catch (err) {
       fsLog.warn('Failed to save composer draft to localStorage', { folderPath, err });
     }
@@ -1173,14 +1171,12 @@ export class StorageService {
       if (folderPath in all) {
         delete all[folderPath];
         localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
-        if (origin === 'local') {
-          this.emitChange({
-            kind: 'draft',
-            action: 'delete',
-            id: `composer:${folderPath}`,
-            origin: 'local',
-          });
-        }
+        this.emitChange({
+          kind: 'draft',
+          action: 'delete',
+          id: `composer:${folderPath}`,
+          origin,
+        });
       }
     } catch (err) {
       fsLog.warn('Failed to delete composer draft from localStorage', { folderPath, err });
@@ -1204,15 +1200,13 @@ export class StorageService {
   public saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin: 'local' | 'remote' = 'local'): void {
     try {
       localStorage.setItem(`${this.getFullscreenDraftsKey()}_${itemId}`, JSON.stringify(draft));
-      if (origin === 'local') {
-        this.emitChange({
-          kind: 'draft',
-          action: 'upsert',
-          id: `fullscreen:${itemId}`,
-          payload: draft,
-          origin: 'local',
-        });
-      }
+      this.emitChange({
+        kind: 'draft',
+        action: 'upsert',
+        id: `fullscreen:${itemId}`,
+        payload: draft,
+        origin,
+      });
     } catch (err) {
       fsLog.warn('Failed to save fullscreen draft to localStorage', { itemId, err });
     }
@@ -1221,14 +1215,12 @@ export class StorageService {
   public clearFullscreenDraft(itemId: string, origin: 'local' | 'remote' = 'local'): void {
     try {
       localStorage.removeItem(`${this.getFullscreenDraftsKey()}_${itemId}`);
-      if (origin === 'local') {
-        this.emitChange({
-          kind: 'draft',
-          action: 'delete',
-          id: `fullscreen:${itemId}`,
-          origin: 'local',
-        });
-      }
+      this.emitChange({
+        kind: 'draft',
+        action: 'delete',
+        id: `fullscreen:${itemId}`,
+        origin,
+      });
     } catch {}
   }
 

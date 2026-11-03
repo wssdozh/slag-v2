@@ -106,6 +106,7 @@ export class SyncEngine {
       storage.subscribeChanges((event) => {
         const op = createSyncOpFromStorageEvent(event);
         if (op) {
+          syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
           this.getOutbox().enqueue(op);
           this.scheduleDebouncedPush();
         }
@@ -773,10 +774,12 @@ export class SyncEngine {
               if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
                 storage.saveComposerDraft(folder, incoming, 'remote');
                 hasDraftsChanged = true;
+                syncLog.info(`Applied remote composer draft for folder "${folder}" (${incoming.content.length} chars)`);
               }
             } else if (ch.action === 'delete') {
               storage.deleteComposerDraft(folder, 'remote');
               hasDraftsChanged = true;
+              syncLog.info(`Deleted remote composer draft for folder "${folder}"`);
             }
           } else if (ch.id.startsWith('fullscreen:')) {
             const itemId = ch.id.slice('fullscreen:'.length);
@@ -786,10 +789,12 @@ export class SyncEngine {
               if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
                 storage.saveFullscreenDraft(itemId, incoming, 'remote');
                 hasDraftsChanged = true;
+                syncLog.info(`Applied remote fullscreen draft for item "${itemId}" ("${incoming.title}")`);
               }
             } else if (ch.action === 'delete') {
               storage.clearFullscreenDraft(itemId, 'remote');
               hasDraftsChanged = true;
+              syncLog.info(`Cleared remote fullscreen draft for item "${itemId}"`);
             }
           }
         }
@@ -1025,8 +1030,11 @@ export class SyncEngine {
         }
       }
 
+      const draftChangesCount = changes.filter((c) => c.type === 'draft').length;
+      const itemChangesCount = changes.filter((c) => c.type === 'item').length;
+      const folderChangesCount = changes.filter((c) => c.type === 'folder').length;
       syncLog.info(
-        `Pushed bundle ${bundle.bundleId} (${changes.length} changes, ${encrypted.ciphertext.length} B) -> room ${this.activeRoomId?.slice(0, 10)}...`
+        `Pushed bundle ${bundle.bundleId} (${changes.length} changes: ${itemChangesCount} items, ${folderChangesCount} folders, ${draftChangesCount} drafts, ${encrypted.ciphertext.length} B) -> room ${this.activeRoomId?.slice(0, 10)}...`
       );
 
       localStorage.setItem(hashKey, stateHash);

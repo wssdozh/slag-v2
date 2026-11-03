@@ -286,7 +286,9 @@ export const Composer: React.FC<ComposerProps> = ({
   useEffect(() => {
     const unsubscribe = storage.subscribeChanges((event) => {
       if (event.kind === 'draft' && event.origin === 'remote') {
-        if (event.id === `composer:${activeFolder}`) {
+        const isCurrentFolder = event.id === `composer:${activeFolder}`;
+        // If current folder has no draft or user is in Inboxes and draft came for Inboxes
+        if (isCurrentFolder) {
           if (event.action === 'upsert' && event.payload) {
             const remoteDraft = event.payload as ComposerDraft;
             // Only adopt if local composer is not currently holding unsubmitted text or attachments
