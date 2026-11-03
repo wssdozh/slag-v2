@@ -205,14 +205,30 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     };
   }, [item.id, title, content, tags, folder, type, priority, status, dueDate, duration, recurrence, flushAutosave]);
 
-  // Flush on unmount if pending
+  // Flush on unmount if pending or sync back to composer draft
   useEffect(() => {
     return () => {
       if (autosaveTimerRef.current) {
         flushAutosave();
+      } else if (item.id.startsWith('draft_')) {
+        const targetFolderVal = folder !== 'Входящие' ? folder : undefined;
+        storage.saveComposerDraft(folder || 'Входящие', {
+          content: content.trim(),
+          itemType: type,
+          priority: type === 'task' ? priority : 'none',
+          dueDate: type === 'task' ? (dueDate || '') : '',
+          tags,
+          attachments,
+          replyTarget: item.replyToId ? { id: item.replyToId, title: '' } : null,
+          targetFolder: targetFolderVal,
+          duration: type === 'task' ? duration : undefined,
+          recurrence: type === 'task' ? recurrence : undefined,
+          updatedAt: Date.now(),
+        });
+        storage.clearFullscreenDraft(item.id);
       }
     };
-  }, [flushAutosave]);
+  }, [item.id, item.replyToId, content, type, priority, dueDate, tags, attachments, folder, duration, recurrence, flushAutosave]);
 
   // Persist width preference
   useEffect(() => {
