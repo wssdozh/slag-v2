@@ -287,6 +287,9 @@ export interface ComposerDraft {
   tags: string[];
   attachments: SlagAttachment[];
   replyTarget: { id: string; title: string } | null;
+  targetFolder?: string | null;
+  duration?: number;
+  recurrence?: RecurrenceRule;
   updatedAt: number;
 }
 

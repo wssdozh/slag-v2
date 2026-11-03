@@ -86,14 +86,16 @@ export const Composer: React.FC<ComposerProps> = ({
   const [reminder] = useState<string | undefined>(initialReminder);
   const [tags, setTags] = useState<string[]>(() => initialDraft?.tags || []);
   const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(
-    initialFolder && initialFolder !== effectiveDefaultFolder
+    initialDraft?.targetFolder
+      ? { folder: initialDraft.targetFolder, forCurrent: effectiveDefaultFolder }
+      : initialFolder && initialFolder !== effectiveDefaultFolder
       ? { folder: initialFolder, forCurrent: effectiveDefaultFolder }
       : null
   );
   const targetFolder = targetFolderOverride?.forCurrent === effectiveDefaultFolder ? targetFolderOverride.folder : null;
-  const setTargetFolder = (folder: string | null) => {
+  const setTargetFolder = useCallback((folder: string | null) => {
     setTargetFolderOverride(folder ? { folder, forCurrent: effectiveDefaultFolder } : null);
-  };
+  }, [effectiveDefaultFolder]);
   const [attachments, setAttachments] = useState<SlagAttachment[]>(() => initialDraft?.attachments || []);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
 
@@ -136,9 +138,9 @@ export const Composer: React.FC<ComposerProps> = ({
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
   const [isDateDismissed, setIsDateDismissed] = useState(false);
   const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
-  const [duration, setDuration] = useState<number | undefined>(undefined);
+  const [duration, setDuration] = useState<number | undefined>(() => initialDraft?.duration);
   const [isDurationDismissed, setIsDurationDismissed] = useState(false);
-  const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(undefined);
+  const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(() => initialDraft?.recurrence);
   const [isRecurrenceDismissed, setIsRecurrenceDismissed] = useState(false);
   const [dismissedTags, setDismissedTags] = useState<Set<string>>(new Set());
 
@@ -161,14 +163,14 @@ export const Composer: React.FC<ComposerProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
-  const draftRef = useRef({ content, itemType, priority, dueDate, tags, attachments, replyTarget });
+  const draftRef = useRef({ content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence });
   const isApplyingRemoteDraftRef = useRef(false);
   const lastAdoptedRemoteDraftUpdatedAtRef = useRef<number>(initialDraft?.updatedAt ?? 0);
   const lastLocalUserEditTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget };
-  }, [content, itemType, priority, dueDate, tags, attachments, replyTarget]);
+    draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence };
+  }, [content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence]);
 
   const resetDraftState = useCallback(() => {
     draftRef.current = {
@@ -179,6 +181,9 @@ export const Composer: React.FC<ComposerProps> = ({
       tags: [],
       attachments: [],
       replyTarget: null,
+      targetFolder: null,
+      duration: undefined,
+      recurrence: undefined,
     };
     setContent('');
     setTags([]);
@@ -238,6 +243,9 @@ export const Composer: React.FC<ComposerProps> = ({
           setTags(currentStored.tags || []);
           setAttachments(currentStored.attachments || []);
           if (currentStored.replyTarget) setReplyTarget(currentStored.replyTarget as any);
+          setTargetFolder(currentStored.targetFolder || null);
+          setDuration(currentStored.duration);
+          setRecurrence(currentStored.recurrence);
         }
       } else {
         // Stored draft was cleared/deleted on remote device
@@ -264,7 +272,7 @@ export const Composer: React.FC<ComposerProps> = ({
       window.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', syncWithStorage);
     };
-  }, [activeFolder, resetDraftState, setReplyTarget]);
+  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder]);
 
   // Autosave when unmounting (e.g. folder switch or page navigation)
   useEffect(() => {
@@ -279,6 +287,9 @@ export const Composer: React.FC<ComposerProps> = ({
           tags: d.tags,
           attachments: d.attachments,
           replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title } : null,
+          targetFolder: d.targetFolder,
+          duration: d.duration,
+          recurrence: d.recurrence,
           updatedAt: Date.now(),
         });
       } else {
@@ -311,6 +322,9 @@ export const Composer: React.FC<ComposerProps> = ({
           tags,
           attachments,
           replyTarget: replyTarget ? { id: replyTarget.id, title: replyTarget.title } : null,
+          targetFolder,
+          duration,
+          recurrence,
           updatedAt: Date.now(),
         });
       } else {
@@ -319,7 +333,7 @@ export const Composer: React.FC<ComposerProps> = ({
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget]);
+  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence]);
 
   // Handle beforeunload to avoid lost text on immediate tab close/refresh
   useEffect(() => {
@@ -335,6 +349,9 @@ export const Composer: React.FC<ComposerProps> = ({
           tags: d.tags,
           attachments: d.attachments,
           replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title } : null,
+          targetFolder: d.targetFolder,
+          duration: d.duration,
+          recurrence: d.recurrence,
           updatedAt: Date.now(),
         });
       }
@@ -371,6 +388,9 @@ export const Composer: React.FC<ComposerProps> = ({
               setTags(remoteDraft.tags || []);
               setAttachments(remoteDraft.attachments || []);
               if (remoteDraft.replyTarget) setReplyTarget(remoteDraft.replyTarget as any);
+              setTargetFolder(remoteDraft.targetFolder || null);
+              setDuration(remoteDraft.duration);
+              setRecurrence(remoteDraft.recurrence);
             }
           } else if (event.action === 'delete') {
             isApplyingRemoteDraftRef.current = true;
@@ -381,7 +401,7 @@ export const Composer: React.FC<ComposerProps> = ({
       }
     });
     return unsubscribe;
-  }, [activeFolder, resetDraftState, setReplyTarget]);
+  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder]);
 
   // All unique tags in vault with usage counts, sorted by frequency
   const allVaultTags = useMemo<TagMeta[]>(() => {
