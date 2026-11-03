@@ -250,6 +250,12 @@ export const Composer: React.FC<ComposerProps> = ({
         return;
       }
 
+      // Check if current draft was superseded by a deletion tombstone
+      const lastTomb = Number(localStorage.getItem(`slag_sync_draft_tomb_${storage.getCurrentVault()?.id || 'default_vault'}_composer:${activeFolder}`) || 0);
+      if (lastTomb > 0 && lastTomb > lastAdoptedRemoteDraftUpdatedAtRef.current) {
+        return;
+      }
+
       if (content.trim() || attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
           content,
@@ -321,12 +327,9 @@ export const Composer: React.FC<ComposerProps> = ({
               if (remoteDraft.replyTarget) setReplyTarget(remoteDraft.replyTarget as any);
             }
           } else if (event.action === 'delete') {
-            const isTextareaFocused = textareaRef.current && document.activeElement === textareaRef.current;
-            if (!isTextareaFocused) {
-              isApplyingRemoteDraftRef.current = true;
-              lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
-              resetDraftState();
-            }
+            isApplyingRemoteDraftRef.current = true;
+            lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
+            resetDraftState();
           }
         }
       }
