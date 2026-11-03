@@ -164,6 +164,37 @@ export class SyncEngine {
       : `${LAST_STATE_HASH_KEY}_${vid}`;
   }
 
+  private getSyncedIdsKey(vaultId?: string): string {
+    return `slag_sync_synced_ids_${vaultId || this.currentVaultId}`;
+  }
+
+  private getTombstonesKey(vaultId?: string): string {
+    return `slag_sync_tombstones_${vaultId || this.currentVaultId}`;
+  }
+
+  private loadSyncedIds(): Set<string> {
+    try {
+      const raw = localStorage.getItem(this.getSyncedIdsKey());
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  }
+
+  private loadTombstones(): Record<string, number> {
+    try {
+      const raw = localStorage.getItem(this.getTombstonesKey());
+      return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private ensureSyncedIdsSeed(): void {
+    if (localStorage.getItem(this.getSyncedIdsKey())) return;
+    localStorage.setItem(this.getSyncedIdsKey(), JSON.stringify(storage.getItems().map((it) => it.id)));
+  }
+
   public getCurrentVaultId(): string {
     return this.currentVaultId;
   }
@@ -357,6 +388,7 @@ export class SyncEngine {
 
       this.connectWebSocket();
       this.startIntervals();
+      this.ensureSyncedIdsSeed();
       await this.pushLocalChanges();
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
@@ -399,6 +431,8 @@ export class SyncEngine {
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
     if (newPhrase !== this.config.seedPhrase) {
       localStorage.removeItem(this.getStateHashKey());
+      localStorage.removeItem(this.getSyncedIdsKey());
+      localStorage.removeItem(this.getTombstonesKey());
       if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
     }
     this.saveConfig({ seedPhrase: newPhrase });
@@ -408,6 +442,8 @@ export class SyncEngine {
 
   public async updateServerUrl(url: string): Promise<void> {
     this.saveConfig({ serverUrl: url });
+    localStorage.removeItem(this.getSyncedIdsKey());
+    localStorage.removeItem(this.getTombstonesKey());
     this.disconnect();
     await this.init();
   }
@@ -595,23 +631,38 @@ export class SyncEngine {
 
       const currentItems: SlagItem[] = [...storage.getItems()];
       const currentFolders: FolderMeta[] = [...storage.getFolders()];
+      const tombstones = this.loadTombstones();
+      let tombstonesDirty = false;
 
       for (const ch of bundle.changes) {
         if (ch.type === 'item') {
           if (ch.action === 'upsert' && ch.payload) {
             const incoming = ch.payload as SlagItem;
+            const tomb = tombstones[ch.id];
+            // ponytail: wall-clock LWW; server-assigned version when clocks skew matters.
+            if (tomb !== undefined && (incoming.updatedAt ?? 0) < tomb) continue;
             const idx = currentItems.findIndex((it) => it.id === ch.id);
             if (idx >= 0) {
+              if ((incoming.updatedAt ?? 0) < (currentItems[idx].updatedAt ?? 0)) continue;
               currentItems[idx] = incoming;
             } else {
               currentItems.unshift(incoming);
             }
+            if (tomb !== undefined) {
+              delete tombstones[ch.id];
+              tombstonesDirty = true;
+            }
             hasItemsChanged = true;
           } else if (ch.action === 'delete') {
+            const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
             const idx = currentItems.findIndex((it) => it.id === ch.id);
-            if (idx >= 0) {
+            if (idx >= 0 && (currentItems[idx].updatedAt ?? 0) <= deletedAt) {
               currentItems.splice(idx, 1);
               hasItemsChanged = true;
+            }
+            if (deletedAt > (tombstones[ch.id] ?? 0)) {
+              tombstones[ch.id] = deletedAt;
+              tombstonesDirty = true;
             }
           }
         } else if (ch.type === 'folder') {
@@ -629,6 +680,10 @@ export class SyncEngine {
           workspaceState = ch.payload as WorkspaceState;
           hasWorkspaceChanged = true;
         }
+      }
+
+      if (tombstonesDirty) {
+        localStorage.setItem(this.getTombstonesKey(), JSON.stringify(tombstones));
       }
 
       if (hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged) {
@@ -760,6 +815,27 @@ export class SyncEngine {
         payload: workspaceState,
       });
 
+      // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
+      const syncedIds = this.loadSyncedIds();
+      const currentIds = new Set(items.map((it) => it.id));
+      const tombstones = this.loadTombstones();
+      for (const id of syncedIds) {
+        if (currentIds.has(id)) continue;
+        const deletedAt = tombstones[id] ?? Date.now();
+        tombstones[id] = deletedAt;
+        changes.push({
+          id,
+          type: 'item',
+          action: 'delete',
+          version: 1,
+          hash: String(deletedAt),
+          payload: { deletedAt },
+        });
+      }
+      for (const id of currentIds) {
+        delete tombstones[id];
+      }
+
       const bundle: SyncBundle = {
         bundleId: `bnd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         roomId,
@@ -800,6 +876,8 @@ export class SyncEngine {
       if (!this.usesAccountSync() && this.currentVaultId === 'default_vault') {
         localStorage.setItem(LAST_STATE_HASH_KEY, stateHash);
       }
+      localStorage.setItem(this.getSyncedIdsKey(), JSON.stringify([...currentIds]));
+      localStorage.setItem(this.getTombstonesKey(), JSON.stringify(tombstones));
       this.status.lastSyncTime = new Date().toLocaleTimeString();
       this.status.state = 'connected';
       this.status.error = null;
