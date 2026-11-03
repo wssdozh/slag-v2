@@ -1,10 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/selfhostFixture';
 
 test('latest init owns both key and room when earlier derivation finishes last', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('slag_sync_config_v2_default_vault', JSON.stringify({ enabled: false }));
-  });
   await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
     const modulePath = '/src/lib/sync/syncEngine.ts';
     const cryptoPath = '/src/lib/sync/crypto.ts';

@@ -1,10 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/selfhostFixture';
 
 test('intentional disconnect and socket replacement never schedule reconnects', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('slag_sync_config_v2_default_vault', JSON.stringify({ enabled: false }));
-  });
   await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
     const modulePath = '/src/lib/sync/syncEngine.ts';
     const { SyncEngine } = await import(/* @vite-ignore */ modulePath);

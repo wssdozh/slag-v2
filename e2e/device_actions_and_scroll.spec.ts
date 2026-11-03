@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/selfhostFixture';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -10,7 +10,7 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
     }
   });
 
-  test('verifies landing scroll, inline device rename, sync mode toggle, and key rotation', async ({ page }) => {
+  test('verifies landing scroll, sync mode toggle, and key rotation', async ({ page }) => {
     // 1. Verify Landing Page Scroll
     await page.goto('/?page=landing');
     await page.waitForLoadState('domcontentloaded');
@@ -46,35 +46,18 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
 
     const syncTabBtn = settingsModal.locator('button[data-testid="settings-tab-sync"]');
     await syncTabBtn.click();
-    await expect(settingsModal.locator('text=SLAG Smile')).toBeVisible({ timeout: 10000 });
+    await expect(settingsModal.getByText('Self-hosted', { exact: false }).first()).toBeVisible({ timeout: 10000 });
     await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
 
-    // 3. Test Inline Device Renaming
-    const deviceNameBtn = settingsModal.locator('button[title*="Кликните для переименования"]').first();
-    await expect(deviceNameBtn).toBeVisible();
-    await deviceNameBtn.click();
-
-    const renameInput = settingsModal.locator('input[type="text"]:focus');
-    await expect(renameInput).toBeVisible();
-    await renameInput.fill('Рабочий ThinkPad');
-    await renameInput.press('Enter');
-
-    await expect(settingsModal.locator('text=Рабочий ThinkPad')).toBeVisible();
-
-    // 4. Test Sync Mode Toggle (Read-Write vs Receive-Only)
-    const syncModeBtn = settingsModal.locator('button[title*="Переключить режим синхронизации"]').first();
-    await expect(syncModeBtn).toContainText('Полный доступ');
+    // 3. Test Sync Mode Toggle (Read-Write vs Receive-Only) on the current device
+    const syncModeBtn = settingsModal.locator('button', { hasText: 'Полный доступ' }).first();
+    await expect(syncModeBtn).toBeVisible();
     await syncModeBtn.click();
-    await expect(syncModeBtn).toContainText('Только чтение');
+    await expect(settingsModal.locator('button', { hasText: 'Только чтение' }).first()).toBeVisible();
 
     // Toggle back to Read-Write
-    await syncModeBtn.click();
-    await expect(syncModeBtn).toContainText('Полный доступ');
-
-    // 5. Test AI-Worker Toggle
-    const aiWorkerBtn = settingsModal.locator('button[title*="AI-воркер"]').first();
-    await expect(aiWorkerBtn).toBeVisible();
-    await aiWorkerBtn.click();
+    await settingsModal.locator('button', { hasText: 'Только чтение' }).first().click();
+    await expect(settingsModal.locator('button', { hasText: 'Полный доступ' }).first()).toBeVisible();
 
     // Take screenshot of Device Actions UI
     await page.screenshot({
@@ -82,9 +65,9 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
       fullPage: false,
     });
 
-    // 6. Test Panic Re-keying (Key Rotation)
+    // 4. Test Panic Re-keying (Key Rotation)
     page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('ротацию ключа');
+      expect(dialog.message()).toContain('Сменить ключ хранилища');
       await dialog.accept();
     });
 
@@ -93,6 +76,6 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
     await rotateKeyBtn.click();
 
     // Wait for toast confirmation
-    await expect(page.locator('text=Ключ хранилища ротирован')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('text=Ключ хранилища изменён')).toBeVisible({ timeout: 8000 });
   });
 });

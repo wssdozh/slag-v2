@@ -1,12 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, serverUrl } from './support/selfhostFixture';
 
 test.describe('Sync Device Access Control & Registration', () => {
   test('displays access management modal and allows configuring per-vault access', async ({ page }) => {
-    await page.addInitScript(() => {
+    await page.addInitScript((serverUrl) => {
       const configKey = 'slag_sync_config_v2_default_vault';
       const existing = {
         enabled: true,
-        serverUrl: 'http://152.53.199.71:8320',
+        serverUrl,
         deviceId: 'slag-test-local',
         deviceName: 'Это устройство',
         seedPhrase: 'apple banana cherry dog elephant fox grape horse igloo jaguar kite lemon',
@@ -26,7 +26,7 @@ test.describe('Sync Device Access Control & Registration', () => {
         ],
       };
       localStorage.setItem(configKey, JSON.stringify(existing));
-    });
+    }, serverUrl);
 
     await page.goto('/');
     await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
@@ -50,14 +50,14 @@ test.describe('Sync Device Access Control & Registration', () => {
     await expect(deviceRow).toBeVisible();
 
     // Click "Управление" button
-    const manageBtn = settingsModal.locator('button', { hasText: 'Управление' });
+    const manageBtn = settingsModal.getByRole('button', { name: 'Доступ Ноутбук (Linux) к хранилищам', exact: true });
     await manageBtn.click();
 
     // Verify Access Management Modal opened
     const accessModal = page.locator('div[role="dialog"]').filter({ hasText: 'Доступ к хранилищам' }).last();
     await expect(accessModal).toBeVisible();
     await expect(accessModal.locator('text=Ноутбук (Linux)')).toBeVisible();
-    await expect(accessModal.locator('text=Выберите доступные хранилища:')).toBeVisible();
+    await expect(accessModal.getByRole('button', { name: 'main Разрешено', exact: true })).toBeVisible();
 
     // Verify vault rows and toggle button
     const vaultRow = accessModal.locator('text=main').first();

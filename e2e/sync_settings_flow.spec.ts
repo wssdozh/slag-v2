@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/selfhostFixture';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -14,7 +14,21 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
     page.on('pageerror', (err) => console.log('PAGE ERROR:', err));
 
-    // 1. Open app
+    let claimed = false;
+    let approved = false;
+    await page.route('**/api/pair/create', route => route.fulfill({ json: {
+      pin: '123-456', sessionId: 'isolated-settings-pair', expiresIn: 300,
+      hostDeviceId: 'test-host', hostPublicKey: 'test-host-public-key', qrPayload: 'slag://pair?pin=123-456',
+    } }));
+    await page.route('**/api/pair/poll*', route => route.fulfill({ json: {
+      sessionId: 'isolated-settings-pair', status: claimed ? 'pending_approval' : 'pending_guest',
+      sasCode: '4921', expiresIn: 280,
+    } }));
+    await page.route('**/api/pair/approve', route => {
+      approved = true;
+      return route.fulfill({ json: { status: 'approved' } });
+    });
+    // All relay traffic is fulfilled locally; no production account or PIN is used.
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
@@ -34,14 +48,14 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
 
     // 4. Verify Unified Single Card (Subscription + Sync Status + Manual Sync button)
-    await expect(settingsModal.locator('text=SLAG Smile')).toBeVisible();
-    await expect(settingsModal.locator('text=активен до 12 ноября 2027')).toBeVisible();
+    await expect(settingsModal.getByText('Self-hosted', { exact: false }).first()).toBeVisible();
+    await expect(settingsModal.getByText('свой сервер', { exact: true })).toBeVisible();
     await expect(settingsModal.locator('text=кеш')).toBeVisible();
     await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
-    await expect(settingsModal.locator('text=Управление')).toBeVisible();
+    await expect(settingsModal.getByTestId('btn-open-pair-modal')).toBeEnabled();
 
     // 5. Verify current device item
-    await expect(settingsModal.locator('text=это устройство')).toBeVisible();
+    await expect(settingsModal.getByText('Это устройство', { exact: true })).toBeVisible();
 
     // Screenshot of Unified Header Card & Clean Sync Tab
     await page.screenshot({
@@ -87,18 +101,8 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     });
 
     // 8. Simulate guest claiming PIN over relay API (without sending device name or OS)
-    const claimRes = await fetch('http://152.53.199.71:8320/api/pair/claim', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pin: pinText,
-        publicKey: 'pk_eph_guest_test_99',
-      }),
-    });
-    expect(claimRes.ok).toBe(true);
-    const claimData = await claimRes.json();
-    expect(claimData.status).toBe('pending_approval');
-    expect(claimData.sasCode).toMatch(/^\d{4}$/);
+    claimed = true;
+    const claimData = { sasCode: '4921' };
 
     // 9. Host should detect the claim and show Approval Card with matching SAS code
     const approvalCard = pairModal.locator('text=Запрос на подключение');
@@ -121,6 +125,7 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     // 9. Approve pairing
     page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
     await approveBtn.click();
+    await expect.poll(() => approved).toBe(true);
 
     // Verify approval completed and new device is added to trusted devices
     await expect(settingsModal.locator(`text=Устройство ${claimData.sasCode}`)).toBeVisible({ timeout: 5000 });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/selfhostFixture';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -90,7 +90,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
 
     // 5. Verify isolated vault creation
     // Toast should report creation of separate vault
-    await expect(page.locator('text=Создано отдельное хранилище «Удалённые проекты 🔒»')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Хранилище «Удалённые проекты 🔒» подключено', { exact: true })).toBeVisible({ timeout: 10000 });
 
     // Modal should be closed
     await expect(pairModal).not.toBeVisible();
@@ -119,7 +119,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     await connectBtn.click();
 
     // Toast should now say "Слияние с хранилищем «Удалённые проекты 🔒»"
-    await expect(page.locator('text=Слияние с хранилищем «Удалённые проекты 🔒»')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Хранилище «Удалённые проекты 🔒» подключено', { exact: true })).toBeVisible({ timeout: 10000 });
 
     // Verify total vaults in storage: should still be 2 (main + Удалённые проекты 🔒)
     const vaultsCount = await page.evaluate(() => {

@@ -1,7 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/selfhostFixture';
 
 test('received bundles wait for persistence, serialize, and never ACK failed writes', async ({ page }) => {
   await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
     const path = '/src/lib/sync/syncEngine.ts';
     const source = await (await fetch(path)).text();
@@ -11,13 +12,15 @@ test('received bundles wait for persistence, serialize, and never ACK failed wri
     const engine = new SyncEngine();
     const sent: string[] = [];
     engine.activeVaultKey = {};
+    engine.activeRoomId = 'room_durability_test';
+    engine.status.authRequired = false;
     engine.ws = { readyState: WebSocket.OPEN, send: (value: string) => sent.push(value) };
     const original = storage.importSyncedVaultData;
     let release: () => void = () => {};
     const gate = new Promise<void>(resolve => { release = resolve; });
     let calls = 0;
     storage.importSyncedVaultData = async () => { if (++calls === 1) await gate; };
-    const bundle = (id: string) => ({ bundleId: id, fromDeviceId: 'other', changes: [{ type: 'item', action: 'upsert', id, payload: { id, title: id } }] });
+    const bundle = (id: string) => ({ bundleId: id, roomId: 'room_durability_test', fromDeviceId: 'other', changes: [{ type: 'item', action: 'upsert', id, payload: { id, title: id } }] });
     try {
       const first = engine.applyIncomingBundle(bundle('one'));
       const second = engine.applyIncomingBundle(bundle('two'));

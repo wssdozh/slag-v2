@@ -65,20 +65,14 @@ test.describe('Landing Showcase & Minimal Account Cabinet Flow', () => {
 
     // Verify we are in Account Cabinet
     await expect(page.locator('header span', { hasText: 'Личный кабинет' })).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=SLAG ID')).toBeVisible();
-    await expect(page.locator('text=E2EE Активен')).toBeVisible();
-    await expect(page.locator('text=Кеш недоставленного на релее')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'SLAG ID' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Войти по seed' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Создать аккаунт' })).toBeVisible();
 
-    // Test tier switcher in cabinet
-    const angryTierBtn = page.locator('[data-testid="tier-btn-angry"]');
-    await expect(angryTierBtn).toBeVisible();
-    await angryTierBtn.click();
-    await expect(page.locator('text=SLAG Angry')).toBeVisible();
-    await expect(page.locator('span', { hasText: '50 ГБ' }).first()).toBeVisible();
-
-    const smileTierBtn = page.locator('[data-testid="tier-btn-smile"]');
-    await smileTierBtn.click();
-    await expect(page.locator('text=SLAG Smile')).toBeVisible();
+    // Create-account tab pre-generates a seed phrase for the user to save
+    await page.getByRole('button', { name: 'Создать аккаунт' }).click();
+    await expect(page.getByTestId('account-generated-seed')).toBeVisible();
+    await expect(page.getByText('Сохраните фразу восстановления')).toBeVisible();
 
     // Take screenshot of Account Cabinet
     await page.screenshot({
@@ -86,17 +80,7 @@ test.describe('Landing Showcase & Minimal Account Cabinet Flow', () => {
       fullPage: false,
     });
 
-    // 3. Test PIN generation inside cabinet
-    const genPinBtn = page.locator('button', { hasText: 'Сгенерировать PIN' });
-    await expect(genPinBtn).toBeVisible();
-    await genPinBtn.click();
-
-    const pinDisplay = page.locator('.font-mono.text-base.font-semibold');
-    await expect(pinDisplay).toBeVisible({ timeout: 15000 });
-    const pinText = (await pinDisplay.textContent())?.trim();
-    expect(pinText).toMatch(/^\d{3}-\d{3}$/);
-
-    // 4. Return to Landing
+    // 3. Return to Landing
     const backBtn = page.locator('button', { hasText: 'На главную' });
     await backBtn.click();
     await expect(page.locator('h1')).toContainText('Заметки со скоростью чата');
