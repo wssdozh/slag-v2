@@ -766,10 +766,17 @@ export class SyncEngine {
           workspaceState = ch.payload as WorkspaceState;
           hasWorkspaceChanged = true;
         } else if (ch.type === 'draft') {
+          const draftTombKey = `slag_sync_draft_tomb_${this.currentVaultId}_${ch.id}`;
+          const lastDeletedAt = Number(localStorage.getItem(draftTombKey) || 0);
+
           if (ch.id.startsWith('composer:')) {
             const folder = ch.id.slice('composer:'.length);
             if (ch.action === 'upsert' && ch.payload) {
               const incoming = ch.payload as ComposerDraft;
+              if ((incoming.updatedAt ?? 0) <= lastDeletedAt) {
+                syncLog.info(`Ignored stale composer draft for "${folder}" (updatedAt <= deletedAt)`);
+                continue;
+              }
               const existing = storage.getComposerDraft(folder);
               if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
                 storage.saveComposerDraft(folder, incoming, 'remote');
@@ -777,6 +784,8 @@ export class SyncEngine {
                 syncLog.info(`Applied remote composer draft for folder "${folder}" (${incoming.content.length} chars)`);
               }
             } else if (ch.action === 'delete') {
+              const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
+              localStorage.setItem(draftTombKey, String(deletedAt));
               storage.deleteComposerDraft(folder, 'remote');
               hasDraftsChanged = true;
               syncLog.info(`Deleted remote composer draft for folder "${folder}"`);
@@ -785,6 +794,10 @@ export class SyncEngine {
             const itemId = ch.id.slice('fullscreen:'.length);
             if (ch.action === 'upsert' && ch.payload) {
               const incoming = ch.payload as FullscreenDraft;
+              if ((incoming.updatedAt ?? 0) <= lastDeletedAt) {
+                syncLog.info(`Ignored stale fullscreen draft for "${itemId}" (updatedAt <= deletedAt)`);
+                continue;
+              }
               const existing = storage.getFullscreenDraft(itemId);
               if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
                 storage.saveFullscreenDraft(itemId, incoming, 'remote');
@@ -792,6 +805,8 @@ export class SyncEngine {
                 syncLog.info(`Applied remote fullscreen draft for item "${itemId}" ("${incoming.title}")`);
               }
             } else if (ch.action === 'delete') {
+              const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
+              localStorage.setItem(draftTombKey, String(deletedAt));
               storage.clearFullscreenDraft(itemId, 'remote');
               hasDraftsChanged = true;
               syncLog.info(`Cleared remote fullscreen draft for item "${itemId}"`);
@@ -993,7 +1008,7 @@ export class SyncEngine {
             action: op.action,
             version: 1,
             hash: String(op.timestamp),
-            payload: op.payload,
+            payload: op.action === 'delete' ? { deletedAt: op.timestamp } : op.payload,
           });
         }
       }

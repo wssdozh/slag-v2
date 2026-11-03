@@ -321,13 +321,11 @@ export const Composer: React.FC<ComposerProps> = ({
               if (remoteDraft.replyTarget) setReplyTarget(remoteDraft.replyTarget as any);
             }
           } else if (event.action === 'delete') {
-            const current = storage.getComposerDraft(activeFolder);
-            if (!current) {
-              const isTextareaFocused = textareaRef.current && document.activeElement === textareaRef.current;
-              if (!isTextareaFocused) {
-                lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
-                resetDraftState();
-              }
+            const isTextareaFocused = textareaRef.current && document.activeElement === textareaRef.current;
+            if (!isTextareaFocused) {
+              isApplyingRemoteDraftRef.current = true;
+              lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
+              resetDraftState();
             }
           }
         }
