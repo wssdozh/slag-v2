@@ -1,8 +1,7 @@
 import type { SlagItem, FolderMeta, AiSettings } from '../types';
 import { storage } from './storage';
-import { syncEngine } from './sync/syncEngine';
-import { accountClient } from './sync/account';
 import { logger } from './logger';
+import { aiClient } from './ai/aiClient';
 import {
   assistantOrchestrator,
   resolveKieEndpoint,
@@ -96,6 +95,10 @@ function extractExplicitHashtags(content: string, style: 'lowercase' | 'kebab-ca
   return explicit;
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function localHeuristicTags(
   content: string,
   existingTags: string[],
@@ -107,7 +110,9 @@ function localHeuristicTags(
   const matchedExisting = existingTags.filter((tag) => {
     const clean = tag.toLowerCase().trim();
     if (clean.length < 3 || isStopTag(clean)) return false;
-    const regex = new RegExp(`\\b${clean}\\b`, 'i');
+    const escaped = escapeRegex(clean);
+    // ponytail: JS RegExp \b does not match Cyrillic boundaries; use unicode boundary
+    const regex = new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escaped}(?=[^\\p{L}\\p{N}_]|$)`, 'iu');
     return regex.test(lower);
   });
 
@@ -119,6 +124,10 @@ function localHeuristicTags(
     backend: ['бэкенд', 'backend', 'api', 'node', 'server', 'база данных', 'sql'],
     задачи: ['задач', 'таск', 'дедлайн', 'план', 'сделать'],
     идеи: ['идея', 'мысль', 'инсайт', 'концепт', 'гипотеза'],
+    фильмы: ['фильм', 'кино', 'movie', 'cinema', 'режиссер'],
+    сериалы: ['сериал', 'эпизод', 'сезон', 'series'],
+    книги: ['книг', 'book', 'автор', 'роман', 'повест'],
+    музыка: ['музык', 'трек', 'альбом', 'song', 'music', 'плейлист'],
   };
 
   const detected: string[] = [];
@@ -176,19 +185,9 @@ function localMatchFolder(
   };
 }
 
-function parseJsonContent<T>(raw: string): T | null {
-  try {
-    const jsonMatch = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as T;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Shared low-level JSON LLM dispatcher across providers (Groq, KIE, Gemini).
- * Cuts duplicate networking boilerplate across tagging and triage.
+ * Shared low-level JSON LLM dispatcher across providers (Groq, KIE, Gemini, Relay).
+ * Delegates to unified aiClient.
  */
 async function callJsonLlm<T>(
   systemPrompt: string,
@@ -196,220 +195,7 @@ async function callJsonLlm<T>(
   settings: AiSettings,
   temperature = 0.1
 ): Promise<T | null> {
-  const promptLength = systemPrompt.length + userPrompt.length;
-
-  // 0. SLAG Subscription Relay Gateway Mode
-  const syncSub = syncEngine.getStatus().subscription;
-  const isSubscriptionAllowed = syncSub.hasAiLease;
-  const isSubscriptionMode = (settings.sourceMode === 'subscription' || !settings.sourceMode) && isSubscriptionAllowed;
-
-  if (isSubscriptionMode) {
-    const start = performance.now();
-    try {
-      const cleanServer = syncEngine.getConfig().serverUrl.replace(/\/+$/, '');
-      const endpoint = `${cleanServer}/api/ai/chat`;
-      const roomId = accountClient.getToken() || syncEngine.getStatus().currentRoomId || 'slag-relay-room';
-      aiLog.debug(`Calling Subscription Relay AI Gateway`, { promptChars: promptLength, endpoint });
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${roomId}`,
-        },
-        body: JSON.stringify({
-          model: 'deepseek-v4-1-flash',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature,
-        }),
-      });
-
-      const durationMs = performance.now() - start;
-      if (res.ok) {
-        const data = await res.json();
-        const raw = data.choices?.[0]?.message?.content;
-        aiLog.info(`Subscription AI Gateway response received (${Math.round(durationMs)}ms)`, {
-          status: res.status,
-          durationMs,
-          replyChars: raw?.length || 0,
-        }, durationMs);
-        if (raw) return parseJsonContent<T>(raw);
-      } else {
-        aiLog.warn(`Subscription AI Gateway returned HTTP ${res.status}`);
-      }
-    } catch (err) {
-      aiLog.warn(`Subscription AI Gateway call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
-    }
-  }
-
-  // 1. Groq Provider
-  if (settings.provider === 'groq' && settings.groqApiKey) {
-    const model = settings.model || 'openai/gpt-oss-120b';
-    const isGptOss = model.includes('gpt-oss');
-    const start = performance.now();
-    try {
-      aiLog.debug(`Calling Groq LLM [${model}]`, { promptChars: promptLength, temperature });
-      const payload: Record<string, any> = {
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature,
-      };
-      if (!isGptOss) {
-        payload.response_format = { type: 'json_object' };
-      }
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.groqApiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const durationMs = performance.now() - start;
-      if (res.ok) {
-        const data = await res.json();
-        const raw = data.choices?.[0]?.message?.content;
-        aiLog.info(`Groq [${model}] response received (${Math.round(durationMs)}ms)`, {
-          status: res.status,
-          durationMs,
-          replyChars: raw?.length || 0,
-        }, durationMs);
-        if (raw) return parseJsonContent<T>(raw);
-      } else {
-        aiLog.warn(`Groq [${model}] returned HTTP ${res.status}`, { status: res.status, statusText: res.statusText });
-      }
-    } catch (err) {
-      aiLog.warn(`Groq LLM call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
-    }
-  }
-
-  // 2. KIE.AI Provider (Claude / OpenAI)
-  if (settings.provider === 'kie' && settings.kieApiKey) {
-    const model = settings.model || 'gemini-3-8-flash-openai';
-    const isClaude = model.toLowerCase().startsWith('claude-');
-    const baseUrl = (settings.kieBaseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
-    const authHeader = settings.kieApiKey.startsWith('Bearer ') ? settings.kieApiKey : `Bearer ${settings.kieApiKey}`;
-    const start = performance.now();
-    let raw = '';
-
-    try {
-      aiLog.debug(`Calling KIE [${model}]`, { promptChars: promptLength, isClaude, temperature });
-      if (isClaude) {
-        const endpoint = `${baseUrl}/claude/v1/messages`;
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': authHeader,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: 2048,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: userPrompt }],
-            temperature,
-          }),
-        });
-        const durationMs = performance.now() - start;
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.content)) {
-            for (const b of data.content) {
-              if (b.type === 'text') raw += b.text || '';
-            }
-          }
-          aiLog.info(`KIE Claude [${model}] response received (${Math.round(durationMs)}ms)`, {
-            status: res.status,
-            durationMs,
-            replyChars: raw.length,
-          }, durationMs);
-        } else {
-          aiLog.warn(`KIE Claude [${model}] returned HTTP ${res.status}`, { status: res.status });
-        }
-      } else {
-        const endpoint = resolveKieEndpoint(settings.kieBaseUrl, model);
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': authHeader,
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt },
-            ],
-            temperature,
-          }),
-        });
-        const durationMs = performance.now() - start;
-        if (res.ok) {
-          const data = await res.json();
-          if (data.code && data.code !== 200) {
-            throw new Error(data.msg || `KIE error ${data.code}`);
-          }
-          raw = data.choices?.[0]?.message?.content || '';
-          aiLog.info(`KIE OpenAI [${model}] response received (${Math.round(durationMs)}ms)`, {
-            status: res.status,
-            durationMs,
-            replyChars: raw.length,
-          }, durationMs);
-        } else {
-          aiLog.warn(`KIE OpenAI [${model}] returned HTTP ${res.status}`, { status: res.status });
-        }
-      }
-
-      if (raw) return parseJsonContent<T>(raw);
-    } catch (err) {
-      aiLog.warn(`KIE LLM call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
-    }
-  }
-
-  // 3. Google Gemini Provider
-  if (settings.provider === 'gemini' && settings.geminiApiKey) {
-    const model = settings.model?.startsWith('gemini') ? settings.model : 'gemini-2.0-flash';
-    const start = performance.now();
-    try {
-      aiLog.debug(`Calling Gemini [${model}]`, { promptChars: promptLength, temperature });
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.geminiApiKey}`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-          generationConfig: {
-            temperature,
-            responseMimeType: 'application/json',
-          },
-        }),
-      });
-      const durationMs = performance.now() - start;
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        aiLog.info(`Gemini [${model}] response received (${Math.round(durationMs)}ms)`, {
-          status: res.status,
-          durationMs,
-          replyChars: text?.length || 0,
-        }, durationMs);
-        if (text) return parseJsonContent<T>(text);
-      } else {
-        aiLog.warn(`Gemini [${model}] returned HTTP ${res.status}`, { status: res.status });
-      }
-    } catch (err) {
-      aiLog.warn(`Gemini LLM call failed (${Math.round(performance.now() - start)}ms), falling back to local heuristic`, err);
-    }
-  }
-
-  return null;
+  return aiClient.completeJson<T>(settings, { systemPrompt, userPrompt, temperature });
 }
 
 /**
