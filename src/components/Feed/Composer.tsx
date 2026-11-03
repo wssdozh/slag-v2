@@ -162,6 +162,8 @@ export const Composer: React.FC<ComposerProps> = ({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const draftRef = useRef({ content, itemType, priority, dueDate, tags, attachments, replyTarget });
+  const isApplyingRemoteDraftRef = useRef(false);
+  const lastAdoptedRemoteDraftUpdatedAtRef = useRef<number>(initialDraft?.updatedAt ?? 0);
 
   useEffect(() => {
     draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget };
@@ -242,6 +244,12 @@ export const Composer: React.FC<ComposerProps> = ({
   // Debounced autosave while typing
   useEffect(() => {
     const timer = setTimeout(() => {
+      // If we just applied an incoming remote draft, skip echoing it back out
+      if (isApplyingRemoteDraftRef.current) {
+        isApplyingRemoteDraftRef.current = false;
+        return;
+      }
+
       if (content.trim() || attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
           content,
@@ -264,6 +272,7 @@ export const Composer: React.FC<ComposerProps> = ({
   // Handle beforeunload to avoid lost text on immediate tab close/refresh
   useEffect(() => {
     const handleBeforeUnload = () => {
+      if (isApplyingRemoteDraftRef.current) return;
       const d = draftRef.current;
       if (d.content.trim() || d.attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
@@ -287,12 +296,22 @@ export const Composer: React.FC<ComposerProps> = ({
     const unsubscribe = storage.subscribeChanges((event) => {
       if (event.kind === 'draft' && event.origin === 'remote') {
         const isCurrentFolder = event.id === `composer:${activeFolder}`;
-        // If current folder has no draft or user is in Inboxes and draft came for Inboxes
         if (isCurrentFolder) {
           if (event.action === 'upsert' && event.payload) {
             const remoteDraft = event.payload as ComposerDraft;
-            // Only adopt if local composer is not currently holding unsubmitted text or attachments
-            if (!draftRef.current.content.trim() && draftRef.current.attachments.length === 0) {
+            const remoteTs = remoteDraft.updatedAt ?? 0;
+            const isTextareaFocused = textareaRef.current && document.activeElement === textareaRef.current;
+            const hasLocalUnsavedChanges = draftRef.current.content.trim().length > 0;
+
+            // Adopt if:
+            // 1. Local composer is completely empty, OR
+            // 2. Incoming draft is strictly newer than our last adopted remote draft AND the textarea is NOT currently focused by the user
+            const shouldAdopt = (!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
+              (!isTextareaFocused && remoteTs > lastAdoptedRemoteDraftUpdatedAtRef.current);
+
+            if (shouldAdopt) {
+              isApplyingRemoteDraftRef.current = true;
+              lastAdoptedRemoteDraftUpdatedAtRef.current = remoteTs;
               setContent(remoteDraft.content || '');
               setItemType(remoteDraft.itemType || 'note');
               setPriority(remoteDraft.priority || 'none');
@@ -304,7 +323,11 @@ export const Composer: React.FC<ComposerProps> = ({
           } else if (event.action === 'delete') {
             const current = storage.getComposerDraft(activeFolder);
             if (!current) {
-              resetDraftState();
+              const isTextareaFocused = textareaRef.current && document.activeElement === textareaRef.current;
+              if (!isTextareaFocused) {
+                lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
+                resetDraftState();
+              }
             }
           }
         }
