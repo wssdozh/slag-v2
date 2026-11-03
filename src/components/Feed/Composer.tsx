@@ -164,6 +164,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const draftRef = useRef({ content, itemType, priority, dueDate, tags, attachments, replyTarget });
   const isApplyingRemoteDraftRef = useRef(false);
   const lastAdoptedRemoteDraftUpdatedAtRef = useRef<number>(initialDraft?.updatedAt ?? 0);
+  const lastLocalUserEditTimeRef = useRef<number>(0);
 
   useEffect(() => {
     draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget };
@@ -219,6 +220,51 @@ export const Composer: React.FC<ComposerProps> = ({
       setReplyTarget(initialDraft.replyTarget as any);
     }
   }, [initialDraft?.replyTarget, replyTarget, setReplyTarget]);
+
+  // Synchronize with stored draft when folder changes, on focus or when returning to tab
+  useEffect(() => {
+    const syncWithStorage = () => {
+      // If user is actively typing right now, don't overwrite
+      if (Date.now() - lastLocalUserEditTimeRef.current < 2000) return;
+      const currentStored = storage.getComposerDraft(activeFolder);
+      if (currentStored) {
+        if ((currentStored.updatedAt ?? 0) > lastAdoptedRemoteDraftUpdatedAtRef.current) {
+          isApplyingRemoteDraftRef.current = true;
+          lastAdoptedRemoteDraftUpdatedAtRef.current = currentStored.updatedAt ?? 0;
+          setContent(currentStored.content || '');
+          setItemType(currentStored.itemType || 'note');
+          setPriority(currentStored.priority || 'none');
+          setDueDate(currentStored.dueDate || '');
+          setTags(currentStored.tags || []);
+          setAttachments(currentStored.attachments || []);
+          if (currentStored.replyTarget) setReplyTarget(currentStored.replyTarget as any);
+        }
+      } else {
+        // Stored draft was cleared/deleted on remote device
+        if (lastAdoptedRemoteDraftUpdatedAtRef.current > 0) {
+          isApplyingRemoteDraftRef.current = true;
+          lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
+          resetDraftState();
+        }
+      }
+    };
+
+    // Check immediately on folder change
+    syncWithStorage();
+
+    // Check when window gains focus or becomes visible
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncWithStorage();
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', syncWithStorage);
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', syncWithStorage);
+    };
+  }, [activeFolder, resetDraftState, setReplyTarget]);
 
   // Autosave when unmounting (e.g. folder switch or page navigation)
   useEffect(() => {
@@ -306,14 +352,14 @@ export const Composer: React.FC<ComposerProps> = ({
           if (event.action === 'upsert' && event.payload) {
             const remoteDraft = event.payload as ComposerDraft;
             const remoteTs = remoteDraft.updatedAt ?? 0;
-            const isTextareaFocused = textareaRef.current && document.activeElement === textareaRef.current;
             const hasLocalUnsavedChanges = draftRef.current.content.trim().length > 0;
+            const isUserActivelyTyping = Date.now() - lastLocalUserEditTimeRef.current < 2000;
 
             // Adopt if:
             // 1. Local composer is completely empty, OR
-            // 2. Incoming draft is strictly newer than our last adopted remote draft AND the textarea is NOT currently focused by the user
+            // 2. Incoming draft is strictly newer than our last adopted remote draft AND the user is NOT actively typing right now
             const shouldAdopt = (!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
-              (!isTextareaFocused && remoteTs > lastAdoptedRemoteDraftUpdatedAtRef.current);
+              (!isUserActivelyTyping && remoteTs > lastAdoptedRemoteDraftUpdatedAtRef.current);
 
             if (shouldAdopt) {
               isApplyingRemoteDraftRef.current = true;
@@ -406,6 +452,7 @@ export const Composer: React.FC<ComposerProps> = ({
   }, [folderQuery, folders, currentFolder]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    lastLocalUserEditTimeRef.current = Date.now();
     const text = e.target.value;
     setContent(text);
 
