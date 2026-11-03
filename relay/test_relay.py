@@ -325,6 +325,72 @@ class TestAccountRelay(RelayTestCase):
         self.assertEqual(status, 403)
         self.assertEqual(revoked_login["error"], "device_revoked")
 
+    async def device_completion(self, identity, pending, device_id="device-2", **overrides):
+        _, challenge = await self.http("POST", "/api/auth/challenge", {"accountId": identity["accountId"]})
+        body = {"continuationSecret": pending["continuationSecret"], "challenge": challenge["challenge"],
+                "deviceSignature": self.signature({"private": self.device_keys[device_id]}, challenge["challenge"])}
+        body.update(overrides)
+        return await self.http("POST", f"/api/auth/device-requests/{pending['requestId']}/complete", body)
+
+    async def test_pending_device_automatic_login_and_single_use(self):
+        identity, owner, _ = await self.register()
+        _, pending = await self.auth_call("/api/auth/login", identity, self.device("device-2"))
+        self.assertEqual(pending["expiresIn"], 600)
+        stored = self.server.db.conn.execute("SELECT * FROM pending_auth_requests WHERE id = ?", (pending["requestId"],)).fetchone()
+        self.assertEqual(stored["secret_hash"], hashlib.sha256(pending["continuationSecret"].encode()).hexdigest())
+        self.assertNotIn(pending["continuationSecret"], tuple(stored))
+        self.assertEqual(await self.device_completion(identity, pending), (200, {"status": "pending"}))
+        await self.http("POST", "/api/devices/device-2/approve", {}, owner)
+        results = await asyncio.gather(self.device_completion(identity, pending), self.device_completion(identity, pending))
+        # Challenges are account-wide; one may supersede the other, but only one session is minted.
+        successful = [result for status, result in results if status == 200]
+        self.assertEqual(len(successful), 1, results)
+        logged_in = successful[0]
+        self.assertEqual(logged_in["account"]["id"], identity["accountId"])
+        self.assertEqual(logged_in["device"]["id"], "device-2")
+        self.assertEqual((await self.http("GET", "/api/account", token=logged_in["token"]))[0], 200)
+        self.assertEqual((await self.device_completion(identity, pending))[0], 409)
+        self.assertEqual(self.server.db.conn.execute("SELECT COUNT(*) FROM auth_sessions WHERE device_id = 'device-2'").fetchone()[0], 1)
+
+    async def test_pending_device_wrong_secret_key_account_and_challenge_replay(self):
+        identity, owner, _ = await self.register()
+        _, pending = await self.auth_call("/api/auth/login", identity, self.device("device-2"))
+        path = f"/api/auth/device-requests/{pending['requestId']}/complete"
+        self.assertEqual((await self.http("POST", path, {}, owner))[0], 401)
+        self.assertEqual((await self.device_completion(identity, pending, continuationSecret="wrong"))[0], 401)
+        self.device("attacker")
+        self.assertEqual((await self.device_completion(identity, pending, "attacker"))[0], 401)
+        other = self.identity()
+        self.assertEqual((await self.device_completion(other, pending))[0], 401)
+        _, challenge = await self.http("POST", "/api/auth/challenge", {"accountId": identity["accountId"]})
+        body = {"continuationSecret": pending["continuationSecret"], "challenge": challenge["challenge"],
+                "deviceSignature": self.signature({"private": self.device_keys["device-2"]}, challenge["challenge"])}
+        self.assertEqual(await self.http("POST", path, body), (200, {"status": "pending"}))
+        await self.http("POST", "/api/devices/device-2/approve", {}, owner)
+        self.assertEqual((await self.http("POST", path, body))[0], 401)
+        self.assertEqual((await self.device_completion(identity, pending))[0], 200)
+
+    async def test_pending_device_expiry_revocation_binding_and_quota(self):
+        identity, owner, _ = await self.register()
+        _, pending = await self.auth_call("/api/auth/login", identity, self.device("device-2"))
+        with self.server.db.conn:
+            self.server.db.conn.execute("UPDATE pending_auth_requests SET expires_at = 0")
+        self.assertEqual(await self.device_completion(identity, pending), (200, {"status": "expired"}))
+        _, pending = await self.auth_call("/api/auth/login", identity, self.device("device-2"))
+        replacement = self.device("replacement")["publicKey"]
+        with self.server.db.conn:
+            self.server.db.conn.execute("UPDATE devices SET public_key = ? WHERE id = 'device-2'", (replacement,))
+        self.assertEqual(await self.device_completion(identity, pending), (200, {"status": "rejected"}))
+        with self.server.db.conn:
+            self.server.db.conn.execute("UPDATE devices SET public_key = ? WHERE id = 'device-2'", (self.device("device-2")["publicKey"],))
+        await self.http("DELETE", "/api/devices/device-2", {}, owner)
+        self.assertEqual(await self.device_completion(identity, pending), (200, {"status": "rejected"}))
+        await self.add_active_device(identity, owner, "device-3")
+        _, limited = await self.auth_call("/api/auth/login", identity, self.device("device-4"))
+        self.assertEqual((await self.http("POST", "/api/devices/device-4/approve", {}, owner))[0], 403)
+        self.assertEqual(await self.device_completion(identity, limited, "device-4"), (200, {"status": "pending"}))
+        self.assertEqual((await self.http("PATCH", "/api/devices/device-1", {"name": "x" * 65}, owner))[0], 400)
+
     async def test_vault_invitations_accept_decline_and_revoke(self):
         _, owner_token, guest_device, guest_token = await self.two_devices()
         await self.accepted_vault(owner_token, guest_token)
@@ -332,6 +398,22 @@ class TestAccountRelay(RelayTestCase):
         self.assertEqual(guest_data["vaults"][0]["id"], "vault-1")
         self.assertEqual(guest_data["vaults"][0]["grants"][1]["status"], "accepted")
         self.assertEqual(guest_data["invitations"], [])
+
+        # Repeating an accepted invitation must not disconnect the guest.
+        repeated = {"mode": "read-write", "encryptedKey": "encrypted-vault-key"}
+        self.assertEqual((await self.http("PUT", "/api/vaults/vault-1/grants/device-2", repeated, owner_token))[0], 200)
+        _, repeated_state = await self.http("GET", "/api/vaults", token=guest_token)
+        self.assertEqual(len(repeated_state["vaults"]), 1)
+        self.assertEqual(repeated_state["invitations"], [])
+        self.assertEqual((await self.http("PUT", "/api/vaults/vault-1/grants/device-1", repeated, owner_token))[0], 409)
+        self.assertEqual((await self.http("PUT", "/api/vaults/vault-1", {"name": "still writable"}, owner_token))[0], 200)
+        # A changed key, even with identical permissions, requires explicit acceptance.
+        self.assertEqual((await self.http("PUT", "/api/vaults/vault-1/grants/device-2",
+                                         {**repeated, "encryptedKey": "rotated-key"}, owner_token))[0], 200)
+        _, changed_state = await self.http("GET", "/api/vaults", token=guest_token)
+        self.assertEqual(changed_state["vaults"], [])
+        self.assertEqual(changed_state["invitations"][0]["encryptedKey"], "rotated-key")
+        await self.http("POST", "/api/vaults/vault-1/accept", {}, guest_token)
 
         grant = {"mode": "receive-only", "encryptedKey": "second-key"}
         await self.http("PUT", "/api/vaults/vault-1/grants/device-2", grant, owner_token)

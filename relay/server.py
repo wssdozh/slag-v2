@@ -30,6 +30,7 @@ DEFAULT_PORT = 8320
 DEFAULT_TTL_SECONDS = 7 * 24 * 3600
 PAIRING_TTL_SECONDS = 300
 CHALLENGE_TTL_SECONDS = 300
+DEVICE_REQUEST_TTL_SECONDS = 600
 SESSION_TTL_SECONDS = 12 * 3600
 PLANS = {
     "free": {"label": "Free", "devices": 2, "cache_mb": 1024},
@@ -210,6 +211,17 @@ class RelayDatabase:
                     expires_at REAL NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_challenges_account ON auth_challenges(account_id);
+                CREATE TABLE IF NOT EXISTS pending_auth_requests (
+                    id TEXT PRIMARY KEY,
+                    secret_hash TEXT NOT NULL,
+                    account_id TEXT NOT NULL,
+                    device_id TEXT NOT NULL,
+                    public_key TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    expires_at REAL NOT NULL,
+                    completed_at REAL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pending_auth_expiry ON pending_auth_requests(expires_at);
                 CREATE TABLE IF NOT EXISTS auth_sessions (
                     token_hash TEXT PRIMARY KEY,
                     account_id TEXT NOT NULL,
@@ -485,6 +497,17 @@ class RelayDatabase:
             self.conn.execute("UPDATE devices SET last_seen_at = ? WHERE id = ?", (now, device["id"]))
             return self._insert_session(account_id, device["id"])
 
+    def create_device_request(self, account_id: str, device: dict) -> dict:
+        request_id = secrets.token_urlsafe(24)
+        secret = secrets.token_urlsafe(32)
+        now = time.time()
+        with self.conn:
+            self.conn.execute("INSERT INTO pending_auth_requests VALUES (?, ?, ?, ?, ?, ?, ?, NULL)",
+                              (request_id, hash_token(secret), account_id, device["id"], device["publicKey"],
+                               now, now + DEVICE_REQUEST_TTL_SECONDS))
+        return {"requestId": request_id, "continuationSecret": secret,
+                "expiresAt": iso_time(now + DEVICE_REQUEST_TTL_SECONDS), "expiresIn": DEVICE_REQUEST_TTL_SECONDS}
+
     def authenticate(self, token: str) -> Optional[dict]:
         return self.authenticate_hash(hash_token(token)) if token else None
 
@@ -607,7 +630,10 @@ class RelayDatabase:
             self.conn.execute("""
                 INSERT INTO vault_grants (vault_id, device_id, mode, status, encrypted_key, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(vault_id, device_id) DO UPDATE SET mode = excluded.mode, status = excluded.status,
+                ON CONFLICT(vault_id, device_id) DO UPDATE SET mode = excluded.mode,
+                    status = CASE WHEN vault_grants.status = 'accepted' AND excluded.status = 'pending'
+                        AND vault_grants.mode = excluded.mode AND vault_grants.encrypted_key IS excluded.encrypted_key
+                        THEN 'accepted' ELSE excluded.status END,
                     encrypted_key = excluded.encrypted_key, updated_at = excluded.updated_at
             """, (vault_id, device_id, mode, status, encrypted_key, time.time()))
 
@@ -645,6 +671,8 @@ class RelayDatabase:
             self.conn.execute("DELETE FROM pairing_sessions WHERE expires_at <= ?", (now,))
             self.conn.execute("DELETE FROM auth_challenges WHERE expires_at <= ?", (now,))
             self.conn.execute("DELETE FROM auth_sessions WHERE expires_at <= ?", (now,))
+            # Keep expired requests briefly so clients can distinguish expiry from bad credentials.
+            self.conn.execute("DELETE FROM pending_auth_requests WHERE expires_at <= ?", (now - 24 * 3600,))
 
 
 class SlagRelayServer:
@@ -885,11 +913,53 @@ class SlagRelayServer:
                 self._verify_device_signature(existing["public_key"], challenge, body.get("deviceSignature", ""))
             result = self.db.login_account(account_id, device)
             if isinstance(result, dict):
-                return result, 202
+                return {**result, **self.db.create_device_request(account_id, device)}, 202
             token, expires_at = result
             saved_device = self.db.conn.execute("SELECT * FROM devices WHERE id = ?", (device["id"],)).fetchone()
             return {"token": token, "expiresAt": iso_time(expires_at), "account": self.db.account_payload(account_id),
                     "device": self.db.device_payload(saved_device)}, 200
+
+        if method == "POST" and path.startswith("/api/auth/device-requests/"):
+            parts = path.strip("/").split("/")
+            if len(parts) != 5 or parts[4] != "complete":
+                raise ApiError(404, "not_found")
+            request_id = urllib.parse.unquote(parts[3])
+            secret = body.get("continuationSecret", "")
+            challenge = body.get("challenge", "")
+            signature = body.get("deviceSignature", "")
+            if not all(isinstance(value, str) and value for value in (secret, challenge, signature)):
+                raise ApiError(401, "invalid_device_request_credentials")
+            # Consume the challenge and request and mint the session in one transaction.
+            with self.db.conn:
+                request = self.db.conn.execute("SELECT * FROM pending_auth_requests WHERE id = ?", (request_id,)).fetchone()
+                if not request or not secrets.compare_digest(request["secret_hash"], hash_token(secret)):
+                    raise ApiError(401, "invalid_device_request_credentials")
+                if request["completed_at"] is not None:
+                    raise ApiError(409, "device_request_completed")
+                consumed = self.db.conn.execute(
+                    "DELETE FROM auth_challenges WHERE account_id = ? AND challenge = ? AND expires_at > ?",
+                    (request["account_id"], challenge, time.time()))
+                if consumed.rowcount != 1:
+                    raise ApiError(401, "invalid_or_expired_challenge")
+                self._verify_device_signature(request["public_key"], challenge, signature)
+                if request["expires_at"] <= time.time():
+                    return {"status": "expired"}, 200
+                device = self.db.conn.execute("SELECT * FROM devices WHERE id = ?", (request["device_id"],)).fetchone()
+                if (not device or device["account_id"] != request["account_id"]
+                        or device["public_key"] != request["public_key"] or device["status"] == "revoked"):
+                    return {"status": "rejected"}, 200
+                if device["status"] != "active":
+                    return {"status": "pending"}, 200
+                completed = self.db.conn.execute(
+                    "UPDATE pending_auth_requests SET completed_at = ? WHERE id = ? AND completed_at IS NULL AND expires_at > ?",
+                    (time.time(), request_id, time.time()))
+                if completed.rowcount != 1:
+                    raise ApiError(409, "device_request_completed")
+                token, expires_at = self.db._insert_session(request["account_id"], request["device_id"])
+                self.db.conn.execute("UPDATE devices SET last_seen_at = ? WHERE id = ?", (time.time(), request["device_id"]))
+                return {"token": token, "expiresAt": iso_time(expires_at),
+                        "account": self.db.account_payload(request["account_id"]),
+                        "device": self.db.device_payload(device)}, 200
 
         if method == "POST" and path == "/api/auth/logout":
             auth = self._auth(headers)
@@ -911,7 +981,7 @@ class SlagRelayServer:
                 return {"status": "ok"}, 200
             if method == "PATCH" and len(parts) == 3:
                 name = body.get("name", "")
-                if not isinstance(name, str) or not name.strip():
+                if not isinstance(name, str) or not name.strip() or len(name.strip()) > 64:
                     raise ApiError(400, "invalid_device_name")
                 self.db.rename_device(auth["account_id"], device_id, name.strip())
                 return {"status": "ok"}, 200
@@ -945,7 +1015,10 @@ class SlagRelayServer:
                 encrypted_key = body.get("encryptedKey")
                 if mode not in ("read-write", "receive-only") or not isinstance(encrypted_key, str):
                     raise ApiError(400, "invalid_grant")
-                self.db.set_vault_grant(vault_id, auth["account_id"], urllib.parse.unquote(parts[4]), mode, encrypted_key)
+                target_device = urllib.parse.unquote(parts[4])
+                if target_device == auth["device_id"]:
+                    raise ApiError(409, "self_grant_not_allowed")
+                self.db.set_vault_grant(vault_id, auth["account_id"], target_device, mode, encrypted_key)
                 return {"status": "ok"}, 200
             if method == "POST" and len(parts) == 4 and parts[3] in ("accept", "decline"):
                 return self.db.respond_to_grant(vault_id, auth["device_id"], parts[3] == "accept"), 200
