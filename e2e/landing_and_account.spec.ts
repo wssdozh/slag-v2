@@ -80,9 +80,8 @@ test.describe('Landing Showcase & Minimal Account Cabinet Flow', () => {
       fullPage: false,
     });
 
-    // 3. Return to Landing
-    const backBtn = page.locator('button', { hasText: 'На главную' });
-    await backBtn.click();
+    // 3. Landing stays reachable by direct URL (no in-app back-to-landing button)
+    await page.goto('/?page=landing');
     await expect(page.locator('h1')).toContainText('Заметки со скоростью чата');
   });
 });

@@ -130,7 +130,7 @@ const AppContent: React.FC = () => {
     return (
       <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
         <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
-          <AccountCabinet onBackToLanding={() => navigatePage('landing')} />
+          <AccountCabinet />
         </Suspense>
       </div>
     );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Check, Copy, Database, KeyRound, Laptop, Loader2, LogOut, Shield, Smartphone } from 'lucide-react';
+import { Check, Copy, Database, KeyRound, Laptop, Loader2, LogOut, Shield, Smartphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { accountClient, generateMnemonic } from '../../lib/sync/account';
 import { getOrCreateDeviceIdentity } from '../../lib/sync/accountCrypto';
@@ -7,9 +7,7 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import { getLocalVaultId, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
 
-interface AccountCabinetProps { onBackToLanding?: () => void }
-
-export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding }) => {
+export const AccountCabinet: React.FC = () => {
   const { vaults, createVault, switchVault } = useApp();
   const [state, setState] = useState(accountClient.getState());
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -71,7 +69,6 @@ export const AccountCabinet: React.FC<AccountCabinetProps> = ({ onBackToLanding 
   return (
     <div className="min-h-screen bg-[#08090a] text-zinc-100">
       <header className="border-b border-white/[0.06] px-5 py-4 flex items-center justify-between gap-4">
-        <button type="button" onClick={onBackToLanding} className="flex items-center gap-2 text-xs text-zinc-400 hover:text-white"><ArrowLeft className="w-4 h-4" />На главную</button>
         <span className="text-sm font-semibold">Личный кабинет</span>
         <button type="button" onClick={openApp} className="text-xs text-zinc-300 hover:text-white">Открыть приложение</button>
       </header>

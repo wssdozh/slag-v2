@@ -457,13 +457,15 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               <RefreshCw className={`w-3 h-3 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
               Синхронизировать
             </button>
-            <button
-              type="button"
-              onClick={() => { window.location.search = '?page=account'; }}
-              className="px-2 py-1 text-2xs text-zinc-400 bg-white/[0.03] border border-white/[0.06] rounded-md"
-            >
-              {hosted ? 'Личный кабинет' : 'Управление'}
-            </button>
+            {hosted && (
+              <button
+                type="button"
+                onClick={() => { window.location.search = '?page=account'; }}
+                className="px-2 py-1 text-2xs text-zinc-400 bg-white/[0.03] border border-white/[0.06] rounded-md"
+              >
+                Личный кабинет
+              </button>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-x-2.5 text-2xs text-zinc-500 border-t border-white/[0.04] pt-2">
