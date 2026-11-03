@@ -42,6 +42,7 @@ export class SyncEngine {
   private activeRoomId: string | null = null;
   private isProcessingSync = false;
   private sequence = 1;
+  private lastAppliedBundleId: string | null = null;
   private initGeneration = 0;
   private currentVaultId: string = 'default_vault';
 
@@ -520,8 +521,6 @@ export class SyncEngine {
     if (!this.activeVaultKey) return;
     const generation = this.initGeneration;
     const roomId = this.activeRoomId;
-    const deviceId = this.config.deviceId;
-    const serverUrl = this.config.serverUrl.replace(/\/+$/, '');
 
     try {
       this.status.state = 'syncing';
@@ -545,6 +544,11 @@ export class SyncEngine {
           bundlePayload.fromDeviceId !== bundle.fromDeviceId) throw new Error('Bundle sender does not match authenticated envelope');
       if (bundle.fromDeviceId === this.config.deviceId) {
         return; // ignore self echo
+      }
+      if (bundle.bundleId === this.lastAppliedBundleId) {
+        // ponytail: relay re-delivers pending bundles until ACK; skip a re-apply we already did.
+        await this.sendAck(bundle.bundleId);
+        return;
       }
 
       let sender = this.config.trustedDevices.find((d) => d.id === bundle.fromDeviceId);
@@ -636,18 +640,8 @@ export class SyncEngine {
       }
       if (generation !== this.initGeneration) return;
 
-      // Send ACK only after persistence succeeds.
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'ack', bundleId: bundle.bundleId }));
-        syncLog.info(`ACK sent for bundle ${bundle.bundleId}`);
-      } else {
-        const response = await fetch(`${serverUrl}/api/rooms/${roomId}/ack?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
-          method: 'POST',
-          headers: this.authHeaders(true),
-          body: JSON.stringify({ deviceId, bundleIds: [bundle.bundleId] }),
-        });
-        if (!response.ok) throw new Error(`Sync ACK failed: HTTP ${response.status}`);
-      }
+      this.lastAppliedBundleId = bundle.bundleId;
+      await this.sendAck(bundle.bundleId);
       if (generation !== this.initGeneration) return;
 
       this.status.lastSyncTime = new Date().toLocaleTimeString();
@@ -661,12 +655,36 @@ export class SyncEngine {
         })
       );
     } catch (err) {
+      if (err instanceof Error && err.message.includes('Local state changed')) {
+        // ponytail: a local edit raced the incoming persist; re-fetch pending now instead of
+        // waiting for the next WS reconnect to re-deliver the un-acked bundle.
+        syncLog.warn('Local changed during sync persist; refetching pending bundles');
+        if (generation === this.initGeneration) void this.fetchPendingBundlesHttp();
+        return;
+      }
       syncLog.error('Error applying incoming bundle:', err);
       if (generation !== this.initGeneration) return;
       this.status.state = 'error';
       this.status.error = 'Не удалось расшифровать или сохранить изменения';
       this.notify();
     }
+  }
+
+  private async sendAck(bundleId: string): Promise<void> {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'ack', bundleId }));
+      syncLog.info(`ACK sent for bundle ${bundleId}`);
+      return;
+    }
+    const roomId = this.activeRoomId;
+    if (!roomId) return;
+    const serverUrl = this.config.serverUrl.replace(/\/+$/, '');
+    const response = await fetch(`${serverUrl}/api/rooms/${roomId}/ack?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
+      method: 'POST',
+      headers: this.authHeaders(true),
+      body: JSON.stringify({ deviceId: this.config.deviceId, bundleIds: [bundleId] }),
+    });
+    if (!response.ok) throw new Error(`Sync ACK failed: HTTP ${response.status}`);
   }
 
   public async pushLocalChanges(): Promise<void> {
@@ -755,21 +773,21 @@ export class SyncEngine {
       const encrypted = await encryptBundle(bundle, vaultKey);
       if (generation !== this.initGeneration) return;
 
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'bundle', bundle: encrypted }));
-      } else {
-        // Fallback HTTP push
-        const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
-        const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
-          method: 'POST',
-          headers: this.authHeaders(true),
-          body: JSON.stringify(encrypted),
-        });
-        if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
-            this.disconnect();
-            throw new Error(response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете');
-          }
+      // Always push over HTTP POST: a synchronous 200/409 ack means a lost WebSocket
+      // cannot drop a bundle (at-least-once). WS stays receive-only.
+      const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
+      const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
+        method: 'POST',
+        headers: this.authHeaders(true),
+        body: JSON.stringify(encrypted),
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          // ponytail: relay dedups by bundle_id; replay means it is already delivered.
+        } else if (response.status === 401 || response.status === 403) {
+          this.disconnect();
+          throw new Error(response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете');
+        } else {
           throw new Error(`Sync push failed: HTTP ${response.status}`);
         }
       }
