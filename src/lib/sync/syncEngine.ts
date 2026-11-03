@@ -3,6 +3,8 @@ export { storage };
 import { logger } from '../logger';
 import { accountClient } from './account';
 export { accountClient };
+import { Outbox } from './outbox/outbox';
+import { createSyncOpFromStorageEvent } from './entities/registry';
 import {
   deriveVaultKey,
   deriveRoomId,
@@ -45,6 +47,7 @@ export class SyncEngine {
   private lastAppliedBundleId: string | null = null;
   private initGeneration = 0;
   private currentVaultId: string = 'default_vault';
+  private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.currentVaultId =
@@ -98,6 +101,16 @@ export class SyncEngine {
       }
       this.notify();
     });
+
+    if (typeof storage !== 'undefined' && typeof storage.subscribeChanges === 'function') {
+      storage.subscribeChanges((event) => {
+        const op = createSyncOpFromStorageEvent(event);
+        if (op) {
+          this.getOutbox().enqueue(op);
+          this.scheduleDebouncedPush();
+        }
+      });
+    }
   }
 
   private computeSubscription(cfg: SyncConfig): SyncStatus['subscription'] {
@@ -154,6 +167,18 @@ export class SyncEngine {
   private notify(): void {
     const current = this.getStatus();
     this.listeners.forEach((fn) => fn(current));
+  }
+
+  public scheduleDebouncedPush(delayMs: number = 300): void {
+    if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
+    this.pushDebounceTimer = setTimeout(() => {
+      this.pushDebounceTimer = null;
+      void this.pushLocalChanges();
+    }, delayMs);
+  }
+
+  public getOutbox(): Outbox {
+    return new Outbox(this.currentVaultId);
   }
 
   private getStateHashKey(vaultId?: string): string {
@@ -433,6 +458,7 @@ export class SyncEngine {
       localStorage.removeItem(this.getStateHashKey());
       localStorage.removeItem(this.getSyncedIdsKey());
       localStorage.removeItem(this.getTombstonesKey());
+      this.getOutbox().clear();
       if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
     }
     this.saveConfig({ seedPhrase: newPhrase });
@@ -444,6 +470,7 @@ export class SyncEngine {
     this.saveConfig({ serverUrl: url });
     localStorage.removeItem(this.getSyncedIdsKey());
     localStorage.removeItem(this.getTombstonesKey());
+    this.getOutbox().clear();
     this.disconnect();
     await this.init();
   }
@@ -675,6 +702,63 @@ export class SyncEngine {
               currentFolders.push(incoming);
             }
             hasFoldersChanged = true;
+          } else if (ch.action === 'delete') {
+            const folderPath = ch.id;
+            const remaining = currentFolders.filter((f) => f.path !== folderPath && !f.path.startsWith(folderPath + '/'));
+            if (remaining.length !== currentFolders.length) {
+              currentFolders.length = 0;
+              currentFolders.push(...remaining);
+              hasFoldersChanged = true;
+              // Reroute child items to "Входящие"
+              for (let i = 0; i < currentItems.length; i++) {
+                if (currentItems[i].folder === folderPath || currentItems[i].folder.startsWith(folderPath + '/')) {
+                  currentItems[i] = { ...currentItems[i], folder: 'Входящие', updatedAt: Date.now() };
+                  hasItemsChanged = true;
+                }
+              }
+            }
+          } else if (ch.action === 'rename') {
+            const payload = ch.payload as { oldPath?: string; folder?: FolderMeta } | undefined;
+            const oldPath = payload?.oldPath;
+            const updatedFolder = payload?.folder || (ch.payload as FolderMeta);
+            if (oldPath && updatedFolder && updatedFolder.path) {
+              for (let i = 0; i < currentFolders.length; i++) {
+                if (currentFolders[i].path === oldPath) {
+                  currentFolders[i] = updatedFolder;
+                  hasFoldersChanged = true;
+                } else if (currentFolders[i].path.startsWith(oldPath + '/')) {
+                  const subPath = updatedFolder.path + currentFolders[i].path.slice(oldPath.length);
+                  const subName = subPath.split('/').pop() || currentFolders[i].name;
+                  currentFolders[i] = { ...currentFolders[i], path: subPath, name: subName };
+                  hasFoldersChanged = true;
+                }
+              }
+              for (let i = 0; i < currentItems.length; i++) {
+                if (currentItems[i].folder === oldPath) {
+                  currentItems[i] = { ...currentItems[i], folder: updatedFolder.path, updatedAt: Date.now() };
+                  hasItemsChanged = true;
+                } else if (currentItems[i].folder.startsWith(oldPath + '/')) {
+                  const subFolder = updatedFolder.path + currentItems[i].folder.slice(oldPath.length);
+                  currentItems[i] = { ...currentItems[i], folder: subFolder, updatedAt: Date.now() };
+                  hasItemsChanged = true;
+                }
+              }
+            }
+          }
+        } else if (ch.type === 'trash') {
+          if (ch.action === 'restore' && ch.payload) {
+            const restored = ch.payload as SlagItem;
+            const idx = currentItems.findIndex((it) => it.id === restored.id);
+            if (idx >= 0) {
+              currentItems[idx] = restored;
+            } else {
+              currentItems.unshift(restored);
+            }
+            if (tombstones[restored.id] !== undefined) {
+              delete tombstones[restored.id];
+              tombstonesDirty = true;
+            }
+            hasItemsChanged = true;
           }
         } else if (ch.type === 'workspace' && ch.payload) {
           workspaceState = ch.payload as WorkspaceState;
@@ -816,6 +900,7 @@ export class SyncEngine {
       });
 
       // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
+      const pendingOps = this.getOutbox().pending();
       const syncedIds = this.loadSyncedIds();
       const currentIds = new Set(items.map((it) => it.id));
       const tombstones = this.loadTombstones();
@@ -834,6 +919,40 @@ export class SyncEngine {
       }
       for (const id of currentIds) {
         delete tombstones[id];
+      }
+
+      // Pack folder mutations and trash operations from Outbox
+      for (const op of pendingOps) {
+        if (op.kind === 'folder') {
+          if (op.action === 'delete') {
+            changes.push({
+              id: op.id,
+              type: 'folder',
+              action: 'delete',
+              version: 1,
+              hash: String(op.timestamp),
+              payload: { path: op.id },
+            });
+          } else if (op.action === 'rename') {
+            changes.push({
+              id: op.id,
+              type: 'folder',
+              action: 'rename',
+              version: 1,
+              hash: String(op.timestamp),
+              payload: { oldPath: op.oldPath, folder: op.payload },
+            });
+          }
+        } else if (op.kind === 'trash' && op.action === 'restore') {
+          changes.push({
+            id: op.id,
+            type: 'trash',
+            action: 'restore',
+            version: 1,
+            hash: String(op.timestamp),
+            payload: op.payload,
+          });
+        }
       }
 
       const bundle: SyncBundle = {
@@ -878,6 +997,7 @@ export class SyncEngine {
       }
       localStorage.setItem(this.getSyncedIdsKey(), JSON.stringify([...currentIds]));
       localStorage.setItem(this.getTombstonesKey(), JSON.stringify(tombstones));
+      this.getOutbox().markSynced(pendingOps.map((o) => o.opId));
       this.status.lastSyncTime = new Date().toLocaleTimeString();
       this.status.state = 'connected';
       this.status.error = null;

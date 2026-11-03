@@ -101,3 +101,90 @@ test('delete wins over stale upsert and restore wins over delete', async ({ page
   });
   expect(result).toEqual({ deleted: true, staleNotResurrected: true, restored: true });
 });
+
+test('folder rename and deletion propagate to folders, nested items, and outbox', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  const result = await page.evaluate(async () => {
+    const { SyncEngine, storage, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+    const originals = {
+      getToken: accountClient.getToken, getSession: accountClient.getSession,
+      refresh: accountClient.refresh, getState: accountClient.getState, subscribe: accountClient.subscribe,
+    };
+    accountClient.getToken = () => null;
+    accountClient.getSession = () => ({ deviceId: 'synthetic-device' });
+    accountClient.refresh = async () => {};
+    accountClient.getState = () => ({ devices: [], vaults: [] });
+    accountClient.subscribe = () => () => {};
+    const engine = new SyncEngine();
+    engine.refreshServerAuth = async () => true;
+    engine.connectWebSocket = () => {};
+    engine.startIntervals = () => {};
+    engine.pushLocalChanges = async () => {};
+    const realFetch = window.fetch;
+    window.fetch = async () => new Response('{}', { status: 200 });
+    try {
+      engine.saveConfig({ enabled: true, seedPhrase: 'synthetic folder seed', deviceId: 'synthetic-device' });
+      await engine.init();
+      const roomId = engine.activeRoomId;
+
+      // 1. Initial seed: folder "Тест" and item in "Тест"
+      const folderInitial = { path: 'Тест', name: 'Тест', icon: 'Folder' };
+      const noteInFolder = { id: 'note-folder-1', type: 'note' as const, title: 'In folder', content: 'test', folder: 'Тест', tags: [], attachments: [], createdAt: 1, updatedAt: 100 };
+      await storage.importSyncedVaultData({ folders: [...storage.getFolders(), folderInitial], items: [noteInFolder] });
+
+      const makeBundle = (bundleId: string, changes: unknown[]) => ({
+        bundleId, roomId, fromDeviceId: 'other-device', sequence: 1,
+        stateRootHash: 'x', timestamp: new Date().toISOString(), changes,
+      });
+
+      // 2. Incoming folder rename: "Тест" -> "НовыйТест"
+      await engine.applyIncomingBundle(makeBundle('b-rename', [
+        {
+          id: 'НовыйТест',
+          type: 'folder',
+          action: 'rename',
+          version: 1,
+          hash: '1',
+          payload: { oldPath: 'Тест', folder: { path: 'НовыйТест', name: 'НовыйТест', icon: 'Folder' } },
+        },
+      ]));
+
+      const renamedFolderExists = storage.getFolders().some((f) => f.path === 'НовыйТест');
+      const itemFolderRenamed = storage.getItemById('note-folder-1')?.folder === 'НовыйТест';
+
+      // 3. Incoming folder delete: "НовыйТест"
+      await engine.applyIncomingBundle(makeBundle('b-del', [
+        { id: 'НовыйТест', type: 'folder', action: 'delete', version: 1, hash: '2', payload: { path: 'НовыйТест' } },
+      ]));
+
+      const deletedFolderGone = !storage.getFolders().some((f) => f.path === 'НовыйТест');
+      const itemReroutedToInbox = storage.getItemById('note-folder-1')?.folder === 'Входящие';
+
+      // 4. Test Outbox integration via storage.deleteFolder (automatic EventBus -> Outbox)
+      storage.saveFolder({ path: 'Локальная', name: 'Локальная', icon: 'Folder' });
+      storage.deleteFolder('Локальная');
+      const pendingFolderDeletes = engine.getOutbox().pending().filter((op) => op.kind === 'folder' && op.action === 'delete');
+      const outboxCapturedDelete = pendingFolderDeletes.some((op) => op.id === 'Локальная');
+
+      return {
+        renamedFolderExists,
+        itemFolderRenamed,
+        deletedFolderGone,
+        itemReroutedToInbox,
+        outboxCapturedDelete,
+      };
+    } finally {
+      window.fetch = realFetch;
+      engine.disconnect();
+      Object.assign(accountClient, originals);
+    }
+  });
+  expect(result).toEqual({
+    renamedFolderExists: true,
+    itemFolderRenamed: true,
+    deletedFolderGone: true,
+    itemReroutedToInbox: true,
+    outboxCapturedDelete: true,
+  });
+});

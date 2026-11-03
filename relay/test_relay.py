@@ -621,6 +621,34 @@ class TestAccountRelay(RelayTestCase):
         self.assertTrue(account["account"]["hasAiLease"])
         self.assertEqual(account["account"]["maxCacheMb"], 10240)
 
+    async def test_monotonic_sync_id_and_since_filtering(self):
+        identity, owner, _, guest = await self.two_devices()
+        await self.accepted_vault(owner, guest)
+        status1, res1 = await self.http("POST", "/api/rooms/sync-test/bundle?vault=vault-1",
+                                        {"bundleId": "bnd-1", "fromDeviceId": "device-1", "sequence": 1, "changes": []}, owner)
+        self.assertEqual(status1, 200)
+        self.assertEqual(res1["syncId"], 1)
+
+        status2, res2 = await self.http("POST", "/api/rooms/sync-test/bundle?vault=vault-1",
+                                        {"bundleId": "bnd-2", "fromDeviceId": "device-1", "sequence": 2, "changes": []}, owner)
+        self.assertEqual(status2, 200)
+        self.assertEqual(res2["syncId"], 2)
+
+        status3, res3 = await self.http("POST", "/api/rooms/sync-test/bundle?vault=vault-1",
+                                        {"bundleId": "bnd-3", "fromDeviceId": "device-1", "sequence": 3, "changes": []}, owner)
+        self.assertEqual(status3, 200)
+        self.assertEqual(res3["syncId"], 3)
+
+        g_status, g_all = await self.http("GET", "/api/rooms/sync-test/bundles?vault=vault-1", token=guest)
+        self.assertEqual(g_status, 200)
+        self.assertEqual(len(g_all["bundles"]), 3)
+
+        s_status, s_res = await self.http("GET", "/api/rooms/sync-test/bundles?vault=vault-1&since=2", token=guest)
+        self.assertEqual(s_status, 200)
+        self.assertEqual(len(s_res["bundles"]), 1)
+        self.assertEqual(s_res["bundles"][0]["bundleId"], "bnd-3")
+        self.assertEqual(s_res["bundles"][0]["syncId"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()

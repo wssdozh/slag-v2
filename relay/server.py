@@ -251,6 +251,15 @@ class RelayDatabase:
             """)
             self._ensure_column("rooms", "vault_id", "TEXT")
             self._ensure_column("rooms", "retired", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column("bundles", "sync_id", "INTEGER")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_bundles_room_sync ON bundles(room_id, sync_id)")
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS device_cursors (
+                device_id TEXT NOT NULL,
+                room_id TEXT NOT NULL,
+                last_sync_id INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(device_id, room_id)
+            )""")
             # ponytail: durable ID tombstones prevent post-expiry replay; compact only with a protocol replay horizon.
             self.conn.execute("""CREATE TABLE IF NOT EXISTS bundle_receipts (
                 bundle_id TEXT PRIMARY KEY, room_id TEXT NOT NULL, created_at REAL NOT NULL)""")
@@ -305,27 +314,40 @@ class RelayDatabase:
         now = time.time()
         self.touch_room(room_id, vault_id)
         with self.conn:
+            max_row = self.conn.execute("SELECT COALESCE(MAX(sync_id), 0) AS max_id FROM bundles WHERE room_id = ?", (room_id,)).fetchone()
+            sync_id = int(max_row["max_id"]) + 1
             self.conn.execute("""
                 INSERT INTO bundles
-                (bundle_id, room_id, from_device_id, sequence, timestamp, payload, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (bundle_id, room_id, from_device, seq, ts, payload_json, now, now + ttl))
+                (bundle_id, room_id, from_device_id, sequence, timestamp, payload, created_at, expires_at, sync_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (bundle_id, room_id, from_device, seq, ts, payload_json, now, now + ttl, sync_id))
             self.conn.execute("INSERT INTO bundle_receipts VALUES (?, ?, ?)", (bundle_id, room_id, now))
-        return True
+        return sync_id
 
-    def get_pending_bundles(self, room_id: str, device_id: str, limit: int = 100) -> list[dict]:
-        rows = self.conn.execute("""
-            SELECT b.bundle_id, b.room_id, b.from_device_id, b.sequence, b.timestamp, b.payload
-            FROM bundles b
-            WHERE b.room_id = ? AND b.from_device_id != ?
-              AND b.bundle_id NOT IN (SELECT bundle_id FROM bundle_acks WHERE device_id = ?)
-              AND b.expires_at > ?
-            ORDER BY b.created_at ASC LIMIT ?
-        """, (room_id, device_id, device_id, time.time(), limit)).fetchall()
+    def get_pending_bundles(self, room_id: str, device_id: str, limit: int = 100, since_sync_id: int = 0) -> list[dict]:
+        if since_sync_id > 0:
+            rows = self.conn.execute("""
+                SELECT b.bundle_id, b.room_id, b.from_device_id, b.sequence, b.timestamp, b.payload, COALESCE(b.sync_id, 0) AS sync_id
+                FROM bundles b
+                WHERE b.room_id = ? AND b.from_device_id != ?
+                  AND COALESCE(b.sync_id, 0) > ?
+                  AND b.expires_at > ?
+                ORDER BY b.sync_id ASC, b.created_at ASC LIMIT ?
+            """, (room_id, device_id, since_sync_id, time.time(), limit)).fetchall()
+        else:
+            rows = self.conn.execute("""
+                SELECT b.bundle_id, b.room_id, b.from_device_id, b.sequence, b.timestamp, b.payload, COALESCE(b.sync_id, 0) AS sync_id
+                FROM bundles b
+                WHERE b.room_id = ? AND b.from_device_id != ?
+                  AND b.bundle_id NOT IN (SELECT bundle_id FROM bundle_acks WHERE device_id = ?)
+                  AND b.expires_at > ?
+                ORDER BY b.created_at ASC LIMIT ?
+            """, (room_id, device_id, device_id, time.time(), limit)).fetchall()
         return [{
             "bundleId": row["bundle_id"], "roomId": row["room_id"],
             "fromDeviceId": row["from_device_id"], "sequence": row["sequence"],
-            "timestamp": row["timestamp"], "payload": json.loads(row["payload"])
+            "timestamp": row["timestamp"], "syncId": row["sync_id"],
+            "payload": json.loads(row["payload"])
         } for row in rows]
 
     def record_acks(self, device_id: str, bundle_ids: list[str], room_id: str) -> int:
@@ -1141,8 +1163,11 @@ class SlagRelayServer:
                                             max_cache_bytes=max_cache, account_id=owner_account_id, vault_id=vault_id)
                 if not saved:
                     return {"error": "cache_limit_exceeded"}, 413
-                await self._broadcast_to_room(room_id, json.dumps({"type": "bundle", "bundle": bundle}), exclude_device=from_device)
-                return {"status": "delivered", "bundleId": bundle_id}, 200
+                sync_id = saved
+                bundle_to_broadcast = dict(bundle)
+                bundle_to_broadcast["syncId"] = sync_id
+                await self._broadcast_to_room(room_id, json.dumps({"type": "bundle", "bundle": bundle_to_broadcast}), exclude_device=from_device)
+                return {"status": "delivered", "bundleId": bundle_id, "syncId": sync_id}, 200
 
             if method == "GET" and action == "bundles":
                 device_id = query.get("device", "")
@@ -1151,7 +1176,12 @@ class SlagRelayServer:
                         raise ApiError(403, "device_mismatch")
                     device_id = auth["device_id"]
                 limit = max(1, min(1000, int(query.get("limit", 100))))
-                return {"bundles": self.db.get_pending_bundles(room_id, device_id, limit)}, 200
+                since_sync_id = 0
+                try:
+                    since_sync_id = int(query.get("since", "0"))
+                except (ValueError, TypeError):
+                    since_sync_id = 0
+                return {"bundles": self.db.get_pending_bundles(room_id, device_id, limit, since_sync_id=since_sync_id)}, 200
 
             if method == "POST" and action == "ack":
                 device_id = body.get("deviceId", "")
@@ -1243,7 +1273,10 @@ class SlagRelayServer:
                                              "connectedDevices": len(self.rooms[room_id])}))
             for item in self.db.get_pending_bundles(room_id, device_id):
                 self._check_ws_auth(conn)
-                await conn.send_text(json.dumps({"type": "bundle", "bundle": item["payload"]}))
+                bundle_payload = item["payload"]
+                if isinstance(bundle_payload, dict):
+                    bundle_payload["syncId"] = item.get("syncId", 0)
+                await conn.send_text(json.dumps({"type": "bundle", "bundle": bundle_payload}))
             try:
                 while not conn.closed:
                     frame = await conn.read_frame()
@@ -1320,8 +1353,11 @@ class SlagRelayServer:
             if not saved:
                 await conn.send_text(json.dumps({"type": "error", "code": "cache_limit_exceeded"}))
                 return
-            await self._broadcast_to_room(conn.room_id, json.dumps({"type": "bundle", "bundle": bundle}), exclude_device=conn.device_id)
-            await conn.send_text(json.dumps({"type": "server_ack", "bundleId": bundle_id, "sequence": seq}))
+            sync_id = saved
+            bundle_to_broadcast = dict(bundle)
+            bundle_to_broadcast["syncId"] = sync_id
+            await self._broadcast_to_room(conn.room_id, json.dumps({"type": "bundle", "bundle": bundle_to_broadcast}), exclude_device=conn.device_id)
+            await conn.send_text(json.dumps({"type": "server_ack", "bundleId": bundle_id, "sequence": seq, "syncId": sync_id}))
 
     async def _broadcast_to_room(self, room_id: str, message_str: str, exclude_device: Optional[str] = None) -> None:
         for client in list(self.rooms.get(room_id, set())):

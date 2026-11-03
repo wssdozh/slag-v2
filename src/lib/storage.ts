@@ -55,6 +55,15 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   folderSettings: {},
 };
 
+export type StorageChangeEvent =
+  | { kind: 'item'; action: 'upsert' | 'delete'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' }
+  | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: 'local' | 'remote' }
+  | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: 'local' | 'remote' }
+  | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: 'local' | 'remote' }
+  | { kind: 'trash'; action: 'restore' | 'purge'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' };
+
+export type StorageChangeListener = (event: StorageChangeEvent) => void;
+
 // Initial default folders: clean, top-level categories without arbitrary pet-projects
 export const DEFAULT_FOLDERS: FolderMeta[] = [
   {
@@ -116,6 +125,22 @@ export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 export class StorageService {
   private currentVault: VaultMeta;
   private tauriInitialized = false;
+  private changeListeners: Set<StorageChangeListener> = new Set();
+
+  public subscribeChanges(listener: StorageChangeListener): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
+  }
+
+  public emitChange(event: StorageChangeEvent): void {
+    for (const listener of this.changeListeners) {
+      try {
+        listener(event);
+      } catch (err) {
+        fsLog.error('Error in storage change listener:', err);
+      }
+    }
+  }
 
   constructor() {
     this.currentVault = this.initCurrentVault();
@@ -733,7 +758,7 @@ export class StorageService {
     }
   }
 
-  public saveFolder(folder: FolderMeta): void {
+  public saveFolder(folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
     const folders = this.getFolders().filter(f => f.path !== folder.path);
     folders.push(folder);
     localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
@@ -741,9 +766,10 @@ export class StorageService {
     if (isTauri()) {
       void this.flushStateToDisk();
     }
+    this.emitChange({ kind: 'folder', action: 'upsert', id: folder.path, payload: folder, origin });
   }
 
-  public renameFolder(oldPath: string, updatedFolder: FolderMeta): void {
+  public renameFolder(oldPath: string, updatedFolder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
     if (oldPath === 'Входящие') return; // Cannot rename system inbox
 
     // 1. Update folders list
@@ -777,12 +803,15 @@ export class StorageService {
     if (isTauri()) {
       void this.renameFolderOnDisk(oldPath, updatedFolder.path, items);
     }
+    this.emitChange({ kind: 'folder', action: 'rename', id: updatedFolder.path, payload: updatedFolder, oldPath, origin });
   }
 
-  public updateFolderDescription(path: string, description: string): void {
+  public updateFolderDescription(path: string, description: string, origin: 'local' | 'remote' = 'local'): void {
+    let targetFolder: FolderMeta | undefined;
     const folders = this.getFolders().map(f => {
       if (f.path === path) {
-        return { ...f, description };
+        targetFolder = { ...f, description };
+        return targetFolder;
       }
       return f;
     });
@@ -791,9 +820,12 @@ export class StorageService {
     if (isTauri()) {
       void this.flushStateToDisk();
     }
+    if (targetFolder) {
+      this.emitChange({ kind: 'folder', action: 'upsert', id: path, payload: targetFolder, origin });
+    }
   }
 
-  public deleteFolder(path: string): void {
+  public deleteFolder(path: string, origin: 'local' | 'remote' = 'local'): void {
     if (path === 'Входящие') return; // Cannot delete system inbox
     const folders = this.getFolders().filter(f => f.path !== path && !f.path.startsWith(path + '/'));
     localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
@@ -834,6 +866,7 @@ export class StorageService {
     }
 
     fsLog.info(`Deleted folder "${path}", items re-routed to Inbox`);
+    this.emitChange({ kind: 'folder', action: 'delete', id: path, origin });
   }
 
   // Items API
@@ -857,7 +890,7 @@ export class StorageService {
     return this.getItems().find(i => i.id === id);
   }
 
-  public saveItem(item: SlagItem): SlagItem {
+  public saveItem(item: SlagItem, origin: 'local' | 'remote' = 'local'): SlagItem {
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
@@ -891,10 +924,11 @@ export class StorageService {
       void this.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
     }
 
+    this.emitChange({ kind: 'item', action: 'upsert', id: updatedItem.id, payload: updatedItem, origin });
     return updatedItem;
   }
 
-  public saveItems(itemsToSave: SlagItem[]): void {
+  public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local'): void {
     if (itemsToSave.length === 0) return;
     const items = this.getItems();
     const oldItemsMap = new Map(items.map(i => [i.id, i]));
@@ -922,6 +956,10 @@ export class StorageService {
         void this.flushItemToDisk(it, old?.folder, oldFilename);
       }
     }
+
+    for (const it of saveMap.values()) {
+      this.emitChange({ kind: 'item', action: 'upsert', id: it.id, payload: it, origin });
+    }
   }
 
   private getTrashKey(): string {
@@ -938,7 +976,7 @@ export class StorageService {
     }
   }
 
-  public moveToTrash(id: string): void {
+  public moveToTrash(id: string, origin: 'local' | 'remote' = 'local'): void {
     const items = this.getItems();
     const item = items.find(i => i.id === id);
     if (!item) return;
@@ -956,9 +994,10 @@ export class StorageService {
     if (isTauri()) {
       void this.removeItemFromDisk(item);
     }
+    this.emitChange({ kind: 'item', action: 'delete', id, payload: item, origin });
   }
 
-  public restoreFromTrash(id: string): SlagItem | null {
+  public restoreFromTrash(id: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
     const trash = this.getTrashItems();
     const item = trash.find(i => i.id === id);
     if (!item) return null;
@@ -968,16 +1007,17 @@ export class StorageService {
     localStorage.setItem(this.getTrashKey(), JSON.stringify(remainingTrash));
 
     // Restore to active items
-    this.saveItem(item);
+    this.saveItem(item, origin);
     fsLog.info(`Restored "${item.title || item.id}" from .trash to "${item.folder}"`);
 
     if (isTauri()) {
       void this.restoreItemOnDisk(item);
     }
+    this.emitChange({ kind: 'trash', action: 'restore', id: item.id, payload: item, origin });
     return item;
   }
 
-  public emptyTrash(): void {
+  public emptyTrash(origin: 'local' | 'remote' = 'local'): void {
     localStorage.removeItem(this.getTrashKey());
     fsLog.info('Emptied .trash folder');
 
@@ -994,18 +1034,19 @@ export class StorageService {
         }
       })();
     }
+    this.emitChange({ kind: 'trash', action: 'purge', id: '*', origin });
   }
 
-  public deleteItem(id: string): void {
-    this.moveToTrash(id);
+  public deleteItem(id: string, origin: 'local' | 'remote' = 'local'): void {
+    this.moveToTrash(id, origin);
   }
 
-  public moveItem(id: string, targetFolder: string): SlagItem | null {
+  public moveItem(id: string, targetFolder: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
     const item = this.getItemById(id);
     if (!item) return null;
     item.folder = targetFolder;
     item.updatedAt = Date.now();
-    return this.saveItem(item);
+    return this.saveItem(item, origin);
   }
 
   // Attachments
@@ -1210,11 +1251,12 @@ export class StorageService {
     }
   }
 
-  public saveWorkspaceState(partialState: Partial<WorkspaceState>): void {
+  public saveWorkspaceState(partialState: Partial<WorkspaceState>, origin: 'local' | 'remote' = 'local'): void {
     try {
       const current = this.getWorkspaceState();
       const updated = { ...current, ...partialState };
       localStorage.setItem(this.getWorkspaceStateKey(), JSON.stringify(updated));
+      this.emitChange({ kind: 'workspace', action: 'upsert', id: 'workspace_state', payload: updated, origin });
     } catch (err) {
       fsLog.warn('Failed to save workspace state to localStorage', err);
     }
@@ -1308,6 +1350,19 @@ export class StorageService {
       await mkdir(notesPath, { baseDir: BaseDirectory.AppData, recursive: true });
       for (const folder of folders) {
         await mkdir(`${notesPath}/${folder.path}`, { baseDir: BaseDirectory.AppData, recursive: true });
+      }
+      if (data.folders) {
+        const nextFolderPaths = new Set(folders.map(f => f.path));
+        try {
+          const oldFoldersList: FolderMeta[] = JSON.parse(previousFolders);
+          for (const oldF of oldFoldersList) {
+            if (!nextFolderPaths.has(oldF.path) && oldF.path !== 'Входящие') {
+              await this.removeFolderFromDisk(oldF.path);
+            }
+          }
+        } catch {
+          // ignore parsing error
+        }
       }
       await writeTextFile(this.getVaultStatePath(vault), JSON.stringify({ folders, workspace, updatedAt: Date.now() }), { baseDir: BaseDirectory.AppData });
     }

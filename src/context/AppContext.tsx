@@ -1365,7 +1365,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const saved = storage.saveItem(newItem);
     refreshData();
-    void syncEngine.pushLocalChanges();
     return saved;
   }, [currentFolder, refreshData]);
 
@@ -1375,7 +1374,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItem(item);
     }
     refreshData();
-    void syncEngine.pushLocalChanges();
   }, [selectedItem, refreshData]);
 
   const deleteItem = useCallback((id: string) => {
@@ -1384,7 +1382,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItem(null);
     }
     refreshData();
-    void syncEngine.pushLocalChanges();
     addToast('Запись перемещена в корзину .trash', 'info');
   }, [selectedItem, refreshData, addToast]);
 
