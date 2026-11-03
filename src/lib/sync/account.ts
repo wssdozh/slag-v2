@@ -1,4 +1,4 @@
-import { generateAccountIdentity, signDeviceChallenge } from './accountCrypto';
+import { generateAccountIdentity, renameStoredDevice, signDeviceChallenge } from './accountCrypto';
 import type {
   AccountDevice,
   AccountDeviceInput,
@@ -10,6 +10,9 @@ import type {
   AccountVault,
 } from './accountTypes';
 import type { DeviceSyncMode } from './types';
+import { logger } from '../logger';
+
+const accountLog = logger.scope('SYNC');
 
 const SESSION_KEY = 'slag_account_session_v1';
 const DEFAULT_SERVER_URL = 'http://152.53.199.71:8320';
@@ -20,6 +23,18 @@ interface AuthResponse {
   status?: string;
   account?: AccountInfo;
   device?: AccountDevice;
+  requestId?: string;
+  continuationSecret?: string;
+  expiresAt?: string;
+}
+
+interface PendingLogin {
+  requestId: string;
+  continuationSecret: string;
+  accountId: string;
+  deviceId: string;
+  serverUrl: string;
+  expiresAt: string;
 }
 
 interface AccountResponse {
@@ -57,8 +72,8 @@ function requireSecureAccountTransport(serverUrl: string): void {
   const url = new URL(serverUrl);
   if (url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) return;
   // ponytail: temporary public HTTP acceptance testing; remove before release and require HTTPS.
-  if (import.meta.env.DEV && localStorage.getItem('slag_allow_insecure_account_test') === 'true' && url.origin === 'http://152.53.199.71:8320') return;
-  throw new Error('Для входа в аккаунт нужен HTTPS. Для тестирования используйте локальный SSH-туннель.');
+  if (url.origin === 'http://152.53.199.71:8320') return;
+  throw new Error('Для входа в аккаунт нужен HTTPS. HTTP временно разрешён только для тестового сервера SLAG.');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,6 +120,7 @@ class AccountClient {
   private listeners = new Set<(state: AccountState) => void>();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private loadingCount = 0;
+  private pendingLogin: PendingLogin | null = null;
 
   constructor() {
     let session: AccountSession | null = null;
@@ -295,11 +311,18 @@ class AccountClient {
       if (!auth || typeof auth.token !== 'string' || !auth.token) {
         if (auth && auth.status === 'pending_device') {
           this.clearSession();
+          if (typeof auth.requestId !== 'string' || typeof auth.continuationSecret !== 'string' || typeof auth.expiresAt !== 'string') {
+            throw new Error('Сервер не поддерживает автоматическое подтверждение входа. Обновите сервер.');
+          }
+          this.pendingLogin = { requestId: auth.requestId, continuationSecret: auth.continuationSecret, expiresAt: auth.expiresAt,
+            accountId: identity.accountId, deviceId: device.deviceId, serverUrl: this.serverUrl };
+          accountLog.info('Device approval requested', { deviceId: device.deviceId });
           return 'pending_device';
         }
         throw new Error('Server response does not contain an authentication token');
       }
 
+      renameStoredDevice(device.deviceId, device.name);
       this.setSession({
         token: auth.token,
         accountId: identity.accountId,
@@ -311,6 +334,43 @@ class AccountClient {
       await this.fetchRemoteState();
       return 'authenticated';
     });
+  }
+
+  cancelPendingLogin(): void {
+    this.pendingLogin = null;
+  }
+
+  async completePendingLogin(): Promise<'pending' | 'authenticated' | 'expired' | 'rejected'> {
+    const pending = this.pendingLogin;
+    if (!pending) return 'expired';
+    if (Date.parse(pending.expiresAt) <= Date.now()) {
+      this.cancelPendingLogin();
+      return 'expired';
+    }
+    this.serverUrl = pending.serverUrl;
+    requireSecureAccountTransport(this.serverUrl);
+    const challenge = await this.request<{ challenge: string }>('/api/auth/challenge', {
+      method: 'POST', body: JSON.stringify({ accountId: pending.accountId }),
+    }, false);
+    if (typeof challenge.challenge !== 'string') throw new Error('Сервер не вернул challenge');
+    const auth = await this.request<AuthResponse>(`/api/auth/device-requests/${encodeURIComponent(pending.requestId)}/complete`, {
+      method: 'POST', body: JSON.stringify({ continuationSecret: pending.continuationSecret,
+        challenge: challenge.challenge, deviceSignature: signDeviceChallenge(pending.deviceId, challenge.challenge) }),
+    }, false);
+    if (this.pendingLogin !== pending) return 'expired';
+    if (auth.status === 'pending') return 'pending';
+    if (auth.status === 'expired' || auth.status === 'rejected') {
+      this.cancelPendingLogin();
+      return auth.status;
+    }
+    if (typeof auth.token !== 'string' || !auth.token) throw new Error('Сервер не вернул сессию после подтверждения');
+    this.cancelPendingLogin();
+    accountLog.info('Device approval completed', { deviceId: pending.deviceId });
+    if (auth.device) renameStoredDevice(pending.deviceId, auth.device.name);
+    this.setSession({ token: auth.token, accountId: pending.accountId, deviceId: pending.deviceId,
+      account: auth.account, device: auth.device, serverUrl: pending.serverUrl });
+    await this.fetchRemoteState();
+    return 'authenticated';
   }
 
   register(
@@ -415,11 +475,13 @@ class AccountClient {
     });
   }
 
-  renameDevice(deviceId: string, name: string): Promise<void> {
-    return this.mutate(`/api/devices/${encodeURIComponent(deviceId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ name }),
+  async renameDevice(deviceId: string, name: string): Promise<void> {
+    const clean = name.trim();
+    if (!clean || clean.length > 64) throw new Error('Имя устройства должно содержать от 1 до 64 символов');
+    await this.mutate(`/api/devices/${encodeURIComponent(deviceId)}`, {
+      method: 'PATCH', body: JSON.stringify({ name: clean }),
     });
+    if (this.session && this.session.deviceId === deviceId) renameStoredDevice(deviceId, clean);
   }
 
   revokeDevice(deviceId: string): Promise<void> {

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/accountHarness';
 
-type AccountModules = typeof import('../src/lib/sync/account') & typeof import('../src/lib/sync/accountCrypto');
+type AccountModules = typeof import('../src/lib/sync/account') & typeof import('../src/lib/sync/accountCrypto') & typeof import('../src/lib/sync/crypto');
 declare global { interface Window { accountTest: AccountModules } }
 
 async function openDevice(page: Page, appUrl: string, relayUrl: string) {
@@ -15,7 +15,8 @@ async function openDevice(page: Page, appUrl: string, relayUrl: string) {
   await page.evaluate(async () => {
     const clientPath = '/src/lib/sync/account.ts';
     const cryptoPath = '/src/lib/sync/accountCrypto.ts';
-    window.accountTest = { ...await import(clientPath), ...await import(cryptoPath) };
+    const bundleCryptoPath = '/src/lib/sync/crypto.ts';
+    window.accountTest = { ...await import(clientPath), ...await import(cryptoPath), ...await import(bundleCryptoPath) };
   });
 }
 
@@ -81,11 +82,7 @@ test('seed account authentication, approved device and encrypted vault invitatio
       expect.objectContaining({ id: 'guest-device', status: 'pending' }),
     );
     await owner.evaluate(() => window.accountTest.accountClient.approveDevice('guest-device'));
-    expect(await guest.evaluate(async ({ seed, url }) => {
-      const api = window.accountTest;
-      const device = await api.getOrCreateDeviceIdentity('guest-device', 'Guest browser', 'web');
-      return api.accountClient.login(seed, url, device);
-    }, { seed: seeds.account, url: relayUrl })).toBe('authenticated');
+    expect(await guest.evaluate(() => window.accountTest.accountClient.completePendingLogin())).toBe('authenticated');
     await owner.evaluate(() => window.accountTest.accountClient.renameDevice('guest-device', 'Approved browser'));
     expect(await owner.evaluate(() => window.accountTest.accountClient.getState().devices)).toContainEqual(
       expect.objectContaining({ id: 'guest-device', name: 'Approved browser', status: 'active' }),
@@ -124,6 +121,58 @@ test('seed account authentication, approved device and encrypted vault invitatio
       id: 'integration-vault', grants: expect.arrayContaining([expect.objectContaining({ deviceId: 'guest-device', status: 'accepted', mode: 'receive-only' })]),
     })]);
 
+    const published = await owner.evaluate(async ({ url, seed }) => {
+      const api = window.accountTest;
+      const roomId = await api.deriveRoomId(seed);
+      const content = 'Synthetic receive-only encrypted note';
+      const hash = await api.computeHash(content);
+      const bundle = {
+        bundleId: crypto.randomUUID(), roomId, fromDeviceId: 'owner-device', sequence: 1,
+        stateRootHash: hash, timestamp: new Date().toISOString(),
+        changes: [{ id: 'synthetic-note', type: 'item' as const, action: 'upsert' as const, version: 1, hash, payload: { content } }],
+      };
+      const encrypted = await api.encryptBundle(bundle, await api.deriveVaultKey(seed));
+      const response = await fetch(`${url}/api/rooms/${roomId}/bundle?vault=integration-vault`, {
+        method: 'POST', headers: { Authorization: `Bearer ${api.accountClient.getToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: encrypted }),
+      });
+      return { status: response.status, bundle, encrypted };
+    }, { url: relayUrl, seed: seeds.vault });
+    expect(published.status).toBe(200);
+    const received = await guest.evaluate(async ({ url, roomId }) => {
+      const api = window.accountTest;
+      const response = await fetch(`${url}/api/rooms/${roomId}/bundles?vault=integration-vault`, {
+        headers: { Authorization: `Bearer ${api.accountClient.getToken()}` },
+      });
+      const body = await response.json();
+      return { status: response.status, bundles: body.bundles };
+    }, { url: relayUrl, roomId: published.bundle.roomId });
+    expect(received.status).toBe(200);
+    expect(received.bundles).toEqual([expect.objectContaining({
+      bundleId: published.bundle.bundleId, payload: published.encrypted,
+    })]);
+    const exchange = await guest.evaluate(async ({ url, roomId, seed, encrypted }) => {
+      const api = window.accountTest;
+      const key = await api.deriveVaultKey(seed);
+      const bundle = await api.decryptBundle(encrypted, key);
+      // Use a fresh, correctly attributed encrypted bundle so denial cannot be a replay or device mismatch.
+      const write = await api.encryptBundle({ ...bundle, bundleId: crypto.randomUUID(), fromDeviceId: 'guest-device' }, key);
+      const response = await fetch(`${url}/api/rooms/${roomId}/bundle?vault=integration-vault`, {
+        method: 'POST', headers: { Authorization: `Bearer ${api.accountClient.getToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: write }),
+      });
+      return { bundle, writeStatus: response.status, writeError: await response.json() };
+    }, { url: relayUrl, roomId: published.bundle.roomId, seed: accepted.seed, encrypted: received.bundles[0].payload });
+    expect(exchange.bundle).toEqual(published.bundle);
+    expect(exchange.writeStatus).toBe(403);
+    expect(exchange.writeError).toEqual({ error: 'vault_access_denied' });
+    const bundleRequests = wire.filter((entry) => /\/bundle\?vault=integration-vault$/.test(entry.url));
+    expect(bundleRequests).toHaveLength(2);
+    for (const request of bundleRequests) {
+      expect(request.body).not.toContain('Synthetic receive-only encrypted note');
+      expect(JSON.parse(request.body).bundle).not.toHaveProperty('changes');
+    }
+
     const logout = await guest.evaluate(async (url) => {
       const api = window.accountTest.accountClient;
       const token = api.getToken()!;
@@ -154,7 +203,11 @@ test('seed account authentication, approved device and encrypted vault invitatio
     );
 
     const authBodies = wire.filter((entry) => /\/api\/auth\/(register|login)$/.test(entry.url)).map((entry) => JSON.parse(entry.body));
-    expect(authBodies).toHaveLength(3);
+    expect(authBodies).toHaveLength(2);
+    const completionBodies = wire.filter((entry) => /\/api\/auth\/device-requests\/[^/]+\/complete$/.test(entry.url)).map((entry) => JSON.parse(entry.body));
+    expect(completionBodies).toHaveLength(1);
+    expect(completionBodies[0].deviceSignature).toMatch(/^[a-f0-9]{128}$/);
+    expect(completionBodies[0].signature).toBeUndefined();
     for (const body of authBodies) {
       expect(body.signature).toMatch(/^[a-f0-9]{128}$/);
       expect(body.deviceSignature).toMatch(/^[a-f0-9]{128}$/);

@@ -2,6 +2,7 @@ import { storage } from '../storage';
 export { storage };
 import { logger } from '../logger';
 import { accountClient } from './account';
+export { accountClient };
 import {
   deriveVaultKey,
   deriveRoomId,
@@ -91,7 +92,9 @@ export class SyncEngine {
       const ownVault = accountState.vaults.find((vault) => vault.id === this.getSyncVaultId());
       const ownGrant = ownVault && ownVault.grants.find((grant) => grant.deviceId === this.config.deviceId);
       if (ownGrant && ownGrant.status === 'accepted') this.config.localSyncMode = ownGrant.mode;
-      if (!this.status.isAuthenticated || (ownGrant && ownGrant.status === 'revoked')) this.disconnect();
+      if (!this.status.isAuthenticated || !ownGrant || ownGrant.status !== 'accepted') {
+        if (this.activeRoomId || this.ws) this.disconnect();
+      }
       this.notify();
     });
   }
@@ -154,7 +157,10 @@ export class SyncEngine {
 
   private getStateHashKey(vaultId?: string): string {
     const vid = vaultId || this.currentVaultId;
-    return `${LAST_STATE_HASH_KEY}_${vid}`;
+    // Account rooms have their own checkpoint: a new mapping must resend the full local state.
+    return this.usesAccountSync() && this.activeRoomId
+      ? `${LAST_STATE_HASH_KEY}_${vid}_${this.activeRoomId}`
+      : `${LAST_STATE_HASH_KEY}_${vid}`;
   }
 
   public getCurrentVaultId(): string {
@@ -327,17 +333,22 @@ export class SyncEngine {
         const grant = vault && vault.grants.find((entry) => entry.deviceId === this.config.deviceId);
         if (!grant || grant.status !== 'accepted') {
           this.status.state = 'idle';
-          this.status.error = grant?.status === 'revoked' ? 'Доступ отозван. Локальная копия сохранена' : 'Хранилище хранится только на этом устройстве';
+          this.status.error = grant && grant.status === 'revoked' ? 'Доступ отозван. Локальная копия сохранена' : grant && grant.status === 'pending' ? 'Примите приглашение в личном кабинете' : 'Хранилище хранится только на этом устройстве';
           this.notify();
           return;
         }
         this.config.localSyncMode = grant.mode;
       }
 
-      const [vaultKey, roomId] = await Promise.all([
+      const [vaultKey, legacyRoomId] = await Promise.all([
         deriveVaultKey(seedPhrase),
         deriveRoomId(seedPhrase),
       ]);
+      if (generation !== this.initGeneration) return;
+      // Never claim an anonymous legacy room: it has no authenticated owner metadata.
+      const roomId = this.usesAccountSync()
+        ? `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', this.getSyncVaultId(), legacyRoomId]))).slice(0, 32)}`
+        : legacyRoomId;
       if (generation !== this.initGeneration) return;
       this.activeVaultKey = vaultKey;
       this.activeRoomId = roomId;
@@ -400,6 +411,8 @@ export class SyncEngine {
     await this.init();
   }
 
+  private reconnectAttempts = 0;
+
   private connectWebSocket(): void {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -430,6 +443,7 @@ export class SyncEngine {
       this.ws = new WebSocket(fullWsUrl);
 
       this.ws.onopen = () => {
+        this.reconnectAttempts = 0;
         syncLog.info('Sync WebSocket connected');
         this.status.state = 'connected';
         this.status.error = null;
@@ -448,14 +462,22 @@ export class SyncEngine {
       };
 
       this.ws.onclose = (event) => {
-        syncLog.info(`Sync WebSocket closed (code ${event.code}), retrying in 5s`);
         this.ws = null;
+        if (event.code === 1008 || event.code === 4401 || event.code === 4403) {
+          this.disconnect();
+          this.status.state = 'error';
+          this.status.error = 'Соединение отклонено сервером. Проверьте вход и доступ к хранилищу';
+          this.notify();
+          return;
+        }
+        const retryMs = Math.min(5000 * 2 ** Math.min(this.reconnectAttempts++, 4), 60000);
+        syncLog.info(`Sync WebSocket closed (code ${event.code}), retrying in ${retryMs}ms`);
         this.status.state = 'offline';
         this.notify();
         this.reconnectTimeout = setTimeout(() => {
           this.reconnectTimeout = null;
-          if (this.config.enabled) this.connectWebSocket();
-        }, 5000);
+          if (this.config.enabled && this.activeRoomId) this.connectWebSocket();
+        }, retryMs);
       };
     } catch (e) {
       syncLog.error('WebSocket spawn error:', e);
@@ -669,7 +691,7 @@ export class SyncEngine {
       if (generation !== this.initGeneration) return;
       const lastSyncedHash =
         localStorage.getItem(hashKey) ||
-        (this.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
+        (!this.usesAccountSync() && this.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
 
       if (lastSyncedHash === stateHash) {
         // Nothing changed
@@ -743,7 +765,13 @@ export class SyncEngine {
           headers: this.authHeaders(true),
           body: JSON.stringify(encrypted),
         });
-        if (!response.ok) throw new Error(`Sync push failed: HTTP ${response.status}`);
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            this.disconnect();
+            throw new Error(response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете');
+          }
+          throw new Error(`Sync push failed: HTTP ${response.status}`);
+        }
       }
 
       syncLog.info(
@@ -751,7 +779,7 @@ export class SyncEngine {
       );
 
       localStorage.setItem(hashKey, stateHash);
-      if (this.currentVaultId === 'default_vault') {
+      if (!this.usesAccountSync() && this.currentVaultId === 'default_vault') {
         localStorage.setItem(LAST_STATE_HASH_KEY, stateHash);
       }
       this.status.lastSyncTime = new Date().toLocaleTimeString();
@@ -841,6 +869,9 @@ export class SyncEngine {
       this.ws.close();
       this.ws = null;
     }
+    this.activeVaultKey = null;
+    this.activeRoomId = null;
+    this.status.currentRoomId = null;
     this.status.state = 'idle';
     this.notify();
   }

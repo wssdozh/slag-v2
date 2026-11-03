@@ -28,6 +28,8 @@ test('intentional disconnect and socket replacement never schedule reconnects', 
     engine.disconnect();
     await new Promise(resolve => setTimeout(resolve, 6000));
     const afterIntentionalClose = sockets.length;
+    // A fresh manual connection needs an active room again; disconnect clears it.
+    engine.activeRoomId = 'room_lifecycle_test';
     engine.connectWebSocket();
     sockets.at(-1)!.onclose!({ code: 1006 });
     engine.disconnect();

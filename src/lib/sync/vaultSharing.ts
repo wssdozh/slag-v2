@@ -23,13 +23,18 @@ export async function shareVaultWithDevice(
   device: AccountDevice,
   mode: DeviceSyncMode,
 ): Promise<void> {
+  const session = accountClient.getSession();
+  if (session && device.id === session.deviceId) throw new Error('Это хранилище уже находится на текущем устройстве');
+  const syncId = storage.ensureVaultSyncId(vault.id);
+  const serverVault = accountClient.getState().vaults.find((entry) => entry.id === syncId);
+  const existingGrant = serverVault ? serverVault.grants.find((entry) => entry.deviceId === device.id) : undefined;
+  if (existingGrant && existingGrant.status !== 'revoked' && existingGrant.mode === mode) return;
   const seedPhrase = syncEngine.getVaultSeedPhrase(vault.id);
   if (!seedPhrase) {
     throw new Error('Ключ хранилища доступен только на устройстве, где оно подключено');
   }
 
   const encryptedKey = await encryptVaultKeyForDevice(seedPhrase, device.publicKey);
-  const syncId = storage.ensureVaultSyncId(vault.id);
   await accountClient.registerVault(syncId, vault.name);
   await accountClient.grantVault(syncId, device.id, mode, encryptedKey);
   if (syncEngine.getCurrentVaultId() === vault.id) await syncEngine.init();
