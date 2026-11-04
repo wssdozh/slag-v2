@@ -132,6 +132,7 @@
 | 27 | [fixes/27-autocomplete-hints.md](<fixes/27-autocomplete-hints.md>) | подсказки клавиш только для точного указателя; три копии шапки → один компонент | да |
 | 09, 47 | [fixes/09-device-name.md](<fixes/09-device-name.md>) | «Мой телефон» по умолчанию на мобильном | код, нужна чистая установка |
 | 47 | [fixes/47-seed-field.md](<fixes/47-seed-field.md>) | автокоррекция и автозаглавные отключены в seed-поле | частично |
+| 29, 30 | [fixes/29-folder-target.md](<fixes/29-folder-target.md>) | выбранная папка больше не теряется: локальное эхо черновика отфильтровано | браузер + устройство |
 
 | — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
 
