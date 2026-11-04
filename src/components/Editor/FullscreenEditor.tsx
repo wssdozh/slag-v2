@@ -1105,12 +1105,15 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <Check className="w-3 h-3 stroke-[3]" />
               </button>
             )}
-            <input
-              type="text"
+            {/* textarea вместо input: заголовок переносится, а не обрезается на узком экране.
+                field-sizing:content даёт авто-высоту без JS (Chrome 123+, Android WebView 156). */}
+            <textarea
+              rows={1}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
               placeholder={type === 'task' ? 'Название задачи...' : 'Заголовок...'}
-              className={`w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight placeholder-zinc-600 border-none px-0 outline-none ${
+              className={`w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight placeholder-zinc-600 border-none px-0 outline-none resize-none overflow-hidden [field-sizing:content] ${
                 type === 'task' && status === 'done' ? 'text-zinc-500 line-through' : 'text-white'
               }`}
             />
