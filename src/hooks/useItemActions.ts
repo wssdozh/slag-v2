@@ -189,7 +189,6 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
   const handleDelete = () => {
     if (!item) return;
     deleteItem(item.id);
-    addToast('Запись удалена', 'info');
     onDone?.();
   };
 

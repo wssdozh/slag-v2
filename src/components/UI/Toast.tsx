@@ -8,16 +8,19 @@ export const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[120] flex flex-col gap-2 items-center pointer-events-none">
+    <div
+      className="fixed left-1/2 -translate-x-1/2 z-[120] flex flex-col gap-2 items-center pointer-events-none w-[calc(100%-2rem)] max-w-md"
+      style={{ top: 'max(calc(var(--sat) + 0.75rem), 1.25rem)' }}
+    >
       {toasts.map(toast => (
         <div
           key={toast.id}
-          className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-surface-elevated/95 backdrop-blur-md border border-white/[0.08] text-sm text-fg-primary shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200"
+          className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-surface-elevated/95 backdrop-blur-md border border-white/[0.08] text-sm text-fg-primary shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 max-w-full"
         >
           {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
           {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
           {toast.type === 'info' && <Info className="w-4 h-4 text-zinc-400 shrink-0" />}
-          <span className="font-medium tracking-tight text-xs">{toast.text}</span>
+          <span className="font-medium tracking-tight text-xs min-w-0 break-words">{toast.text}</span>
           {toast.action && (
             <button
               onClick={() => {

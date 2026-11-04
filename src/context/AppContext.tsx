@@ -1383,7 +1383,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItem(null);
     }
     refreshData();
-    addToast('Запись перемещена в корзину .trash', 'info');
+    // Единственный источник уведомления об удалении: слой модели, а не каждый вызывающий.
+    addToast('Запись в корзине', 'info', {
+      label: 'восстановить',
+      onClick: () => {
+        storage.restoreFromTrash(id);
+        refreshData();
+      },
+    });
   }, [selectedItem, refreshData, addToast]);
 
   const restoreFromTrash = useCallback((id: string) => {
