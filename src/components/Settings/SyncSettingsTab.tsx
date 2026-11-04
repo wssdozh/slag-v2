@@ -70,6 +70,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isTestingServer, setIsTestingServer] = useState(false);
   const [serverStatusMessage, setServerStatusMessage] = useState<string | null>(null);
+  const [serverStatusError, setServerStatusError] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [busyVaultId, setBusyVaultId] = useState<string | null>(null);
   const isPollingRef = useRef(false);
@@ -357,6 +358,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   const handleTestServerConnection = async () => {
     setIsTestingServer(true);
     setServerStatusMessage(null);
+    setServerStatusError(false);
     try {
       const cleanUrl = serverUrlInput.replace(/\/+$/, '');
       const started = Date.now();
@@ -370,6 +372,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       addToast?.('Сервер синхронизации сохранён', 'success');
     } catch (error) {
       setServerStatusMessage(error instanceof Error ? error.message : String(error));
+      setServerStatusError(true);
     } finally {
       setIsTestingServer(false);
     }
@@ -586,7 +589,6 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-zinc-200">Сервер ретрансляции</span>
-          {serverStatusMessage && <span className="font-mono text-2xs text-zinc-400">{serverStatusMessage}</span>}
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -595,6 +597,14 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           </div>
           <button type="button" onClick={() => void handleTestServerConnection()} disabled={isTestingServer} className="px-3 py-1.5 bg-white/[0.06] text-xs text-zinc-300 rounded-lg disabled:opacity-50">{isTestingServer ? 'Тест…' : 'Проверить'}</button>
         </div>
+        {serverStatusMessage && (
+          <p
+            role="status"
+            className={`font-mono text-2xs leading-snug break-words ${serverStatusError ? 'text-rose-300' : 'text-zinc-400'}`}
+          >
+            {serverStatusError ? `не удалось: ${serverStatusMessage}` : serverStatusMessage}
+          </p>
+        )}
         <label className="flex items-center justify-between text-2xs text-zinc-400">
           Автоматическая синхронизация при сохранении
           <input type="checkbox" checked={config.autoSync} onChange={(event) => { syncEngine.saveConfig({ autoSync: event.target.checked }); setConfig(syncEngine.getConfig()); }} className="w-3.5 h-3.5 accent-white" />
