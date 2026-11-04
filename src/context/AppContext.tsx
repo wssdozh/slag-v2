@@ -974,6 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     if (isFullscreenEditorOpen) {
       setIsFullscreenEditorOpen(false);
+      setSelectedItem(null);
       return true;
     }
     if (isMobile && mobileFolderInfoOpen) {

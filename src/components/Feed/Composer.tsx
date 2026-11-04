@@ -71,11 +71,12 @@ export const Composer: React.FC<ComposerProps> = ({
     setReplyTarget,
     items,
     addToast,
-    isMobile
+    isMobile,
+    isFullscreenEditorOpen,
   } = useApp();
 
   const effectiveDefaultFolder = isModal ? 'Входящие' : (initialFolder || currentFolder);
-  const activeFolder = isModal ? 'quick-composer' : effectiveDefaultFolder;
+  const activeFolder = effectiveDefaultFolder;
   const [initialDraft] = useState(() => storage.getComposerDraft(activeFolder));
 
   const [content, setContent] = useState(() => initialDraft?.content || '');
@@ -229,11 +230,18 @@ export const Composer: React.FC<ComposerProps> = ({
   // Synchronize with stored draft when folder changes, on focus or when returning to tab
   useEffect(() => {
     const syncWithStorage = () => {
-      // If user is actively typing right now, don't overwrite
-      if (Date.now() - lastLocalUserEditTimeRef.current < 2000) return;
+      // If user is actively typing right now in focused window, don't overwrite
+      if (
+        typeof document !== 'undefined' &&
+        document.hasFocus() &&
+        textareaRef.current === document.activeElement &&
+        Date.now() - lastLocalUserEditTimeRef.current < 800
+      ) {
+        return;
+      }
       const currentStored = storage.getComposerDraft(activeFolder);
       if (currentStored) {
-        if ((currentStored.updatedAt ?? 0) > lastAdoptedRemoteDraftUpdatedAtRef.current) {
+        if ((currentStored.updatedAt ?? 0) >= lastAdoptedRemoteDraftUpdatedAtRef.current) {
           isApplyingRemoteDraftRef.current = true;
           lastAdoptedRemoteDraftUpdatedAtRef.current = currentStored.updatedAt ?? 0;
           setContent(currentStored.content || '');
@@ -257,8 +265,10 @@ export const Composer: React.FC<ComposerProps> = ({
       }
     };
 
-    // Check immediately on folder change
-    syncWithStorage();
+    // Check immediately on folder change or when returning from fullscreen editor
+    if (!isFullscreenEditorOpen) {
+      syncWithStorage();
+    }
 
     // Check when window gains focus or becomes visible
     const handleVisibility = () => {
@@ -272,7 +282,7 @@ export const Composer: React.FC<ComposerProps> = ({
       window.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', syncWithStorage);
     };
-  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder]);
+  }, [activeFolder, isFullscreenEditorOpen, resetDraftState, setReplyTarget, setTargetFolder]);
 
   // Autosave when unmounting (e.g. folder switch or page navigation)
   useEffect(() => {
@@ -292,8 +302,6 @@ export const Composer: React.FC<ComposerProps> = ({
           recurrence: d.recurrence,
           updatedAt: Date.now(),
         });
-      } else {
-        storage.deleteComposerDraft(activeFolder);
       }
     };
   }, [activeFolder]);
@@ -307,11 +315,11 @@ export const Composer: React.FC<ComposerProps> = ({
         return;
       }
 
-      // Check if current draft was superseded by a deletion tombstone
-      const lastTomb = Number(localStorage.getItem(`slag_sync_draft_tomb_${storage.getCurrentVault()?.id || 'default_vault'}_composer:${activeFolder}`) || 0);
-      if (lastTomb > 0 && lastTomb > lastAdoptedRemoteDraftUpdatedAtRef.current) {
-        return;
-      }
+      // If content is typed locally, remove any leftover deletion tombstone
+      const tombKey = `slag_sync_draft_tomb_${storage.getCurrentVault()?.id || 'default_vault'}_composer:${activeFolder}`;
+      try {
+        localStorage.removeItem(tombKey);
+      } catch {}
 
       if (content.trim() || attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
@@ -327,7 +335,7 @@ export const Composer: React.FC<ComposerProps> = ({
           recurrence,
           updatedAt: Date.now(),
         });
-      } else {
+      } else if (lastLocalUserEditTimeRef.current > 0) {
         storage.deleteComposerDraft(activeFolder);
       }
     }, 250);
@@ -360,37 +368,54 @@ export const Composer: React.FC<ComposerProps> = ({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeFolder]);
 
-  // Listen to remote draft changes (e.g. typing on another device or remote submit)
+  // Listen to draft changes (typing on another device, quick composer window, or editor sync)
   useEffect(() => {
     const unsubscribe = storage.subscribeChanges((event) => {
-      if (event.kind === 'draft' && event.origin === 'remote') {
+      if (event.kind === 'draft') {
         const isCurrentFolder = event.id === `composer:${activeFolder}`;
         if (isCurrentFolder) {
           if (event.action === 'upsert' && event.payload) {
-            const remoteDraft = event.payload as ComposerDraft;
-            const remoteTs = remoteDraft.updatedAt ?? 0;
-            const hasLocalUnsavedChanges = draftRef.current.content.trim().length > 0;
-            const isUserActivelyTyping = Date.now() - lastLocalUserEditTimeRef.current < 2000;
+            const incomingDraft = event.payload as ComposerDraft;
+            const incomingTs = incomingDraft.updatedAt ?? 0;
+            const isUserActivelyTyping =
+              typeof document !== 'undefined' &&
+              document.hasFocus() &&
+              textareaRef.current === document.activeElement &&
+              Date.now() - lastLocalUserEditTimeRef.current < 800;
 
-            // Adopt if:
-            // 1. Local composer is completely empty, OR
-            // 2. Incoming draft is strictly newer than our last adopted remote draft AND the user is NOT actively typing right now
-            const shouldAdopt = (!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
-              (!isUserActivelyTyping && remoteTs > lastAdoptedRemoteDraftUpdatedAtRef.current);
+            const isIdentical =
+              draftRef.current.content === (incomingDraft.content || '') &&
+              draftRef.current.itemType === (incomingDraft.itemType || 'note') &&
+              draftRef.current.priority === (incomingDraft.priority || 'none') &&
+              draftRef.current.dueDate === (incomingDraft.dueDate || '') &&
+              JSON.stringify(draftRef.current.tags) === JSON.stringify(incomingDraft.tags || []) &&
+              draftRef.current.attachments.length === (incomingDraft.attachments?.length || 0) &&
+              draftRef.current.targetFolder === (incomingDraft.targetFolder || null) &&
+              draftRef.current.duration === incomingDraft.duration &&
+              JSON.stringify(draftRef.current.recurrence) === JSON.stringify(incomingDraft.recurrence);
+
+            if (isIdentical) return;
+
+            const hasLocalUnsavedChanges = draftRef.current.content.trim().length > 0;
+            const shouldAdopt =
+              !isUserActivelyTyping &&
+              ((!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
+                incomingTs >= lastAdoptedRemoteDraftUpdatedAtRef.current ||
+                event.origin === 'local');
 
             if (shouldAdopt) {
               isApplyingRemoteDraftRef.current = true;
-              lastAdoptedRemoteDraftUpdatedAtRef.current = remoteTs;
-              setContent(remoteDraft.content || '');
-              setItemType(remoteDraft.itemType || 'note');
-              setPriority(remoteDraft.priority || 'none');
-              setDueDate(remoteDraft.dueDate || '');
-              setTags(remoteDraft.tags || []);
-              setAttachments(remoteDraft.attachments || []);
-              if (remoteDraft.replyTarget) setReplyTarget(remoteDraft.replyTarget as any);
-              setTargetFolder(remoteDraft.targetFolder || null);
-              setDuration(remoteDraft.duration);
-              setRecurrence(remoteDraft.recurrence);
+              lastAdoptedRemoteDraftUpdatedAtRef.current = incomingTs;
+              setContent(incomingDraft.content || '');
+              setItemType(incomingDraft.itemType || 'note');
+              setPriority(incomingDraft.priority || 'none');
+              setDueDate(incomingDraft.dueDate || '');
+              setTags(incomingDraft.tags || []);
+              setAttachments(incomingDraft.attachments || []);
+              if (incomingDraft.replyTarget) setReplyTarget(incomingDraft.replyTarget as any);
+              setTargetFolder(incomingDraft.targetFolder || null);
+              setDuration(incomingDraft.duration);
+              setRecurrence(incomingDraft.recurrence);
             }
           } else if (event.action === 'delete') {
             isApplyingRemoteDraftRef.current = true;
@@ -768,6 +793,9 @@ export const Composer: React.FC<ComposerProps> = ({
         break;
       case 'clear':
         storage.deleteComposerDraft(activeFolder);
+        if (activeFolder !== 'Входящие') {
+          storage.deleteComposerDraft('Входящие');
+        }
         resetDraftState();
         addToast('Черновик очищен', 'info');
         return;
@@ -1043,6 +1071,9 @@ export const Composer: React.FC<ComposerProps> = ({
 
     storage.deleteComposerDraft(destinationFolder);
     storage.deleteComposerDraft(activeFolder);
+    if (activeFolder !== 'Входящие') {
+      storage.deleteComposerDraft('Входящие');
+    }
     resetDraftState();
     if (onComplete) {
       onComplete();

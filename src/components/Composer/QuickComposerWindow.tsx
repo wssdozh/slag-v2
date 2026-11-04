@@ -34,7 +34,8 @@ export const QuickComposerWindow: React.FC = () => {
   // Listen for global shortcut focus event from desktop Rust harness
   useEffect(() => {
     const unlisten = listenQuickComposerFocus(() => {
-      // Keep existing draft intact when re-summoning the window
+      // Trigger focus event so Composer immediately picks up any latest draft from storage/main window
+      window.dispatchEvent(new Event('focus'));
     });
     return unlisten;
   }, []);

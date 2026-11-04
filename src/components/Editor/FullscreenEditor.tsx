@@ -205,30 +205,43 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     };
   }, [item.id, title, content, tags, folder, type, priority, status, dueDate, duration, recurrence, flushAutosave]);
 
+  const syncDraftBackToComposer = useCallback(() => {
+    if (!item.id.startsWith('draft_')) return;
+    const targetFolderVal = folder !== 'Входящие' ? folder : undefined;
+    const draftData = {
+      content: content.trim(),
+      itemType: type,
+      priority: type === 'task' ? priority : 'none',
+      dueDate: type === 'task' ? (dueDate || '') : '',
+      tags,
+      attachments,
+      replyTarget: item.replyToId ? { id: item.replyToId, title: '' } : null,
+      targetFolder: targetFolderVal,
+      duration: type === 'task' ? duration : undefined,
+      recurrence: type === 'task' ? recurrence : undefined,
+      updatedAt: Date.now(),
+    };
+    storage.saveComposerDraft(folder || 'Входящие', draftData, 'local');
+    if (folder && folder !== 'Входящие') {
+      storage.saveComposerDraft('Входящие', draftData, 'local');
+    }
+    storage.clearFullscreenDraft(item.id);
+  }, [item.id, item.replyToId, folder, content, type, priority, dueDate, tags, attachments, duration, recurrence]);
+
   // Flush on unmount if pending or sync back to composer draft
   useEffect(() => {
     return () => {
-      if (autosaveTimerRef.current) {
+      if (item.id.startsWith('draft_')) {
+        if (autosaveTimerRef.current) {
+          clearTimeout(autosaveTimerRef.current);
+          autosaveTimerRef.current = null;
+        }
+        syncDraftBackToComposer();
+      } else if (autosaveTimerRef.current) {
         flushAutosave();
-      } else if (item.id.startsWith('draft_')) {
-        const targetFolderVal = folder !== 'Входящие' ? folder : undefined;
-        storage.saveComposerDraft(folder || 'Входящие', {
-          content: content.trim(),
-          itemType: type,
-          priority: type === 'task' ? priority : 'none',
-          dueDate: type === 'task' ? (dueDate || '') : '',
-          tags,
-          attachments,
-          replyTarget: item.replyToId ? { id: item.replyToId, title: '' } : null,
-          targetFolder: targetFolderVal,
-          duration: type === 'task' ? duration : undefined,
-          recurrence: type === 'task' ? recurrence : undefined,
-          updatedAt: Date.now(),
-        });
-        storage.clearFullscreenDraft(item.id);
       }
     };
-  }, [item.id, item.replyToId, content, type, priority, dueDate, tags, attachments, folder, duration, recurrence, flushAutosave]);
+  }, [item.id, syncDraftBackToComposer, flushAutosave]);
 
   // Persist width preference
   useEffect(() => {
@@ -349,26 +362,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     if (!item.id.startsWith('draft_')) {
       flushAutosave();
     } else {
-      // Sync back to composer draft when closing a newly created draft
-      const targetFolderVal = folder !== 'Входящие' ? folder : undefined;
-      storage.saveComposerDraft(folder || 'Входящие', {
-        content: content.trim(),
-        itemType: type,
-        priority: type === 'task' ? priority : 'none',
-        dueDate: type === 'task' ? (dueDate || '') : '',
-        tags,
-        attachments,
-        replyTarget: item.replyToId ? { id: item.replyToId, title: '' } : null,
-        targetFolder: targetFolderVal,
-        duration: type === 'task' ? duration : undefined,
-        recurrence: type === 'task' ? recurrence : undefined,
-        updatedAt: Date.now(),
-      });
-      storage.clearFullscreenDraft(item.id);
+      syncDraftBackToComposer();
     }
     setIsFullscreenEditorOpen(false);
     setSelectedItem(null);
-  }, [item, content, type, priority, dueDate, tags, attachments, folder, duration, recurrence, flushAutosave, setIsFullscreenEditorOpen, setSelectedItem]);
+  }, [item.id, flushAutosave, syncDraftBackToComposer, setIsFullscreenEditorOpen, setSelectedItem]);
 
   const handleUndo = useCallback(() => {
     const view = getEditorView();

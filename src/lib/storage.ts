@@ -127,6 +127,8 @@ export class StorageService {
   private currentVault: VaultMeta;
   private tauriInitialized = false;
   private changeListeners: Set<StorageChangeListener> = new Set();
+  private instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+  private crossWindowDraftChannel: BroadcastChannel | null = null;
 
   public subscribeChanges(listener: StorageChangeListener): () => void {
     this.changeListeners.add(listener);
@@ -146,8 +148,50 @@ export class StorageService {
   constructor() {
     this.currentVault = this.initCurrentVault();
     this.initDefaultsIfNeeded();
+    this.initCrossWindowDraftSync();
     if (isTauri()) {
       void this.initTauriFs();
+    }
+  }
+
+  private initCrossWindowDraftSync(): void {
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this.crossWindowDraftChannel = new BroadcastChannel('slag_cross_window_drafts_v1');
+        this.crossWindowDraftChannel.onmessage = (event) => {
+          const data = event.data;
+          if (data && data.senderId !== this.instanceId && data.type === 'DRAFT_CHANGED') {
+            this.emitChange({
+              kind: 'draft',
+              action: data.action,
+              id: `composer:${data.folderPath}`,
+              payload: data.draft,
+              origin: 'remote',
+            });
+          }
+        };
+      } catch {
+        this.crossWindowDraftChannel = null;
+      }
+    }
+
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('storage', (event) => {
+        if (event.key === this.getDraftsKey() && event.newValue !== null) {
+          try {
+            const all = JSON.parse(event.newValue);
+            for (const [folderPath, draft] of Object.entries(all)) {
+              this.emitChange({
+                kind: 'draft',
+                action: 'upsert',
+                id: `composer:${folderPath}`,
+                payload: draft as ComposerDraft,
+                origin: 'remote',
+              });
+            }
+          } catch {}
+        }
+      });
     }
   }
 
@@ -1160,6 +1204,17 @@ export class StorageService {
         payload: draft,
         origin,
       });
+      if (origin === 'local' && this.crossWindowDraftChannel) {
+        try {
+          this.crossWindowDraftChannel.postMessage({
+            type: 'DRAFT_CHANGED',
+            senderId: this.instanceId,
+            folderPath,
+            draft,
+            action: 'upsert',
+          });
+        } catch {}
+      }
     } catch (err) {
       fsLog.warn('Failed to save composer draft to localStorage', { folderPath, err });
     }
@@ -1168,15 +1223,29 @@ export class StorageService {
   public deleteComposerDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
     try {
       const all = this.getAllComposerDrafts();
-      if (folderPath in all) {
+      const had = folderPath in all;
+      if (had) {
         delete all[folderPath];
         localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
-        this.emitChange({
-          kind: 'draft',
-          action: 'delete',
-          id: `composer:${folderPath}`,
-          origin,
-        });
+      }
+      const draftTombKey = `slag_sync_draft_tomb_${this.currentVault.id}_composer:${folderPath}`;
+      localStorage.setItem(draftTombKey, String(Date.now()));
+      this.emitChange({
+        kind: 'draft',
+        action: 'delete',
+        id: `composer:${folderPath}`,
+        origin,
+      });
+      if (origin === 'local' && this.crossWindowDraftChannel) {
+        try {
+          this.crossWindowDraftChannel.postMessage({
+            type: 'DRAFT_CHANGED',
+            senderId: this.instanceId,
+            folderPath,
+            draft: null,
+            action: 'delete',
+          });
+        } catch {}
       }
     } catch (err) {
       fsLog.warn('Failed to delete composer draft from localStorage', { folderPath, err });
