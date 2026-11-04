@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 import { logger } from '../../lib/logger';
@@ -134,6 +134,16 @@ export const SettingsModal: React.FC = () => {
       setIsUpdatingHotkey(false);
     }
   };
+
+  // Держим активную вкладку видимой: при возврате в настройки полоса оставалась
+  // на прежней позиции, и выбранный раздел оказывался за правым краем.
+  const tabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = tabsRef.current;
+    const el = box?.querySelector<HTMLElement>(`[data-tab="${activeTab}"]`);
+    if (!box || !el || box.scrollWidth <= box.clientWidth) return;
+    box.scrollTo({ left: el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2 });
+  }, [activeTab]);
 
   if (!isSettingsOpen) return null;
 
@@ -275,9 +285,13 @@ export const SettingsModal: React.FC = () => {
   const settingsBody = (
     <div className="flex-1 flex flex-col md:flex-row min-h-0">
       {/* Tabs Nav: Horizontal scroll on mobile, vertical left column on desktop */}
-      <div className="flex md:flex-col overflow-x-auto md:overflow-visible md:w-48 border-b md:border-b-0 md:border-r border-white/[0.06] bg-panel p-2 gap-1 select-none shrink-0 scrollbar-none">
+      <div
+        ref={tabsRef}
+        className="flex md:flex-col overflow-x-auto md:overflow-visible md:w-48 border-b md:border-b-0 md:border-r border-white/[0.06] bg-panel p-2 gap-1 select-none shrink-0 scrollbar-none"
+      >
         <button
           type="button"
+          data-tab="ai"
           onClick={() => setActiveTab('ai')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
             activeTab === 'ai'
@@ -291,6 +305,7 @@ export const SettingsModal: React.FC = () => {
 
         <button
           type="button"
+          data-tab="vault"
           onClick={() => setActiveTab('vault')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
             activeTab === 'vault'
@@ -304,6 +319,7 @@ export const SettingsModal: React.FC = () => {
 
         <button
           type="button"
+          data-tab="sync"
           onClick={() => setActiveTab('sync')}
           data-testid="settings-tab-sync"
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
@@ -318,6 +334,7 @@ export const SettingsModal: React.FC = () => {
 
         <button
           type="button"
+          data-tab="ui"
           onClick={() => setActiveTab('ui')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
             activeTab === 'ui'
@@ -331,6 +348,7 @@ export const SettingsModal: React.FC = () => {
 
         <button
           type="button"
+          data-tab="shortcuts"
           onClick={() => setActiveTab('shortcuts')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
             activeTab === 'shortcuts'
@@ -344,6 +362,7 @@ export const SettingsModal: React.FC = () => {
 
         <button
           type="button"
+          data-tab="logs"
           onClick={() => setActiveTab('logs')}
           data-testid="settings-tab-logs"
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
