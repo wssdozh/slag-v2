@@ -383,6 +383,14 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        // LIFO: сначала закрывается верхний слой (меню форматирования), редактор — следующим.
+        if (activeMobilePopover) {
+          // capture-фаза: гасим событие, чтобы глобальный обработчик Back
+          // не закрыл редактор вместе с меню (LIFO).
+          e.stopPropagation();
+          setActiveMobilePopover(null);
+          return;
+        }
         handleClose();
       } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.code === 'KeyS')) {
         e.preventDefault();
@@ -395,9 +403,9 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
         setIsFullWidth(prev => !prev);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleClose, handleSave]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [handleClose, handleSave, activeMobilePopover]);
 
   const tagInputRef = useRef<HTMLInputElement | null>(null);
 
