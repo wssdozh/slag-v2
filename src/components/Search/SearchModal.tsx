@@ -181,7 +181,8 @@ const SearchDialog: React.FC = () => {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Поиск по заметкам или введите '>' для команд..."
+        placeholder="Поиск по заметкам"
+        enterKeyHint="search"
         className="flex-1 bg-transparent text-base md:text-sm text-white placeholder-zinc-500 border-none focus:outline-none"
       />
       {query && (
