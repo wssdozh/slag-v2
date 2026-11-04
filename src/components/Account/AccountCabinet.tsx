@@ -185,7 +185,7 @@ export const AccountCabinet: React.FC = () => {
             ) : (
               <>
                 <label htmlFor="account-seed" className="text-sm text-zinc-300">Seed-фраза аккаунта</label>
-                <textarea id="account-seed" data-testid="account-seed-input" value={seed} onChange={(event) => setSeed(event.target.value)} rows={4} spellCheck={false} autoComplete="off" className="w-full resize-none rounded-lg border border-white/[0.08] bg-[#0c0c0e] p-3 text-sm font-mono outline-none focus:border-white/25" placeholder="12 или 24 слова" />
+                <textarea id="account-seed" data-testid="account-seed-input" value={seed} onChange={(event) => setSeed(event.target.value)} rows={4} spellCheck={false} autoCorrect="off" autoCapitalize="none" autoComplete="off" className="w-full resize-none rounded-lg border border-white/[0.08] bg-[#0c0c0e] p-3 text-sm font-mono outline-none focus:border-white/25" placeholder="12 или 24 слова" />
                 <p className="text-xs text-zinc-500">Фраза проверяется на вашем устройстве и не отправляется на сервер. На новом устройстве потребуется подтверждение с уже подключённого.</p>
               </>
             )}
