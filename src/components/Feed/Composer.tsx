@@ -973,8 +973,14 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
+  // Защита от повторного создания: второй вызов в том же тике видит те же данные
+  // и успел бы создать дубль, потому что состояние очищается уже после рендера.
+  const sendGuardRef = useRef(false);
   const sendItemWithAttachments = (attachmentsToSend: SlagAttachment[]) => {
+    if (sendGuardRef.current) return;
     if (!content.trim() && attachmentsToSend.length === 0) return;
+    sendGuardRef.current = true;
+    queueMicrotask(() => { sendGuardRef.current = false; });
 
     // Parse Todoist input synchronously for immediate state accuracy
     const currentParsed = parseTodoistInput(content);
