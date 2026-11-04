@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Command } from 'lucide-react';
 import { SLASH_COMMANDS, CATEGORY_LABELS, type SlashCommand } from '../../types/slashCommands';
+import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 
 interface SlashCommandMenuProps {
   query: string;
@@ -62,19 +63,7 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
       className={`absolute left-0 right-0 ${positionClasses} w-full rounded-2xl bg-surface-elevated border border-white/[0.12] shadow-2xl shadow-black/90 p-1.5 z-50 flex flex-col gap-0.5 animate-in ${animationClasses} fade-in duration-150 ease-out select-none overflow-hidden`}
     >
       {/* Шапка формы команд — фиксированная */}
-      <div className="px-2.5 py-1.5 border-b border-white/[0.06] bg-white/[0.02] rounded-t-xl flex items-center justify-between text-[10px] text-zinc-500 font-mono tracking-wider shrink-0">
-        <div className="flex items-center gap-1.5 text-zinc-300 uppercase">
-          <Command className="w-3 h-3 text-zinc-400" />
-          <span>Команды композера</span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-500">
-          <span>↑↓ выбор</span>
-          <span>•</span>
-          <span>Enter применить</span>
-          <span>•</span>
-          <span>Esc отмена</span>
-        </div>
-      </div>
+      <SuggestionMenuHeader icon={<Command className="w-3 h-3 text-zinc-400" />} title="Команды композера" />
 
       {/* Список команд со скроллом строго внутри */}
       <div
