@@ -1112,7 +1112,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               value={title}
               onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
               onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-              placeholder={type === 'task' ? 'Название задачи...' : 'Заголовок...'}
+              placeholder={type === 'task' ? 'Название таски...' : 'Заголовок...'}
               className={`w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight placeholder-zinc-600 border-none px-0 outline-none resize-none overflow-hidden [field-sizing:content] ${
                 type === 'task' && status === 'done' ? 'text-zinc-500 line-through' : 'text-white'
               }`}
@@ -1231,7 +1231,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                       type="button"
                       onClick={() => setIsDatePickerOpen(prev => !prev)}
                       className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                      title="Установить срок задачи"
+                      title="Установить срок таски"
                     >
                       <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                       <span>Срок</span>
@@ -1286,7 +1286,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                       type="button"
                       onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
                       className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                      title="Установить длительность задачи"
+                      title="Установить длительность таски"
                     >
                       <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                       <span>Длительность</span>
@@ -1343,7 +1343,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                       type="button"
                       onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
                       className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                      title="Повторяющаяся задача"
+                      title="Повторяющаяся таска"
                     >
                       <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                       <span>Повтор</span>

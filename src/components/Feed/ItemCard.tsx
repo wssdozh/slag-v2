@@ -535,7 +535,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <button
               onClick={() => toggleTaskComplete(item.id)}
               title={item.status === 'done' ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
-              aria-label="Изменить статус задачи"
+              aria-label="Изменить статус таски"
               className="mt-0.5 text-zinc-400 hover:text-white transition-colors shrink-0"
             >
               {item.status === 'done' ? (

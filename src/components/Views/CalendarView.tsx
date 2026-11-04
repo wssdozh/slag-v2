@@ -185,7 +185,7 @@ export const CalendarView: React.FC = () => {
           reminder,
         });
         const timeFormatted = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        addToast(`Задача перенесена на ${dateStr} в ${timeFormatted}`, 'info');
+        addToast(`Таска перенесена на ${dateStr} в ${timeFormatted}`, 'info');
       } else if (targetData.dropZone === 'calendar-allday') {
         const dateStr = targetData.dropDate;
         const updatedTitle = cleanTimeFromTitle(task.title);
@@ -195,7 +195,7 @@ export const CalendarView: React.FC = () => {
           dueDate: dateStr,
           reminder: undefined,
         });
-        addToast(`Задача перенесена на ${dateStr} (весь день)`, 'info');
+        addToast(`Таска перенесена на ${dateStr} (весь день)`, 'info');
       } else if (targetData.dropZone === 'calendar-month') {
         const dateStr = targetData.dropDate;
         let reminder: string | undefined = undefined;
@@ -216,7 +216,7 @@ export const CalendarView: React.FC = () => {
           dueDate: dateStr,
           reminder,
         });
-        addToast(`Задача перенесена на ${dateStr}`, 'info');
+        addToast(`Таска перенесена на ${dateStr}`, 'info');
       } else if (targetData.dropZone === 'calendar-unscheduled') {
         const updatedTitle = cleanTimeFromTitle(task.title);
         updateItem({
@@ -437,7 +437,7 @@ export const CalendarView: React.FC = () => {
       ...task,
       dueDate: newDate,
     });
-    addToast(`Задача перенесена на ${newDate}`, 'info');
+    addToast(`Таска перенесена на ${newDate}`, 'info');
   };
 
   // Render a Compact All-Day Task Pill
@@ -455,7 +455,7 @@ export const CalendarView: React.FC = () => {
           handlePointerDown(e, {
             type: 'task',
             id: realTaskId,
-            title: task.title || 'Задача',
+            title: task.title || 'Таска',
           })
         }
         onClick={() => {
@@ -745,7 +745,7 @@ export const CalendarView: React.FC = () => {
             handlePointerDown(e, {
               type: 'task',
               id: realTaskId,
-              title: task.title || 'Задача',
+              title: task.title || 'Таска',
             });
           }
         }}
@@ -1394,7 +1394,7 @@ export const CalendarView: React.FC = () => {
                                 handlePointerDown(e, {
                                   type: 'task',
                                   id: realTaskId,
-                                  title: task.title || 'Задача',
+                                  title: task.title || 'Таска',
                                 })
                               }
                               onClick={e => {
@@ -1416,7 +1416,7 @@ export const CalendarView: React.FC = () => {
                                 {task.title}
                               </span>
                               {task.recurrence && (
-                                <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
+                                <span title="Повторяющаяся таска" className="shrink-0 flex items-center">
                                   <Repeat className="w-2.5 h-2.5 text-amber-400" />
                                 </span>
                               )}
@@ -1556,7 +1556,7 @@ export const CalendarView: React.FC = () => {
                           handlePointerDown(e, {
                             type: 'task',
                             id: task.id,
-                            title: task.title || 'Задача',
+                            title: task.title || 'Таска',
                           })
                         }
                         onClick={() => {
@@ -1633,7 +1633,7 @@ export const CalendarView: React.FC = () => {
                         handlePointerDown(e, {
                           type: 'task',
                           id: task.id,
-                          title: task.title || 'Задача',
+                          title: task.title || 'Таска',
                         })
                       }
                       onClick={() => {
@@ -1753,7 +1753,7 @@ export const CalendarView: React.FC = () => {
                         handlePointerDown(e, {
                           type: 'task',
                           id: realTaskId,
-                          title: task.title || 'Задача',
+                          title: task.title || 'Таска',
                         })
                       }
                       onClick={() => {
@@ -1789,7 +1789,7 @@ export const CalendarView: React.FC = () => {
                           {task.title}
                         </span>
                         {task.recurrence && (
-                          <span title="Повторяющаяся задача" className="shrink-0 flex items-center">
+                          <span title="Повторяющаяся таска" className="shrink-0 flex items-center">
                             <Repeat className="w-3 h-3 text-amber-400" />
                           </span>
                         )}

@@ -55,9 +55,9 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
           title={
             effectiveDueDate
               ? `Срок: ${effectiveDateLabel} (клик для изменения, ПКМ для сброса)`
-              : 'Установить срок задачи'
+              : 'Установить срок таски'
           }
-          aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок задачи'}
+          aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок таски'}
           icon={<Calendar className="w-4 h-4" />}
         />
 
@@ -103,9 +103,9 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                       ? `${Math.floor(effectiveDuration / 60)}ч${effectiveDuration % 60 ? ` ${effectiveDuration % 60}м` : ''}`
                       : `${effectiveDuration}м`
                   } (клик для изменения, ПКМ для сброса)`
-                : 'Установить длительность задачи'
+                : 'Установить длительность таски'
             }
-            aria-label="Установить длительность задачи"
+            aria-label="Установить длительность таски"
             icon={<Clock className="w-4 h-4" />}
           />
         }
@@ -166,7 +166,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 ? `повторение: ${formatRecurrenceLabel(effectiveRecurrence)} (клик для изменения, ПКМ для сброса)`
                 : 'повторение: настроить повтор'
             }
-            aria-label="Повторяющаяся задача"
+            aria-label="Повторяющаяся таска"
             icon={<Repeat className="w-4 h-4" />}
           />
         }

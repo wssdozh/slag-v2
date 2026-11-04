@@ -99,7 +99,7 @@ export const MobileTasksView: React.FC = () => {
             : 'text-zinc-400 hover:text-zinc-200'
         }`}
       >
-        Задачи
+        Таски
       </button>
       <button
         type="button"
@@ -126,13 +126,13 @@ export const MobileTasksView: React.FC = () => {
     <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
       {/* Top Header */}
       <MobileScreenHeader
-        title="Задачи"
+        title="Таски"
         leftSlot={
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white">
               <CheckSquare className="w-3.5 h-3.5" />
             </div>
-            <h1 className="text-base font-bold text-white tracking-tight">Задачи</h1>
+            <h1 className="text-base font-bold text-white tracking-tight">Таски</h1>
             <span className="text-xs font-mono text-zinc-500">
               ({allTasks.length})
             </span>
@@ -201,7 +201,7 @@ export const MobileTasksView: React.FC = () => {
                     toggleTaskComplete(task.id);
                   }}
                   className="mt-0.5 p-1 rounded text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  aria-label="Изменить статус задачи"
+                  aria-label="Изменить статус таски"
                 >
                   {isDone ? (
                     <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-400/20" />

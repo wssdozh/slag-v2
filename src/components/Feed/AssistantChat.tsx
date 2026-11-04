@@ -333,13 +333,13 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
         } else {
           inCodeBlock = false;
           if (codeBlockLang === 'task' || codeBlockLang === 'todo') {
-            const firstLine = codeBlockLines[0] || 'Задача';
+            const firstLine = codeBlockLines[0] || 'Таска';
             const restLines = codeBlockLines.slice(1);
             elements.push(
               <div key={`cb-${i}`} className="my-2 rounded-xl bg-surface border border-white/[0.08] p-3 text-xs flex flex-col gap-2">
                 <div className="flex items-center gap-1.5 text-zinc-400 font-medium font-mono text-2xs uppercase tracking-wider">
                   <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Задача</span>
+                  <span>Таска</span>
                 </div>
                 <div className="font-semibold text-zinc-100 text-xs">
                   {firstLine}
@@ -548,7 +548,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 {isInbox ? 'Ассистент по всем заметкам' : `Ассистент «${folderMeta?.name || currentFolder}»`}
               </h3>
               <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-                Задайте вопрос, найдите записи или попросите создать задачу.
+                Задайте вопрос, найдите записи или попросите создать таску.
               </p>
 
               <div className="flex flex-col gap-1.5 w-full">
@@ -573,12 +573,12 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                   <span className="text-2xs text-zinc-500 font-mono">search</span>
                 </button>
                 <button
-                  onClick={() => handleQuickPrompt('Создай новую задачу: Проверить синхронизацию заметок')}
+                  onClick={() => handleQuickPrompt('Создай новую таску: Проверить синхронизацию заметок')}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
                     <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                    <span>Создать задачу</span>
+                    <span>Создать таску</span>
                   </span>
                   <span className="text-2xs text-zinc-500 font-mono">task</span>
                 </button>
@@ -725,7 +725,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                action.type === 'schedule_task' ? 'Планирование в календарь' :
                                action.type === 'batch_update' ? (action.title || 'Перенос задач') :
                                action.type === 'create_note' ? (
-                                 action.itemType === 'task' ? 'Черновик задачи' :
+                                 action.itemType === 'task' ? 'Черновик таски' :
                                  action.itemType === 'article' ? 'Черновик статьи' :
                                  'Черновик заметки'
                                ) :

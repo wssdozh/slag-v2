@@ -738,7 +738,7 @@ export const Composer: React.FC<ComposerProps> = ({
     switch (cmd.id) {
       case 'task':
         setItemType('task');
-        addToast('Режим переключен: Задача', 'info');
+        addToast('Режим переключен: Таска', 'info');
         break;
       case 'note':
         setItemType('note');
@@ -996,7 +996,7 @@ export const Composer: React.FC<ComposerProps> = ({
     if (itemType === 'article') {
       title = firstLine || 'Новая статья';
     } else if (itemType === 'task') {
-      title = currentParsed.cleanTitle || 'Новая задача';
+      title = currentParsed.cleanTitle || 'Новая таска';
     } else if (firstLine) {
       title = firstLine.slice(0, 50);
     } else if (attachmentsToSend.length > 0) {
@@ -1131,7 +1131,7 @@ export const Composer: React.FC<ComposerProps> = ({
     const currentParsed = parseTodoistInput(content);
 
     const taskTitle = itemType === 'task'
-      ? (currentParsed.cleanTitle || 'Новая задача')
+      ? (currentParsed.cleanTitle || 'Новая таска')
       : firstLine;
 
     const rawGhostTags = currentParsed.tags.filter(t => !dismissedTags.has(t));
@@ -1712,16 +1712,16 @@ export const Composer: React.FC<ComposerProps> = ({
       placeholder={
         isModal
           ? itemType === 'task'
-            ? 'Название задачи... (@ папка, # тег, Enter)'
+            ? 'Название таски... (@ папка, # тег, Enter)'
             : 'Содержимое записи... (@ папка, # тег, Enter)'
           : isMobile
           ? itemType === 'task'
-            ? 'Задача…'
+            ? 'Таска…'
             : itemType === 'article'
             ? 'Черновик статьи…'
             : 'Мысль, заметка или задача…'
           : itemType === 'task'
-          ? 'Задача... (@ папка, # тег, - [ ] подзадачи, [[ ссылки)'
+          ? 'Таска... (@ папка, # тег, - [ ] подзадачи, [[ ссылки)'
           : itemType === 'article'
           ? 'Черновик статьи... (@ папка, # тег, Shift+Enter, [[ ссылки)'
           : 'Мысль, заметка или код... (@ папка, # тег, / команды, [[ ссылки)'

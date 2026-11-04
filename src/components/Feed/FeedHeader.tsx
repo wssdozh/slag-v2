@@ -158,7 +158,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
               type="button"
               onClick={() => setHideCompletedTasks(false)}
               className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
-              title="Показать выполненные задачи"
+              title="Показать выполненные таски"
             >
               <X className="w-3 h-3" />
             </button>

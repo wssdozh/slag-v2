@@ -69,7 +69,7 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
             onToggleComplete();
           }}
           className="p-1 rounded text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          aria-label="Изменить статус задачи"
+          aria-label="Изменить статус таски"
         >
           {isDone ? (
             <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-400/20" />
