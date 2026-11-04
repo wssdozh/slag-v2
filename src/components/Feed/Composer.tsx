@@ -373,6 +373,9 @@ export const Composer: React.FC<ComposerProps> = ({
     const unsubscribe = storage.subscribeChanges((event) => {
       if (event.kind === 'draft') {
         const isCurrentFolder = event.id === `composer:${activeFolder}`;
+        // Эхо собственной записи: состояние уже актуально, применять его обратно нельзя —
+        // иначе только что выбранная папка/теги откатываются к предыдущему черновику.
+        if (isCurrentFolder && event.origin === 'local') return;
         if (isCurrentFolder) {
           if (event.action === 'upsert' && event.payload) {
             const incomingDraft = event.payload as ComposerDraft;
@@ -400,8 +403,7 @@ export const Composer: React.FC<ComposerProps> = ({
             const shouldAdopt =
               !isUserActivelyTyping &&
               ((!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
-                incomingTs >= lastAdoptedRemoteDraftUpdatedAtRef.current ||
-                event.origin === 'local');
+                incomingTs >= lastAdoptedRemoteDraftUpdatedAtRef.current);
 
             if (shouldAdopt) {
               isApplyingRemoteDraftRef.current = true;
