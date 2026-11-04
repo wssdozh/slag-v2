@@ -123,3 +123,25 @@ SLAG v2 автоматически определяет платформу пр�
 - `./slag-v2 --quick`: мгновенно открывает окно быстрой мысли через IPC одиночного инстанса.
 - `./slag-v2 --install-system`: генерирует `.desktop`-файл и привязывает хоткей в GNOME без запуска окна GUI (идеально для инсталляторов и пакетов).
 - `./slag-v2 --uninstall-system`: отвязывает шорткат из GNOME.
+
+---
+
+## 7. Сборка и Отладка на Android (Tauri v2 Mobile)
+
+### Переменные окружения (настроены в `~/.bashrc`):
+```bash
+export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+export NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+export JAVA_HOME="/usr/lib/jvm/java-17-openjdk"
+export PATH="$HOME/.cargo/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+```
+
+### Команды для агента и разработчика:
+| Команда | Описание |
+|---|---|
+| `npm run build:android` | Собрать `app-universal-debug.apk` (Vite frontend + Rust aarch64 cdylib + Gradle APK). |
+| `npm run android:install` | Установить собранный APK на подключенное по USB / Wi-Fi Android-устройство через `adb`. |
+| `npm run android:run` | Запустить установленное приложение `com.slag.notes` на устройстве. |
+| `npm run android:log` | Читать консольные логи в реальном времени (`RustStdoutStderr`, `SLAG`, `chromium`). |
+| `adb exec-out screencap -p > <path>.png` | Снять скриншот экрана мобильного устройства для визуальной инспекции. |
