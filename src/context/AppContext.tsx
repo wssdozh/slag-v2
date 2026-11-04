@@ -28,7 +28,7 @@ import { backupService } from '../lib/backupService';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { openAppFolder } from '../lib/folderOpener';
-import { listenDesktopEvents, isDesktopApp } from '../lib/windowControls';
+import { listenDesktopEvents, isDesktopApp, isMobilePlatform } from '../lib/windowControls';
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -352,7 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof initialWorkspace.isKanbanMaterialsOpen === 'boolean') {
       return initialWorkspace.isKanbanMaterialsOpen;
     }
-    const isMobileInitial = typeof window !== 'undefined' && window.innerWidth < 768;
+    const isMobileInitial = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobilePlatform());
     return !isMobileInitial;
   });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
@@ -557,7 +557,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [forceMobileMode, setForceMobileMode] = useState<boolean | null>(null);
   const isDesktop = isDesktopApp();
   const isStandalone = typeof window !== 'undefined' && Boolean(new URLSearchParams(window.location.search).get('panel'));
-  const isMobile = !isStandalone && (forceMobileMode !== null ? forceMobileMode : (!isDesktop && isMobileScreen));
+  const isMobile = !isStandalone && (forceMobileMode !== null ? forceMobileMode : (isMobilePlatform() || (!isDesktop && isMobileScreen)));
 
   const toggleMobileMode = useCallback(() => {
     setForceMobileMode(prev => {

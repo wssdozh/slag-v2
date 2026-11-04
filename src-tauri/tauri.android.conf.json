@@ -1,0 +1,13 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "SLAG",
+        "url": "index.html",
+        "decorations": false,
+        "transparent": false
+      }
+    ]
+  }
+}

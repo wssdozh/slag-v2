@@ -5,8 +5,13 @@ import { logger } from './logger';
 
 const wsLog = logger.scope('WORKSPACE');
 
+export const isMobilePlatform = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+};
+
 export const isDesktopApp = (): boolean => {
-  return isTauri();
+  return isTauri() && !isMobilePlatform();
 };
 
 export const minimizeWindow = async (): Promise<void> => {
