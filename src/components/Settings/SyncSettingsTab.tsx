@@ -47,7 +47,7 @@ interface SyncSettingsTabProps {
 }
 
 export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) => {
-  const { switchVault, createVault, vaults } = useApp();
+  const { switchVault, createVault, vaults, isMobile } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [accountState, setAccountState] = useState(accountClient.getState());
@@ -523,7 +523,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         <div className="divide-y divide-white/[0.04]">
           <div className="py-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
+              {isMobile ? <Smartphone className="w-4 h-4 text-zinc-400 shrink-0" /> : <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />}
               <div className="min-w-0">
                 <div className="text-xs text-zinc-200">{config.deviceName}</div>
                 <div className="text-[11px] font-mono text-zinc-500 truncate">{config.deviceId} · это устройство</div>
@@ -533,8 +533,10 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               const next = config.localSyncMode === 'receive-only' ? 'read-write' : 'receive-only';
               syncEngine.setDeviceSyncMode(config.deviceId, next);
               setConfig(syncEngine.getConfig());
-            }} className="text-[11px] font-mono text-zinc-400">
-              {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}
+            }}
+            title="Локальный режим синхронизации этого устройства"
+            className="text-[11px] font-mono text-zinc-400">
+              {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Чтение и запись'}
             </button>
           </div>
 
