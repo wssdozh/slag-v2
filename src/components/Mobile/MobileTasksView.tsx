@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
+import { formatDueDateLabel } from '../../lib/dateUtils';
+import { PRIORITY_LABELS } from '../../lib/taskUtils';
 import {
   CheckSquare,
   Circle,
@@ -150,13 +152,13 @@ export const MobileTasksView: React.FC = () => {
               <button
                 key={col.id}
                 onClick={() => setActiveStatusTab(col.id)}
-                className={`flex-1 min-w-0 px-2 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 ${
+                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 ${
                   isActive
                     ? 'bg-white/10 text-white shadow-sm font-semibold'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <span className="truncate">{col.title}</span>
+                <span>{col.title}</span>
                 <span className={`text-[10px] font-mono shrink-0 ${isActive ? 'text-zinc-200' : 'text-zinc-500'}`}>
                   ({count})
                 </span>
@@ -228,13 +230,13 @@ export const MobileTasksView: React.FC = () => {
                     {task.dueDate && (
                       <span className="flex items-center gap-1 text-[10px] font-mono text-blue-400">
                         <Calendar className="w-3 h-3" />
-                        <span>{task.dueDate}</span>
+                        <span>{formatDueDateLabel(task.dueDate)}</span>
                       </span>
                     )}
 
                     {task.priority && task.priority !== 'none' && (
                       <span
-                        className={`text-2xs uppercase font-mono font-medium ${
+                        className={`text-2xs font-mono font-medium ${
                           task.priority === 'high'
                             ? 'text-rose-400'
                             : task.priority === 'medium'
@@ -242,7 +244,7 @@ export const MobileTasksView: React.FC = () => {
                             : 'text-zinc-500'
                         }`}
                       >
-                        {task.priority}
+                        {PRIORITY_LABELS[task.priority] ?? task.priority}
                       </span>
                     )}
                   </div>

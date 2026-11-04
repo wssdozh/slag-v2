@@ -90,3 +90,11 @@ export function migrateLegacySubtasksToContent(
   }
   return `${trimmed}\n\n${checklistLines.join('\n')}`;
 }
+
+/** Подписи приоритетов для интерфейса. Один словарь вместо копий по компонентам. */
+export const PRIORITY_LABELS: Record<string, string> = {
+  none: 'Без приоритета',
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+};
