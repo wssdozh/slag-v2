@@ -535,7 +535,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               setConfig(syncEngine.getConfig());
             }}
             title="Локальный режим синхронизации этого устройства"
-            className="text-[11px] font-mono text-zinc-400">
+            className="text-[11px] font-mono text-zinc-400 whitespace-nowrap shrink-0">
               {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Чтение и запись'}
             </button>
           </div>
