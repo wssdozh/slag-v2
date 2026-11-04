@@ -141,6 +141,7 @@
 | 01, 04, 05, 16 | [fixes/01-mobile-header.md](<fixes/01-mobile-header.md>) | высота шапки учитывает системный inset, подпись не режет разделитель | да |
 | 13б | [fixes/27-search-placeholder.md](<fixes/27-search-placeholder.md>) | подсказка поиска целиком, кнопка «поиск» на клавиатуре | код + браузер |
 | 06 | [fixes/06-secret-fields.md](<fixes/06-secret-fields.md>) | одно поле секрета вместо копипасты, без автокоррекции, с нормальным именем кнопки | браузер |
+| 10 | [fixes/10-server-check.md](<fixes/10-server-check.md>) | результат проверки сервера отдельной строкой, ошибка отличается цветом | браузер |
 
 | — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
 
