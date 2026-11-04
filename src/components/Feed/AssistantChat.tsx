@@ -1166,7 +1166,8 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     type="button"
                     onClick={() => setIsSettingsOpen(true)}
                     className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 text-xs font-mono transition-colors cursor-pointer"
-                    title="Нажмите для настройки API-ключа (⌘,)"
+                    title="Локальный режим без ключа. Нажмите, чтобы настроить API-ключ (⌘,)"
+                    aria-label="Локальный режим, открыть настройки API-ключа"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
                     <span>Локальный</span>
@@ -1174,8 +1175,13 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 )}
 
                 {/* Reasoning Selector - Embedded ghost */}
-                <div className="flex items-center gap-0.5 text-xs font-mono text-zinc-400">
-                  <span className="text-zinc-500 pl-0.5">R:</span>
+                <div
+                  className="flex items-center gap-0.5 text-xs font-mono text-zinc-400"
+                  role="group"
+                  aria-label="Глубина рассуждений модели"
+                  title="Глубина рассуждений модели: Off / Low / Med / High"
+                >
+                  <span className="text-zinc-500 pl-0.5" aria-hidden="true">R:</span>
                   <Select
                     size="md"
                     variant="ghost"
@@ -1200,7 +1206,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                       ? 'text-sky-400 bg-sky-500/10 hover:bg-sky-500/15 font-medium'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
                   }`}
-                  title="Поиск информации в глобальной сети Интернет"
+                  title={aiSettings.webSearchEnabled ? 'Поиск в интернете включён' : 'Поиск в интернете выключен'}
+                  aria-label="Поиск в интернете"
+                  aria-pressed={aiSettings.webSearchEnabled}
                 >
                   <Globe className="w-4 h-4" />
                   <span className="hidden sm:inline">Сеть</span>
