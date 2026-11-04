@@ -39,7 +39,7 @@ test.describe('Recurring Tasks & Streak Engine E2E Verification', () => {
     await checkbox.click();
 
     // Verify completion toast
-    await expect(page.locator('text=/Задача выполнена/')).toBeVisible();
+    await expect(page.locator('text=/Таска выполнена/')).toBeVisible();
 
     // Verify card remains in feed as completed (no instant respawn)
     await expect(taskCard).toBeVisible();
@@ -55,7 +55,7 @@ test.describe('Recurring Tasks & Streak Engine E2E Verification', () => {
 
     // Revert completion on the same day
     await checkbox.click();
-    await expect(page.locator('text=Задача возобновлена')).toBeVisible();
+    await expect(page.locator('text=Таска возобновлена')).toBeVisible();
     await expect(taskCard.locator('h3')).not.toHaveClass(/line-through/);
     await expect(streakBadge).toContainText('0');
   });

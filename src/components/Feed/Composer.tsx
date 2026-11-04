@@ -1719,7 +1719,7 @@ export const Composer: React.FC<ComposerProps> = ({
             ? 'Таска…'
             : itemType === 'article'
             ? 'Черновик статьи…'
-            : 'Мысль, заметка или задача…'
+            : 'Мысль, заметка или таска…'
           : itemType === 'task'
           ? 'Таска... (@ папка, # тег, - [ ] подзадачи, [[ ссылки)'
           : itemType === 'article'

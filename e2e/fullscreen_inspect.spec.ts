@@ -17,7 +17,7 @@ test('Capture Fullscreen Editor Teletype Top Utilities and Object Context', asyn
   await page.waitForTimeout(200);
 
   // Type title
-  const titleInput = page.locator('input[placeholder*="Название задачи"], input[placeholder*="Заголовок"]').first();
+  const titleInput = page.locator('input[placeholder*="Название таски"], input[placeholder*="Заголовок"]').first();
   await titleInput.click();
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.type('Карьера: 7 типичных ошибок начинающего разработчика');

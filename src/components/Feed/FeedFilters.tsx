@@ -62,7 +62,8 @@ export const FeedFilters: React.FC<FeedFiltersProps> = ({
   const typeOptions: SegmentedOption[] = [
     {
       value: 'all',
-      label: 'Все',
+      // В «Входящих» рядом стоит ещё один фильтр «Все» — уточняем, чтобы не читались как дубль.
+      label: isInbox ? 'Все типы' : 'Все',
       title: 'Все типы записей',
     },
     {

@@ -199,7 +199,7 @@ test('fullscreen editor live autosave saves existing note with indicator', async
   await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
 
   // Title input
-  const titleInput = page.locator('input[placeholder*="Название задачи"], input[placeholder*="Заголовок"]').first();
+  const titleInput = page.locator('input[placeholder*="Название таски"], input[placeholder*="Заголовок"]').first();
   await expect(titleInput).toBeVisible();
 
   // Append text to trigger change

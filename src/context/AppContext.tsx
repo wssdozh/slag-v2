@@ -1505,11 +1505,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (newStatus === 'done') {
         const toastText = item.recurrence && streak !== undefined
-          ? `Задача выполнена (🔥 ${streak})`
-          : 'Задача выполнена';
+          ? `Таска выполнена (🔥 ${streak})`
+          : 'Таска выполнена';
         addToast(toastText, 'success');
       } else {
-        addToast('Задача возобновлена', 'info');
+        addToast('Таска возобновлена', 'info');
       }
     }
   }, [items, updateItem, addToast]);

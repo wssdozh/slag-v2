@@ -38,7 +38,7 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
 
     // Type ">" to switch to Command Palette mode
     await searchInput.fill('>задача');
-    const commandItem = page.locator('text=Создать задачу');
+    const commandItem = page.locator('text=Создать таску');
     await expect(commandItem).toBeVisible();
 
     // Press Enter to execute the command
@@ -136,7 +136,7 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
     await expect(page.locator('kbd:has-text("Ctrl+F / Ctrl+K")')).toBeVisible();
     await expect(page.locator('span:has-text("Переключить Ассистента")')).toBeVisible();
     await expect(page.locator('kbd:has-text("Ctrl+J")')).toBeVisible();
-    await expect(page.locator('span:has-text("Создать задачу")')).toBeVisible();
+    await expect(page.locator('span:has-text("Создать таску")')).toBeVisible();
     await expect(page.locator('kbd:text-is("C")')).toBeVisible();
     await expect(page.locator('span:has-text("Создать заметку")')).toBeVisible();
     await expect(page.locator('kbd:text-is("N")')).toBeVisible();

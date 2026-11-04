@@ -71,7 +71,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await checkbox.click();
 
     // Verify completion status change via toast or styling
-    await expect(page.locator('text=Задача выполнена').or(page.locator('text=Задача возобновлена'))).toBeVisible();
+    await expect(page.locator('text=Таска выполнена').or(page.locator('text=Таска возобновлена'))).toBeVisible();
   });
 
   test('3. Hybrid Inbox mode switching (Unsorted, All, Sorted)', async ({ page }) => {
@@ -615,7 +615,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]').first();
     await addBtn.click();
 
-    const input = page.locator('[placeholder*="Название задачи"]');
+    const input = page.locator('[placeholder*="Название таски"]');
     await expect(input).toBeVisible();
     const taskName = 'Линейный Канбан Тест ' + Date.now();
     await input.fill(taskName);
@@ -1777,7 +1777,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // 6. Verify command token is stripped from textarea and Toast/mode confirms Task switch
     await expect(textarea).toHaveValue('');
-    await expect(page.locator('text=Режим переключен: Задача').first()).toBeVisible();
+    await expect(page.locator('text=Режим переключен: Таска').first()).toBeVisible();
 
     // 7. Test deadline command "/today"
     await textarea.fill('/today');
@@ -2219,7 +2219,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const modalHeader = page.locator('h3, [role="dialog"]').filter({ hasText: 'Новая задача' }).first();
     await expect(modalHeader).toBeVisible();
 
-    const taskInput = page.locator('[placeholder*="Название задачи"]');
+    const taskInput = page.locator('[placeholder*="Название таски"]');
     await expect(taskInput).toBeVisible();
 
     // Test Slash Command menu in ComposerModal
@@ -2341,7 +2341,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await addAllDayBtn.click();
     await page.waitForTimeout(200);
 
-    const taskInput = page.locator('[placeholder*="Название задачи"]');
+    const taskInput = page.locator('[placeholder*="Название таски"]');
     await expect(taskInput).toBeVisible();
     const uniqueUntimedTitle = `БезВремени_${Date.now()}`;
     await taskInput.fill(uniqueUntimedTitle);
@@ -2639,7 +2639,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(400);
 
     // Verify toast about recurrence completion
-    const toast = page.locator('text=/Задача выполнена|Повтор выполнен/').first();
+    const toast = page.locator('text=/Таска выполнена|Повтор выполнен/').first();
     await expect(toast).toBeVisible({ timeout: 4000 });
 
     // 7. Verify Discrete Duration Card States (15m, 30m, 45m, 60m)
@@ -2882,7 +2882,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       await page.waitForTimeout(200);
 
       // Verify task composer modal was NOT triggered by drag
-      const composerModal = page.locator('[placeholder*="Название задачи"]');
+      const composerModal = page.locator('[placeholder*="Название таски"]');
       const isComposerVisible = await composerModal.isVisible();
       expect(isComposerVisible).toBe(false);
     }
