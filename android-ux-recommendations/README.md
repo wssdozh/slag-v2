@@ -146,6 +146,7 @@
 | 02 | [fixes/02-dock-a11y.md](<fixes/02-dock-a11y.md>) | синяя точка объяснена в доступном имени кнопки | браузер |
 | 17 | [fixes/17-subtasks-toggle.md](<fixes/17-subtasks-toggle.md>) | у сворачивания подзадач есть состояние и внятное имя | браузер |
 | 04 | [fixes/04-plural-calendar.md](<fixes/04-plural-calendar.md>) | склонение «таска/таски/тасок» в счётчиках календаря и канбана | браузер |
+| 05 | [fixes/05-assistant-controls.md](<fixes/05-assistant-controls.md>) | «Локальный», «R:» и глобус получили понятные имена и состояние | браузер |
 
 | — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
 
