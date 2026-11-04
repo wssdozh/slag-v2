@@ -199,7 +199,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
           <div className="flex items-center justify-between gap-2 relative min-w-0">
             {leftControls}
 
-            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+            <div className="flex items-center gap-1.5 max-md:gap-2.5 shrink-0 ml-auto">
               {rightControls}
 
               {sendButton !== undefined ? (

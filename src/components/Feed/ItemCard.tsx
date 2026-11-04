@@ -485,7 +485,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 });
               }
             }}
-            className="w-6 h-6 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-all duration-150 cursor-pointer flex items-center justify-center shrink-0"
+            className="w-9 h-9 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-all duration-150 cursor-pointer flex items-center justify-center shrink-0"
             title="Действия"
           >
             <MoreVertical className="w-3.5 h-3.5 shrink-0" />
@@ -496,7 +496,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <button
               type="button"
               onClick={handleOpenArticle}
-              className="w-6 h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              className="w-9 h-9 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
               title="Открыть в фокус-редакторе (⌘E)"
               aria-label="Открыть в фокус-редакторе"
             >

@@ -101,6 +101,14 @@
     --slag-feed-gap: 0.75rem;
   }
 
+  /* На тач-экранах плотность крутит мобильную базу, а не десктопные 32px:
+     раньше «normal» на телефоне давал 32px — мельче пальца. */
+  @media (max-width: 768px), (pointer: coarse) {
+    [data-density="compact"] { --slag-ctrl-sm: 30px; --slag-ctrl-md: 34px; --slag-ctrl-lg: 40px; --slag-touch-target: 40px; }
+    [data-density="normal"] { --slag-ctrl-sm: 32px; --slag-ctrl-md: 38px; --slag-ctrl-lg: 44px; --slag-touch-target: 44px; }
+    [data-density="spacious"] { --slag-ctrl-sm: 34px; --slag-ctrl-md: 42px; --slag-ctrl-lg: 48px; --slag-touch-target: 48px; }
+  }
+
   html, body {
     overscroll-behavior-y: none;
     -webkit-text-size-adjust: 100%;
