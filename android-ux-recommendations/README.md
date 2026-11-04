@@ -126,6 +126,9 @@
 | 01, 27 | [fixes/01-composer-hint.md](<fixes/01-composer-hint.md>) | подсказка композера больше не обрывается | да |
 | 32–34 | [fixes/32-composer-gap.md](<fixes/32-composer-gap.md>) | зазор между скрепкой и отправкой 10 px | да |
 | 16–19 | [fixes/16-19-card-menu.md](<fixes/16-19-card-menu.md>) | зона меню карточки 36 px на тач-экранах | да |
+| 45 | [fixes/45-settings-tab.md](<fixes/45-settings-tab.md>) | активная вкладка настроек прокручивается в видимую зону | да |
+| 03, 04 | [fixes/03-status-labels.md](<fixes/03-status-labels.md>) | полные подписи статусов, русские приоритеты и даты | да |
+| 19, 39 | [fixes/19-explorer-capability.md](<fixes/19-explorer-capability.md>) | неподдерживаемый проводник скрыт, native-вызов не дергается | код, без кадра шторки |
 
 порядок работы: пункт → причина в коде → минимальная правка → `tsc -b`, `oxlint` → сборка apk, установка, проверка через adb и CDP → файл в `fixes/`. непроверенное не помечается закрытым.
 
