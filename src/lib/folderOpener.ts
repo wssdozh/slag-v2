@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core';
+import { isDesktopApp } from './windowControls';
 import { logger } from './logger';
 
 const fsLog = logger.scope('FS');
@@ -28,8 +28,8 @@ export async function openAppFolder(
     }
   }
 
-  // 1. Desktop native app via Tauri invoke
-  if (isTauri()) {
+  // 1. Desktop native app via Tauri invoke (на Android команда не зарегистрирована)
+  if (isDesktopApp()) {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const dirPath = await invoke<string>('open_in_folder', { target });
