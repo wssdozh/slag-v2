@@ -138,6 +138,8 @@
 | 09 | [fixes/09-sync-limits.md](<fixes/09-sync-limits.md>) | неизвестные лимиты больше не печатаются как нули | да |
 | 09 | [fixes/09-device-card.md](<fixes/09-device-card.md>) | иконка устройства по платформе, «Чтение и запись» вместо «Полный доступ» | да |
 | 32, 33 | [fixes/33-double-submit.md](<fixes/33-double-submit.md>) | двойной тап по отправке больше не создаёт дубль | браузер |
+| 01, 04, 05, 16 | [fixes/01-mobile-header.md](<fixes/01-mobile-header.md>) | высота шапки учитывает системный inset, подпись не режет разделитель | да |
+| 13б | [fixes/27-search-placeholder.md](<fixes/27-search-placeholder.md>) | подсказка поиска целиком, кнопка «поиск» на клавиатуре | код + браузер |
 
 | — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
 
