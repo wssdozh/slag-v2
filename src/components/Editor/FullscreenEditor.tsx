@@ -1072,7 +1072,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             {/* Linear Dark Save Button (no kbd badge) */}
             <button
               onClick={handleSave}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-xs font-medium border border-white/[0.08] hover:border-white/[0.16] shadow-sm transition-all cursor-pointer active:scale-95"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-xs font-medium border border-white/[0.08] hover:border-white/[0.16] shadow-sm transition-all cursor-pointer active:scale-95"
               title="Сохранить изменения (Ctrl+S / ⌘S)"
             >
               <Save className="w-4 h-4 text-zinc-300" />
@@ -1893,7 +1893,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             title="Сохранить и закрыть (Ctrl+S)"
           >
             <Check className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
-            <span className="text-xs font-medium">Готово</span>
+            <span className="text-xs font-medium">{item.id.startsWith('draft_') ? 'Создать' : 'Готово'}</span>
           </button>
         </div>
       </div>
