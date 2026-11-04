@@ -1,3 +1,4 @@
+import { navigatePage } from '../../lib/navigation';
 import React, { useState } from 'react';
 import {
   Download,
@@ -31,7 +32,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
     if (onNavigateToAccount) {
       onNavigateToAccount();
     } else {
-      window.location.search = '?page=account';
+      navigatePage('account');
     }
   };
 

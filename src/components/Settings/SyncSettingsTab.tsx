@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { navigatePage } from '../../lib/navigation';
 import { storage } from '../../lib/storage';
 import { accountClient } from '../../lib/sync/account';
 import { encryptVaultKeyForDevice } from '../../lib/sync/accountCrypto';
@@ -432,7 +433,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           <button
             type="button"
             data-testid="sync-open-account"
-            onClick={() => { window.location.search = '?page=account'; }}
+            onClick={() => { navigatePage('account'); }}
             className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold whitespace-nowrap"
           >
             Войти в ЛК
@@ -460,7 +461,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
             {hosted && (
               <button
                 type="button"
-                onClick={() => { window.location.search = '?page=account'; }}
+                onClick={() => { navigatePage('account'); }}
                 className="px-2 py-1 text-2xs text-zinc-400 bg-white/[0.03] border border-white/[0.06] rounded-md"
               >
                 Личный кабинет

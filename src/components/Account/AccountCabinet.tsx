@@ -6,6 +6,7 @@ import { getOrCreateDeviceIdentity } from '../../lib/sync/accountCrypto';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { getLocalVaultId, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
+import { navigatePage } from '../../lib/navigation';
 
 export const AccountCabinet: React.FC = () => {
   const { vaults, createVault, switchVault } = useApp();
@@ -107,7 +108,11 @@ export const AccountCabinet: React.FC = () => {
     }
   }, 'Приглашение принято. Синхронизация запущена, но загрузка всех файлов ещё не подтверждена.');
 
-  const openApp = () => { window.location.search = ''; };
+  // Возврат в приложение: назад по истории, иначе — на корень без лишней записи.
+  const openApp = () => {
+    if (window.history.length > 1) window.history.back();
+    else navigatePage(null, 'replace');
+  };
   const account = state.account;
   const currentId = state.session ? state.session.deviceId : null;
   const activeDevices = state.devices.filter((device) => device.status === 'active')
@@ -126,11 +131,23 @@ export const AccountCabinet: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#08090a] text-zinc-100">
-      <header className="border-b border-white/[0.06] px-5 py-4 flex items-center justify-between gap-4">
+      <header
+        className="border-b border-white/[0.06] px-5 pb-4 flex items-center justify-between gap-4"
+        style={{ paddingTop: 'max(var(--sat), 1rem)' }}
+      >
         <span className="text-sm font-semibold">Личный кабинет</span>
-        <button type="button" onClick={openApp} className="text-xs text-zinc-300 hover:text-white">Открыть приложение</button>
+        <button
+          type="button"
+          onClick={openApp}
+          className="text-xs text-zinc-300 hover:text-white px-3 py-2 -mr-3 rounded-lg hover:bg-white/[0.06] transition-colors shrink-0"
+        >
+          Открыть приложение
+        </button>
       </header>
-      <main className="max-w-3xl mx-auto px-5 py-10 flex flex-col gap-8">
+      <main
+        className="max-w-3xl mx-auto px-5 pt-10 flex flex-col gap-8"
+        style={{ paddingBottom: 'calc(max(var(--sab), 0px) + 2.5rem)' }}
+      >
         <div>
           <div className="flex items-center gap-2"><Shield className="w-5 h-5 text-emerald-400" /><h1 className="text-xl font-semibold">SLAG ID</h1></div>
           <p className="text-sm text-zinc-500 mt-2">Подписка, устройства и доступ к хранилищам — в одном месте.</p>

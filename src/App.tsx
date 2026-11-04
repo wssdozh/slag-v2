@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { navigatePage } from './lib/navigation';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
@@ -95,17 +96,6 @@ const AppContent: React.FC = () => {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-
-  const navigatePage = (page: string | null) => {
-    const u = new URL(window.location.href);
-    if (page) {
-      u.searchParams.set('page', page);
-    } else {
-      u.searchParams.delete('page');
-    }
-    window.history.pushState({}, '', u.toString());
-    setCurrentPage(page);
-  };
 
   const isDesktopWidth = typeof window !== 'undefined' && window.innerWidth >= 768;
 
