@@ -145,6 +145,7 @@
 | 03, 24, 25 | [fixes/terminology.md](<fixes/terminology.md>) | единый словарь: «таска» во всех подписях, общий с десктопом | код + сборка |
 | 02 | [fixes/02-dock-a11y.md](<fixes/02-dock-a11y.md>) | синяя точка объяснена в доступном имени кнопки | браузер |
 | 17 | [fixes/17-subtasks-toggle.md](<fixes/17-subtasks-toggle.md>) | у сворачивания подзадач есть состояние и внятное имя | браузер |
+| 04 | [fixes/04-plural-calendar.md](<fixes/04-plural-calendar.md>) | склонение «таска/таски/тасок» в счётчиках календаря и канбана | браузер |
 
 | — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
 
