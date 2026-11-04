@@ -135,6 +135,7 @@
 | 29, 30 | [fixes/29-folder-target.md](<fixes/29-folder-target.md>) | выбранная папка больше не теряется: локальное эхо черновика отфильтровано | браузер + устройство |
 | 20 | [fixes/20-duplicate-save.md](<fixes/20-duplicate-save.md>) | одно сохранение на телефоне, подпись «Создать/Готово» по состоянию | да |
 | 37 | [fixes/37-no-duplicate-preview.md](<fixes/37-no-duplicate-preview.md>) | дубль заголовка/превью не воспроизводится | проверено в браузере |
+| 09 | [fixes/09-sync-limits.md](<fixes/09-sync-limits.md>) | неизвестные лимиты больше не печатаются как нули | да |
 
 | — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
 
