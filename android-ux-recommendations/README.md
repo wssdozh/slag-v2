@@ -137,6 +137,7 @@
 | 37 | [fixes/37-no-duplicate-preview.md](<fixes/37-no-duplicate-preview.md>) | дубль заголовка/превью не воспроизводится | проверено в браузере |
 | 09 | [fixes/09-sync-limits.md](<fixes/09-sync-limits.md>) | неизвестные лимиты больше не печатаются как нули | да |
 | 09 | [fixes/09-device-card.md](<fixes/09-device-card.md>) | иконка устройства по платформе, «Чтение и запись» вместо «Полный доступ» | да |
+| 32, 33 | [fixes/33-double-submit.md](<fixes/33-double-submit.md>) | двойной тап по отправке больше не создаёт дубль | браузер |
 
 | — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
 
