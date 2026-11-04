@@ -289,7 +289,11 @@ export class SyncEngine {
     }
 
     let inheritedDeviceId = generateDeviceId();
-    let inheritedDeviceName = 'Мой ПК';
+    // Имя по умолчанию зависит от платформы: на телефоне «Мой ПК» — дезориентирующая подпись.
+    const defaultDeviceName = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      ? 'Мой телефон'
+      : 'Мой ПК';
+    let inheritedDeviceName = defaultDeviceName;
     let inheritedServerUrl = DEFAULT_SERVER_URL;
     let inheritedPlan: 'free' | 'smile' | 'angry' = 'smile';
     let inheritedBgSync: 0 | 10 | 30 = 0;
