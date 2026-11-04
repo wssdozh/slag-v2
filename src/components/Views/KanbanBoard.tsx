@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { querySearch } from '../../lib/searchService';
+import { pluralRu } from '../../lib/dateUtils';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
 import {
@@ -380,13 +381,13 @@ export const KanbanBoard: React.FC = () => {
                       openComposerModal({ type: 'task', status: column.id, folder: currentFolder });
                     }}
                     className="p-1 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                    title={`Добавить задачу в ${column.title}`}
+                    title={`Добавить таску в ${column.title}`}
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => {
-                      addToast(`Столбец «${column.title}» (${colTasks.length} задач)`, 'info');
+                      addToast(`Столбец «${column.title}» (${colTasks.length} ${pluralRu(colTasks.length, ['таска', 'таски', 'тасок'])})`, 'info');
                     }}
                     className="p-1 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors"
                     title="Опции столбца"

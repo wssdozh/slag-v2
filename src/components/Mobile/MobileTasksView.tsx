@@ -177,7 +177,7 @@ export const MobileTasksView: React.FC = () => {
         {currentColumnTasks.length === 0 ? (
           <EmptyState
             icon={<Inbox className="w-5 h-5" />}
-            title="В этом статусе нет задач"
+            title="В этом статусе нет тасок"
             description="Свайпните для переключения статуса или добавьте задачу ниже."
           />
         ) : (
@@ -280,7 +280,7 @@ export const MobileTasksView: React.FC = () => {
           className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-white/[0.1] hover:border-white/20 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer active:scale-[0.99]"
         >
           <Plus className="w-4 h-4 text-zinc-400" />
-          <span>Добавить задачу</span>
+          <span>Добавить таску</span>
         </button>
       </div>
     </div>

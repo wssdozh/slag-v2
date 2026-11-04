@@ -16,6 +16,7 @@ import {
   getMonthCalendarDays,
   RUSSIAN_MONTHS,
   RUSSIAN_WEEKDAYS,
+  pluralRu,
 } from '../../lib/dateUtils';
 import {
   ChevronLeft,
@@ -1113,7 +1114,7 @@ export const CalendarView: React.FC = () => {
                             });
                           }}
                           className="w-full opacity-0 hover:opacity-100 focus:opacity-100 py-0.5 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] rounded flex items-center justify-center transition-opacity text-[10px] cursor-pointer"
-                          title="Добавить задачу на весь день"
+                          title="Добавить таску на весь день"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -1372,7 +1373,7 @@ export const CalendarView: React.FC = () => {
                             });
                           }}
                           className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-opacity cursor-pointer"
-                          title="Добавить задачу"
+                          title="Добавить таску"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -1544,7 +1545,7 @@ export const CalendarView: React.FC = () => {
               {drawerTab === 'overdue' ? (
                 overdueTasks.length === 0 ? (
                   <div className="py-12 text-center text-xs text-zinc-600 font-mono">
-                    Нет просроченных задач
+                    Нет просроченных тасок
                   </div>
                 ) : (
                   overdueTasks.map(task => {
@@ -1718,7 +1719,7 @@ export const CalendarView: React.FC = () => {
                   {expandedDayDateStr}
                 </h3>
                 <span className="text-[11px] font-mono text-zinc-500">
-                  ({(tasksByDueDate.get(expandedDayDateStr) || []).length} задач)
+                  ({(tasksByDueDate.get(expandedDayDateStr) || []).length} {pluralRu((tasksByDueDate.get(expandedDayDateStr) || []).length, ['таска', 'таски', 'тасок'])})
                 </span>
               </div>
               <button
@@ -1735,7 +1736,7 @@ export const CalendarView: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
               {(tasksByDueDate.get(expandedDayDateStr) || []).length === 0 ? (
                 <div className="py-12 text-center text-xs text-zinc-500 font-mono">
-                  На этот день пока нет задач
+                  На этот день пока нет тасок
                 </div>
               ) : (
                 (tasksByDueDate.get(expandedDayDateStr) || []).map(task => {
@@ -1818,7 +1819,7 @@ export const CalendarView: React.FC = () => {
                 className="w-full flex items-center justify-center gap-2 bg-canvas hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Добавить задачу...</span>
+                <span>Добавить таску...</span>
               </button>
             </div>
           </div>

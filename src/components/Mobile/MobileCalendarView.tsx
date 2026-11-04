@@ -12,6 +12,7 @@ import {
   getMondayOfWeek,
   RUSSIAN_MONTHS,
   RUSSIAN_WEEKDAYS,
+  pluralRu,
 } from '../../lib/dateUtils';
 import {
   Circle,
@@ -621,7 +622,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                     </span>
                     {dayTasks.length > 0 && (
                       <span className="text-[10px] font-mono text-zinc-500">
-                        {dayTasks.length} {dayTasks.length === 1 ? 'задача' : 'задач'}
+                        {dayTasks.length} {pluralRu(dayTasks.length, ['таска', 'таски', 'тасок'])}
                       </span>
                     )}
                   </div>
@@ -693,7 +694,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                           </div>
                         )}
                         <div className="p-3 text-xs text-zinc-500 flex items-center justify-between">
-                          <span>— нет задач</span>
+                          <span>— нет тасок</span>
                           <button
                             type="button"
                             onClick={() => setAddingDate(day.dateStr)}
@@ -740,7 +741,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
                         className="w-full py-2 px-3 flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] border-t border-white/[0.04] transition-colors cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Добавить задачу</span>
+                        <span>Добавить таску</span>
                       </button>
                     ) : null}
                   </div>

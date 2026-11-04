@@ -99,3 +99,16 @@ export function formatDueDateLabel(dateIso: string, rawMatchedText?: string): st
     return dateIso;
   }
 }
+
+/**
+ * Русское склонение по числу: pluralRu(2, ['таска', 'таски', 'тасок']) → «таски».
+ * Одна функция вместо тернарников в каждом счётчике.
+ */
+export function pluralRu(count: number, forms: [string, string, string]): string {
+  const abs = Math.abs(count) % 100;
+  const tail = abs % 10;
+  if (abs > 10 && abs < 20) return forms[2];
+  if (tail > 1 && tail < 5) return forms[1];
+  if (tail === 1) return forms[0];
+  return forms[2];
+}
