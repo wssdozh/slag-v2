@@ -575,6 +575,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSubtasksExpanded(!isSubtasksExpanded)}
+                aria-expanded={isSubtasksExpanded}
+                aria-label={`Подзадачи: ${completedSubtasksCount} из ${totalSubtasksCount}`}
                 className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500 cursor-pointer hover:text-zinc-300 select-none py-0.5 w-fit"
               >
                 <span>

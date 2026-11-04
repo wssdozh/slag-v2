@@ -85,7 +85,7 @@ export const MobileFloatingDock: React.FC = () => {
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
               }`}
               title={tab.label}
-              aria-label={tab.label}
+              aria-label={hasDot ? `${tab.label}, ${unsortedCount} неразобранных записей` : tab.label}
             >
               <div className="relative flex items-center justify-center">
                 <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-zinc-400'}`} />
