@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { SecretKeyField } from '../Settings/SecretKeyField';
 import { storage } from '../../lib/storage';
 import { logger } from '../../lib/logger';
 import { openAppFolder } from '../../lib/folderOpener';
@@ -11,8 +12,6 @@ import {
   Sparkles,
   Download,
   Upload,
-  Eye,
-  EyeOff,
   ExternalLink,
   Database,
   Sliders,
@@ -95,7 +94,6 @@ export const SettingsModal: React.FC = () => {
   const [allowNewTags, setAllowNewTags] = useState(aiSettings.allowNewTags ?? true);
   const [tagCaseStyle, setTagCaseStyle] = useState(aiSettings.tagCaseStyle || 'lowercase');
   const [customTagRules, setCustomTagRules] = useState(aiSettings.customTagRules || '');
-  const [showKey, setShowKey] = useState(false);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [isUpdatingHotkey, setIsUpdatingHotkey] = useState(false);
 
@@ -543,25 +541,11 @@ export const SettingsModal: React.FC = () => {
                             </a>
                           </div>
 
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-medium text-zinc-300">API Key</label>
-                            <div className="relative">
-                              <input
-                                type={showKey ? 'text' : 'password'}
-                                value={groqApiKey}
-                                onChange={(e) => setGroqApiKey(e.target.value)}
-                                placeholder="gsk_..."
-                                className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowKey(!showKey)}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
-                              >
-                                {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                            </div>
-                          </div>
+                          <SecretKeyField
+                            value={groqApiKey}
+                            onChange={setGroqApiKey}
+                            placeholder="gsk_..."
+                          />
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
@@ -610,25 +594,11 @@ export const SettingsModal: React.FC = () => {
                             </a>
                           </div>
 
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-medium text-zinc-300">API Key</label>
-                            <div className="relative">
-                              <input
-                                type={showKey ? 'text' : 'password'}
-                                value={kieApiKey}
-                                onChange={(e) => setKieApiKey(e.target.value)}
-                                placeholder="sk-kie-... или Bearer токен"
-                                className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowKey(!showKey)}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
-                              >
-                                {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                            </div>
-                          </div>
+                          <SecretKeyField
+                            value={kieApiKey}
+                            onChange={setKieApiKey}
+                            placeholder="sk-kie-... или Bearer токен"
+                          />
 
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                             <div className="flex flex-col gap-1.5">
