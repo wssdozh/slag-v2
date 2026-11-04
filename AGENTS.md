@@ -1,6 +1,6 @@
 # AGENTS.md — Кодекс SLAG v2
 
-Стек: **React 19, TypeScript, Tailwind CSS v4, Tauri v2, Orama BM25, Playwright, Vite**.
+Стек: **React 19, TypeScript, Tailwind CSS v4, Tauri v2 (Desktop & Android), Orama BM25, Playwright, Vite**.
 
 ---
 
@@ -31,6 +31,7 @@
    - `npm run lint` — 0 warnings, 0 errors (`oxlint`).
    - `npm run build` — чистая сборка (`tsc -b && vite build`).
    - `npx playwright test` — 100% тестов пройдены.
+   - **Android & Мобильный DoD**: при правках мобильного UI/логики или нативного слоя `src-tauri/` — собрать `npm run build:android`. Если подключено устройство (`adb devices`) — установить `npm run android:install`, запустить `npm run android:run`, снять скриншот `adb exec-out screencap -p > test-results/screenshots/android_<name>.png`, проверить через `read_image` и приложить в ответ.
    - Скриншот-верификация (UI и логика действий): снять скриншот в Playwright (`test-results/screenshots/<name>.png`), подтверждающий правильность работы измененной логики или верстки, проверить через `read_image` и **обязательно показать скриншот пользователю в ответе**: `![Результат](<test-results/screenshots/...>)`.
    - Атомарный коммит Conventional Commits на английском языке.
 

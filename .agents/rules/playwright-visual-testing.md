@@ -51,3 +51,13 @@ await page.locator('.fixed.z-50').screenshot({ path: 'test-results/screenshots/m
 2. Исправить разметку или логику в коде.
 3. Перезапустить тест Playwright, обновить скриншот.
 4. Проверить через `read_image`, убедиться в исправлении и прикрепить скриншот в ответ пользователю.
+
+---
+
+## 5. Мобильная верификация на устройстве (Android via ADB)
+При проверке мобильной верстки или нативного поведения на реальном устройстве:
+1. Деплой: `npm run build:android && npm run android:install && npm run android:run`.
+2. Снятие скриншота: `adb exec-out screencap -p > test-results/screenshots/android_<name>.png`.
+3. Проверка через `read_image` и демонстрация в ответе: `![Результат на Android](<test-results/screenshots/android_<name>.png>)`.
+4. Чтение логов: `npm run android:log`.
+
