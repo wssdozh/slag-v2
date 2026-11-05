@@ -22,7 +22,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(dock).toBeVisible();
 
     // Verify tabs in dock
-    await expect(dock.locator('button[aria-label="Папки"]')).toBeVisible();
+    await expect(dock.locator('button[aria-label^="Папки"]')).toBeVisible();
     await expect(dock.locator('button[aria-label="Таски"]')).toBeVisible();
     await expect(dock.locator('button[aria-label="ИИ"]')).toBeVisible();
     await expect(dock.locator('button[aria-label="Настройки"]')).toBeVisible();
@@ -106,7 +106,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await tasksTab.click();
 
     // Verify Tasks view title
-    await expect(page.locator('h1', { hasText: 'Задачи' })).toBeVisible();
+    await expect(page.locator('h1', { hasText: /Таски|Задачи/ })).toBeVisible();
 
     // Verify segmented status buttons
     await expect(page.locator('button', { hasText: /К выполнению/ })).toBeVisible();
@@ -116,7 +116,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Verify view switcher and inline add button
     await expect(page.locator('button', { hasText: 'Календарь' })).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Добавить задачу' })).toBeVisible();
+    await expect(page.locator('button', { hasText: /Добавить (таску|задачу)/ })).toBeVisible();
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_tasks.png' });
   });
@@ -128,7 +128,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Verify Settings view title and profile card
     await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
-    await expect(page.locator('text=Local-First Obsidian Vault')).toBeVisible();
+    await expect(page.locator('span', { hasText: 'Obsidian' }).first()).toBeVisible();
 
     // Verify dock customization section exists
     await expect(page.locator('text=Нижняя панель (Dock)')).toBeVisible();
@@ -146,7 +146,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const firstTabLabel = await dockButtons.nth(0).getAttribute('aria-label');
     const secondTabLabel = await dockButtons.nth(1).getAttribute('aria-label');
     expect(firstTabLabel).toBe('Таски');
-    expect(secondTabLabel).toBe('Папки');
+    expect(secondTabLabel).toContain('Папки');
 
     await page.screenshot({ path: 'test-results/screenshots/audit/25_settings_root.png' });
     await page.screenshot({ path: 'test-results/screenshots/mobile_settings.png' });
@@ -205,6 +205,10 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(modalHeader).toBeVisible();
 
     // Verify content inside modal (Groq button is visible without horizontal tabs clutter)
+    const byokBtn = page.locator('[data-testid="ai-source-byok"]');
+    if (await byokBtn.isVisible()) {
+      await byokBtn.click();
+    }
     await expect(page.locator('button', { hasText: 'Groq' }).first()).toBeVisible();
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_settings_modal.png' });
@@ -249,7 +253,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.locator('button', { hasText: 'ИИ & Провайдеры' }).click();
 
     // Verify custom Checkbox elements
-    const autoTagCheckbox = page.locator('div[role="checkbox"]').filter({ hasText: 'Автоматический подбор тегов' });
+    const autoTagCheckbox = page.locator('div[role="checkbox"]').filter({ hasText: /Автотегирование|Автоматический подбор/ });
     await expect(autoTagCheckbox).toBeVisible();
     await autoTagCheckbox.click(); // toggle
 

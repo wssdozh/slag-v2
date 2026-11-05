@@ -12,7 +12,7 @@ export const FONT_FAMILY_OPTIONS: Record<UiFontFamily, FontFamilyOption> = {
   inter: {
     id: 'inter',
     label: 'Inter (Linear)',
-    description: 'Фирменный плотный гротеск с улучшенной разборчивостью символов (cv01, ss03)',
+    description: 'Фирменный плотный гротеск для комфортного чтения',
     cssSans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
     cssMono: "'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace",
   },

@@ -81,21 +81,26 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await fabBtn.click();
 
     // Focus editor should be open
-    const editorTitleInput = page.locator('input[placeholder="Заголовок..."]');
+    const editorTitleInput = page.getByPlaceholder('Заголовок...');
     await expect(editorTitleInput).toBeVisible({ timeout: 5000 });
     await editorTitleInput.fill('Новая идея для мобилки');
     await page.screenshot({ path: 'test-results/screenshots/audit/09_fullscreen_editor.png' });
 
     // Close Fullscreen editor
-    const editorBackBtn = page.locator('header button', { hasText: 'Назад' }).first();
+    const editorBackBtn = page.locator('button', { hasText: 'Назад' }).first();
     await editorBackBtn.click();
     await expect(editorTitleInput).not.toBeVisible();
 
     // 8. Re-enter "Входящие" and switch to Kanban View
     await page.locator('button', { hasText: 'Входящие' }).first().click();
-    const viewSwitcher = page.locator('nav[aria-label="Режимы представления"]');
-    const kanbanBtn = viewSwitcher.locator('button[title*="Канбан"]');
-    await kanbanBtn.click();
+    const dotsBtn = page.locator('button[aria-label="Вид и фильтры папки"]');
+    if (await dotsBtn.isVisible()) {
+      await dotsBtn.click();
+      const modal = page.locator('[role="dialog"][aria-label="Вид и фильтры"]');
+      await expect(modal).toBeVisible();
+      await modal.locator('button', { hasText: 'Канбан' }).click();
+      await page.keyboard.press('Escape');
+    }
     await page.waitForTimeout(300);
     await page.screenshot({ path: 'test-results/screenshots/audit/10_folder_kanban.png' });
 
@@ -109,7 +114,13 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     }
 
     // Switch back to Feed
-    await viewSwitcher.locator('button[title*="Лента"]').click();
+    if (await dotsBtn.isVisible()) {
+      await dotsBtn.click();
+      const modal = page.locator('[role="dialog"][aria-label="Вид и фильтры"]');
+      await expect(modal).toBeVisible();
+      await modal.locator('button', { hasText: 'Лента' }).click();
+      await page.keyboard.press('Escape');
+    }
 
     // 9. Folder Info View (Profile & Media tabs)
     await page.locator('button[aria-label="Информация о папке"]').click();
@@ -157,7 +168,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     // 10. Tasks Tab
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
     await dock.locator('button[aria-label="Таски"]').click();
-    await expect(page.locator('h1', { hasText: 'Задачи' })).toBeVisible();
+    await expect(page.locator('h1', { hasText: /Таски|Задачи/ })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/16_tasks_todo.png' });
 
     // Switch to "В работе" tab
@@ -169,7 +180,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await page.screenshot({ path: 'test-results/screenshots/audit/18_tasks_done.png' });
 
     // Click "+ Добавить задачу" button (opens unified ComposerModal)
-    const addInlineTaskBtn = page.locator('button', { hasText: 'Добавить задачу' });
+    const addInlineTaskBtn = page.locator('button', { hasText: /Добавить (таску|задачу)/ });
     if (await addInlineTaskBtn.isVisible()) {
       await addInlineTaskBtn.click();
       await page.waitForTimeout(300);

@@ -130,7 +130,7 @@ export const MobileSettingsView: React.FC = () => {
               <h2 className="text-sm font-bold text-white tracking-tight truncate">{vault.name || 'SLAG Vault'}</h2>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.06] text-[10px] font-mono shrink-0">
                 <Shield className="w-2.5 h-2.5" />
-                <span>Local-First Obsidian Vault</span>
+                <span>Obsidian</span>
               </span>
             </div>
             <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate">

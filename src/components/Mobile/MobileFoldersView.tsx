@@ -215,6 +215,7 @@ export const MobileFoldersView: React.FC = () => {
             onClick={() => setMobileFolderInfoOpen(true)}
             className="flex flex-col items-center justify-center min-w-0 max-w-[200px] hover:opacity-80 active:scale-95 transition-all cursor-pointer select-none"
             title={`Информация и медиа папки «${activeMeta?.name || mobileActiveFolder}»`}
+            aria-label="Информация о папке"
           >
             <span className="text-sm font-bold text-white truncate max-w-full">
               {activeMeta?.name || mobileActiveFolder}

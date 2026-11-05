@@ -95,6 +95,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           onClick={() => openFolderInfoModal(currentFolder)}
           className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none min-w-0"
           title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
+          aria-label="Информация о папке"
         >
           {folderIconComp}
           <h2 className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-white tracking-tight transition-colors truncate max-w-[240px]">

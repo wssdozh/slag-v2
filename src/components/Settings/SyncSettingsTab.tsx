@@ -449,11 +449,11 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       <section className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <span className={`w-2 h-2 rounded-full ${status.state === 'connected' ? 'bg-emerald-500' : status.state === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-zinc-600'}`} />
-            <span className="text-xs font-semibold text-white">{planLabel}</span>
-            <span className="text-[10px] font-mono text-zinc-500">E2EE</span>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${status.state === 'connected' ? 'bg-emerald-500' : status.state === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-zinc-600'}`} />
+            <span className="text-xs font-semibold text-white truncate">{planLabel}</span>
+            <span className="text-[10px] font-mono text-zinc-500 shrink-0">E2EE</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={() => void syncEngine.pushLocalChanges()}
@@ -463,7 +463,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               <RefreshCw className={`w-3 h-3 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
               Синхронизировать
             </button>
-            {hosted && (
+            {hosted && !locked && (
               <button
                 type="button"
                 onClick={() => { navigatePage('account'); }}
@@ -591,11 +591,11 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           <span className="text-xs font-semibold text-zinc-200">Сервер ретрансляции</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Server className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-mono text-white outline-none" />
+          <div className="relative flex-1 min-w-0">
+            <Server className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-mono text-white outline-none truncate" />
           </div>
-          <button type="button" onClick={() => void handleTestServerConnection()} disabled={isTestingServer} className="px-3 py-1.5 bg-white/[0.06] text-xs text-zinc-300 rounded-lg disabled:opacity-50">{isTestingServer ? 'Тест…' : 'Проверить'}</button>
+          <button type="button" onClick={() => void handleTestServerConnection()} disabled={isTestingServer} className="px-3 py-1.5 bg-white/[0.06] text-xs text-zinc-300 rounded-lg disabled:opacity-50 shrink-0">{isTestingServer ? 'Тест…' : 'Проверить'}</button>
         </div>
         {serverStatusMessage && (
           <p
@@ -614,7 +614,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           <div className="grid grid-cols-3 gap-1 bg-[#0c0c0e] p-0.5 rounded-lg border border-white/[0.08]">
             {([0, 10, 30] as const).map((minutes) => (
               <button key={minutes} type="button" data-testid={`sync-interval-${minutes}`} onClick={() => { syncEngine.setBgSyncInterval(minutes); setConfig(syncEngine.getConfig()); }} className={`py-1 text-2xs rounded-md ${config.bgSyncIntervalMinutes === minutes ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>
-                {minutes === 0 ? 'Мгновенно' : minutes === 10 ? '10 минут' : '30 минут (батарея)'}
+                {minutes === 0 ? 'Мгновенно' : minutes === 10 ? '10 мин' : '30 мин (эко)'}
               </button>
             ))}
           </div>
