@@ -4,8 +4,7 @@ import { FeedList } from '../Feed/FeedList';
 import { Composer } from '../Feed/Composer';
 import { KanbanBoard } from '../Views/KanbanBoard';
 import { MobileCalendarView } from './MobileCalendarView';
-import { FeedFilters } from '../Feed/FeedFilters';
-import { ViewModeSwitcher } from '../Feed/ViewModeSwitcher';
+import { ActiveFilterBadges } from '../Feed/ActiveFilterBadges';
 import {
   Folder,
   FolderPlus,
@@ -15,7 +14,8 @@ import {
   Inbox,
   Plus,
   BookOpen,
-  MoreHorizontal
+  ArrowUpDown,
+  MoreVertical,
 } from 'lucide-react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { MobileScreenHeader } from './MobileScreenHeader';
@@ -34,7 +34,25 @@ export const MobileFoldersView: React.FC = () => {
     feedViewMode,
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
+    setIsTriageModalOpen,
+    activeTypeFilter,
+    sortBy,
+    sortOrder,
+    hideCompletedTasks,
+    isPinnedOnlyFilter,
+    inboxMode,
   } = useApp();
+
+  const isInbox = mobileActiveFolder === 'Входящие';
+
+  const isCustomized =
+    feedViewMode !== 'feed' ||
+    activeTypeFilter !== 'all' ||
+    sortBy !== 'createdAt' ||
+    sortOrder !== 'asc' ||
+    hideCompletedTasks ||
+    isPinnedOnlyFilter ||
+    (isInbox && inboxMode !== 'all');
 
   const folderMaterialsCount = useMemo(() => {
     return items.filter(item => {
@@ -45,6 +63,10 @@ export const MobileFoldersView: React.FC = () => {
       return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
     }).length;
   }, [items, currentFolder]);
+
+  const inboxUnsortedCount = useMemo(() => {
+    return isInbox ? items.filter(i => i.folder === 'Входящие').length : 0;
+  }, [items, isInbox]);
 
   // Root folders vs Direct subfolders of mobileActiveFolder
   const directSubfolders = useMemo(() => {
@@ -176,8 +198,6 @@ export const MobileFoldersView: React.FC = () => {
   }
 
   // 2. Inside a Folder: Header + Optional Subfolders Horizontal Bar + Feed + Composer
-  const isInbox = mobileActiveFolder === 'Входящие';
-
   return (
     <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative">
       {/* Top Header */}
@@ -191,26 +211,73 @@ export const MobileFoldersView: React.FC = () => {
         backTitle="Назад к списку папок"
         className="z-20"
         centerSlot={
-          <>
-            <span className="text-sm font-bold text-white truncate max-w-[160px]">
+          <button
+            type="button"
+            onClick={() => setMobileFolderInfoOpen(true)}
+            className="flex flex-col items-center justify-center min-w-0 max-w-[200px] hover:opacity-80 active:scale-95 transition-all cursor-pointer select-none"
+            title={`Информация и медиа папки «${activeMeta?.name || mobileActiveFolder}»`}
+          >
+            <span className="text-sm font-bold text-white truncate max-w-full">
               {activeMeta?.name || mobileActiveFolder}
             </span>
-            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[160px]">
+            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-full">
               {isInbox ? 'Лента входящих' : mobileActiveFolder}
             </span>
-          </>
+          </button>
         }
         rightSlot={
-          <div className="flex items-center">
+          <div className="flex items-center gap-0.5">
+            {/* Kanban Materials Dock Toggle */}
+            {feedViewMode === 'kanban' && (
+              <button
+                type="button"
+                onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer active:scale-95 ${
+                  isKanbanMaterialsOpen
+                    ? 'bg-white/10 text-white'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+                }`}
+                title={
+                  isKanbanMaterialsOpen
+                    ? `Скрыть материалы (${folderMaterialsCount})`
+                    : `Показать материалы (${folderMaterialsCount})`
+                }
+                aria-label="Материалы папки"
+              >
+                <BookOpen className="w-4 h-4 shrink-0" />
+              </button>
+            )}
+
+            {/* AI Triage button in Inbox */}
+            {isInbox && inboxUnsortedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsTriageModalOpen(true)}
+                title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
+                aria-label="Запустить ИИ-Сортировку"
+                className="h-8 px-2 rounded-lg flex items-center gap-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer active:scale-95"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
+                <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
+                <span className="sr-only">Запустить ИИ-Сортировку</span>
+              </button>
+            )}
+
+            {/* View & Filter Options (3-dots button) */}
             <button
               type="button"
               onClick={openFolderViewModal}
-              className="w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              className="relative w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
               title="Вид и фильтры папки"
               aria-label="Вид и фильтры папки"
             >
-              <MoreHorizontal className="w-5 h-5" />
+              <MoreVertical className="w-5 h-5" />
+              {isCustomized && (
+                <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-white ring-2 ring-panel" />
+              )}
             </button>
+
+            {/* Folder Info & Media Profile */}
             <button
               type="button"
               onClick={() => setMobileFolderInfoOpen(true)}
@@ -223,6 +290,9 @@ export const MobileFoldersView: React.FC = () => {
           </div>
         }
       />
+
+      {/* Active Filter Badges Strip (Visible only when filters/tags/ai are active) */}
+      <ActiveFilterBadges className="px-3 py-1 border-b border-white/[0.04] bg-panel/40 shrink-0 z-10" />
 
       {/* Subfolders Quick Ribbon (If folder has subfolders) */}
       {directSubfolders.length > 0 && (
@@ -252,42 +322,12 @@ export const MobileFoldersView: React.FC = () => {
         </div>
       )}
 
-      {/* 1-Row Horizontally Scrollable Filters Strip - Matching Desktop FeedHeader (Hidden in Calendar Mode) */}
-      {feedViewMode !== 'calendar' && (
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04] bg-panel/40 overflow-x-auto scrollbar-none shrink-0 z-10 text-xs">
-          {/* Kanban Materials Dock Toggle */}
-          {feedViewMode === 'kanban' && (
-            <button
-              onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
-              className={`h-ctrl-sm px-2 rounded-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
-                isKanbanMaterialsOpen
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-              }`}
-              title={
-                isKanbanMaterialsOpen
-                  ? `Скрыть материалы (${folderMaterialsCount})`
-                  : `Показать материалы (${folderMaterialsCount})`
-              }
-              aria-label="Материалы папки"
-            >
-              <BookOpen className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          )}
-
-          <FeedFilters compact />
-
-          {/* Unified View Mode Switcher matching Desktop */}
-          <ViewModeSwitcher className="ml-auto" />
-        </div>
-      )}
-
       {/* Main Content Area: Reacting to feedViewMode */}
       <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
         {feedViewMode === 'kanban' ? (
           <KanbanBoard />
         ) : feedViewMode === 'calendar' ? (
-          <MobileCalendarView headerRightExtra={<ViewModeSwitcher />} />
+          <MobileCalendarView />
         ) : (
           <>
             <FeedList />

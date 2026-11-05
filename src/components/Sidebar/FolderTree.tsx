@@ -7,7 +7,7 @@ import {
   ChevronRight,
   ChevronDown,
   Folder,
-  MoreHorizontal
+  MoreVertical
 } from 'lucide-react';
 
 const uiLog = logger.scope('UI');
@@ -220,7 +220,7 @@ export const FolderTree: React.FC = () => {
               title="Действия с папкой"
               className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-opacity"
             >
-              <MoreHorizontal className="w-3.5 h-3.5" />
+              <MoreVertical className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

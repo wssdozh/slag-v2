@@ -10,7 +10,7 @@ import {
   Circle,
   CheckCircle2,
   Plus,
-  MoreHorizontal,
+  MoreVertical,
   Calendar as CalendarIcon,
   Paperclip,
   CheckSquare,
@@ -392,7 +392,7 @@ export const KanbanBoard: React.FC = () => {
                     className="p-1 rounded hover:bg-white/[0.08] text-zinc-400 hover:text-white transition-colors"
                     title="Опции столбца"
                   >
-                    <MoreHorizontal className="w-3.5 h-3.5" />
+                    <MoreVertical className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

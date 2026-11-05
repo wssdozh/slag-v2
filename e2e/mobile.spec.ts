@@ -373,28 +373,28 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // 1. Navigate to "Входящие"
     await page.locator('button', { hasText: 'Входящие' }).first().click();
 
-    // 2. Verify filter strip matching desktop
-    const inboxFilter = page.locator('div[aria-label="Фильтр входящих"]');
-    await expect(inboxFilter).toBeVisible();
-    await expect(inboxFilter.locator('button', { hasText: 'Все' })).toBeVisible();
+    // 2. Verify unified clean header: no bloated filter strip, only vertical 3-dots button
+    const dotsBtn = page.locator('header button[aria-label="Вид и фильтры папки"]');
+    await expect(dotsBtn).toBeVisible();
+    await expect(page.locator('div[aria-label="Фильтр входящих"]')).not.toBeVisible();
+    await expect(page.locator('div[aria-label="Фильтр по типу"]')).not.toBeVisible();
 
-    const typeFilter = page.locator('div[aria-label="Фильтр по типу"]');
-    await expect(typeFilter).toBeVisible();
-    await expect(typeFilter.locator('button', { hasText: 'Все' })).toBeVisible();
+    // Open FolderViewModal via 3-dots button and switch to Calendar mode
+    await dotsBtn.click();
+    const modal = page.locator('[role="dialog"][aria-label="Вид и фильтры"]');
+    await expect(modal).toBeVisible();
+    await modal.locator('button', { hasText: 'Календарь' }).click();
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
 
-    const viewSwitcher = page.locator('nav[aria-label="Режимы представления"]');
-    await expect(viewSwitcher).toBeVisible();
-
-    // 2.1 Switch to Calendar mode inside folder and verify unified header without empty filter strip
-    await viewSwitcher.locator('button[title*="Календарь"]').click();
-    await expect(inboxFilter).not.toBeVisible();
-    await expect(typeFilter).not.toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/mobile_folder_calendar.png' });
-    // Switch back to Feed mode
-    const calSwitcher = page.locator('header nav[aria-label="Режимы представления"]');
-    await expect(calSwitcher).toBeVisible();
-    await calSwitcher.locator('button[title*="Лента"]').click();
-    await expect(inboxFilter).toBeVisible();
+
+    // Switch back to Feed mode via modal
+    await dotsBtn.click();
+    await expect(modal).toBeVisible();
+    await modal.locator('button', { hasText: 'Лента' }).click();
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
 
     // 3. Switch composer to Task mode
     const typeBtn = page.locator('button[aria-label="Сменить тип записи"]').or(page.locator('button', { hasText: 'Заметка' })).first();

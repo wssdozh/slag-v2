@@ -1,20 +1,13 @@
 import React, { useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
+import { ActiveFilterBadges } from './ActiveFilterBadges';
 import {
   Folder,
   Inbox,
   BookOpen,
   ArrowUpDown,
-  MoreHorizontal,
-  X,
-  Pin,
-  Filter,
-  EyeOff,
-  StickyNote,
-  CheckSquare,
-  FileText,
-  FolderCheck,
+  MoreVertical,
 } from 'lucide-react';
 import type { FeedViewMode } from '../../types';
 
@@ -39,19 +32,11 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     openFolderInfoModal,
     openFolderViewModal,
     activeTypeFilter,
-    setActiveTypeFilter,
-    activeTagFilter,
-    setActiveTagFilter,
-    aiItemFilter,
-    clearAiFilter,
-    isPinnedOnlyFilter,
-    setIsPinnedOnlyFilter,
-    hideCompletedTasks,
-    setHideCompletedTasks,
     sortBy,
     sortOrder,
+    hideCompletedTasks,
+    isPinnedOnlyFilter,
     inboxMode,
-    setInboxMode,
   } = useApp();
 
   const headerRef = useRef<HTMLElement | null>(null);
@@ -100,101 +85,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     >
       {/* Left Column: Active Filter Badges */}
       <div className="flex items-center gap-1.5 justify-self-start min-w-0 z-10 overflow-x-auto scrollbar-none py-1">
-        {activeTypeFilter !== 'all' && (
-          <div className="flex items-center gap-1 px-2 h-6 rounded-md bg-white/[0.06] border border-white/[0.08] text-zinc-300 text-[11px] font-mono shrink-0">
-            {activeTypeFilter === 'note' && <StickyNote className="w-3 h-3 text-zinc-400" />}
-            {activeTypeFilter === 'task' && <CheckSquare className="w-3 h-3 text-zinc-400" />}
-            {activeTypeFilter === 'article' && <FileText className="w-3 h-3 text-zinc-400" />}
-            <span>{activeTypeFilter === 'note' ? 'Заметки' : activeTypeFilter === 'task' ? 'Таски' : 'Статьи'}</span>
-            <button
-              type="button"
-              onClick={() => setActiveTypeFilter('all')}
-              className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
-              title="Сбросить фильтр по типу"
-              aria-label="Сбросить фильтр по типу"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {isInbox && inboxMode !== 'all' && (
-          <div className="flex items-center gap-1 px-2 h-6 rounded-md bg-white/[0.06] border border-white/[0.08] text-zinc-300 text-[11px] font-mono shrink-0">
-            {inboxMode === 'sorted' ? <FolderCheck className="w-3 h-3 text-zinc-400" /> : <Inbox className="w-3 h-3 text-zinc-400" />}
-            <span>{inboxMode === 'sorted' ? 'Разобранные' : 'Неразобранные'}</span>
-            <button
-              type="button"
-              onClick={() => setInboxMode('all')}
-              className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
-              title="Показать все входящие"
-              aria-label="Сбросить фильтр входящих"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {isPinnedOnlyFilter && (
-          <div className="flex items-center gap-1 px-2 h-6 rounded-md bg-white/10 text-white text-[11px] font-mono shrink-0">
-            <Pin className="w-3 h-3 text-zinc-300" />
-            <span>Закрепленные</span>
-            <button
-              type="button"
-              onClick={() => setIsPinnedOnlyFilter(false)}
-              className="p-0.5 hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
-              title="Показать все записи"
-              aria-label="Сбросить фильтр закрепленных"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {hideCompletedTasks && (
-          <div className="flex items-center gap-1 px-2 h-6 rounded-md bg-white/[0.06] border border-white/[0.08] text-zinc-400 text-[11px] font-mono shrink-0">
-            <EyeOff className="w-3 h-3 text-zinc-500" />
-            <span>Без готовых</span>
-            <button
-              type="button"
-              onClick={() => setHideCompletedTasks(false)}
-              className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
-              title="Показать выполненные таски"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {activeTagFilter && (
-          <div className="flex items-center gap-1 px-2 h-6 rounded-md bg-white/10 text-white text-[11px] font-mono shrink-0">
-            <span>#{activeTagFilter}</span>
-            <button
-              type="button"
-              onClick={() => setActiveTagFilter(null)}
-              className="p-0.5 hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
-              title="Сбросить фильтр тега"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {aiItemFilter && (
-          <div className="flex items-center gap-1.5 px-2 h-6 rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 text-[11px] font-mono shrink-0">
-            <Filter className="w-3 h-3 text-zinc-400" />
-            <span className="truncate max-w-[120px]">
-              ИИ: "{aiItemFilter.queryLabel}"
-            </span>
-            <button
-              type="button"
-              onClick={clearAiFilter}
-              className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
-              title="Сбросить фильтр ИИ"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
+        <ActiveFilterBadges />
       </div>
 
       {/* Center Column: Prominent Folder Title Button */}
@@ -261,7 +152,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           title="Вид и фильтры папки"
           aria-label="Вид и фильтры папки"
         >
-          <MoreHorizontal className="w-4 h-4" />
+          <MoreVertical className="w-4 h-4" />
           {isCustomized && (
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-white ring-2 ring-panel" />
           )}

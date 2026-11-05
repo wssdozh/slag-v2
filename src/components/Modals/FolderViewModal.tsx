@@ -123,7 +123,7 @@ export const FolderViewModal: React.FC = () => {
           top: coords ? `${coords.top}px` : '56px',
           right: coords ? `${coords.right}px` : '16px',
         }}
-        className="pointer-events-auto w-[310px] rounded-2xl bg-[#121215]/98 border border-white/[0.08] shadow-2xl shadow-black/90 backdrop-blur-xl p-3 space-y-3 animate-in fade-in zoom-in-95 duration-100 text-xs text-zinc-200"
+        className="pointer-events-auto w-[310px] max-w-[calc(100vw-16px)] rounded-2xl bg-[#121215]/98 border border-white/[0.08] shadow-2xl shadow-black/90 backdrop-blur-xl p-3 space-y-3 animate-in fade-in zoom-in-95 duration-100 text-xs text-zinc-200"
       >
         {/* Section 1: View Modes with Reset Icon in top-right */}
         <div>

@@ -20,7 +20,7 @@ import {
   CopyPlus,
   Archive,
   Info,
-  MoreHorizontal,
+  MoreVertical,
   Check,
 } from 'lucide-react';
 import { useItemActions, TYPE_LABELS } from '../../hooks/useItemActions';
@@ -369,7 +369,7 @@ export const ContextMenu: React.FC = () => {
               }`}
             >
               <div className="flex items-center gap-2">
-                <MoreHorizontal className="w-3.5 h-3.5 text-zinc-400" />
+                <MoreVertical className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Дополнительно</span>
               </div>
               <ChevronRight className="w-3 h-3 text-zinc-500" />
