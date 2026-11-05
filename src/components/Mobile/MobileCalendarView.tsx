@@ -38,6 +38,7 @@ const HOUR_HEIGHT = 54; // px per hour
 
 interface MobileCalendarViewProps {
   headerRightExtra?: React.ReactNode;
+  embedded?: boolean;
 }
 
 interface MobileCalendarTaskRowProps {
@@ -128,7 +129,10 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
   );
 };
 
-export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRightExtra }) => {
+export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
+  headerRightExtra,
+  embedded = false,
+}) => {
   const {
     items,
     saveItem,
@@ -427,8 +431,11 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({ headerRi
     <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative">
       {/* 1. Unified Mobile Calendar Header (Single Bar, 44px) */}
       <header
-        className="h-11 border-b border-white/[0.06] bg-panel/95 backdrop-blur-md px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
-        style={{ paddingTop: 'max(var(--sat), 0px)' }}
+        className="border-b border-white/[0.06] bg-panel/95 backdrop-blur-md px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
+        style={{
+          height: embedded ? '2.75rem' : 'calc(2.75rem + max(var(--sat), 0px))',
+          paddingTop: embedded ? '0px' : 'max(var(--sat), 0px)',
+        }}
       >
         {/* Left: Month Dropdown Button & Today shortcut */}
         <div className="flex items-center gap-1 min-w-0 shrink-0">

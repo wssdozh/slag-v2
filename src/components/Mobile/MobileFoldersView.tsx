@@ -9,7 +9,6 @@ import {
   Folder,
   FolderPlus,
   ChevronRight,
-  Info,
   Search,
   Inbox,
   Plus,
@@ -276,17 +275,6 @@ export const MobileFoldersView: React.FC = () => {
                 <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-white ring-2 ring-panel" />
               )}
             </button>
-
-            {/* Folder Info & Media Profile */}
-            <button
-              type="button"
-              onClick={() => setMobileFolderInfoOpen(true)}
-              className="w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
-              title="Инфо папки и медиа"
-              aria-label="Информация о папке"
-            >
-              <Info className="w-5 h-5" />
-            </button>
           </div>
         }
       />
@@ -327,7 +315,7 @@ export const MobileFoldersView: React.FC = () => {
         {feedViewMode === 'kanban' ? (
           <KanbanBoard />
         ) : feedViewMode === 'calendar' ? (
-          <MobileCalendarView />
+          <MobileCalendarView embedded />
         ) : (
           <>
             <FeedList />
