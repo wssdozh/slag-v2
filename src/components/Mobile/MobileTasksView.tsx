@@ -16,6 +16,7 @@ import { MobileCalendarView } from './MobileCalendarView';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { useSwipeGesture } from '../../hooks/useSwipeGesture';
 import { EmptyState } from '../UI/EmptyState';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 interface ColumnDef {
   id: TaskStatus;
@@ -274,7 +275,7 @@ export const MobileTasksView: React.FC = () => {
             openComposerModal({
               type: 'task',
               status: activeStatusTab,
-              folder: currentFolder || 'Входящие'
+              folder: currentFolder || DEFAULT_INBOX_FOLDER
             });
           }}
           className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-white/[0.1] hover:border-white/20 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer active:scale-[0.99]"

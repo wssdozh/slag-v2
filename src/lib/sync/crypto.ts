@@ -2,9 +2,10 @@ import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { BIP39_WORDS } from './bip39Words';
 import type { SyncBundle, EncryptedBundle } from './types';
 import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../byteCodec';
+import { SYNC_CRYPTO_CONSTANTS } from '../../config';
 
-const VAULT_SALT = new TextEncoder().encode('slag-vault-salt-v1');
-const ROOM_SALT = new TextEncoder().encode('slag-relay-room-v1');
+const VAULT_SALT = new TextEncoder().encode(SYNC_CRYPTO_CONSTANTS.VAULT_SALT);
+const ROOM_SALT = new TextEncoder().encode(SYNC_CRYPTO_CONSTANTS.ROOM_SALT);
 
 /** Generates a cryptographically secure 12-word recovery seed phrase */
 export function generateMnemonic(wordCount = 12): string {

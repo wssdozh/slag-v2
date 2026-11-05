@@ -12,6 +12,7 @@ import { serializeItemToMarkdown } from '../markdownSerializer';
 import { logger } from '../logger';
 import { parseTodoistInput } from '../todoistTaskParser';
 import { ITEM_UPDATES_SCHEMA } from '../itemSchema';
+import { DEFAULT_INBOX_FOLDER, AI_LIMITS } from '../../config';
 
 const aiLog = logger.scope('AI');
 
@@ -74,7 +75,7 @@ function extractBalancedJsonObject(text: string, start: number): string | null {
 function actionFields(parsed: Record<string, any>, fallbackTitle: string) {
   return {
     title: parsed.title || fallbackTitle,
-    folder: parsed.folder || 'Входящие',
+    folder: parsed.folder || DEFAULT_INBOX_FOLDER,
     content: parsed.content || '',
     tags: Array.isArray(parsed.tags) ? parsed.tags : [],
   };
@@ -98,7 +99,7 @@ function batchAction(batchItems: BatchUpdateItem[], title?: string, folder?: str
   return {
     type: 'batch_update',
     title: title || `Перенос задач (${batchItems.length})`,
-    folder: folder || 'Входящие',
+    folder: folder || DEFAULT_INBOX_FOLDER,
     content: '',
     tags: [],
     itemType: 'task',
@@ -214,7 +215,7 @@ export function extractActionBlock(
             type: 'update_item',
             targetItemId: parsed.targetItemId,
             title: parsed.title || 'Обновление записи',
-            folder: parsed.folder || 'Входящие',
+            folder: parsed.folder || DEFAULT_INBOX_FOLDER,
             content: parsed.content || '',
             appendContent: parsed.content || undefined,
             dueDate: parsed.dueDate,
@@ -269,10 +270,10 @@ export function extractActionBlock(
     const lines = rawBlock.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length > 0) {
       const rawTitle = lines[0].replace(/^[#*-\d.]+\s*/, '').trim();
-      let folder = currentFolder || 'Входящие';
+      let folder = currentFolder || DEFAULT_INBOX_FOLDER;
       let contentStartIndex = 1;
       const fLine = lines[1] || '';
-      if (fLine.includes('/') || fLine === 'Входящие' || fLine === 'Личное' || fLine === 'Проекты' || fLine === 'Карьера' || fLine === 'Будущее' || fLine === 'База знаний') {
+      if (fLine.includes('/') || fLine === DEFAULT_INBOX_FOLDER || fLine === 'Личное' || fLine === 'Проекты' || fLine === 'Карьера' || fLine === 'Будущее' || fLine === 'База знаний') {
         folder = fLine;
         contentStartIndex = 2;
       }
@@ -418,7 +419,7 @@ export function extractActionBlock(
 export class AssistantOrchestrator {
   async runChat(params: SendAssistantChatParams): Promise<SendAssistantChatResult> {
     const { messages, currentFolder, settings, folders, allItems } = params;
-    const isInbox = currentFolder === 'Входящие';
+    const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
     const folderMeta = folders.find((f) => f.path === currentFolder);
 
     const startTime = Date.now();
@@ -460,7 +461,7 @@ export class AssistantOrchestrator {
         pool = Array.from(new Map(pool.map((item) => [item.id, item])).values());
 
         // Folder scoping
-        if (folderFilter && folderFilter !== 'Входящие' && folderFilter !== 'all') {
+        if (folderFilter && folderFilter !== DEFAULT_INBOX_FOLDER && folderFilter !== 'all') {
           pool = pool.filter((i) => i.folder === folderFilter || i.folder.startsWith(folderFilter + '/'));
         }
 
@@ -498,12 +499,12 @@ export class AssistantOrchestrator {
         }
 
         // Limit
-        const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 15);
+        const limit = Math.min(Math.max(Number(args.limit) || AI_LIMITS.SEARCH_RESULTS_DEFAULT, 1), AI_LIMITS.SEARCH_RESULTS_MAX);
         pool = pool.slice(0, limit);
 
         return pool.map((item) => {
-          const bodySnippet = cleanSnippetText(item.content || '', 140);
-          const attachSnippet = cleanSnippetText(getSearchableAttachmentText(item.attachments), 100);
+          const bodySnippet = cleanSnippetText(item.content || '', AI_LIMITS.TEXT_SNIPPET_LENGTH);
+          const attachSnippet = cleanSnippetText(getSearchableAttachmentText(item.attachments), AI_LIMITS.ATTACHMENT_SNIPPET_LENGTH);
           let snippet = bodySnippet;
           if (attachSnippet) {
             snippet = snippet ? `${snippet} [Вложения: ${attachSnippet}]` : `[Вложения: ${attachSnippet}]`;
@@ -1140,7 +1141,7 @@ ${isInbox
       try {
         const executedToolCalls: ChatToolCall[] = [];
         const turnHistory: AdapterTurnHistoryItem[] = [];
-        const MAX_TOOL_ROUNDS = 3;
+        const MAX_TOOL_ROUNDS = AI_LIMITS.MAX_TOOL_ROUNDS;
         let round = 0;
         let finalContent = '';
         let accumulatedReasoning = '';

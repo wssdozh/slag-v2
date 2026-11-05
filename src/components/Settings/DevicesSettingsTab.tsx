@@ -35,7 +35,7 @@ import type {
   SyncConfig,
   SyncStatus,
 } from '../../lib/sync/types';
-import { getLocalVaultId, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
+import { acceptSharedVault, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
 
 interface DevicesSettingsTabProps {
@@ -312,14 +312,11 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
     if (!invitation) return;
     setBusyVaultId(vaultId);
     try {
-      const result = await installSharedVault({
+      const result = await acceptSharedVault({
         vaultId,
         vaultName: invitation.vaultName || vaultId,
         encryptedKey: invitation.encryptedKey,
-      }, config.deviceId, { createVault, switchVault }, false);
-      await accountClient.acceptVault(vaultId);
-      switchVault(getLocalVaultId(vaultId));
-      await syncEngine.switchVault(getLocalVaultId(vaultId));
+      }, config.deviceId, { createVault, switchVault });
       addToast?.(
         `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${invitation.vaultName || vaultId}»`,
         'success',

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BaseComposer } from './BaseComposer';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   Sparkles,
   Loader2,
@@ -179,7 +180,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   };
 
   const folderMeta = folders.find(f => f.path === currentFolder);
-  const isInbox = currentFolder === 'Входящие';
+  const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
   const isSidebar = variant === 'sidebar';
 
   useEffect(() => {
@@ -1071,7 +1072,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                               key={res.id || rIdx}
                               onClick={() => scrollToItem(res.id || res.title)}
                               className="flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-white/[0.04] transition-colors cursor-pointer group"
-                              title={`Перейти к «${res.title}» (${res.folder || 'Входящие'})`}
+                              title={`Перейти к «${res.title}» (${res.folder || DEFAULT_INBOX_FOLDER})`}
                             >
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 {res.type === 'task' ? (

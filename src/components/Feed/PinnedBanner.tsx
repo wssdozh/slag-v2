@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Pin, CheckSquare, FileText, StickyNote } from 'lucide-react';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' }) => {
   const {
@@ -19,7 +20,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
     return items
       .filter(item => {
         const inScope =
-          currentFolder === 'Входящие'
+          currentFolder === DEFAULT_INBOX_FOLDER
             ? true
             : item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
         return inScope && !item.isArchived && Boolean(item.isPinned);

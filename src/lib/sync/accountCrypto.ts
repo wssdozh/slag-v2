@@ -2,11 +2,12 @@ import { p256 } from '@noble/curves/nist.js';
 import { validateMnemonic } from './crypto';
 import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../byteCodec';
 import type { LocalDeviceIdentity } from './accountTypes';
+import { SYNC_CRYPTO_CONSTANTS, SYNC_STORAGE_KEYS } from '../../config';
 
-const ACCOUNT_KEY_DOMAIN = 'slag-account-identity-v1';
-const DEVICE_KEY_PREFIX = 'slag_account_device_v1:';
-const HKDF_SALT = new TextEncoder().encode('slag-account-device-v1');
-const HKDF_INFO = new TextEncoder().encode('slag-vault-key-v1');
+const ACCOUNT_KEY_DOMAIN = SYNC_CRYPTO_CONSTANTS.ACCOUNT_KEY_DOMAIN;
+const DEVICE_KEY_PREFIX = SYNC_STORAGE_KEYS.DEVICE_KEY_PREFIX;
+const HKDF_SALT = new TextEncoder().encode(SYNC_CRYPTO_CONSTANTS.HKDF_SALT);
+const HKDF_INFO = new TextEncoder().encode(SYNC_CRYPTO_CONSTANTS.HKDF_INFO);
 
 export interface AccountIdentity {
   accountId: string;

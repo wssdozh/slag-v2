@@ -14,6 +14,7 @@ import {
   RUSSIAN_WEEKDAYS,
   pluralRu,
 } from '../../lib/dateUtils';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   Circle,
   CheckCircle2,
@@ -384,7 +385,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
       title: inlineTitle.trim(),
       content: '',
       type: 'task',
-      folder: currentFolder || 'Входящие',
+      folder: currentFolder || DEFAULT_INBOX_FOLDER,
       dueDate: dateStr,
       status: 'todo' as TaskStatus,
       priority: 'none',
@@ -408,7 +409,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
       title: slotTaskTitle.trim(),
       content: '',
       type: 'task',
-      folder: currentFolder || 'Входящие',
+      folder: currentFolder || DEFAULT_INBOX_FOLDER,
       dueDate: addingTimeSlot.dateStr,
       reminder: fullDate,
       status: 'todo' as TaskStatus,

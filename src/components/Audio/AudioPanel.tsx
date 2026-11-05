@@ -17,6 +17,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   extractAudioTracks,
   formatAudioDuration,
@@ -35,7 +36,7 @@ export const AudioPanel: React.FC = () => {
 
   // Scope & Filter State
   const [scopeMode, setScopeMode] = useState<AudioScopeMode>('active');
-  const [pinnedFolder, setPinnedFolder] = useState<string>(currentFolder || 'Входящие');
+  const [pinnedFolder, setPinnedFolder] = useState<string>(currentFolder || DEFAULT_INBOX_FOLDER);
   const [typeFilters, setTypeFilters] = useState<AudioTypeFilter[]>(['voice', 'file']);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
@@ -57,7 +58,7 @@ export const AudioPanel: React.FC = () => {
   const folderPickerRef = useRef<HTMLDivElement | null>(null);
 
   // Effective folder based on mode
-  const effectiveFolder = scopeMode === 'active' ? currentFolder || 'Входящие' : pinnedFolder;
+  const effectiveFolder = scopeMode === 'active' ? currentFolder || DEFAULT_INBOX_FOLDER : pinnedFolder;
 
   // Collision guard on mount
   useEffect(() => {
@@ -76,9 +77,9 @@ export const AudioPanel: React.FC = () => {
     return () => window.removeEventListener('mousedown', handleOutsideClick);
   }, [isFolderPickerOpen]);
 
-  // Deduplicated folders list with "Входящие" first
+  // Deduplicated folders list with inbox first
   const availableFolders = useMemo(() => {
-    return Array.from(new Set(['Входящие', ...folders.map((f) => f.path).filter(Boolean)]));
+    return Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)]));
   }, [folders]);
 
   // Extract tracks for current folder and filters
@@ -289,7 +290,7 @@ export const AudioPanel: React.FC = () => {
   const toggleScopeMode = () => {
     if (scopeMode === 'active') {
       setScopeMode('pinned');
-      if (!pinnedFolder) setPinnedFolder(currentFolder || 'Входящие');
+      if (!pinnedFolder) setPinnedFolder(currentFolder || DEFAULT_INBOX_FOLDER);
     } else {
       setScopeMode('active');
     }

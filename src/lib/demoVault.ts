@@ -1,4 +1,5 @@
 import type { SlagItem } from '../types';
+import { DEFAULT_INBOX_FOLDER } from '../config';
 
 /**
  * Generates a clean, cohesive set of starter demo items across the default folders.
@@ -23,7 +24,7 @@ export function generateDemoItems(): SlagItem[] {
         '- [ ] Указать умную дату: например «позвонить завтра в 15:00 p1»\n' +
         '- [ ] Нажать ⌘K / Ctrl+K для глобального нечёткого поиска\n' +
         '- [ ] Нажать ПКМ по любой заметке для вызова контекстных действий',
-      folder: 'Входящие',
+      folder: DEFAULT_INBOX_FOLDER,
       tags: ['старт', 'инструкция'],
       createdAt: now - 3600000 * 2,
       updatedAt: now - 3600000 * 2,

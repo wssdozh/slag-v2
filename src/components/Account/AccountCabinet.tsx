@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { accountClient, generateMnemonic } from '../../lib/sync/account';
 import { getOrCreateDeviceIdentity } from '../../lib/sync/accountCrypto';
 import { syncEngine } from '../../lib/sync/syncEngine';
-import { getLocalVaultId, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
+import { acceptSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
 import { navigatePage } from '../../lib/navigation';
 
@@ -97,15 +97,8 @@ export const AccountCabinet: React.FC = () => {
     const invitation = state.invitations.find((item) => item.vaultId === vaultId);
     if (!invitation) throw new Error('Приглашение больше недоступно');
     // Decrypt and persist locally before accepting so a failed install remains retryable.
-    await installSharedVault({ vaultId, vaultName: invitation.vaultName, encryptedKey: invitation.encryptedKey }, config.deviceId, { createVault, switchVault }, false);
-    await accountClient.acceptVault(vaultId);
-    setMessage('Приглашение принято. Запускаем синхронизацию; файлы ещё могут загружаться.');
-    switchVault(getLocalVaultId(vaultId));
-    try {
-      await syncEngine.switchVault(getLocalVaultId(vaultId));
-    } catch (error) {
-      throw new Error(`Приглашение принято, но запуск синхронизации не удался: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    await acceptSharedVault({ vaultId, vaultName: invitation.vaultName, encryptedKey: invitation.encryptedKey }, config.deviceId, { createVault, switchVault });
+    setMessage('Приглашение принято. Хранилище загружается в приложении.');
   }, 'Приглашение принято. Синхронизация запущена, но загрузка всех файлов ещё не подтверждена.');
 
   // Возврат в приложение: назад по истории, иначе — на корень без лишней записи.

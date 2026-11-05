@@ -1,6 +1,7 @@
 import YAML from 'yaml';
 import type { SlagItem, SlagItemType } from '../types';
 import { parseSubtasksFromContent } from './taskUtils';
+import { DEFAULT_INBOX_FOLDER } from '../config';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
@@ -13,7 +14,7 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     created: item.createdAt,
     updated: item.updatedAt,
     tags: item.tags || [],
-    folder: item.folder || 'Входящие',
+    folder: item.folder || DEFAULT_INBOX_FOLDER,
   };
 
   if (item.isPinned) frontmatterData.pinned = true;
@@ -75,7 +76,7 @@ export function serializeItemToMarkdown(item: SlagItem): string {
 /**
  * Parses raw Markdown text with YAML frontmatter into a SlagItem.
  */
-export function parseMarkdownToItem(rawContent: string, fallbackId: string, fallbackFolder: string = 'Входящие'): SlagItem {
+export function parseMarkdownToItem(rawContent: string, fallbackId: string, fallbackFolder: string = DEFAULT_INBOX_FOLDER): SlagItem {
   let frontmatter: Record<string, any> = {};
   let body = rawContent;
 

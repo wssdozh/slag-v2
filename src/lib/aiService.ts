@@ -9,6 +9,11 @@ import {
   type SendAssistantChatParams,
   type SendAssistantChatResult,
 } from './ai/orchestrator';
+import {
+  DEFAULT_INBOX_FOLDER,
+  AI_STOP_TAGS,
+  AI_CATEGORY_KEYWORDS,
+} from '../config';
 
 export {
   resolveKieEndpoint,
@@ -41,33 +46,7 @@ export type TriageProgressCallback = (
   progress: TriageProgress
 ) => void;
 
-const STOP_TAGS = new Set([
-  'заметка',
-  'заметки',
-  'note',
-  'notes',
-  'таска',
-  'таски',
-  'задача',
-  'задачи',
-  'task',
-  'tasks',
-  'статья',
-  'статьи',
-  'article',
-  'articles',
-  'аудио',
-  'audio',
-  'голос',
-  'голосовая-заметка',
-  'голосовая заметка',
-  'фото',
-  'изображение',
-  'картинка',
-  'image',
-  'файл',
-  'file',
-]);
+const STOP_TAGS = AI_STOP_TAGS;
 
 function isStopTag(tag: string): boolean {
   const normalized = tag.toLowerCase().replace(/^#/, '').trim();
@@ -116,19 +95,7 @@ function localHeuristicTags(
     return regex.test(lower);
   });
 
-  const keywords: Record<string, string[]> = {
-    разработка: ['разработ', 'код', 'code', 'программ', 'дев', 'dev', 'спецификац', 'архитектур'],
-    геймдев: ['геймдев', 'game', 'игра', 'геймдизайн', 'unity', 'unreal', 'godot'],
-    архитектура: ['архитектур', 'модул', 'рефактор', 'паттерн', 'solid'],
-    frontend: ['фронтенд', 'frontend', 'react', 'vite', 'tailwind', 'css', 'ui'],
-    backend: ['бэкенд', 'backend', 'api', 'node', 'server', 'база данных', 'sql'],
-    задачи: ['задач', 'таск', 'дедлайн', 'план', 'сделать'],
-    идеи: ['идея', 'мысль', 'инсайт', 'концепт', 'гипотеза'],
-    фильмы: ['фильм', 'кино', 'movie', 'cinema', 'режиссер'],
-    сериалы: ['сериал', 'эпизод', 'сезон', 'series'],
-    книги: ['книг', 'book', 'автор', 'роман', 'повест'],
-    музыка: ['музык', 'трек', 'альбом', 'song', 'music', 'плейлист'],
-  };
+  const keywords = AI_CATEGORY_KEYWORDS;
 
   const detected: string[] = [];
   for (const [tag, triggers] of Object.entries(keywords)) {
@@ -151,7 +118,7 @@ function localMatchFolder(
   folders: FolderMeta[],
   fallbackFolder: string
 ): { folder: string; reason: string } {
-  const eligible = folders.filter((f) => f.path !== 'Входящие');
+  const eligible = folders.filter((f) => f.path !== DEFAULT_INBOX_FOLDER);
   if (eligible.length === 0) {
     return { folder: fallbackFolder, reason: 'По умолчанию' };
   }
@@ -213,7 +180,7 @@ export async function categorizeDraft(
   const style = settings.tagCaseStyle || 'lowercase';
   const explicit = extractExplicitHashtags(content, style);
 
-  const eligibleFolders = folders.filter((f) => f.path !== 'Входящие');
+  const eligibleFolders = folders.filter((f) => f.path !== DEFAULT_INBOX_FOLDER);
   const foldersContext = eligibleFolders.map((f) => ({
     path: f.path,
     name: f.name,
@@ -280,7 +247,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
     const combinedTags = Array.from(new Set([...explicit, ...formatted])).slice(0, maxTags);
 
     let targetFolder = parsed.targetFolder?.trim() || currentFolder;
-    const folderExists = eligibleFolders.some((f) => f.path === targetFolder) || targetFolder === currentFolder || targetFolder === 'Входящие';
+    const folderExists = eligibleFolders.some((f) => f.path === targetFolder) || targetFolder === currentFolder || targetFolder === DEFAULT_INBOX_FOLDER;
     if (!folderExists) {
       targetFolder = currentFolder;
     }
@@ -296,7 +263,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
   }
 
   // Local fallback
-  const localMatch = currentFolder === 'Входящие'
+  const localMatch = currentFolder === DEFAULT_INBOX_FOLDER
     ? localMatchFolder(content, eligibleFolders, currentFolder)
     : { folder: currentFolder, reason: 'Текущая папка' };
 
@@ -313,7 +280,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
  * Intelligent AI tagging (backwards-compatible wrapper around categorizeDraft).
  */
 export async function generateSmartTags(content: string, settings: AiSettings): Promise<string[]> {
-  const result = await categorizeDraft(content, 'Входящие', [], settings);
+  const result = await categorizeDraft(content, DEFAULT_INBOX_FOLDER, [], settings);
   return result.tags;
 }
 
@@ -327,7 +294,7 @@ export async function triageInboxItems(
   settings: AiSettings,
   onProgress?: TriageProgressCallback
 ): Promise<TriageSuggestion[]> {
-  const eligibleFolders = folders.filter((f) => f.path !== 'Входящие');
+  const eligibleFolders = folders.filter((f) => f.path !== DEFAULT_INBOX_FOLDER);
   if (inboxItems.length === 0 || eligibleFolders.length === 0) {
     return [];
   }

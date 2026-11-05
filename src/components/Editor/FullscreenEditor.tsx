@@ -8,6 +8,7 @@ import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
 import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/taskUtils';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
@@ -98,7 +99,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       : item.content || '';
   });
   const [type, setType] = useState<SlagItemType>(() => initialDraft?.type ?? (item.type || 'article'));
-  const [folder, setFolder] = useState(() => initialDraft?.folder ?? (item.folder || 'Входящие'));
+  const [folder, setFolder] = useState(() => initialDraft?.folder ?? (item.folder || DEFAULT_INBOX_FOLDER));
   const [tags, setTags] = useState<string[]>(() => initialDraft?.tags ?? (item.tags || []));
   const [newTagInput, setNewTagInput] = useState('');
   const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(() => initialDraft?.priority ?? (item.priority || 'none'));
@@ -207,7 +208,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   const syncDraftBackToComposer = useCallback(() => {
     if (!item.id.startsWith('draft_')) return;
-    const targetFolderVal = folder !== 'Входящие' ? folder : undefined;
+    const targetFolderVal = folder !== DEFAULT_INBOX_FOLDER ? folder : undefined;
     const draftData = {
       content: content.trim(),
       itemType: type,
@@ -221,9 +222,9 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       recurrence: type === 'task' ? recurrence : undefined,
       updatedAt: Date.now(),
     };
-    storage.saveComposerDraft(folder || 'Входящие', draftData, 'local');
-    if (folder && folder !== 'Входящие') {
-      storage.saveComposerDraft('Входящие', draftData, 'local');
+    storage.saveComposerDraft(folder || DEFAULT_INBOX_FOLDER, draftData, 'local');
+    if (folder && folder !== DEFAULT_INBOX_FOLDER) {
+      storage.saveComposerDraft(DEFAULT_INBOX_FOLDER, draftData, 'local');
     }
     storage.clearFullscreenDraft(item.id);
   }, [item.id, item.replyToId, folder, content, type, priority, dueDate, tags, attachments, duration, recurrence]);
@@ -250,7 +251,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   const folderOptions = React.useMemo(() => {
     // Collect non-inbox folders
-    const regularFolders = folders.filter(f => f.path !== 'Входящие');
+    const regularFolders = folders.filter(f => f.path !== DEFAULT_INBOX_FOLDER);
 
     // Hierarchy tree to sort exactly by root and nested paths
     interface Node {
@@ -295,7 +296,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     roots.forEach(r => traverse(r, true));
 
     return [
-      { value: 'Входящие', label: 'Входящие' },
+      { value: DEFAULT_INBOX_FOLDER, label: DEFAULT_INBOX_FOLDER },
       ...orderedPaths.map((item) => ({
         value: item.path,
         label: item.path,
@@ -470,7 +471,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     addToast('ИИ определяет папку и теги...', 'info');
     try {
       const fullText = `${title ? title + '\n' : ''}${content}`.trim();
-      const res = await categorizeDraft(fullText, folder || 'Входящие', folders, aiSettings);
+      const res = await categorizeDraft(fullText, folder || DEFAULT_INBOX_FOLDER, folders, aiSettings);
       if (res.targetFolder && res.targetFolder !== folder) {
         setFolder(res.targetFolder);
       }

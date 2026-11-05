@@ -5,6 +5,7 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import type { SyncStatus } from '../../lib/sync/types';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   Inbox,
   FolderPlus,
@@ -59,7 +60,7 @@ export const Sidebar: React.FC = () => {
     };
   }, [isVaultDropdownOpen]);
 
-  const inboxItemsCount = items.filter(i => i.folder === 'Входящие').length;
+  const inboxItemsCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
 
   return (
     <aside
@@ -67,19 +68,19 @@ export const Sidebar: React.FC = () => {
     >
       {/* Main Folder Navigation */}
       <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-3">
-        {/* Pinned "Входящие" (Inbox) */}
+        {/* Pinned Inbox */}
         <div>
           <button
-            onClick={() => setCurrentFolder('Входящие')}
+            onClick={() => setCurrentFolder(DEFAULT_INBOX_FOLDER)}
             className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-              currentFolder === 'Входящие'
+              currentFolder === DEFAULT_INBOX_FOLDER
                 ? 'bg-white/[0.08] text-white font-medium'
                 : 'text-zinc-300 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
             <div className="flex items-center gap-2">
               <Inbox className="w-4 h-4 text-zinc-300" />
-              <span>Входящие</span>
+              <span>{DEFAULT_INBOX_FOLDER}</span>
             </div>
             {inboxItemsCount > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-2xs font-mono bg-white/10 text-zinc-200">

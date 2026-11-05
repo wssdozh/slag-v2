@@ -1,26 +1,17 @@
 import { create, insert, search, type Orama } from '@orama/orama';
 import type { SlagItem } from '../types';
 import { logger } from './logger';
+import {
+  SEARCH_STOP_WORDS,
+  SEARCH_WEIGHTS,
+  SEARCH_LIMITS,
+} from '../config';
 
 const searchLog = logger.scope('SEARCH');
 let dbInstance: Orama<any> | null = null;
 let lastIndexSignature = '';
 
-// Stop words for Russian and English to clean noisy conversational queries
-const STOP_WORDS = new Set([
-  // Russian prepositions, particles, conversational noise, query verbs & entity mentions
-  'по', 'как', 'жить', 'вообще', 'что', 'это', 'для', 'при', 'от', 'до', 'из', 'со',
-  'ко', 'не', 'же', 'да', 'ну', 'бы', 'то', 'быть', 'все', 'всё', 'поищи', 'найди',
-  'ищи', 'где', 'есть', 'мне', 'нам', 'ты', 'вы', 'он', 'она', 'они', 'их', 'его',
-  'ее', 'её', 'ли', 'так', 'уже', 'еще', 'ещё', 'за', 'под', 'над', 'про', 'без',
-  'о', 'об', 'обо', 'чем', 'тем', 'или', 'но', 'а', 'и', 'в', 'во', 'на', 'с', 'к',
-  'там', 'тут', 'здесь', 'заметку', 'заметки', 'заметка', 'заметкам', 'таску', 'таски',
-  'статью', 'статьи', 'статья', 'запись', 'записи', 'итд', 'тд', 'др', 'прочее',
-  // English common stop words
-  'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'about',
-  'how', 'what', 'why', 'where', 'is', 'are', 'was', 'were', 'find', 'search', 'note',
-  'notes', 'task', 'tasks', 'article', 'articles', 'there', 'here',
-]);
+const STOP_WORDS = SEARCH_STOP_WORDS;
 
 /**
  * Strips common inflections/suffixes for simple Russian & English stemming.
@@ -159,10 +150,10 @@ export async function initSearchIndex(items: SlagItem[]): Promise<Orama<any> | n
         id: item.id,
         type: item.type,
         title: item.title || '',
-        content: (item.content || '').slice(0, 4000),
+        content: (item.content || '').slice(0, SEARCH_LIMITS.INDEX_CONTENT_MAX_LEN),
         tags: item.tags || [],
         folder: item.folder || '',
-        attachmentsText: getSearchableAttachmentText(item.attachments).slice(0, 4000),
+        attachmentsText: getSearchableAttachmentText(item.attachments).slice(0, SEARCH_LIMITS.INDEX_ATTACH_MAX_LEN),
       });
     }
 
@@ -193,7 +184,7 @@ export async function querySearch(
     // Return recent items
     return allItems
       .filter(i => (!typeFilter || typeFilter === 'all' ? true : i.type === typeFilter))
-      .slice(0, 8);
+      .slice(0, SEARCH_LIMITS.RECENT_ITEMS_LIMIT);
   }
 
   const startMs = performance.now();
@@ -204,8 +195,8 @@ export async function querySearch(
     try {
       const searchResult = await search(dbInstance, {
         term: trimmed,
-        tolerance: 1, // typo tolerance
-        limit: 15,
+        tolerance: SEARCH_LIMITS.TYPO_TOLERANCE,
+        limit: SEARCH_LIMITS.ORAMA_PHRASE_LIMIT,
       });
 
       if (searchResult.hits.length > 0) {
@@ -228,8 +219,8 @@ export async function querySearch(
         for (const kw of keywords) {
           const kwResult = await search(dbInstance, {
             term: kw,
-            tolerance: 1,
-            limit: 10,
+            tolerance: SEARCH_LIMITS.TYPO_TOLERANCE,
+            limit: SEARCH_LIMITS.ORAMA_KEYWORD_LIMIT,
           });
           kwResult.hits.forEach(h => keywordHitIds.add((h.document as any).id));
         }
@@ -266,32 +257,32 @@ export async function querySearch(
     const attachWords = extractKeywords(attachText.slice(0, 1500));
 
     // Exact full substring bonuses
-    if (item.title?.toLowerCase().includes(trimmed)) score += 30;
-    if (item.content?.toLowerCase().includes(trimmed)) score += 15;
-    if (attachText.includes(trimmed)) score += 20;
-    if (item.tags?.some(t => t.toLowerCase().includes(trimmed))) score += 20;
+    if (item.title?.toLowerCase().includes(trimmed)) score += SEARCH_WEIGHTS.EXACT_TITLE;
+    if (item.content?.toLowerCase().includes(trimmed)) score += SEARCH_WEIGHTS.EXACT_CONTENT;
+    if (attachText.includes(trimmed)) score += SEARCH_WEIGHTS.EXACT_ATTACH;
+    if (item.tags?.some(t => t.toLowerCase().includes(trimmed))) score += SEARCH_WEIGHTS.EXACT_TAG;
 
     // Token-by-token fuzzy matching
     for (const kw of keywords) {
       // Title match (high weight)
       if (titleWords.some(tw => tokenMatches(kw, tw))) {
-        score += 15;
+        score += SEARCH_WEIGHTS.TOKEN_TITLE;
       }
       // Tag match (medium-high weight)
       if (tagWords.some(tag => tokenMatches(kw, tag))) {
-        score += 12;
+        score += SEARCH_WEIGHTS.TOKEN_TAG;
       }
       // Attachment transcription/OCR match
       if (attachWords.some(aw => tokenMatches(kw, aw))) {
-        score += 12;
+        score += SEARCH_WEIGHTS.TOKEN_ATTACH;
       }
       // Content match (context weight)
       if (contentWords.some(cw => tokenMatches(kw, cw))) {
-        score += 5;
+        score += SEARCH_WEIGHTS.TOKEN_CONTENT;
       }
       // Folder match
       if (item.folder && tokenMatches(kw, item.folder.toLowerCase())) {
-        score += 4;
+        score += SEARCH_WEIGHTS.TOKEN_FOLDER;
       }
     }
 
@@ -301,7 +292,7 @@ export async function querySearch(
   }
 
   scoredItems.sort((a, b) => b.score - a.score);
-  const fallbackResults = scoredItems.slice(0, 15).map(s => s.item);
+  const fallbackResults = scoredItems.slice(0, SEARCH_LIMITS.FALLBACK_MAX_HITS).map(s => s.item);
 
   const duration = performance.now() - startMs;
   searchLog.trace(`Query "${queryText}" [tokens: ${keywords.join(', ')}] yielded ${fallbackResults.length} hits via tokenized scorer (${Math.round(duration)}ms)`);

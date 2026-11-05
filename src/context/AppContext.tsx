@@ -35,6 +35,14 @@ import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
+  STORAGE_KEYS,
+  DEFAULT_INBOX_FOLDER,
+  UI_LAYOUT,
+  UI_BREAKPOINTS,
+  AI_ENDPOINTS,
+  DEFAULT_AI_MODELS,
+} from '../config';
+import {
   evaluateRecurringTasks,
   getISODateString,
 } from '../lib/recurrenceHelper';
@@ -233,11 +241,11 @@ interface AppContextType {
   updateUiConfig: (device: 'desktop' | 'mobile', updates: Partial<DeviceUiConfig>) => void;
 }
 
-const AI_SETTINGS_KEY = 'slag_ai_settings_v2';
-const SIDEBAR_WIDTH_KEY = 'slag_sidebar_width_v2';
-const RIGHT_PANEL_WIDTH_KEY = 'slag_right_panel_width_v2';
-const MOBILE_DOCK_TABS_KEY = 'slag_mobile_dock_tabs_v2';
-const UI_CONFIG_KEY = 'slag_ui_config_v2';
+const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
+const SIDEBAR_WIDTH_KEY = STORAGE_KEYS.SIDEBAR_WIDTH;
+const RIGHT_PANEL_WIDTH_KEY = STORAGE_KEYS.RIGHT_PANEL_WIDTH;
+const MOBILE_DOCK_TABS_KEY = STORAGE_KEYS.MOBILE_DOCK_TABS;
+const UI_CONFIG_KEY = STORAGE_KEYS.UI_CONFIG;
 
 const DEFAULT_UI_CONFIG: AppUiConfig = {
   desktop: {
@@ -260,9 +268,9 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: 'groq',
   groqApiKey: '',
   kieApiKey: '',
-  kieBaseUrl: 'https://api.kie.ai',
+  kieBaseUrl: AI_ENDPOINTS.DEFAULT_KIE_BASE_URL,
   geminiApiKey: '',
-  model: 'openai/gpt-oss-120b',
+  model: DEFAULT_AI_MODELS.GROQ_DEFAULT,
   reasoningEffort: 'low',
   autoTagging: true,
   autoTriage: true,
@@ -344,7 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [folders, setFolders] = useState<FolderMeta[]>(() => storage.getFolders());
   const initialCurFolder = storage.getFolders().some(f => f.path === initialWorkspace.currentFolder)
     ? initialWorkspace.currentFolder
-    : 'Входящие';
+    : DEFAULT_INBOX_FOLDER;
   const initialFolderSetting = (initialWorkspace.folderSettings || {})[initialCurFolder];
 
   const [currentFolder, setCurrentFolder] = useState<string>(initialCurFolder);
@@ -354,7 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof initialWorkspace.isKanbanMaterialsOpen === 'boolean') {
       return initialWorkspace.isKanbanMaterialsOpen;
     }
-    const isMobileInitial = typeof window !== 'undefined' && (window.innerWidth < 768 || isMobilePlatform());
+    const isMobileInitial = typeof window !== 'undefined' && (window.innerWidth < UI_BREAKPOINTS.MOBILE || isMobilePlatform());
     return !isMobileInitial;
   });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
@@ -380,7 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           title: '',
           content: '',
           type: 'note',
-          folder: initialWorkspace.currentFolder || 'Входящие',
+          folder: initialWorkspace.currentFolder || DEFAULT_INBOX_FOLDER,
           tags: [],
           attachments: [],
           createdAt: Date.now(),
@@ -424,7 +432,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setFeedViewMode('feed');
       setActiveTypeFilter('all');
-      if (currentFolder === 'Входящие') {
+      if (currentFolder === DEFAULT_INBOX_FOLDER) {
         setInboxMode('all');
       }
       setSortBy('createdAt');
@@ -543,19 +551,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const setSidebarWidth = (w: number) => {
-    const clamped = Math.max(180, Math.min(480, w));
+    const clamped = Math.max(UI_LAYOUT.SIDEBAR_MIN_WIDTH, Math.min(UI_LAYOUT.SIDEBAR_MAX_WIDTH, w));
     setSidebarWidthState(clamped);
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clamped));
   };
 
   const setRightPanelWidth = (w: number) => {
-    const clamped = Math.max(220, Math.min(520, w));
+    const clamped = Math.max(UI_LAYOUT.RIGHT_PANEL_MIN_WIDTH, Math.min(UI_LAYOUT.RIGHT_PANEL_MAX_WIDTH, w));
     setRightPanelWidthState(clamped);
     localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(clamped));
   };
 
   // Mobile navigation & touch state: desktop and standalone popouts never default to phone layout
-  const isMobileScreen = useIsMobile(768);
+  const isMobileScreen = useIsMobile(UI_BREAKPOINTS.MOBILE);
   const [forceMobileMode, setForceMobileMode] = useState<boolean | null>(null);
   const isDesktop = isDesktopApp();
   const isStandalone = typeof window !== 'undefined' && Boolean(new URLSearchParams(window.location.search).get('panel'));
@@ -831,7 +839,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       uiLog.info(`Navigated to folder: "${currentFolder}"`, {
         from: prevFolderRef.current,
         to: currentFolder,
-        isInbox: currentFolder === 'Входящие',
+        isInbox: currentFolder === DEFAULT_INBOX_FOLDER,
       });
       prevFolderRef.current = currentFolder;
     }
@@ -1260,7 +1268,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    if (currentFolder !== 'Входящие' && currentFolder !== found.folder && !found.folder.startsWith(currentFolder + '/')) {
+    if (currentFolder !== DEFAULT_INBOX_FOLDER && currentFolder !== found.folder && !found.folder.startsWith(currentFolder + '/')) {
       setCurrentFolder(found.folder);
     }
 
@@ -1375,7 +1383,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const now = Date.now();
     setSelectedItem({
       id: 'draft_' + now, title: '', content: '', type: 'note',
-      folder: folder || 'Входящие', tags: [], attachments: [], createdAt: now, updatedAt: now,
+      folder: folder || DEFAULT_INBOX_FOLDER, tags: [], attachments: [], createdAt: now, updatedAt: now,
     });
     setIsFullscreenEditorOpen(true);
   }, []);
@@ -1420,7 +1428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const moveItem = useCallback((itemId: string, targetFolder: string) => {
     const item = items.find(i => i.id === itemId);
-    const prevFolder = item?.folder || 'Входящие';
+    const prevFolder = item?.folder || DEFAULT_INBOX_FOLDER;
     uiLog.info(`Moved note "${item?.title || itemId}" to folder "${targetFolder}"`, {
       itemId,
       title: item?.title,
@@ -1834,13 +1842,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentFolder, refreshData, addToast]);
 
   const deleteFolder = (path: string) => {
-    if (path === 'Входящие') {
-      addToast('Папку «Входящие» нельзя удалить', 'error');
+    if (path === DEFAULT_INBOX_FOLDER) {
+      addToast(`Папку «${DEFAULT_INBOX_FOLDER}» нельзя удалить`, 'error');
       return;
     }
     storage.deleteFolder(path);
     if (currentFolder === path || currentFolder.startsWith(path + '/')) {
-      setCurrentFolder('Входящие');
+      setCurrentFolder(DEFAULT_INBOX_FOLDER);
     }
     refreshData();
     addToast('Папка удалена, заметки перемещены во Входящие', 'info');
@@ -1850,7 +1858,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     storage.switchVault(vaultId);
     void syncEngine.switchVault(vaultId);
     const newWs = storage.getWorkspaceState();
-    setCurrentFolder(newWs.currentFolder || 'Входящие');
+    setCurrentFolder(newWs.currentFolder || DEFAULT_INBOX_FOLDER);
     setFeedViewMode(newWs.feedViewMode || 'feed');
     setInboxMode(newWs.inboxMode || 'all');
     setActiveTypeFilter(newWs.activeTypeFilter || 'all');
@@ -1876,7 +1884,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (!id) {
       void syncEngine.switchVault(newMeta.id);
     }
-    setCurrentFolder('Входящие');
+    setCurrentFolder(DEFAULT_INBOX_FOLDER);
     setSelectedItem(null);
     refreshData();
     addToast(`Создано хранилище «${name}»`, 'success');
@@ -1891,7 +1899,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setVault(storage.getCurrentVault());
         setFolders(storage.getFolders());
         setItems(storage.getItems());
-        setCurrentFolder('Входящие');
+        setCurrentFolder(DEFAULT_INBOX_FOLDER);
         setSelectedItem(null);
       }
       setVaults(storage.getVaults());
@@ -1914,7 +1922,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const openFolderInExplorer = useCallback(async (folderPath: string) => {
     const notesBase = storage.getVaultNotesPath();
-    const target = `${notesBase}/${folderPath || 'Входящие'}`;
+    const target = `${notesBase}/${folderPath || DEFAULT_INBOX_FOLDER}`;
     const res = await openAppFolder(target);
     addToast(res.message, res.success ? 'success' : 'info');
   }, [addToast]);
@@ -1978,7 +1986,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetCurrentFolderViewSettings = useCallback(() => {
     setFeedViewMode('feed');
     setActiveTypeFilter('all');
-    if (currentFolder === 'Входящие') setInboxMode('all');
+    if (currentFolder === DEFAULT_INBOX_FOLDER) setInboxMode('all');
     setSortBy('createdAt');
     setSortOrder('asc');
     setHideCompletedTasks(false);
@@ -2000,13 +2008,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let matchesFolder = false;
       if (aiItemFilter) {
         matchesFolder = true;
-      } else if (currentFolder === 'Входящие') {
+      } else if (currentFolder === DEFAULT_INBOX_FOLDER) {
         if (inboxMode === 'unsorted') {
-          matchesFolder = item.folder === 'Входящие';
+          matchesFolder = item.folder === DEFAULT_INBOX_FOLDER;
         } else if (inboxMode === 'all') {
           matchesFolder = true;
         } else if (inboxMode === 'sorted') {
-          matchesFolder = item.folder !== 'Входящие';
+          matchesFolder = item.folder !== DEFAULT_INBOX_FOLDER;
         }
       } else {
         matchesFolder = item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');

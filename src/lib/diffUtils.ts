@@ -1,3 +1,5 @@
+import { DEFAULT_INBOX_FOLDER } from '../config';
+
 export interface WordChunk {
   text: string;
   type: 'normal' | 'removed' | 'added';
@@ -244,7 +246,7 @@ export function computeMetadataDiff(
     diffs.push({ label: 'Заголовок', oldValue: oldItem.title, newValue: newItem.title });
   }
   if (newItem.folder !== undefined && oldItem.folder !== newItem.folder) {
-    diffs.push({ label: 'Папка', oldValue: oldItem.folder || 'Входящие', newValue: newItem.folder || 'Входящие' });
+    diffs.push({ label: 'Папка', oldValue: oldItem.folder || DEFAULT_INBOX_FOLDER, newValue: newItem.folder || DEFAULT_INBOX_FOLDER });
   }
   if (newItem.dueDate !== undefined && oldItem.dueDate !== newItem.dueDate) {
     diffs.push({ label: 'Срок', oldValue: oldItem.dueDate || 'без срока', newValue: newItem.dueDate || 'без срока' });

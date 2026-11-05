@@ -25,10 +25,17 @@ import type {
   DeviceSyncMode,
 } from './types';
 import type { SlagItem, FolderMeta, WorkspaceState, ComposerDraft, FullscreenDraft } from '../../types';
+import {
+  DEFAULT_SYNC_SERVER_URL,
+  OFFICIAL_SYNC_DOMAINS,
+  SYNC_STORAGE_KEYS,
+  SYNC_INTERVALS,
+  DEFAULT_INBOX_FOLDER,
+} from '../../config';
 
-const SYNC_CONFIG_KEY = 'slag_sync_config_v2';
-const LAST_STATE_HASH_KEY = 'slag_sync_last_state_hash';
-const DEFAULT_SERVER_URL = 'http://152.53.199.71:8320';
+const SYNC_CONFIG_KEY = SYNC_STORAGE_KEYS.SYNC_CONFIG;
+const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
+const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
 
 const syncLog = logger.scope('SYNC');
 
@@ -44,8 +51,10 @@ export class SyncEngine {
   private activeRoomId: string | null = null;
   private isProcessingSync = false;
   private sequence = 1;
-  private lastAppliedBundleId: string | null = null;
+  private appliedBundleIds = new Set<string>();
+  private batchUpdating = false;
   private initGeneration = 0;
+  private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   private currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -55,6 +64,7 @@ export class SyncEngine {
         ? storage.getCurrentVault()?.id
         : 'default_vault') || 'default_vault';
     this.status = {
+      initialSync: { vaultId: this.currentVaultId, state: 'idle', processed: 0, rejected: 0 },
       state: 'idle',
       authRequired: false,
       isAuthenticated: accountClient.isAuthenticated(),
@@ -155,6 +165,7 @@ export class SyncEngine {
   public getStatus(): SyncStatus {
     return {
       ...this.status,
+      initialSync: { ...this.status.initialSync },
       subscription: this.computeSubscription(this.config),
     };
   }
@@ -244,12 +255,12 @@ export class SyncEngine {
   private async refreshServerAuth(): Promise<boolean> {
     try {
       const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
-      const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(5000) });
+      const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(SYNC_INTERVALS.HEALTH_TIMEOUT_MS) });
       if (!response.ok) throw new Error(`Health check failed: HTTP ${response.status}`);
       const health = await response.json();
       this.status.authRequired = Boolean(health.authRequired);
     } catch {
-      const isOfficial = this.config.serverUrl.includes('152.53.199.71') || this.config.serverUrl.includes('slag.app');
+      const isOfficial = OFFICIAL_SYNC_DOMAINS.some((domain) => this.config.serverUrl.includes(domain));
       this.status.authRequired = isOfficial;
     }
     this.status.isAuthenticated = accountClient.getToken(this.config.serverUrl) !== null;
@@ -348,6 +359,26 @@ export class SyncEngine {
     }
   }
 
+  public beginInitialSync(vaultId: string): void {
+    localStorage.setItem(`slag_initial_sync_${vaultId}`, 'pending');
+    this.status.initialSync = { vaultId, state: 'loading', processed: 0, rejected: 0 };
+    this.notify();
+  }
+
+  public failInitialSync(error: unknown): void {
+    this.status.initialSync.state = 'error';
+    this.status.error = error instanceof Error ? error.message : String(error);
+    this.notify();
+  }
+
+  public async retryInitialSync(): Promise<void> {
+    const syncId = this.getSyncVaultId();
+    const pending = accountClient.getState().invitations.some((entry) => entry.vaultId === syncId);
+    if (pending) await accountClient.acceptVault(syncId);
+    this.saveConfig({ enabled: true });
+    await this.init();
+  }
+
   public async switchVault(vaultId: string): Promise<void> {
     if (this.currentVaultId === vaultId && this.status.state !== 'idle' && this.status.state !== 'error') {
       return;
@@ -363,9 +394,13 @@ export class SyncEngine {
   }
 
   public async init(): Promise<void> {
-    const generation = ++this.initGeneration;
+    this.disconnect();
+    const generation = this.initGeneration;
     const seedPhrase = this.config.seedPhrase;
+    const initial = localStorage.getItem(`slag_initial_sync_${this.currentVaultId}`) === 'pending';
+    this.status.initialSync = { vaultId: this.currentVaultId, state: initial ? 'loading' : 'idle', processed: 0, rejected: 0 };
     if (!this.config.enabled) {
+      if (initial) this.failInitialSync(new Error('Синхронизация выключена'));
       this.status.state = 'idle';
       this.notify();
       return;
@@ -379,7 +414,8 @@ export class SyncEngine {
       if (generation !== this.initGeneration) return;
       if (!canSync) {
         this.status.state = 'idle';
-        this.status.error = null;
+        this.status.error = initial ? 'Войдите в аккаунт для загрузки хранилища' : null;
+        if (initial) this.status.initialSync.state = 'error';
         this.activeVaultKey = null;
         this.activeRoomId = null;
         this.status.currentRoomId = null;
@@ -395,6 +431,7 @@ export class SyncEngine {
         const grant = vault && vault.grants.find((entry) => entry.deviceId === this.config.deviceId);
         if (!grant || grant.status !== 'accepted') {
           this.status.state = 'idle';
+          if (initial) this.status.initialSync.state = 'error';
           this.status.error = grant && grant.status === 'revoked' ? 'Доступ отозван. Локальная копия сохранена' : grant && grant.status === 'pending' ? 'Примите приглашение в личном кабинете' : 'Хранилище хранится только на этом устройстве';
           this.notify();
           return;
@@ -416,15 +453,28 @@ export class SyncEngine {
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
 
+      this.ensureSyncedIdsSeed();
+      this.batchUpdating = initial;
+      await this.fetchPendingBundlesHttp();
+      if (generation !== this.initGeneration) return;
+      this.batchUpdating = false;
+      if (initial) {
+        localStorage.removeItem(`slag_initial_sync_${this.currentVaultId}`);
+        this.status.initialSync.state = 'ready';
+        window.dispatchEvent(new CustomEvent('slag-sync-updated', {
+          detail: { hasItemsChanged: true, hasFoldersChanged: true, hasWorkspaceChanged: true, hasDraftsChanged: true },
+        }));
+        this.notify();
+      }
       this.connectWebSocket();
       this.startIntervals();
-      this.ensureSyncedIdsSeed();
-      await this.fetchPendingBundlesHttp();
       await this.pushLocalChanges();
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
       const msg = err instanceof Error ? err.message : String(err);
       syncLog.error('Sync init error:', msg);
+      this.batchUpdating = false;
+      if (initial && localStorage.getItem(`slag_initial_sync_${this.currentVaultId}`) === 'pending') this.status.initialSync.state = 'error';
       this.status.state = 'error';
       this.status.error = msg;
       this.notify();
@@ -540,11 +590,14 @@ export class SyncEngine {
           this.notify();
           return;
         }
-        const retryMs = Math.min(5000 * 2 ** Math.min(this.reconnectAttempts++, 4), 60000);
+        const retryMs = Math.min(
+          SYNC_INTERVALS.RECONNECT_BASE_MS * 2 ** Math.min(this.reconnectAttempts++, SYNC_INTERVALS.RECONNECT_MAX_EXPONENT),
+          SYNC_INTERVALS.RECONNECT_MAX_MS
+        );
         syncLog.info(`Sync WebSocket closed (code ${event.code}), retrying in ${retryMs}ms`);
         this.status.state = 'offline';
         this.notify();
-        void this.fetchPendingBundlesHttp();
+        void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Background pull failed:', error));
         this.reconnectTimeout = setTimeout(() => {
           this.reconnectTimeout = null;
           if (this.config.enabled && this.activeRoomId) this.connectWebSocket();
@@ -581,10 +634,13 @@ export class SyncEngine {
 
   private applyIncomingBundle(bundlePayload: unknown): Promise<void> {
     const generation = this.initGeneration;
-    this.incomingQueue = this.incomingQueue.then(async () => {
+    const applying = this.incomingQueue.then(async () => {
       if (generation === this.initGeneration) await this.persistIncomingBundle(bundlePayload);
     });
-    return this.incomingQueue;
+    this.incomingQueue = applying.catch((error) => {
+      syncLog.warn('Incoming bundle queue paused after failure:', error);
+    });
+    return applying;
   }
 
   private async persistIncomingBundle(bundlePayload: unknown): Promise<void> {
@@ -615,7 +671,7 @@ export class SyncEngine {
       if (bundle.fromDeviceId === this.config.deviceId) {
         return; // ignore self echo
       }
-      if (bundle.bundleId === this.lastAppliedBundleId) {
+      if (this.appliedBundleIds.has(bundle.bundleId)) {
         // ponytail: relay re-delivers pending bundles until ACK; skip a re-apply we already did.
         await this.sendAck(bundle.bundleId);
         return;
@@ -624,6 +680,7 @@ export class SyncEngine {
       let sender = this.config.trustedDevices.find((d) => d.id === bundle.fromDeviceId);
       if (!sender && this.usesAccountSync()) {
         syncLog.warn(`Ignored bundle from unregistered account device: ${bundle.fromDeviceId}`);
+        if (this.batchUpdating) this.status.initialSync.rejected++;
         return;
       }
       if (!sender) {
@@ -647,10 +704,12 @@ export class SyncEngine {
       }
       if (sender.syncMode === 'receive-only') {
         syncLog.warn(`Ignored mutation bundle from receive-only device: ${bundle.fromDeviceId}`);
+        if (this.batchUpdating) this.status.initialSync.rejected++;
         return;
       }
       if (sender.allowedVaults !== undefined && !sender.allowedVaults.includes(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)) {
         syncLog.warn(`Ignored bundle for vault ${this.currentVaultId} from device without access: ${bundle.fromDeviceId}`);
+        if (this.batchUpdating) this.status.initialSync.rejected++;
         return;
       }
 
@@ -717,10 +776,10 @@ export class SyncEngine {
               currentFolders.length = 0;
               currentFolders.push(...remaining);
               hasFoldersChanged = true;
-              // Reroute child items to "Входящие"
+              // Reroute child items to inbox
               for (let i = 0; i < currentItems.length; i++) {
                 if (currentItems[i].folder === folderPath || currentItems[i].folder.startsWith(folderPath + '/')) {
-                  currentItems[i] = { ...currentItems[i], folder: 'Входящие', updatedAt: Date.now() };
+                  currentItems[i] = { ...currentItems[i], folder: DEFAULT_INBOX_FOLDER, updatedAt: Date.now() };
                   hasItemsChanged = true;
                 }
               }
@@ -772,7 +831,7 @@ export class SyncEngine {
           workspaceState = ch.payload as WorkspaceState;
           hasWorkspaceChanged = true;
         } else if (ch.type === 'draft') {
-          const draftTombKey = `slag_sync_draft_tomb_${this.currentVaultId}_${ch.id}`;
+          const draftTombKey = `${SYNC_STORAGE_KEYS.DRAFT_TOMB_PREFIX}${this.currentVaultId}_${ch.id}`;
           const lastDeletedAt = Number(localStorage.getItem(draftTombKey) || 0);
 
           if (ch.id.startsWith('composer:')) {
@@ -834,13 +893,17 @@ export class SyncEngine {
       }
       if (generation !== this.initGeneration) return;
 
-      this.lastAppliedBundleId = bundle.bundleId;
+      this.appliedBundleIds.add(bundle.bundleId);
+      if (this.batchUpdating) this.status.initialSync.processed++;
       await this.sendAck(bundle.bundleId);
       if (generation !== this.initGeneration) return;
 
       this.status.lastSyncTime = new Date().toLocaleTimeString();
-      this.status.state = 'connected';
+      this.status.state = this.batchUpdating ? 'syncing' : 'connected';
       this.notify();
+      if (this.batchUpdating) {
+        return;
+      }
 
       // Dispatch global window event so React UI re-renders cleanly
       window.dispatchEvent(
@@ -850,17 +913,16 @@ export class SyncEngine {
       );
     } catch (err) {
       if (err instanceof Error && err.message.includes('Local state changed')) {
-        // ponytail: a local edit raced the incoming persist; re-fetch pending now instead of
-        // waiting for the next WS reconnect to re-deliver the un-acked bundle.
-        syncLog.warn('Local changed during sync persist; refetching pending bundles');
-        if (generation === this.initGeneration) void this.fetchPendingBundlesHttp();
-        return;
+        // Keep the bundle pending; the caller must not advance past a failed persist.
+        syncLog.warn('Local changed during sync persist; bundle remains pending');
+        throw err;
       }
       syncLog.error('Error applying incoming bundle:', err);
       if (generation !== this.initGeneration) return;
       this.status.state = 'error';
       this.status.error = 'Не удалось расшифровать или сохранить изменения';
       this.notify();
+      if (this.batchUpdating) throw err;
     }
   }
 
@@ -883,14 +945,15 @@ export class SyncEngine {
 
   public async pushLocalChanges(): Promise<void> {
     if (this.status.authRequired && !accountClient.getToken(this.config.serverUrl)) return;
-    if (this.config.localSyncMode === 'receive-only') {
-      syncLog.info('Skipping pushLocalChanges: device is in receive-only mode');
-      return;
-    }
     if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) return;
 
-    // Fetch incoming remote updates before computing state and pushing
+    if (this.status.initialSync.vaultId === this.currentVaultId &&
+        (this.status.initialSync.state === 'loading' || this.status.initialSync.state === 'error')) return;
+    const pullGeneration = this.initGeneration;
+    // Fetch incoming remote updates before computing state and pushing.
     await this.fetchPendingBundlesHttp();
+    if (pullGeneration !== this.initGeneration || this.isProcessingSync) return;
+    if (this.config.localSyncMode === 'receive-only') return;
 
     this.isProcessingSync = true;
     const generation = this.initGeneration;
@@ -1104,33 +1167,55 @@ export class SyncEngine {
       this.autoSyncInterval = setInterval(() => {
         void this.pushLocalChanges();
         if (this.config.bgSyncIntervalMinutes && this.config.bgSyncIntervalMinutes > 0) {
-          void this.fetchPendingBundlesHttp();
+          void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Background pull failed:', error));
         }
       }, intervalMs);
     }
   }
 
-  public async fetchPendingBundlesHttp(): Promise<void> {
-    if (!this.activeRoomId || !this.activeVaultKey) return;
+  public fetchPendingBundlesHttp(): Promise<void> {
+    if (!this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
     const generation = this.initGeneration;
+    if (this.pendingPull && this.pendingPull.generation === generation) return this.pendingPull.promise;
+    const promise = this.pullPendingBundles(generation).finally(() => {
+      if (this.pendingPull && this.pendingPull.generation === generation) this.pendingPull = null;
+    });
+    this.pendingPull = { generation, promise };
+    return promise;
+  }
+
+  private async pullPendingBundles(generation: number): Promise<void> {
     try {
       const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
       const params = new URLSearchParams({ device: this.config.deviceId, vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId });
-      const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
-        headers: this.authHeaders(),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (Array.isArray(data.bundles)) {
+      let cursor = 0;
+      while (generation === this.initGeneration) {
+        const previousCursor = cursor;
+        if (cursor > 0) params.set('since', String(cursor));
+        const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
+          headers: this.authHeaders(),
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (generation !== this.initGeneration) return;
+        if (!res.ok) throw new Error(`Sync pull failed: HTTP ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
         for (const item of data.bundles) {
           if (generation !== this.initGeneration) return;
-          if (item.payload) {
-            await this.applyIncomingBundle(item.payload);
-          }
+          if (!item.payload) throw new Error('Missing sync bundle payload');
+          await this.applyIncomingBundle(item.payload);
+          if (typeof item.syncId === 'number' && item.syncId > cursor) cursor = item.syncId;
         }
+        if (data.bundles.length < 100) break;
+        if (cursor <= previousCursor) throw new Error('Sync pagination cursor did not advance');
       }
     } catch (e) {
+      if (generation !== this.initGeneration) return;
       syncLog.warn('HTTP bundles fetch failed:', e);
+      this.status.state = 'error';
+      this.status.error = e instanceof Error ? e.message : String(e);
+      this.notify();
+      throw e;
     }
   }
 
@@ -1145,6 +1230,8 @@ export class SyncEngine {
 
   public disconnect(): void {
     ++this.initGeneration;
+    this.appliedBundleIds.clear();
+    this.batchUpdating = false;
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
     if (this.reconnectTimeout) {

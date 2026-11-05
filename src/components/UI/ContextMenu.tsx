@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   Maximize2,
   Trash2,
@@ -445,7 +446,7 @@ export const ContextMenu: React.FC = () => {
               <ChevronRight className="w-3 h-3 text-zinc-500" />
             </button>
 
-            {folder.path !== 'Входящие' && (
+            {folder.path !== DEFAULT_INBOX_FOLDER && (
               <>
                 <div className="my-0.5 border-t border-white/[0.06]" />
                 <button

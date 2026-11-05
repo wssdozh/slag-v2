@@ -21,6 +21,7 @@ import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
 import { logger } from '../../lib/logger';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   isDesktopApp,
   openDetachedWindow,
@@ -68,7 +69,7 @@ const WorkspaceContentPanel: React.FC<{
             ? 'Канбан'
             : mode === 'calendar'
               ? 'Календарь'
-              : currentFolder || 'Входящие';
+              : currentFolder || DEFAULT_INBOX_FOLDER;
         panelProps.api.setTitle(title);
       }
     },
@@ -894,7 +895,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       const feedPanels = apiRef.current.panels.filter(
         p => p.id === 'panel_feed' || p.id.startsWith('panel_feed_')
       );
-      const targetTitle = currentFolder || 'Входящие';
+      const targetTitle = currentFolder || DEFAULT_INBOX_FOLDER;
       feedPanels.forEach(p => p.api.setTitle(targetTitle));
       wsLog.debug(`Synchronized feed panel tab title to folder: "${targetTitle}"`, { count: feedPanels.length });
     }
@@ -945,7 +946,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     const centerPanel = api.addPanel({
       id: 'panel_feed',
       component: 'feed',
-      title: currentFolder || 'Входящие',
+      title: currentFolder || DEFAULT_INBOX_FOLDER,
       minimumWidth: getPanelMinWidth('feed'),
       maximumWidth: getPanelMaxWidth('feed'),
     });

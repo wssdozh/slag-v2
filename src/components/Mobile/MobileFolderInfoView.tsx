@@ -10,6 +10,7 @@ import {
 import { useFolderMedia } from '../RightPanel/useFolderMedia';
 import { FolderMediaTabs } from '../RightPanel/FolderMediaTabs';
 import { MobileScreenHeader } from './MobileScreenHeader';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export const MobileFolderInfoView: React.FC = () => {
   const {
@@ -25,7 +26,7 @@ export const MobileFolderInfoView: React.FC = () => {
   } = useApp();
 
   const currentFolderMeta = folders.find(f => f.path === currentFolder);
-  const isInbox = currentFolder === 'Входящие';
+  const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
 
   const mediaData = useFolderMedia(filteredItems);
   const { notesCount, tasksCount, articlesCount } = mediaData;

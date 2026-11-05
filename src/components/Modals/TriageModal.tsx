@@ -13,6 +13,7 @@ import {
 import { BaseModal } from './BaseModal';
 import { Checkbox } from '../UI/Checkbox';
 import { Select } from '../UI/Select';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 const TriageModalDialog: React.FC = () => {
   const {
@@ -26,12 +27,12 @@ const TriageModalDialog: React.FC = () => {
   } = useApp();
 
   const inboxItems = useMemo(
-    () => items.filter(i => i.folder === 'Входящие'),
+    () => items.filter(i => i.folder === DEFAULT_INBOX_FOLDER),
     [items]
   );
 
   const eligibleFolders = useMemo(
-    () => folders.filter(f => f.path !== 'Входящие'),
+    () => folders.filter(f => f.path !== DEFAULT_INBOX_FOLDER),
     [folders]
   );
 

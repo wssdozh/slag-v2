@@ -4,7 +4,7 @@ import type { MobileTabId } from '../../types';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { accountClient } from '../../lib/sync/account';
 import { navigatePage } from '../../lib/navigation';
-import { installSharedVault, getLocalVaultId } from '../../lib/sync/vaultSharing';
+import { acceptSharedVault } from '../../lib/sync/vaultSharing';
 import {
   Sparkles,
   Database,
@@ -67,14 +67,11 @@ export const MobileSettingsView: React.FC = () => {
     const invitation = accountState.invitations.find((item) => item.vaultId === vaultId);
     if (!invitation) return;
     try {
-      const result = await installSharedVault({
+      const result = await acceptSharedVault({
         vaultId,
         vaultName: invitation.vaultName || vaultId,
         encryptedKey: invitation.encryptedKey,
-      }, syncEngine.getConfig().deviceId, { createVault, switchVault }, false);
-      await accountClient.acceptVault(vaultId);
-      switchVault(getLocalVaultId(vaultId));
-      await syncEngine.switchVault(getLocalVaultId(vaultId));
+      }, syncEngine.getConfig().deviceId, { createVault, switchVault });
       addToast(
         `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${invitation.vaultName || vaultId}»`,
         'success',

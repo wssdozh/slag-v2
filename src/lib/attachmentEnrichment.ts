@@ -1,6 +1,7 @@
 import type { SlagAttachment, SlagItem, AiSettings } from '../types';
 import { logger } from './logger';
 import { storage } from './storage';
+import { AI_ENDPOINTS, DEFAULT_AI_MODELS, AI_LIMITS } from '../config';
 
 const enrichLog = logger.scope('AI');
 
@@ -18,8 +19,8 @@ export function extractFocalContext(item: { title?: string; tags?: string[]; con
     parts.push(`Теги: ${item.tags.join(', ')}`);
   }
   if (item.content && item.content.trim()) {
-    // Keep only the first 160 characters to avoid noise and token waste
-    const snippet = item.content.trim().slice(0, 160).replace(/\s+/g, ' ');
+    // Keep only focal characters to avoid noise and token waste
+    const snippet = item.content.trim().slice(0, AI_LIMITS.FOCAL_CONTEXT_MAX_CHARS).replace(/\s+/g, ' ');
     parts.push(`Контекст: ${snippet}`);
   }
   return parts.join(' | ');
@@ -58,7 +59,7 @@ function getGroqApiUrl(endpoint: string): string {
   ) {
     return `/api/groq${endpoint}`;
   }
-  return `https://api.groq.com/openai/v1${endpoint}`;
+  return `${AI_ENDPOINTS.DEFAULT_GROQ_BASE_URL}${endpoint}`;
 }
 
 /**
@@ -75,7 +76,7 @@ async function transcribeAudioGroq(
   const fileName = attachment.name || `audio_${Date.now()}.${ext}`;
 
   formData.append('file', blob, fileName);
-  formData.append('model', 'whisper-large-v3-turbo');
+  formData.append('model', DEFAULT_AI_MODELS.WHISPER_DEFAULT);
   formData.append('response_format', 'json');
   formData.append('temperature', '0');
 
@@ -123,7 +124,7 @@ async function transcribeAudioGemini(
   const prompt = `Контекст: "${focalContext}". Сделай точную дословную расшифровку аудиозаписи. Без лишних вступительных слов. Выведи строго расшифрованный текст.`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `${AI_ENDPOINTS.DEFAULT_GEMINI_BASE_URL}/models/${DEFAULT_AI_MODELS.GEMINI_DEFAULT}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -158,13 +159,13 @@ async function transcribeAudioGemini(
 /**
  * Downscales an image data URL to a maximum dimension to stay within token/payload budgets.
  */
-export async function downscaleImageDataUrl(dataUrl: string, maxDim: number = 1024): Promise<string> {
+export async function downscaleImageDataUrl(dataUrl: string, maxDim: number = AI_LIMITS.IMAGE_DOWNSCALE_MAX_DIM): Promise<string> {
   if (typeof window === 'undefined' || !dataUrl.startsWith('data:image')) return dataUrl;
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       let { width, height } = img;
-      if (width <= maxDim && height <= maxDim && dataUrl.length < 400000) {
+      if (width <= maxDim && height <= maxDim && dataUrl.length < AI_LIMITS.IMAGE_MAX_PAYLOAD_BYTES) {
         resolve(dataUrl);
         return;
       }
@@ -188,7 +189,7 @@ export async function downscaleImageDataUrl(dataUrl: string, maxDim: number = 10
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      resolve(canvas.toDataURL('image/jpeg', AI_LIMITS.IMAGE_JPEG_QUALITY));
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
@@ -217,10 +218,7 @@ async function analyzeImageGroq(
 Ответ верни СТРОГО в формате JSON без разметки:
 {"extractedText": "весь найденный текст или пусто", "summary": "краткое описание"}`;
 
-  const candidateModels = [
-    'qwen/qwen3.8-27b',
-    'qwen-3.8-27b',
-  ];
+  const candidateModels = DEFAULT_AI_MODELS.GROQ_VISION_CANDIDATES;
 
   let lastError = '';
   for (const model of candidateModels) {
@@ -292,7 +290,7 @@ async function analyzeImageGemini(
 Ответ верни СТРОГО в формате JSON: {"extractedText": "найденный текст", "summary": "краткое описание"}`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `${AI_ENDPOINTS.DEFAULT_GEMINI_BASE_URL}/models/${DEFAULT_AI_MODELS.GEMINI_DEFAULT}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -358,7 +356,7 @@ async function analyzeFileGroq(
     };
   }
 
-  const sample = await dataUrlToText(attachment.dataUrl, 4096);
+  const sample = await dataUrlToText(attachment.dataUrl, AI_LIMITS.FILE_SAMPLE_MAX_BYTES);
   if (!sample.trim()) {
     return {
       extractedText: '',
@@ -370,7 +368,7 @@ async function analyzeFileGroq(
 Имя файла: "${attachment.name}".
 Фрагмент файла (первые 4 КБ):
 \`\`\`
-${sample.slice(0, 2500)}
+${sample.slice(0, AI_LIMITS.FILE_SAMPLE_SLICE_CHARS)}
 \`\`\`
 
 Сформулируй краткую суть файла в 1-2 предложениях (что внутри, ключевые параметры, ошибки или данные).
@@ -384,7 +382,7 @@ ${sample.slice(0, 2500)}
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
+      model: DEFAULT_AI_MODELS.GROQ_DEFAULT,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
       response_format: { type: 'json_object' },

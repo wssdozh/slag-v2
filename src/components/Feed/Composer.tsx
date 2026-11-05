@@ -22,6 +22,7 @@ import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { TagSuggestionMenu, type TagMeta } from './TagSuggestionMenu';
 import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
+import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
 import {
   Paperclip,
   Mic,
@@ -75,7 +76,7 @@ export const Composer: React.FC<ComposerProps> = ({
     isFullscreenEditorOpen,
   } = useApp();
 
-  const effectiveDefaultFolder = isModal ? 'Входящие' : (initialFolder || currentFolder);
+  const effectiveDefaultFolder = isModal ? DEFAULT_INBOX_FOLDER : (initialFolder || currentFolder);
   const activeFolder = effectiveDefaultFolder;
   const [initialDraft] = useState(() => storage.getComposerDraft(activeFolder));
 
@@ -155,7 +156,7 @@ export const Composer: React.FC<ComposerProps> = ({
       if (itemType === 'note' && (parsed.dueDate || (parsed.priority && parsed.priority !== 'none') || parsed.duration !== undefined || parsed.recurrence)) {
         setItemType('task');
       }
-    }, 150);
+    }, UI_DELAYS.COMPOSER_TODOIST_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
   }, [content, itemType]);
@@ -338,7 +339,7 @@ export const Composer: React.FC<ComposerProps> = ({
       } else if (lastLocalUserEditTimeRef.current > 0) {
         storage.deleteComposerDraft(activeFolder);
       }
-    }, 250);
+    }, UI_DELAYS.COMPOSER_AUTOSAVE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
   }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence]);
@@ -487,8 +488,8 @@ export const Composer: React.FC<ComposerProps> = ({
     const sorted = [...folders].sort((a, b) => {
       if (a.path === currentFolder) return -1;
       if (b.path === currentFolder) return 1;
-      if (a.path === 'Входящие') return -1;
-      if (b.path === 'Входящие') return 1;
+      if (a.path === DEFAULT_INBOX_FOLDER) return -1;
+      if (b.path === DEFAULT_INBOX_FOLDER) return 1;
       return a.path.localeCompare(b.path, 'ru');
     });
     const q = folderQuery.toLowerCase().trim();
@@ -795,8 +796,8 @@ export const Composer: React.FC<ComposerProps> = ({
         break;
       case 'clear':
         storage.deleteComposerDraft(activeFolder);
-        if (activeFolder !== 'Входящие') {
-          storage.deleteComposerDraft('Входящие');
+        if (activeFolder !== DEFAULT_INBOX_FOLDER) {
+          storage.deleteComposerDraft(DEFAULT_INBOX_FOLDER);
         }
         resetDraftState();
         addToast('Черновик очищен', 'info');
@@ -1079,8 +1080,8 @@ export const Composer: React.FC<ComposerProps> = ({
 
     storage.deleteComposerDraft(destinationFolder);
     storage.deleteComposerDraft(activeFolder);
-    if (activeFolder !== 'Входящие') {
-      storage.deleteComposerDraft('Входящие');
+    if (activeFolder !== DEFAULT_INBOX_FOLDER) {
+      storage.deleteComposerDraft(DEFAULT_INBOX_FOLDER);
     }
     resetDraftState();
     if (onComplete) {

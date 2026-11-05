@@ -23,6 +23,7 @@ import {
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
+import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
 
 export interface ItemCardProps {
@@ -140,13 +141,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
     longPressTimerRef.current = window.setTimeout(() => {
       try {
-        navigator.vibrate?.(15);
+        navigator.vibrate?.(UI_DELAYS.HAPTIC_VIBRATION_MS);
       } catch {
         // Ignore
       }
       setMobileActionSheetItem(item);
       longPressTimerRef.current = null;
-    }, 450);
+    }, UI_DELAYS.LONG_PRESS_MS);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -251,10 +252,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   };
 
   const folderDisplayName =
-    item.folder !== 'Входящие'
+    item.folder !== DEFAULT_INBOX_FOLDER
       ? item.folder.split('/').filter(Boolean).pop() || item.folder
-      : currentFolder !== 'Входящие'
-        ? 'Входящие'
+      : currentFolder !== DEFAULT_INBOX_FOLDER
+        ? DEFAULT_INBOX_FOLDER
         : '';
 
   const metaElements: React.ReactNode[] = [];

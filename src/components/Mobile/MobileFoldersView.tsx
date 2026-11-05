@@ -18,6 +18,7 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 
@@ -47,7 +48,7 @@ export const MobileFoldersView: React.FC = () => {
 
   const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
 
-  const isInbox = mobileActiveFolder === 'Входящие';
+  const isInbox = mobileActiveFolder === DEFAULT_INBOX_FOLDER;
 
   const isCustomized =
     feedViewMode !== 'feed' ||
@@ -61,7 +62,7 @@ export const MobileFoldersView: React.FC = () => {
   const folderMaterialsCount = useMemo(() => {
     return items.filter(item => {
       const inFolder =
-        currentFolder === 'Входящие'
+        currentFolder === DEFAULT_INBOX_FOLDER
           ? true
           : item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
       return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
@@ -69,7 +70,7 @@ export const MobileFoldersView: React.FC = () => {
   }, [items, currentFolder]);
 
   const inboxUnsortedCount = useMemo(() => {
-    return isInbox ? items.filter(i => i.folder === 'Входящие').length : 0;
+    return isInbox ? items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length : 0;
   }, [items, isInbox]);
 
   // Root folders vs Direct subfolders of mobileActiveFolder
@@ -100,7 +101,7 @@ export const MobileFoldersView: React.FC = () => {
 
   // 1. Root Folders List (When no folder is currently opened)
   if (!mobileActiveFolder) {
-    const unsortedCount = items.filter(i => i.folder === 'Входящие').length;
+    const unsortedCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
 
     return (
       <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
@@ -152,17 +153,17 @@ export const MobileFoldersView: React.FC = () => {
 
         {/* Scrollable Root Folders List (Telegram Grouped Style) */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
-          {/* Pinned "Входящие" Card */}
+          {/* Pinned Inbox Card */}
           <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden">
             <button
-              onClick={() => setMobileActiveFolder('Входящие')}
+              onClick={() => setMobileActiveFolder(DEFAULT_INBOX_FOLDER)}
               className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-6 h-6 flex items-center justify-center text-zinc-200 shrink-0">
                   <Inbox className="w-5 h-5" />
                 </div>
-                <div className="text-sm font-semibold text-white truncate">Входящие</div>
+                <div className="text-sm font-semibold text-white truncate">{DEFAULT_INBOX_FOLDER}</div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
@@ -184,7 +185,7 @@ export const MobileFoldersView: React.FC = () => {
 
             <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
               {directSubfolders
-                .filter(f => f.path !== 'Входящие')
+                .filter(f => f.path !== DEFAULT_INBOX_FOLDER)
                 .map(folder => {
                   const Icon = FOLDER_ICONS[folder.icon || 'Folder'] || Folder;
                   const folderItemsCount = items.filter(i => i.folder === folder.path || i.folder.startsWith(folder.path + '/')).length;

@@ -27,35 +27,15 @@ import {
 } from '@tauri-apps/plugin-fs';
 
 import { idbSaveAttachment } from './indexedDbStorage';
+import {
+  DEFAULT_INBOX_FOLDER,
+  STORAGE_KEYS,
+  DEFAULT_WORKSPACE_STATE,
+  DEFAULT_FOLDERS,
+  DEFAULT_VAULT_META,
+} from '../config';
 
-const fsLog = logger.scope('FS');
-
-const VAULTS_KEY = 'slag_vaults_v2';
-const CURRENT_VAULT_KEY = 'slag_current_vault_v2';
-const ITEMS_STORAGE_PREFIX = 'slag_items_';
-const FOLDERS_STORAGE_PREFIX = 'slag_folders_';
-const ATTACHMENTS_STORAGE_PREFIX = 'slag_attachments_';
-const TRASH_STORAGE_PREFIX = 'slag_trash_';
-const DRAFTS_STORAGE_PREFIX = 'slag_drafts_';
-const ASSISTANT_STORAGE_PREFIX = 'slag_assistant_';
-const WORKSPACE_STATE_PREFIX = 'slag_workspace_state_';
-const FULLSCREEN_DRAFTS_PREFIX = 'slag_fullscreen_draft_';
-const FULLSCREEN_WIDTH_KEY = 'slag_fullscreen_is_full_width';
-
-export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
-  currentFolder: 'Входящие',
-  feedViewMode: 'feed',
-  inboxMode: 'all',
-  activeTypeFilter: 'all',
-  activeTagFilter: null,
-  activeMobileTab: 'folders',
-  folderMediaTab: 'media',
-  isKanbanMaterialsOpen: true,
-  sortBy: 'createdAt',
-  sortOrder: 'asc',
-  hideCompletedTasks: false,
-  folderSettings: {},
-};
+export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
 
 export type StorageChangeEvent =
   | { kind: 'item'; action: 'upsert' | 'delete'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' }
@@ -67,46 +47,19 @@ export type StorageChangeEvent =
 
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
 
-// Initial default folders: clean, top-level categories without arbitrary pet-projects
-export const DEFAULT_FOLDERS: FolderMeta[] = [
-  {
-    path: 'Входящие',
-    name: 'Входящие',
-    description: 'Все новые неотсортированные заметки, идеи, быстрые мысли и задачи для дальнейшего распределения.',
-    icon: 'Inbox',
-    isSystem: true,
-  },
-  {
-    path: 'Карьера',
-    name: 'Карьера',
-    description: 'Профессиональный рост, рабочие цели, компетенции и проекты.',
-    icon: 'Briefcase',
-  },
-  {
-    path: 'Проекты',
-    name: 'Проекты',
-    description: 'Активные рабочие и технические проекты, задачи и код.',
-    icon: 'Folder',
-  },
-  {
-    path: 'Личное',
-    name: 'Личное',
-    description: 'Личные цели, планы, здоровье и повседневные дела.',
-    icon: 'Bookmark',
-  },
-  {
-    path: 'База знаний',
-    name: 'База знаний',
-    description: 'Вечнозеленые заметки, статьи, документация и полезные материалы.',
-    icon: 'Book',
-  },
-  {
-    path: 'Архив',
-    name: 'Архив',
-    description: 'Завершенные задачи, старые заметки и архивные материалы.',
-    icon: 'Archive',
-  },
-];
+const fsLog = logger.scope('FS');
+
+const VAULTS_KEY = STORAGE_KEYS.VAULTS;
+const CURRENT_VAULT_KEY = STORAGE_KEYS.CURRENT_VAULT;
+const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
+const FOLDERS_STORAGE_PREFIX = STORAGE_KEYS.FOLDERS_PREFIX;
+const ATTACHMENTS_STORAGE_PREFIX = STORAGE_KEYS.ATTACHMENTS_PREFIX;
+const TRASH_STORAGE_PREFIX = STORAGE_KEYS.TRASH_PREFIX;
+const DRAFTS_STORAGE_PREFIX = STORAGE_KEYS.DRAFTS_PREFIX;
+const ASSISTANT_STORAGE_PREFIX = STORAGE_KEYS.ASSISTANT_PREFIX;
+const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
+const FULLSCREEN_DRAFTS_PREFIX = STORAGE_KEYS.FULLSCREEN_DRAFTS_PREFIX;
+const FULLSCREEN_WIDTH_KEY = STORAGE_KEYS.FULLSCREEN_WIDTH;
 
 // Obsolete dev/manifest demo IDs that should never pollute a clean vault
 export const OBSOLETE_DEMO_IDS = new Set<string>();
@@ -206,12 +159,12 @@ export class StorageService {
 
   public async getNoteAbsolutePath(item: SlagItem): Promise<string> {
     const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-    const folder = item.folder || 'Входящие';
+    const folder = item.folder || DEFAULT_INBOX_FOLDER;
     return this.resolveAbsolutePath(`${this.getVaultNotesPath()}/${folder}/${filename}`, 'note');
   }
 
   public async getFolderAbsolutePath(folderPath: string): Promise<string> {
-    return this.resolveAbsolutePath(`${this.getVaultNotesPath()}/${folderPath || 'Входящие'}`, 'folder');
+    return this.resolveAbsolutePath(`${this.getVaultNotesPath()}/${folderPath || DEFAULT_INBOX_FOLDER}`, 'folder');
   }
 
   private async resolveAbsolutePath(relativePath: string, kind: 'note' | 'folder'): Promise<string> {
@@ -352,7 +305,7 @@ export class StorageService {
             const notesBase = this.getVaultNotesPath().replace(/\\/g, '/');
             const folderPart = normalized.startsWith(notesBase + '/')
               ? normalized.slice(notesBase.length + 1)
-              : (normalized === notesBase ? 'Входящие' : normalized);
+              : (normalized === notesBase ? DEFAULT_INBOX_FOLDER : normalized);
             const fallbackId = entry.name.replace(/\.md$/, '');
             const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
             parsed.filename = entry.name;
@@ -379,7 +332,7 @@ export class StorageService {
     if (!isTauri()) return;
     try {
       const notesBase = this.getVaultNotesPath(vault);
-      const folder = item.folder || 'Входящие';
+      const folder = item.folder || DEFAULT_INBOX_FOLDER;
       const targetDir = `${notesBase}/${folder}`;
       await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
 
@@ -417,7 +370,7 @@ export class StorageService {
     try {
       const notesBase = this.getVaultNotesPath(vault);
       const trashBase = this.getVaultTrashPath(vault);
-      const targetFolder = item.folder || 'Входящие';
+      const targetFolder = item.folder || DEFAULT_INBOX_FOLDER;
       const filename = item.filename || getSafeNoteFilename(item.title, item.id);
       const notePath = `${notesBase}/${targetFolder}/${filename}`;
       const legacyPath = `${notesBase}/${targetFolder}/${item.id}.md`;
@@ -506,7 +459,7 @@ export class StorageService {
   }
 
   private async removeFolderFromDisk(folderPath: string): Promise<void> {
-    if (!isTauri() || !folderPath || folderPath === 'Входящие') return;
+    if (!isTauri() || !folderPath || folderPath === DEFAULT_INBOX_FOLDER) return;
     try {
       const notesBase = this.getVaultNotesPath();
       const targetDir = `${notesBase}/${folderPath}`;
@@ -537,12 +490,7 @@ export class StorageService {
         // ignore
       }
     }
-    const defaultVault: VaultMeta = {
-      id: 'default_vault',
-      name: 'main',
-      mode: 'indexeddb',
-      isCurrent: true,
-    };
+    const defaultVault: VaultMeta = { ...DEFAULT_VAULT_META };
     this.currentVault = defaultVault;
     localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(defaultVault));
     this.saveVaultMeta(defaultVault);
@@ -769,8 +717,8 @@ export class StorageService {
     try {
       const parsed: FolderMeta[] = JSON.parse(raw);
       let changed = false;
-      // Ensure "Входящие" always exists
-      if (!parsed.some(f => f.path === 'Входящие')) {
+      // Ensure inbox always exists
+      if (!parsed.some(f => f.path === DEFAULT_INBOX_FOLDER)) {
         parsed.unshift(DEFAULT_FOLDERS[0]);
         changed = true;
       }
@@ -795,7 +743,7 @@ export class StorageService {
   }
 
   public renameFolder(oldPath: string, updatedFolder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
-    if (oldPath === 'Входящие') return; // Cannot rename system inbox
+    if (oldPath === DEFAULT_INBOX_FOLDER) return; // Cannot rename system inbox
 
     // 1. Update folders list
     const folders = this.getFolders().map(f => {
@@ -851,17 +799,17 @@ export class StorageService {
   }
 
   public deleteFolder(path: string, origin: 'local' | 'remote' = 'local'): void {
-    if (path === 'Входящие') return; // Cannot delete system inbox
+    if (path === DEFAULT_INBOX_FOLDER) return; // Cannot delete system inbox
     const folders = this.getFolders().filter(f => f.path !== path && !f.path.startsWith(path + '/'));
     localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
 
-    // Move orphan items to "Входящие"
+    // Move orphan items to inbox
     const items = this.getItems();
     const movedItems: { item: SlagItem; oldFolder: string }[] = [];
     const updatedItems = items.map(it => {
       if (it.folder === path || it.folder.startsWith(path + '/')) {
         const oldFolder = it.folder;
-        const updated: SlagItem = { ...it, folder: 'Входящие', updatedAt: Date.now() };
+        const updated: SlagItem = { ...it, folder: DEFAULT_INBOX_FOLDER, updatedAt: Date.now() };
         movedItems.push({ item: updated, oldFolder });
         return updated;
       }
@@ -1120,7 +1068,7 @@ export class StorageService {
     scope: string;
   } {
     const allItems = this.getItems();
-    const scopedItems = folderScope && folderScope !== 'Входящие'
+    const scopedItems = folderScope && folderScope !== DEFAULT_INBOX_FOLDER
       ? allItems.filter(i => i.folder === folderScope)
       : allItems;
 
@@ -1135,7 +1083,7 @@ export class StorageService {
       else if (it.type === 'task') tasksCount++;
       else if (it.type === 'article') articlesCount++;
 
-      const folderName = it.folder || 'Входящие';
+      const folderName = it.folder || DEFAULT_INBOX_FOLDER;
       folders[folderName] = (folders[folderName] || 0) + 1;
 
       (it.tags || []).forEach(t => {
@@ -1390,7 +1338,7 @@ export class StorageService {
     }
     for (const item of data.items ?? []) {
       const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-      if (!safeRelativePath(item.folder || 'Входящие') || !safeRelativePath(filename) || filename.includes('/') || !safeRelativePath(item.id) || item.id.includes('/')) {
+      if (!safeRelativePath(item.folder || DEFAULT_INBOX_FOLDER) || !safeRelativePath(filename) || filename.includes('/') || !safeRelativePath(item.id) || item.id.includes('/')) {
         throw new Error('Invalid synced note path');
       }
     }
@@ -1399,7 +1347,7 @@ export class StorageService {
         const usedPaths = new Map<string, string>();
         for (const item of data.items) {
           let filename = item.filename || getSafeNoteFilename(item.title, item.id);
-          const folder = item.folder || 'Входящие';
+          const folder = item.folder || DEFAULT_INBOX_FOLDER;
           let noteRelPath = `${this.getVaultNotesPath(vault)}/${folder}/${filename}`;
           if (usedPaths.has(noteRelPath) && usedPaths.get(noteRelPath) !== item.id) {
             const shortId = item.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(-8) || 'dup';
@@ -1411,7 +1359,7 @@ export class StorageService {
           usedPaths.set(noteRelPath, item.id);
         }
         const nextIds = new Set(data.items.map(item => item.id));
-        const notePath = (item: SlagItem) => `${this.getVaultNotesPath(vault)}/${item.folder || 'Входящие'}/${item.filename || getSafeNoteFilename(item.title, item.id)}`;
+        const notePath = (item: SlagItem) => `${this.getVaultNotesPath(vault)}/${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename || getSafeNoteFilename(item.title, item.id)}`;
         const nextPaths = new Set(data.items.map(notePath));
         for (const item of data.items) {
           const old = previous.find(candidate => candidate.id === item.id);
@@ -1432,7 +1380,7 @@ export class StorageService {
         try {
           const oldFoldersList: FolderMeta[] = JSON.parse(previousFolders);
           for (const oldF of oldFoldersList) {
-            if (!nextFolderPaths.has(oldF.path) && oldF.path !== 'Входящие') {
+            if (!nextFolderPaths.has(oldF.path) && oldF.path !== DEFAULT_INBOX_FOLDER) {
               await this.removeFolderFromDisk(oldF.path);
             }
           }
@@ -1446,9 +1394,9 @@ export class StorageService {
     if (JSON.stringify(this.getItems()) !== previousItems || JSON.stringify(this.getFolders()) !== previousFolders || JSON.stringify(this.getWorkspaceState()) !== previousWorkspace) {
       // Re-persist the latest local state so an in-flight remote write cannot win on disk.
       const latest = this.getItems();
-      const latestPaths = new Set(latest.map(item => `${item.folder || 'Входящие'}/${item.filename || getSafeNoteFilename(item.title, item.id)}`));
+      const latestPaths = new Set(latest.map(item => `${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename || getSafeNoteFilename(item.title, item.id)}`));
       for (const item of data.items ?? []) {
-        if (!latestPaths.has(`${item.folder || 'Входящие'}/${item.filename || getSafeNoteFilename(item.title, item.id)}`)) await this.removeItemFromDisk(item, vault, true);
+        if (!latestPaths.has(`${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename || getSafeNoteFilename(item.title, item.id)}`)) await this.removeItemFromDisk(item, vault, true);
       }
       await this.importSyncedVaultData({ items: this.getItems(), folders: this.getFolders(), workspaceState: this.getWorkspaceState() });
       throw new Error('Local state changed while persisting sync; bundle remains pending');

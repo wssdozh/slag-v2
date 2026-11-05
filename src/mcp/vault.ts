@@ -8,6 +8,7 @@ import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/markdownSer
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/taskUtils';
 
 import { getSafeNoteFilename } from '../lib/noteFilename';
+import { DEFAULT_INBOX_FOLDER } from '../config';
 export { getSafeNoteFilename } from '../lib/noteFilename';
 
 export function resolveVaultConfig(customPath?: string): McpVaultConfig {
@@ -49,7 +50,7 @@ export class McpVault {
   public async init(): Promise<void> {
     await fs.mkdir(this.config.notesDir, { recursive: true });
     await fs.mkdir(this.config.trashDir, { recursive: true });
-    await fs.mkdir(path.join(this.config.notesDir, 'Входящие'), { recursive: true });
+    await fs.mkdir(path.join(this.config.notesDir, DEFAULT_INBOX_FOLDER), { recursive: true });
   }
 
   public async readState(): Promise<VaultStateData> {
@@ -112,10 +113,10 @@ export class McpVault {
       }
     }
 
-    if (!knownPaths.has('Входящие')) {
+    if (!knownPaths.has(DEFAULT_INBOX_FOLDER)) {
       merged.unshift({
-        path: 'Входящие',
-        name: 'Входящие',
+        path: DEFAULT_INBOX_FOLDER,
+        name: DEFAULT_INBOX_FOLDER,
         description: 'Все новые неотсортированные заметки, идеи, быстрые мысли и задачи.',
         icon: 'Inbox',
         isSystem: true,
@@ -165,7 +166,7 @@ export class McpVault {
             try {
               const content = await fs.readFile(abs, 'utf-8');
               const fallbackId = entry.name.replace(/\.md$/, '');
-              const folder = relBase.replace(/\\/g, '/') || 'Входящие';
+              const folder = relBase.replace(/\\/g, '/') || DEFAULT_INBOX_FOLDER;
               const item = parseMarkdownToItem(content, fallbackId, folder);
               item.filename = entry.name;
               matches.push({
@@ -246,7 +247,7 @@ export class McpVault {
     reminder?: string;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
-    const targetFolder = (params.folder || 'Входящие').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    const targetFolder = (params.folder || DEFAULT_INBOX_FOLDER).trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     let existingMatch: NoteMatch | null = null;
 
     if (params.id) {

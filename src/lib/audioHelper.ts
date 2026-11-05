@@ -1,4 +1,5 @@
 import type { SlagItem, InboxMode } from '../types';
+import { DEFAULT_INBOX_FOLDER } from '../config';
 
 export interface AudioTrack {
   id: string; // track unique id (itemId + attachmentId)
@@ -58,24 +59,24 @@ export function extractAudioTracks(
   items.forEach((item) => {
     // Folder filter matching canonical AppContext / Feed logic:
     // When target is 'ALL_FOLDERS', allow everything
-    // When target is 'Входящие', respect inboxMode ('all' = entire vault, 'unsorted' = only inbox, 'sorted' = everything else)
+    // When target is DEFAULT_INBOX_FOLDER, respect inboxMode ('all' = entire vault, 'unsorted' = only inbox, 'sorted' = everything else)
     // When target is a specific folder, include it and its nested subfolders
-    const targetFolder = folderScope || 'Входящие';
+    const targetFolder = folderScope || DEFAULT_INBOX_FOLDER;
     let matchesFolder = false;
 
     if (targetFolder === 'ALL_FOLDERS') {
       matchesFolder = true;
-    } else if (targetFolder === 'Входящие') {
+    } else if (targetFolder === DEFAULT_INBOX_FOLDER) {
       const mode = inboxMode || 'all';
       if (mode === 'unsorted') {
-        matchesFolder = (item.folder || 'Входящие') === 'Входящие';
+        matchesFolder = (item.folder || DEFAULT_INBOX_FOLDER) === DEFAULT_INBOX_FOLDER;
       } else if (mode === 'all') {
         matchesFolder = true;
       } else if (mode === 'sorted') {
-        matchesFolder = (item.folder || 'Входящие') !== 'Входящие';
+        matchesFolder = (item.folder || DEFAULT_INBOX_FOLDER) !== DEFAULT_INBOX_FOLDER;
       }
     } else {
-      const itemFolder = item.folder || 'Входящие';
+      const itemFolder = item.folder || DEFAULT_INBOX_FOLDER;
       matchesFolder = itemFolder === targetFolder || itemFolder.startsWith(targetFolder + '/');
     }
 
@@ -113,7 +114,7 @@ export function extractAudioTracks(
         coverUrl: coverImage?.dataUrl,
         itemId: item.id,
         itemTitle: item.title || 'Без названия',
-        itemFolder: item.folder || 'Входящие',
+        itemFolder: item.folder || DEFAULT_INBOX_FOLDER,
         createdAt: item.createdAt,
       });
     });

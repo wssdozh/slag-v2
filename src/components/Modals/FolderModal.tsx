@@ -6,6 +6,7 @@ import { Folder, Trash2 } from 'lucide-react';
 import { Select } from '../UI/Select';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 const FolderModalDialog: React.FC = () => {
   const {
@@ -48,13 +49,13 @@ const FolderModalDialog: React.FC = () => {
     saveFolder(folderMeta);
   };
 
-  const eligibleParentFolders = folders.filter(f => f.path !== 'Входящие' && f.path !== editingFolder?.path);
+  const eligibleParentFolders = folders.filter(f => f.path !== DEFAULT_INBOX_FOLDER && f.path !== editingFolder?.path);
 
   const CurrentIconComp = FOLDER_ICONS[selectedIcon] || Folder;
 
   const footer = (
     <div className="flex items-center justify-between">
-      {isEditing && editingFolder?.path !== 'Входящие' ? (
+      {isEditing && editingFolder?.path !== DEFAULT_INBOX_FOLDER ? (
         <button
           type="button"
           onClick={() => {

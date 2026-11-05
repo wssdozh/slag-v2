@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { SlagItem } from '../types';
 import { getTodayString } from '../lib/dateUtils';
 import { getRecurringOccurrencesInRange } from '../lib/recurrenceHelper';
+import { DEFAULT_INBOX_FOLDER } from '../config';
 
 export interface CalendarTask extends SlagItem {
   isVirtual?: boolean;
@@ -38,7 +39,7 @@ export function useCalendarSchedule({
         item.type === 'task' || (item.subtasks && item.subtasks.length > 0);
       if (!isTaskLike) return false;
 
-      if (!filterByFolder || !currentFolder || currentFolder === 'Входящие') {
+      if (!filterByFolder || !currentFolder || currentFolder === DEFAULT_INBOX_FOLDER) {
         return true;
       }
       return item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');

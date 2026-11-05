@@ -3,6 +3,7 @@ import { categorizeDraft, generateSmartTags } from '../lib/aiService';
 import { storage, getSafeNoteFilename } from '../lib/storage';
 import { openAppFolder } from '../lib/folderOpener';
 import type { SlagItem, SlagItemType } from '../types';
+import { DEFAULT_INBOX_FOLDER } from '../config';
 
 export const PRIORITY_LABELS: Record<'none' | 'low' | 'medium' | 'high', string> = {
   high: 'Срочный',
@@ -141,7 +142,7 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
   const handleCopyRelativePath = () => {
     if (!item) return;
     const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-    const relPath = `${item.folder || 'Входящие'}/${filename}`;
+    const relPath = `${item.folder || DEFAULT_INBOX_FOLDER}/${filename}`;
     navigator.clipboard.writeText(relPath);
     addToast(`Путь скопирован: ${relPath}`, 'success');
     onDone?.();
@@ -150,7 +151,7 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
   const handleOpenInExplorer = async () => {
     if (!item) return;
     const notesBase = storage.getVaultNotesPath();
-    const folder = item.folder || 'Входящие';
+    const folder = item.folder || DEFAULT_INBOX_FOLDER;
     const filename = item.filename || getSafeNoteFilename(item.title, item.id);
     const target = `${notesBase}/${folder}/${filename}`;
     const res = await openAppFolder(target);
@@ -198,10 +199,10 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
     addToast('ИИ определяет папку и теги...', 'info');
     try {
       const fullText = `${item.title ? item.title + '\n' : ''}${item.content || ''}`.trim();
-      const res = await categorizeDraft(fullText, item.folder || 'Входящие', folders, aiSettings);
+      const res = await categorizeDraft(fullText, item.folder || DEFAULT_INBOX_FOLDER, folders, aiSettings);
 
       const mergedTags = Array.from(new Set([...(item.tags || []), ...(res.tags || [])]));
-      const targetFolder = res.targetFolder || item.folder || 'Входящие';
+      const targetFolder = res.targetFolder || item.folder || DEFAULT_INBOX_FOLDER;
 
       if (targetFolder !== item.folder) {
         moveItem(item.id, targetFolder);

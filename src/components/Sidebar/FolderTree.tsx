@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { FOLDER_ICONS } from './folderIcons';
 import { logger } from '../../lib/logger';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   ChevronRight,
   ChevronDown,
@@ -41,7 +42,7 @@ export const FolderTree: React.FC = () => {
   const [prevFolder, setPrevFolder] = useState(currentFolder);
   if (prevFolder !== currentFolder) {
     setPrevFolder(currentFolder);
-    if (currentFolder && currentFolder !== 'Входящие') {
+    if (currentFolder && currentFolder !== DEFAULT_INBOX_FOLDER) {
       const parts = currentFolder.split('/');
       if (parts.length > 1) {
         let pathAcc = '';
@@ -65,7 +66,7 @@ export const FolderTree: React.FC = () => {
     const rootNodes: Record<string, TreeNode> = {};
 
     folders.forEach(folder => {
-      if (folder.path === 'Входящие') return;
+      if (folder.path === DEFAULT_INBOX_FOLDER) return;
 
       const parts = folder.path.split('/');
       let currentPath = '';

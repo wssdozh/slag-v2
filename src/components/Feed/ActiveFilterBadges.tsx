@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   FolderCheck,
   Inbox,
@@ -37,7 +38,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
     setInboxMode,
   } = useApp();
 
-  const isInbox = currentFolder === 'Входящие';
+  const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
 
   const hasAnyFilter =
     activeTypeFilter !== 'all' ||

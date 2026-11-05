@@ -30,6 +30,7 @@ export interface SubscriptionInfo {
 }
 
 export interface SyncStatus {
+  initialSync: { vaultId: string; state: 'idle' | 'loading' | 'ready' | 'error'; processed: number; rejected: number };
   state: SyncConnectionState;
   authRequired: boolean;
   isAuthenticated: boolean;

@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { querySearch } from '../../lib/searchService';
 import { pluralRu } from '../../lib/dateUtils';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
 import {
@@ -137,7 +138,7 @@ export const KanbanBoard: React.FC = () => {
   // Filter items scoped to current folder
   const folderItems = useMemo(() => {
     return items.filter(item => {
-      if (currentFolder === 'Входящие') return true;
+      if (currentFolder === DEFAULT_INBOX_FOLDER) return true;
       return item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
     });
   }, [items, currentFolder]);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import type { MobileTabId } from '../../types';
 import {
   Folder,
@@ -36,7 +37,7 @@ export const MobileFloatingDock: React.FC = () => {
     currentFolder
   } = useApp();
 
-  const unsortedCount = items.filter(i => i.folder === 'Входящие').length;
+  const unsortedCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
 
   const handleFabClick = () => {
     openNewNote(currentFolder);

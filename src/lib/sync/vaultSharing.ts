@@ -40,6 +40,22 @@ export async function shareVaultWithDevice(
   if (syncEngine.getCurrentVaultId() === vault.id) await syncEngine.init();
 }
 
+export async function acceptSharedVault(
+  shared: { vaultId: string; vaultName: string; encryptedKey: string },
+  deviceId: string,
+  actions: VaultUiActions,
+): Promise<'created' | 'merged'> {
+  const result = await installSharedVault(shared, deviceId, actions, false);
+  try {
+    await accountClient.acceptVault(shared.vaultId);
+    actions.switchVault(getLocalVaultId(shared.vaultId));
+  } catch (error) {
+    syncEngine.failInitialSync(error);
+    throw error;
+  }
+  return result;
+}
+
 export async function installSharedVault(
   shared: { vaultId: string; vaultName: string; encryptedKey: string },
   deviceId: string,
@@ -58,6 +74,7 @@ export async function installSharedVault(
   if (existing) {
     if (connect) actions.switchVault(existing.id);
   } else {
+    syncEngine.beginInitialSync(localId);
     actions.createVault(shared.vaultName, 'indexeddb', undefined, shared.vaultId);
     if (connect) await syncEngine.switchVault(shared.vaultId);
   }

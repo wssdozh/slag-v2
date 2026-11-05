@@ -1,4 +1,5 @@
 import type { LogEntry, LogLevel, LogScope } from '../types';
+import { STORAGE_KEYS, UI_DELAYS } from '../config';
 
 export type LogListener = (entry: LogEntry) => void;
 
@@ -100,7 +101,7 @@ class LoggerEngine {
     // Restore breadcrumbs from previous session if crashed or reloaded
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
-        const raw = sessionStorage.getItem('slag_session_breadcrumbs');
+        const raw = sessionStorage.getItem(STORAGE_KEYS.SESSION_BREADCRUMBS);
         if (raw) {
           const parsed: LogEntry[] = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -160,11 +161,11 @@ class LoggerEngine {
           message: e.message,
           durationMs: e.durationMs,
         }));
-        sessionStorage.setItem('slag_session_breadcrumbs', JSON.stringify(compact));
+        sessionStorage.setItem(STORAGE_KEYS.SESSION_BREADCRUMBS, JSON.stringify(compact));
       } catch {
         // Ignore quota
       }
-    }, 1000);
+    }, UI_DELAYS.LOGGER_PERSIST_DEBOUNCE_MS);
   }
 
   private emit(entry: LogEntry): void {
@@ -186,7 +187,7 @@ class LoggerEngine {
       if (entry.level === 'error' || entry.level === 'warn' || this.diskLogQueue.length >= 25) {
         void this.flushToDisk();
       } else {
-        this.scheduleDiskFlush(1500);
+        this.scheduleDiskFlush(UI_DELAYS.LOGGER_DISK_FLUSH_DEBOUNCE_MS);
       }
     }
 

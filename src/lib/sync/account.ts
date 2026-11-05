@@ -11,12 +11,17 @@ import type {
 } from './accountTypes';
 import type { DeviceSyncMode } from './types';
 import { logger } from '../logger';
+import {
+  DEFAULT_SYNC_SERVER_URL,
+  SYNC_STORAGE_KEYS,
+  SYNC_INTERVALS,
+} from '../../config';
 
 const accountLog = logger.scope('SYNC');
 
-const SESSION_KEY = 'slag_account_session_v1';
-const DEFAULT_SERVER_URL = 'http://152.53.199.71:8320';
-const POLL_INTERVAL_MS = 5000;
+const SESSION_KEY = SYNC_STORAGE_KEYS.ACCOUNT_SESSION;
+const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
+const POLL_INTERVAL_MS = SYNC_INTERVALS.POLL_INTERVAL_MS;
 
 interface AuthResponse {
   token?: string;

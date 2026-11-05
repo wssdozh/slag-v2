@@ -6,6 +6,7 @@ import { Button } from '../UI/Button';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { useFolderMedia } from '../RightPanel/useFolderMedia';
 import { FolderMediaTabs } from '../RightPanel/FolderMediaTabs';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   Folder,
   Inbox,
@@ -41,7 +42,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
     addToast,
   } = useApp();
 
-  const isInbox = targetFolder === 'Входящие';
+  const isInbox = targetFolder === DEFAULT_INBOX_FOLDER;
   const folderMeta = useMemo(() => folders.find(f => f.path === targetFolder), [folders, targetFolder]);
 
   // Mode: View (Profile & Media tabs) vs Edit (Rename, Icon, Description, Delete)
@@ -59,8 +60,8 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
 
   // Filter items in this folder (Inbox includes all inbox items, other folders include exact & descendants)
   const folderItems = useMemo(() => {
-    if (targetFolder === 'Входящие') {
-      return items.filter(it => it.folder === 'Входящие');
+    if (targetFolder === DEFAULT_INBOX_FOLDER) {
+      return items.filter(it => it.folder === DEFAULT_INBOX_FOLDER);
     }
     return items.filter(it => it.folder === targetFolder || it.folder.startsWith(targetFolder + '/'));
   }, [items, targetFolder]);
@@ -117,8 +118,8 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
     }
 
     const updated: FolderMeta = {
-      path: isInbox ? 'Входящие' : newPath,
-      name: isInbox ? 'Входящие' : cleanName,
+      path: isInbox ? DEFAULT_INBOX_FOLDER : newPath,
+      name: isInbox ? DEFAULT_INBOX_FOLDER : cleanName,
       icon: editIcon,
       description: editDescription.trim(),
     };
@@ -229,7 +230,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
             : folderMeta?.path || targetFolder
           : `${folderItems.length} ${
               folderItems.length === 1 ? 'запись' : folderItems.length < 5 ? 'записи' : 'записей'
-            } • ${isInbox ? 'Входящие' : folderMeta?.path || targetFolder}`
+            } • ${isInbox ? DEFAULT_INBOX_FOLDER : folderMeta?.path || targetFolder}`
       }
       icon={<CurrentIcon className="w-4 h-4" />}
       maxWidth="max-w-xl"
@@ -436,6 +437,6 @@ export const FolderInfoModal: React.FC = () => {
 
   if (!isFolderInfoModalOpen) return null;
 
-  const target = folderInfoTarget || currentFolder || 'Входящие';
+  const target = folderInfoTarget || currentFolder || DEFAULT_INBOX_FOLDER;
   return <FolderInfoModalDialog key={target} targetFolder={target} />;
 };

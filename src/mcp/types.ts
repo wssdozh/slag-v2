@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_INBOX_FOLDER } from '../config';
 import type { SlagItem, FolderMeta } from '../types';
 
 export interface McpVaultConfig {
@@ -28,7 +29,7 @@ export const SaveNoteSchema = {
   content: z.string().optional().describe('Основной текст в формате Markdown.'),
   appendContent: z.string().optional().describe('Текст для добавления в конец существующей заметки.'),
   type: z.enum(['note', 'task', 'article']).default('note').describe('Тип записи: note (заметка), task (задача), article (статья).'),
-  folder: z.string().default('Входящие').describe('Папка сохранения (например "Входящие" или "Проекты/Дизайн").'),
+  folder: z.string().default(DEFAULT_INBOX_FOLDER).describe(`Папка сохранения (например "${DEFAULT_INBOX_FOLDER}" или "Проекты/Дизайн").`),
   tags: z.array(z.string()).optional().describe('Список тегов без знака решетки #.'),
   status: z.enum(['backlog', 'todo', 'in_progress', 'done']).optional().describe('Статус задачи.'),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional().describe('Приоритет задачи.'),

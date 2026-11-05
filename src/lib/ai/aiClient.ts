@@ -6,6 +6,7 @@ import { logger } from '../logger';
 import { OpenAiChatAdapter } from './adapters/openAiAdapter';
 import { OpenAiResponsesAdapter } from './adapters/openAiResponsesAdapter';
 import { AnthropicMessagesAdapter } from './adapters/anthropicAdapter';
+import { AI_ENDPOINTS, DEFAULT_AI_MODELS } from '../../config';
 
 const aiLog = logger.scope('AI');
 
@@ -35,7 +36,7 @@ export interface PromptResult {
  * For DeepSeek models on native KIE, routes to /openai/v1/responses.
  */
 export function resolveKieEndpoint(baseUrl?: string, model?: string): string {
-  const clean = (baseUrl || 'https://api.kie.ai').replace(/\/+$/, '');
+  const clean = (baseUrl || AI_ENDPOINTS.DEFAULT_KIE_BASE_URL).replace(/\/+$/, '');
   if (clean.endsWith('/chat/completions') || clean.endsWith('/messages') || clean.endsWith('/responses')) return clean;
 
   const m = (model || '').toLowerCase();
@@ -61,7 +62,7 @@ export function resolveAiTarget(settings: AiSettings): AiResolvedTarget | null {
 
   if (isSubscriptionMode) {
     const tier = settings.subscriptionModel || 'fast';
-    const model = tier === 'deep' ? 'deepseek-v4-1-flash' : tier === 'smart' ? 'claude-haiku-5-5' : 'gemini-2.0-flash';
+    const model = DEFAULT_AI_MODELS.SUBSCRIPTION_TIERS[tier as keyof typeof DEFAULT_AI_MODELS.SUBSCRIPTION_TIERS] || DEFAULT_AI_MODELS.SUBSCRIPTION_TIERS.fast;
     const cleanServer = syncEngine.getConfig().serverUrl.replace(/\/+$/, '');
     const apiKey = accountClient.getToken() || syncEngine.getStatus().currentRoomId || 'slag-relay-room';
     return {
@@ -83,19 +84,19 @@ export function resolveAiTarget(settings: AiSettings): AiResolvedTarget | null {
   }
 
   if (isGroq) {
-    const model = settings.model || 'openai/gpt-oss-120b';
+    const model = settings.model || DEFAULT_AI_MODELS.GROQ_DEFAULT;
     return {
       providerName: 'Groq',
       apiKey: settings.groqApiKey,
       model,
-      endpointUrl: 'https://api.groq.com/openai/v1/chat/completions',
+      endpointUrl: `${AI_ENDPOINTS.DEFAULT_GROQ_BASE_URL}/chat/completions`,
       adapter: new OpenAiChatAdapter(),
       isSubscriptionMode: false,
     };
   }
 
   if (isKie) {
-    const defaultModel = 'deepseek-v4-1-flash';
+    const defaultModel = DEFAULT_AI_MODELS.KIE_DEFAULT;
     const model = settings.model || defaultModel;
     const lower = model.toLowerCase();
     const endpointUrl = resolveKieEndpoint(settings.kieBaseUrl, model);
@@ -133,12 +134,12 @@ export function resolveAiTarget(settings: AiSettings): AiResolvedTarget | null {
   }
 
   if (isGemini) {
-    const model = settings.model || 'gemini-2.0-flash';
+    const model = settings.model || DEFAULT_AI_MODELS.GEMINI_DEFAULT;
     return {
       providerName: 'Gemini',
       apiKey: settings.geminiApiKey,
       model,
-      endpointUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+      endpointUrl: `${AI_ENDPOINTS.DEFAULT_GEMINI_BASE_URL}/openai/chat/completions`,
       adapter: new OpenAiChatAdapter(),
       isSubscriptionMode: false,
     };

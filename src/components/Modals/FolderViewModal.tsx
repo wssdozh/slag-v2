@@ -9,6 +9,7 @@ import {
   ArrowUpZA,
   RotateCcw,
 } from 'lucide-react';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export const FolderViewModal: React.FC = () => {
   const {
@@ -27,7 +28,7 @@ export const FolderViewModal: React.FC = () => {
     currentFolder,
   } = useApp();
 
-  const isInbox = currentFolder === 'Входящие';
+  const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
   const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
 
   // Position popover directly under the 3-dots button in the active header

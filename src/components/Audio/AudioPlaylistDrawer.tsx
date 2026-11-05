@@ -4,6 +4,7 @@ import type { AudioTrack, AudioTypeFilter } from '../../lib/audioHelper';
 import { formatAudioDuration } from '../../lib/audioHelper';
 import type { FolderMeta } from '../../types';
 import { IconButton } from '../UI/IconButton';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 interface AudioPlaylistDrawerProps {
   isOpen: boolean;
@@ -115,7 +116,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
             </button>
             {isFolderSelectOpen && (
               <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto">
-                {Array.from(new Set(['Входящие', ...folders.map((f) => f.path).filter(Boolean)])).map(
+                {Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)])).map(
                   (folderPath) => (
                     <button
                       key={folderPath}

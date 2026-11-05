@@ -3,6 +3,7 @@ import { Music } from 'lucide-react';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { useApp } from '../../context/AppContext';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export const MobileAudioView: React.FC = () => {
   const { currentFolder } = useApp();
@@ -12,7 +13,7 @@ export const MobileAudioView: React.FC = () => {
       {/* Top Header */}
       <MobileScreenHeader
         title="Плеер"
-        subtitle={currentFolder || 'Входящие'}
+        subtitle={currentFolder || DEFAULT_INBOX_FOLDER}
         icon={<Music className="w-3.5 h-3.5 text-zinc-300" />}
       />
 

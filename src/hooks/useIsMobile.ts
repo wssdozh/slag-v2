@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { UI_BREAKPOINTS } from '../config';
 
 /**
  * Hook to detect mobile screens (< 768px by default).
  * Responsive to window resizes and orientation changes.
  */
-export function useIsMobile(breakpoint = 768): boolean {
+export function useIsMobile(breakpoint: number = UI_BREAKPOINTS.MOBILE): boolean {
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < breakpoint;

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { UI_DELAYS } from '../config';
 
 export interface UseComposerMediaOptions {
   onCancel?: () => void;
@@ -48,7 +49,7 @@ export function useComposerMedia(options: UseComposerMediaOptions = {}) {
       clearTimeout(holdTimerRef.current);
     }
 
-    // 220ms hold threshold to differentiate single tap (toggle audio/video) from holding (record)
+    // Hold threshold to differentiate single tap (toggle audio/video) from holding (record)
     holdTimerRef.current = window.setTimeout(() => {
       holdTimerRef.current = null;
       setRecordMode('holding');
@@ -61,9 +62,9 @@ export function useComposerMedia(options: UseComposerMediaOptions = {}) {
         setIsRecordingVideo(true);
       }
       try {
-        navigator.vibrate?.(15);
+        navigator.vibrate?.(UI_DELAYS.HAPTIC_VIBRATION_MS);
       } catch {}
-    }, 220);
+    }, UI_DELAYS.HOLD_TO_RECORD_MS);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {

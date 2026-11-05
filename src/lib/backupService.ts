@@ -30,15 +30,17 @@ import {
   BaseDirectory,
 } from '@tauri-apps/plugin-fs';
 
+import {
+  DEFAULT_INBOX_FOLDER,
+  DEFAULT_BACKUP_SETTINGS,
+  STORAGE_KEYS,
+} from '../config';
+
+export { DEFAULT_BACKUP_SETTINGS };
+
 const backupLog = logger.scope('FS');
 
-const BACKUP_SETTINGS_KEY = 'slag_backup_settings_v2';
-
-export const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
-  autoBackupEnabled: true,
-  intervalHours: 24,
-  retentionCount: 7,
-};
+const BACKUP_SETTINGS_KEY = STORAGE_KEYS.BACKUP_SETTINGS;
 
 export interface SlagManifest {
   version: 2;
@@ -164,7 +166,7 @@ export class BackupService {
     // 1. Pack notes
     for (const item of items) {
       const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-      const folderPath = item.folder ? item.folder.replace(/\\/g, '/') : 'Входящие';
+      const folderPath = item.folder ? item.folder.replace(/\\/g, '/') : DEFAULT_INBOX_FOLDER;
       const archivePath = `notes/${folderPath}/${filename}`;
       const mdContent = serializeItemToMarkdown(item);
       zippable[archivePath] = strToU8(mdContent);
@@ -519,7 +521,7 @@ export class BackupService {
         const cleanPath = mdKey.replace(/\\/g, '/').replace(/^notes\//, '');
         const parts = cleanPath.split('/');
         const filename = parts.pop() || 'untitled.md';
-        const folder = parts.length > 0 ? parts.join('/') : 'Входящие';
+        const folder = parts.length > 0 ? parts.join('/') : DEFAULT_INBOX_FOLDER;
         folderSet.add(folder);
 
         const fallbackId = filename.replace(/\.md$/, '');
@@ -533,7 +535,7 @@ export class BackupService {
           path: f,
           name: f.split('/').pop() || f,
           description: '',
-          isSystem: f === 'Входящие',
+          isSystem: f === DEFAULT_INBOX_FOLDER,
         }));
       }
     }

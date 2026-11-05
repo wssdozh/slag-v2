@@ -1,6 +1,7 @@
 import type { DeviceSyncMode, PairingSessionData, PairingClaimResult, PairingPollResult } from './types';
 import { accountClient } from './account';
 import { bytesToBase64, base64ToBytes } from '../byteCodec';
+import { SYNC_INTERVALS } from '../../config';
 
 function pairingHeaders(serverUrl: string, includeJson = true): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -151,8 +152,8 @@ export async function pollPairingPayload(
   serverUrl: string,
   sessionId: string,
   _guestDeviceId: string,
-  timeoutMs = 60_000,
-  intervalMs = 1500
+  timeoutMs: number = SYNC_INTERVALS.PAIRING_TIMEOUT_MS,
+  intervalMs: number = SYNC_INTERVALS.PAIRING_POLL_INTERVAL_MS
 ): Promise<string> {
   const start = Date.now();
 
