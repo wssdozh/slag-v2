@@ -227,7 +227,7 @@ export const APP_COMMANDS: AppCommand[] = [
   },
   {
     id: 'composer:task',
-    title: 'Создать задачу',
+    title: 'Создать таску',
     description: 'Открыть форму быстрого создания задачи',
     category: 'Создание',
     keywords: ['задача', 'задачи', 'таск', 'task', 'todo', 'дело'],

@@ -2273,6 +2273,7 @@ ${isInbox
     const recentActionMsg = [...messages].reverse().find((m) => m.content && (
       m.content.includes('[Действие ассистента:') ||
       m.content.includes('[Подготовлен черновик') ||
+      m.content.includes('[Подготовлено действие:') ||
       m.content.includes('Уточните, какие именно подробности') ||
       m.content.includes('«почистить яйца»')
     ));

@@ -143,7 +143,9 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
   const oldText = oldItem?.content || '';
   const currentProposedText = rawUpdates?.content !== undefined
     ? rawUpdates.content
-    : oldText;
+    : rawUpdates?.appendContent
+      ? (oldText ? `${oldText}\n\n${rawUpdates.appendContent}` : rawUpdates.appendContent)
+      : oldText;
 
   const tempNewItem: SlagItem | undefined = useMemo(() => {
     if (!oldItem) return undefined;

@@ -88,17 +88,21 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       (action.appliedItemId && i.id === action.appliedItemId) ||
       (action.title && i.title.toLowerCase() === action.title.toLowerCase())
     );
+    const baseUpdates = action.updates || {
+      content: action.content,
+      appendContent: action.appendContent,
+      dueDate: action.dueDate,
+      priority: action.priority,
+      tags: action.tags,
+      folder: action.folder,
+    };
+    const updates = action.appendContent && baseUpdates.appendContent === undefined
+      ? { ...baseUpdates, appendContent: action.appendContent }
+      : baseUpdates;
     return [{
       title: action.title,
       targetItem: target,
-      updates: action.updates || {
-        content: action.content,
-        appendContent: action.appendContent,
-        dueDate: action.dueDate,
-        priority: action.priority,
-        tags: action.tags,
-        folder: action.folder,
-      },
+      updates,
     }];
   };
 
