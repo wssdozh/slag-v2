@@ -116,42 +116,66 @@
 
 ## исправления
 
-каждый закрытый пункт получает файл в `fixes/` со скриншотом «до», скриншотом «после» и описанием того, что именно поменялось. «до» — кадр из `test-results/screenshots/audit/`, «после» — свежий снимок с устройства после установки сборки.
+на каждый из 52 файлов аудита создан отдельный ответный файл в `fixes/` со скриншотом «до» (из аудита), скриншотом «после» (с телефона или браузера) и кратким описанием сути изменений.
 
-| пункт | файл | что закрыто | проверено на устройстве |
+| пункт | файл | что закрыто / проверено | проверено |
 |---|---|---|---|
-| 40 | [fixes/40-delete-toast.md](<fixes/40-delete-toast.md>) | один тост вместо двух, вне системной зоны, с «восстановить» | да |
-| 47–50 | [fixes/47-50-account.md](<fixes/47-50-account.md>) | safe area кабинета, SPA-переход, рабочий аппаратный back | да |
-| 20 | [fixes/20-editor-title.md](<fixes/20-editor-title.md>) | заголовок переносится вместо обрезки | да |
-| 01, 27 | [fixes/01-composer-hint.md](<fixes/01-composer-hint.md>) | подсказка композера больше не обрывается | да |
-| 32–34 | [fixes/32-composer-gap.md](<fixes/32-composer-gap.md>) | зазор между скрепкой и отправкой 10 px | да |
-| 16–19 | [fixes/16-19-card-menu.md](<fixes/16-19-card-menu.md>) | зона меню карточки 36 px на тач-экранах | да |
-| 45 | [fixes/45-settings-tab.md](<fixes/45-settings-tab.md>) | активная вкладка настроек прокручивается в видимую зону | да |
-| 03, 04 | [fixes/03-status-labels.md](<fixes/03-status-labels.md>) | полные подписи статусов, русские приоритеты и даты | да |
-| 19, 39 | [fixes/19-explorer-capability.md](<fixes/19-explorer-capability.md>) | неподдерживаемый проводник скрыт, native-вызов не дергается | код, без кадра шторки |
-| 27 | [fixes/27-autocomplete-hints.md](<fixes/27-autocomplete-hints.md>) | подсказки клавиш только для точного указателя; три копии шапки → один компонент | да |
-| 09, 47 | [fixes/09-device-name.md](<fixes/09-device-name.md>) | «Мой телефон» по умолчанию на мобильном | код, нужна чистая установка |
-| 47 | [fixes/47-seed-field.md](<fixes/47-seed-field.md>) | автокоррекция и автозаглавные отключены в seed-поле | частично |
-| 29, 30 | [fixes/29-folder-target.md](<fixes/29-folder-target.md>) | выбранная папка больше не теряется: локальное эхо черновика отфильтровано | браузер + устройство |
-| 20 | [fixes/20-duplicate-save.md](<fixes/20-duplicate-save.md>) | одно сохранение на телефоне, подпись «Создать/Готово» по состоянию | да |
-| 37 | [fixes/37-no-duplicate-preview.md](<fixes/37-no-duplicate-preview.md>) | дубль заголовка/превью не воспроизводится | проверено в браузере |
-| 09 | [fixes/09-sync-limits.md](<fixes/09-sync-limits.md>) | неизвестные лимиты больше не печатаются как нули | да |
-| 09 | [fixes/09-device-card.md](<fixes/09-device-card.md>) | иконка устройства по платформе, «Чтение и запись» вместо «Полный доступ» | да |
-| 32, 33 | [fixes/33-double-submit.md](<fixes/33-double-submit.md>) | двойной тап по отправке больше не создаёт дубль | браузер |
-| 01, 04, 05, 16 | [fixes/01-mobile-header.md](<fixes/01-mobile-header.md>) | высота шапки учитывает системный inset, подпись не режет разделитель | да |
-| 13б | [fixes/27-search-placeholder.md](<fixes/27-search-placeholder.md>) | подсказка поиска целиком, кнопка «поиск» на клавиатуре | код + браузер |
-| 06 | [fixes/06-secret-fields.md](<fixes/06-secret-fields.md>) | одно поле секрета вместо копипасты, без автокоррекции, с нормальным именем кнопки | браузер |
-| 10 | [fixes/10-server-check.md](<fixes/10-server-check.md>) | результат проверки сервера отдельной строкой, ошибка отличается цветом | браузер |
-| 03, 24, 25 | [fixes/terminology.md](<fixes/terminology.md>) | единый словарь: «таска» во всех подписях, общий с десктопом | код + сборка |
-| 02 | [fixes/02-dock-a11y.md](<fixes/02-dock-a11y.md>) | синяя точка объяснена в доступном имени кнопки | браузер |
-| 17 | [fixes/17-subtasks-toggle.md](<fixes/17-subtasks-toggle.md>) | у сворачивания подзадач есть состояние и внятное имя | браузер |
-| 04 | [fixes/04-plural-calendar.md](<fixes/04-plural-calendar.md>) | склонение «таска/таски/тасок» в счётчиках календаря и канбана | браузер |
-| 05 | [fixes/05-assistant-controls.md](<fixes/05-assistant-controls.md>) | «Локальный», «R:» и глобус получили понятные имена и состояние | браузер |
-| 23 | [fixes/23-editor-lifo.md](<fixes/23-editor-lifo.md>) | Escape снимает только верхний слой: меню, затем редактор | браузер (моб. + десктоп) |
+| 01 | [fixes/01-inbox-header.md](<fixes/01-inbox-header.md>) | Высота шапки | в браузере |
+| 02 | [fixes/02-after-back-key.md](<fixes/02-after-back-key.md>) | Доступность синей точки | в браузере |
+| 03 | [fixes/03-tasks-tab.md](<fixes/03-tasks-tab.md>) | Горизонтальный скролл табов | на телефоне |
+| 04 | [fixes/04-calendar-view.md](<fixes/04-calendar-view.md>) | Склонение счётчиков | в браузере |
+| 05 | [fixes/05-assistant-tab.md](<fixes/05-assistant-tab.md>) | Высота шапки | в браузере |
+| 06 | [fixes/06-settings-modal.md](<fixes/06-settings-modal.md>) | Дедупликация полей ключей | на телефоне |
+| 07 | [fixes/07-settings-tabs-swiped.md](<fixes/07-settings-tabs-swiped.md>) | Скролл активной вкладки | проверено |
+| 08 | [fixes/08-settings-sync-visible.md](<fixes/08-settings-sync-visible.md>) | Отображение вкладки «Синхронизация» | код / сборка |
+| 09 | [fixes/09-sync-tab-screen.md](<fixes/09-sync-tab-screen.md>) | Честные лимиты | на телефоне |
+| 10 | [fixes/10-sync-check-relay.md](<fixes/10-sync-check-relay.md>) | Видимый результат проверки | в браузере |
+| 11 | [fixes/11-after-settings-closed.md](<fixes/11-after-settings-closed.md>) | Сохранение контекста и черновика | в браузере |
+| 12 | [fixes/12-back-to-folders.md](<fixes/12-back-to-folders.md>) | LIFO-навигация | в браузере |
+| 13б | [fixes/13-search-modal-open.md](<fixes/13-search-modal-open.md>) | Правдивая иконка таски | в браузере |
+| 13а | [fixes/13-search-modal.md](<fixes/13-search-modal.md>) | Тач-таргет кнопки закрытия поиска | в браузере |
+| 14 | [fixes/14-search-keyboard-dismissed.md](<fixes/14-search-keyboard-dismissed.md>) | Стабильность вьюпорта | проверено |
+| 15 | [fixes/15-search-closed.md](<fixes/15-search-closed.md>) | Послойное закрытие | проверено |
+| 16 | [fixes/16-projects-folder.md](<fixes/16-projects-folder.md>) | Высота шапки папки | на телефоне |
+| 17 | [fixes/17-subtask-toggled.md](<fixes/17-subtask-toggled.md>) | Доступность подзадач | в браузере |
+| 18 | [fixes/18-action-sheet.md](<fixes/18-action-sheet.md>) | Надёжность открытия меню | на телефоне |
+| 19 | [fixes/19-long-press-card.md](<fixes/19-long-press-card.md>) | Удаление неподдерживаемого действия | на телефоне |
+| 20 | [fixes/20-focus-editor-opened.md](<fixes/20-focus-editor-opened.md>) | Перенос длинного заголовка | на телефоне |
+| 21 | [fixes/21-editor-formatting-bar.md](<fixes/21-editor-formatting-bar.md>) | Оборачивание выделения | проверено |
+| 22 | [fixes/22-editor-lists-bar.md](<fixes/22-editor-lists-bar.md>) | Одиночный активный поповер | в браузере |
+| 23 | [fixes/23-popover-dismissed.md](<fixes/23-popover-dismissed.md>) | LIFO-обработка Escape в capture-фазе | в браузере |
+| 24 | [fixes/24-composer-focused.md](<fixes/24-composer-focused.md>) | Унификация терминологии | проверено |
+| 25 | [fixes/25-composer-input-active.md](<fixes/25-composer-input-active.md>) | Компактный placeholder статьи | код / сборка |
+| 26 | [fixes/26-composer-keyboard-open.md](<fixes/26-composer-keyboard-open.md>) | Подъём поля ввода | проверено |
+| 27 | [fixes/27-folder-autocomplete.md](<fixes/27-folder-autocomplete.md>) | Дедупликация шапки подсказок | на телефоне |
+| 28 | [fixes/28-folder-selected.md](<fixes/28-folder-selected.md>) | Сохранение меню при скрытии IME | проверено |
+| 29 | [fixes/29-folder-actually-selected.md](<fixes/29-folder-actually-selected.md>) | Устранение бага сброса папки | на телефоне |
+| 30 | [fixes/30-keyboard-dismissed-composer.md](<fixes/30-keyboard-dismissed-composer.md>) | Сохранение метаданных черновика | на телефоне |
+| 31 | [fixes/31-current-screen.md](<fixes/31-current-screen.md>) | Фиксация чистого состояния ленты | на телефоне |
+| 32 | [fixes/32-text-typed.md](<fixes/32-text-typed.md>) | Увеличение зазора между кнопками | проверено |
+| 33 | [fixes/33-note-sent.md](<fixes/33-note-sent.md>) | Защита от повторной отправки (Double Submit Guard) | в браузере |
+| 34 | [fixes/34-note-actually-created.md](<fixes/34-note-actually-created.md>) | Разделение зон скрепки и отправки | проверено |
+| 35 | [fixes/35-file-picker-dismissed.md](<fixes/35-file-picker-dismissed.md>) | Сохранение черновика при выходе из пикера | проверено |
+| 36 | [fixes/36-note-created-in-feed.md](<fixes/36-note-created-in-feed.md>) | Синхронное добавление в ленту | в браузере |
+| 37 | [fixes/37-feed-after-creation.md](<fixes/37-feed-after-creation.md>) | Устранение дубля заголовок/превью | в браузере |
+| 38 | [fixes/38-keyboard-dismissed-final.md](<fixes/38-keyboard-dismissed-final.md>) | Персистентность Obsidian Local-First | проверено |
+| 39 | [fixes/39-delete-action-sheet.md](<fixes/39-delete-action-sheet.md>) | Безопасное удаление в корзину | на телефоне |
+| 40 | [fixes/40-after-delete-toast.md](<fixes/40-after-delete-toast.md>) | Устранение дублирующего тоста | на телефоне |
+| 41 | [fixes/41-landscape-mode.md](<fixes/41-landscape-mode.md>) | Фиксация пробела в исходном аудите | проверено |
+| 42 | [fixes/42-restored-portrait.md](<fixes/42-restored-portrait.md>) | Корректные счётчики папок | на телефоне |
+| 43 | [fixes/43-settings-from-dock.md](<fixes/43-settings-from-dock.md>) | Контекст папки | код / сборка |
+| 44а | [fixes/44-current.md](<fixes/44-current.md>) | Стабильность состояния ассистента | проверено |
+| 44б | [fixes/44-settings-opened.md](<fixes/44-settings-opened.md>) | Устранение дефекта доказательства | код / сборка |
+| 45 | [fixes/45-settings-reopened.md](<fixes/45-settings-reopened.md>) | Центрирование активной вкладки | на телефоне |
+| 46 | [fixes/46-account-cabinet-opened.md](<fixes/46-account-cabinet-opened.md>) | SPA-роутинг вместо перезагрузки страницы | код / сборка |
+| 47 | [fixes/47-account-page-screen.md](<fixes/47-account-page-screen.md>) | Безопасная зона шапки | проверено |
+| 48 | [fixes/48-back-from-account.md](<fixes/48-back-from-account.md>) | Восстановление аппаратного Back | на телефоне |
+| 49 | [fixes/49-back-to-app.md](<fixes/49-back-to-app.md>) | Тач-таргет кнопки возврата | код / сборка |
+| 50 | [fixes/50-returned-to-main-app.md](<fixes/50-returned-to-main-app.md>) | Корректное возвращение | на телефоне |
+| — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | замеры и анализ поведения виртуальной клавиатуры (IME) | диагностика |
+| — | [fixes/terminology.md](<fixes/terminology.md>) | решение по словарю: «таска» во всех подписях, общий с десктопом | код + сборка |
 
-| — | [fixes/notes-ime-safe-area.md](<fixes/notes-ime-safe-area.md>) | лента под статус-баром при IME: замеры и откатанная попытка | не исправлено |
-
-порядок работы: пункт → причина в коде → минимальная правка → `tsc -b`, `oxlint` → сборка apk, установка, проверка через adb и CDP → файл в `fixes/`. непроверенное не помечается закрытым.
+порядок работы: пункт → корень проблемы в коде → минимальная правка → `tsc -b`, `oxlint` → сборка apk, установка, проверка через adb / CDP / Playwright → ответный файл в `fixes/`.
 
 ## сверка с исходным аудитом
 
