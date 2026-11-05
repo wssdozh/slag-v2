@@ -25,6 +25,7 @@ import {
   Laptop
 } from 'lucide-react';
 import { MobileScreenHeader } from './MobileScreenHeader';
+import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 
 const ALL_AVAILABLE_TABS: { id: MobileTabId; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'folders', label: 'Папки', icon: Folder },
@@ -41,7 +42,6 @@ export const MobileSettingsView: React.FC = () => {
     items,
     folders,
     openSettingsModal,
-    openVaultModal,
     createVault,
     switchVault,
     setIsLogViewerOpen,
@@ -55,6 +55,7 @@ export const MobileSettingsView: React.FC = () => {
 
   const [syncStatus, setSyncStatus] = useState(syncEngine.getStatus());
   const [accountState, setAccountState] = useState(accountClient.getState());
+  const [isVaultSwitcherOpen, setIsVaultSwitcherOpen] = useState(false);
 
   useEffect(() => syncEngine.subscribe(setSyncStatus), []);
   useEffect(() => accountClient.subscribe(setAccountState), []);
@@ -167,10 +168,10 @@ export const MobileSettingsView: React.FC = () => {
 
       {/* Main Settings List (Matching iOS/Telegram grouped style) */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">
-        {/* Profile / Vault Card (Horizontal, Compact, Clickable to open VaultModal) */}
+        {/* Profile / Vault Card (Horizontal, Compact, Clickable to open Vault Switcher) */}
         <button
           type="button"
-          onClick={openVaultModal}
+          onClick={() => setIsVaultSwitcherOpen(true)}
           className="w-full flex items-center justify-between gap-3.5 p-3.5 rounded-2xl bg-surface/80 border border-white/[0.06] shadow-sm hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
         >
           <div className="flex items-center gap-3.5 min-w-0 flex-1">
@@ -192,6 +193,12 @@ export const MobileSettingsView: React.FC = () => {
           </div>
           <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
         </button>
+
+        <VaultSwitcherMenu
+          isOpen={isVaultSwitcherOpen}
+          onClose={() => setIsVaultSwitcherOpen(false)}
+          variant="sheet"
+        />
 
         {/* Pending Vault Invitations */}
         {accountState.invitations.length > 0 && (

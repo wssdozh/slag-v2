@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
+import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import type { SyncStatus } from '../../lib/sync/types';
 import {
   Inbox,
@@ -10,12 +11,7 @@ import {
   Settings,
   Database,
   ChevronDown,
-  Check,
-  PlusCircle,
-  FolderSync,
-  FolderOpen,
   Terminal,
-  Trash2,
   RefreshCw,
 } from 'lucide-react';
 
@@ -30,13 +26,6 @@ export const Sidebar: React.FC = () => {
     openSettingsModal,
     setIsLogViewerOpen,
     openCreateFolderModal,
-    switchVault,
-    createVault,
-    deleteVault,
-    openVaultModal,
-    pickVaultDirectory,
-    revealVaultInExplorer,
-    addToast
   } = useApp();
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => syncEngine.getStatus());
@@ -71,23 +60,6 @@ export const Sidebar: React.FC = () => {
   }, [isVaultDropdownOpen]);
 
   const inboxItemsCount = items.filter(i => i.folder === 'Входящие').length;
-
-  const handleOpenLocalDirectory = async () => {
-    try {
-      const res = await pickVaultDirectory();
-      if (res) {
-        createVault(res.name, res.mode, res.path);
-        setIsVaultDropdownOpen(false);
-      }
-    } catch {
-      addToast('Не удалось открыть папку', 'error');
-    }
-  };
-
-  const handleRevealNotesInExplorer = async () => {
-    await revealVaultInExplorer();
-    setIsVaultDropdownOpen(false);
-  };
 
   return (
     <aside
@@ -159,91 +131,12 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {/* Vault Switcher Dropdown */}
-        {isVaultDropdownOpen && (
-          <div className="absolute bottom-full left-2 right-2 mb-1.5 rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1.5 z-40 flex flex-col gap-0.5 text-xs animate-in fade-in duration-100">
-            <div className="px-2.5 py-1 text-2xs font-mono font-medium text-zinc-500 uppercase tracking-wider">
-              Хранилища (Vaults)
-            </div>
-
-            <div className="max-h-48 overflow-y-auto space-y-0.5">
-              {vaults.map((v) => {
-                const isCurrent = v.id === vault.id;
-                return (
-                  <div
-                    key={v.id}
-                    className={`group/v flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors ${
-                      isCurrent
-                        ? 'bg-white/[0.08] text-white font-medium'
-                        : 'text-zinc-300 hover:bg-white/[0.04] hover:text-white'
-                    }`}
-                  >
-                    <button
-                      onClick={() => {
-                        switchVault(v.id);
-                        setIsVaultDropdownOpen(false);
-                      }}
-                      className="flex-1 min-w-0 text-left cursor-pointer flex flex-col"
-                    >
-                      <span className="truncate">{getVaultDisplayName(v, vaults)}</span>
-                      {v.path && (
-                        <span className="text-2xs text-zinc-500 truncate font-mono">
-                          {v.path}
-                        </span>
-                      )}
-                    </button>
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-200" />}
-                      {v.id !== 'default_vault' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteVault(v.id);
-                          }}
-                          title="Удалить хранилище"
-                          className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-white/[0.08] transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="my-1 border-t border-white/[0.06]" />
-
-            {/* Create new vault option */}
-            <button
-              onClick={() => {
-                setIsVaultDropdownOpen(false);
-                openVaultModal();
-              }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer w-full text-left"
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span className="truncate">Создать новое хранилище...</span>
-            </button>
-
-            {/* Open local folder option */}
-            <button
-              onClick={handleOpenLocalDirectory}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer w-full text-left"
-            >
-              <FolderSync className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span className="truncate">Подключить папку на диске...</span>
-            </button>
-
-            {/* Reveal notes folder in OS explorer */}
-            <button
-              onClick={handleRevealNotesInExplorer}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:bg-white/[0.06] hover:text-white transition-colors cursor-pointer w-full text-left"
-            >
-              <FolderOpen className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span className="truncate">Показать заметки в Проводнике</span>
-            </button>
-          </div>
-        )}
+        <VaultSwitcherMenu
+          isOpen={isVaultDropdownOpen}
+          onClose={() => setIsVaultDropdownOpen(false)}
+          variant="dropdown"
+          position="bottom"
+        />
 
         {/* Sync Status button */}
         <button

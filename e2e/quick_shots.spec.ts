@@ -54,7 +54,7 @@ test.describe('Quick Shots Suite', () => {
       await page.screenshot({ path: path.join(outDir, `mobile_settings_${tab.id}.png`) });
     }
 
-    // Capture mobile vault modal via clicking profile card
+    // Capture mobile vault switcher sheet via clicking profile card
     const closeBtn = page.locator('button[title="Назад"]').first();
     if (await closeBtn.isVisible()) await closeBtn.click();
     await page.waitForTimeout(200);
@@ -63,7 +63,25 @@ test.describe('Quick Shots Suite', () => {
     if (await vaultCard.isVisible()) {
       await vaultCard.click();
       await page.waitForTimeout(200);
-      await page.screenshot({ path: path.join(outDir, 'mobile_vault_modal.png') });
+      await page.screenshot({ path: path.join(outDir, 'mobile_vault_sheet.png') });
+
+      // Click outside / escape to close
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(150);
+    }
+
+    // Go to folders tab and test the header vault dropdown
+    const dockFolders = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label*="Папки"]').first();
+    if (await dockFolders.isVisible()) {
+      await dockFolders.click();
+      await page.waitForTimeout(200);
+
+      const headerVaultBtn = page.locator('button[data-testid="mobile-vault-switcher-btn"]').first();
+      if (await headerVaultBtn.isVisible()) {
+        await headerVaultBtn.click();
+        await page.waitForTimeout(200);
+        await page.screenshot({ path: path.join(outDir, 'mobile_vault_dropdown.png') });
+      }
     }
   });
 });
