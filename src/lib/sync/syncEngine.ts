@@ -419,6 +419,7 @@ export class SyncEngine {
       this.connectWebSocket();
       this.startIntervals();
       this.ensureSyncedIdsSeed();
+      await this.fetchPendingBundlesHttp();
       await this.pushLocalChanges();
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
@@ -543,6 +544,7 @@ export class SyncEngine {
         syncLog.info(`Sync WebSocket closed (code ${event.code}), retrying in ${retryMs}ms`);
         this.status.state = 'offline';
         this.notify();
+        void this.fetchPendingBundlesHttp();
         this.reconnectTimeout = setTimeout(() => {
           this.reconnectTimeout = null;
           if (this.config.enabled && this.activeRoomId) this.connectWebSocket();
@@ -886,6 +888,10 @@ export class SyncEngine {
       return;
     }
     if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) return;
+
+    // Fetch incoming remote updates before computing state and pushing
+    await this.fetchPendingBundlesHttp();
+
     this.isProcessingSync = true;
     const generation = this.initGeneration;
     const roomId = this.activeRoomId;
