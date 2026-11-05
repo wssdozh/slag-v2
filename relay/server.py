@@ -9,7 +9,9 @@ import base64
 import hashlib
 import json
 import logging
+import mimetypes
 import os
+from pathlib import Path
 import secrets
 import sqlite3
 import struct
@@ -1282,6 +1284,24 @@ class SlagRelayServer:
                 logger.warning("Upstream AI gateway exception: %s", type(exc).__name__)
                 await self._send_response(writer, self._json_response({"error": "upstream_gateway_failed"}, 502))
             return None
+
+        if method in ("GET", "HEAD") and not path.startswith("/api/") and path != "/health":
+            static_dir = os.environ.get("SLAG_STATIC_DIR") or str(Path(__file__).resolve().parent / "dist")
+            if os.path.isdir(static_dir):
+                clean_path = path.lstrip("/")
+                target = (Path(static_dir) / clean_path).resolve()
+                if not str(target).startswith(str(Path(static_dir).resolve())):
+                    raise ApiError(403, "access_denied")
+                if clean_path and target.is_file():
+                    mime, _ = mimetypes.guess_type(str(target))
+                    data = b"" if method == "HEAD" else target.read_bytes()
+                    await self._send_response(writer, self._http_response(200, "OK", mime or "application/octet-stream", data))
+                    return None
+                index_html = Path(static_dir) / "index.html"
+                if index_html.is_file():
+                    data = b"" if method == "HEAD" else index_html.read_bytes()
+                    await self._send_response(writer, self._http_response(200, "OK", "text/html; charset=utf-8", data))
+                    return None
 
         return {"error": "not_found", "path": path}, 404
 

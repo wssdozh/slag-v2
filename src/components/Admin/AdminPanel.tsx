@@ -53,7 +53,13 @@ function shortId(id: string): string {
 export const AdminPanel: React.FC = () => {
   const isTauri = isTauriEnvironment();
   const [serverUrl, setServerUrl] = useState(() => {
-    return sessionStorage.getItem(SERVER_STORAGE_KEY) || syncEngine.getConfig().serverUrl || 'http://152.53.199.71:8320';
+    if (sessionStorage.getItem(SERVER_STORAGE_KEY)) {
+      return sessionStorage.getItem(SERVER_STORAGE_KEY)!;
+    }
+    if (typeof window !== 'undefined' && window.location.origin.startsWith('http') && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      return window.location.origin;
+    }
+    return syncEngine.getConfig().serverUrl || 'http://152.53.199.71:8320';
   });
   const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_STORAGE_KEY) || '');
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(sessionStorage.getItem(TOKEN_STORAGE_KEY)));
