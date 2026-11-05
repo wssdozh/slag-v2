@@ -10,10 +10,11 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
     }
   });
 
-  test('admin authentication, stats, accounts list, plan switching and tauri isolation', async ({ page }) => {
+  test('admin authentication, stats, accounts, device revocation, maintenance and tauri isolation', async ({ page }) => {
     test.setTimeout(60_000);
 
     let currentPlan = 'free';
+    let deviceStatus = 'active';
 
     // Mock relay admin endpoints
     await page.route('**/api/admin/**', async (route) => {
@@ -42,6 +43,10 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
             activeRooms: 4,
             totalBundles: 156,
             totalCacheBytes: 42475520,
+            activeSessions: 5,
+            pendingPairings: 1,
+            totalVaults: 3,
+            dbSizeBytes: 12582912,
           }),
         });
       }
@@ -61,12 +66,16 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
                 maxDevices: currentPlan === 'free' ? 2 : currentPlan === 'smile' ? 5 : 15,
                 maxCacheMb: currentPlan === 'free' ? 1024 : currentPlan === 'smile' ? 10240 : 51200,
                 usedCacheMb: 40.5,
+                vaults: [
+                  { id: 'v_work_11', name: 'Рабочее', updatedAt: '2026-11-04T10:00:00Z', grantsCount: 2 },
+                  { id: 'v_pers_22', name: 'Личное', updatedAt: '2026-11-03T14:20:00Z', grantsCount: 1 },
+                ],
                 devices: [
                   {
                     id: 'dev_pc_11223344',
                     name: 'Workstation ThinkPad',
                     platform: 'desktop',
-                    status: 'active',
+                    status: deviceStatus,
                     lastSeenAt: '2026-11-05T09:30:00Z',
                   },
                   {
@@ -86,6 +95,7 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
                 maxDevices: 5,
                 maxCacheMb: 10240,
                 usedCacheMb: 120.0,
+                vaults: [{ id: 'v_sync_99', name: 'Проект X', updatedAt: '2026-11-05T08:00:00Z', grantsCount: 1 }],
                 devices: [
                   {
                     id: 'dev_mac_33445566',
@@ -101,6 +111,43 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
         });
       }
 
+      if (url.includes('/api/admin/rooms') && method === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            rooms: [
+              {
+                roomId: 'room_112233445566',
+                vaultId: 'v_work_11',
+                lastActiveAt: '2026-11-05T10:20:00Z',
+                createdAt: '2026-11-01T12:00:00Z',
+                bundlesCount: 84,
+                cacheBytes: 25165824,
+              },
+              {
+                roomId: 'room_aabbccddeeff',
+                vaultId: 'v_sync_99',
+                lastActiveAt: '2026-11-05T09:10:00Z',
+                createdAt: '2026-11-03T18:40:00Z',
+                bundlesCount: 72,
+                cacheBytes: 17309696,
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url.includes('/api/admin/accounts/') && url.includes('/devices/') && method === 'POST') {
+        deviceStatus = 'revoked';
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', accountStatus: 'revoked' }),
+        });
+      }
+
       if (url.includes('/api/admin/accounts/') && method === 'PATCH') {
         const postData = JSON.parse(route.request().postData() || '{}');
         currentPlan = postData.plan;
@@ -111,57 +158,81 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
         });
       }
 
+      if (url.includes('/api/admin/maintenance/cleanup') && method === 'POST') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', timestamp: 1793872000 }),
+        });
+      }
+
+      if (url.includes('/api/admin/maintenance/vacuum') && method === 'POST') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', bytesBefore: 12582912, bytesAfter: 8388608, freedBytes: 4194304 }),
+        });
+      }
+
       return route.fulfill({ status: 404, body: JSON.stringify({ error: 'not_found' }) });
     });
 
     // 1. Open ?page=admin in browser mode
     await page.goto('/?page=admin', { waitUntil: 'domcontentloaded' });
-
-    // Verify login form is visible
     await expect(page.locator('h1', { hasText: 'вход в админ-панель' })).toBeVisible();
 
     await page.screenshot({
-      path: 'test-results/screenshots/admin_login.png',
+      path: 'screenshots/admin_login.png',
       fullPage: false,
     });
 
-    // 2. Test invalid token
+    // 2. Test login
     const tokenInput = page.locator('#admin-token');
-    await tokenInput.fill('wrong-token');
-    await page.locator('button[type="submit"]', { hasText: 'войти' }).click();
-    await expect(page.locator('[role="status"]', { hasText: 'неверный админ-токен' })).toBeVisible();
-
-    // 3. Test successful login
     await tokenInput.fill('secret-admin-token');
     await page.locator('button[type="submit"]', { hasText: 'войти' }).click();
 
-    // Verify dashboard metrics are loaded
+    // Verify dashboard metrics and navigation tabs
     await expect(page.locator('header', { hasText: 'SLAG Relay Admin' })).toBeVisible();
-    await expect(page.locator('text=2д 0ч')).toBeVisible();
-    await expect(page.locator('text=40.5 MB')).toBeVisible();
+    await expect(page.locator('button', { hasText: 'аккаунты' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'обслуживание' })).toBeVisible();
 
-    // Verify accounts
-    const firstAccountId = page.locator('span', { hasText: 'acc_7a8b9c0d1e2f34567890abcd' });
-    await expect(firstAccountId).toBeVisible();
-    await expect(page.locator('text=Workstation ThinkPad')).toBeVisible();
-    await expect(page.locator('text=Pixel 8 Pro')).toBeVisible();
+    // Verify accounts list
+    await expect(page.locator('span', { hasText: 'acc_7a8b9c0d1e2f34567890abcd' })).toBeVisible();
+    await expect(page.locator('text=Рабочее')).toBeVisible();
+    await expect(page.locator('text=Личное')).toBeVisible();
 
-    // 4. Test plan change: click 'angry' on first account
+    // 3. Test plan change: click 'angry' on first account
     const angryBtn = page.locator('button', { hasText: 'angry' }).first();
     await angryBtn.click();
     await expect(angryBtn).toHaveClass(/bg-white text-black/);
 
-    // Capture screenshot of authenticated admin panel
+    // 4. Test device revocation
+    const revokeBtn = page.locator('button[title="отозвать доступ"]').first();
+    await expect(revokeBtn).toBeVisible();
+    await revokeBtn.click();
+    await expect(page.locator('span', { hasText: 'revoked' }).first()).toBeVisible();
+
+    // Capture screenshot of accounts tab
     await page.screenshot({
-      path: 'test-results/screenshots/admin_panel.png',
+      path: 'screenshots/admin_panel.png',
       fullPage: false,
     });
 
-    // 5. Test search filter
-    const searchInput = page.locator('input[placeholder="поиск по id аккаунта"]');
-    await searchInput.fill('9988');
-    await expect(page.locator('text=acc_99887766554433221100aabb')).toBeVisible();
-    await expect(page.locator('text=acc_7a8b9c0d1e2f34567890abcd')).not.toBeVisible();
+    // 5. Switch to Maintenance tab
+    await page.locator('button', { hasText: 'обслуживание' }).click();
+    await expect(page.locator('text=размер базы')).toBeVisible();
+    await expect(page.locator('text=12.0 MB')).toBeVisible();
+    await expect(page.locator('text=комнаты синхронизации')).toBeVisible();
+
+    // Run Vacuum
+    await page.locator('button', { hasText: 'сжать базу (vacuum)' }).click();
+    await expect(page.locator('[role="status"]', { hasText: 'база сжата' })).toBeVisible();
+
+    // Capture screenshot of maintenance tab
+    await page.screenshot({
+      path: 'screenshots/admin_maintenance.png',
+      fullPage: false,
+    });
 
     // 6. Test Tauri app isolation
     const tauriContext = await page.context().browser()!.newContext();

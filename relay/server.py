@@ -922,18 +922,27 @@ class SlagRelayServer:
 
         if method == "GET" and path == "/api/admin/stats":
             self._admin_auth(headers)
+            now = time.time()
             accounts_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM accounts").fetchone()["c"]
             devices_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM devices").fetchone()["c"]
             bundles_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM bundles").fetchone()["c"]
             total_cache = self.db.conn.execute("SELECT COALESCE(SUM(LENGTH(payload)), 0) AS s FROM bundles").fetchone()["s"]
+            active_sessions = self.db.conn.execute("SELECT COUNT(*) AS c FROM auth_sessions WHERE expires_at > ?", (now,)).fetchone()["c"]
+            pending_pairings = self.db.conn.execute("SELECT COUNT(*) AS c FROM pairing_sessions WHERE expires_at > ?", (now,)).fetchone()["c"]
+            total_vaults = self.db.conn.execute("SELECT COUNT(*) AS c FROM vaults").fetchone()["c"]
+            db_size = os.path.getsize(self.db.db_path) if os.path.isfile(self.db.db_path) else 0
             return {
                 "status": "ok",
-                "uptime": int(time.time() - self.start_time),
+                "uptime": int(now - self.start_time),
                 "totalAccounts": accounts_count,
                 "totalDevices": devices_count,
                 "activeRooms": len(self.rooms),
                 "totalBundles": bundles_count,
                 "totalCacheBytes": total_cache,
+                "activeSessions": active_sessions,
+                "pendingPairings": pending_pairings,
+                "totalVaults": total_vaults,
+                "dbSizeBytes": db_size,
             }, 200
 
         if method == "GET" and path == "/api/admin/accounts":
@@ -945,6 +954,13 @@ class SlagRelayServer:
                 p = self.db.account_payload(acc_id)
                 p["createdAt"] = iso_time(r["created_at"])
                 p["devices"] = self.db.list_devices(acc_id)
+                vault_rows = self.db.conn.execute("""
+                    SELECT v.id, v.name, v.updated_at,
+                           (SELECT COUNT(*) FROM vault_grants WHERE vault_id = v.id AND status = 'accepted') AS grants_count
+                    FROM vaults v WHERE v.owner_account_id = ? ORDER BY v.updated_at DESC
+                """, (acc_id,)).fetchall()
+                p["vaults"] = [{"id": v["id"], "name": v["name"], "updatedAt": iso_time(v["updated_at"]),
+                                "grantsCount": v["grants_count"]} for v in vault_rows]
                 accounts_list.append(p)
             return {"status": "ok", "accounts": accounts_list}, 200
 
@@ -962,6 +978,52 @@ class SlagRelayServer:
                 with self.db.conn:
                     self.db.conn.execute("UPDATE accounts SET plan = ? WHERE account_id = ?", (plan_name, account_id))
                 return {"status": "ok", "account": self.db.account_payload(account_id)}, 200
+
+            if len(parts) == 6 and parts[4] == "devices" and method == "POST":
+                self._admin_auth(headers)
+                account_id = urllib.parse.unquote(parts[3])
+                device_id = urllib.parse.unquote(parts[5])
+                self.db.revoke_device(account_id, device_id)
+                return {"status": "ok", "deviceId": device_id, "accountStatus": "revoked"}, 200
+
+        if method == "GET" and path == "/api/admin/rooms":
+            self._admin_auth(headers)
+            room_rows = self.db.conn.execute("""
+                SELECT r.room_id, r.vault_id, r.last_active_at, r.created_at,
+                       COUNT(b.bundle_id) AS bundles_count,
+                       COALESCE(SUM(LENGTH(b.payload)), 0) AS cache_bytes
+                FROM rooms r
+                LEFT JOIN bundles b ON r.room_id = b.room_id
+                GROUP BY r.room_id
+                ORDER BY r.last_active_at DESC
+                LIMIT 100
+            """).fetchall()
+            rooms_list = [{
+                "roomId": r["room_id"],
+                "vaultId": r["vault_id"],
+                "lastActiveAt": iso_time(r["last_active_at"]),
+                "createdAt": iso_time(r["created_at"]),
+                "bundlesCount": r["bundles_count"],
+                "cacheBytes": r["cache_bytes"],
+            } for r in room_rows]
+            return {"status": "ok", "rooms": rooms_list}, 200
+
+        if method == "POST" and path == "/api/admin/maintenance/cleanup":
+            self._admin_auth(headers)
+            self.db.cleanup_expired()
+            return {"status": "ok", "timestamp": int(time.time())}, 200
+
+        if method == "POST" and path == "/api/admin/maintenance/vacuum":
+            self._admin_auth(headers)
+            size_before = os.path.getsize(self.db.db_path) if os.path.isfile(self.db.db_path) else 0
+            self.db.conn.execute("VACUUM")
+            size_after = os.path.getsize(self.db.db_path) if os.path.isfile(self.db.db_path) else 0
+            return {
+                "status": "ok",
+                "bytesBefore": size_before,
+                "bytesAfter": size_after,
+                "freedBytes": max(0, size_before - size_after),
+            }, 200
 
         if method == "POST" and path == "/api/auth/challenge":
             account_id = body.get("accountId", "")
