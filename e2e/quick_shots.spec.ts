@@ -1,7 +1,7 @@
 import { test } from '@playwright/test';
 import * as path from 'path';
 
-const outDir = path.join(process.cwd(), 'test-results', 'screenshots');
+const outDir = path.join(process.cwd(), 'docs', 'screenshots');
 
 test.describe('Quick Shots Suite', () => {
   test('desktop settings shots', async ({ page }) => {
@@ -14,7 +14,7 @@ test.describe('Quick Shots Suite', () => {
     await btn.click();
     await page.waitForTimeout(200);
 
-    const tabs = ['ai', 'vault', 'sync', 'ui', 'shortcuts', 'logs'];
+    const tabs = ['ai', 'vault', 'devices', 'sync', 'ui', 'shortcuts', 'logs'];
     for (const tab of tabs) {
       await page.locator(`button[data-tab="${tab}"]`).first().click();
       await page.waitForTimeout(150);
@@ -36,6 +36,7 @@ test.describe('Quick Shots Suite', () => {
     const tabs = [
       { id: 'ai', text: 'ИИ & Провайдеры' },
       { id: 'vault', text: 'Хранилище & Бэкап' },
+      { id: 'devices', text: 'Устройства & Доступ' },
       { id: 'sync', text: 'Синхронизация' },
       { id: 'ui', text: 'Интерфейс, масштаб и плотность' },
       { id: 'shortcuts', text: 'Горячие клавиши' },
@@ -51,6 +52,18 @@ test.describe('Quick Shots Suite', () => {
       }
       await page.waitForTimeout(150);
       await page.screenshot({ path: path.join(outDir, `mobile_settings_${tab.id}.png`) });
+    }
+
+    // Capture mobile vault modal via clicking profile card
+    const closeBtn = page.locator('button[title="Назад"]').first();
+    if (await closeBtn.isVisible()) await closeBtn.click();
+    await page.waitForTimeout(200);
+
+    const vaultCard = page.locator('button:has-text("Obsidian")').first();
+    if (await vaultCard.isVisible()) {
+      await vaultCard.click();
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: path.join(outDir, 'mobile_vault_modal.png') });
     }
   });
 });

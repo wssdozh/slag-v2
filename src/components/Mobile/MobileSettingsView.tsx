@@ -4,6 +4,7 @@ import type { MobileTabId } from '../../types';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { accountClient } from '../../lib/sync/account';
 import { navigatePage } from '../../lib/navigation';
+import { installSharedVault, getLocalVaultId } from '../../lib/sync/vaultSharing';
 import {
   Sparkles,
   Database,
@@ -20,7 +21,8 @@ import {
   Plus,
   GripVertical,
   Sliders,
-  Keyboard
+  Keyboard,
+  Laptop
 } from 'lucide-react';
 import { MobileScreenHeader } from './MobileScreenHeader';
 
@@ -39,6 +41,9 @@ export const MobileSettingsView: React.FC = () => {
     items,
     folders,
     openSettingsModal,
+    openVaultModal,
+    createVault,
+    switchVault,
     setIsLogViewerOpen,
     mobileDockTabs,
     setMobileDockTabs,
@@ -56,6 +61,36 @@ export const MobileSettingsView: React.FC = () => {
 
   const isLocked = syncStatus.authRequired && !accountClient.isAuthenticated();
   const account = accountState.account;
+
+  const handleAcceptInvitation = async (vaultId: string) => {
+    const invitation = accountState.invitations.find((item) => item.vaultId === vaultId);
+    if (!invitation) return;
+    try {
+      const result = await installSharedVault({
+        vaultId,
+        vaultName: invitation.vaultName || vaultId,
+        encryptedKey: invitation.encryptedKey,
+      }, syncEngine.getConfig().deviceId, { createVault, switchVault }, false);
+      await accountClient.acceptVault(vaultId);
+      switchVault(getLocalVaultId(vaultId));
+      await syncEngine.switchVault(getLocalVaultId(vaultId));
+      addToast(
+        `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${invitation.vaultName || vaultId}»`,
+        'success',
+      );
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : String(error), 'error');
+    }
+  };
+
+  const handleDeclineInvitation = async (vaultId: string) => {
+    try {
+      await accountClient.declineVault(vaultId);
+      addToast('Приглашение скрыто', 'info');
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : String(error), 'error');
+    }
+  };
 
   const activeTabs = mobileDockTabs
     .map(id => ALL_AVAILABLE_TABS.find(t => t.id === id))
@@ -132,24 +167,65 @@ export const MobileSettingsView: React.FC = () => {
 
       {/* Main Settings List (Matching iOS/Telegram grouped style) */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">
-        {/* Profile / Vault Card (Horizontal, Compact) */}
-        <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-surface/80 border border-white/[0.06] shadow-sm">
-          <div className="w-12 h-12 rounded-full bg-white/[0.06] border border-white/[0.1] flex items-center justify-center text-white text-base font-bold font-mono shrink-0 shadow-inner">
-            {vault.name ? vault.name.slice(0, 2).toUpperCase() : 'SL'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-white tracking-tight truncate">{vault.name || 'SLAG Vault'}</h2>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.06] text-[10px] font-mono shrink-0">
-                <Shield className="w-2.5 h-2.5" />
-                <span>Obsidian</span>
-              </span>
+        {/* Profile / Vault Card (Horizontal, Compact, Clickable to open VaultModal) */}
+        <button
+          type="button"
+          onClick={openVaultModal}
+          className="w-full flex items-center justify-between gap-3.5 p-3.5 rounded-2xl bg-surface/80 border border-white/[0.06] shadow-sm hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
+        >
+          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+            <div className="w-12 h-12 rounded-full bg-white/[0.06] border border-white/[0.1] flex items-center justify-center text-white text-base font-bold font-mono shrink-0 shadow-inner">
+              {vault.name ? vault.name.slice(0, 2).toUpperCase() : 'SL'}
             </div>
-            <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate">
-              {folders.length} {folders.length === 1 ? 'папка' : folders.length < 5 ? 'папки' : 'папок'} • {items.length} {items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}
-            </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-white tracking-tight truncate">{vault.name || 'SLAG Vault'}</h2>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.06] text-[10px] font-mono shrink-0">
+                  <Shield className="w-2.5 h-2.5" />
+                  <span>Obsidian</span>
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate">
+                {folders.length} {folders.length === 1 ? 'папка' : folders.length < 5 ? 'папки' : 'папок'} • {items.length} {items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}
+              </p>
+            </div>
           </div>
-        </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+        </button>
+
+        {/* Pending Vault Invitations */}
+        {accountState.invitations.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {accountState.invitations.map((inv) => (
+              <div
+                key={inv.vaultId}
+                className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-emerald-500/30 shadow-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-2xs font-mono text-emerald-400 uppercase tracking-wider">Приглашение в хранилище</div>
+                  <div className="text-xs font-semibold text-white truncate mt-0.5">{inv.vaultName || inv.vaultId}</div>
+                  <div className="text-2xs text-zinc-500">{inv.mode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}</div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void handleDeclineInvitation(inv.vaultId)}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Скрыть
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleAcceptInvitation(inv.vaultId)}
+                    className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition-colors cursor-pointer active:scale-95"
+                  >
+                    Принять
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* SLAG ID Banner (When not logged in) */}
         {isLocked && (
@@ -220,6 +296,32 @@ export const MobileSettingsView: React.FC = () => {
                   <Database className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-semibold text-zinc-200">Хранилище & Бэкап</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+            </button>
+
+            <button
+              onClick={() => openSettingsModal('devices')}
+              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
+                  <Laptop className="w-5 h-5" />
+                </div>
+                <div className="text-xs font-semibold text-zinc-200">Устройства & Доступ</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+            </button>
+
+            <button
+              onClick={() => openSettingsModal('sync')}
+              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div className="text-xs font-semibold text-zinc-200">Синхронизация & Сервер</div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
             </button>

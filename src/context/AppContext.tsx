@@ -142,9 +142,9 @@ interface AppContextType {
   setIsFullscreenEditorOpen: (open: boolean) => void;
   setIsSearchOpen: (open: boolean) => void;
   setIsSettingsOpen: (open: boolean) => void;
-  settingsTab: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs';
-  setSettingsTab: (tab: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs') => void;
-  openSettingsModal: (tab?: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs') => void;
+  settingsTab: 'ai' | 'vault' | 'devices' | 'sync' | 'ui' | 'shortcuts' | 'logs';
+  setSettingsTab: (tab: 'ai' | 'vault' | 'devices' | 'sync' | 'ui' | 'shortcuts' | 'logs') => void;
+  openSettingsModal: (tab?: 'ai' | 'vault' | 'devices' | 'sync' | 'ui' | 'shortcuts' | 'logs') => void;
   setIsLogViewerOpen: (open: boolean) => void;
   openCreateFolderModal: (parentPath?: string) => void;
   openEditFolderModal: (folder: FolderMeta) => void;
@@ -473,9 +473,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [settingsTab, setSettingsTab] = useState<'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs'>('ai');
+  const [settingsTab, setSettingsTab] = useState<'ai' | 'vault' | 'devices' | 'sync' | 'ui' | 'shortcuts' | 'logs'>('ai');
 
-  const openSettingsModal = useCallback((tab?: 'ai' | 'vault' | 'sync' | 'ui' | 'shortcuts' | 'logs') => {
+  const openSettingsModal = useCallback((tab?: 'ai' | 'vault' | 'devices' | 'sync' | 'ui' | 'shortcuts' | 'logs') => {
     if (tab) setSettingsTab(tab);
     setIsSettingsOpen(true);
   }, []);

@@ -21,6 +21,8 @@ import { MobileScreenHeader } from './MobileScreenHeader';
 
 export const MobileFoldersView: React.FC = () => {
   const {
+    vault,
+    openVaultModal,
     folders,
     items,
     currentFolder,
@@ -101,7 +103,18 @@ export const MobileFoldersView: React.FC = () => {
       <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
         {/* Top Header */}
         <MobileScreenHeader
-          title="Заметки"
+          title={
+            <button
+              type="button"
+              onClick={openVaultModal}
+              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer text-left"
+              title="Переключить хранилище"
+            >
+              <span>Заметки</span>
+              <span className="text-zinc-500 font-normal text-xs font-mono truncate max-w-[120px]">/ {vault.name || 'main'}</span>
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-500 rotate-90 shrink-0" />
+            </button>
+          }
           icon="S"
           rightSlot={
             <>

@@ -25,7 +25,8 @@ import {
   Trash2,
   Clock,
   HardDrive,
-  RefreshCw
+  RefreshCw,
+  Laptop
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
 import { Select } from '../UI/Select';
@@ -33,6 +34,7 @@ import { Checkbox } from '../UI/Checkbox';
 import { NumberInput } from '../UI/NumberInput';
 import { BaseModal } from './BaseModal';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
+import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { AiSourceMode, SubscriptionAiTier } from '../../types';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
@@ -313,6 +315,21 @@ export const SettingsModal: React.FC = () => {
         >
           <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span>Хранилище & Бэкап</span>
+        </button>
+
+        <button
+          type="button"
+          data-tab="devices"
+          onClick={() => setActiveTab('devices')}
+          data-testid="settings-tab-devices"
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+            activeTab === 'devices'
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <Laptop className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span>Устройства</span>
         </button>
 
         <button
@@ -947,6 +964,10 @@ export const SettingsModal: React.FC = () => {
               </div>
             )}
 
+            {activeTab === 'devices' && (
+              <DevicesSettingsTab addToast={addToast} />
+            )}
+
             {activeTab === 'sync' && (
               <SyncSettingsTab addToast={addToast} />
             )}
@@ -1302,7 +1323,7 @@ export const SettingsModal: React.FC = () => {
               >
                 Закрыть
               </button>
-              {activeTab !== 'logs' && activeTab !== 'shortcuts' && (
+              {activeTab !== 'logs' && activeTab !== 'shortcuts' && activeTab !== 'devices' && (
                 <button
                   type="submit"
                   className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shadow-sm active:scale-95"
@@ -1337,6 +1358,7 @@ export const SettingsModal: React.FC = () => {
                 / {
                   activeTab === 'ai' ? 'ИИ & Провайдеры' :
                   activeTab === 'vault' ? 'Хранилище & Бэкап' :
+                  activeTab === 'devices' ? 'Устройства' :
                   activeTab === 'sync' ? 'Синхронизация' :
                   activeTab === 'ui' ? 'Интерфейс & Панели' :
                   activeTab === 'shortcuts' ? 'Горячие клавиши' :
