@@ -257,6 +257,102 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
         });
       }
 
+      if (url.includes('/api/admin/rooms/') && (url.includes('/purge-unacked') || url.includes('/purge')) && method === 'POST') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', roomId: 'room_112233445566', deletedBundles: 8 }),
+        });
+      }
+
+      if (url.includes('/api/admin/analytics/charts') && method === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            period: '7d',
+            dates: ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'],
+            userGrowth: [
+              { date: '2026-10-30', free: 1, smile: 0, angry: 0, total: 1 },
+              { date: '2026-10-31', free: 2, smile: 1, angry: 0, total: 3 },
+              { date: '2026-11-01', free: 3, smile: 1, angry: 0, total: 4 },
+              { date: '2026-11-02', free: 2, smile: 0, angry: 1, total: 3 },
+              { date: '2026-11-03', free: 4, smile: 2, angry: 0, total: 6 },
+              { date: '2026-11-04', free: 5, smile: 1, angry: 1, total: 7 },
+              { date: '2026-11-05', free: 6, smile: 2, angry: 0, total: 8 },
+            ],
+            appLaunches: [
+              { date: '2026-10-30', desktop: 10, mobile: 5, web: 2, total: 17 },
+              { date: '2026-10-31', desktop: 14, mobile: 8, web: 4, total: 26 },
+              { date: '2026-11-01', desktop: 18, mobile: 12, web: 5, total: 35 },
+              { date: '2026-11-02', desktop: 15, mobile: 9, web: 3, total: 27 },
+              { date: '2026-11-03', desktop: 22, mobile: 14, web: 6, total: 42 },
+              { date: '2026-11-04', desktop: 28, mobile: 19, web: 7, total: 54 },
+              { date: '2026-11-05', desktop: 32, mobile: 21, web: 9, total: 62 },
+            ],
+            revenue: [
+              { date: '2026-10-30', amount: 0, count: 0 },
+              { date: '2026-10-31', amount: 190, count: 1 },
+              { date: '2026-11-01', amount: 0, count: 0 },
+              { date: '2026-11-02', amount: 490, count: 1 },
+              { date: '2026-11-03', amount: 190, count: 1 },
+              { date: '2026-11-04', amount: 380, count: 2 },
+              { date: '2026-11-05', amount: 490, count: 1 },
+            ],
+            traffic: [
+              { date: '2026-10-30', bytes: 1048576, bundles: 14 },
+              { date: '2026-10-31', bytes: 3145728, bundles: 28 },
+              { date: '2026-11-01', bytes: 5242880, bundles: 45 },
+              { date: '2026-11-02', bytes: 8388608, bundles: 62 },
+              { date: '2026-11-03', bytes: 12582912, bundles: 89 },
+              { date: '2026-11-04', bytes: 18874368, bundles: 120 },
+              { date: '2026-11-05', bytes: 25165824, bundles: 156 },
+            ],
+            funnel: {
+              landingViews: 1280,
+              ctaClicks: 340,
+              paywallViews: 140,
+              checkoutStarts: 52,
+              paidConversions: 18,
+              dropOffRate: 65.4,
+              steps: [
+                { name: 'визиты', count: 1280, rate: 100 },
+                { name: 'клик cta', count: 340, rate: 26.6 },
+                { name: 'пейвол', count: 140, rate: 10.9 },
+                { name: 'чекаут', count: 52, rate: 4.1 },
+                { name: 'оплата', count: 18, rate: 1.4 },
+              ],
+            },
+            aiDistribution: {
+              meanTokens: 1420,
+              medianTokens: 850,
+              minTokens: 120,
+              maxTokens: 12400,
+              totalTokens: 357000,
+              totalCostRub: 49.98,
+              totalRevenueRub: 680,
+              grossMarginPercent: 92.6,
+              topUsers: [
+                { accountId: 'acc_7a8b9c0d1e2f34567890abcd', tokens: 12400, costRub: 1.74, plan: 'smile', requests: 14 },
+              ],
+              dailyTokens: [
+                { date: '2026-11-05', promptTokens: 245000, completionTokens: 112000, total: 357000 },
+              ],
+            },
+            syncHealth: {
+              totalBundles: 156,
+              totalAcks: 148,
+              successRatePercent: 98.4,
+              stuckUnackedBundles: 8,
+              topHeavyRooms: [
+                { roomId: 'room_112233445566', vaultId: 'v_work_11', bundlesCount: 84, cacheBytes: 25165824 },
+              ],
+            },
+          }),
+        });
+      }
+
       if (url.includes('/api/admin/accounts/') && url.includes('/toggle-status') && method === 'POST') {
         accountStatus = accountStatus === 'active' ? 'blocked' : 'active';
         return route.fulfill({
@@ -313,6 +409,14 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
     // 1. Accounts tab
     await expect(page.locator('[data-testid="tab-accounts"]')).toHaveClass(/bg-white\/10/);
     await expect(page.locator('span', { hasText: 'acc_7a8b9c0d1e2f34567890abcd' })).toBeVisible();
+    await expect(page.locator('text=рост пользователей')).toBeVisible();
+    await expect(page.locator('text=активность и заходы')).toBeVisible();
+
+    // Inline renewal drawer check
+    const quickGrantBtn = page.locator('button', { hasText: '+ подписка' }).first();
+    await quickGrantBtn.click();
+    await expect(page.locator('text=быстрое продление:')).toBeVisible();
+
     const lockBtn = page.locator('button[title="заблокировать"]').first();
     await lockBtn.click();
     await expect(page.locator('span', { hasText: 'blocked' }).first()).toBeVisible();
@@ -325,6 +429,14 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
     await expect(page.locator('text=MRR (выручка/мес)')).toBeVisible();
     await expect(page.locator('text=680 ₽')).toBeVisible();
     await expect(page.locator('text=33.3%')).toBeVisible();
+    await expect(page.locator('text=динамика оплат и выручки')).toBeVisible();
+    await expect(page.locator('text=воронка перехвата и оплат')).toBeVisible();
+
+    // Autocomplete account search
+    const accountSearchInput = page.locator('#grant-account-input');
+    await accountSearchInput.click();
+    await accountSearchInput.fill('ThinkPad');
+    await page.locator('button', { hasText: 'Workstation ThinkPad' }).click();
 
     // Grant subscription form
     await page.locator('button[type="submit"]', { hasText: 'начислить' }).click();
@@ -337,6 +449,9 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
     await expect(page.locator('[data-testid="tab-ai"]')).toHaveClass(/bg-white\/10/);
     await expect(page.locator('text=operational')).toBeVisible();
     await expect(page.locator('text=357 000')).toBeVisible();
+    await expect(page.locator('text=распределение расхода токенов на юзера')).toBeVisible();
+    await expect(page.locator('text=unit-экономика ии-шлюза')).toBeVisible();
+    await expect(page.locator('text=топ транжир токенов')).toBeVisible();
 
     // AI Ping
     await page.locator('button', { hasText: 'проверить пинг шлюза' }).click();
@@ -350,6 +465,14 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
     const relayClasses = await page.locator('[data-testid="tab-relay"]').getAttribute('class');
     console.log('RELAY TAB CLASSES:', relayClasses);
     await expect(page.locator('text=комнаты синхронизации')).toBeVisible();
+    await expect(page.locator('text=трафик синхронизации')).toBeVisible();
+    await expect(page.locator('text=здоровье синхронизации')).toBeVisible();
+    await expect(page.locator('text=инспектор хранилища')).toBeVisible();
+
+    // Purge unacked bundles action
+    const purgeBtn = page.locator('button', { hasText: 'сбросить зависшие пакеты' }).first();
+    await purgeBtn.click();
+    await expect(page.locator('[role="status"]', { hasText: 'сброшен' })).toBeVisible();
 
     await page.screenshot({ path: 'screenshots/tab_relay.png' });
 

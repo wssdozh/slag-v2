@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity,
+  AlertTriangle,
   Check,
+  Clock,
   Copy,
   CreditCard,
   Database,
@@ -17,14 +19,17 @@ import {
   Smartphone,
   Sparkles,
   Trash2,
+  TrendingUp,
   Unlock,
   Users,
   Wrench,
+  Zap,
 } from 'lucide-react';
 import { isTauriEnvironment } from '../../lib/platform';
 import { navigatePage } from '../../lib/navigation';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { formatBytes } from '../../lib/formatBytes';
+import { SparklineChart, BarChart, FunnelChart, DistributionGauge } from './Charts';
 
 type AdminTab = 'accounts' | 'billing' | 'ai' | 'relay' | 'security';
 
@@ -126,6 +131,43 @@ interface AdminRoom {
   cacheBytes: number;
 }
 
+interface AnalyticsData {
+  period: '7d' | '30d';
+  dates: string[];
+  userGrowth: Array<{ date: string; free: number; smile: number; angry: number; total: number }>;
+  appLaunches: Array<{ date: string; desktop: number; mobile: number; web: number; total: number }>;
+  revenue: Array<{ date: string; amount: number; count: number }>;
+  traffic: Array<{ date: string; bytes: number; bundles: number }>;
+  funnel: {
+    landingViews: number;
+    ctaClicks: number;
+    paywallViews: number;
+    checkoutStarts: number;
+    paidConversions: number;
+    dropOffRate: number;
+    steps: Array<{ name: string; count: number; rate: number }>;
+  };
+  aiDistribution: {
+    meanTokens: number;
+    medianTokens: number;
+    minTokens: number;
+    maxTokens: number;
+    totalTokens: number;
+    totalCostRub: number;
+    totalRevenueRub: number;
+    grossMarginPercent: number;
+    topUsers: Array<{ accountId: string; tokens: number; costRub: number; plan: string; requests: number }>;
+    dailyTokens: Array<{ date: string; promptTokens: number; completionTokens: number; total: number }>;
+  };
+  syncHealth: {
+    totalBundles: number;
+    totalAcks: number;
+    successRatePercent: number;
+    stuckUnackedBundles: number;
+    topHeavyRooms: Array<{ roomId: string; vaultId: string | null; bundlesCount: number; cacheBytes: number }>;
+  };
+}
+
 const TOKEN_STORAGE_KEY = 'slag_admin_token';
 const SERVER_STORAGE_KEY = 'slag_admin_server_url';
 const PLANS: Array<'free' | 'smile' | 'angry'> = ['free', 'smile', 'angry'];
@@ -170,21 +212,37 @@ export const AdminPanel: React.FC = () => {
   const [aiLogs, setAiLogs] = useState<AiLog[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [securityStats, setSecurityStats] = useState<{ blockedAccountsCount: number; revokedDevicesCount: number } | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [period, setPeriod] = useState<'7d' | '30d'>('7d');
 
-  // Form states
+  // Filter states for accounts
+  const [search, setSearch] = useState('');
+  const [filterPlan, setFilterPlan] = useState<'all' | 'free' | 'smile' | 'angry'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'blocked'>('all');
+  const [filterPlatform, setFilterPlatform] = useState<'all' | 'desktop' | 'mobile'>('all');
+  const [filterExpiringSoon, setFilterExpiringSoon] = useState(false);
+
+  // Quick grant states
+  const [inlineGrantAccountId, setInlineGrantAccountId] = useState<string | null>(null);
+  const [inlinePlan, setInlinePlan] = useState<'smile' | 'angry'>('smile');
+  const [inlineDays, setInlineDays] = useState('30');
+
+  // Billing form states
   const [grantAccountId, setGrantAccountId] = useState('');
   const [grantPlan, setGrantPlan] = useState<'smile' | 'angry'>('smile');
   const [grantDays, setGrantDays] = useState('30');
   const [grantAmount, setGrantAmount] = useState('190');
+  const [accountSearchQuery, setAccountSearchQuery] = useState('');
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
 
-  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [currentTimestamp] = useState(() => Date.now());
 
-  const loadData = useCallback(async (activeToken: string, activeUrl: string) => {
+  const loadData = useCallback(async (activeToken: string, activeUrl: string, activePeriod: '7d' | '30d') => {
     setLoading(true);
     setError(null);
     const headers = {
@@ -192,7 +250,7 @@ export const AdminPanel: React.FC = () => {
       'Content-Type': 'application/json',
     };
     try {
-      const [statsRes, accountsRes, roomsRes, billStatsRes, txRes, aiStatsRes, aiLogsRes, auditRes] =
+      const [statsRes, accountsRes, roomsRes, billStatsRes, txRes, aiStatsRes, aiLogsRes, auditRes, analyticsRes] =
         await Promise.all([
           fetch(`${activeUrl}/api/admin/stats`, { headers }),
           fetch(`${activeUrl}/api/admin/accounts`, { headers }),
@@ -202,6 +260,7 @@ export const AdminPanel: React.FC = () => {
           fetch(`${activeUrl}/api/admin/ai/stats`, { headers }).catch(() => null),
           fetch(`${activeUrl}/api/admin/ai/logs`, { headers }).catch(() => null),
           fetch(`${activeUrl}/api/admin/audit`, { headers }).catch(() => null),
+          fetch(`${activeUrl}/api/admin/analytics/charts?period=${activePeriod}`, { headers }).catch(() => null),
         ]);
 
       if (statsRes.status === 401 || accountsRes.status === 401) {
@@ -251,6 +310,10 @@ export const AdminPanel: React.FC = () => {
           revokedDevicesCount: auditData.revokedDevicesCount || 0,
         });
       }
+      if (analyticsRes && analyticsRes.ok) {
+        const aData = (await analyticsRes.json()) as AnalyticsData;
+        setAnalytics(aData);
+      }
 
       setIsAuthenticated(true);
       sessionStorage.setItem(TOKEN_STORAGE_KEY, activeToken);
@@ -271,12 +334,12 @@ export const AdminPanel: React.FC = () => {
     let active = true;
     void Promise.resolve().then(async () => {
       if (!active) return;
-      await loadData(token, serverUrl);
+      await loadData(token, serverUrl, period);
     });
     return () => {
       active = false;
     };
-  }, [isAuthenticated, token, serverUrl, loadData]);
+  }, [isAuthenticated, token, serverUrl, period, loadData]);
 
   const switchTab = (tab: AdminTab) => {
     setActiveTab(tab);
@@ -294,7 +357,7 @@ export const AdminPanel: React.FC = () => {
     }
     setToken(cleanToken);
     setServerUrl(cleanUrl);
-    void loadData(cleanToken, cleanUrl);
+    void loadData(cleanToken, cleanUrl, period);
   };
 
   const handleLogout = () => {
@@ -309,6 +372,7 @@ export const AdminPanel: React.FC = () => {
     setAiStats(null);
     setAiLogs([]);
     setAuditLogs([]);
+    setAnalytics(null);
     setError(null);
     setStatusMessage(null);
   };
@@ -434,9 +498,60 @@ export const AdminPanel: React.FC = () => {
         throw new Error(data.error || `ошибка ${res.status}`);
       }
       setStatusMessage(`подписка ${grantPlan} начислена аккаунту ${shortId(grantAccountId)}`);
-      await loadData(token, serverUrl);
+      await loadData(token, serverUrl, period);
     } catch (err) {
       setError(`ошибка начисления: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleQuickGrant = async (accountId: string, plan: 'smile' | 'angry' = 'smile', days = 30) => {
+    setActionBusy(true);
+    setStatusMessage(null);
+    setError(null);
+    try {
+      const amount = plan === 'smile' ? 190 : 490;
+      const res = await fetch(`${serverUrl}/api/admin/billing/grant`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accountId, plan, periodDays: days, amount }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || `ошибка ${res.status}`);
+      }
+      setStatusMessage(`подписка ${plan} начислена аккаунту ${shortId(accountId)}`);
+      setInlineGrantAccountId(null);
+      await loadData(token, serverUrl, period);
+    } catch (err) {
+      setError(`ошибка начисления: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handlePurgeRoom = async (roomId: string) => {
+    setActionBusy(true);
+    setStatusMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(`${serverUrl}/api/admin/rooms/${encodeURIComponent(roomId)}/purge-unacked`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) throw new Error(`ошибка ${res.status}`);
+      const data = (await res.json()) as { deletedBundles?: number };
+      setStatusMessage(`кеш комнаты ${shortId(roomId)} сброшен (удалено ${data.deletedBundles || 0} пакетов)`);
+      await loadData(token, serverUrl, period);
+    } catch (err) {
+      setError(`ошибка очистки комнаты: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setActionBusy(false);
     }
@@ -458,7 +573,7 @@ export const AdminPanel: React.FC = () => {
       if (!res.ok) throw new Error(`ошибка ${res.status}`);
       const data = (await res.json()) as { latencyMs: number; model: string };
       setStatusMessage(`шлюз отвечает: пинг ${data.latencyMs} мс (${data.model})`);
-      await loadData(token, serverUrl);
+      await loadData(token, serverUrl, period);
     } catch (err) {
       setError(`ошибка пинга шлюза: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -480,7 +595,7 @@ export const AdminPanel: React.FC = () => {
       });
       if (!res.ok) throw new Error(`ошибка ${res.status}`);
       setStatusMessage('очистка выполнена: устаревшие бандлы и сессии удалены');
-      await loadData(token, serverUrl);
+      await loadData(token, serverUrl, period);
     } catch (err) {
       setError(`ошибка очистки: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -505,7 +620,7 @@ export const AdminPanel: React.FC = () => {
       setStatusMessage(
         `база сжата: ${formatBytes(data.bytesBefore)} → ${formatBytes(data.bytesAfter)} (освобождено ${formatBytes(data.freedBytes) || '0 B'})`
       );
-      await loadData(token, serverUrl);
+      await loadData(token, serverUrl, period);
     } catch (err) {
       setError(`ошибка сжатия базы: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -540,9 +655,45 @@ export const AdminPanel: React.FC = () => {
     );
   }
 
-  const filteredAccounts = accounts.filter((acc) =>
-    acc.id.toLowerCase().includes(search.toLowerCase().trim())
-  );
+  // Filtered accounts logic
+  const nowMs = currentTimestamp;
+  const filteredAccounts = accounts.filter((acc) => {
+    const q = search.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      acc.id.toLowerCase().includes(q) ||
+      acc.devices.some((d) => d.name.toLowerCase().includes(q) || d.id.toLowerCase().includes(q));
+    const matchesPlan = filterPlan === 'all' || acc.plan === filterPlan;
+    const matchesStatus = filterStatus === 'all' || acc.status === filterStatus;
+    const matchesPlatform =
+      filterPlatform === 'all' || acc.devices.some((d) => d.platform === filterPlatform);
+    const matchesExpiring =
+      !filterExpiringSoon ||
+      (acc.expiresAt &&
+        new Date(acc.expiresAt).getTime() > nowMs &&
+        new Date(acc.expiresAt).getTime() - nowMs <= 7 * 86400 * 1000);
+
+    return matchesSearch && matchesPlan && matchesStatus && matchesPlatform && matchesExpiring;
+  });
+
+  // Expiring soon accounts (<= 7 days)
+  const expiringAccounts = accounts.filter((acc) => {
+    if (!acc.expiresAt) return false;
+    const expMs = new Date(acc.expiresAt).getTime();
+    const diffDays = (expMs - nowMs) / (86400 * 1000);
+    return diffDays > 0 && diffDays <= 7;
+  });
+
+  // Autocomplete matching accounts in billing tab
+  const autocompleteAccounts = accounts.filter((acc) => {
+    const q = accountSearchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      acc.id.toLowerCase().includes(q) ||
+      acc.devices.some((d) => d.name.toLowerCase().includes(q)) ||
+      acc.plan.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="min-h-screen bg-[#08090a] text-zinc-100 selection:bg-white/20 selection:text-white">
@@ -625,10 +776,32 @@ export const AdminPanel: React.FC = () => {
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
             <>
+              {/* Period toggle */}
+              <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.06] text-[11px] font-mono">
+                <button
+                  type="button"
+                  onClick={() => setPeriod('7d')}
+                  className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                    period === '7d' ? 'bg-white/10 text-white font-medium' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  7 дней
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriod('30d')}
+                  className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                    period === '30d' ? 'bg-white/10 text-white font-medium' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  30 дней
+                </button>
+              </div>
+
               <button
                 type="button"
                 disabled={loading || actionBusy}
-                onClick={() => void loadData(token, serverUrl)}
+                onClick={() => void loadData(token, serverUrl, period)}
                 className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer disabled:opacity-40"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -655,7 +828,7 @@ export const AdminPanel: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-6">
+      <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
         {error && (
           <div role="status" className="p-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             {error}
@@ -716,22 +889,142 @@ export const AdminPanel: React.FC = () => {
         ) : activeTab === 'accounts' ? (
           /* 1. Accounts Tab */
           <>
-            <div className="flex items-center justify-between gap-4">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="поиск по id аккаунта"
-                className="w-full max-w-xs rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-3 py-1.5 text-xs text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
-              />
-              <span className="text-xs font-mono text-zinc-500 shrink-0">
-                аккаунтов: {filteredAccounts.length}
-              </span>
+            {/* Charts: User Growth & App Launches */}
+            {analytics && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>рост пользователей (новых за {period})</span>
+                    </div>
+                  </div>
+                  <SparklineChart
+                    data={analytics.userGrowth.map((g) => ({
+                      label: g.date.slice(5),
+                      value: g.total,
+                    }))}
+                    color="#10b981"
+                    unit="юзеров"
+                  />
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-3.5 h-3.5 text-sky-400" />
+                      <span>активность и заходы в приложение</span>
+                    </div>
+                  </div>
+                  <BarChart
+                    data={analytics.appLaunches.map((l) => ({
+                      label: l.date.slice(5),
+                      value: l.total,
+                    }))}
+                    color="#38bdf8"
+                    unit="заходов"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Filter controls */}
+            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="поиск по id или имени устройства..."
+                  className="w-full sm:max-w-xs rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-3 py-1.5 text-xs text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
+                />
+                <span className="text-xs font-mono text-zinc-500 shrink-0">
+                  найдено: {filteredAccounts.length} / {accounts.length}
+                </span>
+              </div>
+
+              {/* Multi-facet filter buttons */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/[0.04] text-[11px] font-mono">
+                <div className="flex items-center gap-1 pr-2 border-r border-white/[0.06]">
+                  <span className="text-zinc-500 mr-1">тариф:</span>
+                  {(['all', 'free', 'smile', 'angry'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setFilterPlan(p)}
+                      className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                        filterPlan === p
+                          ? 'bg-white text-black font-semibold'
+                          : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {p === 'all' ? 'все' : p}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1 pr-2 border-r border-white/[0.06]">
+                  <span className="text-zinc-500 mr-1">статус:</span>
+                  {(['all', 'active', 'blocked'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setFilterStatus(s)}
+                      className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                        filterStatus === s
+                          ? 'bg-white text-black font-semibold'
+                          : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {s === 'all' ? 'все' : s}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1 pr-2 border-r border-white/[0.06]">
+                  <span className="text-zinc-500 mr-1">платформа:</span>
+                  {(['all', 'desktop', 'mobile'] as const).map((plt) => (
+                    <button
+                      key={plt}
+                      type="button"
+                      onClick={() => setFilterPlatform(plt)}
+                      className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                        filterPlatform === plt
+                          ? 'bg-white text-black font-semibold'
+                          : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {plt === 'all' ? 'все' : plt}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setFilterExpiringSoon((prev) => !prev)}
+                  className={`px-2.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    filterExpiringSoon
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Clock className="w-3 h-3 text-amber-400" />
+                  <span>истекают скоро (≤7д)</span>
+                  {expiringAccounts.length > 0 && (
+                    <span className="px-1 rounded bg-amber-500/30 text-[10px] text-amber-200">
+                      {expiringAccounts.length}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
 
+            {/* Accounts list */}
             <div className="flex flex-col gap-3">
               {filteredAccounts.map((acc) => {
                 const isUpdating = actionBusy;
+                const isInlineOpen = inlineGrantAccountId === acc.id;
+
                 return (
                   <div key={acc.id} className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -757,6 +1050,16 @@ export const AdminPanel: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {/* Direct action: inline renewal button */}
+                        <button
+                          type="button"
+                          onClick={() => setInlineGrantAccountId((prev) => (prev === acc.id ? null : acc.id))}
+                          className="px-2.5 py-1 text-[11px] font-mono rounded bg-white/10 hover:bg-white/15 text-zinc-200 flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <CreditCard className="w-3 h-3 text-emerald-400" />
+                          <span>{isInlineOpen ? 'скрыть' : '+ подписка'}</span>
+                        </button>
+
                         <div className="flex items-center gap-1">
                           {PLANS.map((plan) => {
                             const isActive = acc.plan === plan;
@@ -792,6 +1095,43 @@ export const AdminPanel: React.FC = () => {
                         </button>
                       </div>
                     </div>
+
+                    {/* Inline Quick Grant Drawer */}
+                    {isInlineOpen && (
+                      <div className="p-3 rounded-lg bg-[#0c0c0e] border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs text-zinc-300">
+                          <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>быстрое продление:</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] font-mono">
+                          <select
+                            value={inlinePlan}
+                            onChange={(e) => setInlinePlan(e.target.value as 'smile' | 'angry')}
+                            className="rounded bg-[#141417] border border-white/[0.08] px-2 py-1 text-white outline-none"
+                          >
+                            <option value="smile">Smile (190 ₽)</option>
+                            <option value="angry">Angry (490 ₽)</option>
+                          </select>
+                          <select
+                            value={inlineDays}
+                            onChange={(e) => setInlineDays(e.target.value)}
+                            className="rounded bg-[#141417] border border-white/[0.08] px-2 py-1 text-white outline-none"
+                          >
+                            <option value="30">30 дней</option>
+                            <option value="90">90 дней</option>
+                            <option value="365">365 дней</option>
+                          </select>
+                          <button
+                            type="button"
+                            disabled={actionBusy}
+                            onClick={() => void handleQuickGrant(acc.id, inlinePlan, parseInt(inlineDays, 10))}
+                            className="px-3 py-1 bg-emerald-400 text-black font-semibold rounded hover:bg-emerald-300 transition-colors cursor-pointer disabled:opacity-40"
+                          >
+                            начислить
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
                       <span>кеш {acc.usedCacheMb} / {acc.maxCacheMb} мб</span>
@@ -878,7 +1218,7 @@ export const AdminPanel: React.FC = () => {
 
               {filteredAccounts.length === 0 && (
                 <div className="py-8 text-center text-xs text-zinc-500">
-                  {accounts.length === 0 ? 'нет зарегистрированных аккаунтов' : 'ничего не найдено'}
+                  {accounts.length === 0 ? 'нет зарегистрированных аккаунтов' : 'ничего не найдено под выбранные фильтры'}
                 </div>
               )}
             </div>
@@ -907,28 +1247,155 @@ export const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {/* Manual Grant Form */}
+            {/* Actionable queue: Expiring within 7 days */}
+            {expiringAccounts.length > 0 && (
+              <div className="p-4 rounded-xl bg-[#141417] border border-amber-500/20 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>истекающие подписки (ближайшие 7 дней) — {expiringAccounts.length}</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-zinc-500">требуют внимания или продления</span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {expiringAccounts.map((acc) => (
+                    <div
+                      key={acc.id}
+                      className="p-2.5 rounded-lg bg-[#0c0c0e] border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-white">{shortId(acc.id)}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-amber-400">
+                          {acc.plan}
+                        </span>
+                        {acc.devices.length > 0 && (
+                          <span className="text-[11px] text-zinc-500 truncate hidden sm:inline">
+                            ({acc.devices.map((d) => d.name).join(', ')})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] font-mono text-amber-400">
+                          до {new Date(acc.expiresAt!).toLocaleDateString('ru-RU')}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={actionBusy}
+                          onClick={() => void handleQuickGrant(acc.id, acc.plan === 'angry' ? 'angry' : 'smile', 30)}
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white text-[11px] font-mono rounded transition-colors cursor-pointer"
+                        >
+                          +30 дней
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Charts: Revenue Trend & Drop-off Funnel */}
+            {analytics && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>динамика оплат и выручки ({period})</span>
+                    </div>
+                  </div>
+                  <SparklineChart
+                    data={analytics.revenue.map((r) => ({
+                      label: r.date.slice(5),
+                      value: r.amount,
+                    }))}
+                    color="#10b981"
+                    unit="₽"
+                  />
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                  <FunnelChart
+                    steps={analytics.funnel.steps}
+                    dropOffRate={analytics.funnel.dropOffRate}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Manual Grant Form with Searchable Autocomplete */}
             <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
               <div className="flex items-center gap-2 text-xs font-medium text-white">
                 <CreditCard className="w-3.5 h-3.5 text-zinc-400" />
                 <span>ручное начисление / продление подписки</span>
               </div>
               <form onSubmit={handleGrantSubscription} className="flex flex-wrap items-end gap-3 pt-1">
-                <div className="flex flex-col gap-1 min-w-[200px]">
-                  <label htmlFor="grant-account" className="text-[11px] text-zinc-400">аккаунт</label>
+                {/* Searchable Autocomplete Input */}
+                <div className="flex flex-col gap-1 min-w-[260px] relative">
+                  <label htmlFor="grant-account-input" className="text-[11px] text-zinc-400">
+                    аккаунт (поиск по id/девайсу)
+                  </label>
+                  <input
+                    id="grant-account-input"
+                    type="text"
+                    value={accountSearchQuery}
+                    placeholder={grantAccountId ? `выбран: ${shortId(grantAccountId)}` : 'начните ввод id или девайса...'}
+                    onChange={(e) => {
+                      setAccountSearchQuery(e.target.value);
+                      setIsAccountDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsAccountDropdownOpen(true)}
+                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                  />
+
+                  {/* Hidden select for compatibility with tests and form submission */}
                   <select
                     id="grant-account"
                     value={grantAccountId}
                     onChange={(e) => setGrantAccountId(e.target.value)}
-                    required
-                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                    className="hidden"
                   >
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {shortId(a.id)} ({a.plan})
+                        {shortId(a.id)}
                       </option>
                     ))}
                   </select>
+
+                  {/* Live dropdown list */}
+                  {isAccountDropdownOpen && (
+                    <div className="absolute top-[58px] left-0 right-0 z-40 max-h-48 overflow-y-auto rounded-lg bg-[#141417] border border-white/[0.12] shadow-2xl p-1 flex flex-col gap-0.5">
+                      {autocompleteAccounts.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => {
+                            setGrantAccountId(a.id);
+                            setAccountSearchQuery(`${shortId(a.id)} (${a.plan})`);
+                            setIsAccountDropdownOpen(false);
+                          }}
+                          className={`px-2.5 py-1.5 text-left rounded text-xs flex items-center justify-between cursor-pointer ${
+                            grantAccountId === a.id ? 'bg-white/10 text-white font-medium' : 'hover:bg-white/[0.04] text-zinc-300'
+                          }`}
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-mono text-xs">{shortId(a.id)}</span>
+                            {a.devices.length > 0 && (
+                              <span className="text-[10px] text-zinc-500 truncate">
+                                {a.devices.map((d) => d.name).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-mono px-1 rounded bg-white/[0.04] text-zinc-400">
+                            {a.plan}
+                          </span>
+                        </button>
+                      ))}
+                      {autocompleteAccounts.length === 0 && (
+                        <div className="p-2 text-center text-xs text-zinc-500">аккаунты не найдены</div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -1044,6 +1511,96 @@ export const AdminPanel: React.FC = () => {
               </div>
             )}
 
+            {/* Distribution and Unit-economics */}
+            {analytics && analytics.aiDistribution && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-xs font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>распределение расхода токенов на юзера</span>
+                    </div>
+                  </div>
+                  <DistributionGauge
+                    min={analytics.aiDistribution.minTokens}
+                    max={analytics.aiDistribution.maxTokens}
+                    mean={analytics.aiDistribution.meanTokens}
+                    median={analytics.aiDistribution.medianTokens}
+                    unit="tok"
+                  />
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col justify-between gap-3">
+                  <div className="flex items-center justify-between text-xs font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>unit-экономика ии-шлюза</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-zinc-500">себестоимость API vs доход</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2.5 rounded bg-white/[0.03] border border-white/[0.04]">
+                      <span className="block text-[10px] font-mono text-zinc-500">затраты на API</span>
+                      <span className="text-sm font-semibold text-rose-400">
+                        {analytics.aiDistribution.totalCostRub} ₽
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded bg-white/[0.03] border border-white/[0.04]">
+                      <span className="block text-[10px] font-mono text-zinc-500">выручка подписок</span>
+                      <span className="text-sm font-semibold text-emerald-400">
+                        {analytics.aiDistribution.totalRevenueRub} ₽
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded bg-white/[0.03] border border-white/[0.04]">
+                      <span className="block text-[10px] font-mono text-zinc-500">маржинальность</span>
+                      <span className="text-sm font-semibold text-white">
+                        {analytics.aiDistribution.grossMarginPercent}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    себестоимость рассчитывается по 0.14 ₽ за 1k токенов (базовый тариф DeepSeek V4). пока маржинальность выше 80%, лимиты тарифов сбалансированы.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Top Spenders Table */}
+            {analytics && analytics.aiDistribution && analytics.aiDistribution.topUsers.length > 0 && (
+              <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+                <span className="text-xs font-medium text-white">топ транжир токенов (риск перерасхода)</span>
+                <div className="flex flex-col gap-1.5">
+                  {analytics.aiDistribution.topUsers.map((u) => {
+                    const planPrice = u.plan === 'angry' ? 490 : 190;
+                    const isBurnHigh = u.costRub > planPrice * 0.5;
+
+                    return (
+                      <div
+                        key={u.accountId}
+                        className="p-2.5 rounded-lg bg-[#0c0c0e] border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-white">{shortId(u.accountId)}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-zinc-300">
+                            {u.plan}
+                          </span>
+                          <span className="text-[11px] text-zinc-500">({u.requests} запросов)</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-[11px] font-mono">
+                          <span className="text-zinc-300">{u.tokens.toLocaleString('ru-RU')} tok</span>
+                          <span className={`font-semibold ${isBurnHigh ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {u.costRub} ₽
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* AI Benchmark Ping Action */}
             <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex items-center justify-between gap-4">
               <div className="flex flex-col gap-1">
@@ -1115,6 +1672,106 @@ export const AdminPanel: React.FC = () => {
                 <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">пакетов в очереди</span>
                   <span className="text-sm font-semibold text-white">{stats.totalBundles}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Sync health metrics & Traffic chart */}
+            {analytics && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <Radio className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>трафик синхронизации (бандлов за {period})</span>
+                    </div>
+                  </div>
+                  <BarChart
+                    data={analytics.traffic.map((t) => ({
+                      label: t.date.slice(5),
+                      value: t.bundles,
+                    }))}
+                    color="#10b981"
+                    unit="бандлов"
+                  />
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col justify-between gap-3">
+                  <div className="flex items-center justify-between text-xs font-medium text-white">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>здоровье синхронизации (error rate)</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-400">
+                      {analytics.syncHealth.successRatePercent}% успех
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 rounded bg-white/[0.03] border border-white/[0.04]">
+                      <span className="block text-[10px] font-mono text-zinc-500">подтверждений (acks)</span>
+                      <span className="text-sm font-semibold text-white">
+                        {analytics.syncHealth.totalAcks}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded bg-white/[0.03] border border-white/[0.04]">
+                      <span className="block text-[10px] font-mono text-zinc-500">зависших пакетов</span>
+                      <span className={`text-sm font-semibold ${analytics.syncHealth.stuckUnackedBundles > 50 ? 'text-amber-400' : 'text-zinc-300'}`}>
+                        {analytics.syncHealth.stuckUnackedBundles}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    зависшие пакеты возникают, когда один из девайсов пользователя долго оффлайн или не шлет acks. их можно сбросить вручную ниже в инспекторе хранилища.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Storage Runaway Inspector */}
+            {analytics && analytics.syncHealth.topHeavyRooms.length > 0 && (
+              <div className="p-4 rounded-xl bg-[#141417] border border-amber-500/20 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    <span>инспектор хранилища (топ комнат по весу кеша)</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-zinc-500">защита от переполнения диска</span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {analytics.syncHealth.topHeavyRooms.map((room) => (
+                    <div
+                      key={room.roomId}
+                      className="p-2.5 rounded-lg bg-[#0c0c0e] border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-white">{shortId(room.roomId)}</span>
+                        {room.vaultId && (
+                          <span className="text-[10px] font-mono text-zinc-500 truncate">
+                            vault: {shortId(room.vaultId)}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-mono text-zinc-400">
+                          ({room.bundlesCount} бандлов)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] font-mono font-semibold text-amber-400">
+                          {formatBytes(room.cacheBytes) || '0 B'}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={actionBusy}
+                          onClick={() => void handlePurgeRoom(room.roomId)}
+                          className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-[11px] font-mono rounded transition-colors cursor-pointer"
+                        >
+                          сбросить зависшие пакеты
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

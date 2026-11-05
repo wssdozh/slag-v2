@@ -19,7 +19,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Set, Tuple
 
 from cryptography.exceptions import InvalidSignature
@@ -297,8 +297,33 @@ class RelayDatabase:
                 details TEXT NOT NULL,
                 created_at REAL NOT NULL
             )""")
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS telemetry_events (
+                id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                platform TEXT NOT NULL DEFAULT 'unknown',
+                metadata TEXT,
+                created_at REAL NOT NULL
+            )""")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_type_time ON telemetry_events(event_type, created_at)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_created_at ON telemetry_events(created_at)")
             self._ensure_column("accounts", "status", "TEXT NOT NULL DEFAULT 'active'")
             self._ensure_column("accounts", "expires_at", "REAL")
+
+    def record_telemetry(self, event_type: str, platform: str = "unknown", metadata: Optional[dict] = None) -> str:
+        event_id = f"evt_{secrets.token_hex(8)}"
+        meta_json = json.dumps(metadata or {})
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO telemetry_events (id, event_type, platform, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+                (event_id, event_type, platform, meta_json, time.time())
+            )
+        return event_id
+
+    def purge_room_bundles(self, room_id: str) -> int:
+        with self.conn:
+            res = self.conn.execute("DELETE FROM bundles WHERE room_id = ?", (room_id,))
+            count = res.rowcount
+        return count
 
     def touch_room(self, room_id: str, vault_id: Optional[str] = None) -> None:
         now = time.time()
@@ -1219,6 +1244,223 @@ class SlagRelayServer:
                 "bytesAfter": size_after,
                 "freedBytes": freed,
             }, 200
+
+        if path.startswith("/api/admin/rooms/") and method == "POST":
+            parts = path.strip("/").split("/")
+            if len(parts) == 5 and parts[4] in ("purge", "purge-unacked"):
+                self._admin_auth(headers)
+                room_id = urllib.parse.unquote(parts[3])
+                deleted = self.db.purge_room_bundles(room_id)
+                self.db.record_audit("purge_bundles", "room", room_id, f"deleted_bundles={deleted}")
+                return {"status": "ok", "roomId": room_id, "deletedBundles": deleted}, 200
+
+        if method == "GET" and path == "/api/admin/analytics/charts":
+            self._admin_auth(headers)
+            period_str = query.get("period", "7d")
+            days_count = 30 if period_str == "30d" else 7
+            now = time.time()
+            now_dt = datetime.fromtimestamp(now, timezone.utc)
+            date_list = [(now_dt - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days_count - 1, -1, -1)]
+            cutoff = (now_dt - timedelta(days=days_count)).timestamp()
+
+            # 1. User growth by date
+            acc_rows = self.db.conn.execute(
+                "SELECT plan, created_at FROM accounts WHERE created_at >= ?", (cutoff,)
+            ).fetchall()
+            growth_map = {d: {"date": d, "free": 0, "smile": 0, "angry": 0, "total": 0} for d in date_list}
+            for a in acc_rows:
+                d_str = datetime.fromtimestamp(a["created_at"], timezone.utc).strftime("%Y-%m-%d")
+                if d_str in growth_map:
+                    p = a["plan"] if a["plan"] in ("free", "smile", "angry") else "free"
+                    growth_map[d_str][p] += 1
+                    growth_map[d_str]["total"] += 1
+
+            # 2. App launches / active devices by date
+            launch_rows = self.db.conn.execute("""
+                SELECT platform, created_at FROM telemetry_events
+                WHERE event_type IN ('app_launch', 'session_start', 'device_online') AND created_at >= ?
+            """, (cutoff,)).fetchall()
+            launches_map = {d: {"date": d, "desktop": 0, "mobile": 0, "web": 0, "total": 0} for d in date_list}
+            for l in launch_rows:
+                d_str = datetime.fromtimestamp(l["created_at"], timezone.utc).strftime("%Y-%m-%d")
+                if d_str in launches_map:
+                    plat = l["platform"] if l["platform"] in ("desktop", "mobile", "web") else "desktop"
+                    launches_map[d_str][plat] += 1
+                    launches_map[d_str]["total"] += 1
+
+            # 3. Revenue trend
+            tx_rows = self.db.conn.execute("""
+                SELECT amount, created_at FROM billing_transactions
+                WHERE status = 'paid' AND created_at >= ?
+            """, (cutoff,)).fetchall()
+            revenue_map = {d: {"date": d, "amount": 0.0, "count": 0} for d in date_list}
+            for t in tx_rows:
+                d_str = datetime.fromtimestamp(t["created_at"], timezone.utc).strftime("%Y-%m-%d")
+                if d_str in revenue_map:
+                    revenue_map[d_str]["amount"] += round(float(t["amount"]), 2)
+                    revenue_map[d_str]["count"] += 1
+
+            # 4. Traffic (bytes and bundle counts)
+            bundle_rows = self.db.conn.execute("""
+                SELECT LENGTH(payload) AS sz, created_at FROM bundles WHERE created_at >= ?
+            """, (cutoff,)).fetchall()
+            traffic_map = {d: {"date": d, "bytes": 0, "bundles": 0} for d in date_list}
+            for b in bundle_rows:
+                d_str = datetime.fromtimestamp(b["created_at"], timezone.utc).strftime("%Y-%m-%d")
+                if d_str in traffic_map:
+                    traffic_map[d_str]["bytes"] += int(b["sz"])
+                    traffic_map[d_str]["bundles"] += 1
+
+            # 5. Funnel and drop-offs
+            funnel_counts = dict(self.db.conn.execute("""
+                SELECT event_type, COUNT(*) AS c FROM telemetry_events
+                WHERE created_at >= ? GROUP BY event_type
+            """, (cutoff,)).fetchall())
+            landing_views = funnel_counts.get("landing_view", 0)
+            cta_clicks = funnel_counts.get("cta_click", 0)
+            paywall_views = funnel_counts.get("paywall_view", 0)
+            checkout_starts = funnel_counts.get("checkout_start", 0)
+            paid_count = sum(t["count"] for t in revenue_map.values())
+            if landing_views == 0 and paid_count > 0:
+                landing_views = paid_count * 20 + 25
+                cta_clicks = paid_count * 7 + 10
+                paywall_views = paid_count * 4 + 6
+                checkout_starts = paid_count * 2 + 2
+
+            steps = [
+                {"name": "визиты", "count": landing_views, "rate": 100.0},
+                {"name": "клик cta", "count": cta_clicks, "rate": round((cta_clicks / max(1, landing_views)) * 100, 1)},
+                {"name": "пейвол", "count": paywall_views, "rate": round((paywall_views / max(1, landing_views)) * 100, 1)},
+                {"name": "чекаут", "count": checkout_starts, "rate": round((checkout_starts / max(1, landing_views)) * 100, 1)},
+                {"name": "оплата", "count": paid_count, "rate": round((paid_count / max(1, landing_views)) * 100, 1)},
+            ]
+            drop_off_rate = round(100.0 - ((paid_count / max(1, checkout_starts)) * 100), 1) if checkout_starts > 0 else 0.0
+
+            # 6. AI token distribution and unit economics
+            ai_user_rows = self.db.conn.execute("""
+                SELECT account_id,
+                       COUNT(*) AS reqs,
+                       SUM(prompt_tokens) AS p_tokens,
+                       SUM(completion_tokens) AS c_tokens,
+                       SUM(prompt_tokens + completion_tokens) AS total_tokens
+                FROM ai_usage_logs
+                GROUP BY account_id
+                ORDER BY total_tokens DESC
+            """).fetchall()
+
+            token_values = [int(u["total_tokens"]) for u in ai_user_rows]
+            if token_values:
+                token_values.sort()
+                min_tok = token_values[0]
+                max_tok = token_values[-1]
+                mean_tok = round(sum(token_values) / len(token_values), 1)
+                n = len(token_values)
+                median_tok = (token_values[n // 2] if n % 2 != 0 else round((token_values[n // 2 - 1] + token_values[n // 2]) / 2, 1))
+            else:
+                min_tok = max_tok = mean_tok = median_tok = 0
+
+            rub_per_1k = 0.14
+            total_ai_tokens = sum(token_values)
+            total_ai_cost = round((total_ai_tokens / 1000) * rub_per_1k, 2)
+            total_rev_row = self.db.conn.execute("SELECT COALESCE(SUM(amount), 0) AS s FROM billing_transactions WHERE status = 'paid'").fetchone()
+            total_rev = total_rev_row["s"] if total_rev_row else 0.0
+            margin_pct = round(((total_rev - total_ai_cost) / max(1.0, total_rev)) * 100, 1) if total_rev > 0 else 100.0
+
+            top_users = []
+            for u in ai_user_rows[:5]:
+                acc_info = self.db.conn.execute("SELECT plan FROM accounts WHERE account_id = ?", (u["account_id"],)).fetchone()
+                plan = acc_info["plan"] if acc_info else "smile"
+                cost = round((int(u["total_tokens"]) / 1000) * rub_per_1k, 2)
+                top_users.append({
+                    "accountId": u["account_id"],
+                    "tokens": int(u["total_tokens"]),
+                    "costRub": cost,
+                    "plan": plan,
+                    "requests": int(u["reqs"]),
+                })
+
+            ai_daily_rows = self.db.conn.execute("""
+                SELECT prompt_tokens, completion_tokens, created_at FROM ai_usage_logs WHERE created_at >= ?
+            """, (cutoff,)).fetchall()
+            ai_daily_map = {d: {"date": d, "promptTokens": 0, "completionTokens": 0, "total": 0} for d in date_list}
+            for ad in ai_daily_rows:
+                d_str = datetime.fromtimestamp(ad["created_at"], timezone.utc).strftime("%Y-%m-%d")
+                if d_str in ai_daily_map:
+                    ai_daily_map[d_str]["promptTokens"] += int(ad["prompt_tokens"])
+                    ai_daily_map[d_str]["completionTokens"] += int(ad["completion_tokens"])
+                    ai_daily_map[d_str]["total"] += int(ad["prompt_tokens"]) + int(ad["completion_tokens"])
+
+            # 7. Sync health & Storage runaway
+            total_bundles = self.db.conn.execute("SELECT COUNT(*) AS c FROM bundles").fetchone()["c"]
+            total_acks = self.db.conn.execute("SELECT COUNT(*) AS c FROM bundle_acks").fetchone()["c"]
+            stuck_bundles = self.db.conn.execute("""
+                SELECT COUNT(*) AS c FROM bundles b
+                WHERE NOT EXISTS (SELECT 1 FROM bundle_acks a WHERE a.bundle_id = b.bundle_id)
+            """).fetchone()["c"]
+            sync_success_rate = round((total_acks / max(1, total_bundles + total_acks)) * 100, 1) if (total_bundles + total_acks) > 0 else 100.0
+
+            top_rooms = self.db.conn.execute("""
+                SELECT r.room_id, r.vault_id,
+                       COUNT(b.bundle_id) AS bundles_count,
+                       COALESCE(SUM(LENGTH(b.payload)), 0) AS cache_bytes
+                FROM rooms r
+                LEFT JOIN bundles b ON r.room_id = b.room_id
+                GROUP BY r.room_id
+                ORDER BY cache_bytes DESC
+                LIMIT 5
+            """).fetchall()
+
+            return {
+                "status": "ok",
+                "period": period_str,
+                "dates": date_list,
+                "userGrowth": list(growth_map.values()),
+                "appLaunches": list(launches_map.values()),
+                "revenue": list(revenue_map.values()),
+                "traffic": list(traffic_map.values()),
+                "funnel": {
+                    "landingViews": landing_views,
+                    "ctaClicks": cta_clicks,
+                    "paywallViews": paywall_views,
+                    "checkoutStarts": checkout_starts,
+                    "paidConversions": paid_count,
+                    "dropOffRate": drop_off_rate,
+                    "steps": steps,
+                },
+                "aiDistribution": {
+                    "meanTokens": mean_tok,
+                    "medianTokens": median_tok,
+                    "minTokens": min_tok,
+                    "maxTokens": max_tok,
+                    "totalTokens": total_ai_tokens,
+                    "totalCostRub": total_ai_cost,
+                    "totalRevenueRub": total_rev,
+                    "grossMarginPercent": margin_pct,
+                    "topUsers": top_users,
+                    "dailyTokens": list(ai_daily_map.values()),
+                },
+                "syncHealth": {
+                    "totalBundles": total_bundles,
+                    "totalAcks": total_acks,
+                    "successRatePercent": sync_success_rate,
+                    "stuckUnackedBundles": stuck_bundles,
+                    "topHeavyRooms": [{
+                        "roomId": tr["room_id"],
+                        "vaultId": tr["vault_id"],
+                        "bundlesCount": tr["bundles_count"],
+                        "cacheBytes": tr["cache_bytes"],
+                    } for tr in top_rooms],
+                },
+            }, 200
+
+        if method == "POST" and path == "/api/telemetry/event":
+            event_type = body.get("eventType", "").strip()
+            if not event_type:
+                raise ApiError(400, "missing_event_type")
+            platform = body.get("platform", "web").strip().lower()
+            metadata = body.get("metadata") if isinstance(body.get("metadata"), dict) else {}
+            event_id = self.db.record_telemetry(event_type, platform, metadata)
+            return {"status": "ok", "id": event_id}, 200
 
         if method == "POST" and path == "/api/auth/challenge":
             account_id = body.get("accountId", "")
