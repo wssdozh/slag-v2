@@ -698,7 +698,8 @@ class RelayDatabase:
 
 
 class SlagRelayServer:
-    def __init__(self, host: str, port: int, db_path: str, require_account_auth: Optional[bool] = None):
+    def __init__(self, host: str, port: int, db_path: str, require_account_auth: Optional[bool] = None,
+                 admin_token: Optional[str] = None):
         self.host = host
         self.port = port
         self.start_time = time.time()
@@ -710,12 +711,15 @@ class SlagRelayServer:
                 raise ValueError("SLAG_REQUIRE_ACCOUNT_AUTH must be a boolean")
             require_account_auth = value in ("1", "true", "yes", "on")
         self.require_account_auth = require_account_auth
+        if admin_token is None:
+            admin_token = os.environ.get("SLAG_ADMIN_TOKEN")
+        self.admin_token = admin_token.strip() if admin_token and admin_token.strip() else None
         self.db = RelayDatabase(db_path)
 
     def _cors_headers(self) -> str:
         return ("Access-Control-Allow-Origin: *\r\n"
                 "Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\r\n"
-                "Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With\r\n")
+                "Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Token\r\n")
 
     def _http_response(self, status_code: int, status_text: str, content_type: str, body: bytes) -> bytes:
         headers = [f"HTTP/1.1 {status_code} {status_text}", f"Content-Type: {content_type}",
@@ -749,6 +753,13 @@ class SlagRelayServer:
         if not auth:
             raise ApiError(401, "unauthorized")
         return auth
+
+    def _admin_auth(self, headers: dict) -> None:
+        if not self.admin_token:
+            raise ApiError(403, "admin_not_configured")
+        token = headers.get("x-admin-token", "").strip() or self._bearer(headers)
+        if not token or not secrets.compare_digest(token, self.admin_token):
+            raise ApiError(401, "invalid_admin_token")
 
     @staticmethod
     def _validate_account_id(account_id: str) -> None:
@@ -906,6 +917,49 @@ class SlagRelayServer:
             return {"status": "ok", "service": "slag-relay", "version": "0.2.0",
                     "uptime": int(time.time() - self.start_time), "activeRooms": len(self.rooms),
                     "timestamp": int(time.time()), "authRequired": self.require_account_auth}, 200
+
+        if method == "GET" and path == "/api/admin/stats":
+            self._admin_auth(headers)
+            accounts_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM accounts").fetchone()["c"]
+            devices_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM devices").fetchone()["c"]
+            bundles_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM bundles").fetchone()["c"]
+            total_cache = self.db.conn.execute("SELECT COALESCE(SUM(LENGTH(payload)), 0) AS s FROM bundles").fetchone()["s"]
+            return {
+                "status": "ok",
+                "uptime": int(time.time() - self.start_time),
+                "totalAccounts": accounts_count,
+                "totalDevices": devices_count,
+                "activeRooms": len(self.rooms),
+                "totalBundles": bundles_count,
+                "totalCacheBytes": total_cache,
+            }, 200
+
+        if method == "GET" and path == "/api/admin/accounts":
+            self._admin_auth(headers)
+            rows = self.db.conn.execute("SELECT account_id, created_at FROM accounts ORDER BY created_at DESC").fetchall()
+            accounts_list = []
+            for r in rows:
+                acc_id = r["account_id"]
+                p = self.db.account_payload(acc_id)
+                p["createdAt"] = iso_time(r["created_at"])
+                p["devices"] = self.db.list_devices(acc_id)
+                accounts_list.append(p)
+            return {"status": "ok", "accounts": accounts_list}, 200
+
+        if path.startswith("/api/admin/accounts/"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and method == "PATCH":
+                self._admin_auth(headers)
+                account_id = urllib.parse.unquote(parts[3])
+                plan_name = body.get("plan")
+                if plan_name not in PLANS:
+                    raise ApiError(400, "invalid_plan")
+                account = self.db.conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
+                if not account:
+                    raise ApiError(404, "account_not_found")
+                with self.db.conn:
+                    self.db.conn.execute("UPDATE accounts SET plan = ? WHERE account_id = ?", (plan_name, account_id))
+                return {"status": "ok", "account": self.db.account_payload(account_id)}, 200
 
         if method == "POST" and path == "/api/auth/challenge":
             account_id = body.get("accountId", "")
@@ -1392,8 +1446,9 @@ def main() -> None:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--db", default="data/relay.db")
+    parser.add_argument("--admin-token", default=os.environ.get("SLAG_ADMIN_TOKEN"))
     args = parser.parse_args()
-    relay = SlagRelayServer(args.host, args.port, args.db)
+    relay = SlagRelayServer(args.host, args.port, args.db, admin_token=args.admin_token)
     try:
         asyncio.run(relay.run())
     except KeyboardInterrupt:

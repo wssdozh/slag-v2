@@ -37,6 +37,9 @@ const LandingPage = lazy(() =>
 const AccountCabinet = lazy(() =>
   import('./components/Account/AccountCabinet').then((m) => ({ default: m.AccountCabinet }))
 );
+const AdminPanel = lazy(() =>
+  import('./components/Admin/AdminPanel').then((m) => ({ default: m.AdminPanel }))
+);
 
 const AppContent: React.FC = () => {
   const {
@@ -121,6 +124,16 @@ const AppContent: React.FC = () => {
       <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
         <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
           <AccountCabinet />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (currentPage === 'admin') {
+    return (
+      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
+        <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+          <AdminPanel />
         </Suspense>
       </div>
     );
