@@ -39,11 +39,15 @@ test.describe('Sync Device Access Control & Registration', () => {
       await page.locator('button[title*="Настройки"], button:has-text("Настройки")').first().click();
       const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
       await expect(settingsModal).toBeVisible();
-      await settingsModal.locator('button', { hasText: 'Синхронизация' }).click();
+      await settingsModal.locator('button', { hasText: 'Устройства' }).click();
     }
 
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
+    const devicesTab = settingsModal.locator('button[data-tab="devices"]');
+    if (await devicesTab.isVisible()) {
+      await devicesTab.click();
+    }
 
     // Verify trusted device row is visible
     const deviceRow = settingsModal.locator('text=Ноутбук (Linux)');

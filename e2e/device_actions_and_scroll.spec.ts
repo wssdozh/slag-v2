@@ -50,14 +50,17 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
     await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
 
     // 3. Test Sync Mode Toggle (Read-Write vs Receive-Only) on the current device
-    const syncModeBtn = settingsModal.locator('button', { hasText: 'Полный доступ' }).first();
+    const devicesTabBtn = settingsModal.locator('button[data-tab="devices"]');
+    await devicesTabBtn.click();
+
+    const syncModeBtn = settingsModal.locator('button', { hasText: /Чтение и запись|Полный доступ/ }).first();
     await expect(syncModeBtn).toBeVisible();
     await syncModeBtn.click();
     await expect(settingsModal.locator('button', { hasText: 'Только чтение' }).first()).toBeVisible();
 
     // Toggle back to Read-Write
     await settingsModal.locator('button', { hasText: 'Только чтение' }).first().click();
-    await expect(settingsModal.locator('button', { hasText: 'Полный доступ' }).first()).toBeVisible();
+    await expect(settingsModal.locator('button', { hasText: /Чтение и запись|Полный доступ/ }).first()).toBeVisible();
 
     // Take screenshot of Device Actions UI
     await page.screenshot({
@@ -66,6 +69,7 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
     });
 
     // 4. Test Panic Re-keying (Key Rotation)
+    await syncTabBtn.click();
     page.once('dialog', async (dialog) => {
       expect(dialog.message()).toContain('Сменить ключ хранилища');
       await dialog.accept();

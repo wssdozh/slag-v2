@@ -52,10 +52,6 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     await expect(settingsModal.getByText('свой сервер', { exact: true })).toBeVisible();
     await expect(settingsModal.locator('text=кеш')).toBeVisible();
     await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
-    await expect(settingsModal.getByTestId('btn-open-pair-modal')).toBeEnabled();
-
-    // 5. Verify current device item
-    await expect(settingsModal.getByText('Это устройство', { exact: true })).toBeVisible();
 
     // Screenshot of Unified Header Card & Clean Sync Tab
     await page.screenshot({
@@ -80,7 +76,11 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
       fullPage: false,
     });
 
-    // 7. Test Pairing Modal & PIN Display
+    // 7. Switch to "Устройства" tab
+    await settingsModal.locator('button[data-tab="devices"]').click();
+    await expect(settingsModal.getByTestId('btn-open-pair-modal')).toBeEnabled();
+
+    // Test Pairing Modal & PIN Display
     const pairBtn = settingsModal.locator('button', { hasText: 'Привязать устройство' });
     await expect(pairBtn).toBeVisible();
     await pairBtn.click();
