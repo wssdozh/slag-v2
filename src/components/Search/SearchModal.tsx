@@ -12,7 +12,8 @@ import {
   Search,
   X,
   FileText,
-  CheckSquare,
+  Circle,
+  CheckCircle2,
   StickyNote,
   CornerDownLeft,
   Folder,
@@ -169,8 +170,9 @@ const SearchDialog: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsSearchOpen(false)}
-        className="md:hidden p-1 -ml-1 text-zinc-400 hover:text-white cursor-pointer"
+        className="md:hidden w-10 h-10 -ml-2 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white active:scale-95 transition-all cursor-pointer shrink-0"
         title="Назад"
+        aria-label="Закрыть поиск"
       >
         <ArrowLeft className="w-5 h-5" />
       </button>
@@ -290,7 +292,7 @@ const SearchDialog: React.FC = () => {
                       </kbd>
                     )}
                     {isSelected && (
-                      <CornerDownLeft className="w-3 h-3 text-zinc-400" />
+                      <CornerDownLeft className="w-3 h-3 text-zinc-400 hidden [@media(pointer:fine)]:block" />
                     )}
                   </div>
                 </div>
@@ -318,7 +320,11 @@ const SearchDialog: React.FC = () => {
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   {item.type === 'task' && (
-                    <CheckSquare className="w-4 h-4 text-amber-400 shrink-0" />
+                    item.status === 'done' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" aria-label="Таска выполнена" />
+                    ) : (
+                      <Circle className="w-4 h-4 text-zinc-500 shrink-0" aria-label="Таска к выполнению" />
+                    )
                   )}
                   {item.type === 'article' && (
                     <FileText className="w-4 h-4 text-blue-400 shrink-0" />
@@ -353,7 +359,7 @@ const SearchDialog: React.FC = () => {
                     {item.folder}
                   </span>
                   {isSelected && (
-                    <CornerDownLeft className="w-3 h-3 text-zinc-400" />
+                    <CornerDownLeft className="w-3 h-3 text-zinc-400 hidden [@media(pointer:fine)]:block" />
                   )}
                 </div>
               </div>
