@@ -24,6 +24,7 @@ import type {
   FolderViewSettings,
 } from '../types';
 import { storage } from '../lib/storage';
+import { applyTaskCompletion } from '../lib/taskCompletion';
 import { backupService } from '../lib/backupService';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
@@ -177,6 +178,7 @@ interface AppContextType {
   // Storage operations
   saveItem: (item: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }) => SlagItem;
   updateItem: (item: SlagItem) => void;
+  openNewNote: (folder: string) => void;
   deleteItem: (id: string) => void;
   restoreFromTrash: (id: string) => void;
   toggleTaskComplete: (itemId: string, subtaskId?: string) => void;
@@ -1369,10 +1371,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved;
   }, [currentFolder, refreshData]);
 
+  const openNewNote = useCallback((folder: string) => {
+    const now = Date.now();
+    setSelectedItem({
+      id: 'draft_' + now, title: '', content: '', type: 'note',
+      folder: folder || 'Входящие', tags: [], attachments: [], createdAt: now, updatedAt: now,
+    });
+    setIsFullscreenEditorOpen(true);
+  }, []);
+
   const updateItem = useCallback((item: SlagItem) => {
-    storage.saveItem(item);
+    const previous = storage.getItems().find(existing => existing.id === item.id);
+    const updated = previous ? applyTaskCompletion(previous, item) : item;
+    const saved = storage.saveItem(updated);
     if (selectedItem?.id === item.id) {
-      setSelectedItem(item);
+      setSelectedItem(saved);
     }
     refreshData();
   }, [selectedItem, refreshData]);
@@ -1420,7 +1433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [items, refreshData, addToast]);
 
   const toggleTaskComplete = useCallback((itemId: string, subtaskId?: string) => {
-    const item = items.find(i => i.id === itemId);
+    const item = storage.getItems().find(i => i.id === itemId);
     if (!item) return;
 
     if (subtaskId && (item.subtasks || item.content)) {
@@ -1441,25 +1454,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every(st => st.completed);
       const newStatus = allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status;
 
-      let streak = item.streak;
-      let history = item.history;
-      let lastCompletedDate = item.lastCompletedDate;
-
-      if (item.recurrence && allDone && item.status !== 'done') {
-        const todayStr = getISODateString(new Date());
-        streak = (streak ?? 0) + 1;
-        history = Array.from(new Set([...(history || []), todayStr]));
-        lastCompletedDate = todayStr;
-      }
-
       updateItem({
         ...item,
         content: updatedContent,
         subtasks: updatedSubtasks,
         status: newStatus,
-        streak,
-        history,
-        lastCompletedDate,
       });
     } else {
       const isCurrentlyDone = item.status === 'done';
@@ -1473,46 +1472,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             completed: newStatus === 'done',
           }));
 
-      let streak = item.streak;
-      let history = item.history;
-      let lastCompletedDate = item.lastCompletedDate;
-
-      if (item.recurrence) {
-        const todayStr = getISODateString(new Date());
-        if (newStatus === 'done') {
-          streak = (streak ?? 0) + 1;
-          history = Array.from(new Set([...(history || []), todayStr]));
-          lastCompletedDate = todayStr;
-        } else {
-          // Unchecking task on the same day reverts completion & streak increment
-          if (lastCompletedDate === todayStr) {
-            streak = Math.max(0, (streak ?? 1) - 1);
-            history = (history || []).filter(d => d !== todayStr);
-            lastCompletedDate = history.length > 0 ? history[history.length - 1] : undefined;
-          }
-        }
-      }
-
       updateItem({
         ...item,
         content: updatedContent,
         status: newStatus,
         subtasks: updatedSubtasks,
-        streak,
-        history,
-        lastCompletedDate,
       });
 
       if (newStatus === 'done') {
-        const toastText = item.recurrence && streak !== undefined
-          ? `Таска выполнена (🔥 ${streak})`
+        const completed = storage.getItems().find(existing => existing.id === itemId);
+        const toastText = item.recurrence && completed && completed.streak !== undefined
+          ? `Таска выполнена (🔥 ${completed.streak})`
           : 'Таска выполнена';
         addToast(toastText, 'success');
       } else {
         addToast('Таска возобновлена', 'info');
       }
     }
-  }, [items, updateItem, addToast]);
+  }, [updateItem, addToast]);
 
   const completeTaskForever = useCallback((itemId: string) => {
     const item = items.find(i => i.id === itemId);
@@ -2313,6 +2290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetCurrentFolderViewSettings,
         saveItem,
         updateItem,
+        openNewNote,
         deleteItem,
         restoreFromTrash,
         toggleTaskComplete,

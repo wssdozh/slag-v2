@@ -35,7 +35,7 @@ test.describe('Recurring Tasks & Streak Engine E2E Verification', () => {
     });
 
     // Toggle completion directly in feed
-    const checkbox = taskCard.locator('button[aria-label="Изменить статус задачи"]');
+    const checkbox = taskCard.locator('button[aria-label="Изменить статус таски"]');
     await checkbox.click();
 
     // Verify completion toast
@@ -72,7 +72,7 @@ test.describe('Recurring Tasks & Streak Engine E2E Verification', () => {
 
     const taskCard = page.locator('.group', { hasText: taskTitle });
     await expect(taskCard).toBeVisible();
-    const checkbox = taskCard.locator('button[aria-label="Изменить статус задачи"]');
+    const checkbox = taskCard.locator('button[aria-label="Изменить статус таски"]');
     const streakBadge = taskCard.locator('span[title*="Серия"]');
 
     // Rapid toggle sequence 4 times

@@ -20,8 +20,7 @@ export const MobileFolderInfoView: React.FC = () => {
     openEditFolderModal,
     openLightbox,
     setActiveTagFilter,
-    setIsFullscreenEditorOpen,
-    setSelectedItem,
+    openNewNote,
     setIsTriageModalOpen
   } = useApp();
 
@@ -33,19 +32,7 @@ export const MobileFolderInfoView: React.FC = () => {
 
   const handleCreateNote = () => {
     setMobileFolderInfoOpen(false);
-    const draftItem = {
-      id: 'draft_' + Date.now(),
-      title: '',
-      content: '',
-      type: 'note' as const,
-      folder: currentFolder || 'Входящие',
-      tags: [],
-      attachments: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    setSelectedItem(draftItem);
-    setIsFullscreenEditorOpen(true);
+    openNewNote(currentFolder);
   };
 
   return (

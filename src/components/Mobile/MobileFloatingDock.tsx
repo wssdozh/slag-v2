@@ -32,28 +32,14 @@ export const MobileFloatingDock: React.FC = () => {
     setActiveMobileTab,
     mobileDockTabs,
     items,
-    setSelectedItem,
-    setIsFullscreenEditorOpen,
+    openNewNote,
     currentFolder
   } = useApp();
 
   const unsortedCount = items.filter(i => i.folder === 'Входящие').length;
 
   const handleFabClick = () => {
-    // Open full focus draft in current folder
-    const draftItem = {
-      id: 'draft_' + Date.now(),
-      title: '',
-      content: '',
-      type: 'note' as const,
-      folder: currentFolder || 'Входящие',
-      tags: [],
-      attachments: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    setSelectedItem(draftItem);
-    setIsFullscreenEditorOpen(true);
+    openNewNote(currentFolder);
   };
 
   return (

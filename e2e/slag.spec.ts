@@ -64,10 +64,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // Find task card
     const taskCard = page.locator('.group', { hasText: taskTitle });
     await expect(taskCard).toBeVisible();
-    await expect(taskCard.locator('button[aria-label="Изменить статус задачи"]')).toBeVisible();
+    await expect(taskCard.locator('button[aria-label="Изменить статус таски"]')).toBeVisible();
 
     // Toggle completion directly in feed
-    const checkbox = taskCard.locator('button[aria-label="Изменить статус задачи"]');
+    const checkbox = taskCard.locator('button[aria-label="Изменить статус таски"]');
     await checkbox.click();
 
     // Verify completion status change via toast or styling
@@ -794,7 +794,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(createdCard.getByRole('button', { name: '#culture' })).toBeVisible();
 
     // Verify task checkbox is present
-    await expect(createdCard.locator('button[aria-label="Изменить статус задачи"]')).toBeVisible();
+    await expect(createdCard.locator('button[aria-label="Изменить статус таски"]')).toBeVisible();
 
     // Verify task priority badge is present
     await expect(createdCard.locator('[aria-label*="Средний"]')).toBeVisible();

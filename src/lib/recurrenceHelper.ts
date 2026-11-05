@@ -12,8 +12,14 @@ export const RECURRENCE_PRESETS: Array<{ label: string; rule: RecurrenceRule }> 
 ];
 
 export function parseISODateString(dateStr: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return new Date(NaN);
   const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0);
+  const date = new Date(0);
+  date.setHours(12, 0, 0, 0);
+  date.setFullYear(y, m - 1, d);
+  return y >= 1 && date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
+    ? date
+    : new Date(NaN);
 }
 
 /**
@@ -69,7 +75,11 @@ export function computeNextStrictOccurrenceDate(
   recurrence: RecurrenceRule
 ): string {
   const baseDate = parseISODateString(baseDueDate);
-  const interval = Math.max(1, recurrence.interval || 1);
+  if (!Number.isFinite(baseDate.getTime())) return baseDueDate;
+  const rawInterval = recurrence.interval;
+  const interval = rawInterval !== undefined && Number.isSafeInteger(rawInterval) && rawInterval >= 1
+    ? rawInterval
+    : 1;
   let nextDate = new Date(baseDate);
 
   switch (recurrence.freq) {
@@ -86,22 +96,15 @@ export function computeNextStrictOccurrenceDate(
     }
 
     case 'weekly': {
-      if (recurrence.weekdays && recurrence.weekdays.length > 0) {
-        const targetDays = new Set(recurrence.weekdays);
-        let found = false;
-        // Search up to 3 weeks ahead for the next matching weekday
-        for (let i = 1; i <= 21; i++) {
-          const candidate = new Date(baseDate);
-          candidate.setDate(candidate.getDate() + i);
-          if (targetDays.has(getIsoWeekday(candidate))) {
-            nextDate = candidate;
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          nextDate.setDate(nextDate.getDate() + 7 * interval);
-        }
+      const days = [...new Set(recurrence.weekdays || [])]
+        .filter(day => Number.isInteger(day) && day >= 1 && day <= 7)
+        .sort((a, b) => a - b);
+      if (days.length > 0) {
+        const weekday = getIsoWeekday(baseDate);
+        const laterDay = days.find(day => day > weekday);
+        // Selected days share an active ISO week; interval skips whole inactive weeks.
+        const offset = laterDay !== undefined ? laterDay - weekday : 7 * interval - weekday + days[0];
+        nextDate.setDate(nextDate.getDate() + offset);
       } else {
         nextDate.setDate(nextDate.getDate() + 7 * interval);
       }
@@ -120,6 +123,7 @@ export function computeNextStrictOccurrenceDate(
 
     case 'yearly': {
       nextDate.setFullYear(nextDate.getFullYear() + interval);
+      if (nextDate.getMonth() !== baseDate.getMonth()) nextDate.setDate(0);
       break;
     }
 
@@ -129,12 +133,38 @@ export function computeNextStrictOccurrenceDate(
     }
   }
 
-  return getISODateString(nextDate);
+  // Invalid/overflowing input must never create a non-advancing recurrence loop.
+  return Number.isFinite(nextDate.getTime()) && nextDate.getFullYear() <= 9999
+    ? getISODateString(nextDate)
+    : baseDueDate;
+}
+
+function occurrenceOnOrAfter(baseDueDate: string, recurrence: RecurrenceRule, target: string): string {
+  let current = baseDueDate;
+  while (current < target) {
+    const next = computeNextStrictOccurrenceDate(current, recurrence);
+    if (next <= current) return current;
+    current = next;
+  }
+  return current;
+}
+
+function moveReminder(reminder: string | undefined, fromDueDate: string, toDueDate: string): string | undefined {
+  if (!reminder) return undefined;
+  const original = new Date(reminder);
+  const from = parseISODateString(fromDueDate);
+  const to = parseISODateString(toDueDate);
+  if (![original, from, to].every(date => Number.isFinite(date.getTime()))) return reminder;
+  const dayOffset = Math.round((Date.UTC(original.getFullYear(), original.getMonth(), original.getDate())
+    - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 86400000);
+  to.setDate(to.getDate() + dayOffset);
+  to.setHours(original.getHours(), original.getMinutes(), original.getSeconds(), original.getMilliseconds());
+  return Number.isFinite(to.getTime()) ? to.toISOString() : reminder;
 }
 
 /**
  * Computes the next occurrence date for a recurring task when completed or rescheduled.
- * If the task is overdue (currentDueDate < today), advances to the next future occurrence.
+ * If overdue, advances along the existing schedule to its first occurrence on or after the reference day.
  */
 export function computeNextOccurrence(
   currentDueDate: string,
@@ -142,25 +172,11 @@ export function computeNextOccurrence(
   currentTimeIso?: string,
   referenceDate: Date = new Date()
 ): { nextDueDate: string; nextReminder?: string } {
-  const todayStr = getISODateString(referenceDate);
-  const baseDueDate = currentDueDate < todayStr ? todayStr : currentDueDate;
-  const nextDueDate = computeNextStrictOccurrenceDate(baseDueDate, recurrence);
-  let nextReminder: string | undefined = undefined;
-
-  if (currentTimeIso) {
-    try {
-      const orig = new Date(currentTimeIso);
-      const nextDate = parseISODateString(nextDueDate);
-      if (!isNaN(orig.getTime())) {
-        const nextDt = new Date(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate(), orig.getHours(), orig.getMinutes(), 0, 0);
-        nextReminder = nextDt.toISOString();
-      }
-    } catch {
-      // fallback
-    }
-  }
-
-  return { nextDueDate, nextReminder };
+  const firstNext = computeNextStrictOccurrenceDate(currentDueDate, recurrence);
+  const nextDueDate = Number.isFinite(referenceDate.getTime())
+    ? occurrenceOnOrAfter(firstNext, recurrence, getISODateString(referenceDate))
+    : firstNext;
+  return { nextDueDate, nextReminder: moveReminder(currentTimeIso, currentDueDate, nextDueDate) };
 }
 
 /**
@@ -173,15 +189,15 @@ export function getRecurringOccurrencesInRange(
   endRangeStr: string,
   maxCount: number = 50
 ): string[] {
-  if (!task.recurrence || !task.dueDate) return [];
+  if (!task.recurrence || !task.dueDate || !Number.isSafeInteger(maxCount) || maxCount < 1
+    || ![task.dueDate, startRangeStr, endRangeStr].every(date => Number.isFinite(parseISODateString(date).getTime()))
+    || startRangeStr > endRangeStr) return [];
 
   const occurrences: string[] = [];
   let currentDue = task.dueDate;
-  let count = 0;
 
-  while (count < maxCount) {
-    count++;
-    const { nextDueDate } = computeNextOccurrence(currentDue, task.recurrence, task.reminder);
+  while (occurrences.length < maxCount) {
+    const nextDueDate = computeNextStrictOccurrenceDate(currentDue, task.recurrence);
     if (nextDueDate <= currentDue) break; // Infinite loop safeguard
     currentDue = nextDueDate;
 
@@ -201,7 +217,7 @@ export function getRecurringOccurrencesInRange(
  *    resetting status to 'todo', resetting subtasks (if resetSubtasks is true),
  *    bumping createdAt to now so it drops as a fresh message into today's feed,
  *    and maintaining streak.
- * 2. Rolling over overdue uncompleted tasks (dueDate < today) to today,
+ * 2. Rolling over overdue uncompleted tasks to the first scheduled date on or after today,
  *    bumping createdAt to now, and resetting streak to 0 with red-tint indicator.
  *
  * ponytail: in-memory scan across items array on date change, upgrade to indexed cursor if vault items exceed 10,000
@@ -213,9 +229,11 @@ export function evaluateRecurringTasks(
   const todayStr = getISODateString(referenceDate);
   const nowTs = referenceDate.getTime();
   let changedCount = 0;
+  if (!Number.isFinite(nowTs)) return { updatedItems: items, changedCount };
 
   const updatedItems = items.map(item => {
-    if (item.type !== 'task' || !item.recurrence || !item.dueDate) {
+    if (item.type !== 'task' || !item.recurrence || !item.dueDate
+      || !Number.isFinite(parseISODateString(item.dueDate).getTime())) {
       return item;
     }
 
@@ -226,14 +244,16 @@ export function evaluateRecurringTasks(
       const nextDue = computeNextStrictOccurrenceDate(item.dueDate, item.recurrence);
 
       // If next recurrence date hasn't arrived yet, keep it done where it is
-      if (todayStr < nextDue) {
+      if (nextDue <= item.dueDate || todayStr < nextDue) {
         return item;
       }
 
       // Next due date has arrived
+      // ponytail: no persisted anchor/history; advance the existing clamped schedule, not an invented day.
+      const targetDueDate = occurrenceOnOrAfter(nextDue, item.recurrence, todayStr);
+      if (targetDueDate < todayStr) return item;
       changedCount++;
       const isExactOrNextCycle = todayStr === nextDue;
-      const targetDueDate = isExactOrNextCycle ? nextDue : todayStr;
       // If user was absent for multiple cycles, streak resets to 0; otherwise kept
       const newStreak = isExactOrNextCycle ? (item.streak ?? 1) : 0;
 
@@ -252,6 +272,7 @@ export function evaluateRecurringTasks(
         ...item,
         status: 'todo' as const,
         dueDate: targetDueDate,
+        reminder: moveReminder(item.reminder, item.dueDate, targetDueDate),
         streak: newStreak,
         content: updatedContent,
         subtasks: updatedSubtasks,
@@ -260,13 +281,16 @@ export function evaluateRecurringTasks(
       };
     }
 
-    // Case 2: Overdue uncompleted task -> Rollover to today & reset streak
+    // Case 2: Missed task -> next scheduled date on/after today, preserving schedule phase.
     if (item.dueDate < todayStr) {
+      const targetDueDate = occurrenceOnOrAfter(item.dueDate, item.recurrence, todayStr);
+      if (targetDueDate < todayStr) return item;
       changedCount++;
       return {
         ...item,
         status: 'todo' as const,
-        dueDate: todayStr,
+        dueDate: targetDueDate,
+        reminder: moveReminder(item.reminder, item.dueDate, targetDueDate),
         streak: 0,
         createdAt: nowTs,
         updatedAt: nowTs,
