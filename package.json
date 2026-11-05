@@ -16,6 +16,7 @@
     "android:log": "adb logcat -s RustStdoutStderr:V SLAG:* chromium:I",
     "lint": "oxlint",
     "test:e2e": "playwright test",
+    "shots": "playwright test e2e/quick_shots.spec.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },
