@@ -34,6 +34,8 @@ test.describe('Back Navigation Engine: Desktop Mouse Back & Keyboard', () => {
   });
 
   test('Desktop: UI Dismiss (Escape) keeps history stack synchronized', async ({ page }) => {
+    const initialUrl = page.url();
+
     // Open Search
     await page.keyboard.press('Control+k');
     const searchInput = page.locator('input[placeholder*="Поиск по заметкам"]');
@@ -50,7 +52,7 @@ test.describe('Back Navigation Engine: Desktop Mouse Back & Keyboard', () => {
     await expect(searchInput).toBeHidden();
 
     // Verify app URL is unchanged and no crash
-    expect(page.url()).toContain('5173');
+    expect(page.url()).toBe(initialUrl);
   });
 });
 
@@ -87,7 +89,7 @@ test.describe('Back Navigation Engine: Mobile Touch, Gestures & PopState', () =>
 
     // Switch to Tasks tab
     await dock.locator('button[aria-label="Таски"]').click();
-    await expect(page.locator('h1', { hasText: 'Задачи' })).toBeVisible();
+    await expect(page.locator('h1', { hasText: 'Таски' })).toBeVisible();
 
     // Emulate system back
     await page.goBack();

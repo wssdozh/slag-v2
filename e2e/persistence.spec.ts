@@ -187,7 +187,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     await expect(editorModal).toBeVisible({ timeout: 5000 });
 
     // 2. Type unique title and in-flight draft content
-    const titleInput = page.locator('header ~ div input[placeholder*="Заголовок"], header ~ div input[placeholder*="Название"]').first();
+    const titleInput = page.locator('[data-testid="fullscreen-editor-modal"] textarea[placeholder*="Заголовок"], [data-testid="fullscreen-editor-modal"] textarea[placeholder*="Название"]').first();
     await titleInput.click();
     await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.type('Персистентный черновик фуллсайза');
@@ -210,7 +210,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     await expect(editorModal).toBeVisible({ timeout: 5000 });
 
     // 6. Verify in-flight draft title and content were restored
-    const reloadedTitle = page.locator('header ~ div input[placeholder*="Заголовок"], header ~ div input[placeholder*="Название"]').first();
+    const reloadedTitle = page.locator('[data-testid="fullscreen-editor-modal"] textarea[placeholder*="Заголовок"], [data-testid="fullscreen-editor-modal"] textarea[placeholder*="Название"]').first();
     await expect(reloadedTitle).toHaveValue('Персистентный черновик фуллсайза');
 
     const reloadedCm = page.locator('.cm-content').first();
@@ -224,7 +224,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     await page.screenshot({ path: 'test-results/screenshots/fullscreen_restored_after_reload.png' });
 
     // 8. Save and close
-    await page.locator('header button', { hasText: 'Сохранить' }).click();
+    await page.locator('header button[title*="Сохранить изменения"]').click();
     await expect(editorModal).not.toBeVisible();
 
     // 9. Reload again - editor should stay closed

@@ -520,12 +520,12 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await groqProviderBtn.click();
 
     // Verify gpt-oss-120b model option exists
-    const modelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /OpenAI GPT-OSS 120B/ });
+    const modelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /GPT-OSS 120B/ });
     await expect(modelSelect).toBeVisible();
 
     // Verify Tag Taxonomy controls exist
-    await expect(settingsModal.locator('text=Норма таксономии и правила тегирования')).toBeVisible();
-    await expect(settingsModal.locator('text=Максимум тегов на запись')).toBeVisible();
+    await expect(settingsModal.locator('text=Правила тегов')).toBeVisible();
+    await expect(settingsModal.locator('text=Лимит тегов на запись')).toBeVisible();
     await expect(settingsModal.locator('text=Стиль регистра тегов')).toBeVisible();
     await expect(settingsModal.locator('text=Разрешить ИИ создавать новые теги')).toBeVisible();
 
@@ -611,8 +611,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(page.locator('h3', { hasText: 'В работе' })).toBeVisible();
     await expect(page.locator('h3', { hasText: 'Выполнено' })).toBeVisible();
 
-    // 4. Create a task inline via "+ Новая задача" button placed directly under cards
-    const addBtn = page.locator('button[title="Добавить задачу в К выполнению"]').first();
+    // 4. Create a task inline via the column "+" button (title reflects the unified "таска" term)
+    const addBtn = page.locator('[data-testid="kanban-column-todo"] button[title="Добавить таску в К выполнению"]').first();
     await addBtn.click();
 
     const input = page.locator('[placeholder*="Название таски"]');
@@ -772,7 +772,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // 6. Test removing date via right click on toolbar button
     await dueDateBtn.click({ button: 'right' });
-    await expect(page.locator('button[title="Установить срок задачи"]')).toBeVisible();
+    await expect(page.locator('button[title="Установить срок таски"]')).toBeVisible();
 
     // 7. Retype and send task via Enter
     await composerTextarea.fill('');
@@ -1454,10 +1454,10 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await settingsModal.getByTestId('ai-source-byok').click();
 
     await expect(settingsModal.locator('text=Глубина рассуждений').first()).toBeVisible();
-    await expect(settingsModal.locator('text=Автоматизация и поиск')).toBeVisible();
-    await expect(settingsModal.locator('text=Автоматический подбор тегов')).toBeVisible();
-    await expect(settingsModal.locator('text=Интеллектуальная диспетчеризация (AI Triage)')).toBeVisible();
-    await expect(settingsModal.locator('text=Поиск в реальном времени (Web Search)')).toBeVisible();
+    await expect(settingsModal.locator('text=Автоматизация')).toBeVisible();
+    await expect(settingsModal.locator('text=Автотегирование новых заметок')).toBeVisible();
+    await expect(settingsModal.locator('text=AI-триаж (папки, задачи, приоритеты)')).toBeVisible();
+    await expect(settingsModal.locator('text=Веб-поиск при ответах')).toBeVisible();
 
     // Select Reasoning Effort: high
     const reasoningSelect = settingsModal.locator('button[aria-haspopup="listbox"]').filter({ hasText: /Отключено|Низкая|Средняя|Высокая/ }).first();
@@ -1539,7 +1539,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(fullscreenEditorRoot).toBeVisible();
 
     // Verify paperclip attach button in toolbar
-    const attachBtn = page.locator('button[title*="Прикрепить файл или медиа"]').first();
+    const attachBtn = page.locator('button[title*="Прикрепить файл"]').first();
     await expect(attachBtn).toBeVisible();
 
     // Simulate pasting an image file into the fullscreen editor
@@ -2284,7 +2284,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     });
 
     // Save changes
-    await page.locator('button', { hasText: 'Сохранить' }).click();
+    await page.locator('header button[title*="Сохранить изменения"]').click();
     await page.waitForTimeout(200);
 
     // 6. Switch to Calendar view and verify inspecting task opens FullscreenEditor
@@ -2336,7 +2336,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.waitForTimeout(300);
 
     // 2. Create an untimed task directly in All-Day ("Весь день") section via ComposerModal
-    const addAllDayBtn = page.locator('button[title="Добавить задачу на весь день"]').first();
+    const addAllDayBtn = page.locator('button[title="Добавить таску на весь день"]').first();
     await expect(addAllDayBtn).toBeVisible({ timeout: 5000 });
     await addAllDayBtn.click();
     await page.waitForTimeout(200);
@@ -2755,9 +2755,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // =========================================================================
     // 1. KANBAN: Mouse grab-and-drag horizontal scrolling
     // =========================================================================
-    const kanbanBtn = page.locator('button[title*="Канбан"]').first();
-    await expect(kanbanBtn).toBeVisible();
-    await kanbanBtn.click();
+    await switchToView(page, 'kanban');
     await page.waitForTimeout(300);
 
     // Set a compact viewport so both Kanban and Calendar have horizontal overflow
@@ -2815,9 +2813,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     // 2. CALENDAR WEEK VIEW: Mouse grab-and-drag horizontal & vertical panning
     // =========================================================================
     await page.setViewportSize({ width: 1280, height: 720 });
-    const calendarBtn = page.locator('button[title*="Календарь"]').first();
-    await expect(calendarBtn).toBeVisible();
-    await calendarBtn.click();
+    await switchToView(page, 'calendar');
     await page.waitForTimeout(300);
     await page.setViewportSize({ width: 800, height: 600 });
 
@@ -2918,7 +2914,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(card.locator('strong')).toHaveText('Важный текст');
     await expect(card.locator('em')).toHaveText('курсив');
     await expect(card.locator('code')).toHaveText('код');
-    await expect(card.locator('span', { hasText: 'Манифест' })).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Манифест', exact: true })).toBeVisible();
 
     // 4. Capture screenshot for visual inspection
     await card.screenshot({
@@ -3241,9 +3237,13 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await expect(editorRoot).toBeVisible();
 
     // 2. Desktop: Verify sticky toolbar at top
-    const desktopStickyToolbar = page.locator('.hidden.md\\:flex.sticky.top-0');
+    const desktopStickyToolbar = page.locator('[data-testid="fullscreen-editor-modal"] header.sticky.top-0');
     await expect(desktopStickyToolbar).toBeVisible();
-    await expect(desktopStickyToolbar.locator('button[title*="Заголовок 1"]')).toBeVisible();
+    const textStylesBtn = desktopStickyToolbar.locator('button[title*="Стили текста"]');
+    await expect(textStylesBtn).toBeVisible();
+    await textStylesBtn.click();
+    await expect(desktopStickyToolbar.locator('button', { hasText: 'Заголовок 1' })).toBeVisible();
+    await textStylesBtn.click();
 
     // Take screenshot of Desktop editor with sticky toolbar
     await page.screenshot({ path: 'test-results/screenshots/editor-desktop-sticky.png' });
@@ -3290,7 +3290,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await page.locator('button', { hasText: 'Таска' }).click();
 
     // 2. Click the Calendar icon button in toolbar
-    const calendarBtn = page.locator('button[title*="Установить срок задачи"]').first();
+    const calendarBtn = page.locator('button[title*="Установить срок таски"]').first();
     await expect(calendarBtn).toBeVisible();
     await calendarBtn.click();
 
@@ -3734,15 +3734,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const demoCheckTrigger = page.locator('aside button', { hasText: 'demo_check' });
     await expect(demoCheckTrigger).toBeVisible();
 
-    // 4. Verify demo note exists in Входящие
+    // 4. Fresh vaults start clean (f239d6b) and offer the demo seeder in the empty state
+    await expect(page.locator('text=Хранилище пустое')).toBeVisible();
+    await page.locator('button', { hasText: 'Сгенерировать демо-заметки и папки' }).click();
+
+    // 5. Verify demo note exists in Входящие
     await expect(page.locator('text=Добро пожаловать в SLAG').first()).toBeVisible();
 
-    // 5. Navigate to Проекты and verify demo task exists
+    // 6. Navigate to Проекты and verify demo task exists
     const projectsBtn = page.locator('aside span', { hasText: 'Проекты' }).first();
     await projectsBtn.click();
     await expect(page.locator('text=План работы над проектом').first()).toBeVisible();
 
-    // 6. Navigate to База знаний and verify demo note exists
+    // 7. Navigate to База знаний and verify demo note exists
     const kbBtn = page.locator('aside span', { hasText: 'База знаний' }).first();
     await kbBtn.click();
     await expect(page.locator('text=Горячие клавиши и разметка').first()).toBeVisible();
@@ -4042,8 +4046,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const card = page.locator('[data-testid="action-card"], .max-w-xl').last();
     await expect(card).toBeVisible({ timeout: 5000 });
 
-    // Verify "Сравнить" button is visible in card
-    const compareBtn = card.locator('button', { hasText: 'Сравнить' }).first();
+    // Verify the diff trigger (icon button in the card header) is visible in card
+    const compareBtn = card.locator('button[title*="Сравнить изменения"]').first();
     await expect(compareBtn).toBeVisible();
 
     // Verify individual jump and diff icons exist on each row
@@ -4092,7 +4096,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     const updateCard = page.locator('[data-testid="action-card"], .max-w-xl').last();
     await expect(updateCard).toBeVisible({ timeout: 5000 });
-    const contentCompareBtn = updateCard.locator('button', { hasText: 'Сравнить' }).first();
+    const contentCompareBtn = updateCard.locator('button[title*="Сравнить изменения"]').first();
     await expect(contentCompareBtn).toBeVisible();
 
     await contentCompareBtn.click();

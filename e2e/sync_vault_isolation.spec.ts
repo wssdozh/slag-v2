@@ -69,8 +69,9 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
 
-    // 3. Open Pair Device Modal
-    const pairBtn = settingsModal.locator('button', { hasText: 'Привязать устройство' });
+    // 3. Open Pair Device Modal (pairing lives on the "Устройства" tab)
+    await settingsModal.getByTestId('settings-tab-devices').click();
+    const pairBtn = settingsModal.getByTestId('btn-open-pair-modal');
     await expect(pairBtn).toBeVisible();
     await pairBtn.click();
 
@@ -111,6 +112,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     // 6. Test Scenario 2: Repeat pairing with the SAME vaultId (should MERGE, not create a 3rd vault)
     await sidebarSyncBtn.click();
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
+    await settingsModal.getByTestId('settings-tab-devices').click();
     await pairBtn.click();
     await expect(pairModal).toBeVisible({ timeout: 5000 });
 
@@ -189,12 +191,13 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
       });
     });
 
-    // Open sync tab and pair modal
+    // Open settings, switch to the "Устройства" tab and open the pair modal
     const sidebarSyncBtn = page.locator('[data-testid="sidebar-sync-btn"]');
     await sidebarSyncBtn.click();
 
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
-    const pairBtn = settingsModal.locator('button', { hasText: 'Привязать устройство' });
+    await settingsModal.getByTestId('settings-tab-devices').click();
+    const pairBtn = settingsModal.getByTestId('btn-open-pair-modal');
     await pairBtn.click();
 
     const pairModal = page.locator('[data-testid="pair-device-modal"]');

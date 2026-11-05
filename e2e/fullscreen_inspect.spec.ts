@@ -17,13 +17,13 @@ test('Capture Fullscreen Editor Teletype Top Utilities and Object Context', asyn
   await page.waitForTimeout(200);
 
   // Type title
-  const titleInput = page.locator('input[placeholder*="Название таски"], input[placeholder*="Заголовок"]').first();
+  const titleInput = page.locator('textarea[placeholder*="Название таски"], textarea[placeholder*="Заголовок"]').first();
   await titleInput.click();
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.type('Карьера: 7 типичных ошибок начинающего разработчика');
 
-  // Add tags via seamless textarea-like input
-  const tagInput = page.locator('header ~ div input[placeholder*="тег"]').or(page.locator('header ~ div input[type="text"]').nth(1));
+  // Add tags via the flat taxonomy input (its placeholder disappears once the first tag lands)
+  const tagInput = editorModal.locator('input[type="text"]').first();
   for (const tag of ['карьера', 'it', 'советы', 'опыт', 'сакутин', 'вебинар', 'игра', 'игры', 'заработок']) {
     await tagInput.fill(tag);
     await page.keyboard.press('Enter');
