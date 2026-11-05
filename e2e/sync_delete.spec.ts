@@ -4,27 +4,10 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
-    const { SyncEngine, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     const cryptoMod = await import(/* @vite-ignore */ '/src/lib/sync/crypto.ts');
-    const originals = {
-      getToken: accountClient.getToken, getSession: accountClient.getSession,
-      refresh: accountClient.refresh, getState: accountClient.getState, subscribe: accountClient.subscribe,
-    };
-    accountClient.getToken = () => null;
-    accountClient.getSession = () => ({ deviceId: 'synthetic-device' });
-    accountClient.refresh = async () => {};
-    accountClient.getState = () => ({ devices: [], vaults: [] });
-    accountClient.subscribe = () => () => {};
-    const engine = new SyncEngine();
-    engine.refreshServerAuth = async () => true;
-    engine.connectWebSocket = () => {};
-    engine.startIntervals = () => {};
-    const push = engine.pushLocalChanges.bind(engine);
-    engine.pushLocalChanges = async () => {};
-    const realFetch = window.fetch;
-    try {
-      engine.saveConfig({ enabled: true, seedPhrase: 'synthetic delete seed', deviceId: 'synthetic-device' });
-      await engine.init();
+    return withSyncHarness(async ({ engine, push, init }) => {
+      await init('synthetic delete seed');
       localStorage.setItem(engine.getSyncedIdsKey(), JSON.stringify(['ghost-note']));
       const key = await cryptoMod.deriveVaultKey('synthetic delete seed');
       let captured: { changes?: Array<{ id: string; type: string; action: string }> } = {};
@@ -40,11 +23,7 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
         syncedIdsUpdated: !JSON.parse(localStorage.getItem(engine.getSyncedIdsKey()) || '[]').includes('ghost-note'),
         tombstoneStored: Object.prototype.hasOwnProperty.call(JSON.parse(localStorage.getItem(engine.getTombstonesKey()) || '{}'), 'ghost-note'),
       };
-    } finally {
-      window.fetch = realFetch;
-      engine.disconnect();
-      Object.assign(accountClient, originals);
-    }
+    });
   });
   expect(result).toEqual({ hasDelete: true, syncedIdsUpdated: true, tombstoneStored: true });
 });
@@ -53,26 +32,10 @@ test('delete wins over stale upsert and restore wins over delete', async ({ page
   await page.goto('/');
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
-    const { SyncEngine, storage, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
-    const originals = {
-      getToken: accountClient.getToken, getSession: accountClient.getSession,
-      refresh: accountClient.refresh, getState: accountClient.getState, subscribe: accountClient.subscribe,
-    };
-    accountClient.getToken = () => null;
-    accountClient.getSession = () => ({ deviceId: 'synthetic-device' });
-    accountClient.refresh = async () => {};
-    accountClient.getState = () => ({ devices: [], vaults: [] });
-    accountClient.subscribe = () => () => {};
-    const engine = new SyncEngine();
-    engine.refreshServerAuth = async () => true;
-    engine.connectWebSocket = () => {};
-    engine.startIntervals = () => {};
-    engine.pushLocalChanges = async () => {};
-    const realFetch = window.fetch;
-    window.fetch = async () => new Response('{}', { status: 200 });
-    try {
-      engine.saveConfig({ enabled: true, seedPhrase: 'synthetic lww seed', deviceId: 'synthetic-device' });
-      await engine.init();
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
+    return withSyncHarness(async ({ engine, storage, init }) => {
+      window.fetch = async () => new Response('{}', { status: 200 });
+      await init('synthetic lww seed');
       const roomId = engine.activeRoomId;
       const base = { id: 'n1', type: 'note' as const, title: 'n1', content: 'x', folder: 'Входящие', tags: [], attachments: [], createdAt: 1, updatedAt: 100 };
       await storage.importSyncedVaultData({ items: [base] });
@@ -93,11 +56,7 @@ test('delete wins over stale upsert and restore wins over delete', async ({ page
       ]));
       const restored = storage.getItems().some((it) => it.id === 'n1');
       return { deleted, staleNotResurrected, restored };
-    } finally {
-      window.fetch = realFetch;
-      engine.disconnect();
-      Object.assign(accountClient, originals);
-    }
+    });
   });
   expect(result).toEqual({ deleted: true, staleNotResurrected: true, restored: true });
 });
@@ -106,26 +65,10 @@ test('folder rename and deletion propagate to folders, nested items, and outbox'
   await page.goto('/');
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
-    const { SyncEngine, storage, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
-    const originals = {
-      getToken: accountClient.getToken, getSession: accountClient.getSession,
-      refresh: accountClient.refresh, getState: accountClient.getState, subscribe: accountClient.subscribe,
-    };
-    accountClient.getToken = () => null;
-    accountClient.getSession = () => ({ deviceId: 'synthetic-device' });
-    accountClient.refresh = async () => {};
-    accountClient.getState = () => ({ devices: [], vaults: [] });
-    accountClient.subscribe = () => () => {};
-    const engine = new SyncEngine();
-    engine.refreshServerAuth = async () => true;
-    engine.connectWebSocket = () => {};
-    engine.startIntervals = () => {};
-    engine.pushLocalChanges = async () => {};
-    const realFetch = window.fetch;
-    window.fetch = async () => new Response('{}', { status: 200 });
-    try {
-      engine.saveConfig({ enabled: true, seedPhrase: 'synthetic folder seed', deviceId: 'synthetic-device' });
-      await engine.init();
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
+    return withSyncHarness(async ({ engine, storage, init }) => {
+      window.fetch = async () => new Response('{}', { status: 200 });
+      await init('synthetic folder seed');
       const roomId = engine.activeRoomId;
 
       // 1. Initial seed: folder "Тест" and item in "Тест"
@@ -174,11 +117,7 @@ test('folder rename and deletion propagate to folders, nested items, and outbox'
         itemReroutedToInbox,
         outboxCapturedDelete,
       };
-    } finally {
-      window.fetch = realFetch;
-      engine.disconnect();
-      Object.assign(accountClient, originals);
-    }
+    });
   });
   expect(result).toEqual({
     renamedFolderExists: true,

@@ -51,6 +51,61 @@ export function cleanSnippetText(text: string, maxLen = 140): string {
     .slice(0, maxLen);
 }
 
+function extractBalancedJsonObject(text: string, start: number): string | null {
+  if (text[start] !== '{') return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
+function actionFields(parsed: Record<string, any>, fallbackTitle: string) {
+  return {
+    title: parsed.title || fallbackTitle,
+    folder: parsed.folder || 'Входящие',
+    content: parsed.content || '',
+    tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+  };
+}
+
+function parseBatchItems(items: unknown, validatePriority: boolean): BatchUpdateItem[] {
+  return Array.isArray(items) ? items.map((it: any) => ({
+    targetItemId: it.targetItemId || it.id || '',
+    title: it.title || 'Задача',
+    updates: it.updates || {
+      dueDate: it.dueDate,
+      reminder: it.reminder,
+      priority: validatePriority && !['none', 'low', 'medium', 'high'].includes(it.priority) ? undefined : it.priority,
+      status: it.status,
+    },
+    reason: it.reason,
+  })) : [];
+}
+
+function batchAction(batchItems: BatchUpdateItem[], title?: string, folder?: string): SuggestedAction {
+  return {
+    type: 'batch_update',
+    title: title || `Перенос задач (${batchItems.length})`,
+    folder: folder || 'Входящие',
+    content: '',
+    tags: [],
+    itemType: 'task',
+    batchUpdateItems: batchItems,
+  };
+}
+
 /**
  * Parses embedded action block from assistant response (create_note, schedule_task, reschedule_task, update_task_status, decompose_task, move_note)
  */
@@ -73,31 +128,11 @@ export function extractActionBlock(
       const actionKind = parsed.action || tagAction;
 
       if (actionKind === 'batch_update' || actionKind === 'batch_update_items' || actionKind === 'batch_reschedule' || actionKind === 'batch_reschedule_tasks' || Array.isArray(parsed.items)) {
-        const batchItems: BatchUpdateItem[] = Array.isArray(parsed.items)
-          ? parsed.items.map((it: any) => ({
-              targetItemId: it.targetItemId || it.id || '',
-              title: it.title || 'Задача',
-              updates: it.updates || {
-                dueDate: it.dueDate,
-                reminder: it.reminder,
-                priority: ['none', 'low', 'medium', 'high'].includes(it.priority) ? it.priority : undefined,
-                status: it.status,
-              },
-              reason: it.reason,
-            }))
-          : [];
+        const batchItems = parseBatchItems(parsed.items, true);
         if (batchItems.length > 0) {
           return {
             cleanText,
-            suggestedAction: {
-              type: 'batch_update',
-              title: parsed.title || `Перенос задач (${batchItems.length})`,
-              folder: parsed.folder || 'Входящие',
-              content: '',
-              tags: [],
-              itemType: 'task',
-              batchUpdateItems: batchItems,
-            },
+            suggestedAction: batchAction(batchItems, parsed.title, parsed.folder),
           };
         }
       }
@@ -110,11 +145,8 @@ export function extractActionBlock(
             suggestedAction: {
               type: 'update_item',
               targetItemId: parsed.id || parsed.targetItemId,
-              title: parsed.title || 'Обновление записи',
-              folder: parsed.folder || 'Входящие',
-              content: parsed.content || '',
+              ...actionFields(parsed, 'Обновление записи'),
               appendContent: parsed.appendContent,
-              tags: Array.isArray(parsed.tags) ? parsed.tags : [],
               itemType: parsed.itemType || 'note',
               dueDate: parsed.dueDate,
               reminder: parsed.reminder,
@@ -128,11 +160,8 @@ export function extractActionBlock(
           cleanText,
           suggestedAction: {
             type: 'create_note',
-            title: parsed.title || 'Новая запись',
-            folder: parsed.folder || 'Входящие',
-            content: parsed.content || '',
+            ...actionFields(parsed, 'Новая запись'),
             appendContent: parsed.appendContent,
-            tags: Array.isArray(parsed.tags) ? parsed.tags : [],
             itemType: ['note', 'task', 'article'].includes(parsed.itemType) ? parsed.itemType : (parsed.dueDate ? 'task' : 'note'),
             dueDate: parsed.dueDate,
             reminder: parsed.reminder,
@@ -147,10 +176,7 @@ export function extractActionBlock(
           cleanText,
           suggestedAction: {
             type: actionKind === 'schedule_task' ? 'schedule_task' : 'create_note',
-            title: parsed.title || 'Новая запись',
-            folder: parsed.folder || 'Входящие',
-            content: parsed.content || '',
-            tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+            ...actionFields(parsed, 'Новая запись'),
             itemType: ['note', 'task', 'article'].includes(parsed.itemType) ? parsed.itemType : (actionKind === 'schedule_task' ? 'task' : 'note'),
             dueDate: parsed.dueDate,
             reminder: parsed.reminder,
@@ -165,10 +191,7 @@ export function extractActionBlock(
           suggestedAction: {
             type: 'update_item',
             targetItemId: parsed.targetItemId || parsed.id,
-            title: parsed.title || 'Обновление записи',
-            folder: parsed.folder || 'Входящие',
-            content: parsed.content || '',
-            tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+            ...actionFields(parsed, 'Обновление записи'),
             itemType: parsed.itemType || 'note',
             updates: parsed.updates || parsed,
           },
@@ -211,39 +234,27 @@ export function extractActionBlock(
 
   // Safeguard against raw pseudo-protocol string leak:
   // e.g. [Действие ассистента: batch_reschedule_tasks | ... | Параметры: {"items":[...]}]
-  const pseudoActionRegex = /\[Действие ассистента:\s*([\w_]+)\s*\|[^|]*\|[^|]*Параметры:\s*(\{[\s\S]*?\})\s*\]/i;
-  const pseudoMatch = text.match(pseudoActionRegex);
-  if (pseudoMatch) {
+  // Balanced extraction: nested item objects are valid params, a lazy regex would truncate them.
+  const pseudoHeader = /\[Действие ассистента:\s*([\w_]+)\s*\|[^|]*\|[^|]*Параметры:\s*/i;
+  const pseudoMatch = text.match(pseudoHeader);
+  const pseudoJson = pseudoMatch?.index !== undefined
+    ? extractBalancedJsonObject(text, pseudoMatch.index + pseudoMatch[0].length)
+    : null;
+  if (pseudoMatch?.index !== undefined && pseudoJson) {
     try {
       const actionName = pseudoMatch[1].trim();
-      const params = JSON.parse(pseudoMatch[2]);
-      const cleanText = text.replace(pseudoMatch[0], '').trim();
+      const params = JSON.parse(pseudoJson);
+      const blockEnd = text.indexOf(']', pseudoMatch.index + pseudoMatch[0].length + pseudoJson.length);
+      const cleanText = text.replace(text.slice(
+        pseudoMatch.index,
+        blockEnd >= 0 ? blockEnd + 1 : pseudoMatch.index + pseudoMatch[0].length + pseudoJson.length
+      ), '').trim();
 
       if (actionName === 'batch_update_items' || actionName === 'batch_update' || actionName === 'batch_reschedule_tasks' || actionName === 'batch_reschedule') {
-        const batchItems: BatchUpdateItem[] = Array.isArray(params.items)
-          ? params.items.map((it: any) => ({
-              targetItemId: it.targetItemId || it.id || '',
-              title: it.title || 'Задача',
-              updates: it.updates || {
-                dueDate: it.dueDate,
-                reminder: it.reminder,
-                priority: it.priority,
-                status: it.status,
-              },
-              reason: it.reason,
-            }))
-          : [];
+        const batchItems = parseBatchItems(params.items, false);
         return {
           cleanText,
-          suggestedAction: {
-            type: 'batch_update',
-            title: `Перенос задач (${batchItems.length})`,
-            folder: 'Входящие',
-            content: '',
-            tags: [],
-            itemType: 'task',
-            batchUpdateItems: batchItems,
-          },
+          suggestedAction: batchAction(batchItems),
         };
       }
     } catch {

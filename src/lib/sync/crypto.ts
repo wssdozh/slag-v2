@@ -1,31 +1,10 @@
 import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { BIP39_WORDS } from './bip39Words';
 import type { SyncBundle, EncryptedBundle } from './types';
+import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../byteCodec';
 
 const VAULT_SALT = new TextEncoder().encode('slag-vault-salt-v1');
 const ROOM_SALT = new TextEncoder().encode('slag-relay-room-v1');
-
-function bufferToBase64(buf: ArrayBuffer | Uint8Array): string {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function base64ToBuffer(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function toArrayBuffer(arr: Uint8Array): ArrayBuffer {
-  return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength) as ArrayBuffer;
-}
 
 /** Generates a cryptographically secure 12-word recovery seed phrase */
 export function generateMnemonic(wordCount = 12): string {
@@ -125,15 +104,15 @@ export async function encryptBundle(bundle: SyncBundle, key: CryptoKey): Promise
     fromDeviceId: bundle.fromDeviceId,
     sequence: bundle.sequence,
     timestamp: bundle.timestamp,
-    iv: bufferToBase64(iv),
-    ciphertext: bufferToBase64(ciphertextBuffer),
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(ciphertextBuffer),
   };
 }
 
 /** Decrypts and decompresses an EncryptedBundle */
 export async function decryptBundle(encrypted: EncryptedBundle, key: CryptoKey): Promise<SyncBundle> {
-  const iv = base64ToBuffer(encrypted.iv);
-  const ciphertext = base64ToBuffer(encrypted.ciphertext);
+  const iv = base64ToBytes(encrypted.iv);
+  const ciphertext = base64ToBytes(encrypted.ciphertext);
 
   const decryptedBuffer = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: toArrayBuffer(iv) },

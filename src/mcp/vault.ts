@@ -7,15 +7,8 @@ import type { McpVaultConfig, VaultStateData, NoteMatch } from './types';
 import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/markdownSerializer';
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/taskUtils';
 
-export function getSafeNoteFilename(title?: string, fallbackId: string = 'untitled'): string {
-  const clean = (title || '')
-    .trim()
-    .replace(/[\\/:*?"<>|\r\n\t]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const safe = clean.slice(0, 60).trim();
-  return `${safe || fallbackId}.md`;
-}
+import { getSafeNoteFilename } from '../lib/noteFilename';
+export { getSafeNoteFilename } from '../lib/noteFilename';
 
 export function resolveVaultConfig(customPath?: string): McpVaultConfig {
   let targetPath = customPath || process.env.SLAG_VAULT_PATH;

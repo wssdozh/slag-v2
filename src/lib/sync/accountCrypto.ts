@@ -1,5 +1,6 @@
 import { p256 } from '@noble/curves/nist.js';
 import { validateMnemonic } from './crypto';
+import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../byteCodec';
 import type { LocalDeviceIdentity } from './accountTypes';
 
 const ACCOUNT_KEY_DOMAIN = 'slag-account-identity-v1';
@@ -32,23 +33,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
-function base64ToBytes(value: string): Uint8Array {
-  const binary = atob(value);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 async function sha256(data: string | Uint8Array): Promise<Uint8Array> {

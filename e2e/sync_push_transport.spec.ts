@@ -1,29 +1,46 @@
 import { test, expect } from './support/selfhostFixture';
 
+test('sync harness restores browser state when initialization fails', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  const result = await page.evaluate(async () => {
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
+    const { storage, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+    const realFetch = window.fetch;
+    const realImport = storage.importSyncedVaultData;
+    const methods = ['getToken', 'getSession', 'refresh', 'getState', 'subscribe'] as const;
+    const originals = methods.map((method) => accountClient[method]);
+    let disconnected = false;
+    let error = '';
+    try {
+      await withSyncHarness(async ({ engine, storage, init }) => {
+        const disconnect = engine.disconnect.bind(engine);
+        engine.disconnect = () => { disconnected = true; disconnect(); };
+        engine.init = async () => { throw new Error('setup failed'); };
+        window.fetch = async () => new Response('{}');
+        storage.importSyncedVaultData = async () => {};
+        await init('synthetic failing seed');
+      });
+    } catch (caught) {
+      error = (caught as Error).message;
+    }
+    return {
+      error, disconnected,
+      fetchRestored: window.fetch === realFetch,
+      importRestored: storage.importSyncedVaultData === realImport,
+      accountRestored: methods.every((method, index) => accountClient[method] === originals[index]),
+    };
+  });
+  expect(result).toEqual({ error: 'setup failed', disconnected: true, fetchRestored: true, importRestored: true, accountRestored: true });
+});
+
 test('push always goes over HTTP POST and 409 replay counts as delivered', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
-    const { SyncEngine, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
-    const originals = {
-      getToken: accountClient.getToken, getSession: accountClient.getSession,
-      refresh: accountClient.refresh, getState: accountClient.getState, subscribe: accountClient.subscribe,
-    };
-    accountClient.getToken = () => null;
-    accountClient.getSession = () => ({ deviceId: 'synthetic-device' });
-    accountClient.refresh = async () => {};
-    accountClient.getState = () => ({ devices: [], vaults: [] });
-    accountClient.subscribe = () => () => {};
-    const engine = new SyncEngine();
-    engine.refreshServerAuth = async () => true;
-    engine.connectWebSocket = () => {};
-    engine.startIntervals = () => {};
-    const push = engine.pushLocalChanges.bind(engine);
-    engine.pushLocalChanges = async () => {};
-    const realFetch = window.fetch;
-    try {
-      engine.saveConfig({ enabled: true, seedPhrase: 'synthetic push seed', deviceId: 'synthetic-device' });
-      await engine.init();
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
+    return withSyncHarness(async ({ engine, push, init }) => {
+      await init('synthetic push seed');
       let wsSends = 0;
       engine.ws = { readyState: 1, send: () => { wsSends++; }, close: () => {} };
       const posts: number[] = [];
@@ -37,11 +54,7 @@ test('push always goes over HTTP POST and 409 replay counts as delivered', async
       await push();
       const replayAccepted = posts.length === 2 && wsSends === 0 && engine.status.error === null && localStorage.getItem(engine.getStateHashKey()) !== null;
       return { firstPushOverHttp, replayAccepted, posts };
-    } finally {
-      window.fetch = realFetch;
-      engine.disconnect();
-      Object.assign(accountClient, originals);
-    }
+    });
   });
   expect(result).toEqual({ firstPushOverHttp: true, replayAccepted: true, posts: [200, 409] });
 });
@@ -50,29 +63,13 @@ test('a re-delivered bundleId applies only once', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
-    const { SyncEngine, storage, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
-    const originals = {
-      getToken: accountClient.getToken, getSession: accountClient.getSession,
-      refresh: accountClient.refresh, getState: accountClient.getState, subscribe: accountClient.subscribe,
-    };
-    accountClient.getToken = () => null;
-    accountClient.getSession = () => ({ deviceId: 'synthetic-device' });
-    accountClient.refresh = async () => {};
-    accountClient.getState = () => ({ devices: [], vaults: [] });
-    accountClient.subscribe = () => () => {};
-    const engine = new SyncEngine();
-    engine.refreshServerAuth = async () => true;
-    engine.connectWebSocket = () => {};
-    engine.startIntervals = () => {};
-    engine.pushLocalChanges = async () => {};
-    let applies = 0;
-    const origImport = storage.importSyncedVaultData.bind(storage);
-    storage.importSyncedVaultData = async (data) => { applies++; return origImport(data); };
-    const realFetch = window.fetch;
-    window.fetch = async () => new Response('{}', { status: 200 });
-    try {
-      engine.saveConfig({ enabled: true, seedPhrase: 'synthetic dedup seed', deviceId: 'synthetic-device' });
-      await engine.init();
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
+    return withSyncHarness(async ({ engine, storage, init }) => {
+      let applies = 0;
+      const origImport = storage.importSyncedVaultData.bind(storage);
+      storage.importSyncedVaultData = async (data) => { applies++; return origImport(data); };
+      window.fetch = async () => new Response('{}', { status: 200 });
+      await init('synthetic dedup seed');
       const bundle = {
         bundleId: 'dup-bundle', roomId: engine.activeRoomId, fromDeviceId: 'other-device', sequence: 1,
         stateRootHash: 'x', timestamp: new Date().toISOString(),
@@ -82,12 +79,7 @@ test('a re-delivered bundleId applies only once', async ({ page }) => {
       await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle }));
       await new Promise((resolve) => setTimeout(resolve, 80));
       return { applies };
-    } finally {
-      storage.importSyncedVaultData = origImport;
-      window.fetch = realFetch;
-      engine.disconnect();
-      Object.assign(accountClient, originals);
-    }
+    });
   });
   expect(result).toEqual({ applies: 1 });
 });

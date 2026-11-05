@@ -1,3 +1,4 @@
+import { formatBytes } from '../../lib/formatBytes';
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, LightboxImage, SlagAttachment } from '../../types';
@@ -68,12 +69,6 @@ const isGenericTitle = (title?: string): boolean => {
   );
 };
 
-const formatBytes = (bytes?: number): string => {
-  if (!bytes || bytes <= 0) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
 
 const ItemCardComponent: React.FC<ItemCardProps> = ({
   item,

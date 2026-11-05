@@ -12,6 +12,8 @@ import type {
 import { DEFAULT_FOLDER_VIEW_SETTINGS } from '../types';
 import { serializeItemToMarkdown, parseMarkdownToItem } from './markdownSerializer';
 import { generateDemoItems } from './demoVault';
+import { getSafeNoteFilename } from './noteFilename';
+export { getSafeNoteFilename } from './noteFilename';
 import { logger } from './logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -109,17 +111,6 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
 // Obsolete dev/manifest demo IDs that should never pollute a clean vault
 export const OBSOLETE_DEMO_IDS = new Set<string>();
 
-// ponytail: regex-санитизация под ограничения Windows/Unix без внешних slug-библиотек; срез до 60 символов
-export function getSafeNoteFilename(title?: string, fallbackId: string = 'untitled'): string {
-  const clean = (title || '')
-    .trim()
-    .replace(/[\\/:*?"<>|\r\n\t]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const safe = clean.slice(0, 60).trim();
-  return `${safe || fallbackId}.md`;
-}
-
 // Initial demo & onboarding items
 export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
@@ -216,25 +207,14 @@ export class StorageService {
   public async getNoteAbsolutePath(item: SlagItem): Promise<string> {
     const filename = item.filename || getSafeNoteFilename(item.title, item.id);
     const folder = item.folder || 'Входящие';
-    const relativePath = `${this.getVaultNotesPath()}/${folder}/${filename}`;
-
-    if (isTauri()) {
-      try {
-        const { appDataDir } = await import('@tauri-apps/api/path');
-        const base = await appDataDir();
-        const cleanBase = base.replace(/[/\\]+$/, '');
-        const cleanRel = relativePath.replace(/^[/\\]+/, '');
-        const sep = navigator.userAgent.includes('Windows') ? '\\' : '/';
-        return `${cleanBase}${sep}${cleanRel.split('/').join(sep)}`;
-      } catch (err) {
-        fsLog.warn('Failed to resolve absolute note path via Tauri API', err);
-      }
-    }
-    return relativePath;
+    return this.resolveAbsolutePath(`${this.getVaultNotesPath()}/${folder}/${filename}`, 'note');
   }
 
   public async getFolderAbsolutePath(folderPath: string): Promise<string> {
-    const relativePath = `${this.getVaultNotesPath()}/${folderPath || 'Входящие'}`;
+    return this.resolveAbsolutePath(`${this.getVaultNotesPath()}/${folderPath || 'Входящие'}`, 'folder');
+  }
+
+  private async resolveAbsolutePath(relativePath: string, kind: 'note' | 'folder'): Promise<string> {
     if (isTauri()) {
       try {
         const { appDataDir } = await import('@tauri-apps/api/path');
@@ -244,7 +224,7 @@ export class StorageService {
         const sep = navigator.userAgent.includes('Windows') ? '\\' : '/';
         return `${cleanBase}${sep}${cleanRel.split('/').join(sep)}`;
       } catch (err) {
-        fsLog.warn('Failed to resolve absolute folder path via Tauri API', err);
+        fsLog.warn(`Failed to resolve absolute ${kind} path via Tauri API`, err);
       }
     }
     return relativePath;

@@ -1,5 +1,6 @@
 import type { DeviceSyncMode, PairingSessionData, PairingClaimResult, PairingPollResult } from './types';
 import { accountClient } from './account';
+import { bytesToBase64, base64ToBytes } from '../byteCodec';
 
 function pairingHeaders(serverUrl: string, includeJson = true): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -70,21 +71,25 @@ export async function claimPairingSession(
 }
 
 function utf8ToBase64(str: string): string {
-  const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  return bytesToBase64(new TextEncoder().encode(str));
 }
 
 function base64ToUtf8(b64: string): string {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder().decode(base64ToBytes(b64));
+}
+
+async function postPairing(
+  serverUrl: string,
+  action: 'approve' | 'reject',
+  payload: Record<string, unknown>
+): Promise<boolean> {
+  const cleanUrl = serverUrl.replace(/\/+$/, '');
+  const res = await fetch(`${cleanUrl}/api/pair/${action}`, {
+    method: 'POST',
+    headers: pairingHeaders(serverUrl),
+    body: JSON.stringify(payload),
+  });
+  return res.ok;
 }
 
 /** Host approves pairing session and sends encrypted vault key */
@@ -93,16 +98,10 @@ export async function approvePairingSession(
   sessionId: string,
   payloadText: string
 ): Promise<boolean> {
-  const cleanUrl = serverUrl.replace(/\/+$/, '');
-  const res = await fetch(`${cleanUrl}/api/pair/approve`, {
-    method: 'POST',
-    headers: pairingHeaders(serverUrl),
-    body: JSON.stringify({
-      sessionId,
-      encryptedPayload: utf8ToBase64(payloadText),
-    }),
+  return postPairing(serverUrl, 'approve', {
+    sessionId,
+    encryptedPayload: utf8ToBase64(payloadText),
   });
-  return res.ok;
 }
 
 /** Approves account pairing with a vault key encrypted for the guest device. */
@@ -111,13 +110,7 @@ export async function approveAccountPairingSession(
   sessionId: string,
   payload: { vaultId: string; vaultName: string; mode: DeviceSyncMode; encryptedKey: string }
 ): Promise<boolean> {
-  const cleanUrl = serverUrl.replace(/\/+$/, '');
-  const res = await fetch(`${cleanUrl}/api/pair/approve`, {
-    method: 'POST',
-    headers: pairingHeaders(serverUrl),
-    body: JSON.stringify({ sessionId, ...payload }),
-  });
-  return res.ok;
+  return postPairing(serverUrl, 'approve', { sessionId, ...payload });
 }
 
 /** Host rejects pairing session and terminates exchange */
@@ -125,13 +118,7 @@ export async function rejectPairingSession(
   serverUrl: string,
   sessionId: string
 ): Promise<boolean> {
-  const cleanUrl = serverUrl.replace(/\/+$/, '');
-  const res = await fetch(`${cleanUrl}/api/pair/reject`, {
-    method: 'POST',
-    headers: pairingHeaders(serverUrl),
-    body: JSON.stringify({ sessionId }),
-  });
-  return res.ok;
+  return postPairing(serverUrl, 'reject', { sessionId });
 }
 
 /** Polls current status of a pairing session */

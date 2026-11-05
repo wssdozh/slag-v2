@@ -12,6 +12,11 @@ export interface MenuDropdownProps {
   align?: 'start' | 'end';
   /** Min width of the dropdown popover in px */
   minWidth?: number;
+  /** Width used for viewport collision calculations (defaults to minWidth). */
+  positioningWidth?: number;
+  /** Keep the left edge inside the viewport. */
+  clampLeft?: boolean;
+  ariaLabel?: string;
   /** Controlled open state */
   isOpen?: boolean;
   /** Controlled open state callback */
@@ -28,6 +33,9 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
   direction = 'auto',
   align = 'start',
   minWidth = 150,
+  positioningWidth = minWidth,
+  clampLeft = true,
+  ariaLabel,
   isOpen: controlledIsOpen,
   onOpenChange,
   className = '',
@@ -53,7 +61,7 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
   const updatePosition = useCallback(() => {
     if (!triggerContainerRef.current) return;
     const rect = triggerContainerRef.current.getBoundingClientRect();
-    const dropdownW = minWidth;
+    const dropdownW = positioningWidth;
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
 
@@ -70,7 +78,7 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
     if (left + dropdownW > window.innerWidth - 8) {
       left = Math.max(8, window.innerWidth - dropdownW - 8);
     }
-    if (left < 8) {
+    if (clampLeft && left < 8) {
       left = 8;
     }
 
@@ -85,7 +93,7 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
         left,
       });
     }
-  }, [direction, align, minWidth]);
+  }, [direction, align, positioningWidth, clampLeft]);
 
   const toggle = useCallback(() => {
     if (!isOpen) {
@@ -153,7 +161,7 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
       : null;
 
   return (
-    <div ref={triggerContainerRef} className={`relative inline-flex items-center shrink-0 ${className}`}>
+    <div ref={triggerContainerRef} aria-label={ariaLabel} className={`relative inline-flex items-center shrink-0 ${className}`}>
       <div onClick={toggle} className="inline-flex items-center">
         {trigger}
       </div>
