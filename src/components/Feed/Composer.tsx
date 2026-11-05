@@ -796,9 +796,6 @@ export const Composer: React.FC<ComposerProps> = ({
         break;
       case 'clear':
         storage.deleteComposerDraft(activeFolder);
-        if (activeFolder !== DEFAULT_INBOX_FOLDER) {
-          storage.deleteComposerDraft(DEFAULT_INBOX_FOLDER);
-        }
         resetDraftState();
         addToast('Черновик очищен', 'info');
         return;
@@ -1080,9 +1077,6 @@ export const Composer: React.FC<ComposerProps> = ({
 
     storage.deleteComposerDraft(destinationFolder);
     storage.deleteComposerDraft(activeFolder);
-    if (activeFolder !== DEFAULT_INBOX_FOLDER) {
-      storage.deleteComposerDraft(DEFAULT_INBOX_FOLDER);
-    }
     resetDraftState();
     if (onComplete) {
       onComplete();
