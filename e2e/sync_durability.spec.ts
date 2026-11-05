@@ -30,9 +30,14 @@ test('received bundles wait for persistence, serialize, and never ACK failed wri
       await Promise.all([first, second]);
       const after = sent.map(value => JSON.parse(value).bundleId);
       storage.importSyncedVaultData = async () => { throw new Error('disk full'); };
-      await engine.applyIncomingBundle(bundle('failed'));
-      return { before, after, finalAcks: sent.length, state: engine.getStatus().state };
+      let failure = '';
+      try {
+        await engine.applyIncomingBundle(bundle('failed'));
+      } catch (error) {
+        failure = error instanceof Error ? error.message : String(error);
+      }
+      return { before, after, finalAcks: sent.length, state: engine.getStatus().state, failure };
     } finally { storage.importSyncedVaultData = original; }
   });
-  expect(result).toEqual({ before: { calls: 1, acks: 0 }, after: ['one', 'two'], finalAcks: 2, state: 'error' });
+  expect(result).toEqual({ before: { calls: 1, acks: 0 }, after: ['one', 'two'], finalAcks: 2, state: 'error', failure: 'disk full' });
 });

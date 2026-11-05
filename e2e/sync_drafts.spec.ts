@@ -56,6 +56,7 @@ test('composer draft emits draft op to outbox and packs into bundle', async ({ p
       let captured: { changes?: Array<{ id: string; type: string; action: string; payload?: unknown }> } = {};
 
       window.fetch = async (_url, opts: any) => {
+        if (!opts || opts.method !== 'POST') return Response.json({ bundles: [] });
         const encrypted = JSON.parse(opts.body);
         captured = await cryptoMod.decryptBundle(encrypted, key);
         return new Response('{}', { status: 200 });

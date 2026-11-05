@@ -64,7 +64,11 @@ export class SyncEngine {
         ? storage.getCurrentVault()?.id
         : 'default_vault') || 'default_vault';
     this.status = {
-      initialSync: { vaultId: this.currentVaultId, state: 'idle', processed: 0, rejected: 0 },
+      initialSync: {
+        vaultId: this.currentVaultId,
+        state: localStorage.getItem(`slag_initial_sync_${this.currentVaultId}`) === 'pending' ? 'loading' : 'idle',
+        processed: 0, rejected: 0,
+      },
       state: 'idle',
       authRequired: false,
       isAuthenticated: accountClient.isAuthenticated(),
@@ -398,6 +402,8 @@ export class SyncEngine {
     const generation = this.initGeneration;
     const seedPhrase = this.config.seedPhrase;
     const initial = localStorage.getItem(`slag_initial_sync_${this.currentVaultId}`) === 'pending';
+    const startedAt = performance.now();
+    if (initial) syncLog.info('Initial sync started', { vaultId: this.currentVaultId });
     this.status.initialSync = { vaultId: this.currentVaultId, state: initial ? 'loading' : 'idle', processed: 0, rejected: 0 };
     if (!this.config.enabled) {
       if (initial) this.failInitialSync(new Error('Синхронизация выключена'));
@@ -461,6 +467,10 @@ export class SyncEngine {
       if (initial) {
         localStorage.removeItem(`slag_initial_sync_${this.currentVaultId}`);
         this.status.initialSync.state = 'ready';
+        syncLog.info('Initial sync queue drained', {
+          vaultId: this.currentVaultId, durationMs: Math.round(performance.now() - startedAt),
+          applied: this.status.initialSync.processed, rejected: this.status.initialSync.rejected,
+        });
         window.dispatchEvent(new CustomEvent('slag-sync-updated', {
           detail: { hasItemsChanged: true, hasFoldersChanged: true, hasWorkspaceChanged: true, hasDraftsChanged: true },
         }));
@@ -540,6 +550,9 @@ export class SyncEngine {
     }
     if (this.ws) {
       this.ws.onclose = null;
+      this.ws.onmessage = null;
+      this.ws.onopen = null;
+      this.ws.onerror = null;
       this.ws.close();
       this.ws = null;
     }
@@ -922,7 +935,7 @@ export class SyncEngine {
       this.status.state = 'error';
       this.status.error = 'Не удалось расшифровать или сохранить изменения';
       this.notify();
-      if (this.batchUpdating) throw err;
+      throw err;
     }
   }
 
@@ -1240,6 +1253,9 @@ export class SyncEngine {
     }
     if (this.ws) {
       this.ws.onclose = null;
+      this.ws.onmessage = null;
+      this.ws.onopen = null;
+      this.ws.onerror = null;
       this.ws.close();
       this.ws = null;
     }

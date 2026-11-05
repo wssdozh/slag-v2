@@ -34,7 +34,11 @@ test('account rooms isolate legacy routing and checkpoints, and pending access s
       localStorage.setItem('slag_sync_last_state_hash', root);
       localStorage.setItem(`slag_sync_last_state_hash_${engine.getCurrentVaultId()}`, root);
       let posts = 0;
-      window.fetch = async () => { posts++; return new Response('{}', { status: 200 }); };
+      window.fetch = async (_url, opts) => {
+        if (!opts || opts.method !== 'POST') return Response.json({ bundles: [] });
+        posts++;
+        return new Response('{}', { status: 200 });
+      };
       await push();
       await push();
       const fullResendOnce = posts === 1;

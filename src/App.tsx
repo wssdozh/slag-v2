@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { navigatePage } from './lib/navigation';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
+import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
 import { SearchModal } from './components/Search/SearchModal';
 import { FolderModal } from './components/Modals/FolderModal';
@@ -145,7 +146,11 @@ const AppContent: React.FC = () => {
   if (standalonePanelId) {
     return (
       <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative">
-        <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
+        <InitialSyncBoundary>
+          <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
+        </InitialSyncBoundary>
+        <VaultModal />
+        <ToastContainer />
       </div>
     );
   }
@@ -153,6 +158,7 @@ const AppContent: React.FC = () => {
   if (isMobile && forceMobileMode && isDesktopWidth) {
     return (
       <div className="w-screen h-screen overflow-hidden bg-canvas-subtle flex flex-col items-center justify-center p-4 relative select-none">
+        <InitialSyncBoundary>
         {/* Top Banner with Toggle Back */}
         <div className="absolute top-3 inset-x-0 flex items-center justify-center pointer-events-none z-50">
           <button
@@ -175,10 +181,11 @@ const AppContent: React.FC = () => {
         <FolderModal />
         <FolderInfoModal />
         <FolderViewModal />
-        <VaultModal />
         <TriageModal />
         <ComposerModal />
         <LogModal />
+        </InitialSyncBoundary>
+        <VaultModal />
         <ToastContainer />
         <ImageLightbox
           images={lightboxImages}
@@ -194,6 +201,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative">
+      <InitialSyncBoundary>
       {isMobile ? <MobileShell /> : <WorkspaceShell />}
 
       {/* Global Right-Click Context Menu (Desktop) & Mobile Action Sheet (Touch) */}
@@ -211,8 +219,9 @@ const AppContent: React.FC = () => {
       <FolderModal />
       <FolderInfoModal />
       <FolderViewModal />
-      <VaultModal />
       <ComposerModal />
+      </InitialSyncBoundary>
+      <VaultModal />
       <ToastContainer />
       <ImageLightbox
         images={lightboxImages}

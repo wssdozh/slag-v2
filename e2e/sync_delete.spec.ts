@@ -12,6 +12,7 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
       const key = await cryptoMod.deriveVaultKey('synthetic delete seed');
       let captured: { changes?: Array<{ id: string; type: string; action: string }> } = {};
       window.fetch = async (_url, opts) => {
+        if (!opts || opts.method !== 'POST') return Response.json({ bundles: [] });
         const encrypted = JSON.parse(opts.body);
         captured = await cryptoMod.decryptBundle(encrypted, key);
         return new Response('{}', { status: 200 });
@@ -34,7 +35,7 @@ test('delete wins over stale upsert and restore wins over delete', async ({ page
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     return withSyncHarness(async ({ engine, storage, init }) => {
-      window.fetch = async () => new Response('{}', { status: 200 });
+      window.fetch = async () => Response.json({ bundles: [] });
       await init('synthetic lww seed');
       const roomId = engine.activeRoomId;
       const base = { id: 'n1', type: 'note' as const, title: 'n1', content: 'x', folder: 'Входящие', tags: [], attachments: [], createdAt: 1, updatedAt: 100 };
@@ -67,7 +68,7 @@ test('folder rename and deletion propagate to folders, nested items, and outbox'
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     return withSyncHarness(async ({ engine, storage, init }) => {
-      window.fetch = async () => new Response('{}', { status: 200 });
+      window.fetch = async () => Response.json({ bundles: [] });
       await init('synthetic folder seed');
       const roomId = engine.activeRoomId;
 

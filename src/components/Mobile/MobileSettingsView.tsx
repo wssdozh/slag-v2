@@ -50,6 +50,7 @@ export const MobileSettingsView: React.FC = () => {
     addToast
   } = useApp();
 
+  const [acceptingVaultId, setAcceptingVaultId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const touchDragRef = useRef<{ startIndex: number } | null>(null);
 
@@ -65,7 +66,8 @@ export const MobileSettingsView: React.FC = () => {
 
   const handleAcceptInvitation = async (vaultId: string) => {
     const invitation = accountState.invitations.find((item) => item.vaultId === vaultId);
-    if (!invitation) return;
+    if (!invitation || acceptingVaultId) return;
+    setAcceptingVaultId(vaultId);
     try {
       const result = await acceptSharedVault({
         vaultId,
@@ -78,6 +80,8 @@ export const MobileSettingsView: React.FC = () => {
       );
     } catch (error) {
       addToast(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setAcceptingVaultId(null);
     }
   };
 
@@ -220,10 +224,11 @@ export const MobileSettingsView: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    disabled={acceptingVaultId !== null}
                     onClick={() => void handleAcceptInvitation(inv.vaultId)}
                     className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition-colors cursor-pointer active:scale-95"
                   >
-                    Принять
+                    {acceptingVaultId === inv.vaultId ? 'подключаем…' : 'Принять'}
                   </button>
                 </div>
               </div>

@@ -45,7 +45,11 @@ test('push always goes over HTTP POST and 409 replay counts as delivered', async
       engine.ws = { readyState: 1, send: () => { wsSends++; }, close: () => {} };
       const posts: number[] = [];
       let status = 200;
-      window.fetch = async () => { posts.push(status); return new Response('{}', { status }); };
+      window.fetch = async (_url, opts) => {
+        if (!opts || opts.method !== 'POST') return Response.json({ bundles: [] });
+        posts.push(status);
+        return new Response('{}', { status });
+      };
       await push();
       const firstPushOverHttp = posts.length === 1 && wsSends === 0;
       localStorage.removeItem(engine.getStateHashKey());
@@ -68,7 +72,7 @@ test('a re-delivered bundleId applies only once', async ({ page }) => {
       let applies = 0;
       const origImport = storage.importSyncedVaultData.bind(storage);
       storage.importSyncedVaultData = async (data) => { applies++; return origImport(data); };
-      window.fetch = async () => new Response('{}', { status: 200 });
+      window.fetch = async () => Response.json({ bundles: [] });
       await init('synthetic dedup seed');
       const bundle = {
         bundleId: 'dup-bundle', roomId: engine.activeRoomId, fromDeviceId: 'other-device', sequence: 1,
