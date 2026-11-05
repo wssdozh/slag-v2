@@ -1,6 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { MobileTabId } from '../../types';
+import { syncEngine } from '../../lib/sync/syncEngine';
+import { accountClient } from '../../lib/sync/account';
+import { navigatePage } from '../../lib/navigation';
 import {
   Sparkles,
   Database,
@@ -44,6 +47,15 @@ export const MobileSettingsView: React.FC = () => {
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const touchDragRef = useRef<{ startIndex: number } | null>(null);
+
+  const [syncStatus, setSyncStatus] = useState(syncEngine.getStatus());
+  const [accountState, setAccountState] = useState(accountClient.getState());
+
+  useEffect(() => syncEngine.subscribe(setSyncStatus), []);
+  useEffect(() => accountClient.subscribe(setAccountState), []);
+
+  const isLocked = syncStatus.authRequired && !accountClient.isAuthenticated();
+  const account = accountState.account;
 
   const activeTabs = mobileDockTabs
     .map(id => ALL_AVAILABLE_TABS.find(t => t.id === id))
@@ -138,6 +150,47 @@ export const MobileSettingsView: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* SLAG ID Banner (When not logged in) */}
+        {isLocked && (
+          <div className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface/80 border border-white/[0.06] shadow-sm">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white shrink-0">
+                <Shield className="w-4 h-4 text-zinc-300" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-white tracking-tight">SLAG ID</div>
+                <div className="text-2xs text-zinc-400 mt-0.5 truncate">Синхронизация и облачный ИИ</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              data-testid="mobile-settings-login-btn"
+              onClick={() => navigatePage('account')}
+              className="h-ctrl-sm px-3.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shrink-0 active:scale-95"
+            >
+              Войти
+            </button>
+          </div>
+        )}
+
+        {!isLocked && account && (
+          <div
+            onClick={() => navigatePage('account')}
+            className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-surface/60 border border-white/[0.05] hover:bg-surface/80 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <Shield className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-white truncate">{account.planLabel || 'SLAG ID'}</div>
+                <div className="text-[10px] font-mono text-zinc-500 truncate">Аккаунт подключен</div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+          </div>
+        )}
 
         {/* Group 1: Quick Settings Navigation (Opens specific tab in SettingsModal) */}
         <div className="flex flex-col gap-1.5">

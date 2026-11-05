@@ -139,7 +139,10 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Drag-and-drop test: drag "Папки" over "Таски" (index 0 to index 1)
     const tasksActiveRow = page.locator('[data-dock-tab-index="1"]');
-    await foldersActiveRow.dragTo(tasksActiveRow);
+    await foldersActiveRow.dispatchEvent('dragstart');
+    await tasksActiveRow.dispatchEvent('dragover');
+    await foldersActiveRow.dispatchEvent('dragend');
+    await page.waitForTimeout(100);
 
     // Verify that in the dock, "Таски" is now before "Папки"
     const dockButtons = page.locator('nav[aria-label="Мобильная навигация"] button');

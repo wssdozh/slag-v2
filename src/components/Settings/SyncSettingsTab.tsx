@@ -430,18 +430,18 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   return (
     <div className="flex flex-col gap-3 text-zinc-100">
       {locked && (
-        <section className="p-4 rounded-xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-between gap-4">
-          <div>
-            <h3 className="text-xs font-semibold text-white">Для синхронизации нужен SLAG ID</h3>
-            <p className="text-2xs text-zinc-400 mt-1">Войдите по seed-фразе или создайте аккаунт. Локальные заметки останутся доступны.</p>
+        <section className="p-3.5 rounded-xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-xs font-semibold text-white">Синхронизация недоступна</h3>
+            <p className="text-2xs text-zinc-400 mt-0.5">Требуется вход в аккаунт SLAG ID.</p>
           </div>
           <button
             type="button"
             data-testid="sync-open-account"
             onClick={() => { navigatePage('account'); }}
-            className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold whitespace-nowrap"
+            className="px-3.5 py-1.5 rounded-lg bg-white text-black text-xs font-semibold whitespace-nowrap shrink-0 active:scale-95 cursor-pointer"
           >
-            Войти в ЛК
+            Войти
           </button>
         </section>
       )}
