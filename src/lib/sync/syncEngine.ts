@@ -964,7 +964,13 @@ export class SyncEngine {
         (this.status.initialSync.state === 'loading' || this.status.initialSync.state === 'error')) return;
     const pullGeneration = this.initGeneration;
     // Fetch incoming remote updates before computing state and pushing.
-    await this.fetchPendingBundlesHttp();
+    try {
+      await this.fetchPendingBundlesHttp();
+    } catch (error) {
+      // The pull reports its error; background push callers must not reject unhandled.
+      syncLog.warn('Push skipped after failed pull:', error);
+      return;
+    }
     if (pullGeneration !== this.initGeneration || this.isProcessingSync) return;
     if (this.config.localSyncMode === 'receive-only') return;
 

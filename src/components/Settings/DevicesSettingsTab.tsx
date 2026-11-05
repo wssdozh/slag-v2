@@ -81,12 +81,14 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (managingDevice) setManagingDevice(null);
-      else if (isPairModalOpen) setIsPairModalOpen(false);
+      if (event.key !== 'Escape' || (!managingDevice && !isPairModalOpen)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (isPairModalOpen) setIsPairModalOpen(false);
+      else setManagingDevice(null);
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isPairModalOpen, managingDevice]);
 
   useEffect(() => {
