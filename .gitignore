@@ -46,6 +46,10 @@ test-results/
 playwright-report/
 coverage/
 
+# Local test vaults & design scratch
+test-vault/
+design-assets/
+
 # Python & Relay
 __pycache__/
 *.py[cod]
