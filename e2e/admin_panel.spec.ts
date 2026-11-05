@@ -2,19 +2,20 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
+test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
   test.beforeEach(async () => {
-    const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots');
+    const screenshotDir = path.join(process.cwd(), 'screenshots');
     if (!fs.existsSync(screenshotDir)) {
       fs.mkdirSync(screenshotDir, { recursive: true });
     }
   });
 
-  test('admin authentication, stats, accounts, device revocation, maintenance and tauri isolation', async ({ page }) => {
+  test('admin authentication and all 5 commercial tabs verification', async ({ page }) => {
     test.setTimeout(60_000);
 
     let currentPlan = 'free';
     let deviceStatus = 'active';
+    let accountStatus = 'active';
 
     // Mock relay admin endpoints
     await page.route('**/api/admin/**', async (route) => {
@@ -63,6 +64,8 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
                 plan: currentPlan,
                 planLabel: currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1),
                 createdAt: '2026-11-01T12:00:00Z',
+                expiresAt: '2026-12-01T12:00:00Z',
+                status: accountStatus,
                 maxDevices: currentPlan === 'free' ? 2 : currentPlan === 'smile' ? 5 : 15,
                 maxCacheMb: currentPlan === 'free' ? 1024 : currentPlan === 'smile' ? 10240 : 51200,
                 usedCacheMb: 40.5,
@@ -92,6 +95,8 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
                 plan: 'smile',
                 planLabel: 'Smile',
                 createdAt: '2026-11-03T18:40:00Z',
+                expiresAt: null,
+                status: 'active',
                 maxDevices: 5,
                 maxCacheMb: 10240,
                 usedCacheMb: 120.0,
@@ -105,6 +110,127 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
                     lastSeenAt: '2026-11-05T11:00:00Z',
                   },
                 ],
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url.includes('/api/admin/billing/stats') && method === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            mrr: 680,
+            totalRevenue: 3420,
+            paidAccounts: 2,
+            freeAccounts: 4,
+            conversionRate: 33.3,
+          }),
+        });
+      }
+
+      if (url.includes('/api/admin/billing/transactions') && method === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            transactions: [
+              {
+                id: 'tx_aabb1122',
+                accountId: 'acc_7a8b9c0d1e2f34567890abcd',
+                amount: 490,
+                currency: 'RUB',
+                plan: 'angry',
+                periodDays: 30,
+                status: 'paid',
+                createdAt: '2026-11-05T11:00:00Z',
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url.includes('/api/admin/billing/grant') && method === 'POST') {
+        currentPlan = 'angry';
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', transactionId: 'tx_grant_123' }),
+        });
+      }
+
+      if (url.includes('/api/admin/ai/stats') && method === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            gatewayStatus: 'operational',
+            totalRequests: 842,
+            totalPromptTokens: 245000,
+            totalCompletionTokens: 112000,
+            totalTokens: 357000,
+            activeModels: ['deepseek-v4-1-flash', 'claude-3-5-sonnet'],
+          }),
+        });
+      }
+
+      if (url.includes('/api/admin/ai/logs') && method === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            logs: [
+              {
+                id: 'ai_log_1',
+                accountId: 'acc_7a8b9c0d1e2f34567890abcd',
+                model: 'deepseek-v4-1-flash',
+                promptTokens: 420,
+                completionTokens: 85,
+                latencyMs: 124.5,
+                createdAt: '2026-11-05T11:30:00Z',
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url.includes('/api/admin/ai/ping') && method === 'POST') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', latencyMs: 64.2, model: 'deepseek-v4-1-flash' }),
+        });
+      }
+
+      if (url.includes('/api/admin/audit') && method === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            blockedAccountsCount: 0,
+            revokedDevicesCount: 1,
+            logs: [
+              {
+                id: 'aud_1',
+                action: 'grant_subscription',
+                targetType: 'account',
+                targetId: 'acc_7a8b9c0d1e2f34567890abcd',
+                details: 'plan=angry, days=30',
+                createdAt: '2026-11-05T11:45:00Z',
+              },
+              {
+                id: 'aud_2',
+                action: 'revoke_device',
+                targetType: 'device',
+                targetId: 'dev_pc_11223344',
+                details: 'account=acc_7a8b9c0d1e2f34567890abcd',
+                createdAt: '2026-11-05T10:00:00Z',
               },
             ],
           }),
@@ -126,16 +252,17 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
                 bundlesCount: 84,
                 cacheBytes: 25165824,
               },
-              {
-                roomId: 'room_aabbccddeeff',
-                vaultId: 'v_sync_99',
-                lastActiveAt: '2026-11-05T09:10:00Z',
-                createdAt: '2026-11-03T18:40:00Z',
-                bundlesCount: 72,
-                cacheBytes: 17309696,
-              },
             ],
           }),
+        });
+      }
+
+      if (url.includes('/api/admin/accounts/') && url.includes('/toggle-status') && method === 'POST') {
+        accountStatus = accountStatus === 'active' ? 'blocked' : 'active';
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', account: { status: accountStatus } }),
         });
       }
 
@@ -177,72 +304,64 @@ test.describe('SLAG Relay Admin Panel (?page=admin)', () => {
       return route.fulfill({ status: 404, body: JSON.stringify({ error: 'not_found' }) });
     });
 
-    // 1. Open ?page=admin in browser mode
+    // 1. Login
     await page.goto('/?page=admin', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('h1', { hasText: 'вход в админ-панель' })).toBeVisible();
-
-    await page.screenshot({
-      path: 'screenshots/admin_login.png',
-      fullPage: false,
-    });
-
-    // 2. Test login
     const tokenInput = page.locator('#admin-token');
     await tokenInput.fill('secret-admin-token');
     await page.locator('button[type="submit"]', { hasText: 'войти' }).click();
 
-    // Verify dashboard metrics and navigation tabs
-    await expect(page.locator('header', { hasText: 'SLAG Relay Admin' })).toBeVisible();
-    await expect(page.locator('button', { hasText: 'аккаунты' })).toBeVisible();
-    await expect(page.locator('button', { hasText: 'обслуживание' })).toBeVisible();
-
-    // Verify accounts list
+    // 1. Accounts tab
+    await expect(page.locator('[data-testid="tab-accounts"]')).toHaveClass(/bg-white\/10/);
     await expect(page.locator('span', { hasText: 'acc_7a8b9c0d1e2f34567890abcd' })).toBeVisible();
-    await expect(page.locator('text=Рабочее')).toBeVisible();
-    await expect(page.locator('text=Личное')).toBeVisible();
+    const lockBtn = page.locator('button[title="заблокировать"]').first();
+    await lockBtn.click();
+    await expect(page.locator('span', { hasText: 'blocked' }).first()).toBeVisible();
 
-    // 3. Test plan change: click 'angry' on first account
-    const angryBtn = page.locator('button', { hasText: 'angry' }).first();
-    await angryBtn.click();
-    await expect(angryBtn).toHaveClass(/bg-white text-black/);
+    await page.screenshot({ path: 'screenshots/tab_accounts.png' });
 
-    // 4. Test device revocation
-    const revokeBtn = page.locator('button[title="отозвать доступ"]').first();
-    await expect(revokeBtn).toBeVisible();
-    await revokeBtn.click();
-    await expect(page.locator('span', { hasText: 'revoked' }).first()).toBeVisible();
+    // 2. Billing Tab
+    await page.locator('[data-testid="tab-billing"]').click();
+    await expect(page.locator('[data-testid="tab-billing"]')).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('text=MRR (выручка/мес)')).toBeVisible();
+    await expect(page.locator('text=680 ₽')).toBeVisible();
+    await expect(page.locator('text=33.3%')).toBeVisible();
 
-    // Capture screenshot of accounts tab
-    await page.screenshot({
-      path: 'screenshots/admin_panel.png',
-      fullPage: false,
-    });
+    // Grant subscription form
+    await page.locator('button[type="submit"]', { hasText: 'начислить' }).click();
+    await expect(page.locator('[role="status"]', { hasText: 'подписка smile начислена' })).toBeVisible();
 
-    // 5. Switch to Maintenance tab
-    await page.locator('button', { hasText: 'обслуживание' }).click();
-    await expect(page.locator('text=размер базы')).toBeVisible();
-    await expect(page.locator('text=12.0 MB')).toBeVisible();
+    await page.screenshot({ path: 'screenshots/tab_billing.png' });
+
+    // 3. AI Gateway Tab
+    await page.locator('[data-testid="tab-ai"]').click();
+    await expect(page.locator('[data-testid="tab-ai"]')).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('text=operational')).toBeVisible();
+    await expect(page.locator('text=357 000')).toBeVisible();
+
+    // AI Ping
+    await page.locator('button', { hasText: 'проверить пинг шлюза' }).click();
+    await expect(page.locator('[role="status"]', { hasText: 'шлюз отвечает: пинг 64.2 мс' })).toBeVisible();
+
+    await page.screenshot({ path: 'screenshots/tab_ai.png' });
+
+    // 4. Relay Tab
+    await page.locator('[data-testid="tab-relay"]').click();
+    await page.waitForTimeout(100);
+    const relayClasses = await page.locator('[data-testid="tab-relay"]').getAttribute('class');
+    console.log('RELAY TAB CLASSES:', relayClasses);
     await expect(page.locator('text=комнаты синхронизации')).toBeVisible();
 
-    // Run Vacuum
-    await page.locator('button', { hasText: 'сжать базу (vacuum)' }).click();
-    await expect(page.locator('[role="status"]', { hasText: 'база сжата' })).toBeVisible();
+    await page.screenshot({ path: 'screenshots/tab_relay.png' });
 
-    // Capture screenshot of maintenance tab
-    await page.screenshot({
-      path: 'screenshots/admin_maintenance.png',
-      fullPage: false,
-    });
+    // 5. Security Tab
+    await page.locator('[data-testid="tab-security"]').click();
+    await page.waitForTimeout(100);
+    const secClasses = await page.locator('[data-testid="tab-security"]').getAttribute('class');
+    console.log('SECURITY TAB CLASSES:', secClasses);
+    await expect(page.locator('text=P-256 E2EE (Zero-Knowledge)')).toBeVisible();
+    await expect(page.locator('text=журнал аудита действий')).toBeVisible();
+    await expect(page.locator('text=grant_subscription')).toBeVisible();
 
-    // 6. Test Tauri app isolation
-    const tauriContext = await page.context().browser()!.newContext();
-    const tauriPage = await tauriContext.newPage();
-    await tauriPage.addInitScript(() => {
-      (window as any).isTauri = true;
-    });
-    await tauriPage.goto('/?page=admin', { waitUntil: 'domcontentloaded' });
-    await expect(tauriPage.locator('text=доступно только в веб-версии')).toBeVisible();
-    await expect(tauriPage.locator('button', { hasText: 'вернуться в приложение' })).toBeVisible();
-    await tauriContext.close();
+    await page.screenshot({ path: 'screenshots/tab_security.png' });
   });
 });

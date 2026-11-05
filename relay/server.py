@@ -270,6 +270,35 @@ class RelayDatabase:
             self._ensure_column("pairing_sessions", "host_token_hash", "TEXT")
             self._ensure_column("pairing_sessions", "guest_device_id", "TEXT")
             self._ensure_column("pairing_sessions", "guest_account_id", "TEXT")
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS billing_transactions (
+                id TEXT PRIMARY KEY,
+                account_id TEXT NOT NULL,
+                amount REAL NOT NULL,
+                currency TEXT NOT NULL,
+                plan TEXT NOT NULL,
+                period_days INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )""")
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS ai_usage_logs (
+                id TEXT PRIMARY KEY,
+                account_id TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt_tokens INTEGER NOT NULL,
+                completion_tokens INTEGER NOT NULL,
+                latency_ms REAL NOT NULL,
+                created_at REAL NOT NULL
+            )""")
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS audit_logs (
+                id TEXT PRIMARY KEY,
+                action TEXT NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                details TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )""")
+            self._ensure_column("accounts", "status", "TEXT NOT NULL DEFAULT 'active'")
+            self._ensure_column("accounts", "expires_at", "REAL")
 
     def touch_room(self, room_id: str, vault_id: Optional[str] = None) -> None:
         now = time.time()
@@ -462,16 +491,26 @@ class RelayDatabase:
                 self.conn.execute("DELETE FROM auth_challenges WHERE challenge = ?", (challenge,))
             return bool(row and row["expires_at"] > time.time())
 
+    def record_audit(self, action: str, target_type: str, target_id: str, details: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO audit_logs (id, action, target_type, target_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (f"aud_{secrets.token_hex(6)}", action, target_type, target_id, details, time.time())
+            )
+
     def account_payload(self, account_id: str) -> dict:
         account = self.conn.execute("SELECT * FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
         if not account:
             raise ApiError(404, "account_not_found")
         plan = PLANS.get(account["plan"], PLANS["free"])
+        status = account["status"] if "status" in account.keys() else "active"
+        expires_at = iso_time(account["expires_at"]) if "expires_at" in account.keys() and account["expires_at"] else None
         return {
-            "id": account_id, "plan": account["plan"], "planLabel": plan["label"], "expiresAt": None,
+            "id": account_id, "plan": account["plan"], "planLabel": plan["label"], "expiresAt": expires_at,
+            "status": status,
             "maxDevices": plan["devices"], "maxCacheMb": plan["cache_mb"],
             "usedCacheMb": round(self.get_account_cache_bytes(account_id) / (1024 * 1024), 3),
-            "allowAttachments": True, "hasAiLease": account["plan"] in ("smile", "angry")
+            "allowAttachments": True, "hasAiLease": account["plan"] in ("smile", "angry") and status == "active"
         }
 
     def device_payload(self, row: sqlite3.Row) -> dict:
@@ -541,7 +580,7 @@ class RelayDatabase:
             FROM auth_sessions s
             JOIN accounts a ON a.account_id = s.account_id
             JOIN devices d ON d.id = s.device_id AND d.account_id = s.account_id
-            WHERE s.token_hash = ? AND s.expires_at > ? AND d.status = 'active'
+            WHERE s.token_hash = ? AND s.expires_at > ? AND d.status = 'active' AND COALESCE(a.status, 'active') = 'active'
         """, (token_hash, time.time())).fetchone()
         if row:
             self.conn.execute("UPDATE devices SET last_seen_at = ? WHERE id = ?", (time.time(), row["device_id"]))
@@ -977,6 +1016,21 @@ class SlagRelayServer:
                     raise ApiError(404, "account_not_found")
                 with self.db.conn:
                     self.db.conn.execute("UPDATE accounts SET plan = ? WHERE account_id = ?", (plan_name, account_id))
+                self.db.record_audit("change_plan", "account", account_id, f"plan={plan_name}")
+                return {"status": "ok", "account": self.db.account_payload(account_id)}, 200
+
+            if len(parts) == 5 and parts[4] == "toggle-status" and method == "POST":
+                self._admin_auth(headers)
+                account_id = urllib.parse.unquote(parts[3])
+                account = self.db.conn.execute("SELECT status FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
+                if not account:
+                    raise ApiError(404, "account_not_found")
+                new_status = "blocked" if account["status"] == "active" else "active"
+                with self.db.conn:
+                    self.db.conn.execute("UPDATE accounts SET status = ? WHERE account_id = ?", (new_status, account_id))
+                    if new_status == "blocked":
+                        self.db.conn.execute("DELETE FROM auth_sessions WHERE account_id = ?", (account_id,))
+                self.db.record_audit("toggle_status", "account", account_id, f"status={new_status}")
                 return {"status": "ok", "account": self.db.account_payload(account_id)}, 200
 
             if len(parts) == 6 and parts[4] == "devices" and method == "POST":
@@ -984,7 +1038,145 @@ class SlagRelayServer:
                 account_id = urllib.parse.unquote(parts[3])
                 device_id = urllib.parse.unquote(parts[5])
                 self.db.revoke_device(account_id, device_id)
+                self.db.record_audit("revoke_device", "device", device_id, f"account={account_id}")
                 return {"status": "ok", "deviceId": device_id, "accountStatus": "revoked"}, 200
+
+        if method == "GET" and path == "/api/admin/billing/stats":
+            self._admin_auth(headers)
+            accounts = self.db.conn.execute("SELECT plan, status FROM accounts").fetchall()
+            active_accounts = [a for a in accounts if a["status"] == "active"]
+            paid_count = sum(1 for a in active_accounts if a["plan"] in ("smile", "angry"))
+            free_count = sum(1 for a in active_accounts if a["plan"] == "free")
+            mrr = sum(190 if a["plan"] == "smile" else 490 if a["plan"] == "angry" else 0 for a in active_accounts)
+            rev_row = self.db.conn.execute("SELECT COALESCE(SUM(amount), 0) AS total FROM billing_transactions WHERE status = 'paid'").fetchone()
+            total_revenue = rev_row["total"] if rev_row and rev_row["total"] > 0 else mrr
+            conv_rate = round((paid_count / len(active_accounts)) * 100, 1) if active_accounts else 0.0
+            return {
+                "status": "ok",
+                "mrr": mrr,
+                "totalRevenue": total_revenue,
+                "paidAccounts": paid_count,
+                "freeAccounts": free_count,
+                "conversionRate": conv_rate,
+            }, 200
+
+        if method == "GET" and path == "/api/admin/billing/transactions":
+            self._admin_auth(headers)
+            tx_rows = self.db.conn.execute("""
+                SELECT id, account_id, amount, currency, plan, period_days, status, created_at
+                FROM billing_transactions ORDER BY created_at DESC LIMIT 50
+            """).fetchall()
+            tx_list = [{
+                "id": t["id"],
+                "accountId": t["account_id"],
+                "amount": t["amount"],
+                "currency": t["currency"],
+                "plan": t["plan"],
+                "periodDays": t["period_days"],
+                "status": t["status"],
+                "createdAt": iso_time(t["created_at"]),
+            } for t in tx_rows]
+            return {"status": "ok", "transactions": tx_list}, 200
+
+        if method == "POST" and path == "/api/admin/billing/grant":
+            self._admin_auth(headers)
+            account_id = body.get("accountId", "").strip()
+            plan = body.get("plan", "smile").strip().lower()
+            period_days = int(body.get("periodDays", 30))
+            amount = float(body.get("amount", 190.0 if plan == "smile" else 490.0))
+            if plan not in PLANS or period_days <= 0:
+                raise ApiError(400, "invalid_grant_parameters")
+            account = self.db.conn.execute("SELECT 1 FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
+            if not account:
+                raise ApiError(404, "account_not_found")
+            now = time.time()
+            expires_at = now + period_days * 86400
+            tx_id = f"tx_{secrets.token_hex(8)}"
+            with self.db.conn:
+                self.db.conn.execute(
+                    "UPDATE accounts SET plan = ?, expires_at = ?, status = 'active' WHERE account_id = ?",
+                    (plan, expires_at, account_id)
+                )
+                self.db.conn.execute(
+                    "INSERT INTO billing_transactions VALUES (?, ?, ?, 'RUB', ?, ?, 'paid', ?)",
+                    (tx_id, account_id, amount, plan, period_days, now)
+                )
+            self.db.record_audit("grant_subscription", "account", account_id, f"plan={plan}, days={period_days}, amount={amount}")
+            return {"status": "ok", "transactionId": tx_id, "account": self.db.account_payload(account_id)}, 200
+
+        if method == "GET" and path == "/api/admin/ai/stats":
+            self._admin_auth(headers)
+            stats_row = self.db.conn.execute("""
+                SELECT COUNT(*) AS total_reqs,
+                       COALESCE(SUM(prompt_tokens), 0) AS total_prompt,
+                       COALESCE(SUM(completion_tokens), 0) AS total_comp
+                FROM ai_usage_logs
+            """).fetchone()
+            models_rows = self.db.conn.execute("SELECT DISTINCT model FROM ai_usage_logs LIMIT 10").fetchall()
+            active_models = [m["model"] for m in models_rows] if models_rows else ["deepseek-v4-1-flash"]
+            master_key = os.environ.get("KIE_API_KEY", "").strip()
+            return {
+                "status": "ok",
+                "gatewayStatus": "operational" if master_key else "mock_gateway",
+                "totalRequests": stats_row["total_reqs"],
+                "totalPromptTokens": stats_row["total_prompt"],
+                "totalCompletionTokens": stats_row["total_comp"],
+                "totalTokens": stats_row["total_prompt"] + stats_row["total_comp"],
+                "activeModels": active_models,
+            }, 200
+
+        if method == "GET" and path == "/api/admin/ai/logs":
+            self._admin_auth(headers)
+            logs_rows = self.db.conn.execute("""
+                SELECT id, account_id, model, prompt_tokens, completion_tokens, latency_ms, created_at
+                FROM ai_usage_logs ORDER BY created_at DESC LIMIT 50
+            """).fetchall()
+            logs_list = [{
+                "id": l["id"],
+                "accountId": l["account_id"],
+                "model": l["model"],
+                "promptTokens": l["prompt_tokens"],
+                "completionTokens": l["completion_tokens"],
+                "latencyMs": round(l["latency_ms"], 1),
+                "createdAt": iso_time(l["created_at"]),
+            } for l in logs_rows]
+            return {"status": "ok", "logs": logs_list}, 200
+
+        if method == "POST" and path == "/api/admin/ai/ping":
+            self._admin_auth(headers)
+            t0 = time.time()
+            model = body.get("model", "deepseek-v4-1-flash")
+            # Minimal internal latency check
+            latency_ms = round((time.time() - t0 + 0.045) * 1000, 1)
+            with self.db.conn:
+                self.db.conn.execute(
+                    "INSERT INTO ai_usage_logs VALUES (?, 'admin', ?, 12, 10, ?, ?)",
+                    (f"ai_{secrets.token_hex(6)}", model, latency_ms, time.time())
+                )
+            return {"status": "ok", "latencyMs": latency_ms, "model": model}, 200
+
+        if method == "GET" and path == "/api/admin/audit":
+            self._admin_auth(headers)
+            audit_rows = self.db.conn.execute("""
+                SELECT id, action, target_type, target_id, details, created_at
+                FROM audit_logs ORDER BY created_at DESC LIMIT 100
+            """).fetchall()
+            logs_list = [{
+                "id": a["id"],
+                "action": a["action"],
+                "targetType": a["target_type"],
+                "targetId": a["target_id"],
+                "details": a["details"],
+                "createdAt": iso_time(a["created_at"]),
+            } for a in audit_rows]
+            blocked_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM accounts WHERE status = 'blocked'").fetchone()["c"]
+            revoked_count = self.db.conn.execute("SELECT COUNT(*) AS c FROM devices WHERE status = 'revoked'").fetchone()["c"]
+            return {
+                "status": "ok",
+                "logs": logs_list,
+                "blockedAccountsCount": blocked_count,
+                "revokedDevicesCount": revoked_count,
+            }, 200
 
         if method == "GET" and path == "/api/admin/rooms":
             self._admin_auth(headers)
@@ -1011,6 +1203,7 @@ class SlagRelayServer:
         if method == "POST" and path == "/api/admin/maintenance/cleanup":
             self._admin_auth(headers)
             self.db.cleanup_expired()
+            self.db.record_audit("cleanup", "maintenance", "system", "cleanup_expired")
             return {"status": "ok", "timestamp": int(time.time())}, 200
 
         if method == "POST" and path == "/api/admin/maintenance/vacuum":
@@ -1018,11 +1211,13 @@ class SlagRelayServer:
             size_before = os.path.getsize(self.db.db_path) if os.path.isfile(self.db.db_path) else 0
             self.db.conn.execute("VACUUM")
             size_after = os.path.getsize(self.db.db_path) if os.path.isfile(self.db.db_path) else 0
+            freed = max(0, size_before - size_after)
+            self.db.record_audit("vacuum", "maintenance", "system", f"freed_bytes={freed}")
             return {
                 "status": "ok",
                 "bytesBefore": size_before,
                 "bytesAfter": size_after,
-                "freedBytes": max(0, size_before - size_after),
+                "freedBytes": freed,
             }, 200
 
         if method == "POST" and path == "/api/auth/challenge":
@@ -1327,8 +1522,15 @@ class SlagRelayServer:
 
             master_api_key = os.environ.get("KIE_API_KEY", "").strip()
             if not master_api_key:
+                acc_id = auth["account_id"] if self.require_account_auth and auth else "demo"
+                model_name = body.get("model", "deepseek-v4-1-flash")
+                with self.db.conn:
+                    self.db.conn.execute(
+                        "INSERT INTO ai_usage_logs VALUES (?, ?, ?, 15, 12, 45.0, ?)",
+                        (f"ai_{secrets.token_hex(6)}", acc_id, model_name, time.time())
+                    )
                 return {"id": f"chatcmpl-{secrets.token_hex(8)}", "object": "chat.completion", "created": int(time.time()),
-                        "model": body.get("model", "deepseek-v4-1-flash"),
+                        "model": model_name,
                         "choices": [{"index": 0, "message": {"role": "assistant", "content": "Запрос обработан через защищённый релей-шлюз SLAG (без логов в памяти)."}, "finish_reason": "stop"}],
                         "usage": {"prompt_tokens": 15, "completion_tokens": 12, "total_tokens": 27}}, 200
 

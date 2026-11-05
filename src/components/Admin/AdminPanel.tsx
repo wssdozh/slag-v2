@@ -1,24 +1,32 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Activity,
   Check,
   Copy,
+  CreditCard,
   Database,
   FolderSync,
   Laptop,
   Loader2,
+  Lock,
   LogOut,
   Radio,
   RefreshCw,
   Server,
   Shield,
   Smartphone,
+  Sparkles,
   Trash2,
+  Unlock,
+  Users,
   Wrench,
 } from 'lucide-react';
 import { isTauriEnvironment } from '../../lib/platform';
 import { navigatePage } from '../../lib/navigation';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { formatBytes } from '../../lib/formatBytes';
+
+type AdminTab = 'accounts' | 'billing' | 'ai' | 'relay' | 'security';
 
 interface AdminStats {
   uptime: number;
@@ -53,11 +61,60 @@ interface AdminAccount {
   plan: 'free' | 'smile' | 'angry';
   planLabel: string;
   createdAt: string | null;
+  expiresAt: string | null;
+  status: 'active' | 'blocked';
   maxDevices: number;
   maxCacheMb: number;
   usedCacheMb: number;
   devices: AdminDevice[];
   vaults?: AdminVault[];
+}
+
+interface BillingStats {
+  mrr: number;
+  totalRevenue: number;
+  paidAccounts: number;
+  freeAccounts: number;
+  conversionRate: number;
+}
+
+interface BillingTransaction {
+  id: string;
+  accountId: string;
+  amount: number;
+  currency: string;
+  plan: string;
+  periodDays: number;
+  status: string;
+  createdAt: string | null;
+}
+
+interface AiStats {
+  gatewayStatus: string;
+  totalRequests: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalTokens: number;
+  activeModels: string[];
+}
+
+interface AiLog {
+  id: string;
+  accountId: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  latencyMs: number;
+  createdAt: string | null;
+}
+
+interface AuditLog {
+  id: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  details: string;
+  createdAt: string | null;
 }
 
 interface AdminRoom {
@@ -103,16 +160,27 @@ export const AdminPanel: React.FC = () => {
   const [inputToken, setInputToken] = useState('');
   const [inputServerUrl, setInputServerUrl] = useState(serverUrl);
 
-  const [activeTab, setActiveTab] = useState<'accounts' | 'maintenance'>('accounts');
+  const [activeTab, setActiveTab] = useState<AdminTab>('accounts');
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
+  const [billingStats, setBillingStats] = useState<BillingStats | null>(null);
+  const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
+  const [aiStats, setAiStats] = useState<AiStats | null>(null);
+  const [aiLogs, setAiLogs] = useState<AiLog[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [securityStats, setSecurityStats] = useState<{ blockedAccountsCount: number; revokedDevicesCount: number } | null>(null);
+
+  // Form states
+  const [grantAccountId, setGrantAccountId] = useState('');
+  const [grantPlan, setGrantPlan] = useState<'smile' | 'angry'>('smile');
+  const [grantDays, setGrantDays] = useState('30');
+  const [grantAmount, setGrantAmount] = useState('190');
+
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
-  const [updatingPlanId, setUpdatingPlanId] = useState<string | null>(null);
-  const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
-  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
-  const [maintenanceStatus, setMaintenanceStatus] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -124,11 +192,17 @@ export const AdminPanel: React.FC = () => {
       'Content-Type': 'application/json',
     };
     try {
-      const [statsRes, accountsRes, roomsRes] = await Promise.all([
-        fetch(`${activeUrl}/api/admin/stats`, { headers }),
-        fetch(`${activeUrl}/api/admin/accounts`, { headers }),
-        fetch(`${activeUrl}/api/admin/rooms`, { headers }).catch(() => null),
-      ]);
+      const [statsRes, accountsRes, roomsRes, billStatsRes, txRes, aiStatsRes, aiLogsRes, auditRes] =
+        await Promise.all([
+          fetch(`${activeUrl}/api/admin/stats`, { headers }),
+          fetch(`${activeUrl}/api/admin/accounts`, { headers }),
+          fetch(`${activeUrl}/api/admin/rooms`, { headers }).catch(() => null),
+          fetch(`${activeUrl}/api/admin/billing/stats`, { headers }).catch(() => null),
+          fetch(`${activeUrl}/api/admin/billing/transactions`, { headers }).catch(() => null),
+          fetch(`${activeUrl}/api/admin/ai/stats`, { headers }).catch(() => null),
+          fetch(`${activeUrl}/api/admin/ai/logs`, { headers }).catch(() => null),
+          fetch(`${activeUrl}/api/admin/audit`, { headers }).catch(() => null),
+        ]);
 
       if (statsRes.status === 401 || accountsRes.status === 401) {
         throw new Error('неверный админ-токен');
@@ -140,15 +214,44 @@ export const AdminPanel: React.FC = () => {
         throw new Error(`ошибка сервера (${statsRes.status}/${accountsRes.status})`);
       }
 
-      const statsData = (await statsRes.json()) as AdminStats;
-      const accountsData = (await accountsRes.json()) as { accounts: AdminAccount[] };
+      setStats((await statsRes.json()) as AdminStats);
+      const accData = (await accountsRes.json()) as { accounts: AdminAccount[] };
+      setAccounts(accData.accounts || []);
+      if (!grantAccountId && accData.accounts.length > 0) {
+        setGrantAccountId(accData.accounts[0].id);
+      }
 
-      setStats(statsData);
-      setAccounts(accountsData.accounts || []);
       if (roomsRes && roomsRes.ok) {
         const roomsData = (await roomsRes.json()) as { rooms: AdminRoom[] };
         setRooms(roomsData.rooms || []);
       }
+      if (billStatsRes && billStatsRes.ok) {
+        setBillingStats((await billStatsRes.json()) as BillingStats);
+      }
+      if (txRes && txRes.ok) {
+        const txData = (await txRes.json()) as { transactions: BillingTransaction[] };
+        setTransactions(txData.transactions || []);
+      }
+      if (aiStatsRes && aiStatsRes.ok) {
+        setAiStats((await aiStatsRes.json()) as AiStats);
+      }
+      if (aiLogsRes && aiLogsRes.ok) {
+        const logsData = (await aiLogsRes.json()) as { logs: AiLog[] };
+        setAiLogs(logsData.logs || []);
+      }
+      if (auditRes && auditRes.ok) {
+        const auditData = (await auditRes.json()) as {
+          logs: AuditLog[];
+          blockedAccountsCount: number;
+          revokedDevicesCount: number;
+        };
+        setAuditLogs(auditData.logs || []);
+        setSecurityStats({
+          blockedAccountsCount: auditData.blockedAccountsCount || 0,
+          revokedDevicesCount: auditData.revokedDevicesCount || 0,
+        });
+      }
+
       setIsAuthenticated(true);
       sessionStorage.setItem(TOKEN_STORAGE_KEY, activeToken);
       sessionStorage.setItem(SERVER_STORAGE_KEY, activeUrl);
@@ -161,7 +264,7 @@ export const AdminPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [grantAccountId]);
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;
@@ -174,6 +277,12 @@ export const AdminPanel: React.FC = () => {
       active = false;
     };
   }, [isAuthenticated, token, serverUrl, loadData]);
+
+  const switchTab = (tab: AdminTab) => {
+    setActiveTab(tab);
+    setStatusMessage(null);
+    setError(null);
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,11 +304,17 @@ export const AdminPanel: React.FC = () => {
     setStats(null);
     setAccounts([]);
     setRooms([]);
+    setBillingStats(null);
+    setTransactions([]);
+    setAiStats(null);
+    setAiLogs([]);
+    setAuditLogs([]);
     setError(null);
+    setStatusMessage(null);
   };
 
   const handlePlanChange = async (accountId: string, newPlan: 'free' | 'smile' | 'angry') => {
-    setUpdatingPlanId(accountId);
+    setActionBusy(true);
     setError(null);
     try {
       const res = await fetch(`${serverUrl}/api/admin/accounts/${encodeURIComponent(accountId)}`, {
@@ -230,12 +345,38 @@ export const AdminPanel: React.FC = () => {
     } catch (err) {
       setError(`не удалось сменить тариф: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setUpdatingPlanId(null);
+      setActionBusy(false);
+    }
+  };
+
+  const handleToggleAccountStatus = async (accountId: string) => {
+    setActionBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${serverUrl}/api/admin/accounts/${encodeURIComponent(accountId)}/toggle-status`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || `ошибка ${res.status}`);
+      }
+      const data = (await res.json()) as { account: AdminAccount };
+      setAccounts((prev) =>
+        prev.map((acc) => (acc.id === accountId ? { ...acc, status: data.account.status } : acc))
+      );
+    } catch (err) {
+      setError(`не удалось изменить статус: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setActionBusy(false);
     }
   };
 
   const handleRevokeDevice = async (accountId: string, deviceId: string) => {
-    setRevokingDeviceId(deviceId);
+    setActionBusy(true);
     setError(null);
     try {
       const res = await fetch(
@@ -264,13 +405,70 @@ export const AdminPanel: React.FC = () => {
     } catch (err) {
       setError(`не удалось отозвать устройство: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setRevokingDeviceId(null);
+      setActionBusy(false);
+    }
+  };
+
+  const handleGrantSubscription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!grantAccountId) return;
+    setActionBusy(true);
+    setStatusMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(`${serverUrl}/api/admin/billing/grant`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accountId: grantAccountId,
+          plan: grantPlan,
+          periodDays: parseInt(grantDays, 10),
+          amount: parseFloat(grantAmount),
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || `ошибка ${res.status}`);
+      }
+      setStatusMessage(`подписка ${grantPlan} начислена аккаунту ${shortId(grantAccountId)}`);
+      await loadData(token, serverUrl);
+    } catch (err) {
+      setError(`ошибка начисления: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleAiPing = async () => {
+    setActionBusy(true);
+    setStatusMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(`${serverUrl}/api/admin/ai/ping`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model: 'deepseek-v4-1-flash' }),
+      });
+      if (!res.ok) throw new Error(`ошибка ${res.status}`);
+      const data = (await res.json()) as { latencyMs: number; model: string };
+      setStatusMessage(`шлюз отвечает: пинг ${data.latencyMs} мс (${data.model})`);
+      await loadData(token, serverUrl);
+    } catch (err) {
+      setError(`ошибка пинга шлюза: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setActionBusy(false);
     }
   };
 
   const handleCleanup = async () => {
-    setMaintenanceBusy(true);
-    setMaintenanceStatus(null);
+    setActionBusy(true);
+    setStatusMessage(null);
     setError(null);
     try {
       const res = await fetch(`${serverUrl}/api/admin/maintenance/cleanup`, {
@@ -281,18 +479,18 @@ export const AdminPanel: React.FC = () => {
         },
       });
       if (!res.ok) throw new Error(`ошибка ${res.status}`);
-      setMaintenanceStatus('очистка выполнена: устаревшие бандлы и сессии удалены');
+      setStatusMessage('очистка выполнена: устаревшие бандлы и сессии удалены');
       await loadData(token, serverUrl);
     } catch (err) {
       setError(`ошибка очистки: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setMaintenanceBusy(false);
+      setActionBusy(false);
     }
   };
 
   const handleVacuum = async () => {
-    setMaintenanceBusy(true);
-    setMaintenanceStatus(null);
+    setActionBusy(true);
+    setStatusMessage(null);
     setError(null);
     try {
       const res = await fetch(`${serverUrl}/api/admin/maintenance/vacuum`, {
@@ -304,14 +502,14 @@ export const AdminPanel: React.FC = () => {
       });
       if (!res.ok) throw new Error(`ошибка ${res.status}`);
       const data = (await res.json()) as { bytesBefore: number; bytesAfter: number; freedBytes: number };
-      setMaintenanceStatus(
+      setStatusMessage(
         `база сжата: ${formatBytes(data.bytesBefore)} → ${formatBytes(data.bytesAfter)} (освобождено ${formatBytes(data.freedBytes) || '0 B'})`
       );
       await loadData(token, serverUrl);
     } catch (err) {
       setError(`ошибка сжатия базы: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setMaintenanceBusy(false);
+      setActionBusy(false);
     }
   };
 
@@ -355,28 +553,71 @@ export const AdminPanel: React.FC = () => {
             <span className="text-sm font-semibold tracking-tight text-white">SLAG Relay Admin</span>
           </div>
           {isAuthenticated && (
-            <nav className="flex items-center gap-2">
+            <nav className="flex items-center gap-1.5 overflow-x-auto">
               <button
                 type="button"
-                onClick={() => setActiveTab('accounts')}
-                className={`px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
+                data-testid="tab-accounts"
+                onClick={() => switchTab('accounts')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
                   activeTab === 'accounts'
                     ? 'bg-white/10 text-white font-medium'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                аккаунты
+                <Users className="w-3.5 h-3.5" />
+                <span>аккаунты</span>
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('maintenance')}
-                className={`px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
-                  activeTab === 'maintenance'
+                data-testid="tab-billing"
+                onClick={() => switchTab('billing')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
+                  activeTab === 'billing'
                     ? 'bg-white/10 text-white font-medium'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                обслуживание
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>биллинг</span>
+              </button>
+              <button
+                type="button"
+                data-testid="tab-ai"
+                onClick={() => switchTab('ai')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
+                  activeTab === 'ai'
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>ии-шлюз</span>
+              </button>
+              <button
+                type="button"
+                data-testid="tab-relay"
+                onClick={() => switchTab('relay')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
+                  activeTab === 'relay'
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>релей</span>
+              </button>
+              <button
+                type="button"
+                data-testid="tab-security"
+                onClick={() => switchTab('security')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
+                  activeTab === 'security'
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>безопасность</span>
               </button>
             </nav>
           )}
@@ -386,7 +627,7 @@ export const AdminPanel: React.FC = () => {
             <>
               <button
                 type="button"
-                disabled={loading || maintenanceBusy}
+                disabled={loading || actionBusy}
                 onClick={() => void loadData(token, serverUrl)}
                 className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer disabled:opacity-40"
               >
@@ -421,9 +662,9 @@ export const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {maintenanceStatus && (
+        {statusMessage && (
           <div role="status" className="p-3 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-            {maintenanceStatus}
+            {statusMessage}
           </div>
         )}
 
@@ -473,32 +714,8 @@ export const AdminPanel: React.FC = () => {
             </form>
           </div>
         ) : activeTab === 'accounts' ? (
+          /* 1. Accounts Tab */
           <>
-            {stats && (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
-                  <span className="text-[11px] font-mono text-zinc-500">uptime</span>
-                  <span className="text-sm font-semibold text-white">{formatUptime(stats.uptime)}</span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
-                  <span className="text-[11px] font-mono text-zinc-500">аккаунты</span>
-                  <span className="text-sm font-semibold text-white">{stats.totalAccounts}</span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
-                  <span className="text-[11px] font-mono text-zinc-500">устройства</span>
-                  <span className="text-sm font-semibold text-white">{stats.totalDevices}</span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
-                  <span className="text-[11px] font-mono text-zinc-500">хранилища</span>
-                  <span className="text-sm font-semibold text-white">{stats.totalVaults}</span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1 col-span-2 sm:col-span-1">
-                  <span className="text-[11px] font-mono text-zinc-500">кеш бандлов</span>
-                  <span className="text-sm font-semibold text-white">{formatBytes(stats.totalCacheBytes) || '0 B'}</span>
-                </div>
-              </div>
-            )}
-
             <div className="flex items-center justify-between gap-4">
               <input
                 type="text"
@@ -508,13 +725,13 @@ export const AdminPanel: React.FC = () => {
                 className="w-full max-w-xs rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-3 py-1.5 text-xs text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
               />
               <span className="text-xs font-mono text-zinc-500 shrink-0">
-                найдено: {filteredAccounts.length}
+                аккаунтов: {filteredAccounts.length}
               </span>
             </div>
 
             <div className="flex flex-col gap-3">
               {filteredAccounts.map((acc) => {
-                const isUpdating = updatingPlanId === acc.id;
+                const isUpdating = actionBusy;
                 return (
                   <div key={acc.id} className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -530,39 +747,64 @@ export const AdminPanel: React.FC = () => {
                         >
                           {copiedId === acc.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
+                        <span
+                          className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
+                            acc.status === 'blocked' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'text-zinc-500'
+                          }`}
+                        >
+                          {acc.status}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        {PLANS.map((plan) => {
-                          const isActive = acc.plan === plan;
-                          return (
-                            <button
-                              key={plan}
-                              type="button"
-                              disabled={isUpdating || isActive}
-                              onClick={() => void handlePlanChange(acc.id, plan)}
-                              className={`px-2.5 py-1 text-[11px] font-mono rounded transition-colors cursor-pointer disabled:cursor-default ${
-                                isActive
-                                  ? 'bg-white text-black font-medium'
-                                  : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]'
-                              }`}
-                            >
-                              {plan}
-                            </button>
-                          );
-                        })}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          {PLANS.map((plan) => {
+                            const isActive = acc.plan === plan;
+                            return (
+                              <button
+                                key={plan}
+                                type="button"
+                                disabled={isUpdating || isActive}
+                                onClick={() => void handlePlanChange(acc.id, plan)}
+                                className={`px-2.5 py-1 text-[11px] font-mono rounded transition-colors cursor-pointer disabled:cursor-default ${
+                                  isActive
+                                    ? 'bg-white text-black font-medium'
+                                    : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]'
+                                }`}
+                              >
+                                {plan}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => void handleToggleAccountStatus(acc.id)}
+                          className={`p-1.5 rounded transition-colors cursor-pointer ${
+                            acc.status === 'blocked'
+                              ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                              : 'bg-white/[0.04] text-zinc-400 hover:text-rose-400 hover:bg-white/[0.08]'
+                          }`}
+                          title={acc.status === 'blocked' ? 'разблокировать' : 'заблокировать'}
+                        >
+                          {acc.status === 'blocked' ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
                       <span>кеш {acc.usedCacheMb} / {acc.maxCacheMb} мб</span>
                       <span>устройств {acc.devices.length} / {acc.maxDevices}</span>
-                      {acc.vaults && acc.vaults.length > 0 && (
-                        <span>хранилищ: {acc.vaults.length}</span>
-                      )}
+                      {acc.vaults && acc.vaults.length > 0 && <span>хранилищ: {acc.vaults.length}</span>}
                       {acc.createdAt && (
                         <span className="text-zinc-500">
                           создан {new Date(acc.createdAt).toLocaleDateString('ru-RU')}
+                        </span>
+                      )}
+                      {acc.expiresAt && (
+                        <span className="text-amber-400/90 font-mono text-[11px]">
+                          подписка до {new Date(acc.expiresAt).toLocaleDateString('ru-RU')}
                         </span>
                       )}
                     </div>
@@ -617,16 +859,12 @@ export const AdminPanel: React.FC = () => {
                               {dev.status === 'active' && (
                                 <button
                                   type="button"
-                                  disabled={revokingDeviceId === dev.id}
+                                  disabled={actionBusy}
                                   onClick={() => void handleRevokeDevice(acc.id, dev.id)}
                                   className="text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-40"
                                   title="отозвать доступ"
                                 >
-                                  {revokingDeviceId === dev.id ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-3 h-3" />
-                                  )}
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
                               )}
                             </div>
@@ -645,11 +883,227 @@ export const AdminPanel: React.FC = () => {
               )}
             </div>
           </>
-        ) : (
-          /* Maintenance Tab */
+        ) : activeTab === 'billing' ? (
+          /* 2. Billing Tab */
+          <div className="flex flex-col gap-6">
+            {billingStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">MRR (выручка/мес)</span>
+                  <span className="text-sm font-semibold text-emerald-400">{billingStats.mrr.toLocaleString('ru-RU')} ₽</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">платных аккаунтов</span>
+                  <span className="text-sm font-semibold text-white">{billingStats.paidAccounts}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">бесплатных</span>
+                  <span className="text-sm font-semibold text-zinc-400">{billingStats.freeAccounts}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">конверсия</span>
+                  <span className="text-sm font-semibold text-white">{billingStats.conversionRate}%</span>
+                </div>
+              </div>
+            )}
+
+            {/* Manual Grant Form */}
+            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-white">
+                <CreditCard className="w-3.5 h-3.5 text-zinc-400" />
+                <span>ручное начисление / продление подписки</span>
+              </div>
+              <form onSubmit={handleGrantSubscription} className="flex flex-wrap items-end gap-3 pt-1">
+                <div className="flex flex-col gap-1 min-w-[200px]">
+                  <label htmlFor="grant-account" className="text-[11px] text-zinc-400">аккаунт</label>
+                  <select
+                    id="grant-account"
+                    value={grantAccountId}
+                    onChange={(e) => setGrantAccountId(e.target.value)}
+                    required
+                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {shortId(a.id)} ({a.plan})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="grant-plan" className="text-[11px] text-zinc-400">тариф</label>
+                  <select
+                    id="grant-plan"
+                    value={grantPlan}
+                    onChange={(e) => {
+                      const p = e.target.value as 'smile' | 'angry';
+                      setGrantPlan(p);
+                      setGrantAmount(p === 'smile' ? '190' : '490');
+                    }}
+                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                  >
+                    <option value="smile">Smile (190 ₽)</option>
+                    <option value="angry">Angry (490 ₽)</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="grant-days" className="text-[11px] text-zinc-400">дней</label>
+                  <select
+                    id="grant-days"
+                    value={grantDays}
+                    onChange={(e) => setGrantDays(e.target.value)}
+                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                  >
+                    <option value="30">30 дней</option>
+                    <option value="90">90 дней</option>
+                    <option value="365">365 дней</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1 w-24">
+                  <label htmlFor="grant-amount" className="text-[11px] text-zinc-400">сумма (₽)</label>
+                  <input
+                    id="grant-amount"
+                    type="number"
+                    value={grantAmount}
+                    onChange={(e) => setGrantAmount(e.target.value)}
+                    required
+                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={actionBusy || !grantAccountId}
+                  className="px-3.5 py-2 bg-white text-black font-medium text-xs rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  начислить
+                </button>
+              </form>
+            </div>
+
+            {/* Transactions List */}
+            <div className="flex flex-col gap-3">
+              <span className="text-xs font-medium text-white">история операций ({transactions.length})</span>
+              <div className="flex flex-col gap-2">
+                {transactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="p-3 rounded-lg bg-[#141417] border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-zinc-400">{tx.id}</span>
+                      <span className="font-mono text-white" title={tx.accountId}>
+                        {shortId(tx.accountId)}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[11px] font-mono text-zinc-300">
+                        {tx.plan} ({tx.periodDays}д)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-400 shrink-0">
+                      <span className="text-emerald-400 font-semibold">{tx.amount} {tx.currency}</span>
+                      <span className="text-zinc-500">
+                        {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString('ru-RU') : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {transactions.length === 0 && (
+                  <div className="py-6 text-center text-xs text-zinc-500">транзакций пока нет</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : activeTab === 'ai' ? (
+          /* 3. AI Gateway Tab */
+          <div className="flex flex-col gap-6">
+            {aiStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">статус шлюза</span>
+                  <span className={`text-sm font-semibold ${aiStats.gatewayStatus === 'operational' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {aiStats.gatewayStatus}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">всего запросов</span>
+                  <span className="text-sm font-semibold text-white">{aiStats.totalRequests}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">суммарно токенов</span>
+                  <span className="text-sm font-semibold text-white">{aiStats.totalTokens.toLocaleString('ru-RU')}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">активные модели</span>
+                  <span className="text-xs font-mono text-zinc-300 truncate">
+                    {aiStats.activeModels.join(', ')}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* AI Benchmark Ping Action */}
+            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-white">диагностика апстрима</span>
+                <span className="text-xs text-zinc-500">проверка задержки и доступности шлюза к моделям</span>
+              </div>
+              <button
+                type="button"
+                disabled={actionBusy}
+                onClick={() => void handleAiPing()}
+                className="px-3.5 py-2 bg-white/10 hover:bg-white/15 text-zinc-200 text-xs rounded-lg transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-2"
+              >
+                {actionBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <Activity className="w-3.5 h-3.5" />
+                <span>проверить пинг шлюза</span>
+              </button>
+            </div>
+
+            {/* AI Logs */}
+            <div className="flex flex-col gap-3">
+              <span className="text-xs font-medium text-white">лог обращений ({aiLogs.length})</span>
+              <div className="flex flex-col gap-2">
+                {aiLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-lg bg-[#141417] border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-zinc-400">{log.id}</span>
+                      <span className="font-mono text-zinc-200">{shortId(log.accountId)}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[11px] font-mono text-zinc-300">
+                        {log.model}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-400 shrink-0">
+                      <span>{log.promptTokens + log.completionTokens} tok</span>
+                      <span className="text-emerald-400">{log.latencyMs} ms</span>
+                      {log.createdAt && (
+                        <span className="text-zinc-500">
+                          {new Date(log.createdAt).toLocaleTimeString('ru-RU')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {aiLogs.length === 0 && (
+                  <div className="py-6 text-center text-xs text-zinc-500">запросов к ИИ пока нет</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : activeTab === 'relay' ? (
+          /* 4. Relay Health Tab */
           <div className="flex flex-col gap-6">
             {stats && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">uptime</span>
+                  <span className="text-sm font-semibold text-white">{formatUptime(stats.uptime)}</span>
+                </div>
                 <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">размер базы</span>
                   <span className="text-sm font-semibold text-white">{formatBytes(stats.dbSizeBytes) || '0 B'}</span>
@@ -657,10 +1111,6 @@ export const AdminPanel: React.FC = () => {
                 <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">активные сессии</span>
                   <span className="text-sm font-semibold text-white">{stats.activeSessions}</span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
-                  <span className="text-[11px] font-mono text-zinc-500">пины сопряжения</span>
-                  <span className="text-sm font-semibold text-white">{stats.pendingPairings}</span>
                 </div>
                 <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">пакетов в очереди</span>
@@ -678,20 +1128,20 @@ export const AdminPanel: React.FC = () => {
               <div className="flex flex-wrap gap-3 pt-1">
                 <button
                   type="button"
-                  disabled={maintenanceBusy}
+                  disabled={actionBusy}
                   onClick={() => void handleCleanup()}
                   className="px-3.5 py-2 bg-white/10 hover:bg-white/15 text-zinc-200 text-xs rounded-lg transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-2"
                 >
-                  {maintenanceBusy && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {actionBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>очистить истекшие данные</span>
                 </button>
                 <button
                   type="button"
-                  disabled={maintenanceBusy}
+                  disabled={actionBusy}
                   onClick={() => void handleVacuum()}
                   className="px-3.5 py-2 bg-white/10 hover:bg-white/15 text-zinc-200 text-xs rounded-lg transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-2"
                 >
-                  <Database className="w-3 h-3" />
+                  <Database className="w-3.5 h-3.5" />
                   <span>сжать базу (vacuum)</span>
                 </button>
               </div>
@@ -735,9 +1185,60 @@ export const AdminPanel: React.FC = () => {
                 ))}
 
                 {rooms.length === 0 && (
-                  <div className="py-6 text-center text-xs text-zinc-500">
-                    нет активных комнат
+                  <div className="py-6 text-center text-xs text-zinc-500">нет активных комнат</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* 5. Security Tab */
+          <div className="flex flex-col gap-6">
+            {securityStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">заблокировано аккаунтов</span>
+                  <span className={`text-sm font-semibold ${securityStats.blockedAccountsCount > 0 ? 'text-rose-400' : 'text-zinc-400'}`}>
+                    {securityStats.blockedAccountsCount}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                  <span className="text-[11px] font-mono text-zinc-500">отозвано устройств</span>
+                  <span className="text-sm font-semibold text-zinc-400">
+                    {securityStats.revokedDevicesCount}
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1 col-span-2 sm:col-span-1">
+                  <span className="text-[11px] font-mono text-zinc-500">политика шифрования</span>
+                  <span className="text-sm font-semibold text-emerald-400">P-256 E2EE (Zero-Knowledge)</span>
+                </div>
+              </div>
+            )}
+
+            {/* Audit Log Table */}
+            <div className="flex flex-col gap-3">
+              <span className="text-xs font-medium text-white">журнал аудита действий ({auditLogs.length})</span>
+              <div className="flex flex-col gap-2">
+                {auditLogs.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-lg bg-[#141417] border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[11px] font-mono text-zinc-300">
+                        {item.action}
+                      </span>
+                      <span className="font-mono text-zinc-400">
+                        {item.targetType}:{shortId(item.targetId)}
+                      </span>
+                      <span className="text-zinc-500 text-[11px] truncate">{item.details}</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-zinc-500 shrink-0">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleString('ru-RU') : '—'}
+                    </span>
                   </div>
+                ))}
+                {auditLogs.length === 0 && (
+                  <div className="py-6 text-center text-xs text-zinc-500">записей аудита пока нет</div>
                 )}
               </div>
             </div>
