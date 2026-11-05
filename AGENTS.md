@@ -39,5 +39,6 @@
 
 ## 3. Справочник
 
-- Детали правил: `.agents/rules/` (`ui-ux-contract.md`, `code-style-ts-react.md`, `anti-deadlock.md`, `playwright-visual-testing.md`, `request-pipeline.md`, `logging-diagnostics-standard.md`, `triz-contradiction-resolution.md`).
+- Детали правил: `.agents/rules/` (`ui-ux-contract.md`, `code-style-ts-react.md`, `anti-deadlock.md`, `playwright-visual-testing.md`, `request-pipeline.md`, `logging-diagnostics-standard.md`, `triz-contradiction-resolution.md`, `mcp-vault-usage.md`).
+- Руководство по подключению MCP: `docs/mcp-guide.md`.
 - Регламент сборок (Web, Desktop HMR, Standalone .exe): `BUILD.md`.
