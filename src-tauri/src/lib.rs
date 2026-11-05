@@ -469,9 +469,14 @@ pub fn run() {
                     .item(&quit_item)
                     .build()?;
 
-                if let Some(icon) = app.default_window_icon() {
+                let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
+                    .ok()
+                    .or_else(|| app.default_window_icon().cloned());
+
+                if let Some(icon) = tray_icon {
                     let _tray = TrayIconBuilder::new()
-                        .icon(icon.clone())
+                        .icon(icon)
+                        .icon_as_template(true)
                         .tooltip("SLAG v2")
                         .menu(&menu)
                         .show_menu_on_left_click(false)
