@@ -61,21 +61,20 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
           icon={<Calendar className="w-4 h-4" />}
         />
 
-        {isDatePickerOpen && (
-          <DatePickerPopover
-            value={effectiveDueDate}
-            onChange={(newDate) => {
-              onDateChange(newDate);
-              setIsDatePickerOpen(false);
-            }}
-            onClear={() => {
-              onDateClear();
-              setIsDatePickerOpen(false);
-            }}
-            onClose={() => setIsDatePickerOpen(false)}
-            direction="up"
-          />
-        )}
+        <DatePickerPopover
+          isOpen={isDatePickerOpen}
+          value={effectiveDueDate}
+          onChange={(newDate) => {
+            onDateChange(newDate);
+            setIsDatePickerOpen(false);
+          }}
+          onClear={() => {
+            onDateClear();
+            setIsDatePickerOpen(false);
+          }}
+          onClose={() => setIsDatePickerOpen(false)}
+          direction="up"
+        />
       </div>
 
       {/* Duration Dropdown */}

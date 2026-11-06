@@ -9,6 +9,7 @@ export interface TagMeta {
 }
 
 interface TagSuggestionMenuProps {
+  isOpen?: boolean;
   query: string;
   tags: TagMeta[];
   selectedIndex: number;
@@ -18,6 +19,7 @@ interface TagSuggestionMenuProps {
 }
 
 export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
+  isOpen = true,
   query,
   tags,
   selectedIndex,
@@ -27,6 +29,7 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
 }) => {
   return (
     <SuggestionMenuShell
+      isOpen={isOpen}
       selectedIndex={selectedIndex}
       placement={placement}
       isModal={isModal}

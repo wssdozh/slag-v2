@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isDesktopApp } from '../../lib/windowControls';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
+import { usePresence } from '../../hooks/usePresence';
 import {
   Check,
   Trash2,
@@ -37,6 +38,8 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
     addToast,
   } = useApp();
 
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -50,7 +53,7 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isPresent) return null;
 
   const handleSwitch = (id: string) => {
     switchVault(id);
@@ -175,11 +178,16 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
   if (isSheet) {
     return (
       <div
+        ref={ref}
+        data-motion-state={phase}
+        onTransitionEnd={onTransitionEnd}
+        inert={!isOpen}
         onClick={onClose}
         className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 motion-fade select-none"
       >
         <div
-            onClick={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          data-motion-state={phase}
           className={`w-full sm:max-w-sm bg-surface-elevated border-t sm:border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-3 flex flex-col gap-1 max-h-[85vh] overflow-y-auto motion-sheet text-xs shadow-2xl ${className}`}
           style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
         >
@@ -191,13 +199,20 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
   }
 
   return (
-    <>
+    <div
+      ref={ref}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isOpen}
+    >
       <div
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] motion-fade"
+        data-motion-state={phase}
         onClick={onClose}
       />
       <div
         onClick={(e) => e.stopPropagation()}
+        data-motion-state={phase}
         className={`absolute z-50 rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs motion-popover ${
           position === 'bottom'
             ? 'bottom-full left-2 right-2 mb-1.5'
@@ -206,6 +221,6 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
       >
         {menuContent}
       </div>
-    </>
+    </div>
   );
 };

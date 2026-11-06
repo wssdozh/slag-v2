@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   getMonthCalendarDays,
   RUSSIAN_MONTHS,
@@ -8,8 +8,10 @@ import {
   getNextWeekIso,
 } from '../../lib/dateUtils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { usePresence } from '../../hooks/usePresence';
 
 export interface DatePickerPopoverProps {
+  isOpen?: boolean;
   value?: string;
   onChange: (dateIso: string) => void;
   onClear?: () => void;
@@ -19,6 +21,7 @@ export interface DatePickerPopoverProps {
 }
 
 export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
+  isOpen = true,
   value,
   onChange,
   onClear,
@@ -26,7 +29,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
   direction = 'up',
   className = '',
 }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const { ref: containerRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
 
   const [currentYear, setCurrentYear] = useState(() => {
     if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -48,6 +51,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
 
   // Close when clicking outside or pressing Escape
   useEffect(() => {
+    if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         onClose();
@@ -66,7 +70,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
       window.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [isOpen, onClose, containerRef]);
 
   const handlePrevMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -96,9 +100,14 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
     ? 'bottom-full mb-1.5'
     : 'top-full mt-1.5';
 
+  if (!isPresent) return null;
+
   return (
     <div
       ref={containerRef}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isOpen}
       onClick={(e) => e.stopPropagation()}
       className={`absolute left-0 ${positionClasses} w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-white/[0.1] shadow-2xl shadow-black/90 p-2.5 z-50 flex flex-col gap-2 select-none motion-popover ${className}`}
     >

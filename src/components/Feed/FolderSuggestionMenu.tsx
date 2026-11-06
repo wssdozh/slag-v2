@@ -6,6 +6,7 @@ import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 
 interface FolderSuggestionMenuProps {
+  isOpen?: boolean;
   query: string;
   folders: FolderMeta[];
   currentFolder: string;
@@ -17,6 +18,7 @@ interface FolderSuggestionMenuProps {
 }
 
 export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
+  isOpen = true,
   query,
   folders,
   currentFolder,
@@ -28,6 +30,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
 }) => {
   return (
     <SuggestionMenuShell
+      isOpen={isOpen}
       selectedIndex={selectedIndex}
       placement={placement}
       isModal={isModal}

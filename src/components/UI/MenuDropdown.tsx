@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { usePresence } from '../../hooks/usePresence';
 
 export interface MenuDropdownProps {
   /** Trigger element */
@@ -43,6 +44,7 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const { ref: dropdownRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
 
   const setOpen = useCallback(
     (next: boolean) => {
@@ -55,8 +57,13 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
   );
 
   const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
+  const [lastCoords, setLastCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
+  if (coords && coords !== lastCoords) {
+    setLastCoords(coords);
+  }
+  const effectiveCoords = coords || lastCoords;
+
   const triggerContainerRef = useRef<HTMLDivElement | null>(null);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const updatePosition = useCallback(() => {
     if (!triggerContainerRef.current) return;
@@ -94,6 +101,12 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
       });
     }
   }, [direction, align, positioningWidth, clampLeft]);
+
+  useLayoutEffect(() => {
+    if (isOpen) {
+      updatePosition();
+    }
+  }, [isOpen, updatePosition]);
 
   const toggle = useCallback(() => {
     if (!isOpen) {
@@ -139,18 +152,20 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, updatePosition, setOpen]);
+  }, [isOpen, updatePosition, setOpen, dropdownRef]);
 
   const portalContent =
-    isOpen && coords && typeof document !== 'undefined'
+    isPresent && effectiveCoords && typeof document !== 'undefined'
       ? createPortal(
           <div
             ref={dropdownRef}
+            data-motion-state={phase}
+            onTransitionEnd={onTransitionEnd}
             style={{
               position: 'fixed',
-              ...(coords.top !== undefined ? { top: `${coords.top}px` } : {}),
-              ...(coords.bottom !== undefined ? { bottom: `${coords.bottom}px` } : {}),
-              left: `${coords.left}px`,
+              ...(effectiveCoords.top !== undefined ? { top: `${effectiveCoords.top}px` } : {}),
+              ...(effectiveCoords.bottom !== undefined ? { bottom: `${effectiveCoords.bottom}px` } : {}),
+              left: `${effectiveCoords.left}px`,
               minWidth: `${minWidth}px`,
             }}
             className={`z-[9999] rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl motion-popover ${dropdownClassName}`}

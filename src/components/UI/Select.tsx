@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
+import { usePresence } from '../../hooks/usePresence';
 
 export interface SelectOption {
   value: string;
@@ -45,13 +46,19 @@ export const Select: React.FC<SelectProps> = ({
   showArrow = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { ref: listRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [calculatedDirection, setCalculatedDirection] = useState<'down' | 'up'>('down');
   const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [lastCoords, setLastCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+  if (coords && coords !== lastCoords) {
+    setLastCoords(coords);
+  }
+  const effectiveCoords = coords || lastCoords;
+
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -122,7 +129,7 @@ export const Select: React.FC<SelectProps> = ({
     if (items[safeHighlightedIndex]) {
       items[safeHighlightedIndex].scrollIntoView({ block: 'nearest' });
     }
-  }, [isOpen, safeHighlightedIndex]);
+  }, [isOpen, safeHighlightedIndex, listRef]);
 
   // Re-align on scroll or resize while open
   useEffect(() => {
@@ -204,21 +211,23 @@ export const Select: React.FC<SelectProps> = ({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [isOpen, filteredOptions, safeHighlightedIndex, handleSelect]);
+  }, [isOpen, filteredOptions, safeHighlightedIndex, handleSelect, listRef]);
 
   const isSmall = size === 'sm';
 
-  const portalContent = isOpen && coords && typeof document !== 'undefined'
+  const portalContent = isPresent && effectiveCoords && typeof document !== 'undefined'
     ? createPortal(
         <div
           ref={listRef}
           role="listbox"
+          data-motion-state={phase}
+          onTransitionEnd={onTransitionEnd}
           style={{
             position: 'fixed',
-            left: `${coords.left}px`,
-            top: calculatedDirection === 'up' ? undefined : `${coords.top}px`,
-            bottom: calculatedDirection === 'up' ? `${window.innerHeight - coords.top}px` : undefined,
-            minWidth: `${coords.width}px`,
+            left: `${effectiveCoords.left}px`,
+            top: calculatedDirection === 'up' ? undefined : `${effectiveCoords.top}px`,
+            bottom: calculatedDirection === 'up' ? `${window.innerHeight - effectiveCoords.top}px` : undefined,
+            minWidth: `${effectiveCoords.width}px`,
           }}
           className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl motion-popover flex flex-col gap-0.5 ${dropdownClassName}`}
         >

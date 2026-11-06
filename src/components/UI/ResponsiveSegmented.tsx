@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { MenuDropdown } from './MenuDropdown';
 import { ChevronDown, Check } from 'lucide-react';
 
@@ -37,6 +37,36 @@ export function ResponsiveSegmented<T extends string = string>({
   const selectedOption = options.find((opt) => opt.value === value) || options[0];
 
   const heightClass = size === 'sm' ? 'h-ctrl-sm' : 'h-ctrl-md';
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number; ready: boolean }>({
+    left: 0,
+    width: 0,
+    ready: false,
+  });
+
+  const updateIndicator = useCallback(() => {
+    if (!containerRef.current) return;
+    const activeBtn = containerRef.current.querySelector<HTMLButtonElement>(`[data-segmented-value="${value}"]`);
+    if (activeBtn) {
+      setIndicatorStyle({
+        left: activeBtn.offsetLeft,
+        width: activeBtn.offsetWidth,
+        ready: true,
+      });
+    }
+  }, [value]);
+
+  useLayoutEffect(() => {
+    if (compact) return;
+    updateIndicator();
+  }, [updateIndicator, options, compact]);
+
+  useEffect(() => {
+    if (compact) return;
+    window.addEventListener('resize', updateIndicator);
+    return () => window.removeEventListener('resize', updateIndicator);
+  }, [updateIndicator, compact]);
 
   // Compact Mode: Single dropdown trigger button displaying current active option
   if (compact) {
@@ -105,12 +135,24 @@ export function ResponsiveSegmented<T extends string = string>({
     );
   }
 
-  // Expanded Mode: Segmented strip of buttons
+  // Expanded Mode: Segmented strip of buttons with sliding active pill
   return (
     <div
+      ref={containerRef}
       aria-label={ariaLabel}
-      className={`flex items-center ${heightClass} gap-0.5 shrink-0 ${className}`}
+      className={`relative flex items-center ${heightClass} gap-0.5 shrink-0 select-none ${className}`}
     >
+      {indicatorStyle.ready && (
+        <div
+          data-testid="segmented-pill"
+          className="absolute top-0 bottom-0 left-0 rounded-md bg-white/10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
+          style={{
+            transform: `translateX(${indicatorStyle.left}px)`,
+            width: `${indicatorStyle.width}px`,
+            transitionTimingFunction: 'var(--ease-settle)',
+          }}
+        />
+      )}
       {options.map((opt) => {
         const isSelected = opt.value === value;
         const showExpandedLabel = opt.showLabelInExpanded ?? !opt.icon;
@@ -118,16 +160,17 @@ export function ResponsiveSegmented<T extends string = string>({
         return (
           <button
             key={opt.value}
+            data-segmented-value={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
             title={opt.title || opt.label}
             aria-label={opt.ariaLabel || opt.label}
-            className={`h-full ${
+            className={`relative z-10 h-full ${
               opt.icon && !showExpandedLabel ? 'px-1.5' : 'px-2'
             } rounded-md text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
               isSelected
-                ? 'bg-white/10 text-white font-medium'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+                ? `${indicatorStyle.ready ? '' : 'bg-white/10'} text-white font-medium`
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
             }`}
           >
             {opt.icon && <span className="shrink-0">{opt.icon}</span>}
