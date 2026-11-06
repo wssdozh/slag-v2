@@ -67,11 +67,42 @@ export function expandFromRect(origin: HTMLElement, target: HTMLElement): void {
 }
 
 /**
- * - `tab`   — peers (tabs, feed/kanban): a plain cross-fade, nothing slides.
- * - `push`  — deeper (a folder, its info): the new screen comes from the right.
- * - `pop`   — back: the old screen leaves to the right, the new waits behind it.
+ * Collapses the full-bleed surface back into the origin card on exit,
+ * providing symmetric reverse motion.
  */
-export type ScreenSwap = 'tab' | 'push' | 'pop';
+export function collapseToRect(target: HTMLElement, dest: HTMLElement): Animation | undefined {
+  if (prefersReducedMotion()) return undefined;
+  const to = dest.getBoundingClientRect();
+  const from = target.getBoundingClientRect();
+  if (to.width < 8 || to.height < 8 || from.width < 8 || from.height < 8) return undefined;
+
+  const top = Math.max(0, to.top - from.top);
+  const left = Math.max(0, to.left - from.left);
+  const right = Math.max(0, from.right - to.right);
+  const bottom = Math.max(0, from.bottom - to.bottom);
+  const distance = Math.hypot(left - 0, top - 0) + (from.width - to.width) * 0.25;
+
+  return target.animate(
+    [
+      { clipPath: 'inset(0px round 0px)', opacity: 1 },
+      { clipPath: `inset(${top}px ${right}px ${bottom}px ${left}px round 12px)`, opacity: 0 },
+    ],
+    {
+      duration: Math.min(220, Math.max(160, distance * 0.25)),
+      easing: motionEase('standard'),
+      fill: 'forwards',
+    },
+  );
+}
+
+/**
+ * - `tab`      — peers (tabs, feed/kanban): a plain cross-fade.
+ * - `tab-next` — lateral advance: the new tab slides in from the right.
+ * - `tab-prev` — lateral return: the previous tab slides in from the left.
+ * - `push`     — deeper (a folder, its info): the new screen comes from the right.
+ * - `pop`      — back: the old screen leaves to the right, the new waits behind it.
+ */
+export type ScreenSwap = 'tab' | 'tab-next' | 'tab-prev' | 'push' | 'pop';
 
 /**
  * Swaps one full screen for another behind the browser's own snapshot layer.

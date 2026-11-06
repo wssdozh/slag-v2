@@ -34,7 +34,7 @@ import { listenDesktopEvents, isDesktopApp, isMobilePlatform } from '../lib/wind
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { crossFade, swapScreen } from '../lib/motion';
+import { crossFade, swapScreen, type ScreenSwap } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
   STORAGE_KEYS,
@@ -601,14 +601,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // Tabs are peers (cross-fade), entering a folder is a push, leaving is a pop.
-  // The depth lives in a ref so the setter stays stable for the dock and Escape.
+  // Tabs are peers (cross-fade or directional slide), entering a folder is a push, leaving is a pop.
+  // The depth and active tab live in refs so setters stay stable for the dock and Escape.
   const mobileFolderRef = useRef<string | null>(null);
+  const activeTabRef = useRef<MobileTabId>(initialWorkspace.activeMobileTab || 'folders');
+  useEffect(() => {
+    activeTabRef.current = activeMobileTab;
+  }, [activeMobileTab]);
+
   const folderDepth = (path: string | null) => (path ? path.split('/').length : 0);
 
   const setActiveMobileTab = useCallback((next: React.SetStateAction<MobileTabId>) => {
-    swapScreen('tab', () => setActiveMobileTabState(next));
-  }, []);
+    const prev = activeTabRef.current;
+    const resolvedNext = typeof next === 'function' ? next(prev) : next;
+    const prevIdx = mobileDockTabs.indexOf(prev);
+    const nextIdx = mobileDockTabs.indexOf(resolvedNext);
+    const kind: ScreenSwap =
+      prevIdx !== -1 && nextIdx !== -1 && prevIdx !== nextIdx
+        ? nextIdx > prevIdx ? 'tab-next' : 'tab-prev'
+        : 'tab';
+
+    swapScreen(kind, () => setActiveMobileTabState(resolvedNext));
+  }, [mobileDockTabs]);
 
   const setMobileActiveFolder = useCallback((folder: string | null) => {
     const previous = mobileFolderRef.current;
