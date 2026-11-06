@@ -542,7 +542,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
       </div>
 
       {/* Messages Stream */}
-      <div className={`flex-1 min-h-0 overflow-y-auto p-3 flex flex-col ${isSidebar ? 'text-xs' : 'p-4 text-sm'}`}>
+      <div data-testid="assistant-messages" className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 flex flex-col ${isSidebar ? 'text-xs' : 'p-4 text-sm'}`}>
         <div className={`w-full flex-1 flex flex-col gap-3.5 ${isSidebar ? '' : 'max-w-2xl mx-auto'}`}>
           {chatMessages.length === 0 ? (
             <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
@@ -637,16 +637,16 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
                 {/* Tool Calls execution: plain text outside message bubble without chips */}
                 {msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0 && (
-                  <div className="flex flex-col gap-0.5 px-1 -mt-0.5 mb-0.5 select-text">
+                  <div className="flex flex-col gap-0.5 px-1 -mt-0.5 mb-0.5 select-text min-w-0">
                     {msg.toolCalls.map((tc, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500"
+                        className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500 min-w-0"
                       >
                         <Terminal className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
-                        <span className="text-zinc-400">{tc.name}</span>
+                        <span className="text-zinc-400 shrink-0">{tc.name}</span>
                         {tc.args?.query && (
-                          <span className="text-zinc-500 truncate max-w-[200px]">("{tc.args.query}")</span>
+                          <span className="text-zinc-500 truncate max-w-[200px] min-w-0">("{tc.args.query}")</span>
                         )}
                       </div>
                     ))}
@@ -685,7 +685,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                         : 'bg-surface text-zinc-200 border border-white/[0.06] shadow-sm'
                     }`}
                   >
-                    <div className="font-sans text-sm flex flex-col gap-1.5">
+                    <div className="font-sans text-sm flex flex-col gap-1.5 break-words">
                       {renderRichContent(msg.content)}
                     </div>
                   </div>
