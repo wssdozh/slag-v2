@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule } from '../../types';
@@ -54,6 +54,7 @@ import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../lib/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/windowControls';
+import { expandFromRect } from '../../lib/motion';
 
 let activeEditorView: EditorView | null = null;
 
@@ -84,6 +85,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     addToast,
     openLightbox,
     aiSettings,
+    isSearchOpen,
   } = useApp();
 
   const [activeMobilePopover, setActiveMobilePopover] = useState<'formatting' | 'lists' | 'ai' | null>(null);
@@ -112,6 +114,20 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
   const [attachments, setAttachments] = useState<SlagAttachment[]>(item.attachments || []);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const hasExpandedRef = useRef(false);
+
+  // Unfold out of the card that was tapped. Search and the other views have no
+  // card on screen, so they keep the plain fade.
+  useLayoutEffect(() => {
+    if (hasExpandedRef.current) return;
+    hasExpandedRef.current = true;
+    const target = rootRef.current;
+    if (!target || isSearchOpen) return;
+    const origin = document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`);
+    if (origin) expandFromRect(origin, target);
+  }, [item.id, isSearchOpen]);
 
   // Zen mode & layout controls (persisting user's width preference)
   const [isFullWidth, setIsFullWidth] = useState(() => initialFullWidth);
@@ -624,6 +640,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
   return (
     <div
+      ref={rootRef}
       data-testid="fullscreen-editor-modal"
       onDragOver={handleDragOver}
       onDragEnter={handleDragOver}

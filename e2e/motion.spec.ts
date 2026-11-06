@@ -139,6 +139,32 @@ test('a fresh note lands, and the list settles when one is deleted', async ({ pa
   expect(travelled).toBe(true);
 });
 
+test('the editor unfolds out of the card it was opened from', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('button', { hasText: /Заметка|Таска|Статья/ }).first().click();
+  await page.locator('button', { hasText: 'Статья' }).click();
+  const title = 'Статья ' + Date.now();
+  await page.locator('main textarea').fill(title);
+  await page.locator('button[title*="Отправить"]').click();
+
+  const card = page.locator('[data-flip-id]', { hasText: title });
+  await expect(card).toBeVisible();
+  await card.locator('h3').click();
+
+  const editor = page.getByTestId('fullscreen-editor-modal');
+  await expect(editor).toBeVisible();
+  await expect.poll(
+    () => editor.evaluate(element => element.getAnimations().filter(animation =>
+      animation.effect instanceof KeyframeEffect &&
+      animation.effect.getKeyframes().some(keyframe => String(keyframe.clipPath ?? '').includes('inset'))
+    ).length),
+    { intervals: [30, 30, 50, 50, 100], timeout: 4000 },
+  ).toBeGreaterThan(0);
+
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/screenshots/motion_editor_open.png' });
+});
+
 test('the inbox counter pops when its number changes', async ({ page }) => {
   await page.goto('/');
   await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
