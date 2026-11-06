@@ -13,18 +13,18 @@
  */
 
 @theme {
-  /* Canvas & Panel Base Layer (Raycast Charcoal #131316) */
-  --color-canvas: #131316;
-  --color-canvas-subtle: #0f0f12;
+  /* Canvas & Panel Base Layer (True Neutral Gray #161616) */
+  --color-canvas: #161616;
+  --color-canvas-subtle: #111111;
 
   /* Sidebars & Fixed Panels */
-  --color-panel: #131316;
-  --color-panel-header: #131316;
+  --color-panel: #161616;
+  --color-panel-header: #161616;
 
-  /* Surface Cards & Fullscreen Editor Canvas (#1a1a1f) */
-  --color-surface: #1a1a1f;
-  --color-surface-hover: #212127;
-  --color-surface-elevated: #24242c;
+  /* Surface Cards & Fullscreen Editor Canvas (#1f1f1f) */
+  --color-surface: #1f1f1f;
+  --color-surface-hover: #262626;
+  --color-surface-elevated: #222222;
   --color-surface-active: rgba(255, 255, 255, 0.08);
 
   /* Typography / Text Colors (Linear Zinc Hierarchy) */
@@ -51,15 +51,15 @@
 
 :root {
   /* Core Raw Hex Tokens for CSS var() consumption */
-  --color-canvas: #131316;
-  --color-canvas-subtle: #0f0f12;
+  --color-canvas: #161616;
+  --color-canvas-subtle: #111111;
 
-  --color-panel: #131316;
-  --color-panel-header: #131316;
+  --color-panel: #161616;
+  --color-panel-header: #161616;
 
-  --color-surface: #1a1a1f;
-  --color-surface-hover: #212127;
-  --color-surface-elevated: #24242c;
+  --color-surface: #1f1f1f;
+  --color-surface-hover: #262626;
+  --color-surface-elevated: #222222;
   --color-surface-active: rgba(255, 255, 255, 0.08);
 
   --border-subtle: rgba(255, 255, 255, 0.08);

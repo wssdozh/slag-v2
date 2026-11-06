@@ -4,18 +4,18 @@
  */
 
 export const THEME_COLORS = {
-  // Canvas / Base (Raycast Charcoal #131316)
-  canvas: '#131316',
-  canvasSubtle: '#0f0f12',
+  // Canvas / Base (True Neutral Gray #161616)
+  canvas: '#161616',
+  canvasSubtle: '#111111',
 
   // Panels & Sidebars
-  panel: '#131316',
-  panelHeader: '#131316',
+  panel: '#161616',
+  panelHeader: '#161616',
 
-  // Surfaces & Cards (#1a1a1f)
-  surface: '#1a1a1f',
-  surfaceHover: '#212127',
-  surfaceElevated: '#24242c',
+  // Surfaces & Cards (#1f1f1f)
+  surface: '#1f1f1f',
+  surfaceHover: '#262626',
+  surfaceElevated: '#222222',
   surfaceActive: 'rgba(255, 255, 255, 0.08)',
 
   // Typography

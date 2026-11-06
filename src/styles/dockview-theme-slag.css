@@ -8,8 +8,8 @@
   isolation: isolate;
   position: relative;
   z-index: 0;
-  --dv-group-view-background-color: var(--color-canvas, #131316);
-  --dv-tabs-and-actions-container-background-color: var(--color-panel, #131316);
+  --dv-group-view-background-color: var(--color-canvas, #161616);
+  --dv-tabs-and-actions-container-background-color: var(--color-panel, #161616);
   --dv-activegroup-visiblepanel-tab-background-color: rgba(255, 255, 255, 0.08);
   --dv-activegroup-hiddenpanel-tab-background-color: transparent;
   --dv-inactivegroup-visiblepanel-tab-background-color: rgba(255, 255, 255, 0.05);
@@ -514,14 +514,14 @@
 .dv-resize-container {
   border-radius: 8px !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  background-color: var(--color-canvas, #131316) !important;
+  background-color: var(--color-canvas, #161616) !important;
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   overflow: hidden;
 }
 
 .dockview-theme-slag .dv-resize-container-with-titlebar > .dv-floating-titlebar,
 .dv-resize-container-with-titlebar > .dv-floating-titlebar {
-  background-color: var(--color-panel, #131316) !important;
+  background-color: var(--color-panel, #161616) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
   height: 28px !important;
 }
@@ -531,7 +531,7 @@
  */
 .dockview-theme-slag .dv-context-menu,
 .dv-context-menu {
-  background-color: var(--color-surface-elevated, #24242c) !important;
+  background-color: var(--color-surface-elevated, #222222) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 8px !important;
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.7) !important;
