@@ -284,14 +284,6 @@
   height: 0 !important;
 }
 
-/* Apple-style smooth spring press feedback */
-.btn-press {
-  transition: transform 120ms var(--ease-press), background-color 150ms var(--ease-standard), opacity 150ms var(--ease-standard);
-}
-.btn-press:active {
-  transform: scale(0.97);
-}
-
 /* Flash after an AI action: the accent comes from the theme, never from a literal. */
 @keyframes itemHighlightPulse {
   0% {
@@ -400,7 +392,7 @@
   vertical-align: 0.1em !important;
   margin: 0 0.4em 0 -0.16em !important;
   transform: translateY(-0.04em) !important;
-  transition: border-color 120ms ease, background-color 120ms ease, transform 100ms ease !important;
+  transition: border-color var(--slag-motion-fast) var(--ease-standard), background-color var(--slag-motion-fast) var(--ease-standard) !important;
   box-shadow: none !important;
   outline: none !important;
 }
@@ -422,7 +414,7 @@
   border-bottom: 1.75px solid var(--color-success) !important;
   transform: rotate(45deg) translate(-0.02em, -0.04em) !important;
   opacity: 0 !important;
-  transition: opacity 120ms ease !important;
+  transition: opacity var(--slag-motion-fast) var(--ease-standard) !important;
 }
 
 .cm-atomic-task-checkbox:checked::after {

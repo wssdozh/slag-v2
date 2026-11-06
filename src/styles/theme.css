@@ -48,7 +48,7 @@
   --color-danger: #f43f5e;
   --color-danger-subtle: rgba(244, 63, 94, 0.12);
 
-  /* Motion Curves — generate `ease-standard`, `ease-entrance`, `ease-press` */
+  /* Shared motion curves, also available as Tailwind easing utilities. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -92,38 +92,104 @@
   --bg-hover: var(--color-surface-hover);
   --bg-active: var(--color-surface-active);
 
-  /* Motion: three curves instead of ad-hoc cubic-beziers. Used as `ease-standard`,
-     `ease-entrance`, `ease-press`. */
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-/**
- * Motion: Tailwind has no duration namespace, and a hand-rolled `@utility` would have to
- * mirror `--tw-duration` to survive the cascade — not worth it for four numbers. So the
- * scale stays numeric and canonical: `duration-75` instant, `duration-100` fast,
- * `duration-150` base, `duration-200` slow. Anything else is a bug. These vars exist for
- * raw CSS that cannot use utilities.
- */
-:root {
+  /* One duration scale for CSS and semantic presets; no duplicate TS config. */
   --slag-motion-instant: 75ms;
   --slag-motion-fast: 100ms;
   --slag-motion-base: 150ms;
   --slag-motion-slow: 200ms;
 }
 
-/**
- * Accessibility: the app is a dense list UI where transform/opacity motion is
- * decorative, so honour the OS setting globally instead of per component.
- */
+/* Entry-only consumers use @starting-style. Controlled overlays additionally
+   set data-motion-state through usePresence, including on older WebViews. */
+.motion-fade,
+.motion-dialog,
+.motion-popover,
+.motion-sheet {
+  opacity: 1;
+  transition-property: opacity, scale, translate;
+  transition-duration: var(--slag-motion-slow);
+  transition-timing-function: var(--ease-entrance);
+}
+
+.motion-dialog,
+.motion-popover {
+  scale: none;
+}
+
+.motion-sheet {
+  translate: 0 0;
+}
+
+.motion-popover {
+  transform-origin: var(--motion-origin, center);
+  transition-duration: var(--slag-motion-base);
+}
+
+@starting-style {
+  .motion-fade,
+  .motion-dialog,
+  .motion-popover,
+  .motion-sheet { opacity: 0; }
+  .motion-dialog,
+  .motion-popover { scale: 0.98; }
+  .motion-sheet { translate: 0 100%; }
+}
+
+:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet)[data-motion-state="entering"],
+:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet)[data-motion-state="exiting"] {
+  opacity: 0;
+}
+
+:is(.motion-dialog, .motion-popover):is([data-motion-state="entering"], [data-motion-state="exiting"]) {
+  scale: 0.98;
+}
+.motion-sheet:is([data-motion-state="entering"], [data-motion-state="exiting"]) {
+  translate: 0 100%;
+}
+[data-motion-state="exiting"] {
+  pointer-events: none;
+  transition-duration: var(--slag-motion-fast);
+}
+
+/* Press and release have different timing. Disabled controls never move. */
+.motion-press,
+.btn-press {
+  transition-property: color, background-color, border-color, opacity, scale;
+  transition-duration: var(--slag-motion-base), var(--slag-motion-base), var(--slag-motion-base), var(--slag-motion-base), var(--slag-motion-fast);
+  transition-timing-function: var(--ease-standard), var(--ease-standard), var(--ease-standard), var(--ease-standard), var(--ease-press);
+}
+:is(.motion-press, .btn-press):active:not(:disabled):not([aria-disabled="true"]) {
+  scale: 0.98;
+  transition-duration: var(--slag-motion-instant);
+}
+
+.motion-keyboard {
+  transition: transform var(--slag-motion-fast) var(--ease-standard);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Functional transforms still reach their target; only interpolation stops. */
+  .transition-transform,
+  .motion-keyboard {
+    transition: none !important;
+  }
+  :is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet, .motion-press, .btn-press) {
+    transition-property: opacity, color, background-color, border-color !important;
+    transition-duration: var(--slag-motion-fast) !important;
+    scale: none !important;
+    translate: none !important;
+  }
+  @starting-style {
+    :is(.motion-dialog, .motion-popover, .motion-sheet) {
+      scale: none;
+      translate: none;
+    }
   }
 }
