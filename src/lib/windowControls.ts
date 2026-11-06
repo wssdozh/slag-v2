@@ -14,6 +14,17 @@ export const isDesktopApp = (): boolean => {
   return isTauri() && !isMobilePlatform();
 };
 
+// Secondary webviews (quick composer, detached panels) must not run their own sync engine:
+// each one opens its own room socket and pushes its own copy of the vault.
+export const isPrimaryWindow = (): boolean => {
+  if (!isTauri()) return true;
+  try {
+    return getCurrentWindow().label === 'main';
+  } catch {
+    return true;
+  }
+};
+
 export const minimizeWindow = async (): Promise<void> => {
   if (!isTauri()) return;
   try {

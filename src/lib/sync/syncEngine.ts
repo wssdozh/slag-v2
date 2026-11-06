@@ -32,6 +32,7 @@ import {
   SYNC_INTERVALS,
   DEFAULT_INBOX_FOLDER,
 } from '../../config';
+import { isPrimaryWindow } from '../windowControls';
 
 const SYNC_CONFIG_KEY = SYNC_STORAGE_KEYS.SYNC_CONFIG;
 const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
@@ -53,6 +54,7 @@ export class SyncEngine {
   private sequence = 1;
   private appliedBundleIds = new Set<string>();
   private batchUpdating = false;
+  private forceFullPush = false;
   private initGeneration = 0;
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   private currentVaultId: string = 'default_vault';
@@ -118,6 +120,9 @@ export class SyncEngine {
 
     if (typeof storage !== 'undefined' && typeof storage.subscribeChanges === 'function') {
       storage.subscribeChanges((event) => {
+        // Remote-origin writes are already applied state; echoing them re-queues a push and
+        // two devices ping-pong the same bundle forever.
+        if (event.origin === 'remote') return;
         const op = createSyncOpFromStorageEvent(event);
         if (op) {
           syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
@@ -211,6 +216,27 @@ export class SyncEngine {
 
   private getTombstonesKey(vaultId?: string): string {
     return `slag_sync_tombstones_${vaultId || this.currentVaultId}`;
+  }
+
+  private getSentHashesKey(vaultId?: string): string {
+    return `slag_sync_sent_hashes_${vaultId || this.currentVaultId}_${this.activeRoomId || 'local'}`;
+  }
+
+  private loadSentHashes(): Record<string, string> {
+    try {
+      const raw = localStorage.getItem(this.getSentHashesKey());
+      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private saveSentHashes(hashes: Record<string, string>): void {
+    try {
+      localStorage.setItem(this.getSentHashesKey(), JSON.stringify(hashes));
+    } catch {
+      // Quota exceeded: the next push simply resends a few unchanged entities.
+    }
   }
 
   private loadSyncedIds(): Set<string> {
@@ -398,6 +424,7 @@ export class SyncEngine {
   }
 
   public async init(): Promise<void> {
+    if (!isPrimaryWindow()) return;
     this.disconnect();
     const generation = this.initGeneration;
     const seedPhrase = this.config.seedPhrase;
@@ -607,7 +634,7 @@ export class SyncEngine {
           SYNC_INTERVALS.RECONNECT_BASE_MS * 2 ** Math.min(this.reconnectAttempts++, SYNC_INTERVALS.RECONNECT_MAX_EXPONENT),
           SYNC_INTERVALS.RECONNECT_MAX_MS
         );
-        syncLog.info(`Sync WebSocket closed (code ${event.code}), retrying in ${retryMs}ms`);
+        syncLog.info(`Sync WebSocket closed (code ${event.code}${event.reason ? `, reason: ${event.reason.slice(0, 120)}` : ''}), retrying in ${retryMs}ms`);
         this.status.state = 'offline';
         this.notify();
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Background pull failed:', error));
@@ -694,6 +721,13 @@ export class SyncEngine {
       if (!sender && this.usesAccountSync()) {
         syncLog.warn(`Ignored bundle from unregistered account device: ${bundle.fromDeviceId}`);
         if (this.batchUpdating) this.status.initialSync.rejected++;
+        // ACK means "do not redeliver", not "applied": without it the relay replays this
+        // bundle forever and the warning above floods the log.
+        try {
+          await this.sendAck(bundle.bundleId);
+        } catch (error) {
+          syncLog.warn('Failed to ACK rejected bundle:', error);
+        }
         return;
       }
       if (!sender) {
@@ -958,7 +992,14 @@ export class SyncEngine {
 
   public async pushLocalChanges(): Promise<void> {
     if (this.status.authRequired && !accountClient.getToken(this.config.serverUrl)) return;
-    if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) return;
+    if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) {
+      syncLog.debug('Push skipped: engine is not ready', {
+        processing: this.isProcessingSync,
+        hasKey: Boolean(this.activeVaultKey),
+        hasRoom: Boolean(this.activeRoomId),
+      });
+      return;
+    }
 
     if (this.status.initialSync.vaultId === this.currentVaultId &&
         (this.status.initialSync.state === 'loading' || this.status.initialSync.state === 'error')) return;
@@ -1004,11 +1045,24 @@ export class SyncEngine {
       this.notify();
 
       const changes: SyncChangeItem[] = [];
+      // Only entities whose hash differs from what this room already received go out;
+      // sending the whole vault on every keystroke is what kept pushes at 60 changes.
+      let sentHashes = this.loadSentHashes();
+      if (this.forceFullPush) {
+        this.forceFullPush = false;
+        sentHashes = {};
+        this.saveSentHashes({});
+      }
+      const packedHashes: Record<string, string> = {};
+      const pack = (key: string, hash: string, change: SyncChangeItem) => {
+        if (sentHashes[key] === hash) return;
+        changes.push(change);
+        packedHashes[key] = hash;
+      };
 
-      // Pack all current items as upsert changes
       for (const item of items) {
         const itemHash = await computeHash(JSON.stringify(item));
-        changes.push({
+        pack(`item:${item.id}`, itemHash, {
           id: item.id,
           type: 'item',
           action: 'upsert',
@@ -1018,10 +1072,9 @@ export class SyncEngine {
         });
       }
 
-      // Pack folders
       for (const folder of folders) {
         const folderHash = await computeHash(JSON.stringify(folder));
-        changes.push({
+        pack(`folder:${folder.path}`, folderHash, {
           id: folder.path,
           type: 'folder',
           action: 'upsert',
@@ -1031,13 +1084,13 @@ export class SyncEngine {
         });
       }
 
-      // Pack workspace state (kanban columns, views)
-      changes.push({
+      const workspaceHash = await computeHash(JSON.stringify(workspaceState));
+      pack('workspace:workspace_state', workspaceHash, {
         id: 'workspace_state',
         type: 'workspace',
         action: 'upsert',
         version: 1,
-        hash: await computeHash(JSON.stringify(workspaceState)),
+        hash: workspaceHash,
         payload: workspaceState,
       });
 
@@ -1105,6 +1158,15 @@ export class SyncEngine {
         }
       }
 
+      if (changes.length === 0) {
+        // Only outbox noise that changed nothing on disk: nothing to send.
+        syncLog.debug('Push skipped: no entity changed since the last bundle');
+        localStorage.setItem(hashKey, stateHash);
+        this.getOutbox().markSynced(pendingOps.map((o) => o.opId));
+        this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
+        return;
+      }
+
       const bundle: SyncBundle = {
         bundleId: `bnd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         roomId,
@@ -1145,6 +1207,7 @@ export class SyncEngine {
       );
 
       localStorage.setItem(hashKey, stateHash);
+      this.saveSentHashes({ ...sentHashes, ...packedHashes });
       if (!this.usesAccountSync() && this.currentVaultId === 'default_vault') {
         localStorage.setItem(LAST_STATE_HASH_KEY, stateHash);
       }
@@ -1219,6 +1282,13 @@ export class SyncEngine {
         if (!res.ok) throw new Error(`Sync pull failed: HTTP ${res.status}`);
         const data = await res.json();
         if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
+        const requestedSince = cursor;
+        if (requestedSince > 0 && typeof data.oldest === 'number' && data.oldest > 0 && requestedSince + 1 < data.oldest) {
+          // The cursor points before the oldest bundle the relay still keeps: everything in
+          // between expired, so a delta can never close the gap — resend the full state once.
+          syncLog.warn(`Sync cursor ${requestedSince} is older than relay history (${data.oldest}): scheduling a full resend`);
+          this.forceFullPush = true;
+        }
         for (const item of data.bundles) {
           if (generation !== this.initGeneration) return;
           if (!item.payload) throw new Error('Missing sync bundle payload');

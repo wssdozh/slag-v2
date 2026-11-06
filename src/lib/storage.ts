@@ -1427,7 +1427,7 @@ export class StorageService {
         this.saveAssistantHistory(data.assistantHistory);
       }
       if (data.workspaceState && typeof data.workspaceState === 'object') {
-        this.saveWorkspaceState(data.workspaceState);
+        this.saveWorkspaceState(data.workspaceState, 'remote');
       }
       if (data.composerDrafts && typeof data.composerDrafts === 'object') {
         try {

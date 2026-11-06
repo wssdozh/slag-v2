@@ -380,6 +380,14 @@ class RelayDatabase:
             self.conn.execute("INSERT INTO bundle_receipts VALUES (?, ?, ?)", (bundle_id, room_id, now))
         return sync_id
 
+    def get_room_watermarks(self, room_id: str) -> dict:
+        row = self.conn.execute("""
+            SELECT COALESCE(MAX(sync_id), 0) AS head,
+                   COALESCE(MIN(sync_id), 0) AS oldest
+            FROM bundles WHERE room_id = ? AND expires_at > ?
+        """, (room_id, time.time())).fetchone()
+        return {"head": int(row["head"]), "oldest": int(row["oldest"])}
+
     def get_pending_bundles(self, room_id: str, device_id: str, limit: int = 100, since_sync_id: int = 0) -> list[dict]:
         if since_sync_id > 0:
             rows = self.conn.execute("""
@@ -1736,7 +1744,8 @@ class SlagRelayServer:
                     since_sync_id = int(query.get("since", "0"))
                 except (ValueError, TypeError):
                     since_sync_id = 0
-                return {"bundles": self.db.get_pending_bundles(room_id, device_id, limit, since_sync_id=since_sync_id)}, 200
+                bundles = self.db.get_pending_bundles(room_id, device_id, limit, since_sync_id=since_sync_id)
+                return {"bundles": bundles, **self.db.get_room_watermarks(room_id)}, 200
 
             if method == "POST" and action == "ack":
                 device_id = body.get("deviceId", "")

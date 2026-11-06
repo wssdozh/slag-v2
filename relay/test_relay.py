@@ -170,6 +170,16 @@ class TestLegacyRelay(RelayTestCase):
         await w1.wait_closed()
         await w2.wait_closed()
 
+    async def test_bundles_response_exposes_head_and_oldest(self):
+        room = "watermark-room"
+        self.assertTrue(self.server.db.save_bundle(room, "w1", "dev-1", 1, "ts", json.dumps({"n": 1})))
+        self.assertTrue(self.server.db.save_bundle(room, "w2", "dev-1", 2, "ts", json.dumps({"n": 2})))
+        status, result = await self.http("GET", f"/api/rooms/{room}/bundles?device=dev-2&since=1")
+        self.assertEqual(status, 200)
+        self.assertEqual([b["bundleId"] for b in result["bundles"]], ["w2"])
+        self.assertEqual(result["head"], 2)
+        self.assertEqual(result["oldest"], 1)
+
     async def test_cache_limit_and_per_device_ack_retention(self):
         room = "cache-room"
         self.assertTrue(self.server.db.save_bundle(room, "b1", "dev-1", 1, "ts", json.dumps({"note": "hello"}), max_cache_bytes=200))
