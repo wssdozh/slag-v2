@@ -43,6 +43,9 @@ const ToastCard: React.FC<{ toast: ToastMessage }> = ({ toast }) => {
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    // A press that lands on a control belongs to the control: capturing it would
+    // retarget the click and the action inside the toast would never fire.
+    if ((event.target as HTMLElement | null)?.closest('button, a, [role="button"], input, textarea')) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       startY: event.clientY,

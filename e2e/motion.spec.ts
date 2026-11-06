@@ -108,6 +108,14 @@ test('a closed toast leaves through its exit state before unmounting', async ({ 
   }));
   expect(state).toEqual({ phase: 'exiting', connected: true });
   await expect(toast).toHaveCount(0);
+
+  // A real pointer click on a control inside the toast must not be eaten by the
+  // drag handler: unknown intent means no pointer capture.
+  await card.locator('button[aria-label="Изменить статус таски"]').click();
+  const second = page.getByTestId('toast').filter({ hasText: 'Таска возобновлена' });
+  await expect(second).toBeVisible();
+  await second.getByRole('button', { name: 'Закрыть уведомление' }).click();
+  await expect(second).toHaveCount(0);
 });
 
 test('a fresh note lands, and the list settles when one is deleted', async ({ page }) => {
