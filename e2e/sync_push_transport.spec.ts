@@ -54,6 +54,10 @@ test('push always goes over HTTP POST and 409 replay counts as delivered', async
       const firstPushOverHttp = posts.length === 1 && wsSends === 0;
       localStorage.removeItem(engine.getStateHashKey());
       localStorage.removeItem('slag_sync_last_state_hash');
+      // A full resend also means forgetting which entity hashes the room already has.
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('slag_sync_sent_hashes_'))
+        .forEach((key) => localStorage.removeItem(key));
       status = 409;
       await push();
       const replayAccepted = posts.length === 2 && wsSends === 0 && engine.status.error === null && localStorage.getItem(engine.getStateHashKey()) !== null;
