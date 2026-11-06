@@ -61,6 +61,8 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
     if (!isOpen) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current);
+    // A press on the folder link belongs to the link; the rest of the header is ours.
+    if ((event.target as HTMLElement | null)?.closest('button, a, [role="button"], input, textarea')) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     sessionRef.current = {
       startY: event.clientY,
