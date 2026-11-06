@@ -4,9 +4,8 @@ import { useApp } from '../../context/AppContext';
 import type { SlagItem, LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
+import { TaskStatusMark } from '../UI/TaskStatusMark';
 import {
-  CheckCircle2,
-  Circle,
   Maximize2,
   MoreVertical,
   Calendar,
@@ -534,11 +533,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               aria-label="Изменить статус таски"
               className="mt-0.5 text-zinc-400 hover:text-white transition-colors shrink-0"
             >
-              {item.status === 'done' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-500/10" />
-              ) : (
-                <Circle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
-              )}
+              <TaskStatusMark done={item.status === 'done'} className="w-4 h-4" />
             </button>
 
             <div className="flex-1 min-w-0 pr-14 sm:pr-16">
@@ -594,11 +589,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                         aria-label={`Отметить подзадачу ${st.title}`}
                         className="text-zinc-500 group-hover/sub:text-zinc-300 transition-colors shrink-0"
                       >
-                        {st.completed ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Circle className="w-3.5 h-3.5 text-zinc-600 group-hover/sub:text-zinc-400" />
-                        )}
+                        <TaskStatusMark done={st.completed} className="w-3.5 h-3.5" />
                       </button>
                       <span
                         className={`text-xs sm:text-ui flex-1 min-w-0 ${

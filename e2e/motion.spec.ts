@@ -8,6 +8,50 @@ async function openSettings(page: import('@playwright/test').Page) {
   return modal;
 }
 
+async function createTask(page: import('@playwright/test').Page, title: string) {
+  const typeDropdownButton = page.locator('button', { hasText: /Заметка|Таска|Статья/ }).first();
+  await typeDropdownButton.click();
+  await page.locator('button', { hasText: 'Таска' }).click();
+  await page.locator('main textarea').fill(title);
+  await page.locator('button[title*="Отправить"]').click();
+  const card = page.locator('.group', { hasText: title });
+  await expect(card).toBeVisible();
+  return card;
+}
+
+test('task completion draws the check, and reduced motion paints it at once', async ({ page }) => {
+  await page.goto('/');
+  // Slow the shared scale down so the draw can be measured instead of raced.
+  await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
+  const card = await createTask(page, 'Проверка галочки ' + Date.now());
+  const toggle = card.locator('button[aria-label="Изменить статус таски"]');
+
+  await toggle.click();
+  const path = card.locator('path.motion-check');
+  await expect(path).toHaveAttribute('pathLength', '1');
+  const before = await path.evaluate(el => parseFloat(getComputedStyle(el).strokeDashoffset));
+  await page.waitForTimeout(400);
+  const after = await path.evaluate(el => parseFloat(getComputedStyle(el).strokeDashoffset));
+  expect(after).toBeLessThan(before);
+
+  // Back to todo, then complete again with reduced motion: nothing to interpolate.
+  await toggle.click();
+  await expect(card.locator('h3')).not.toHaveClass(/line-through/);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await toggle.click();
+  const still = await card.locator('svg.text-success').evaluate(el => {
+    const drawn = el.querySelector('path.motion-check');
+    const ring = el.querySelector('.motion-check-ring');
+    return {
+      animations: el.getAnimations().length + (drawn?.getAnimations().length ?? 0) + (ring?.getAnimations().length ?? 0),
+      dash: getComputedStyle(drawn!).strokeDasharray,
+      offset: getComputedStyle(drawn!).strokeDashoffset,
+    };
+  });
+  expect(still).toEqual({ animations: 0, dash: 'none', offset: '0px' });
+  await card.screenshot({ path: 'test-results/screenshots/motion_check_draw.png' });
+});
+
 test('shared modal exits before unmount and becomes inert immediately', async ({ page }) => {
   const modal = await openSettings(page);
   const result = await modal.evaluate(element => {

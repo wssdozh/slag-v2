@@ -52,6 +52,9 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Gesture release: eases out with a hair of overshoot. Plain cubic-bezier, so
+     no engine ends up with an invalid easing and no transition at all. */
+  --ease-settle: cubic-bezier(0.16, 1.12, 0.3, 1);
 }
 
 :root {
@@ -173,6 +176,26 @@
   transition: transform var(--slag-motion-fast) var(--ease-standard);
 }
 
+/* Task completion: the stroke draws itself, the ring lands over it. Both are
+   mount-only animations, so an ordinary re-render never replays them. */
+@keyframes motion-check-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes motion-check-ring {
+  from { transform: scale(0.72); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.motion-check {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: motion-check-draw var(--slag-motion-slow) var(--ease-standard) 40ms forwards;
+}
+.motion-check-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: motion-check-ring var(--slag-motion-slow) var(--ease-settle) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -191,6 +214,15 @@
     transition-duration: var(--slag-motion-fast) !important;
     scale: none !important;
     translate: none !important;
+  }
+  /* A drawn check must not stay hidden once the animation is switched off. */
+  .motion-check,
+  .motion-check-ring {
+    animation: none !important;
+  }
+  .motion-check {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
   }
   @starting-style {
     :is(.motion-dialog, .motion-sheet) {

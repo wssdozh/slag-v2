@@ -5,13 +5,12 @@ import { formatDueDateLabel } from '../../lib/dateUtils';
 import { PRIORITY_LABELS } from '../../lib/taskUtils';
 import {
   CheckSquare,
-  Circle,
-  CheckCircle2,
   Plus,
   MoreVertical,
   Calendar,
   Inbox,
 } from 'lucide-react';
+import { TaskStatusMark } from '../UI/TaskStatusMark';
 import { MobileCalendarView } from './MobileCalendarView';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { useSwipeGesture } from '../../hooks/useSwipeGesture';
@@ -204,11 +203,7 @@ export const MobileTasksView: React.FC = () => {
                   className="mt-0.5 p-1 rounded text-zinc-400 hover:text-white transition-colors cursor-pointer"
                   aria-label="Изменить статус таски"
                 >
-                  {isDone ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-400/20" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-zinc-500 hover:text-zinc-300" />
-                  )}
+                  <TaskStatusMark done={isDone} className="w-5 h-5" />
                 </button>
 
                 {/* Center: Title & Metadata */}

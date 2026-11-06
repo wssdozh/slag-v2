@@ -15,9 +15,8 @@ import {
   pluralRu,
 } from '../../lib/dateUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { TaskStatusMark } from '../UI/TaskStatusMark';
 import {
-  Circle,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -74,21 +73,20 @@ const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
           className="p-1 rounded text-zinc-400 hover:text-white transition-colors cursor-pointer"
           aria-label="Изменить статус таски"
         >
-          {isDone ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-400/20" />
-          ) : (
-            <Circle
-              className={`w-4 h-4 ${
-                task.priority === 'high'
-                  ? 'text-rose-400'
-                  : task.priority === 'medium'
-                  ? 'text-amber-400'
-                  : task.priority === 'low'
-                  ? 'text-blue-400'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            />
-          )}
+          <TaskStatusMark
+            done={isDone}
+            className={`w-4 h-4 ${
+              isDone
+                ? ''
+                : task.priority === 'high'
+                ? 'text-rose-400'
+                : task.priority === 'medium'
+                ? 'text-amber-400'
+                : task.priority === 'low'
+                ? 'text-blue-400'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          />
         </button>
       </div>
 
