@@ -5,6 +5,7 @@ import { querySearch } from '../../lib/searchService';
 import { pluralRu } from '../../lib/dateUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { useDragToScroll } from '../../hooks/useDragToScroll';
+import { useFlipLayout } from '../../hooks/useFlipLayout';
 import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
 import {
   CircleDashed,
@@ -142,6 +143,9 @@ export const KanbanBoard: React.FC = () => {
       return item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
     });
   }, [items, currentFolder]);
+
+  // Cards glide between columns instead of teleporting.
+  useFlipLayout(kanbanBoardRef, folderItems.map(item => `${item.id}:${item.status ?? ''}`).join('|'));
 
   // TRIZ Materials: Notes and Articles in this folder
   const folderMaterials = useMemo(() => {
@@ -281,6 +285,7 @@ export const KanbanBoard: React.FC = () => {
               filteredMaterials.map(mat => (
                 <div
                   key={mat.id}
+                  data-flip-id={mat.id}
                   data-draggable="true"
                   onPointerDown={e =>
                     handlePointerDown(e, {
@@ -416,6 +421,7 @@ export const KanbanBoard: React.FC = () => {
                     return (
                       <div
                         key={task.id}
+                        data-flip-id={task.id}
                         data-draggable="true"
                         onPointerDown={e =>
                           handlePointerDown(e, {

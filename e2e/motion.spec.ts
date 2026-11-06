@@ -165,6 +165,44 @@ test('the editor unfolds out of the card it was opened from', async ({ page }) =
   await page.screenshot({ path: 'test-results/screenshots/motion_editor_open.png' });
 });
 
+test('a kanban card glides to its new column, and reduced motion skips it', async ({ page }) => {
+  await page.goto('/');
+  await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
+  await page.locator('header button[aria-label="Вид и фильтры папки"]').first().click();
+  const viewModal = page.locator('[role="dialog"][aria-label="Вид и фильтры"]');
+  await viewModal.locator('button', { hasText: 'Канбан' }).click();
+  await page.keyboard.press('Escape');
+  await expect(viewModal).not.toBeVisible();
+
+  await page.locator('[data-testid="kanban-column-todo"] button[title="Добавить таску в К выполнению"]').first().click();
+  const input = page.locator('[placeholder*="Название таски"]');
+  const title = 'Глайд ' + Date.now();
+  await input.fill(title);
+  await input.press('Enter');
+
+  const card = page.locator('[data-testid="kanban-card"]', { hasText: title });
+  await expect(card).toBeVisible();
+  await card.locator('button[title="Сменить статус задачи"]').click();
+  await card.getByRole('button', { name: 'В работе', exact: true }).click();
+
+  const glided = () => page.locator('[data-testid="kanban-card"]', { hasText: title }).evaluate(element =>
+    element.getAnimations().some(animation =>
+      animation.effect instanceof KeyframeEffect &&
+      animation.effect.getKeyframes().some(keyframe => String(keyframe.transform ?? '').includes('translate'))
+    )
+  );
+  await expect.poll(glided, { intervals: [30, 30, 50, 100], timeout: 4000 }).toBe(true);
+
+  // With reduced motion the card simply appears in the new column.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await card.locator('button[title="Сменить статус задачи"]').click();
+  await card.getByRole('button', { name: 'К выполнению', exact: true }).click();
+  await expect(card).toBeVisible();
+  const still = await card.evaluate(element => element.getAnimations().length);
+  expect(still).toBe(0);
+  await page.screenshot({ path: 'test-results/screenshots/motion_kanban.png' });
+});
+
 test('the inbox counter pops when its number changes', async ({ page }) => {
   await page.goto('/');
   await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
