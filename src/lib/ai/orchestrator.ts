@@ -13,6 +13,7 @@ import { logger } from '../logger';
 import { parseTodoistInput } from '../todoistTaskParser';
 import { ITEM_UPDATES_SCHEMA } from '../itemSchema';
 import { DEFAULT_INBOX_FOLDER, AI_LIMITS } from '../../config';
+import { getAppGuideContent, APP_GUIDE_TOPICS } from './appGuide';
 
 const aiLog = logger.scope('AI');
 
@@ -860,6 +861,14 @@ export class AssistantOrchestrator {
         };
       }
 
+      if (name === 'get_app_guide') {
+        const guide = getAppGuideContent(args.topics);
+        return {
+          status: 'success',
+          guide,
+        };
+      }
+
       return { error: `Неизвестный инструмент: ${name}` };
     };
 
@@ -993,6 +1002,24 @@ export class AssistantOrchestrator {
           },
         },
       },
+      {
+        name: 'get_app_guide',
+        description: 'Справочник по интерфейсу, кнопкам, навигации, горячим клавишам и логике работы SLAG v2. Вызывай, когда пользователь спрашивает, как пользоваться приложением, куда нажать, как работает режим (канбан, календарь, триаж, синхронизация) или какие есть хоткеи.',
+        parameters: {
+          type: 'object',
+          properties: {
+            topics: {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: APP_GUIDE_TOPICS as unknown as string[],
+              },
+              description: 'Список топиков справки: overview, navigation, views, composer, feed_and_cards, context_menu, editor, kanban, calendar, search_triage, sync_storage, mobile, shortcuts.',
+            },
+          },
+          required: ['topics'],
+        },
+      },
     ];
 
     if (settings.webSearchEnabled) {
@@ -1080,6 +1107,10 @@ ${isInbox
 
 ФИЛЬТРАЦИЯ ЛЕНТЫ:
 - Если пользователь пишет «а с фильтром», «покажи в ленте с фильтром», «отфильтруй по этим задачам» — вызови инструмент filter_feed!
+
+СПРАВКА ПО ПРИЛОЖЕНИЮ И ИНТЕРФЕЙСУ (get_app_guide):
+- Если пользователь спрашивает, как устроено приложение, куда нажать, как работает режим (канбан, календарь, триаж, синхронизация, редактор, мобилка), какие есть горячие клавиши или как настроить фичу — ОБЯЗАТЕЛЬНО вызывай инструмент get_app_guide с нужными топиками (topics)!
+- КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО выдумывать кнопки, несуществующие экраны и горячие клавиши от себя. Отвечай строго на основе возвращенного руководства: кратко, емко, живыми глаголами.
 
 ПЛАНИРОВАНИЕ И РАСПРЕДЕЛЕНИЕ ЗАДАЧ:
 - Ты обладаешь полной автономностью (ReAct-подход): ты можешь свободно вызывать get_calendar_agenda или search_notes для анализа текущего расписания, либо сразу опираться на блок «АКТУАЛЬНЫЙ СРЕЗ ЗАДАЧ».
