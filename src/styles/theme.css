@@ -196,6 +196,27 @@
   animation: motion-check-ring var(--slag-motion-slow) var(--ease-settle) both;
 }
 
+/* Toasts enter as a banner and retract upwards. A dragged toast leaves from
+   wherever the finger dropped it, so no exit target can be too short. */
+.motion-toast {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity var(--slag-motion-fast) var(--ease-standard),
+    translate var(--slag-motion-slow) var(--ease-entrance);
+}
+@starting-style {
+  .motion-toast {
+    opacity: 0;
+    translate: 0 -12px;
+  }
+}
+.motion-toast[data-motion-state="exiting"] {
+  opacity: 0;
+  translate: 0 calc(-100% - 12px);
+  transition-duration: var(--slag-motion-slow);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -209,7 +230,7 @@
   .motion-keyboard {
     transition: none !important;
   }
-  :is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet, .motion-press, .btn-press) {
+  :is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet, .motion-press, .btn-press, .motion-toast) {
     transition-property: opacity, color, background-color, border-color !important;
     transition-duration: var(--slag-motion-fast) !important;
     scale: none !important;
@@ -225,7 +246,7 @@
     stroke-dashoffset: 0;
   }
   @starting-style {
-    :is(.motion-dialog, .motion-sheet) {
+    :is(.motion-dialog, .motion-sheet, .motion-toast) {
       scale: none;
       translate: none;
     }

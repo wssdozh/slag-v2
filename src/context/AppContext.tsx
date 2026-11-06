@@ -56,7 +56,7 @@ import {
 const uiLog = logger.scope('UI');
 const appLog = logger.scope('APP');
 
-interface ToastMessage {
+export interface ToastMessage {
   id: string;
   type: 'info' | 'success' | 'error';
   text: string;
@@ -684,9 +684,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
     setToasts(prev => [...prev.slice(-2), { id, text, type, action }]);
     logger.log(type === 'error' ? 'error' : 'info', 'UI', `Toast: ${text}`);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, action ? 4500 : 2800);
   }, []);
 
   const undoLastAction = useCallback((): boolean => {

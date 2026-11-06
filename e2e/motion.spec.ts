@@ -52,6 +52,64 @@ test('task completion draws the check, and reduced motion paints it at once', as
   await card.screenshot({ path: 'test-results/screenshots/motion_check_draw.png' });
 });
 
+test('a toast holds under the cursor, snaps back, then leaves by swipe', async ({ page }) => {
+  await page.goto('/');
+  const card = await createTask(page, 'Тост ' + Date.now());
+  await card.locator('button[aria-label="Изменить статус таски"]').click();
+
+  const toast = page.getByTestId('toast').filter({ hasText: 'Таска выполнена' });
+  await expect(toast).toBeVisible();
+
+  await page.screenshot({ path: 'test-results/screenshots/motion_toast.png' });
+
+  // The auto-dismiss timer must wait while the cursor is on the card.
+  await toast.hover();
+  await page.waitForTimeout(3200);
+  await expect(toast).toBeVisible();
+
+  const box = (await toast.boundingBox())!;
+  const centreX = box.x + box.width / 2;
+  const centreY = box.y + box.height / 2;
+
+  // A short drag is not a decision yet: it has to come back.
+  await page.mouse.move(centreX, centreY);
+  await page.mouse.down();
+  await page.mouse.move(centreX, centreY - 8);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  await expect(toast).toBeVisible();
+
+  // A flick upwards is a decision.
+  await page.mouse.move(centreX, centreY);
+  await page.mouse.down();
+  for (let step = 1; step <= 6; step += 1) {
+    await page.mouse.move(centreX, centreY - step * 14);
+  }
+  await page.mouse.up();
+  await expect(toast).toHaveCount(0);
+});
+
+test('a closed toast leaves through its exit state before unmounting', async ({ page }) => {
+  await page.goto('/');
+  const card = await createTask(page, 'Тост выход ' + Date.now());
+  await card.locator('button[aria-label="Изменить статус таски"]').click();
+
+  const toast = page.getByTestId('toast').filter({ hasText: 'Таска выполнена' });
+  await expect(toast).toBeVisible();
+  const state = await toast.evaluate(element => new Promise<{ phase: string; connected: boolean }>(resolve => {
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute('data-motion-state') === 'exiting') {
+        observer.disconnect();
+        resolve({ phase: 'exiting', connected: element.isConnected });
+      }
+    });
+    observer.observe(element, { attributes: true });
+    element.querySelector<HTMLButtonElement>('button[aria-label="Закрыть уведомление"]')!.click();
+  }));
+  expect(state).toEqual({ phase: 'exiting', connected: true });
+  await expect(toast).toHaveCount(0);
+});
+
 test('shared modal exits before unmount and becomes inert immediately', async ({ page }) => {
   const modal = await openSettings(page);
   const result = await modal.evaluate(element => {

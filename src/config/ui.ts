@@ -20,8 +20,19 @@ export const UI_DELAYS = {
   LONG_PRESS_MS: 450,
   HAPTIC_VIBRATION_MS: 15,
   HOLD_TO_RECORD_MS: 220,
-  TOAST_DEFAULT_DURATION_MS: 3000,
+  TOAST_DEFAULT_DURATION_MS: 2800,
+  TOAST_ACTION_DURATION_MS: 4500,
   COPY_FEEDBACK_MS: 1500,
   LOGGER_PERSIST_DEBOUNCE_MS: 1000,
   LOGGER_DISK_FLUSH_DEBOUNCE_MS: 1500,
+} as const;
+
+/* Decision thresholds for pointer gestures. Timing lives in the CSS motion scale;
+   these only answer "did the user mean it". */
+export const UI_GESTURES = {
+  TOAST_DRAG_START_PX: 6,
+  TOAST_DISMISS_PX: 24,
+  TOAST_FLICK_MIN_PX: 12,
+  TOAST_RUBBER_BAND: 0.25,
+  DISMISS_VELOCITY_PX_MS: 0.35,
 } as const;
