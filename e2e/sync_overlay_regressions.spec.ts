@@ -1,56 +1,84 @@
 import { test, expect } from './support/selfhostFixture';
 
-for (const caller of ['direct', 'debounce', 'interval'] as const) {
-  test(`failed pre-push pull is handled for ${caller} callers and can retry`, async ({ page }) => {
+for (const caller of ['direct', 'debounce'] as const) {
+  test(`${caller} push never pulls before it pushes`, async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
     const result = await page.evaluate(async (caller) => {
       const { SyncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
       const engine = new SyncEngine();
-      engine.activeRoomId = 'room_failed_pre_push';
+      engine.activeRoomId = 'room_no_pre_pull';
       engine.activeVaultKey = {};
       const originalFetch = window.fetch;
       const originalInterval = window.setInterval;
-      const unhandled: string[] = [];
-      const onUnhandled = (event: PromiseRejectionEvent) => { unhandled.push(String(event.reason)); event.preventDefault(); };
-      window.addEventListener('unhandledrejection', onUnhandled);
-      let intervalCallback: (() => void) | undefined;
-      let requests = 0;
-      window.fetch = async () => { requests++; return new Response('unavailable', { status: 503 }); };
-      let rejected = false;
+      const methods: string[] = [];
+      window.fetch = async (_url, opts) => {
+        methods.push((opts && opts.method) || 'GET');
+        return new Response('{}', { status: 503 });
+      };
       try {
         if (caller === 'direct') {
-          try { await engine.pushLocalChanges(); } catch { rejected = true; }
-        } else if (caller === 'debounce') {
-          engine.scheduleDebouncedPush(0);
+          await engine.pushLocalChanges();
         } else {
-          window.setInterval = ((callback: () => void, delay: number) => {
-            if (delay === 15000) intervalCallback = callback;
-            return originalInterval(() => {}, 60_000);
-          }) as typeof window.setInterval;
-          engine.config.autoSync = true;
-          engine.config.bgSyncIntervalMinutes = 0;
-          engine.startIntervals();
-          intervalCallback!();
+          engine.scheduleDebouncedPush(0);
+          await new Promise<void>((resolve) => originalInterval(() => resolve(), 120));
         }
-        await new Promise<void>(resolve => {
-          const timer = originalInterval(() => { if (requests) { clearInterval(timer); resolve(); } }, 20);
-        });
-        const failed = { state: engine.status.state, error: engine.status.error, processing: engine.isProcessingSync };
-        window.fetch = async () => { requests++; return Response.json({ bundles: [] }); };
-        engine.config.localSyncMode = 'receive-only';
-        await engine.pushLocalChanges();
-        return { rejected, unhandled, failed, requests };
+        return { methods };
       } finally {
         window.fetch = originalFetch;
         window.setInterval = originalInterval;
-        window.removeEventListener('unhandledrejection', onUnhandled);
         engine.disconnect();
       }
     }, caller);
-    expect(result).toEqual({ rejected: false, unhandled: [], failed: { state: 'error', error: 'Sync pull failed: HTTP 503', processing: false }, requests: 2 });
+    expect(result).toEqual({ methods: [] });
   });
 }
+
+test('idle tick polls nothing while the socket is open', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  const result = await page.evaluate(async () => {
+    const { SyncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+    const engine = new SyncEngine();
+    engine.activeRoomId = 'room_idle_tick';
+    engine.activeVaultKey = {};
+    const originalFetch = window.fetch;
+    const originalInterval = window.setInterval;
+    const methods: string[] = [];
+    let tick: (() => void) | undefined;
+    window.fetch = async (_url, opts) => {
+      methods.push((opts && opts.method) || 'GET');
+      return Response.json({ bundles: [], head: 0, oldest: 0 });
+    };
+    try {
+      window.setInterval = ((callback: () => void, delay: number) => {
+        if (delay === 15000) tick = callback;
+        return originalInterval(() => {}, 60_000);
+      }) as typeof window.setInterval;
+      engine.config.autoSync = true;
+      engine.config.bgSyncIntervalMinutes = 0;
+      engine.ws = { readyState: 1, send: () => {}, close: () => {} };
+      engine.startIntervals();
+      tick!();
+      await new Promise<void>((resolve) => originalInterval(() => resolve(), 120));
+      const withSocket = methods.length;
+      window.setInterval = originalInterval;
+      engine.ws = null;
+      engine.startIntervals();
+      tick!();
+      await new Promise<void>((resolve) => originalInterval(() => resolve(), 120));
+      const withoutSocket = methods.length - withSocket;
+      return { withSocket, withoutSocket };
+    } finally {
+      window.fetch = originalFetch;
+      window.setInterval = originalInterval;
+      engine.disconnect();
+    }
+  });
+  // A live socket already delivers and drains, so the tick must stay off the network.
+  // A dead socket still needs its catch-up pull (the push path itself never pulls).
+  expect(result).toEqual({ withSocket: 0, withoutSocket: 1 });
+});
 
 for (const overlay of ['pair', 'access'] as const) {
   test(`escape closes only the ${overlay} overlay above settings`, async ({ page }, testInfo) => {

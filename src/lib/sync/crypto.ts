@@ -110,6 +110,27 @@ export async function encryptBundle(bundle: SyncBundle, key: CryptoKey): Promise
   };
 }
 
+/**
+ * Binary websocket frame for a push (uplink only):
+ * `[0x01][version:1][idLen:1][bundleId][sequence:4 BE][iv:12][ciphertext]`.
+ * The relay already knows the sender from the socket, so base64 and the JSON envelope
+ * (both ~33% of a small bundle) are not paid on the slow mobile uplink.
+ */
+export function encodeBundleFrame(encrypted: EncryptedBundle): Uint8Array<ArrayBuffer> {
+  const idBytes = new TextEncoder().encode(encrypted.bundleId);
+  const iv = base64ToBytes(encrypted.iv);
+  const ciphertext = base64ToBytes(encrypted.ciphertext);
+  const frame = new Uint8Array(3 + idBytes.length + 4 + 12 + ciphertext.length);
+  frame[0] = 0x01;
+  frame[1] = 0x01;
+  frame[2] = idBytes.length;
+  frame.set(idBytes, 3);
+  new DataView(frame.buffer).setUint32(3 + idBytes.length, encrypted.sequence >>> 0);
+  frame.set(iv, 7 + idBytes.length);
+  frame.set(ciphertext, 19 + idBytes.length);
+  return frame;
+}
+
 /** Decrypts and decompresses an EncryptedBundle */
 export async function decryptBundle(encrypted: EncryptedBundle, key: CryptoKey): Promise<SyncBundle> {
   const iv = base64ToBytes(encrypted.iv);

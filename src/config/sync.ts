@@ -19,8 +19,13 @@ export const SYNC_INTERVALS = {
   PAIRING_POLL_INTERVAL_MS: 2000,
   PAIRING_TIMEOUT_MS: 120000,
   DEFAULT_BG_SYNC_INTERVAL_MINUTES: 15,
-  PUSH_DEBOUNCE_MS: 400,
-  WS_PING_INTERVAL_MS: 30000,
+  // Coalesce one burst of edits, not a whole second of typing.
+  PUSH_DEBOUNCE_MS: 50,
+  // Drafts change on every keystroke and must never drive the push rate.
+  DRAFT_PUSH_DEBOUNCE_MS: 1000,
+  // A websocket push not confirmed in this window is resent over HTTP.
+  WS_ACK_TIMEOUT_MS: 2500,
+  WS_PING_INTERVAL_MS: 25000,
 } as const;
 
 export const SYNC_CRYPTO_CONSTANTS = {

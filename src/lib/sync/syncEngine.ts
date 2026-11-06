@@ -9,6 +9,7 @@ import {
   deriveVaultKey,
   deriveRoomId,
   encryptBundle,
+  encodeBundleFrame,
   decryptBundle,
   generateMnemonic,
   generateDeviceId,
@@ -40,6 +41,22 @@ const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
 
 const syncLog = logger.scope('SYNC');
 
+/** A bundle handed to the relay but not yet confirmed; holds the bookkeeping commit applies. */
+interface PendingPush {
+  bundleId: string;
+  encrypted: EncryptedBundle;
+  frame: Uint8Array<ArrayBuffer>;
+  hashKey: string;
+  stateHash: string;
+  packedHashes: Record<string, string>;
+  syncedIds: string[];
+  tombstones: Record<string, number>;
+  opIds: string[];
+  changes: number;
+  settled: boolean;
+  fallbackTimer: ReturnType<typeof setTimeout> | null;
+}
+
 export class SyncEngine {
   private config: SyncConfig;
   private status: SyncStatus;
@@ -59,6 +76,10 @@ export class SyncEngine {
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   private currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingPushes = new Map<string, PendingPush>();
+  private wsSupportsBinary = false;
+  private pushDirty = false;
+  private entityHashes = new Map<string, { sig: string; hash: string }>();
 
   constructor() {
     this.currentVaultId =
@@ -127,7 +148,10 @@ export class SyncEngine {
         if (op) {
           syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
           this.getOutbox().enqueue(op);
-          this.scheduleDebouncedPush();
+          // A draft changes on every keystroke; only notes/folders/workspace drive the fast path.
+          this.scheduleDebouncedPush(
+            op.kind === 'draft' ? SYNC_INTERVALS.DRAFT_PUSH_DEBOUNCE_MS : SYNC_INTERVALS.PUSH_DEBOUNCE_MS
+          );
         }
       });
     }
@@ -190,7 +214,7 @@ export class SyncEngine {
     this.listeners.forEach((fn) => fn(current));
   }
 
-  public scheduleDebouncedPush(delayMs: number = 300): void {
+  public scheduleDebouncedPush(delayMs: number = SYNC_INTERVALS.PUSH_DEBOUNCE_MS): void {
     if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
     this.pushDebounceTimer = setTimeout(() => {
       this.pushDebounceTimer = null;
@@ -655,7 +679,15 @@ export class SyncEngine {
       const msg = JSON.parse(data);
       if (msg.type === 'welcome') {
         this.status.connectedDevicesCount = msg.connectedDevices || 1;
+        // Relay advertises the binary uplink frame; older relays simply omit it.
+        this.wsSupportsBinary = msg.binary === true;
+        // Catch up on anything missed while the socket was down: connect is the only
+        // moment a full pull is mandatory now that push no longer pulls first.
+        void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));
         this.notify();
+      } else if (msg.type === 'server_ack' && typeof msg.bundleId === 'string') {
+        const pending = this.pendingPushes.get(msg.bundleId);
+        if (pending) this.commitPush(pending);
       } else if (msg.type === 'pong') {
         const now = Date.now();
         if (msg.ts) {
@@ -664,6 +696,8 @@ export class SyncEngine {
         }
       } else if (msg.type === 'bundle') {
         await this.applyIncomingBundle(msg.bundle);
+      } else if (msg.type === 'error') {
+        syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
       }
     } catch (e) {
       syncLog.error('Failed to parse incoming message:', e);
@@ -993,6 +1027,8 @@ export class SyncEngine {
   public async pushLocalChanges(): Promise<void> {
     if (this.status.authRequired && !accountClient.getToken(this.config.serverUrl)) return;
     if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) {
+      // An edit landing mid-push must not be dropped: repush right after this bundle.
+      if (this.isProcessingSync) this.pushDirty = true;
       syncLog.debug('Push skipped: engine is not ready', {
         processing: this.isProcessingSync,
         hasKey: Boolean(this.activeVaultKey),
@@ -1003,21 +1039,10 @@ export class SyncEngine {
 
     if (this.status.initialSync.vaultId === this.currentVaultId &&
         (this.status.initialSync.state === 'loading' || this.status.initialSync.state === 'error')) return;
-    const pullGeneration = this.initGeneration;
-    // Fetch incoming remote updates before computing state and pushing.
-    try {
-      await this.fetchPendingBundlesHttp();
-    } catch (error) {
-      // The pull reports its error; background push callers must not reject unhandled.
-      syncLog.warn('Push skipped after failed pull:', error);
-      return;
-    }
-    if (pullGeneration !== this.initGeneration || this.isProcessingSync) return;
     if (this.config.localSyncMode === 'receive-only') return;
 
     this.isProcessingSync = true;
     const generation = this.initGeneration;
-    const roomId = this.activeRoomId;
     const vaultKey = this.activeVaultKey;
     const hashKey = this.getStateHashKey();
 
@@ -1051,6 +1076,7 @@ export class SyncEngine {
       if (this.forceFullPush) {
         this.forceFullPush = false;
         sentHashes = {};
+        this.entityHashes.clear();
         this.saveSentHashes({});
       }
       const packedHashes: Record<string, string> = {};
@@ -1060,9 +1086,21 @@ export class SyncEngine {
         packedHashes[key] = hash;
       };
 
+      // Stringify + SHA-256 of every note on every keystroke is the only O(vault) work in
+      // the push path (11 ms at 50 notes, 182 ms at 5000). `updatedAt` is bumped by every
+      // storage mutation, so it is a cheap change signature: hash only what moved.
       for (const item of items) {
-        const itemHash = await computeHash(JSON.stringify(item));
-        pack(`item:${item.id}`, itemHash, {
+        const cacheKey = `item:${item.id}`;
+        const sig = `${item.updatedAt ?? 0}:${item.title?.length ?? 0}:${item.content?.length ?? 0}`;
+        const cached = this.entityHashes.get(cacheKey);
+        let itemHash: string;
+        if (cached && cached.sig === sig) {
+          itemHash = cached.hash;
+        } else {
+          itemHash = await computeHash(JSON.stringify(item));
+          this.entityHashes.set(cacheKey, { sig, hash: itemHash });
+        }
+        pack(cacheKey, itemHash, {
           id: item.id,
           type: 'item',
           action: 'upsert',
@@ -1169,7 +1207,7 @@ export class SyncEngine {
 
       const bundle: SyncBundle = {
         bundleId: `bnd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        roomId,
+        roomId: this.activeRoomId,
         fromDeviceId: this.config.deviceId,
         sequence: this.sequence++,
         stateRootHash: stateHash,
@@ -1180,13 +1218,101 @@ export class SyncEngine {
       const encrypted = await encryptBundle(bundle, vaultKey);
       if (generation !== this.initGeneration) return;
 
-      // Always push over HTTP POST: a synchronous 200/409 ack means a lost WebSocket
-      // cannot drop a bundle (at-least-once). WS stays receive-only.
+      const pending: PendingPush = {
+        bundleId: bundle.bundleId,
+        encrypted,
+        frame: encodeBundleFrame(encrypted),
+        hashKey,
+        stateHash,
+        packedHashes,
+        syncedIds: [...currentIds],
+        tombstones: { ...tombstones },
+        opIds: pendingOps.map((o) => o.opId),
+        changes: changes.length,
+        settled: false,
+        fallbackTimer: null,
+      };
+
+      syncLog.info(
+        `Queued bundle ${pending.bundleId} (${changes.length} changes, ${encrypted.ciphertext.length} B) -> room ${this.activeRoomId.slice(0, 10)}...`
+      );
+
+      if (generation !== this.initGeneration) return;
+      this.pendingPushes.set(pending.bundleId, pending);
+      const ws = this.ws;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // Fast path: the socket is already open, so the bundle leaves on it without waiting
+        // for a request/response round trip. The relay's `server_ack` commits the
+        // bookkeeping; if it never arrives the same bundle is replayed over HTTP below
+        // (the relay dedups by bundleId, so a double delivery is harmless).
+        pending.fallbackTimer = setTimeout(() => {
+          pending.fallbackTimer = null;
+          void this.deliverPushOverHttp(pending);
+        }, SYNC_INTERVALS.WS_ACK_TIMEOUT_MS);
+        try {
+          ws.send(this.wsSupportsBinary ? pending.frame : JSON.stringify({ type: 'bundle', bundle: encrypted }));
+          this.status.state = 'connected';
+          this.status.error = null;
+        } catch (error) {
+          syncLog.warn('Websocket push failed, falling back to HTTP:', error);
+          await this.deliverPushOverHttp(pending);
+        }
+      } else {
+        await this.deliverPushOverHttp(pending);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      syncLog.error('Failed to push sync bundle:', msg);
+      this.status.state = 'error';
+      this.status.error = msg;
+    } finally {
+      this.isProcessingSync = false;
+      if (this.pushDirty) {
+        this.pushDirty = false;
+        this.scheduleDebouncedPush(0);
+      }
+      this.notify();
+    }
+  }
+
+  /** Commits a confirmed push: hashes, tombstones and the outbox advance only once the relay has it. */
+  private commitPush(pending: PendingPush): void {
+    if (pending.settled) return;
+    pending.settled = true;
+    if (pending.fallbackTimer) {
+      clearTimeout(pending.fallbackTimer);
+      pending.fallbackTimer = null;
+    }
+    this.pendingPushes.delete(pending.bundleId);
+
+    localStorage.setItem(pending.hashKey, pending.stateHash);
+    this.saveSentHashes({ ...this.loadSentHashes(), ...pending.packedHashes });
+    if (!this.usesAccountSync() && this.currentVaultId === 'default_vault') {
+      localStorage.setItem(LAST_STATE_HASH_KEY, pending.stateHash);
+    }
+    localStorage.setItem(this.getSyncedIdsKey(), JSON.stringify(pending.syncedIds));
+    localStorage.setItem(this.getTombstonesKey(), JSON.stringify(pending.tombstones));
+    this.getOutbox().markSynced(pending.opIds);
+    this.status.lastSyncTime = new Date().toLocaleTimeString();
+    this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
+    this.status.error = null;
+    syncLog.info(`Bundle ${pending.bundleId} confirmed by relay (${pending.changes} changes)`);
+    this.notify();
+  }
+
+  private async deliverPushOverHttp(pending: PendingPush): Promise<void> {
+    if (pending.settled) return;
+    if (pending.fallbackTimer) {
+      clearTimeout(pending.fallbackTimer);
+      pending.fallbackTimer = null;
+    }
+    try {
+      if (!this.activeRoomId) throw new Error('Sync room is not ready');
       const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
       const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
         method: 'POST',
         headers: this.authHeaders(true),
-        body: JSON.stringify(encrypted),
+        body: JSON.stringify(pending.encrypted),
       });
       if (!response.ok) {
         if (response.status === 409) {
@@ -1198,32 +1324,14 @@ export class SyncEngine {
           throw new Error(`Sync push failed: HTTP ${response.status}`);
         }
       }
-
-      const draftChangesCount = changes.filter((c) => c.type === 'draft').length;
-      const itemChangesCount = changes.filter((c) => c.type === 'item').length;
-      const folderChangesCount = changes.filter((c) => c.type === 'folder').length;
-      syncLog.info(
-        `Pushed bundle ${bundle.bundleId} (${changes.length} changes: ${itemChangesCount} items, ${folderChangesCount} folders, ${draftChangesCount} drafts, ${encrypted.ciphertext.length} B) -> room ${this.activeRoomId?.slice(0, 10)}...`
-      );
-
-      localStorage.setItem(hashKey, stateHash);
-      this.saveSentHashes({ ...sentHashes, ...packedHashes });
-      if (!this.usesAccountSync() && this.currentVaultId === 'default_vault') {
-        localStorage.setItem(LAST_STATE_HASH_KEY, stateHash);
-      }
-      localStorage.setItem(this.getSyncedIdsKey(), JSON.stringify([...currentIds]));
-      localStorage.setItem(this.getTombstonesKey(), JSON.stringify(tombstones));
-      this.getOutbox().markSynced(pendingOps.map((o) => o.opId));
-      this.status.lastSyncTime = new Date().toLocaleTimeString();
-      this.status.state = 'connected';
-      this.status.error = null;
+      this.commitPush(pending);
     } catch (err: unknown) {
+      if (pending.settled) return;
+      this.pendingPushes.delete(pending.bundleId);
       const msg = err instanceof Error ? err.message : String(err);
-      syncLog.error('Failed to push sync bundle:', msg);
+      syncLog.error(`Failed to push bundle ${pending.bundleId}:`, msg);
       this.status.state = 'error';
       this.status.error = msg;
-    } finally {
-      this.isProcessingSync = false;
       this.notify();
     }
   }
@@ -1232,13 +1340,13 @@ export class SyncEngine {
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
 
-    // Heartbeat ping every 25 seconds
+    // Heartbeat ping: this is the only traffic an idle session should produce.
     this.pingInterval = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         const ts = Math.floor(Date.now() / 1000);
         this.ws.send(JSON.stringify({ type: 'ping', ts }));
       }
-    }, 25000);
+    }, SYNC_INTERVALS.WS_PING_INTERVAL_MS);
 
     // Auto sync check: 15s for realtime (0), or periodic for battery saver
     if (this.config.autoSync) {
@@ -1247,9 +1355,14 @@ export class SyncEngine {
         : 15000;
 
       this.autoSyncInterval = setInterval(() => {
-        void this.pushLocalChanges();
-        if (this.config.bgSyncIntervalMinutes && this.config.bgSyncIntervalMinutes > 0) {
+        const wsOpen = this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+        // A live socket delivers remote bundles and drains the outbox, so an idle tick
+        // must not wake the radio for an HTTP poll: that was 5.7k requests a day.
+        if (!wsOpen) {
           void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Background pull failed:', error));
+        }
+        if (!wsOpen || this.getOutbox().pending().length > 0) {
+          void this.pushLocalChanges();
         }
       }, intervalMs);
     }
@@ -1320,6 +1433,13 @@ export class SyncEngine {
   public disconnect(): void {
     ++this.initGeneration;
     this.appliedBundleIds.clear();
+    this.entityHashes.clear();
+    this.wsSupportsBinary = false;
+    this.pushDirty = false;
+    for (const pending of this.pendingPushes.values()) {
+      if (pending.fallbackTimer) clearTimeout(pending.fallbackTimer);
+    }
+    this.pendingPushes.clear();
     this.batchUpdating = false;
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);

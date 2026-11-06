@@ -30,6 +30,8 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_PORT = 8320
 DEFAULT_TTL_SECONDS = 7 * 24 * 3600
+BUNDLE_FRAME_BUNDLE = 0x01
+BUNDLE_FRAME_VERSION = 0x01
 PAIRING_TTL_SECONDS = 300
 CHALLENGE_TTL_SECONDS = 300
 DEVICE_REQUEST_TTL_SECONDS = 600
@@ -50,6 +52,34 @@ def iso_time(value: Optional[float]) -> Optional[str]:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def decode_bundle_frame(data: bytes, device_id: str) -> dict:
+    """Binary push frame: [0x01][version:1][idLen:1][bundleId][sequence:4 BE][iv:12][ciphertext].
+
+    Clients send it on the websocket instead of a base64 JSON envelope: the uplink is the
+    slow half of mobile sync, and base64 costs a third of every small bundle.
+    """
+    if len(data) < 3 or data[0] != BUNDLE_FRAME_BUNDLE or data[1] != BUNDLE_FRAME_VERSION:
+        raise ValueError("unsupported bundle frame")
+    id_len = data[2]
+    header_end = 3 + id_len + 4 + 12
+    if not id_len or len(data) <= header_end:
+        raise ValueError("truncated bundle frame")
+    bundle_id = data[3:3 + id_len].decode("utf-8", errors="replace")
+    if not bundle_id:
+        raise ValueError("empty bundle id")
+    sequence = struct.unpack("!I", data[3 + id_len:7 + id_len])[0]
+    iv = data[7 + id_len:19 + id_len]
+    ciphertext = data[header_end:]
+    return {
+        "bundleId": bundle_id,
+        "fromDeviceId": device_id,
+        "sequence": sequence,
+        "timestamp": str(time.time()),
+        "iv": base64.b64encode(iv).decode("ascii"),
+        "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
+    }
 
 
 class ApiError(Exception):
@@ -145,6 +175,13 @@ class RelayDatabase:
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        # A bundle is broadcast right after save_bundle returns, so the commit sits directly
+        # on the delivery latency path. WAL + NORMAL takes the fsync out of that path.
+        try:
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            self.conn.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.Error as exc:
+            logger.warning("SQLite tuning unavailable: %s", exc)
         self._init_schema()
 
     def _ensure_column(self, table: str, column: str, declaration: str) -> None:
@@ -1859,7 +1896,7 @@ class SlagRelayServer:
             self.db.touch_room(room_id, vault_id)
             logger.info("WebSocket connected")
             await conn.send_text(json.dumps({"type": "welcome", "deviceId": device_id, "roomId": room_id,
-                                             "connectedDevices": len(self.rooms[room_id])}))
+                                             "connectedDevices": len(self.rooms[room_id]), "binary": True}))
             for item in self.db.get_pending_bundles(room_id, device_id):
                 self._check_ws_auth(conn)
                 bundle_payload = item["payload"]
@@ -1876,6 +1913,8 @@ class SlagRelayServer:
                         break
                     if opcode == 0x1:
                         await self._handle_ws_message(conn, payload.decode("utf-8", errors="replace"))
+                    elif opcode == 0x2:
+                        await self._handle_ws_binary(conn, payload)
             finally:
                 if room_id in self.rooms:
                     self.rooms[room_id].discard(conn)
@@ -1928,25 +1967,41 @@ class SlagRelayServer:
             bundle = msg.get("bundle", {})
             if not isinstance(bundle, dict):
                 return
-            bundle_id = bundle.get("bundleId", secrets.token_hex(12))
-            from_device = bundle.get("fromDeviceId", conn.device_id)
-            if conn.account_id and from_device != conn.device_id:
-                await conn.send_text(json.dumps({"type": "error", "code": "device_mismatch"}))
-                return
-            seq = int(bundle.get("sequence", 0))
-            timestamp = bundle.get("timestamp", str(time.time()))
-            payload_str = json.dumps(bundle)
-            vault_id = self.db.conn.execute("SELECT vault_id FROM rooms WHERE room_id = ?", (conn.room_id,)).fetchone()["vault_id"]
-            saved = self.db.save_bundle(conn.room_id, bundle_id, from_device, seq, timestamp, payload_str,
-                                        max_cache_bytes=conn.max_cache_bytes, account_id=conn.account_id, vault_id=vault_id)
-            if not saved:
-                await conn.send_text(json.dumps({"type": "error", "code": "cache_limit_exceeded"}))
-                return
-            sync_id = saved
-            bundle_to_broadcast = dict(bundle)
-            bundle_to_broadcast["syncId"] = sync_id
-            await self._broadcast_to_room(conn.room_id, json.dumps({"type": "bundle", "bundle": bundle_to_broadcast}), exclude_device=conn.device_id)
-            await conn.send_text(json.dumps({"type": "server_ack", "bundleId": bundle_id, "sequence": seq, "syncId": sync_id}))
+            await self._ingest_ws_bundle(conn, bundle)
+
+    async def _handle_ws_binary(self, conn: WebSocketConnection, data: bytes) -> None:
+        try:
+            bundle = decode_bundle_frame(data, conn.device_id)
+        except ValueError:
+            await conn.send_text(json.dumps({"type": "error", "code": "invalid_frame"}))
+            return
+        try:
+            self._check_ws_auth(conn, write=True)
+            await self._ingest_ws_bundle(conn, bundle)
+        except ApiError as exc:
+            await conn.send_text(json.dumps({"type": "error", "code": exc.error}))
+
+    async def _ingest_ws_bundle(self, conn: WebSocketConnection, bundle: dict) -> None:
+        bundle_id = bundle.get("bundleId", secrets.token_hex(12))
+        from_device = bundle.get("fromDeviceId", conn.device_id)
+        if conn.account_id and from_device != conn.device_id:
+            await conn.send_text(json.dumps({"type": "error", "code": "device_mismatch"}))
+            return
+        seq = int(bundle.get("sequence", 0))
+        timestamp = bundle.get("timestamp", str(time.time()))
+        payload_str = json.dumps(bundle)
+        room = self.db.conn.execute("SELECT vault_id FROM rooms WHERE room_id = ?", (conn.room_id,)).fetchone()
+        vault_id = room["vault_id"] if room else None
+        saved = self.db.save_bundle(conn.room_id, bundle_id, from_device, seq, timestamp, payload_str,
+                                    max_cache_bytes=conn.max_cache_bytes, account_id=conn.account_id, vault_id=vault_id)
+        if not saved:
+            await conn.send_text(json.dumps({"type": "error", "code": "cache_limit_exceeded"}))
+            return
+        sync_id = saved
+        bundle_to_broadcast = dict(bundle)
+        bundle_to_broadcast["syncId"] = sync_id
+        await self._broadcast_to_room(conn.room_id, json.dumps({"type": "bundle", "bundle": bundle_to_broadcast}), exclude_device=conn.device_id)
+        await conn.send_text(json.dumps({"type": "server_ack", "bundleId": bundle_id, "sequence": seq, "syncId": sync_id}))
 
     async def _broadcast_to_room(self, room_id: str, message_str: str, exclude_device: Optional[str] = None) -> None:
         for client in list(self.rooms.get(room_id, set())):

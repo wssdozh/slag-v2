@@ -24,16 +24,17 @@ from server import RelayDatabase, SlagRelayServer
 from unittest.mock import patch
 
 
-def make_client_ws_frame(payload: bytes) -> bytes:
+def make_client_ws_frame(payload: bytes, opcode: int = 0x1) -> bytes:
     length = len(payload)
     mask = os.urandom(4)
     masked = bytearray(value ^ mask[i % 4] for i, value in enumerate(payload))
+    first = 0x80 | opcode
     if length <= 125:
-        header = bytearray([0x81, 0x80 | length]) + mask
+        header = bytearray([first, 0x80 | length]) + mask
     elif length <= 65535:
-        header = bytearray([0x81, 0x80 | 126]) + struct.pack("!H", length) + mask
+        header = bytearray([first, 0x80 | 126]) + struct.pack("!H", length) + mask
     else:
-        header = bytearray([0x81, 0x80 | 127]) + struct.pack("!Q", length) + mask
+        header = bytearray([first, 0x80 | 127]) + struct.pack("!Q", length) + mask
     return header + masked
 
 
@@ -169,6 +170,49 @@ class TestLegacyRelay(RelayTestCase):
         w2.close()
         await w1.wait_closed()
         await w2.wait_closed()
+
+    async def test_binary_bundle_frame_push(self):
+        r1, w1, _ = await self.open_ws("binary-room", "dev-1")
+        welcome = await read_server_ws_frame(r1)
+        self.assertEqual(welcome["type"], "welcome")
+        self.assertTrue(welcome["binary"])
+        r2, w2, _ = await self.open_ws("binary-room", "dev-2")
+        await read_server_ws_frame(r2)
+
+        bundle_id = b"bnd_binary_1"
+        iv = os.urandom(12)
+        ciphertext = os.urandom(64)
+        frame = bytes([0x01, 0x01, len(bundle_id)]) + bundle_id + struct.pack("!I", 7) + iv + ciphertext
+        w1.write(make_client_ws_frame(frame, opcode=0x2))
+        await w1.drain()
+
+        ack = await read_server_ws_frame(r1)
+        self.assertEqual(ack["type"], "server_ack")
+        self.assertEqual(ack["bundleId"], "bnd_binary_1")
+        self.assertEqual(ack["sequence"], 7)
+
+        delivered = await read_server_ws_frame(r2)
+        payload = delivered["bundle"]
+        self.assertEqual(payload["bundleId"], "bnd_binary_1")
+        self.assertEqual(payload["fromDeviceId"], "dev-1")
+        self.assertEqual(base64.b64decode(payload["iv"]), iv)
+        self.assertEqual(base64.b64decode(payload["ciphertext"]), ciphertext)
+
+        w1.close()
+        w2.close()
+        await w1.wait_closed()
+        await w2.wait_closed()
+
+    async def test_binary_frame_rejects_garbage(self):
+        r1, w1, _ = await self.open_ws("binary-bad", "dev-1")
+        await read_server_ws_frame(r1)
+        w1.write(make_client_ws_frame(b"\x09\x09short", opcode=0x2))
+        await w1.drain()
+        error = await read_server_ws_frame(r1)
+        self.assertEqual(error["type"], "error")
+        self.assertEqual(error["code"], "invalid_frame")
+        w1.close()
+        await w1.wait_closed()
 
     async def test_bundles_response_exposes_head_and_oldest(self):
         room = "watermark-room"
