@@ -110,6 +110,21 @@ test('a closed toast leaves through its exit state before unmounting', async ({ 
   await expect(toast).toHaveCount(0);
 });
 
+test('the inbox counter pops when its number changes', async ({ page }) => {
+  await page.goto('/');
+  await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
+  const badge = page.getByTestId('inbox-count');
+  await expect(badge).toBeVisible();
+  const before = (await badge.innerText()).trim();
+
+  await createTask(page, 'Счётчик ' + Date.now());
+  await expect(badge).not.toHaveText(before);
+  const running = await badge.evaluate(el => el.getAnimations().filter(animation => animation.playState === 'running').length);
+  expect(running).toBeGreaterThan(0);
+
+  await page.locator('aside').first().screenshot({ path: 'test-results/screenshots/motion_count.png' });
+});
+
 test('shared modal exits before unmount and becomes inert immediately', async ({ page }) => {
   const modal = await openSettings(page);
   const result = await modal.evaluate(element => {

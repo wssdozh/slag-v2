@@ -217,6 +217,16 @@
   transition-duration: var(--slag-motion-slow);
 }
 
+/* Counters pop once when the value changes; consumers remount the span by key. */
+@keyframes motion-count-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.motion-count {
+  animation: motion-count-pop var(--slag-motion-slow) var(--ease-settle);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -239,6 +249,9 @@
   /* A drawn check must not stay hidden once the animation is switched off. */
   .motion-check,
   .motion-check-ring {
+    animation: none !important;
+  }
+  .motion-count {
     animation: none !important;
   }
   .motion-check {

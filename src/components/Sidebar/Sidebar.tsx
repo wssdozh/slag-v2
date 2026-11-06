@@ -83,7 +83,11 @@ export const Sidebar: React.FC = () => {
               <span>{DEFAULT_INBOX_FOLDER}</span>
             </div>
             {inboxItemsCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-2xs font-mono bg-white/10 text-zinc-200">
+              <span
+                key={inboxItemsCount}
+                data-testid="inbox-count"
+                className="px-1.5 py-0.2 rounded-full text-2xs font-mono bg-white/10 text-zinc-200 motion-count"
+              >
                 {inboxItemsCount}
               </span>
             )}

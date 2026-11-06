@@ -141,7 +141,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
             className="h-ctrl-sm px-2 rounded-md flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] cursor-pointer motion-press"
           >
             <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
-            <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
+            <span key={inboxUnsortedCount} className="font-mono text-[11px] motion-count">{inboxUnsortedCount}</span>
             <span className="sr-only">Запустить ИИ-Сортировку</span>
           </button>
         )}

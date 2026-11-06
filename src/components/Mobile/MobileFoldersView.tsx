@@ -288,7 +288,7 @@ export const MobileFoldersView: React.FC = () => {
                 className="h-8 px-2 rounded-lg flex items-center gap-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] motion-press cursor-pointer"
               >
                 <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
-                <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
+                <span key={inboxUnsortedCount} className="font-mono text-[11px] motion-count">{inboxUnsortedCount}</span>
                 <span className="sr-only">Запустить ИИ-Сортировку</span>
               </button>
             )}
@@ -326,7 +326,7 @@ export const MobileFoldersView: React.FC = () => {
               >
                 <Folder className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{sub.name}</span>
-                <span className="text-[10px] font-mono text-zinc-500">({subItemsCount})</span>
+                <span key={subItemsCount} className="text-[10px] font-mono text-zinc-500 motion-count">({subItemsCount})</span>
               </button>
             );
           })}
