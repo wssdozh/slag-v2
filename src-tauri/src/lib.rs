@@ -275,8 +275,36 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
     }
 }
 
+#[cfg(target_os = "linux")]
+const LINUX_APP_ID: &str = "com.slag.notes";
+
+/// Brings the main window forward without remapping an already visible window.
+///
+/// Calling `show()`/`unminimize()` unconditionally re-maps the surface on Wayland,
+/// which the user perceives as the window flashing when a second launch activates it.
+#[cfg(desktop)]
+fn reveal_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        if window.is_minimized().unwrap_or(false) {
+            let _ = window.unminimize();
+        }
+        if !window.is_visible().unwrap_or(true) {
+            let _ = window.show();
+        }
+        let _ = window.set_focus();
+        #[cfg(target_os = "windows")]
+        set_webview_memory_level(&window, false);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // GNOME ties a Wayland window to its launcher by app_id, and GTK derives app_id from
+    // the program name (the binary name by default). With a binary name the dock never
+    // shows SLAG as running, so the launcher looks "not open" and starts an extra process.
+    #[cfg(target_os = "linux")]
+    glib::set_prgname(Some(LINUX_APP_ID));
+
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--install-system") {
         #[cfg(target_os = "linux")]
@@ -332,17 +360,19 @@ pub fn run() {
                         return;
                     }
                 }
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
-                    #[cfg(target_os = "windows")]
-                    set_webview_memory_level(&window, false);
-                }
+                reveal_main_window(app);
             }))
             .plugin(
                 tauri_plugin_window_state::Builder::default()
                     .with_denylist(&["quick-composer"])
+                    // Visibility is owned by the tray + single-instance flow: persisting it
+                    // would let a hidden window restore as "should not be shown".
+                    .with_state_flags(
+                        tauri_plugin_window_state::StateFlags::SIZE
+                            | tauri_plugin_window_state::StateFlags::POSITION
+                            | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                            | tauri_plugin_window_state::StateFlags::FULLSCREEN,
+                    )
                     .build(),
             )
             .plugin(
@@ -356,13 +386,11 @@ pub fn run() {
                                 #[cfg(target_os = "windows")]
                                 set_webview_memory_level(&quick_win, false);
                                 let _ = quick_win.emit("slag://focus-composer", ());
-                            } else if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.unminimize();
-                                let _ = window.set_focus();
-                                #[cfg(target_os = "windows")]
-                                set_webview_memory_level(&window, false);
-                                let _ = window.emit("slag://open-composer", ());
+                            } else {
+                                reveal_main_window(app);
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.emit("slag://open-composer", ());
+                                }
                             }
                         }
                     })
@@ -411,6 +439,12 @@ pub fn run() {
                             }
                         }
                     });
+                }
+
+                // The window starts hidden so the restored geometry is applied before the
+                // first frame; showing it earlier makes the layout jump (sidebar resize).
+                if !std::env::args().any(|a| a == "--quick" || a == "-q" || a == "--composer") {
+                    reveal_main_window(app.handle());
                 }
 
                 if let Some(quick_window) = app.get_webview_window("quick-composer") {
@@ -482,13 +516,7 @@ pub fn run() {
                         .show_menu_on_left_click(false)
                         .on_menu_event(|app, event| match event.id().as_ref() {
                             "open" => {
-                                if let Some(window) = app.get_webview_window("main") {
-                                    let _ = window.show();
-                                    let _ = window.unminimize();
-                                    let _ = window.set_focus();
-                                    #[cfg(target_os = "windows")]
-                                    set_webview_memory_level(&window, false);
-                                }
+                                reveal_main_window(app);
                             }
                             "quick_note" => {
                                 if let Some(quick_win) = app.get_webview_window("quick-composer") {
@@ -498,13 +526,11 @@ pub fn run() {
                                     #[cfg(target_os = "windows")]
                                     set_webview_memory_level(&quick_win, false);
                                     let _ = quick_win.emit("slag://focus-composer", ());
-                                } else if let Some(window) = app.get_webview_window("main") {
-                                    let _ = window.show();
-                                    let _ = window.unminimize();
-                                    let _ = window.set_focus();
-                                    #[cfg(target_os = "windows")]
-                                    set_webview_memory_level(&window, false);
-                                    let _ = window.emit("slag://open-composer", ());
+                                } else {
+                                    reveal_main_window(app);
+                                    if let Some(window) = app.get_webview_window("main") {
+                                        let _ = window.emit("slag://open-composer", ());
+                                    }
                                 }
                             }
                             "quit" => {
@@ -529,11 +555,7 @@ pub fn run() {
                                             trim_working_set();
                                         }
                                     } else {
-                                        let _ = window.show();
-                                        let _ = window.unminimize();
-                                        let _ = window.set_focus();
-                                        #[cfg(target_os = "windows")]
-                                        set_webview_memory_level(&window, false);
+                                        reveal_main_window(app);
                                     }
                                 }
                             }

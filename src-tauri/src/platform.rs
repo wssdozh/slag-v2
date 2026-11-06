@@ -233,7 +233,7 @@ Icon=com.slag.notes
 Terminal=false
 Type=Application
 Categories=Office;Utility;
-StartupWMClass=slag-v2
+StartupWMClass=com.slag.notes
 Actions=QuickComposer;
 
 [Desktop Action QuickComposer]
