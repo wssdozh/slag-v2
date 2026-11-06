@@ -536,13 +536,13 @@ export const FeedList: React.FC = () => {
         )}
 
         {/* Bottom spacer so the last card clears the composer with a clean gap */}
-        <div className="h-36 shrink-0 pointer-events-none" aria-hidden="true" />
+        <div className="h-[104px] shrink-0 pointer-events-none" aria-hidden="true" />
         <div ref={bottomAnchorRef} />
       </div>
 
       {/* Floating scroll to bottom button: centered comfortably above the composer island */}
       {showScrollBottom && (
-        <div className="absolute bottom-40 inset-x-0 pointer-events-none z-30 flex justify-center px-4">
+        <div className="absolute bottom-28 inset-x-0 pointer-events-none z-30 flex justify-center px-4">
           <button
             type="button"
             onClick={scrollToBottom}
