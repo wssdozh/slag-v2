@@ -113,7 +113,8 @@ SLAG v2 автоматически определяет платформу пр�
 1. **Linux (Wayland + GNOME)**:
    - Из-за ограничений безопасности Wayland глобальные шорткаты регистрируются через системный демон GNOME Media Keys (`org.gnome.settings-daemon.plugins.media-keys`).
    - При первом запуске автоматически прописывается биндинг `Ctrl+Shift+Space` -> `<path_to_binary> --quick`.
-   - Автоматически генерируется десктоп-файл `~/.local/share/applications/com.slag.notes.desktop` с Actions `QuickComposer` и устанавливается иконка `~/.local/share/icons/hicolor/128x128/apps/com.slag.notes.png`.
+   - Только release-сборка регистрирует `~/.local/share/applications/com.slag.notes.desktop` и иконку. Debug-сборки не меняют системный ярлык и хоткей.
+   - На Linux повторное открытие основного окна вызывает GTK `present()` на главном потоке вместо Tauri `set_focus()`; ярлык объявляет `StartupNotify=true`.
 2. **Linux (Wayland non-GNOME / Hyprland / Sway)**:
    - В настройках («Горячие клавиши») отображается готовая строка биндинга для конфигурационного файла тайлингового менеджера (`bind = CTRL SHIFT, SPACE, exec, <path> --quick`).
 3. **Windows / macOS / Linux X11**:

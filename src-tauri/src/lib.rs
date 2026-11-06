@@ -278,10 +278,7 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
 #[cfg(target_os = "linux")]
 const LINUX_APP_ID: &str = "com.slag.notes";
 
-/// Brings the main window forward without remapping an already visible window.
-///
-/// Calling `show()`/`unminimize()` unconditionally re-maps the surface on Wayland,
-/// which the user perceives as the window flashing when a second launch activates it.
+/// Brings the main window forward, changing visibility only when necessary.
 #[cfg(desktop)]
 fn reveal_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -291,6 +288,17 @@ fn reveal_main_window(app: &tauri::AppHandle) {
         if !window.is_visible().unwrap_or(true) {
             let _ = window.show();
         }
+        #[cfg(target_os = "linux")]
+        {
+            let handle = window.clone();
+            let _ = window.run_on_main_thread(move || {
+                use gtk::prelude::GtkWindowExt;
+                if let Ok(native) = handle.gtk_window() {
+                    native.present();
+                }
+            });
+        }
+        #[cfg(not(target_os = "linux"))]
         let _ = window.set_focus();
         #[cfg(target_os = "windows")]
         set_webview_memory_level(&window, false);

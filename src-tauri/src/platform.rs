@@ -143,6 +143,9 @@ pub fn is_gnome_shortcut_installed(expected_exe: &str) -> bool {
 
 #[cfg(target_os = "linux")]
 pub fn install_gnome_shortcut(binding: Option<&str>) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("Desktop integration is only available in release builds".to_string());
+    }
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("Failed to get current executable path: {e}"))?;
     let exe_str = exe_path.to_string_lossy();
@@ -207,6 +210,10 @@ pub fn remove_gnome_shortcut() -> Result<(), String> {
 
 #[cfg(target_os = "linux")]
 pub fn ensure_desktop_entry() -> Result<(), String> {
+    // Development binaries must never replace the installed launcher.
+    if cfg!(debug_assertions) {
+        return Err("Desktop integration is only available in release builds".to_string());
+    }
     let home = std::env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
     let data_home = std::env::var("XDG_DATA_HOME")
         .map(PathBuf::from)
@@ -234,6 +241,7 @@ Terminal=false
 Type=Application
 Categories=Office;Utility;
 StartupWMClass=com.slag.notes
+StartupNotify=true
 Actions=QuickComposer;
 
 [Desktop Action QuickComposer]
@@ -328,8 +336,17 @@ pub fn detect_platform() -> PlatformInfo {
     }
 }
 
+#[cfg(all(test, target_os = "linux", debug_assertions))]
+mod tests {
+    #[test]
+    fn debug_build_cannot_replace_desktop_integration() {
+        assert!(super::ensure_desktop_entry().is_err());
+        assert!(super::install_gnome_shortcut(None).is_err());
+    }
+}
+
 pub fn auto_adapt_system() {
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", not(debug_assertions)))]
     {
         let info = detect_platform();
         if info.is_gnome {
