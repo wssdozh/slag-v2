@@ -25,6 +25,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useItemActions, TYPE_LABELS } from '../../hooks/useItemActions';
+import { usePresence } from '../../hooks/usePresence';
 
 export const ContextMenu: React.FC = () => {
   const {
@@ -42,8 +43,14 @@ export const ContextMenu: React.FC = () => {
   } = useApp();
 
   const isOpen = contextMenu !== null;
-  // Menus unmount on close: a retained copy kept pointer-events alive over the feed.
-  const activeTarget = contextMenu;
+  const { ref: menuRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
+
+  // Retain the target while exiting so it fades out with its content instead of vanishing
+  const [cachedTarget, setCachedTarget] = useState(contextMenu);
+  if (contextMenu && contextMenu !== cachedTarget) {
+    setCachedTarget(contextMenu);
+  }
+  const activeTarget = contextMenu || cachedTarget;
 
   const [activeSubmenu, setActiveSubmenu] = useState<'more' | 'type' | 'explorer' | null>(null);
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
@@ -196,7 +203,7 @@ export const ContextMenu: React.FC = () => {
     setActiveSubmenu(null);
   }, []);
 
-  if (!activeTarget) return null;
+  if (!isPresent || !activeTarget) return null;
 
   const { x, y, type, item, folder } = activeTarget;
 
@@ -237,12 +244,19 @@ export const ContextMenu: React.FC = () => {
 
   return (
     <div
+      ref={menuRef}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isOpen}
       onClick={isOpen ? (e) => e.stopPropagation() : undefined}
       style={{ left: `${clampedX}px`, top: `${clampedY}px` }}
       className="fixed z-50 motion-fade"
     >
       {/* Main Menu Container */}
-      <div className="w-60 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover">
+      <div
+        data-motion-state={phase}
+        className="w-60 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+      >
         {type === 'item' && item && (
           <>
             {/* Quick Primary Actions */}

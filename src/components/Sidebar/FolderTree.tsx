@@ -6,7 +6,6 @@ import { logger } from '../../lib/logger';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   ChevronRight,
-  ChevronDown,
   Folder,
   MoreVertical
 } from 'lucide-react';
@@ -183,14 +182,17 @@ export const FolderTree: React.FC = () => {
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {hasChildren ? (
               <button
+                type="button"
                 onClick={(e) => toggleExpand(node.fullPath, e)}
+                aria-expanded={isExpanded}
+                aria-label={isExpanded ? `Свернуть папку ${node.name}` : `Развернуть папку ${node.name}`}
                 className="p-0.5 text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
               >
-                {isExpanded ? (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5" />
-                )}
+                <ChevronRight
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ease-out ${
+                    isExpanded ? 'rotate-90 text-zinc-300' : 'text-zinc-500'
+                  }`}
+                />
               </button>
             ) : (
               <span className="w-3.5 shrink-0" />
@@ -229,9 +231,15 @@ export const FolderTree: React.FC = () => {
           </div>
         </div>
 
-        {hasChildren && isExpanded && (
-          <div className="flex flex-col">
-            {node.children.map(child => renderNode(child, depth + 1))}
+        {hasChildren && (
+          <div
+            className="motion-accordion"
+            data-expanded={isExpanded}
+            aria-hidden={!isExpanded}
+          >
+            <div className="motion-accordion-inner flex flex-col">
+              {node.children.map(child => renderNode(child, depth + 1))}
+            </div>
           </div>
         )}
       </div>

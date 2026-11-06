@@ -6,6 +6,7 @@ import { computeAntiOverlapLayout, type LayoutPositionedTask } from '../../lib/c
 import { useDragToScroll } from '../../hooks/useDragToScroll';
 import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
 import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
+import { usePresence } from '../../hooks/usePresence';
 import {
   getISODateString,
   getTodayString,
@@ -246,6 +247,18 @@ export const CalendarView: React.FC = () => {
 
   // Expanded Day Card modal for Month view
   const [expandedDayDateStr, setExpandedDayDateStr] = useState<string | null>(null);
+  const [cachedDayDateStr, setCachedDayDateStr] = useState<string | null>(null);
+  if (expandedDayDateStr && expandedDayDateStr !== cachedDayDateStr) {
+    setCachedDayDateStr(expandedDayDateStr);
+  }
+  const isExpandedDayOpen = Boolean(expandedDayDateStr);
+  const {
+    ref: expandedDayRef,
+    phase: expandedDayPhase,
+    isPresent: isExpandedDayPresent,
+    onTransitionEnd: onExpandedDayTransitionEnd,
+  } = usePresence(isExpandedDayOpen);
+  const effectiveDayDateStr = expandedDayDateStr || cachedDayDateStr;
 
   // Live minute ticker for Red Ribbon Indicator
   const [nowMinute, setNowMinute] = useState(() => {
@@ -1483,8 +1496,12 @@ export const CalendarView: React.FC = () => {
         {/* ============================================================== */}
         {/* 3. Side Drawer: Overdue and Unscheduled Tasks                 */}
         {/* ============================================================== */}
-        {isDrawerOpen && (
-          <div className="w-72 sm:w-80 border-l border-white/[0.06] bg-panel/95 flex flex-col shrink-0 z-20">
+        <div
+          className={`border-l border-white/[0.06] bg-panel/95 flex flex-col shrink-0 z-20 overflow-hidden transition-[width] duration-200 ease-out ${
+            isDrawerOpen ? 'w-72 sm:w-80' : 'w-0 border-l-0'
+          }`}
+        >
+          <div className="w-72 sm:w-80 flex flex-col h-full shrink-0">
             {/* Drawer Tabs */}
             <div className="h-10 px-2 border-b border-white/[0.06] flex items-center justify-between bg-panel">
               <div className="flex items-center gap-1">
@@ -1696,30 +1713,35 @@ export const CalendarView: React.FC = () => {
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ============================================================== */}
       {/* 4. Expanded Day Card Popover (Modal like Todoist Image 3)      */}
       {/* ============================================================== */}
-      {expandedDayDateStr && (
+      {isExpandedDayPresent && effectiveDayDateStr && (
         <div
+          ref={expandedDayRef}
+          data-motion-state={expandedDayPhase}
+          onTransitionEnd={onExpandedDayTransitionEnd}
+          inert={!isExpandedDayOpen}
           onClick={() => setExpandedDayDateStr(null)}
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 motion-fade"
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-surface border border-white/[0.1] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            data-motion-state={expandedDayPhase}
+            className="w-full max-w-md rounded-2xl bg-surface border border-white/[0.1] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden motion-dialog"
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-surface-elevated">
               <div className="flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4 text-zinc-300" />
                 <h3 className="text-sm font-semibold text-zinc-100">
-                  {expandedDayDateStr}
+                  {effectiveDayDateStr}
                 </h3>
                 <span className="text-[11px] font-mono text-zinc-500">
-                  ({(tasksByDueDate.get(expandedDayDateStr) || []).length} {pluralRu((tasksByDueDate.get(expandedDayDateStr) || []).length, ['таска', 'таски', 'тасок'])})
+                  ({(tasksByDueDate.get(effectiveDayDateStr) || []).length} {pluralRu((tasksByDueDate.get(effectiveDayDateStr) || []).length, ['таска', 'таски', 'тасок'])})
                 </span>
               </div>
               <button
@@ -1734,12 +1756,12 @@ export const CalendarView: React.FC = () => {
 
             {/* Tasks list */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
-              {(tasksByDueDate.get(expandedDayDateStr) || []).length === 0 ? (
+              {(tasksByDueDate.get(effectiveDayDateStr) || []).length === 0 ? (
                 <div className="py-12 text-center text-xs text-zinc-500 font-mono">
                   На этот день пока нет тасок
                 </div>
               ) : (
-                (tasksByDueDate.get(expandedDayDateStr) || []).map(task => {
+                (tasksByDueDate.get(effectiveDayDateStr) || []).map(task => {
                   const slot = getTaskTimeSlot(task);
                   const styling = getPriorityBadge(task.priority);
                   const isDone = task.status === 'done';
@@ -1809,10 +1831,10 @@ export const CalendarView: React.FC = () => {
             <div className="p-3 border-t border-white/[0.06] bg-surface-elevated">
               <button
                 onClick={() => {
-                  if (!expandedDayDateStr) return;
+                  if (!effectiveDayDateStr) return;
                   openComposerModal({
                     type: 'task',
-                    dueDate: expandedDayDateStr,
+                    dueDate: effectiveDayDateStr,
                     folder: currentFolder,
                   });
                 }}

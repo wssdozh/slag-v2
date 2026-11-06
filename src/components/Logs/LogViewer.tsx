@@ -10,7 +10,6 @@ import {
   Copy,
   Download,
   Trash2,
-  ChevronDown,
   ChevronRight,
   Check,
   ArrowDown,
@@ -429,21 +428,27 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
                     </button>
                     {hasData && (
                       <span className="text-zinc-500 p-0.5">
-                        {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-zinc-300' : ''}`} />
                       </span>
                     )}
                   </div>
                 </div>
 
                 {/* Expanded Payload Data (flat subtle pre) */}
-                {hasData && isExpanded && (
+                {hasData && (
                   <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="mt-1.5 p-2 bg-black/40 rounded border border-white/[0.04] overflow-x-auto text-[10px] text-zinc-400"
+                    className="motion-accordion"
+                    data-expanded={isExpanded}
+                    aria-hidden={!isExpanded}
                   >
-                    <pre className="whitespace-pre-wrap font-mono">
-                      {JSON.stringify(entry.data, null, 2)}
-                    </pre>
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="motion-accordion-inner mt-1.5 p-2 bg-black/40 rounded border border-white/[0.04] overflow-x-auto text-[10px] text-zinc-400"
+                    >
+                      <pre className="whitespace-pre-wrap font-mono">
+                        {JSON.stringify(entry.data, null, 2)}
+                      </pre>
+                    </div>
                   </div>
                 )}
               </div>

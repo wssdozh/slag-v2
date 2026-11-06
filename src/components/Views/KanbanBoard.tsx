@@ -230,7 +230,7 @@ export const KanbanBoard: React.FC = () => {
             ? `absolute inset-y-0 left-0 z-40 w-72 bg-panel shadow-2xl border-r border-white/[0.08] transition-transform duration-200 ${
                 isKanbanMaterialsOpen ? 'translate-x-0' : '-translate-x-full'
               }`
-            : `bg-panel/95 flex flex-col shrink-0 overflow-hidden ${
+            : `bg-panel/95 flex flex-col shrink-0 overflow-hidden transition-[width] duration-200 ease-out ${
                 isKanbanMaterialsOpen ? 'w-60 sm:w-64 border-r border-white/[0.06]' : 'w-0 border-r-0'
               }`
         }`}
@@ -471,7 +471,7 @@ export const KanbanBoard: React.FC = () => {
                               {isMenuOpen && (
                                 <div
                                   onClick={e => e.stopPropagation()}
-                                  className="absolute left-0 top-full mt-1 w-36 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-xl py-1 z-30 space-y-0.5"
+                                  className="absolute left-0 top-full mt-1 w-36 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-xl py-1 z-30 space-y-0.5 motion-popover"
                                 >
                                   {COLUMNS.map(col => (
                                     <button

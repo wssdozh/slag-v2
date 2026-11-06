@@ -87,7 +87,7 @@ export const FolderInfoPanel: React.FC = () => {
           </div>
 
           {isEditingDescription ? (
-            <div className="flex flex-col gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1 motion-fade">
               <textarea
                 value={descriptionDraft}
                 onChange={(e) => setDescriptionDraft(e.target.value)}
@@ -112,7 +112,7 @@ export const FolderInfoPanel: React.FC = () => {
               </div>
             </div>
           ) : (
-            <p className="text-xs text-zinc-300 leading-relaxed font-normal">
+            <p className="text-xs text-zinc-300 leading-relaxed font-normal motion-fade">
               {currentFolderMeta?.description || (
                 <span className="italic text-zinc-600">
                   Описание не задано. Добавьте его, чтобы ИИ понимал, что сортировать сюда.

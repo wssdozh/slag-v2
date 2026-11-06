@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import {
   Image as ImageIcon,
   Mic,
@@ -42,6 +42,53 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
 
   const isMobile = variant === 'mobile';
 
+  const desktopTabBarRef = useRef<HTMLDivElement | null>(null);
+  const [desktopTabIndicator, setDesktopTabIndicator] = useState<{ left: number; width: number; ready: boolean }>({
+    left: 0,
+    width: 0,
+    ready: false,
+  });
+
+  const mobileTabBarRef = useRef<HTMLDivElement | null>(null);
+  const [mobileTabIndicator, setMobileTabIndicator] = useState<{ left: number; width: number; ready: boolean }>({
+    left: 0,
+    width: 0,
+    ready: false,
+  });
+
+  const updateIndicators = useCallback(() => {
+    if (isMobile) {
+      if (!mobileTabBarRef.current) return;
+      const activeBtn = mobileTabBarRef.current.querySelector<HTMLButtonElement>(`[data-mobile-media-tab="${activeTab}"]`);
+      if (activeBtn) {
+        setMobileTabIndicator({
+          left: activeBtn.offsetLeft,
+          width: activeBtn.offsetWidth,
+          ready: true,
+        });
+      }
+    } else {
+      if (!desktopTabBarRef.current) return;
+      const activeBtn = desktopTabBarRef.current.querySelector<HTMLButtonElement>(`[data-media-tab="${activeTab}"]`);
+      if (activeBtn) {
+        setDesktopTabIndicator({
+          left: activeBtn.offsetLeft,
+          width: activeBtn.offsetWidth,
+          ready: true,
+        });
+      }
+    }
+  }, [activeTab, isMobile]);
+
+  useLayoutEffect(() => {
+    updateIndicators();
+  }, [updateIndicators]);
+
+  useEffect(() => {
+    window.addEventListener('resize', updateIndicators);
+    return () => window.removeEventListener('resize', updateIndicators);
+  }, [updateIndicators]);
+
   const tabDefs = [
     { id: 'media' as const, label: isMobile ? 'Фото' : 'Медиа', icon: ImageIcon, count: allImages.length },
     { id: 'audio' as const, label: 'Аудио', icon: Mic, count: allAudio.length },
@@ -54,18 +101,30 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
     <div className={`flex flex-col gap-3 ${className}`}>
       {/* Tabs Header */}
       {isMobile ? (
-        <div className="flex items-center gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+        <div ref={mobileTabBarRef} className="relative flex items-center gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none select-none">
+          {mobileTabIndicator.ready && (
+            <div
+              data-testid="folder-media-pill"
+              className="absolute top-1 bottom-1 left-0 rounded-xl bg-white/10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
+              style={{
+                transform: `translateX(${mobileTabIndicator.left}px)`,
+                width: `${mobileTabIndicator.width}px`,
+                transitionTimingFunction: 'var(--ease-settle)',
+              }}
+            />
+          )}
           {tabDefs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                data-mobile-media-tab={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                className={`relative z-10 shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center gap-1 cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'bg-white/10 text-white shadow-sm'
+                    ? `${mobileTabIndicator.ready ? '' : 'bg-white/10'} text-white font-semibold`
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
@@ -79,10 +138,21 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
           })}
         </div>
       ) : (
-        <div className="flex items-center gap-1 border-b border-white/[0.06] pb-1 overflow-x-auto scrollbar-none">
+        <div ref={desktopTabBarRef} className="relative flex items-center gap-1 border-b border-white/[0.06] pb-1 overflow-x-auto scrollbar-none select-none">
+          {desktopTabIndicator.ready && (
+            <span
+              className="absolute bottom-[-1px] left-0 h-[2px] bg-white rounded-full transition-[transform,width] duration-200 pointer-events-none"
+              style={{
+                transform: `translateX(${desktopTabIndicator.left}px)`,
+                width: `${desktopTabIndicator.width}px`,
+                transitionTimingFunction: 'var(--ease-settle)',
+              }}
+            />
+          )}
           {tabDefs.map(tab => (
             <button
               key={tab.id}
+              data-media-tab={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`relative pb-1 px-2 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
@@ -99,16 +169,13 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                   {tab.count}
                 </span>
               )}
-              {activeTab === tab.id && (
-                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-white rounded-full" />
-              )}
             </button>
           ))}
         </div>
       )}
 
       {/* Tab Panes */}
-      <div className="flex flex-col gap-2 min-h-[140px]">
+      <div key={activeTab} className="flex flex-col gap-2 min-h-[140px] motion-fade">
         {/* Media / Photos */}
         {activeTab === 'media' && (
           allImages.length === 0 ? (

@@ -22,6 +22,7 @@ import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
 import { logger } from '../../lib/logger';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { usePresence } from '../../hooks/usePresence';
 import {
   isDesktopApp,
   openDetachedWindow,
@@ -322,7 +323,7 @@ const detachPanel = async (api: DockviewApi, panel: IDockviewPanel, box?: { left
 // Header action [+] and popout buttons on each tab group
 const GroupHeaderActions: React.FC<any> = (props) => {
   const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const { ref: menuRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
   const seqRef = useRef(0);
 
   useEffect(() => {
@@ -341,7 +342,7 @@ const GroupHeaderActions: React.FC<any> = (props) => {
       window.removeEventListener('mousedown', handleClick);
       window.removeEventListener('keydown', handleKey);
     };
-  }, [isOpen]);
+  }, [isOpen, menuRef]);
 
   const addPanel = (panelId: string, title: string) => {
     setIsOpen(false);
@@ -386,9 +387,12 @@ const GroupHeaderActions: React.FC<any> = (props) => {
         <Plus className="w-3.5 h-3.5" />
       </button>
 
-      {isOpen && (
+      {isPresent && (
         <div
           ref={menuRef}
+          data-motion-state={phase}
+          onTransitionEnd={onTransitionEnd}
+          inert={!isOpen}
           className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-50 motion-popover"
         >
           <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04]">
