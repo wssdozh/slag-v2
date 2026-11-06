@@ -228,6 +228,42 @@ test('search results cascade for the first batch, then stop animating', async ({
   await page.screenshot({ path: 'test-results/screenshots/motion_search_stagger.png' });
 });
 
+test('switching vaults cross-fades where the browser supports it', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('slag_vaults_v2', JSON.stringify([
+      { id: 'default_vault', name: 'main', mode: 'indexeddb' },
+      { id: 'vault_two', name: 'второе', mode: 'indexeddb' },
+    ]));
+    const doc = document as any;
+    const original = doc.startViewTransition?.bind(document);
+    (window as any).__vt = 0;
+    doc.startViewTransition = (callback: () => void) => {
+      (window as any).__vt += 1;
+      return original?.(callback);
+    };
+  });
+  await page.goto('/');
+  await page.locator('aside button', { hasText: 'main' }).first().click();
+  await page.getByRole('button', { name: 'второе' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__vt)).toBeGreaterThan(0);
+  await expect(page.getByTestId('toast').filter({ hasText: 'Хранилище переключено' })).toBeVisible();
+});
+
+test('a browser without view transitions still switches vaults', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('slag_vaults_v2', JSON.stringify([
+      { id: 'default_vault', name: 'main', mode: 'indexeddb' },
+      { id: 'vault_two', name: 'второе', mode: 'indexeddb' },
+    ]));
+    delete (Document.prototype as any).startViewTransition;
+  });
+  await page.goto('/');
+  await page.locator('aside button', { hasText: 'main' }).first().click();
+  await page.getByRole('button', { name: 'второе' }).click();
+  await expect(page.getByTestId('toast').filter({ hasText: 'Хранилище переключено' })).toBeVisible();
+  await expect(page.locator('aside button', { hasText: 'второе' })).toBeVisible();
+});
+
 test('the inbox counter pops when its number changes', async ({ page }) => {
   await page.goto('/');
   await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });

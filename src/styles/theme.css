@@ -217,6 +217,13 @@
   transition-duration: var(--slag-motion-slow);
 }
 
+/* Vault and view swaps fade through the browser's own snapshot layer. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--slag-motion-base);
+  animation-timing-function: var(--ease-standard);
+}
+
 /* Search palette: the first batch of results cascades in, then stops. */
 @keyframes motion-stagger-row {
   from { opacity: 0; translate: 0 4px; }

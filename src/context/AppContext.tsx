@@ -33,6 +33,7 @@ import { listenDesktopEvents, isDesktopApp, isMobilePlatform } from '../lib/wind
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { crossFade } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
   STORAGE_KEYS,
@@ -1852,23 +1853,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const switchVault = (vaultId: string) => {
-    storage.switchVault(vaultId);
+    // One cross-fade over the whole swap, so the feed does not blink between vaults.
+    crossFade(() => {
+      storage.switchVault(vaultId);
+      const newWs = storage.getWorkspaceState();
+      setCurrentFolder(newWs.currentFolder || DEFAULT_INBOX_FOLDER);
+      setFeedViewMode(newWs.feedViewMode || 'feed');
+      setInboxMode(newWs.inboxMode || 'all');
+      setActiveTypeFilter(newWs.activeTypeFilter || 'all');
+      setActiveTagFilter(newWs.activeTagFilter || null);
+      setActiveMobileTab(newWs.activeMobileTab || 'folders');
+      setIsKanbanMaterialsOpen(typeof newWs.isKanbanMaterialsOpen === 'boolean' ? newWs.isKanbanMaterialsOpen : true);
+      setSortBy(newWs.sortBy || 'createdAt');
+      setSortOrder(newWs.sortOrder || 'asc');
+      setHideCompletedTasks(newWs.hideCompletedTasks ?? false);
+      setFolderSettings(newWs.folderSettings || {});
+      setChatMessages(storage.getAssistantHistory());
+      setSelectedItem(null);
+      refreshData();
+    });
     void syncEngine.switchVault(vaultId);
-    const newWs = storage.getWorkspaceState();
-    setCurrentFolder(newWs.currentFolder || DEFAULT_INBOX_FOLDER);
-    setFeedViewMode(newWs.feedViewMode || 'feed');
-    setInboxMode(newWs.inboxMode || 'all');
-    setActiveTypeFilter(newWs.activeTypeFilter || 'all');
-    setActiveTagFilter(newWs.activeTagFilter || null);
-    setActiveMobileTab(newWs.activeMobileTab || 'folders');
-    setIsKanbanMaterialsOpen(typeof newWs.isKanbanMaterialsOpen === 'boolean' ? newWs.isKanbanMaterialsOpen : true);
-    setSortBy(newWs.sortBy || 'createdAt');
-    setSortOrder(newWs.sortOrder || 'asc');
-    setHideCompletedTasks(newWs.hideCompletedTasks ?? false);
-    setFolderSettings(newWs.folderSettings || {});
-    setChatMessages(storage.getAssistantHistory());
-    setSelectedItem(null);
-    refreshData();
     addToast('Хранилище переключено', 'info');
   };
 

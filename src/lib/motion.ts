@@ -1,3 +1,5 @@
+import { flushSync } from 'react-dom';
+
 /**
  * Bridges the CSS motion scale into the few places that need numbers in JS.
  * Timing lives in `theme.css`; nothing here invents a second duration.
@@ -62,4 +64,18 @@ export function expandFromRect(origin: HTMLElement, target: HTMLElement): void {
       easing: motionEase('entrance'),
     },
   );
+}
+
+/**
+ * Runs an update behind the browser's own cross-fade, where it exists. React has
+ * to flush inside the callback, otherwise the new snapshot is still the old DOM.
+ */
+export function crossFade(update: () => void): void {
+  if (prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
+    update();
+    return;
+  }
+  document.startViewTransition(() => {
+    flushSync(update);
+  });
 }
