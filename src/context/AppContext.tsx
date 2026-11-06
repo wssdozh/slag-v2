@@ -34,7 +34,7 @@ import { listenDesktopEvents, isDesktopApp, isMobilePlatform } from '../lib/wind
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { crossFade } from '../lib/motion';
+import { crossFade, swapScreen } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
   STORAGE_KEYS,
@@ -227,7 +227,7 @@ interface AppContextType {
   // Mobile Navigation & Touch Actions
   isMobile: boolean;
   activeMobileTab: MobileTabId;
-  setActiveMobileTab: (tab: MobileTabId) => void;
+  setActiveMobileTab: React.Dispatch<React.SetStateAction<MobileTabId>>;
   mobileActiveFolder: string | null;
   setMobileActiveFolder: (folder: string | null) => void;
   mobileFolderInfoOpen: boolean;
@@ -578,9 +578,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [isMobileScreen]);
 
-  const [activeMobileTab, setActiveMobileTab] = useState<MobileTabId>(() => initialWorkspace.activeMobileTab || 'folders');
+  const [activeMobileTab, setActiveMobileTabState] = useState<MobileTabId>(() => initialWorkspace.activeMobileTab || 'folders');
   const [mobileActiveFolder, setMobileActiveFolderState] = useState<string | null>(null);
-  const [mobileFolderInfoOpen, setMobileFolderInfoOpen] = useState<boolean>(false);
+  const [mobileFolderInfoOpen, setMobileFolderInfoOpenState] = useState<boolean>(false);
   const [mobileActionSheetItem, setMobileActionSheetItem] = useState<SlagItem | null>(null);
   const [mobileDockTabs, setMobileDockTabsState] = useState<MobileTabId[]>(() => {
     try {
@@ -601,11 +601,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Tabs are peers (cross-fade), entering a folder is a push, leaving is a pop.
+  // The depth lives in a ref so the setter stays stable for the dock and Escape.
+  const mobileFolderRef = useRef<string | null>(null);
+  const folderDepth = (path: string | null) => (path ? path.split('/').length : 0);
+
+  const setActiveMobileTab = useCallback((next: React.SetStateAction<MobileTabId>) => {
+    swapScreen('tab', () => setActiveMobileTabState(next));
+  }, []);
+
   const setMobileActiveFolder = useCallback((folder: string | null) => {
-    setMobileActiveFolderState(folder);
-    if (folder) {
-      setCurrentFolder(folder);
-    }
+    const previous = mobileFolderRef.current;
+    mobileFolderRef.current = folder;
+    const kind = folder === null
+      ? 'pop'
+      : previous === null || folderDepth(folder) > folderDepth(previous)
+        ? 'push'
+        : 'pop';
+    swapScreen(kind, () => {
+      setMobileActiveFolderState(folder);
+      if (folder) {
+        setCurrentFolder(folder);
+      }
+    });
+  }, []);
+
+  const setMobileFolderInfoOpen = useCallback((open: boolean) => {
+    swapScreen(open ? 'push' : 'pop', () => setMobileFolderInfoOpenState(open));
   }, []);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -1023,9 +1045,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isFullscreenEditorOpen,
     isMobile,
     mobileFolderInfoOpen,
+    setMobileFolderInfoOpen,
     mobileActiveFolder,
     setMobileActiveFolder,
     activeMobileTab,
+    setActiveMobileTab,
   ]);
 
   const toggleAssistant = useCallback(() => {

@@ -37,7 +37,7 @@ export const MobileFolderInfoView: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-canvas flex flex-col text-fg-primary select-none motion-fade overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-canvas flex flex-col text-fg-primary select-none overflow-hidden">
       {/* Top Header with Back Button */}
       <MobileScreenHeader
         onBack={() => setMobileFolderInfoOpen(false)}

@@ -67,15 +67,52 @@ export function expandFromRect(origin: HTMLElement, target: HTMLElement): void {
 }
 
 /**
- * Runs an update behind the browser's own cross-fade, where it exists. React has
- * to flush inside the callback, otherwise the new snapshot is still the old DOM.
+ * - `tab`   — peers (tabs, feed/kanban): a plain cross-fade, nothing slides.
+ * - `push`  — deeper (a folder, its info): the new screen comes from the right.
+ * - `pop`   — back: the old screen leaves to the right, the new waits behind it.
  */
-export function crossFade(update: () => void): void {
-  if (prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
+export type ScreenSwap = 'tab' | 'push' | 'pop';
+
+/**
+ * Swaps one full screen for another behind the browser's own snapshot layer.
+ * The outgoing screen is never kept mounted: no duplicate nodes for tests or
+ * screen readers, and a second tap cannot cut the exit short — it just starts
+ * the next swap. React has to flush inside the callback, otherwise the new
+ * snapshot is still the old DOM.
+ */
+export function swapScreen(kind: ScreenSwap, update: () => void): void {
+  const root = document.documentElement;
+  if (
+    prefersReducedMotion() ||
+    typeof document.startViewTransition !== 'function' ||
+    root.dataset.motionSwap
+  ) {
     update();
     return;
   }
-  document.startViewTransition(() => {
-    flushSync(update);
-  });
+
+  const release = () => {
+    delete root.dataset.motionSwap;
+  };
+  root.dataset.motionSwap = kind;
+
+  let transition: ReturnType<typeof document.startViewTransition>;
+  try {
+    transition = document.startViewTransition(() => {
+      flushSync(update);
+    });
+  } catch {
+    release();
+    update();
+    return;
+  }
+
+  // The attribute picks the keyframes, so it must outlive the animation itself.
+  // `finished` settles even when the swap is skipped or the tab is hidden.
+  transition.finished.then(release, release);
+}
+
+/** Cross-fade an update through the same snapshot layer, where it exists. */
+export function crossFade(update: () => void): void {
+  swapScreen('tab', update);
 }

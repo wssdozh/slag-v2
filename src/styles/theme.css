@@ -236,6 +236,39 @@
   animation-timing-function: var(--ease-standard);
 }
 
+/* Screen swaps. The outgoing screen is a snapshot, so nothing is kept mounted
+   and a fast second tap starts the next swap instead of cutting the exit. */
+@keyframes motion-swap-fade-in { from { opacity: 0; } }
+@keyframes motion-swap-fade-out { to { opacity: 0; } }
+@keyframes motion-swap-push-in { from { transform: translateX(100%); } }
+@keyframes motion-swap-push-out { to { transform: translateX(-18%); opacity: 0.72; } }
+@keyframes motion-swap-pop-in { from { transform: translateX(-18%); opacity: 0.72; } }
+@keyframes motion-swap-pop-out { to { transform: translateX(100%); } }
+
+html[data-motion-swap]::view-transition-old(root),
+html[data-motion-swap]::view-transition-new(root) {
+  animation-duration: var(--slag-motion-slow);
+  animation-timing-function: var(--ease-standard);
+  mix-blend-mode: normal;
+}
+html[data-motion-swap]::view-transition-new(root) {
+  animation-timing-function: var(--ease-entrance);
+}
+html[data-motion-swap="tab"]::view-transition-old(root),
+html[data-motion-swap="tab"]::view-transition-new(root) {
+  animation-duration: var(--slag-motion-base);
+}
+html[data-motion-swap="tab"]::view-transition-old(root) { animation-name: motion-swap-fade-out; }
+html[data-motion-swap="tab"]::view-transition-new(root) { animation-name: motion-swap-fade-in; }
+html[data-motion-swap="push"]::view-transition-old(root) { animation-name: motion-swap-push-out; }
+html[data-motion-swap="push"]::view-transition-new(root) { animation-name: motion-swap-push-in; }
+/* Going back the leaving screen stays on top and uncovers what is behind it. */
+html[data-motion-swap="pop"]::view-transition-old(root) {
+  animation-name: motion-swap-pop-out;
+  z-index: 1;
+}
+html[data-motion-swap="pop"]::view-transition-new(root) { animation-name: motion-swap-pop-in; }
+
 /* Search palette: the first batch of results cascades in, then stops. */
 @keyframes motion-stagger-row {
   from { opacity: 0; translate: 0 4px; }
