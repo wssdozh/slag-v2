@@ -4,19 +4,19 @@
  */
 
 export const THEME_COLORS = {
-  // Canvas / Base (Seamless #0c0c0e)
-  canvas: '#0c0c0e',
-  canvasSubtle: '#08080a',
+  // Canvas / Base (Raycast Charcoal #131316)
+  canvas: '#131316',
+  canvasSubtle: '#0f0f12',
 
   // Panels & Sidebars
-  panel: '#0c0c0e',
-  panelHeader: '#0c0c0e',
+  panel: '#131316',
+  panelHeader: '#131316',
 
-  // Surfaces & Cards (Classic Relaxed #141417)
-  surface: '#141417',
-  surfaceHover: '#161619',
-  surfaceElevated: '#18181c',
-  surfaceActive: 'rgba(255, 255, 255, 0.07)',
+  // Surfaces & Cards (#1a1a1f)
+  surface: '#1a1a1f',
+  surfaceHover: '#212127',
+  surfaceElevated: '#24242c',
+  surfaceActive: 'rgba(255, 255, 255, 0.08)',
 
   // Typography
   fgPrimary: '#f4f4f5',
@@ -25,9 +25,9 @@ export const THEME_COLORS = {
   fgDim: '#52525b',
 
   // Borders
-  borderSubtle: 'rgba(255, 255, 255, 0.06)',
-  borderHover: 'rgba(255, 255, 255, 0.12)',
-  borderStrong: 'rgba(255, 255, 255, 0.2)',
+  borderSubtle: 'rgba(255, 255, 255, 0.08)',
+  borderHover: 'rgba(255, 255, 255, 0.14)',
+  borderStrong: 'rgba(255, 255, 255, 0.22)',
 
   // Functional & Semantic
   accent: '#3b82f6',
