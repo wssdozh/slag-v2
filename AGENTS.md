@@ -31,7 +31,36 @@
 | `e2e/**`, `playwright.config.ts` | `.agents/rules/playwright-visual-testing.md` |
 | заметки и задачи хранилища | `.agents/rules/mcp-vault-usage.md` |
 
-## 4. Порядок работы
+## 4. Карта
+
+```text
+src/
+  components/   UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, UI
+  context/      AppContext — единственный стейт-хаб
+  hooks/        переиспользуемая стейтфул-логика
+  lib/          всё системное: storage, поиск, ИИ, sync, утилиты
+  types/        доменные типы
+  mcp/          MCP-сервер, собирается отдельным конфигом
+  styles/       theme.css — токены
+src-tauri/      Rust: десктоп и Android
+e2e/            Playwright
+relay/          сервер синхронизации
+docs/project-map/  база знаний проекта, 14 документов
+```
+
+Детали не пересказываю, читаю по вопросу:
+
+| Вопрос | Документ |
+|---|---|
+| UX, ЛКМ/ПКМ, горячие клавиши | `docs/project-map/01_UI_UX_Interactions_Matrix.md` |
+| модель данных и frontmatter | `docs/project-map/02_Data_Model_Obsidian_Vault.md` |
+| ИИ, теги, триаж | `docs/project-map/03_AI_Engine_Zero_Slop_Gemini.md` |
+| поиск Orama | `docs/project-map/05_Search_Orama_Local_First.md` |
+| синхронизация | `docs/sync-architecture.md` |
+| сборки | `BUILD.md` |
+| MCP | `docs/mcp-guide.md` |
+
+## 5. Порядок работы
 
 - Сначала `glob` / `grep` по затронутым файлам. О том, что уже есть в кодовой базе, не спрашивать.
 - Неуверенность — один вопрос через `ask_user_question` с 2–4 вариантами, рекомендуемый первым.
