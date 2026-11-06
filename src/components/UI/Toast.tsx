@@ -15,7 +15,7 @@ export const ToastContainer: React.FC = () => {
       {toasts.map(toast => (
         <div
           key={toast.id}
-          className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-surface-elevated/95 backdrop-blur-md border border-white/[0.08] text-sm text-fg-primary shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 max-w-full"
+          className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-surface-elevated/95 backdrop-blur-md border border-white/[0.08] text-sm text-fg-primary shadow-2xl motion-fade max-w-full"
         >
           {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
           {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}

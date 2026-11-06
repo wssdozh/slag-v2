@@ -43,7 +43,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
             onClick={onBack}
             aria-label={backLabel}
             title={backTitle || backLabel}
-            className="h-10 px-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+            className="h-10 px-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer flex items-center gap-1.5"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-xs font-medium">{backLabel}</span>

@@ -178,7 +178,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-6 h-6 rounded-full bg-white hover:bg-zinc-200 active:scale-95 flex items-center justify-center text-black shrink-0 cursor-pointer transition-transform shadow-sm"
+          className="w-6 h-6 rounded-full bg-white hover:bg-zinc-200 motion-press flex items-center justify-center text-black shrink-0 cursor-pointer shadow-sm"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >
           {isPlaying ? (
@@ -227,7 +227,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-full bg-white hover:bg-zinc-200 active:scale-95 flex items-center justify-center text-black transition-all shrink-0 shadow-sm cursor-pointer"
+          className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-full bg-white hover:bg-zinc-200 motion-press flex items-center justify-center text-black shrink-0 shadow-sm cursor-pointer"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
           aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >
@@ -270,7 +270,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 type="button"
                 onClick={handleTranscriptToggle}
                 disabled={enrichmentStatus === 'processing'}
-                className="w-6 h-6 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                className="w-6 h-6 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] motion-press flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                 title={
                   enrichmentStatus === 'processing'
                     ? 'Идет расшифровка...'
@@ -318,7 +318,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
       {/* Telegram-style Transcript with user-approved divider line */}
       {isExpanded && transcript && (
-        <div className="mt-2 pt-2 border-t border-white/[0.08] text-xs sm:text-[13px] text-zinc-200 font-sans leading-relaxed select-text flex flex-col animate-in fade-in duration-150">
+        <div className="mt-2 pt-2 border-t border-white/[0.08] text-xs sm:text-[13px] text-zinc-200 font-sans leading-relaxed select-text flex flex-col motion-fade">
           <p className="whitespace-pre-wrap">{transcript}</p>
         </div>
       )}

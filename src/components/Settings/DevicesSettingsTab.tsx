@@ -427,7 +427,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
             data-testid="btn-open-pair-modal"
             disabled={locked}
             onClick={handleOpenPairModal}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-2xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-md disabled:opacity-40 whitespace-nowrap shrink-0 cursor-pointer active:scale-95"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-2xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-md disabled:opacity-40 whitespace-nowrap shrink-0 cursor-pointer motion-press"
           >
             <Plus className="w-3.5 h-3.5" /> Привязать устройство
           </button>

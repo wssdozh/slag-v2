@@ -41,6 +41,7 @@ import {
 
 export interface ComposerProps {
   isModal?: boolean;
+  isActive?: boolean;
   initialType?: SlagItemType;
   initialStatus?: SlagItemStatus;
   initialFolder?: string;
@@ -52,6 +53,7 @@ export interface ComposerProps {
 
 export const Composer: React.FC<ComposerProps> = ({
   isModal = false,
+  isActive = true,
   initialType,
   initialStatus,
   initialFolder,
@@ -285,8 +287,9 @@ export const Composer: React.FC<ComposerProps> = ({
     };
   }, [activeFolder, isFullscreenEditorOpen, resetDraftState, setReplyTarget, setTargetFolder]);
 
-  // Autosave when unmounting (e.g. folder switch or page navigation)
+  // Flush on logical modal close as well as unmount; exit motion must not delay saving.
   useEffect(() => {
+    if (!isActive) return;
     return () => {
       const d = draftRef.current;
       if (d.content.trim() || d.attachments.length > 0) {
@@ -305,10 +308,11 @@ export const Composer: React.FC<ComposerProps> = ({
         });
       }
     };
-  }, [activeFolder]);
+  }, [activeFolder, isModal, isActive]);
 
   // Debounced autosave while typing
   useEffect(() => {
+    if (!isActive) return;
     const timer = setTimeout(() => {
       // If we just applied an incoming remote draft, skip echoing it back out
       if (isApplyingRemoteDraftRef.current) {
@@ -342,7 +346,7 @@ export const Composer: React.FC<ComposerProps> = ({
     }, UI_DELAYS.COMPOSER_AUTOSAVE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence]);
+  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive]);
 
   // Handle beforeunload to avoid lost text on immediate tab close/refresh
   useEffect(() => {
@@ -895,7 +899,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
   // Window-level drag & drop and paste support when running as a dedicated modal/window island
   useEffect(() => {
-    if (!isModal) return;
+    if (!isModal || !isActive) return;
 
     const onWindowDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes('Files')) {
@@ -951,7 +955,7 @@ export const Composer: React.FC<ComposerProps> = ({
       window.removeEventListener('drop', onWindowDrop);
       window.removeEventListener('paste', onWindowPaste);
     };
-  }, [isModal, attachFiles]);
+  }, [isModal, isActive, attachFiles]);
 
   const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const clipboardFiles: File[] = [];
@@ -1342,7 +1346,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <>
         {/* Reply Banner (Flat, Anti-Matryoshka) */}
         {replyTarget && (
-        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 animate-in fade-in slide-in-from-bottom-1 select-none">
+        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 motion-fade select-none">
           <div className="flex items-center gap-1.5 truncate min-w-0">
             <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="text-[11px] font-mono text-zinc-500 shrink-0">
@@ -1471,7 +1475,7 @@ export const Composer: React.FC<ComposerProps> = ({
         />
       )}
       {wikiQuery !== null && matchingWikiItems.length > 0 && (
-        <div className={`absolute left-0 ${isModal ? 'bottom-[calc(100%+55px)]' : 'bottom-[calc(100%+14px)]'} w-72 max-h-52 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto`}>
+        <div className={`absolute left-0 ${isModal ? 'bottom-[calc(100%+55px)]' : 'bottom-[calc(100%+14px)]'} w-72 max-h-52 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 motion-popover pointer-events-auto`}>
           <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
             Связать заметку [[...]]
           </div>
@@ -1509,7 +1513,7 @@ export const Composer: React.FC<ComposerProps> = ({
   );
 
   const customControls = isRecordingAudio ? (
-    <div className="pt-1 w-full animate-in fade-in duration-150">
+    <div className="pt-1 w-full motion-fade">
       <AudioRecorder
         finishTriggerRef={triggerFinishRef}
         onRecorded={handleRecordedAudio}
@@ -1517,7 +1521,7 @@ export const Composer: React.FC<ComposerProps> = ({
       />
     </div>
   ) : isRecordingVideo ? (
-    <div className="pt-1 w-full flex flex-col items-center animate-in fade-in duration-150">
+    <div className="pt-1 w-full flex flex-col items-center motion-fade">
       <VideoRecorder
         finishTriggerRef={triggerFinishRef}
         onRecorded={handleRecordedVideo}
@@ -1529,7 +1533,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const hasActiveProperties = Boolean(targetFolder) || allPreviewTags.length > 0;
 
   const propertiesSlot = hasActiveProperties ? (
-    <div className="flex items-center gap-2 px-1 pt-1 pb-1 overflow-x-auto scrollbar-none whitespace-nowrap animate-in fade-in duration-150 text-xs">
+    <div className="flex items-center gap-2 px-1 pt-1 pb-1 overflow-x-auto scrollbar-none whitespace-nowrap motion-fade text-xs">
       {/* Target Folder */}
       {targetFolder && (
         <span
@@ -1565,7 +1569,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <div className="flex items-center gap-1 shrink-0 relative">
       {/* Lock Hint Banner when holding mic/video button */}
       {lockHint && recordMode === 'holding' && (
-        <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-surface border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
+        <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-surface border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none motion-popover">
           <Lock className="w-3.5 h-3.5 text-accent animate-bounce" />
           <span>Потяните вверх для фиксации</span>
         </div>
@@ -1679,7 +1683,7 @@ export const Composer: React.FC<ComposerProps> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
-        className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
+        className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center motion-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
         title={
           mobileMediaType === 'audio'
             ? 'Записать аудио (удерживайте) / Кликните для видео'

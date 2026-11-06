@@ -163,7 +163,7 @@ const AppContent: React.FC = () => {
         <div className="absolute top-3 inset-x-0 flex items-center justify-center pointer-events-none z-50">
           <button
             onClick={toggleMobileMode}
-            className="pointer-events-auto px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs text-white backdrop-blur-md border border-white/[0.08] shadow-lg flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+            className="pointer-events-auto px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs text-white backdrop-blur-md border border-white/[0.08] shadow-lg flex items-center gap-2 cursor-pointer motion-press"
           >
             <Monitor className="w-3.5 h-3.5" />
             <span>Вернуться в десктопный режим</span>

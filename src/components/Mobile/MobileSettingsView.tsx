@@ -226,7 +226,7 @@ export const MobileSettingsView: React.FC = () => {
                     type="button"
                     disabled={acceptingVaultId !== null}
                     onClick={() => void handleAcceptInvitation(inv.vaultId)}
-                    className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition-colors cursor-pointer active:scale-95"
+                    className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold hover:bg-zinc-200 cursor-pointer motion-press"
                   >
                     {acceptingVaultId === inv.vaultId ? 'подключаем…' : 'Принять'}
                   </button>
@@ -252,7 +252,7 @@ export const MobileSettingsView: React.FC = () => {
               type="button"
               data-testid="mobile-settings-login-btn"
               onClick={() => navigatePage('account')}
-              className="h-ctrl-sm px-3.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shrink-0 active:scale-95"
+              className="h-ctrl-sm px-3.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 cursor-pointer shrink-0 motion-press"
             >
               Войти
             </button>

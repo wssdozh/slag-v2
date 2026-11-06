@@ -629,7 +629,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="fixed inset-0 z-50 z-[100] bg-surface flex flex-col animate-in fade-in duration-150 text-fg-primary"
+      className="fixed inset-0 z-50 z-[100] bg-surface flex flex-col motion-fade text-fg-primary"
     >
       {/* Hidden File Picker Input */}
       <input
@@ -642,7 +642,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
-        <div className="fixed inset-4 z-[120] rounded-3xl bg-surface/95 backdrop-blur-md border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
+        <div className="fixed inset-4 z-[120] rounded-3xl bg-surface/95 backdrop-blur-md border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none motion-fade">
           <UploadCloud className="w-12 h-12 text-accent animate-bounce" />
           <span className="text-base font-semibold text-white">
             Перетащите медиафайлы сюда
@@ -682,7 +682,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             {/* Back Button: pure icon */}
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer"
               title="Назад к ленте (Escape)"
               aria-label="Назад к ленте"
             >
@@ -805,7 +805,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={handleUndo}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-zinc-400"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer text-zinc-400"
                   title="Отменить (Ctrl+Z)"
                 >
                   <Undo2 className="w-4 h-4" />
@@ -813,7 +813,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={handleRedo}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-zinc-400"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer text-zinc-400"
                   title="Повторить (Ctrl+Y)"
                 >
                   <Redo2 className="w-4 h-4" />
@@ -836,7 +836,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   </button>
 
                   {activeTopDropdown === 'style' && (
-                    <div className="absolute top-full mt-1.5 left-0 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
+                    <div className="absolute top-full mt-1.5 left-0 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover">
                       <button
                         type="button"
                         onClick={() => {
@@ -911,7 +911,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   </button>
 
                   {activeTopDropdown === 'list' && (
-                    <div className="absolute top-full mt-1.5 left-0 w-48 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in duration-100">
+                    <div className="absolute top-full mt-1.5 left-0 w-48 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover">
                       <button
                         type="button"
                         onClick={() => {
@@ -966,7 +966,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={() => insertMarkdown('**', '**')}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer font-bold"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer font-bold"
                   title="Жирный (Ctrl+B)"
                 >
                   <Bold className="w-4 h-4" />
@@ -974,7 +974,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={() => insertMarkdown('*', '*')}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer italic"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer italic"
                   title="Курсив (Ctrl+I)"
                 >
                   <Italic className="w-4 h-4" />
@@ -982,7 +982,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={() => insertMarkdown('~~', '~~')}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer"
                   title="Зачёркнутый"
                 >
                   <Strikethrough className="w-4 h-4" />
@@ -990,7 +990,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={() => insertMarkdown('`', '`')}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer"
                   title="Инлайн-код"
                 >
                   <Code className="w-4 h-4" />
@@ -1002,7 +1002,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={() => insertMarkdown('[[', ']]')}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer"
                   title="Ссылка [[заметка]]"
                 >
                   <Link2 className="w-4 h-4" />
@@ -1012,7 +1012,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer"
+                  className="p-1.5 rounded-md hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer"
                   title="Прикрепить файл, фото или медиа"
                 >
                   <Paperclip className="w-4 h-4 text-zinc-400" />
@@ -1024,7 +1024,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                 <button
                   type="button"
                   onClick={handleAiDecomposeInline}
-                  className="p-1.5 rounded-md text-zinc-400 hover:text-purple-300 hover:bg-purple-500/10 active:scale-95 transition-all cursor-pointer"
+                  className="p-1.5 rounded-md text-zinc-400 hover:text-purple-300 hover:bg-purple-500/10 motion-press cursor-pointer"
                   title="Разобрать через ИИ (папка и теги)"
                 >
                   <Sparkles className="w-4 h-4" />
@@ -1054,7 +1054,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <button
               type="button"
               onClick={() => setIsFullWidth(prev => !prev)}
-              className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+              className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                 isFullWidth
                   ? 'text-white bg-white/10 border border-white/10'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -1068,7 +1068,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <button
               type="button"
               onClick={() => setIsZenMode(prev => !prev)}
-              className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+              className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                 isZenMode
                   ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -1081,7 +1081,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             {/* Linear Dark Save Button (no kbd badge) */}
             <button
               onClick={handleSave}
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-xs font-medium border border-white/[0.08] hover:border-white/[0.16] shadow-sm transition-all cursor-pointer active:scale-95"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-xs font-medium border border-white/[0.08] hover:border-white/[0.16] shadow-sm cursor-pointer motion-press"
               title="Сохранить изменения (Ctrl+S / ⌘S)"
             >
               <Save className="w-4 h-4 text-zinc-300" />
@@ -1094,7 +1094,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
       {/* Editor Body */}
       <div className="flex-1 overflow-y-auto py-6 md:py-8 bg-surface">
         <div
-          className={`mx-auto w-full px-4 md:px-6 flex flex-col gap-4 pb-28 transition-all duration-200 ${
+          className={`mx-auto w-full px-4 md:px-6 flex flex-col gap-4 pb-28 ${
             isFullWidth ? 'max-w-5xl' : 'max-w-3xl'
           }`}
         >
@@ -1104,7 +1104,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
               <button
                 type="button"
                 onClick={() => setStatus((prev: SlagItemStatus) => (prev === 'done' ? 'todo' : 'done'))}
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-all shrink-0 cursor-pointer ${
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
                   status === 'done'
                     ? 'border border-emerald-500 bg-emerald-500/20 text-emerald-400'
                     : 'border border-zinc-600 hover:border-blue-400 text-transparent hover:text-blue-400'
@@ -1303,7 +1303,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   )}
 
                   {isDurationDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                    <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
                       {[15, 30, 45, 60, 90, 120].map(mins => (
                         <button
                           key={mins}
@@ -1360,7 +1360,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   )}
 
                   {isRecurrenceDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 animate-in fade-in pointer-events-auto">
+                    <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
                       {RECURRENCE_PRESETS.map(opt => (
                         <button
                           key={opt.label}
@@ -1457,7 +1457,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   <div
                     key={att.id}
                     onClick={() => setSelectedAttachmentId(att.id === selectedAttachmentId ? null : att.id)}
-                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg border transition-all cursor-pointer ${
+                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
                       selectedAttachmentId === att.id
                         ? 'bg-blue-500/10 border-blue-500/40 ring-1 ring-blue-500/40 shadow-sm'
                         : 'bg-black/40 border-white/[0.06] hover:border-white/[0.12]'
@@ -1637,7 +1637,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
         {/* Floating Popovers */}
         {activeMobilePopover === 'formatting' && (
           <div className="relative z-40 px-3 pb-2">
-            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 motion-popover">
               <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
                 <span>Стили текста</span>
                 <span className="font-mono text-[10px] text-zinc-500">Aa</span>
@@ -1648,7 +1648,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('# ', '');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <Heading1 className="w-4 h-4 text-zinc-400" />
                 <span>Заголовок 1</span>
@@ -1659,7 +1659,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('## ', '');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <Heading2 className="w-4 h-4 text-zinc-400" />
                 <span>Заголовок 2</span>
@@ -1670,7 +1670,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('**', '**');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left font-bold"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left font-bold"
               >
                 <Bold className="w-4 h-4 text-zinc-400" />
                 <span>Жирный</span>
@@ -1681,7 +1681,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('*', '*');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left italic"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left italic"
               >
                 <Italic className="w-4 h-4 text-zinc-400" />
                 <span>Курсив</span>
@@ -1692,7 +1692,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('~~', '~~');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left line-through"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left line-through"
               >
                 <span className="font-mono text-xs text-zinc-400">S</span>
                 <span>Зачёркнутый</span>
@@ -1703,7 +1703,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('`', '`');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left font-mono"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left font-mono"
               >
                 <Code className="w-4 h-4 text-zinc-400" />
                 <span>Моноширинный</span>
@@ -1714,7 +1714,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
         {activeMobilePopover === 'lists' && (
           <div className="relative z-40 px-3 pb-2">
-            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 motion-popover">
               <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
                 <span>Списки и блоки</span>
                 <span className="font-mono text-[10px] text-zinc-500">:=</span>
@@ -1725,7 +1725,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('- ', '');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <List className="w-4 h-4 text-zinc-400" />
                 <span>Список с маркерами</span>
@@ -1736,7 +1736,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('1. ', '');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <span className="font-mono text-xs text-zinc-400 font-bold">1=</span>
                 <span>Список с номерами</span>
@@ -1747,7 +1747,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('- [ ] ', '');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <CheckSquare className="w-4 h-4 text-zinc-400" />
                 <span>Чек-лист</span>
@@ -1758,7 +1758,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('> ', '');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <Quote className="w-4 h-4 text-zinc-400" />
                 <span>Цитата</span>
@@ -1769,7 +1769,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('```\n', '\n```');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <Code className="w-4 h-4 text-zinc-400" />
                 <span>Блок кода</span>
@@ -1780,7 +1780,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   insertMarkdown('[[', ']]');
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <Link2 className="w-4 h-4 text-zinc-400" />
                 <span>Ссылка [[заметка]]</span>
@@ -1791,7 +1791,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
         {activeMobilePopover === 'ai' && (
           <div className="relative z-40 px-3 pb-2">
-            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 motion-popover">
               <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
                 <span>ИИ-Помощник</span>
                 <span className="font-mono text-[10px] text-zinc-400">AI</span>
@@ -1802,7 +1802,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   handleAiDecomposeInline();
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <Sparkles className="w-4 h-4 text-zinc-400" />
                 <span>Разобрать (папка и теги)</span>
@@ -1813,7 +1813,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                   handleAiTagsInline();
                   setActiveMobilePopover(null);
                 }}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] active:scale-98 transition-all text-left"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-200 hover:bg-white/[0.08] motion-press text-left"
               >
                 <Tag className="w-4 h-4 text-zinc-400" />
                 <span>Подобрать теги</span>
@@ -1832,7 +1832,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <button
               type="button"
               onClick={() => setActiveMobilePopover(prev => (prev === 'ai' ? null : 'ai'))}
-              className={`p-2 rounded-xl transition-all cursor-pointer ${
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
                 activeMobilePopover === 'ai'
                   ? 'bg-white/15 text-white'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -1849,7 +1849,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <button
               type="button"
               onClick={() => setActiveMobilePopover(prev => (prev === 'formatting' ? null : 'formatting'))}
-              className={`p-2 rounded-xl transition-all cursor-pointer ${
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
                 activeMobilePopover === 'formatting'
                   ? 'bg-white/15 text-white'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -1863,7 +1863,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <button
               type="button"
               onClick={() => setActiveMobilePopover(prev => (prev === 'lists' ? null : 'lists'))}
-              className={`p-2 rounded-xl transition-all cursor-pointer ${
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
                 activeMobilePopover === 'lists'
                   ? 'bg-white/15 text-white'
                   : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -1877,7 +1877,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <button
               type="button"
               onClick={handleInsertTable}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
               title="Вставить таблицу"
             >
               <Table className="w-4 h-4" />
@@ -1887,7 +1887,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
+              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
               title="Прикрепить файл"
             >
               <Paperclip className="w-4 h-4" />
@@ -1898,7 +1898,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
           <button
             type="button"
             onClick={handleSave}
-            className="h-9 px-3.5 rounded-xl bg-white/[0.1] hover:bg-white/[0.16] text-white flex items-center gap-1.5 border border-white/[0.1] shadow-md active:scale-95 transition-all cursor-pointer shrink-0 ml-2"
+            className="h-9 px-3.5 rounded-xl bg-white/[0.1] hover:bg-white/[0.16] text-white flex items-center gap-1.5 border border-white/[0.1] shadow-md motion-press cursor-pointer shrink-0 ml-2"
             title="Сохранить и закрыть (Ctrl+S)"
           >
             <Check className="w-4 h-4 text-emerald-400 stroke-[2.5]" />

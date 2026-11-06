@@ -66,7 +66,7 @@ export const MobileFloatingDock: React.FC = () => {
             <button
               key={tabId}
               onClick={() => setActiveMobileTab(tabId)}
-              className={`relative h-10 min-w-11 px-3 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
+              className={`relative h-10 min-w-11 px-3 rounded-full flex items-center justify-center motion-press cursor-pointer ${
                 isActive
                   ? 'bg-white/10 text-white font-medium shadow-sm'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
@@ -91,7 +91,7 @@ export const MobileFloatingDock: React.FC = () => {
       {/* Floating Action Button (FAB) matching Linear circular pill */}
       <button
         onClick={handleFabClick}
-        className="pointer-events-auto w-12 h-12 rounded-full bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.12] flex items-center justify-center text-white shadow-2xl shadow-black/80 hover:bg-white/10 active:scale-90 transition-all cursor-pointer shrink-0"
+        className="pointer-events-auto w-12 h-12 rounded-full bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.12] flex items-center justify-center text-white shadow-2xl shadow-black/80 hover:bg-white/10 motion-press cursor-pointer shrink-0"
         title="Новая запись"
         aria-label="Создать новую запись"
       >

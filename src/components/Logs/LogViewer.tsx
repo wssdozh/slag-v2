@@ -213,7 +213,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по логам..."
-            className="w-full bg-white/[0.03] text-xs text-zinc-200 pl-7 pr-6 py-1 rounded border border-transparent focus:border-white/10 focus:bg-white/[0.05] outline-none transition-all placeholder-zinc-600"
+            className="w-full bg-white/[0.03] text-xs text-zinc-200 pl-7 pr-6 py-1 rounded border border-transparent focus:border-white/10 focus:bg-white/[0.05] outline-none transition-colors placeholder-zinc-600"
           />
           {searchQuery && (
             <button

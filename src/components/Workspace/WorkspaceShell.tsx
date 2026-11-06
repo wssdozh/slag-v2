@@ -389,7 +389,7 @@ const GroupHeaderActions: React.FC<any> = (props) => {
       {isOpen && (
         <div
           ref={menuRef}
-          className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-50 animate-in fade-in duration-100"
+          className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-50 motion-popover"
         >
           <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04]">
             Добавить вкладку
@@ -1302,7 +1302,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
             width: `${dropPreview.width}px`,
             height: `${dropPreview.height}px`,
           }}
-          className="pointer-events-none z-[9999] rounded border border-blue-500/70 bg-blue-500/15 shadow-[0_0_20px_rgba(59,130,246,0.25)] transition-all duration-75"
+          className="pointer-events-none z-[9999] rounded border border-blue-500/70 bg-blue-500/15 shadow-[0_0_20px_rgba(59,130,246,0.25)] transition-[border-color,background-color] duration-75"
         />
       )}
 

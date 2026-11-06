@@ -187,7 +187,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
   };
 
   return (
-    <div className="flex flex-col items-center gap-2.5 p-1 select-none animate-in fade-in w-full max-w-sm mx-auto">
+    <div className="flex flex-col items-center gap-2.5 p-1 select-none motion-fade w-full max-w-sm mx-auto">
       {/* Telegram Circular Video Preview with SVG Progress Ring */}
       <div className="relative w-52 h-52 sm:w-60 sm:h-60 rounded-full overflow-hidden bg-black border-2 border-white/20 shadow-2xl">
         <video
@@ -221,7 +221,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            className="transition-all duration-75"
+            className="transition-[stroke-dashoffset] duration-75"
           />
         </svg>
 
@@ -229,7 +229,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
         <button
           type="button"
           onClick={toggleCamera}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 p-2 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:text-white border border-white/10 hover:bg-black/80 transition-all cursor-pointer"
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 p-2 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:text-white border border-white/10 hover:bg-black/80 transition-colors cursor-pointer"
           title="Сменить камеру"
         >
           <RefreshCw className="w-4 h-4" />
@@ -259,7 +259,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
             type="button"
             onClick={() => handleFinish(true)}
             disabled={!isReady}
-            className="w-7 h-7 rounded-lg bg-white text-black hover:bg-zinc-200 active:scale-95 flex items-center justify-center transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            className="w-7 h-7 rounded-lg bg-white text-black hover:bg-zinc-200 motion-press flex items-center justify-center shadow-sm cursor-pointer disabled:opacity-50"
             title="Отправить видео-сообщение (Enter)"
           >
             <Send className="w-3.5 h-3.5 ml-0.5 fill-current" />

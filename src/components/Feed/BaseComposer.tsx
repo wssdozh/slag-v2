@@ -147,12 +147,12 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 isDraggingOver
                   ? 'border-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
                   : 'border-white/[0.12]'
-              } p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-all duration-300 w-full relative ${className}`
+              } p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
         }
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
-          <div className="absolute inset-0.5 z-30 rounded-xl bg-surface/92 backdrop-blur-sm border-2 border-dashed border-blue-500/50 flex items-center justify-center gap-2 pointer-events-none select-none text-xs font-mono text-zinc-300 animate-in fade-in duration-100">
+          <div className="absolute inset-0.5 z-30 rounded-xl bg-surface/92 backdrop-blur-sm border-2 border-dashed border-blue-500/50 flex items-center justify-center gap-2 pointer-events-none select-none text-xs font-mono text-zinc-300 motion-fade">
             <UploadCloud className="w-4 h-4 text-blue-400 animate-bounce" />
             <span>Отпустите файлы для прикрепления</span>
           </div>
@@ -217,9 +217,9 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                     }
                   }}
                   disabled={isSubmitDisabled}
-                  className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center transition-all btn-press shrink-0 ${
+                  className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center motion-press shrink-0 ${
                     !isSubmitDisabled
-                      ? 'bg-white text-black hover:bg-zinc-200 active:scale-95 shadow-sm cursor-pointer'
+                      ? 'bg-white text-black hover:bg-zinc-200 shadow-sm cursor-pointer'
                       : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
                   }`}
                   title={submitTitle}

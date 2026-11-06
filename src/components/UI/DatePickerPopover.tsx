@@ -100,7 +100,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
     <div
       ref={containerRef}
       onClick={(e) => e.stopPropagation()}
-      className={`absolute left-0 ${positionClasses} w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-white/[0.1] shadow-2xl shadow-black/90 p-2.5 z-50 flex flex-col gap-2 select-none animate-in fade-in zoom-in-95 duration-100 ${className}`}
+      className={`absolute left-0 ${positionClasses} w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-white/[0.1] shadow-2xl shadow-black/90 p-2.5 z-50 flex flex-col gap-2 select-none motion-popover ${className}`}
     >
       {/* Quick Presets */}
       <div className="grid grid-cols-3 gap-1">
@@ -186,7 +186,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
                 onChange(cell.dateStr);
                 onClose();
               }}
-              className={`h-7 rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-7 rounded-lg text-xs flex items-center justify-center transition-colors cursor-pointer ${
                 isSelected
                   ? 'bg-accent text-white font-bold shadow-sm'
                   : isToday

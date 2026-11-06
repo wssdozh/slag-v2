@@ -292,7 +292,7 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     await imgThumb.click();
 
     // Verify Lightbox opens
-    const lightbox = page.locator('.fixed.z-50').filter({ hasText: 'из' });
+    const lightbox = page.getByTestId('image-lightbox');
     await expect(lightbox).toBeVisible();
     await expect(lightbox.locator('text=photo1.png')).toBeVisible();
     await expect(lightbox.locator('text=1 из 2')).toBeVisible();

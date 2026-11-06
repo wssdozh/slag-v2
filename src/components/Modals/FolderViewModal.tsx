@@ -124,7 +124,7 @@ export const FolderViewModal: React.FC = () => {
           top: coords ? `${coords.top}px` : '56px',
           right: coords ? `${coords.right}px` : '16px',
         }}
-        className="pointer-events-auto w-[310px] max-w-[calc(100vw-16px)] rounded-2xl bg-surface-elevated/98 border border-white/[0.08] shadow-2xl shadow-black/90 backdrop-blur-xl p-3 space-y-3 animate-in fade-in zoom-in-95 duration-100 text-xs text-zinc-200"
+        className="pointer-events-auto w-[310px] max-w-[calc(100vw-16px)] rounded-2xl bg-surface-elevated/98 border border-white/[0.08] shadow-2xl shadow-black/90 backdrop-blur-xl p-3 space-y-3 motion-popover text-xs text-zinc-200"
       >
         {/* Section 1: View Modes with Reset Icon in top-right */}
         <div>
@@ -150,7 +150,7 @@ export const FolderViewModal: React.FC = () => {
                   key={m.id}
                   type="button"
                   onClick={() => updateCurrentFolderViewSettings({ viewMode: m.id })}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-[color,background-color,box-shadow] cursor-pointer ${
                     isActive
                       ? 'bg-white/10 text-white shadow-sm'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -193,7 +193,7 @@ export const FolderViewModal: React.FC = () => {
                   key={sf.id}
                   type="button"
                   onClick={() => updateCurrentFolderViewSettings({ sortBy: sf.id })}
-                  className={`flex-1 py-1 rounded-md text-[11px] text-center transition-all cursor-pointer ${
+                  className={`flex-1 py-1 rounded-md text-[11px] text-center transition-[color,background-color,box-shadow] cursor-pointer ${
                     isActive
                       ? 'bg-white/10 text-white font-medium shadow-sm'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -220,7 +220,7 @@ export const FolderViewModal: React.FC = () => {
                     key={opt.id}
                     type="button"
                     onClick={() => updateCurrentFolderViewSettings({ typeFilter: opt.id })}
-                    className={`flex-1 py-1 rounded-md text-[11px] text-center transition-all cursor-pointer ${
+                    className={`flex-1 py-1 rounded-md text-[11px] text-center transition-[color,background-color,box-shadow] cursor-pointer ${
                       isActive
                         ? 'bg-white/10 text-white font-medium shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'
@@ -243,7 +243,7 @@ export const FolderViewModal: React.FC = () => {
                     key={opt.id}
                     type="button"
                     onClick={() => updateCurrentFolderViewSettings({ inboxMode: opt.id })}
-                    className={`flex-1 py-1 px-1 rounded-md text-[11px] text-center transition-all cursor-pointer whitespace-nowrap truncate ${
+                    className={`flex-1 py-1 px-1 rounded-md text-[11px] text-center transition-[color,background-color,box-shadow] cursor-pointer whitespace-nowrap truncate ${
                       isActive
                         ? 'bg-white/10 text-white font-medium shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'

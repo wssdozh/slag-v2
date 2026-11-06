@@ -63,7 +63,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 ${
+                className={`shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center gap-1 cursor-pointer whitespace-nowrap ${
                   isActive
                     ? 'bg-white/10 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -121,7 +121,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                 <div
                   key={(img.id || img.url) + idx}
                   onClick={() => onOpenLightbox(allImages, idx)}
-                  className={`aspect-square overflow-hidden bg-black/40 border border-white/[0.06] cursor-pointer hover:opacity-90 active:scale-95 transition-all ${
+                  className={`aspect-square overflow-hidden bg-black/40 border border-white/[0.06] cursor-pointer hover:opacity-90 transition-opacity ${
                     isMobile ? 'rounded-xl' : 'rounded'
                   }`}
                 >

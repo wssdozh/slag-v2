@@ -47,7 +47,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       } ${className}`}
     >
       <div
-        className={`w-4 h-4 mt-0.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-all ${
+        className={`w-4 h-4 mt-0.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-[color,background-color,border-color,box-shadow] ${
           checked
             ? 'bg-white border-white text-black shadow-xs'
             : 'border-white/20 bg-white/[0.03] group-hover:border-white/40'

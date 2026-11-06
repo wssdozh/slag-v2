@@ -77,7 +77,9 @@ test.describe('Extreme Torture & Memory Bloat Probe', () => {
 
     // STAGE 4: Rapid Folder & View Switching (60 times)
     console.log('\n[STAGE 4] Executing 60 rapid Folder & View switches...');
-    const switchButtons = page.locator('button:has-text("Все"), button:has-text("Заметки"), button:has-text("Таски"), button:has-text("Статьи"), button:has-text("Входящие")');
+    // Scope to the feed: during an exit animation the closing dialog still owns matching
+    // buttons for a frame, and a global match shifts the index onto a navigating row.
+    const switchButtons = page.locator('main').locator('button:has-text("Все"), button:has-text("Заметки"), button:has-text("Таски"), button:has-text("Статьи"), button:has-text("Входящие")');
     const switchCount = await switchButtons.count();
     for (let i = 0; i < 60; i++) {
       if (switchCount > 0) {

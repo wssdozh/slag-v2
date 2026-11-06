@@ -439,7 +439,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         onTouchCancel={handleTouchEnd}
         style={{
           transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined,
-          transition: swipeOffset ? 'none' : 'transform 150ms ease-out',
+          transition: swipeOffset ? 'none' : 'transform var(--slag-motion-base) var(--ease-standard)',
         }}
         className={`group relative flex flex-col ${
           isPureVoice || isPureFile ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'
@@ -455,11 +455,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             isPureVoice || isPureFile
               ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
               : 'sm:top-2.5 sm:right-2.5 flex items-center'
-          } gap-1 sm:gap-0 sm:group-hover:gap-1 transition-all duration-150 z-20 pointer-events-auto`}
+          } gap-1 sm:gap-0 sm:group-hover:gap-1 z-20 pointer-events-auto`}
         >
           <button
             onClick={() => setReplyTarget(item)}
-            className="h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-all duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100"
+            className="h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity] duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100"
             title="Ответить (R)"
           >
             <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
@@ -481,7 +481,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 });
               }
             }}
-            className="w-9 h-9 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-all duration-150 cursor-pointer flex items-center justify-center shrink-0"
+            className="w-9 h-9 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity] duration-150 cursor-pointer flex items-center justify-center shrink-0"
             title="Действия"
           >
             <MoreVertical className="w-3.5 h-3.5 shrink-0" />
@@ -708,7 +708,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       e.stopPropagation();
                       toggleOcr(imageAttachments[0].id);
                     }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md active:scale-95 z-10"
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
                     title={expandedOcrIds.has(imageAttachments[0].id) ? 'Скрыть текст' : 'Показать текст с фото'}
                   >
                     <FileText className="w-3.5 h-3.5 text-zinc-300" />
@@ -728,7 +728,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       e.stopPropagation();
                       handleEnrichAttachment(imageAttachments[0]);
                     }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md active:scale-95 z-10"
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
                     title="Распознать текст на изображении"
                   >
                     <Sparkles className="w-3 h-3 text-zinc-400" />
@@ -806,7 +806,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               className={
                 isPureFile
                   ? 'flex items-center gap-2.5 sm:gap-3 w-full select-none group/file cursor-pointer'
-                  : 'flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-all group/file select-none cursor-pointer w-full'
+                  : 'flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-colors group/file select-none cursor-pointer w-full'
               }
             >
               {/* Pure File Icon without podlozhka */}
@@ -841,7 +841,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     </span>
                   )}
                   <div
-                    className="w-7 h-7 rounded-lg text-zinc-400 group-hover/file:text-white group-hover/file:bg-white/[0.08] flex items-center justify-center transition-all"
+                    className="w-7 h-7 rounded-lg text-zinc-400 group-hover/file:text-white group-hover/file:bg-white/[0.08] flex items-center justify-center transition-colors"
                     title="Скачать файл"
                   >
                     <Download className="w-4 h-4" />

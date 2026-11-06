@@ -41,12 +41,13 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         e.stopPropagation();
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -175,11 +176,11 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
     return (
       <div
         onClick={onClose}
-        className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 animate-in fade-in duration-150 select-none"
+        className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 motion-fade select-none"
       >
         <div
-          onClick={(e) => e.stopPropagation()}
-          className={`w-full sm:max-w-sm bg-surface-elevated border-t sm:border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-3 flex flex-col gap-1 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 text-xs shadow-2xl ${className}`}
+            onClick={(e) => e.stopPropagation()}
+          className={`w-full sm:max-w-sm bg-surface-elevated border-t sm:border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-3 flex flex-col gap-1 max-h-[85vh] overflow-y-auto motion-sheet text-xs shadow-2xl ${className}`}
           style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
         >
           <div className="w-8 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1.5 sm:hidden" />
@@ -192,12 +193,12 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
+        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] motion-fade"
         onClick={onClose}
       />
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute z-50 rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs animate-in fade-in zoom-in-95 duration-100 ${
+        className={`absolute z-50 rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs motion-popover ${
           position === 'bottom'
             ? 'bottom-full left-2 right-2 mb-1.5'
             : 'top-full left-0 mt-2 w-72 sm:w-80'

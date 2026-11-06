@@ -183,7 +183,7 @@ export const BarChart: React.FC<BarChartProps> = ({
             >
               <div
                 style={{ height: `${barHeight}px`, backgroundColor: isSelected ? color : 'rgba(255,255,255,0.12)' }}
-                className="w-full max-w-[24px] rounded-t transition-all group-hover:brightness-125"
+                className="w-full max-w-[24px] rounded-t transition-[background-color,filter] group-hover:brightness-125"
               />
             </div>
           );
@@ -234,10 +234,11 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({ steps, dropOffRate }) 
                 </div>
               </div>
 
+              {/* ponytail: width tracks chart data, not surrounding layout. */}
               <div className="relative w-full h-2 rounded-full bg-white/[0.04] overflow-hidden">
                 <div
                   style={{ width: `${widthPct}%` }}
-                  className={`h-full rounded-full transition-all duration-300 ${
+                  className={`h-full rounded-full transition-[width] duration-300 ${
                     i === steps.length - 1
                       ? 'bg-emerald-400'
                       : i === 0

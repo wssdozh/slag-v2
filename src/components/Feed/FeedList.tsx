@@ -427,7 +427,7 @@ export const FeedList: React.FC = () => {
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
-          <div className="absolute inset-2 z-30 rounded-2xl bg-canvas/92 backdrop-blur-md border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none animate-in fade-in duration-100">
+          <div className="absolute inset-2 z-30 rounded-2xl bg-canvas/92 backdrop-blur-md border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none motion-fade">
             <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
             <span className="text-sm font-medium text-zinc-200">
               Перетащите файлы сюда для создания заметки
@@ -542,11 +542,11 @@ export const FeedList: React.FC = () => {
 
       {/* Floating scroll to bottom button: centered comfortably above the composer island */}
       {showScrollBottom && (
-        <div className="absolute bottom-28 inset-x-0 pointer-events-none z-30 flex justify-center px-4">
+        <div className="absolute bottom-28 inset-x-0 pointer-events-none z-30 flex justify-center px-4 motion-fade">
           <button
             type="button"
             onClick={scrollToBottom}
-            className="pointer-events-auto w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer transition-all active:scale-90 animate-in fade-in zoom-in-95 group"
+            className="pointer-events-auto w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer motion-press group"
             title="К последним заметкам"
             aria-label="Прокрутить к последним заметкам"
           >

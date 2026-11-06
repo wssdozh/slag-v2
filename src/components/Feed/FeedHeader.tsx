@@ -94,7 +94,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
         <button
           type="button"
           onClick={() => openFolderInfoModal(currentFolder)}
-          className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group select-none min-w-0"
+          className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] motion-press cursor-pointer group select-none min-w-0"
           title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
           aria-label="Информация о папке"
         >
@@ -138,7 +138,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
             onClick={() => setIsTriageModalOpen(true)}
             title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
             aria-label="Запустить ИИ-Сортировку"
-            className="h-ctrl-sm px-2 rounded-md flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer active:scale-95"
+            className="h-ctrl-sm px-2 rounded-md flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] cursor-pointer motion-press"
           >
             <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
             <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
@@ -150,7 +150,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
         <button
           type="button"
           onClick={openFolderViewModal}
-          className="relative h-ctrl-sm w-ctrl-sm flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer"
+          className="relative h-ctrl-sm w-ctrl-sm flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] motion-press cursor-pointer"
           title="Вид и фильтры папки"
           aria-label="Вид и фильтры папки"
         >

@@ -44,7 +44,7 @@ export const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonPr
         ref={ref}
         type={type}
         disabled={disabled}
-        className={`transition-all cursor-pointer flex items-center justify-center shrink-0 outline-none select-none disabled:opacity-40 disabled:cursor-not-allowed ${sizeClass} ${activeGlowClass} ${className}`}
+        className={`motion-press cursor-pointer flex items-center justify-center shrink-0 outline-none select-none disabled:opacity-40 disabled:cursor-not-allowed ${sizeClass} ${activeGlowClass} ${className}`}
         {...props}
       >
         {icon}

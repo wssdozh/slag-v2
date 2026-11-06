@@ -435,10 +435,10 @@ export const AudioPanel: React.FC = () => {
                   onMouseDown={handleTimelineMouseDown}
                   className="group relative flex-1 flex items-center h-4 cursor-pointer select-none"
                 >
-                  <div className="w-full h-1 bg-white/15 rounded-full overflow-hidden transition-all group-hover:h-1.5">
+                  <div className="w-full h-1 bg-white/15 rounded-full overflow-hidden group-hover:h-1.5">
                     <div
                       style={{ width: `${progressPercent}%` }}
-                      className="h-full bg-white transition-all duration-75"
+                      className="h-full bg-white transition-[width] duration-75"
                     />
                   </div>
                   <div
@@ -477,7 +477,7 @@ export const AudioPanel: React.FC = () => {
                 {/* Central Round Play / Pause */}
                 <button
                   onClick={togglePlay}
-                  className="w-13 h-13 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center shadow-xl transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                  className="w-13 h-13 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center shadow-xl motion-press cursor-pointer"
                   title={isPlaying ? 'Пауза (Пробел)' : 'Воспроизведение (Пробел)'}
                   aria-label={isPlaying ? 'Пауза' : 'Воспроизведение'}
                 >
@@ -592,7 +592,7 @@ export const AudioPanel: React.FC = () => {
               }
             >
               <Pin
-                className={`w-3.5 h-3.5 transition-all ${
+                className={`w-3.5 h-3.5 transition-[color,scale] ${
                   scopeMode === 'pinned'
                     ? 'text-zinc-200 fill-current scale-105'
                     : 'text-zinc-500 group-hover:text-zinc-300'

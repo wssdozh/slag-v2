@@ -102,7 +102,7 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
-          className="transition-all duration-75"
+          className="transition-[stroke-dashoffset] duration-75"
         />
       </svg>
 
@@ -112,7 +112,7 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
           isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
         }`}
       >
-        <div className="w-12 h-12 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-lg hover:scale-105 active:scale-95 transition-transform">
+        <div className="w-12 h-12 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-lg motion-press">
           {isPlaying ? (
             <Pause className="w-5 h-5 fill-current" />
           ) : (

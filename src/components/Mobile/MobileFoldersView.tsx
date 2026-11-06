@@ -132,7 +132,7 @@ export const MobileFoldersView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
-                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer"
                 title="Поиск"
                 aria-label="Поиск"
               >
@@ -141,7 +141,7 @@ export const MobileFoldersView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => openCreateFolderModal()}
-                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer"
                 title="Новая папка"
                 aria-label="Новая папка"
               >
@@ -243,7 +243,7 @@ export const MobileFoldersView: React.FC = () => {
           <button
             type="button"
             onClick={() => setMobileFolderInfoOpen(true)}
-            className="flex flex-col items-center justify-center min-w-0 max-w-[200px] hover:opacity-80 active:scale-95 transition-all cursor-pointer select-none"
+            className="flex flex-col items-center justify-center min-w-0 max-w-[200px] hover:opacity-80 motion-press cursor-pointer select-none"
             title={`Информация и медиа папки «${activeMeta?.name || mobileActiveFolder}»`}
             aria-label="Информация о папке"
           >
@@ -262,7 +262,7 @@ export const MobileFoldersView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer active:scale-95 ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center motion-press cursor-pointer ${
                   isKanbanMaterialsOpen
                     ? 'bg-white/10 text-white'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
@@ -285,7 +285,7 @@ export const MobileFoldersView: React.FC = () => {
                 onClick={() => setIsTriageModalOpen(true)}
                 title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
                 aria-label="Запустить ИИ-Сортировку"
-                className="h-8 px-2 rounded-lg flex items-center gap-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer active:scale-95"
+                className="h-8 px-2 rounded-lg flex items-center gap-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] motion-press cursor-pointer"
               >
                 <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
                 <span className="font-mono text-[11px]">{inboxUnsortedCount}</span>
@@ -297,7 +297,7 @@ export const MobileFoldersView: React.FC = () => {
             <button
               type="button"
               onClick={openFolderViewModal}
-              className="relative w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              className="relative w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer"
               title="Вид и фильтры папки"
               aria-label="Вид и фильтры папки"
             >
@@ -322,7 +322,7 @@ export const MobileFoldersView: React.FC = () => {
               <button
                 key={sub.path}
                 onClick={() => setMobileActiveFolder(sub.path)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-xs font-medium text-zinc-300 shrink-0 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-xs font-medium text-zinc-300 shrink-0 motion-press cursor-pointer whitespace-nowrap"
               >
                 <Folder className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{sub.name}</span>
@@ -352,10 +352,9 @@ export const MobileFoldersView: React.FC = () => {
             <FeedList />
             {/* Telegram-style Composer Island at the bottom of the feed */}
             <div
-              className="absolute inset-x-0 bottom-0 pointer-events-none z-30 pb-2 px-2 flex justify-center"
+              className="absolute inset-x-0 bottom-0 pointer-events-none z-30 pb-2 px-2 flex justify-center motion-keyboard"
               style={{
                 transform: `translateY(calc(-1 * var(--keyboard-inset-bottom, 0px)))`,
-                transition: 'transform 100ms ease-out',
               }}
             >
               <div className="pointer-events-auto w-full max-w-lg">

@@ -215,7 +215,7 @@ export const KanbanBoard: React.FC = () => {
       {isMobile && isKanbanMaterialsOpen && (
         <div
           onClick={() => setIsKanbanMaterialsOpen(false)}
-          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-30 animate-in fade-in duration-150"
+          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-30 motion-fade"
         />
       )}
 
@@ -226,7 +226,7 @@ export const KanbanBoard: React.FC = () => {
             ? `absolute inset-y-0 left-0 z-40 w-72 bg-panel shadow-2xl border-r border-white/[0.08] transition-transform duration-200 ${
                 isKanbanMaterialsOpen ? 'translate-x-0' : '-translate-x-full'
               }`
-            : `bg-panel/95 flex flex-col transition-all duration-200 shrink-0 overflow-hidden ${
+            : `bg-panel/95 flex flex-col shrink-0 overflow-hidden ${
                 isKanbanMaterialsOpen ? 'w-60 sm:w-64 border-r border-white/[0.06]' : 'w-0 border-r-0'
               }`
         }`}
@@ -293,7 +293,7 @@ export const KanbanBoard: React.FC = () => {
                     setSelectedItem(mat);
                     setIsFullscreenEditorOpen(true);
                   }}
-                  className={`group p-2.5 rounded-lg bg-surface/80 hover:bg-surface-elevated border border-white/[0.05] hover:border-white/[0.12] transition-all text-left space-y-1.5 shadow-sm touch-none ${
+                  className={`group p-2.5 rounded-lg bg-surface/80 hover:bg-surface-elevated border border-white/[0.05] hover:border-white/[0.12] transition-colors text-left space-y-1.5 shadow-sm touch-none ${
                     isDragging && draggingPayload?.id === mat.id
                       ? 'opacity-40 scale-[0.98] ring-1 ring-blue-500/50'
                       : 'cursor-grab active:cursor-grabbing'
@@ -439,7 +439,7 @@ export const KanbanBoard: React.FC = () => {
                           });
                         }}
                         data-testid="kanban-card"
-                        className={`group relative p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-white/[0.06] hover:border-white/[0.14] transition-all text-left space-y-2 shadow-sm select-none touch-none ${
+                        className={`group relative p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-white/[0.06] hover:border-white/[0.14] transition-colors text-left space-y-2 shadow-sm select-none touch-none ${
                           isDragging && draggingPayload?.id === task.id
                             ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
                             : 'cursor-grab active:cursor-grabbing'

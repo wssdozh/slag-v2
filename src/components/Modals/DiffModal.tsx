@@ -174,7 +174,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Сравнение изменений"
-      className="fixed inset-0 z-[100] bg-canvas flex flex-col text-fg-primary animate-in fade-in duration-150 select-none overflow-hidden"
+      className="fixed inset-0 z-[100] bg-canvas flex flex-col text-fg-primary motion-fade select-none overflow-hidden"
     >
       {/* Top Control Bar */}
       <header
@@ -187,7 +187,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 active:scale-[0.96]"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer shrink-0"
               title="Вернуться назад (Esc)"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -232,7 +232,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] text-xs font-medium transition-all active:scale-[0.96] cursor-pointer"
+              className="px-3 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] text-xs font-medium motion-press cursor-pointer"
             >
               Закрыть
             </button>
@@ -242,7 +242,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
               <button
                 type="button"
                 onClick={handleApplyClick}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-all active:scale-[0.96] cursor-pointer shadow-sm shadow-blue-500/20"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium motion-press cursor-pointer shadow-sm shadow-blue-500/20"
                 title="Применить изменения (Ctrl+Enter)"
               >
                 <Check className="w-3.5 h-3.5" />
@@ -273,7 +273,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                       key={idx}
                       type="button"
                       onClick={() => setSelectedIndex(idx)}
-                      className={`h-[28px] px-3 text-[11px] font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap active:scale-[0.98] ${
+                      className={`h-[28px] px-3 text-[11px] font-medium rounded-md motion-press cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                         isSelected
                           ? 'bg-white/10 text-white font-medium border border-white/[0.08] shadow-xs'
                           : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'

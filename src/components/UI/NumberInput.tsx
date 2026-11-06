@@ -65,7 +65,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         onClick={handleDecrement}
         disabled={!canDec}
         aria-label="Уменьшить"
-        className="w-7 h-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+        className="w-7 h-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
       >
         <Minus className="w-3 h-3" />
       </button>
@@ -88,7 +88,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         onClick={handleIncrement}
         disabled={!canInc}
         aria-label="Увеличить"
-        className="w-7 h-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+        className="w-7 h-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
       >
         <Plus className="w-3 h-3" />
       </button>

@@ -220,9 +220,7 @@ export const Select: React.FC<SelectProps> = ({
             bottom: calculatedDirection === 'up' ? `${window.innerHeight - coords.top}px` : undefined,
             minWidth: `${coords.width}px`,
           }}
-          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl animate-in fade-in duration-100 flex flex-col gap-0.5 ${
-            calculatedDirection === 'up' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
-          } ${dropdownClassName}`}
+          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl motion-popover flex flex-col gap-0.5 ${dropdownClassName}`}
         >
           {/* Subtle Search Query Badge when user types */}
           {searchQuery && (
@@ -296,7 +294,7 @@ export const Select: React.FC<SelectProps> = ({
         aria-expanded={isOpen}
         aria-label={ariaLabel || placeholder}
         title={title || ariaLabel || selectedOption?.label || placeholder}
-        className={`w-full flex items-center justify-between gap-1 transition-all cursor-pointer text-left ${
+        className={`w-full flex items-center justify-between gap-1 motion-press cursor-pointer text-left ${
           variant === 'ghost'
             ? isSmall
               ? 'h-6 px-1.5 text-xs rounded-md bg-transparent hover:bg-white/[0.06] text-zinc-300 hover:text-white border-0'
@@ -304,7 +302,7 @@ export const Select: React.FC<SelectProps> = ({
             : isSmall
               ? 'h-ctrl-sm px-2 text-xs rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300'
               : 'h-ctrl-md px-3 text-xs rounded-lg bg-black/50 hover:bg-black/70 border border-white/[0.08] focus:border-white/20 text-zinc-200'
-        } ${disabled ? 'opacity-40 cursor-not-allowed' : 'active:scale-[0.99]'}`}
+        } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
       >
         <span className="truncate flex items-center gap-1.5">
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}

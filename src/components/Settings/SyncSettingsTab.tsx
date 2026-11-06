@@ -85,7 +85,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
             type="button"
             data-testid="sync-open-account"
             onClick={() => { navigatePage('account'); }}
-            className="px-3.5 py-1.5 rounded-lg bg-white text-black text-xs font-semibold whitespace-nowrap shrink-0 active:scale-95 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg bg-white text-black text-xs font-semibold whitespace-nowrap shrink-0 motion-press cursor-pointer"
           >
             Войти
           </button>
@@ -105,7 +105,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
               type="button"
               onClick={() => void syncEngine.pushLocalChanges()}
               disabled={locked || status.state === 'syncing'}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-2xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-md disabled:opacity-40 whitespace-nowrap shrink-0 cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-2xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-md disabled:opacity-40 whitespace-nowrap shrink-0 cursor-pointer motion-press"
             >
               <RefreshCw className={`w-3 h-3 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
               Синхронизировать
@@ -149,7 +149,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           type="button"
           data-testid="sync-to-devices-btn"
           onClick={() => setSettingsTab('devices')}
-          className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-xs text-zinc-200 font-medium transition-colors cursor-pointer shrink-0 active:scale-95"
+          className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-xs text-zinc-200 font-medium cursor-pointer shrink-0 motion-press"
         >
           Устройства →
         </button>

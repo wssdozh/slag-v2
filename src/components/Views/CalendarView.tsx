@@ -476,7 +476,7 @@ export const CalendarView: React.FC = () => {
           });
         }}
         title={task.title}
-        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-all min-w-0 touch-none ${styling.bg} ${styling.border} ${styling.text} ${
+        className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border text-left text-xs transition-[color,background-color,border-color,opacity] min-w-0 touch-none ${styling.bg} ${styling.border} ${styling.text} ${
           task.isVirtual ? 'border-dashed opacity-85' : ''
         } ${
           isDragging && draggingTaskId === realTaskId
@@ -775,7 +775,7 @@ export const CalendarView: React.FC = () => {
           left: `${left}%`,
           width: `${width}%`,
         }}
-        className={`group/card absolute rounded-lg border select-none transition-all duration-75 z-10 shadow-sm touch-none ${styling.bg} ${styling.border} ${styling.text} ${
+        className={`group/card absolute rounded-lg border select-none transition-[color,background-color,border-color,opacity] duration-75 z-10 shadow-sm touch-none ${styling.bg} ${styling.border} ${styling.text} ${
           isCompact
             ? totalCols > 1
               ? 'px-1.5 py-0 flex items-center justify-between'
@@ -911,7 +911,7 @@ export const CalendarView: React.FC = () => {
             title="Потяните для изменения длительности (шаг 15 мин)"
           >
             <div
-              className={`w-8 h-0.5 rounded-full transition-all duration-150 ${
+              className={`w-8 h-0.5 rounded-full transition-[background-color,opacity] duration-150 ${
                 isResizing
                   ? 'bg-blue-400 opacity-100 shadow-sm'
                   : 'bg-white/40 opacity-0 group-hover/card:opacity-100 group-hover/handle:opacity-100'
@@ -970,7 +970,7 @@ export const CalendarView: React.FC = () => {
           <div aria-label="Режим календаря" className="flex items-center h-8 bg-surface p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
             <button
               onClick={() => setViewMode('week')}
-              className={`h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
+              className={`h-7 px-3 rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
                 viewMode === 'week'
                   ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
@@ -980,7 +980,7 @@ export const CalendarView: React.FC = () => {
             </button>
             <button
               onClick={() => setViewMode('month')}
-              className={`h-7 px-3 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
+              className={`h-7 px-3 rounded-md text-[12px] font-medium transition-colors cursor-pointer ${
                 viewMode === 'month'
                   ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
@@ -1456,9 +1456,9 @@ export const CalendarView: React.FC = () => {
         {timelineResizing && (
           <div
             data-testid="timeline-resize-tooltip"
-            className={`fixed z-50 pointer-events-none px-3.5 py-2 rounded-xl bg-surface-elevated/95 border text-xs font-mono text-zinc-100 shadow-2xl backdrop-blur-md flex items-center gap-2.5 transition-all duration-75 select-none ${
+            className={`fixed z-50 pointer-events-none px-3.5 py-2 rounded-xl bg-surface-elevated/95 border text-xs font-mono text-zinc-100 shadow-2xl backdrop-blur-md flex items-center gap-2.5 transition-[border-color,box-shadow] duration-75 select-none ${
               timelineResizing.isSnapped
-                ? 'border-blue-400 shadow-blue-500/30 scale-105'
+                ? 'border-blue-400 shadow-blue-500/30'
                 : 'border-white/15'
             }`}
             style={{
@@ -1484,7 +1484,7 @@ export const CalendarView: React.FC = () => {
         {/* 3. Side Drawer: Overdue and Unscheduled Tasks                 */}
         {/* ============================================================== */}
         {isDrawerOpen && (
-          <div className="w-72 sm:w-80 border-l border-white/[0.06] bg-panel/95 flex flex-col shrink-0 transition-all duration-200 z-20">
+          <div className="w-72 sm:w-80 border-l border-white/[0.06] bg-panel/95 flex flex-col shrink-0 z-20">
             {/* Drawer Tabs */}
             <div className="h-10 px-2 border-b border-white/[0.06] flex items-center justify-between bg-panel">
               <div className="flex items-center gap-1">
@@ -1531,7 +1531,7 @@ export const CalendarView: React.FC = () => {
               {isDragging && (
                 <div
                   data-drop-zone="calendar-unscheduled"
-                  className={`p-3 rounded-lg border-2 border-dashed transition-all text-center text-xs font-mono flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`p-3 rounded-lg border-2 border-dashed transition-colors text-center text-xs font-mono flex items-center justify-center gap-2 cursor-pointer ${
                     activeZoneData?.dropZone === 'calendar-unscheduled'
                       ? 'bg-amber-500/20 border-amber-500/60 text-amber-200 scale-[1.01]'
                       : 'bg-white/[0.02] border-white/[0.1] text-zinc-400 hover:border-zinc-500'
@@ -1564,7 +1564,7 @@ export const CalendarView: React.FC = () => {
                           setSelectedItem(task);
                           setIsFullscreenEditorOpen(true);
                         }}
-                        className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-rose-500/20 hover:border-rose-500/40 transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
+                        className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-rose-500/20 hover:border-rose-500/40 transition-colors text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
                           isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                         }`}
                       >
@@ -1641,7 +1641,7 @@ export const CalendarView: React.FC = () => {
                         setSelectedItem(task);
                         setIsFullscreenEditorOpen(true);
                       }}
-                      className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-white/[0.06] hover:border-white/[0.12] transition-all text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
+                      className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-white/[0.06] hover:border-white/[0.12] transition-colors text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
                         isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
                       }`}
                     >
@@ -1705,7 +1705,7 @@ export const CalendarView: React.FC = () => {
       {expandedDayDateStr && (
         <div
           onClick={() => setExpandedDayDateStr(null)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 motion-fade"
         >
           <div
             onClick={e => e.stopPropagation()}

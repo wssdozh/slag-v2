@@ -38,7 +38,7 @@ export const MobileAssistantView: React.FC = () => {
               <button
                 type="button"
                 onClick={clearChatMessages}
-                className="w-ctrl-md h-ctrl-md rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-rose-400 flex items-center justify-center active:scale-95 transition-all cursor-pointer touch-target"
+                className="w-ctrl-md h-ctrl-md rounded-lg hover:bg-white/[0.06] text-zinc-500 hover:text-rose-400 flex items-center justify-center motion-press cursor-pointer touch-target"
                 title="Очистить диалог"
                 aria-label="Очистить диалог"
               >
@@ -48,7 +48,7 @@ export const MobileAssistantView: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
-              className="w-ctrl-md h-ctrl-md rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer touch-target"
+              className="w-ctrl-md h-ctrl-md rounded-lg hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer touch-target"
               title="Настройки ИИ"
               aria-label="Настройки ИИ"
             >

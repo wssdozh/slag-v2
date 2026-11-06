@@ -55,7 +55,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute inset-0 z-30 bg-panel/95 backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <div className="absolute inset-0 z-30 bg-panel/95 backdrop-blur-xl flex flex-col overflow-hidden motion-fade">
       {/* Drawer Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
         <div className="flex items-center gap-2">

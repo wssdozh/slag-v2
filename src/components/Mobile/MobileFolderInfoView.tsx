@@ -37,7 +37,7 @@ export const MobileFolderInfoView: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-canvas flex flex-col text-fg-primary select-none animate-in slide-in-from-right duration-200 overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-canvas flex flex-col text-fg-primary select-none motion-fade overflow-hidden">
       {/* Top Header with Back Button */}
       <MobileScreenHeader
         onBack={() => setMobileFolderInfoOpen(false)}
@@ -49,7 +49,7 @@ export const MobileFolderInfoView: React.FC = () => {
               onClick={() => {
                 openEditFolderModal(currentFolderMeta);
               }}
-              className="w-10 h-10 rounded-lg text-zinc-400 hover:text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              className="w-10 h-10 rounded-lg text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer"
               title="Редактировать папку"
             >
               <Edit2 className="w-4 h-4" />
@@ -86,7 +86,7 @@ export const MobileFolderInfoView: React.FC = () => {
           <div className="flex items-center gap-2 mt-1">
             <button
               onClick={handleCreateNote}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium active:scale-95 transition-all cursor-pointer border border-white/[0.08]"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium motion-press cursor-pointer border border-white/[0.08]"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Запись</span>
@@ -95,7 +95,7 @@ export const MobileFolderInfoView: React.FC = () => {
             {currentFolderMeta && !currentFolderMeta.isSystem && (
               <button
                 onClick={() => openEditFolderModal(currentFolderMeta)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium active:scale-95 transition-all cursor-pointer border border-white/[0.06]"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium motion-press cursor-pointer border border-white/[0.06]"
                 title="Редактировать папку"
               >
                 <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
@@ -109,7 +109,7 @@ export const MobileFolderInfoView: React.FC = () => {
                   setMobileFolderInfoOpen(false);
                   setIsTriageModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-xs font-medium active:scale-95 transition-all cursor-pointer border border-blue-500/20"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-xs font-medium motion-press cursor-pointer border border-blue-500/20"
                 title="AI Triage — сортировка входящих"
               >
                 <Sparkles className="w-3.5 h-3.5 text-accent" />

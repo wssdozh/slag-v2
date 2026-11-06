@@ -27,9 +27,9 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     }[size];
 
     const variantClasses = {
-      ghost: 'text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95',
-      danger: 'text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] active:scale-95',
-      secondary: 'text-zinc-300 bg-white/[0.06] hover:bg-white/10 active:scale-95',
+      ghost: 'text-zinc-400 hover:text-white hover:bg-white/[0.06]',
+      danger: 'text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06]',
+      secondary: 'text-zinc-300 bg-white/[0.06] hover:bg-white/10',
     }[variant];
 
     return (
@@ -37,7 +37,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         ref={ref}
         type={type}
         disabled={disabled}
-        className={`flex items-center justify-center shrink-0 select-none cursor-pointer transition-all outline-none focus:ring-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none ${sizeClasses} ${variantClasses} ${className}`}
+        className={`flex items-center justify-center shrink-0 select-none cursor-pointer motion-press outline-none focus:ring-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none ${sizeClasses} ${variantClasses} ${className}`}
         {...props}
       >
         {icon || children}

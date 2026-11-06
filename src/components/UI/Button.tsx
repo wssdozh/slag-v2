@@ -28,13 +28,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantClasses = {
       primary:
-        'bg-white text-black hover:bg-zinc-200 active:scale-95 font-semibold shadow-sm',
+        'bg-white text-black hover:bg-zinc-200 font-semibold shadow-sm',
       secondary:
-        'bg-white/[0.06] hover:bg-white/10 active:scale-95 text-zinc-200 font-medium border border-white/[0.08]',
+        'bg-white/[0.06] hover:bg-white/10 text-zinc-200 font-medium border border-white/[0.08]',
       ghost:
-        'hover:bg-white/[0.06] active:scale-95 text-zinc-400 hover:text-white font-medium',
+        'hover:bg-white/[0.06] text-zinc-400 hover:text-white font-medium',
       danger:
-        'hover:bg-rose-500/10 text-rose-400 active:scale-95 font-medium',
+        'hover:bg-rose-500/10 text-rose-400 font-medium',
     }[variant];
 
     return (
@@ -42,7 +42,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         type={type}
         disabled={disabled}
-        className={`inline-flex items-center justify-center select-none cursor-pointer transition-all outline-none focus:ring-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none whitespace-nowrap ${sizeClasses} ${variantClasses} ${className}`}
+        className={`inline-flex items-center justify-center select-none cursor-pointer motion-press outline-none focus:ring-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none whitespace-nowrap ${sizeClasses} ${variantClasses} ${className}`}
         {...props}
       >
         {icon && <span className="shrink-0">{icon}</span>}

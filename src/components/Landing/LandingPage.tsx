@@ -77,7 +77,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             <button
               type="button"
               onClick={handleDownload}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black font-semibold text-xs rounded-lg hover:bg-zinc-200 active:scale-[0.96] transition-all cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black font-semibold text-xs rounded-lg hover:bg-zinc-200 motion-press cursor-pointer shadow-sm"
             >
               <Download className="w-3.5 h-3.5" />
               <span>{downloadStarted ? 'Скачивание...' : 'Скачать .exe'}</span>
@@ -109,7 +109,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
           <button
             type="button"
             onClick={handleDownload}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white text-black font-semibold text-sm rounded-xl hover:bg-zinc-200 active:scale-[0.96] transition-all cursor-pointer shadow-lg shadow-white/5"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white text-black font-semibold text-sm rounded-xl hover:bg-zinc-200 motion-press cursor-pointer shadow-lg shadow-white/5"
           >
             <Download className="w-4 h-4" />
             <span>Скачать для Windows (.exe)</span>
@@ -118,7 +118,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             href="https://github.com/wssdozh/slag-v2"
             target="_blank"
             rel="noreferrer"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white text-sm font-medium rounded-xl transition-all active:scale-[0.96] cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white text-sm font-medium rounded-xl motion-press cursor-pointer"
           >
             <Terminal className="w-4 h-4 text-zinc-500" />
             <span>Исходный код</span>
@@ -349,7 +349,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             </div>
             <a
               href="#download"
-              className="w-full py-2.5 text-center text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all cursor-pointer active:scale-[0.96]"
+              className="w-full py-2.5 text-center text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl motion-press cursor-pointer"
             >
               Начать бесплатно
             </a>
@@ -397,7 +397,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
               type="button"
               data-testid="landing-btn-choose-smile"
               onClick={navigateToAccount}
-              className="w-full py-2.5 text-center text-xs font-semibold text-black bg-white hover:bg-zinc-200 rounded-xl transition-all cursor-pointer active:scale-[0.96] shadow-sm"
+              className="w-full py-2.5 text-center text-xs font-semibold text-black bg-white hover:bg-zinc-200 rounded-xl motion-press cursor-pointer shadow-sm"
             >
               Выбрать Smile
             </button>
@@ -445,7 +445,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
               type="button"
               data-testid="landing-btn-choose-angry"
               onClick={navigateToAccount}
-              className="w-full py-2.5 text-center text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all cursor-pointer active:scale-[0.96]"
+              className="w-full py-2.5 text-center text-xs font-medium text-zinc-200 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl motion-press cursor-pointer"
             >
               Выбрать Angry
             </button>
@@ -469,7 +469,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             href="https://github.com/wssdozh/slag-v2"
             target="_blank"
             rel="noreferrer"
-            className="px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg transition-all text-center whitespace-nowrap active:scale-[0.96]"
+            className="px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg motion-press text-center whitespace-nowrap"
           >
             Docker на GitHub ↗
           </a>

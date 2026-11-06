@@ -227,7 +227,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
   };
 
   return (
-    <div className="flex flex-col items-center justify-between w-full pt-1 pb-0.5 px-1 select-none animate-in fade-in duration-200">
+    <div className="flex flex-col items-center justify-between w-full pt-1 pb-0.5 px-1 select-none motion-fade">
       {/* Centerpiece: Large Glowing Azure Liquid Orb */}
       <div className="relative my-2 flex items-center justify-center">
         <VoiceOrb analyser={analyserNode} size={116} />
@@ -253,7 +253,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
         <button
           type="button"
           onClick={() => handleFinish(true)}
-          className="h-ctrl-sm px-3 rounded-md bg-white text-black hover:bg-zinc-200 active:scale-95 flex items-center gap-1.5 transition-all shadow-sm cursor-pointer text-xs font-medium"
+          className="h-ctrl-sm px-3 rounded-md bg-white text-black hover:bg-zinc-200 motion-press flex items-center gap-1.5 shadow-sm cursor-pointer text-xs font-medium"
           title="Отправить войс"
         >
           <span>Отправить</span>

@@ -94,7 +94,7 @@ export const MobileTasksView: React.FC = () => {
       <button
         type="button"
         onClick={() => setViewMode('tasks')}
-        className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+        className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
           viewMode === 'tasks'
             ? 'bg-white/10 text-white shadow-sm'
             : 'text-zinc-400 hover:text-zinc-200'
@@ -107,7 +107,7 @@ export const MobileTasksView: React.FC = () => {
         onClick={() => setViewMode('calendar')}
         title="Календарь"
         aria-label="Календарь"
-        className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1 ${
+        className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
           viewMode === 'calendar'
             ? 'bg-white/10 text-white shadow-sm'
             : 'text-zinc-400 hover:text-zinc-200'
@@ -153,7 +153,7 @@ export const MobileTasksView: React.FC = () => {
               <button
                 key={col.id}
                 onClick={() => setActiveStatusTab(col.id)}
-                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 ${
+                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
                   isActive
                     ? 'bg-white/10 text-white shadow-sm font-semibold'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -192,7 +192,7 @@ export const MobileTasksView: React.FC = () => {
                   setSelectedItem(task);
                   setIsFullscreenEditorOpen(true);
                 }}
-                className="flex items-start justify-between p-3.5 rounded-2xl bg-surface/80 hover:bg-surface-elevated border border-white/[0.05] active:scale-[0.99] transition-all cursor-pointer shadow-sm gap-3"
+                className="flex items-start justify-between p-3.5 rounded-2xl bg-surface/80 hover:bg-surface-elevated border border-white/[0.05] transition-colors cursor-pointer shadow-sm gap-3"
               >
                 {/* Left: Checkbox */}
                 <button
@@ -278,7 +278,7 @@ export const MobileTasksView: React.FC = () => {
               folder: currentFolder || DEFAULT_INBOX_FOLDER
             });
           }}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-white/[0.1] hover:border-white/20 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.04] transition-all cursor-pointer active:scale-[0.99]"
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-white/[0.1] hover:border-white/20 text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.04] transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4 text-zinc-400" />
           <span>Добавить таску</span>

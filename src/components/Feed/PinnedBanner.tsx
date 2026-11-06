@@ -116,7 +116,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
               return (
                 <div
                   key={it.id}
-                  className={`w-0.5 rounded-full transition-all duration-200 ${
+                  className={`w-0.5 rounded-full transition-colors duration-200 ${
                     isActive
                       ? 'h-2.5 bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.6)]'
                       : 'h-1 bg-white/20'
@@ -171,7 +171,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
           e.stopPropagation();
           togglePinnedOnlyFilter();
         }}
-        className={`p-1.5 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+        className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1 ${
           isPinnedOnlyFilter
             ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm'
             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08]'

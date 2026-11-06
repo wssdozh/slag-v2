@@ -41,6 +41,10 @@ export const ContextMenu: React.FC = () => {
     currentFolder,
   } = useApp();
 
+  const isOpen = contextMenu !== null;
+  // Menus unmount on close: a retained copy kept pointer-events alive over the feed.
+  const activeTarget = contextMenu;
+
   const [activeSubmenu, setActiveSubmenu] = useState<'more' | 'type' | 'explorer' | null>(null);
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const [prevContextMenu, setPrevContextMenu] = useState(contextMenu);
@@ -49,18 +53,20 @@ export const ContextMenu: React.FC = () => {
   // Synchronously reset submenu state when the menu target changes
   if (contextMenu !== prevContextMenu) {
     setPrevContextMenu(contextMenu);
-    setActiveSubmenu(null);
-    setTriggerRect(null);
+    if (contextMenu) {
+      setActiveSubmenu(null);
+      setTriggerRect(null);
+    }
   }
 
   const actions = useItemActions(contextMenu?.item, closeContextMenu);
 
-  // Clear timer on unmount
+  // Cancel pending submenu changes when logical ownership ends, not after exit.
   useEffect(() => {
     return () => {
       if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     };
-  }, []);
+  }, [isOpen]);
 
   // Keyboard navigation & quick shortcuts while context menu is open
   useEffect(() => {
@@ -190,9 +196,9 @@ export const ContextMenu: React.FC = () => {
     setActiveSubmenu(null);
   }, []);
 
-  if (!contextMenu) return null;
+  if (!activeTarget) return null;
 
-  const { x, y, type, item, folder } = contextMenu;
+  const { x, y, type, item, folder } = activeTarget;
 
   // Viewport clamping
   const menuWidth = 240;
@@ -231,12 +237,12 @@ export const ContextMenu: React.FC = () => {
 
   return (
     <div
-      onClick={(e) => e.stopPropagation()}
+      onClick={isOpen ? (e) => e.stopPropagation() : undefined}
       style={{ left: `${clampedX}px`, top: `${clampedY}px` }}
-      className="fixed z-50 z-[110]"
+      className="fixed z-50 motion-fade"
     >
       {/* Main Menu Container */}
-      <div className="w-60 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100">
+      <div className="w-60 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover">
         {type === 'item' && item && (
           <>
             {/* Quick Primary Actions */}
@@ -532,10 +538,10 @@ export const ContextMenu: React.FC = () => {
       {/* Side Submenu Panel: Quick Type Change */}
       {type === 'item' && item && activeSubmenu === 'type' && triggerRect && (
         <div
-          style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+                      style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
-          className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
         >
           {/* Bridge hit-area */}
           <div
@@ -597,10 +603,10 @@ export const ContextMenu: React.FC = () => {
       {/* Side Submenu Panel: Explorer / File System */}
       {((type === 'item' && item) || (type === 'folder' && folder)) && activeSubmenu === 'explorer' && triggerRect && (
         <div
-          style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+                      style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
-          className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
         >
           {/* Bridge hit-area */}
           <div
@@ -689,10 +695,10 @@ export const ContextMenu: React.FC = () => {
       {/* Side Submenu Panel: Additional Utilities */}
       {type === 'item' && item && activeSubmenu === 'more' && triggerRect && (
         <div
-          style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+                      style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
-          className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
         >
           {/* Bridge hit-area */}
           <div

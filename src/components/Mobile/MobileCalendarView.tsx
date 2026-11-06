@@ -448,7 +448,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
               setPickerMonth(Number(parts[1]) - 1);
               setIsMonthPickerOpen(true);
             }}
-            className="flex items-center gap-1 py-1 px-1.5 rounded-lg hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer text-left shrink-0"
+            className="flex items-center gap-1 py-1 px-1.5 rounded-lg hover:bg-white/[0.06] motion-press cursor-pointer text-left shrink-0"
           >
             <span className="text-xs font-bold text-white tracking-tight truncate max-w-[105px]">
               {currentMonthLabel}
@@ -459,7 +459,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
           <button
             type="button"
             onClick={handleGoToToday}
-            className={`h-6 px-1.5 rounded-md text-[10px] font-medium transition-all cursor-pointer active:scale-95 flex items-center gap-0.5 shrink-0 ${
+            className={`h-6 px-1.5 rounded-md text-[10px] font-medium cursor-pointer motion-press flex items-center gap-0.5 shrink-0 ${
               (calendarLayout === 'agenda' && isCurrentWeek && selectedDate === todayStr) ||
               (calendarLayout === '3day' && isThreeDayToday)
                 ? 'text-zinc-500 hover:text-zinc-300'
@@ -476,7 +476,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
           <button
             type="button"
             onClick={() => setCalendarLayout('agenda')}
-            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
               calendarLayout === 'agenda'
                 ? 'bg-white/10 text-white shadow-xs font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -489,7 +489,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
           <button
             type="button"
             onClick={() => setCalendarLayout('3day')}
-            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
               calendarLayout === '3day'
                 ? 'bg-white/10 text-white shadow-xs font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -531,7 +531,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                     key={day.dateStr}
                     type="button"
                     onClick={() => handleSelectDay(day.dateStr)}
-                    className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all cursor-pointer relative active:scale-95 ${
+                    className={`flex flex-col items-center justify-center py-1.5 rounded-xl cursor-pointer relative motion-press ${
                       isSelected
                         ? 'bg-white text-black font-bold shadow-sm'
                         : isToday
@@ -718,7 +718,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                     {addingDate === day.dateStr ? (
                       <form
                         onSubmit={e => handleCreateTaskOnDate(day.dateStr, e)}
-                        className="p-2.5 bg-black/40 border-t border-white/[0.06] flex items-center gap-2 animate-in fade-in"
+                        className="p-2.5 bg-black/40 border-t border-white/[0.06] flex items-center gap-2 motion-fade"
                       >
                         <input
                           type="text"
@@ -730,7 +730,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                         />
                         <button
                           type="submit"
-                          className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-semibold cursor-pointer active:scale-95 transition-all shrink-0"
+                          className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-semibold cursor-pointer motion-press shrink-0"
                         >
                           OK
                         </button>
@@ -819,7 +819,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                           setSelectedItem(target);
                           setIsFullscreenEditorOpen(true);
                         }}
-                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-[10px] text-zinc-300 truncate cursor-pointer active:scale-95 transition-all ${
+                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-[10px] text-zinc-300 truncate cursor-pointer motion-press ${
                           task.isVirtual ? 'border-dashed opacity-85' : ''
                         }`}
                         title={task.title}
@@ -884,7 +884,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                           {isAddingThis && (
                             <div
                               onClick={e => e.stopPropagation()}
-                              className="absolute inset-x-1 top-1 z-30 bg-surface-elevated border border-white/20 rounded-xl p-1.5 shadow-2xl flex flex-col gap-1.5 animate-in fade-in"
+                              className="absolute inset-x-1 top-1 z-30 bg-surface-elevated border border-white/20 rounded-xl p-1.5 shadow-2xl flex flex-col gap-1.5 motion-popover"
                             >
                               <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
                                 <span>{String(hour).padStart(2, '0')}:00</span>
@@ -907,7 +907,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                                 />
                                 <button
                                   type="submit"
-                                  className="py-1 rounded bg-white text-black text-[10px] font-semibold cursor-pointer active:scale-95 transition-all"
+                                  className="py-1 rounded bg-white text-black text-[10px] font-semibold cursor-pointer motion-press"
                                 >
                                   Добавить
                                 </button>
@@ -949,7 +949,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                             left: `${left}%`,
                             width: `${width}%`
                           }}
-                          className="absolute rounded-lg p-1.5 border border-white/[0.08] bg-surface/95 hover:bg-surface-elevated flex flex-col justify-between select-none cursor-pointer transition-all z-10 shadow-sm active:scale-[0.98]"
+                          className="absolute rounded-lg p-1.5 border border-white/[0.08] bg-surface/95 hover:bg-surface-elevated flex flex-col justify-between select-none cursor-pointer transition-colors z-10 shadow-sm"
                         >
                           <div className="flex items-start gap-1 min-w-0">
                             {task.priority && task.priority !== 'none' && (
@@ -996,9 +996,9 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
       {/* 5. SHEET: Month Date Picker (Select a Date)                              */}
       {/* ========================================================================= */}
       {isMonthPickerOpen && (
-        <div data-testid="month-picker-sheet" className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs animate-in fade-in select-none">
+        <div data-testid="month-picker-sheet" className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs motion-fade select-none">
           <div
-            className="w-full max-h-[85vh] bg-surface border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200"
+            className="w-full max-h-[85vh] bg-surface border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl motion-sheet"
             style={{ paddingBottom: 'max(var(--sab), 1rem)' }}
           >
             {/* Handle & Header */}
@@ -1076,7 +1076,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                       key={cell.dateStr}
                       type="button"
                       onClick={() => handleSelectDateFromPicker(cell.dateStr)}
-                      className={`h-10 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer relative active:scale-95 ${
+                      className={`h-10 rounded-xl flex flex-col items-center justify-center cursor-pointer relative motion-press ${
                         isSelected
                           ? 'bg-white text-black font-bold shadow-sm'
                           : isToday
