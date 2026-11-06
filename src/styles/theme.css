@@ -47,6 +47,11 @@
   --color-warning-subtle: rgba(245, 158, 11, 0.12);
   --color-danger: #f43f5e;
   --color-danger-subtle: rgba(244, 63, 94, 0.12);
+
+  /* Motion Curves — generate `ease-standard`, `ease-entrance`, `ease-press` */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 :root {
@@ -86,4 +91,39 @@
   --bg-surface: var(--color-surface);
   --bg-hover: var(--color-surface-hover);
   --bg-active: var(--color-surface-active);
+
+  /* Motion: three curves instead of ad-hoc cubic-beziers. Used as `ease-standard`,
+     `ease-entrance`, `ease-press`. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/**
+ * Motion: Tailwind has no duration namespace, and a hand-rolled `@utility` would have to
+ * mirror `--tw-duration` to survive the cascade — not worth it for four numbers. So the
+ * scale stays numeric and canonical: `duration-75` instant, `duration-100` fast,
+ * `duration-150` base, `duration-200` slow. Anything else is a bug. These vars exist for
+ * raw CSS that cannot use utilities.
+ */
+:root {
+  --slag-motion-instant: 75ms;
+  --slag-motion-fast: 100ms;
+  --slag-motion-base: 150ms;
+  --slag-motion-slow: 200ms;
+}
+
+/**
+ * Accessibility: the app is a dense list UI where transform/opacity motion is
+ * decorative, so honour the OS setting globally instead of per component.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

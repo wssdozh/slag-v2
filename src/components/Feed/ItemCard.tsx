@@ -443,9 +443,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         }}
         className={`group relative flex flex-col ${
           isPureVoice || isPureFile ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'
-        } p-2.5 sm:p-3 rounded-xl transition-all cursor-default select-none ${
+        } p-2.5 sm:p-3 rounded-xl transition-colors duration-150 ease-standard cursor-default select-none ${
           isHighlighted
-            ? 'bg-blue-500/10 border border-blue-500/40 item-highlight-pulse'
+            ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
             : 'bg-surface/80 hover:bg-surface-hover border border-white/[0.05]'
         }`}
       >
