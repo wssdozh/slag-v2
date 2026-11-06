@@ -110,6 +110,35 @@ test('a closed toast leaves through its exit state before unmounting', async ({ 
   await expect(toast).toHaveCount(0);
 });
 
+test('a fresh note lands, and the list settles when one is deleted', async ({ page }) => {
+  await page.goto('/');
+  await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
+
+  const text = 'Лента ' + Date.now();
+  await page.locator('main textarea').fill(text);
+  await page.locator('main textarea').press('Enter');
+  const created = page.locator('[data-flip-id]', { hasText: text });
+  await expect(created).toBeVisible();
+  await expect.poll(() => created.evaluate(el => el.getAnimations().length)).toBeGreaterThan(0);
+
+  const cards = page.locator('[data-flip-id]');
+  const count = await cards.count();
+  const neighbourId = await cards.nth(1).getAttribute('data-flip-id');
+  await cards.first().click({ button: 'right' });
+  await page.locator('.fixed.z-50').getByRole('button', { name: 'Удалить' }).click();
+  await expect(cards).toHaveCount(count - 1);
+
+  // The neighbour travels from its old spot instead of teleporting.
+  const travelled = await page.evaluate(id => {
+    const element = document.querySelector(`[data-flip-id="${id}"]`);
+    return element?.getAnimations().some(animation =>
+      animation.effect instanceof KeyframeEffect &&
+      animation.effect.getKeyframes().some(keyframe => String(keyframe.transform ?? '').includes('translate'))
+    ) ?? false;
+  }, neighbourId);
+  expect(travelled).toBe(true);
+});
+
 test('the inbox counter pops when its number changes', async ({ page }) => {
   await page.goto('/');
   await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });

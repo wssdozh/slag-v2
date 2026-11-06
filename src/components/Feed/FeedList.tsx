@@ -16,6 +16,7 @@ import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { enrichItemAttachments } from '../../lib/attachmentEnrichment';
 import { PinnedBanner } from './PinnedBanner';
+import { useFlipLayout } from '../../hooks/useFlipLayout';
 
 const PAGE_SIZE = 35;
 
@@ -146,6 +147,9 @@ export const FeedList: React.FC = () => {
   }, [filteredItems, effectiveVisibleCount]);
 
   const hasMoreOlder = filteredItems.length > effectiveVisibleCount;
+
+  // Cards glide when the list shrinks or reorders; a fresh note lands instead.
+  useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'));
 
   // Load more older items with scroll position preservation
   const loadMoreOlder = useCallback(() => {

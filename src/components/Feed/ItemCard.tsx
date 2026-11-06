@@ -429,6 +429,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       <div
         id={`item-${item.id}`}
+        data-flip-id={item.id}
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onContextMenu={handleContextMenu}
