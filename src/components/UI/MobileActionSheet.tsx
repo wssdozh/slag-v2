@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { usePresence } from '../../hooks/usePresence';
+import { useSheetDrag } from '../../hooks/useSheetDrag';
 import { useApp } from '../../context/AppContext';
 import {
   Maximize2,
@@ -24,11 +25,14 @@ export const MobileActionSheet: React.FC = () => {
     navigateToFolder,
   } = useApp();
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setMobileActionSheetItem(null);
-  };
+  }, [setMobileActionSheetItem]);
 
-  const { ref, phase, isPresent, onTransitionEnd } = usePresence(mobileActionSheetItem !== null);
+  const isOpen = mobileActionSheetItem !== null;
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
+  const { panelRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle, scrimStyle } =
+    useSheetDrag({ isOpen, onDismiss: handleClose });
   const [lastItem, setLastItem] = useState(mobileActionSheetItem);
   if (mobileActionSheetItem && mobileActionSheetItem !== lastItem) setLastItem(mobileActionSheetItem);
   const actions = useItemActions(mobileActionSheetItem, handleClose);
@@ -40,43 +44,57 @@ export const MobileActionSheet: React.FC = () => {
   return (
     <div
       ref={ref}
+      data-testid="action-sheet"
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
       inert={mobileActionSheetItem === null}
       aria-hidden={mobileActionSheetItem === null || undefined}
       onClick={handleClose}
+      style={scrimStyle}
       className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end motion-fade select-none"
     >
       <div
+        ref={panelRef}
         onClick={e => e.stopPropagation()}
+        data-testid="sheet-panel"
         data-motion-state={phase}
         className="w-full bg-surface-elevated border-t border-white/[0.08] rounded-t-2xl p-3 flex flex-col gap-2 max-h-[85vh] overflow-y-auto motion-sheet"
-        style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
+        style={{ paddingBottom: 'max(var(--sab), 0.75rem)', ...panelStyle }}
       >
-        {/* Drag handle */}
-        <div className="w-8 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1" />
+        {/* The handle owns the gesture; the scroller below keeps scrolling. */}
+        <div
+          data-sheet-handle
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerEnd}
+          onPointerCancel={onPointerCancel}
+          style={{ touchAction: 'none' }}
+          className="flex flex-col gap-2 shrink-0"
+        >
+          <div className="w-8 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1" />
 
-        {/* Item Title Header */}
-        <div className="px-3 py-1.5 flex items-center justify-between border-b border-white/[0.05]">
-          <div className="flex items-center gap-2 min-w-0">
-            {item.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-            {item.type === 'article' && <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-            {item.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-            <span className="text-xs font-semibold text-zinc-200 truncate">
-              {item.title || item.content.slice(0, 40) || 'Без названия'}
-            </span>
+          {/* Item Title Header */}
+          <div className="px-3 py-1.5 flex items-center justify-between border-b border-white/[0.05]">
+            <div className="flex items-center gap-2 min-w-0">
+              {item.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+              {item.type === 'article' && <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+              {item.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+              <span className="text-xs font-semibold text-zinc-200 truncate">
+                {item.title || item.content.slice(0, 40) || 'Без названия'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                handleClose();
+                navigateToFolder(item.folder, item.id);
+              }}
+              className="text-[10px] font-mono text-zinc-500 hover:text-zinc-200 hover:underline transition-colors cursor-pointer shrink-0 ml-2"
+              title={`Перейти в папку «${item.folder}» и перейти к этой записи`}
+            >
+              {item.folder}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              handleClose();
-              navigateToFolder(item.folder, item.id);
-            }}
-            className="text-[10px] font-mono text-zinc-500 hover:text-zinc-200 hover:underline transition-colors cursor-pointer shrink-0 ml-2"
-            title={`Перейти в папку «${item.folder}» и перейти к этой записи`}
-          >
-            {item.folder}
-          </button>
         </div>
 
         {/* Quick Type Switcher (Segmented Control) */}
