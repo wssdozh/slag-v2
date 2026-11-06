@@ -338,3 +338,30 @@ test('reduced motion keeps a short fade without spatial movement and cleans up',
   await page.keyboard.press('Escape');
   await expect(modal).toHaveCount(0);
 });
+
+test('a closing dialog keeps its whole exit instead of blinking out', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('sidebar-settings-btn').click();
+  const modal = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Настройки', exact: true }) });
+  await expect(modal).toHaveAttribute('data-motion-state', 'open');
+
+  const exit = modal.evaluate(element => new Promise<{ duration: number; alive: boolean }>(resolve => {
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute('data-motion-state') !== 'exiting') return;
+      observer.disconnect();
+      const duration = getComputedStyle(element).transitionDuration;
+      window.setTimeout(() => resolve({
+        duration: parseFloat(duration) * (duration.trim().endsWith('ms') ? 1 : 1000),
+        alive: document.body.contains(element),
+      }), 100);
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ['data-motion-state'] });
+  }));
+
+  await modal.getByRole('button', { name: 'Закрыть' }).first().click();
+  const result = await exit;
+  // The exit is shorter than the entrance, but it is not a blink: 100ms is gone
+  // before the eye reads it, so the surface would look pulled out from under.
+  expect(result.duration).toBeGreaterThanOrEqual(150);
+  expect(result.alive).toBe(true);
+});

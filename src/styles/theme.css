@@ -148,9 +148,21 @@
 .motion-sheet:is([data-motion-state="entering"], [data-motion-state="exiting"]) {
   translate: 0 100%;
 }
+/* An exit is its own gesture: shorter than the entrance, but never so short
+   that the surface looks like it was pulled out from under the cursor. */
 [data-motion-state="exiting"] {
   pointer-events: none;
+  transition-timing-function: var(--ease-standard);
+}
+:is(.motion-fade, .motion-dialog)[data-motion-state="exiting"] {
+  transition-duration: var(--slag-motion-base);
+}
+.motion-popover[data-motion-state="exiting"] {
   transition-duration: var(--slag-motion-fast);
+}
+/* A sheet travels its own height, so it needs the full duration to read. */
+.motion-sheet[data-motion-state="exiting"] {
+  transition-duration: var(--slag-motion-slow);
 }
 
 /* Surfaces that swap colour, shadow and a selected scale in one go. */
@@ -217,7 +229,7 @@
   transition-duration: var(--slag-motion-slow);
 }
 
-/* Vault and view swaps fade through the browser's own snapshot layer. */
+/* Vault and screen swaps fade through the browser's own snapshot layer. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: var(--slag-motion-base);
