@@ -55,6 +55,14 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
   const [noteResults, setNoteResults] = useState<SlagItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isStaggering, setIsStaggering] = useState(true);
+
+  // Results cascade only for the first batch after the palette opens. Typing after
+  // that must feel instant, so the rows stop animating once the window closes.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsStaggering(false), 600);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const commandContext: AppCommandContext = useMemo(
     () => ({
@@ -247,7 +255,10 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
       </div>
 
       {/* Results List */}
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5">
+      <div
+        className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5 motion-stagger"
+        data-stagger={isStaggering ? 'true' : undefined}
+      >
         {combinedItems.length === 0 ? (
           <div className="py-12 text-center text-xs text-zinc-500">
             Ничего не найдено по запросу «{query}»
@@ -263,6 +274,7 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
                   key={`cmd_${cmd.id}`}
                   onClick={() => handleSelectCommand(cmd)}
                   onMouseEnter={() => setSelectedIndex(index)}
+                  style={{ '--stagger-index': Math.min(index, 6) } as React.CSSProperties}
                   className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors ${
                     isSelected ? 'bg-white/[0.07] text-white' : 'text-zinc-300 hover:bg-white/[0.03]'
                   }`}
@@ -318,6 +330,7 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
                 key={`note_${item.id}`}
                 onClick={() => handleSelectItem(item)}
                 onMouseEnter={() => setSelectedIndex(index)}
+                style={{ '--stagger-index': Math.min(index, 6) } as React.CSSProperties}
                 className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors ${
                   isSelected ? 'bg-white/[0.07] text-white' : 'text-zinc-300 hover:bg-white/[0.03]'
                 }`}

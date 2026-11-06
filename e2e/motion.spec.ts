@@ -203,6 +203,31 @@ test('a kanban card glides to its new column, and reduced motion skips it', asyn
   await page.screenshot({ path: 'test-results/screenshots/motion_kanban.png' });
 });
 
+test('search results cascade for the first batch, then stop animating', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+  await page.keyboard.press('Control+f');
+  const input = page.locator('input[placeholder*="Поиск по заметкам"]');
+  await expect(input).toBeVisible();
+  await input.fill('и');
+
+  const list = page.locator('.motion-stagger');
+  const rows = list.locator('> *');
+  await expect(rows.first()).toBeVisible();
+  await expect(list).toHaveAttribute('data-stagger', 'true');
+
+  const delays = await rows.evaluateAll(elements =>
+    elements.slice(0, 7).map(element => getComputedStyle(element).animationDelay),
+  );
+  expect(delays[0]).toBe('0s');
+  expect(delays.length).toBeGreaterThan(1);
+  expect(delays[1]).toBe('0.014s');
+  expect(delays[delays.length - 1]).toBe(`${Math.min(delays.length - 1, 6) * 0.014}s`);
+
+  await expect(list).not.toHaveAttribute('data-stagger', 'true', { timeout: 3000 });
+  await page.screenshot({ path: 'test-results/screenshots/motion_search_stagger.png' });
+});
+
 test('the inbox counter pops when its number changes', async ({ page }) => {
   await page.goto('/');
   await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
