@@ -28,16 +28,38 @@ test.describe('screen swaps on a phone', () => {
 
   test('dock tabs cross-fade and never stack two screens', async ({ page }) => {
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
+    const pill = dock.locator('[data-testid="dock-active-pill"]');
+    await expect(pill).toBeVisible();
+
     await dock.getByRole('button', { name: 'Таски' }).click();
 
     // The outgoing screen is a snapshot, not a live second tree.
     expect(await page.locator('header').count()).toBe(1);
     await expect(page.locator('h1', { hasText: 'Заметки' })).toHaveCount(0);
-    expect(await swaps(page)).toContain('tab');
+    expect(await swaps(page)).toContain('tab-next');
+
+    // Pill stays visible and slides under the active tab
+    await expect(pill).toBeVisible();
+    await page.screenshot({ path: 'test-results/screenshots/motion_dock_pill.png' });
 
     await dock.getByRole('button', { name: /^Папки/ }).click();
     await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
-    expect((await swaps(page)).filter(kind => kind === 'tab')).toHaveLength(2);
+    expect(await swaps(page)).toEqual(['tab-next', 'tab-prev']);
+  });
+
+  test('subtasks accordion expands and collapses smoothly without layout jump', async ({ page }) => {
+    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    const accordionBtn = page.locator('button[aria-label*="Подзадачи"]').first();
+    if (await accordionBtn.count()) {
+      await expect(accordionBtn).toBeVisible();
+      const accordionContainer = page.locator('.motion-accordion').first();
+      await expect(accordionContainer).toHaveAttribute('data-expanded', 'true');
+      await accordionBtn.click();
+      await expect(accordionContainer).toHaveAttribute('data-expanded', 'false');
+      await accordionBtn.click();
+      await expect(accordionContainer).toHaveAttribute('data-expanded', 'true');
+      await page.screenshot({ path: 'test-results/screenshots/motion_subtasks_accordion.png' });
+    }
   });
 
   test('a folder pushes in and pops back out', async ({ page }) => {

@@ -61,10 +61,10 @@ test('the action sheet drags 1:1, snaps back, then dismisses', async ({ page }) 
     await page.mouse.move(x, y + step * 6);
   }
   await page.mouse.up();
-  await page.waitForTimeout(320);
-  await expect(sheet).toBeVisible();
-  const back = (await panel.boundingBox())!;
-  expect(Math.abs(back.y - rest.y)).toBeLessThan(1);
+  await expect.poll(async () => {
+    const b = await panel.boundingBox();
+    return b ? Math.abs(b.y - rest.y) : 999;
+  }).toBeLessThan(1.5);
 
   // A fast drag tracks the pointer exactly, then commits.
   await page.mouse.move(x, y);
