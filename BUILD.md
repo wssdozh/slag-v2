@@ -115,6 +115,7 @@ SLAG v2 автоматически определяет платформу пр�
    - При первом запуске автоматически прописывается биндинг `Ctrl+Shift+Space` -> `<path_to_binary> --quick`.
    - Только release-сборка регистрирует `~/.local/share/applications/com.slag.notes.desktop` и иконку. Debug-сборки не меняют системный ярлык и хоткей.
    - На Linux повторное открытие основного окна вызывает GTK `present()` на главном потоке вместо Tauri `set_focus()`; ярлык объявляет `StartupNotify=true`.
+   - Linux-сборка по умолчанию выставляет `WEBKIT_DISABLE_DMABUF_RENDERER=1` до старта GTK: DMA-BUF путь WebKitGTK перерисовывает угол окна устаревшим буфером (мерцание). Переменную окружения можно переопределить снаружи.
 2. **Linux (Wayland non-GNOME / Hyprland / Sway)**:
    - В настройках («Горячие клавиши») отображается готовая строка биндинга для конфигурационного файла тайлингового менеджера (`bind = CTRL SHIFT, SPACE, exec, <path> --quick`).
 3. **Windows / macOS / Linux X11**:

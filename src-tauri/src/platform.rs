@@ -346,7 +346,7 @@ mod tests {
 }
 
 pub fn auto_adapt_system() {
-    #[cfg(all(target_os = "linux", not(debug_assertions)))]
+    #[cfg(target_os = "linux")]
     {
         let info = detect_platform();
         if info.is_gnome {

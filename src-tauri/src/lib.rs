@@ -278,6 +278,16 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
 #[cfg(target_os = "linux")]
 const LINUX_APP_ID: &str = "com.slag.notes";
 
+/// WebKitGTK's DMA-BUF path repaints the frameless window's corner with a stale
+/// buffer on Mesa, which shows up as a flicker. Keep the stable shared-memory
+/// renderer unless the environment already pins a value.
+#[cfg(target_os = "linux")]
+fn use_stable_renderer() {
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+}
+
 /// Brings the main window forward, changing visibility only when necessary.
 #[cfg(desktop)]
 fn reveal_main_window(app: &tauri::AppHandle) {
@@ -307,11 +317,15 @@ fn reveal_main_window(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // GNOME ties a Wayland window to its launcher by app_id, and GTK derives app_id from
-    // the program name (the binary name by default). With a binary name the dock never
-    // shows SLAG as running, so the launcher looks "not open" and starts an extra process.
     #[cfg(target_os = "linux")]
-    glib::set_prgname(Some(LINUX_APP_ID));
+    {
+        // Both settings must land before GTK/WebKit start, so they stay first in run().
+        use_stable_renderer();
+        // GNOME ties a Wayland window to its launcher by app_id, and GTK derives app_id from
+        // the program name (the binary name by default). With a binary name the dock never
+        // shows SLAG as running, so the launcher looks "not open" and starts an extra process.
+        glib::set_prgname(Some(LINUX_APP_ID));
+    }
 
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--install-system") {
