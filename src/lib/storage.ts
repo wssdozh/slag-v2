@@ -69,7 +69,7 @@ export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
 export class StorageService {
   private currentVault: VaultMeta;
-  private tauriInitialized = false;
+  private tauriInitialization: Promise<boolean> | null = null;
   private changeListeners: Set<StorageChangeListener> = new Set();
   private instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   private crossWindowDraftChannel: BroadcastChannel | null = null;
@@ -282,11 +282,13 @@ export class StorageService {
   }
 
   // ponytail: in-memory sync cache with async fs flush. ceiling: 5,000 notes. upgrade: worker-thread batch indexing if disk io throttles
-  public async initTauriFs(): Promise<boolean> {
-    if (!isTauri() || this.tauriInitialized) return false;
-    this.tauriInitialized = true;
-    await this.migrateLegacyNotesToVaults();
-    return await this.syncCurrentVaultFs();
+  public initTauriFs(): Promise<boolean> {
+    if (!isTauri()) return Promise.resolve(false);
+    if (!this.tauriInitialization) {
+      this.tauriInitialization = this.migrateLegacyNotesToVaults()
+        .then(() => this.syncCurrentVaultFs());
+    }
+    return this.tauriInitialization;
   }
 
   private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {
