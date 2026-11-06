@@ -16,6 +16,7 @@ import {
 } from '../../lib/dateUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { TaskStatusMark } from '../UI/TaskStatusMark';
+import { usePresence } from '../../hooks/usePresence';
 import {
   ChevronDown,
   ChevronLeft,
@@ -157,6 +158,12 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
 
   // Sheets
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const {
+    ref: monthPickerRef,
+    phase: monthPickerPhase,
+    isPresent: isMonthPickerPresent,
+    onTransitionEnd: onMonthPickerTransitionEnd,
+  } = usePresence(isMonthPickerOpen);
 
   // Picker Month offset
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
@@ -993,9 +1000,18 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
       {/* ========================================================================= */}
       {/* 5. SHEET: Month Date Picker (Select a Date)                              */}
       {/* ========================================================================= */}
-      {isMonthPickerOpen && (
-        <div data-testid="month-picker-sheet" className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs motion-fade select-none">
+      {isMonthPickerPresent && (
+        <div
+          ref={monthPickerRef}
+          data-motion-state={monthPickerPhase}
+          onTransitionEnd={onMonthPickerTransitionEnd}
+          onClick={() => setIsMonthPickerOpen(false)}
+          data-testid="month-picker-sheet"
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs motion-fade select-none"
+        >
           <div
+            onClick={e => e.stopPropagation()}
+            data-motion-state={monthPickerPhase}
             className="w-full max-h-[85vh] bg-surface border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl motion-sheet"
             style={{ paddingBottom: 'max(var(--sab), 1rem)' }}
           >

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { formatDueDateLabel } from '../../lib/dateUtils';
@@ -44,6 +44,34 @@ export const MobileTasksView: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'tasks' | 'calendar'>('tasks');
   const [activeStatusTab, setActiveStatusTab] = useState<TaskStatus>('todo');
+
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  const [tabIndicator, setTabIndicator] = useState<{ left: number; width: number; ready: boolean }>({
+    left: 0,
+    width: 0,
+    ready: false,
+  });
+
+  const updateTabIndicator = useCallback(() => {
+    if (!tabBarRef.current) return;
+    const activeBtn = tabBarRef.current.querySelector<HTMLButtonElement>(`[data-status-tab="${activeStatusTab}"]`);
+    if (activeBtn) {
+      setTabIndicator({
+        left: activeBtn.offsetLeft,
+        width: activeBtn.offsetWidth,
+        ready: true,
+      });
+    }
+  }, [activeStatusTab]);
+
+  useLayoutEffect(() => {
+    updateTabIndicator();
+  }, [updateTabIndicator]);
+
+  useEffect(() => {
+    window.addEventListener('resize', updateTabIndicator);
+    return () => window.removeEventListener('resize', updateTabIndicator);
+  }, [updateTabIndicator]);
 
   const { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } = useSwipeGesture({
     onSwipeLeft: () => {
@@ -142,8 +170,19 @@ export const MobileTasksView: React.FC = () => {
       />
 
       {/* Segmented Status Tabs (Pills style matching MobileFolderInfoView) */}
-      <div className="px-3 py-2 bg-panel/60 border-b border-white/[0.04] shrink-0">
-        <div className="flex items-center justify-between gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+      <div className="px-3 py-2 bg-panel/60 border-b border-white/[0.04] shrink-0 select-none">
+        <div ref={tabBarRef} className="relative flex items-center justify-between gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none">
+          {tabIndicator.ready && (
+            <div
+              data-testid="status-tab-pill"
+              className="absolute top-1 bottom-1 left-0 rounded-xl bg-white/10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
+              style={{
+                transform: `translateX(${tabIndicator.left}px)`,
+                width: `${tabIndicator.width}px`,
+                transitionTimingFunction: 'var(--ease-settle)',
+              }}
+            />
+          )}
           {COLUMNS.map(col => {
             const count = (tasksByStatus[col.id] || []).length;
             const isActive = activeStatusTab === col.id;
@@ -151,10 +190,11 @@ export const MobileTasksView: React.FC = () => {
             return (
               <button
                 key={col.id}
+                data-status-tab={col.id}
                 onClick={() => setActiveStatusTab(col.id)}
-                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                className={`relative z-10 shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'bg-white/10 text-white shadow-sm font-semibold'
+                    ? `${tabIndicator.ready ? '' : 'bg-white/10 shadow-sm'} text-white font-semibold`
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >

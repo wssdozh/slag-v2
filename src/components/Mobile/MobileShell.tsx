@@ -23,7 +23,7 @@ export const MobileShell: React.FC = () => {
   return (
     <div className="w-full h-full flex flex-col bg-canvas text-fg-primary overflow-hidden relative">
       {/* Active Tab Screen */}
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+      <main className="flex-1 min-h-0 flex flex-col overflow-hidden relative mobile-screen-view">
         {activeMobileTab === 'folders' && <MobileFoldersView />}
         {activeMobileTab === 'tasks' && <MobileTasksView />}
         {activeMobileTab === 'assistant' && <MobileAssistantView />}
@@ -32,8 +32,8 @@ export const MobileShell: React.FC = () => {
         {activeMobileTab === 'audio' && <MobileAudioView />}
       </main>
 
-      {/* Floating Linear Island Dock (Visible on root views except Assistant) */}
-      {isFloatingDockVisible && <MobileFloatingDock />}
+      {/* Floating Linear Island Dock (Smooth presence transition on root views) */}
+      <MobileFloatingDock isVisible={isFloatingDockVisible} />
 
       {/* Fullscreen Slide-over Folder Info & Media Profile */}
       {mobileFolderInfoOpen && <MobileFolderInfoView />}
