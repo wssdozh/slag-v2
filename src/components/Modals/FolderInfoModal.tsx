@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { BaseModal } from './BaseModal';
@@ -25,10 +26,12 @@ import {
 
 interface FolderInfoModalDialogProps {
   targetFolder: string;
+  presence: ReturnType<typeof usePresence>;
 }
 
-const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFolder }) => {
+const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFolder, presence }) => {
   const {
+    isFolderInfoModalOpen,
     closeFolderInfoModal,
     folders,
     items,
@@ -146,7 +149,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
         setIsEditMode(prev => !prev);
         setIsConfirmingDelete(false);
       }}
-      className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+      className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 motion-surface cursor-pointer ${
         isEditMode
           ? 'bg-white/10 text-white'
           : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -220,7 +223,8 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
 
   return (
     <BaseModal
-      isOpen={true}
+      presence={presence}
+      isOpen={isFolderInfoModalOpen}
       onClose={closeFolderInfoModal}
       title={isEditMode ? 'Редактирование папки' : (folderMeta?.name || targetFolder)}
       subtitle={
@@ -275,7 +279,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
                   key={key}
                   type="button"
                   onClick={() => setEditIcon(key)}
-                  className={`p-2 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+                  className={`p-2 rounded-md flex items-center justify-center motion-surface cursor-pointer ${
                     editIcon === key
                       ? 'bg-white text-black font-medium shadow-sm scale-105'
                       : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -394,7 +398,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
                   closeFolderInfoModal();
                   setIsTriageModalOpen(true);
                 }}
-                className="flex-1 py-1.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-xs text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-98"
+                className="flex-1 py-1.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-xs text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 motion-surface cursor-pointer motion-press"
               >
                 <ArrowUpDown className="w-3.5 h-3.5 text-blue-400" />
                 <span>ИИ-Сортировка входящих</span>
@@ -407,7 +411,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
                 closeFolderInfoModal();
                 openComposerModal({ folder: targetFolder });
               }}
-              className="flex-1 py-1.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-xs text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-98"
+              className="flex-1 py-1.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-xs text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 motion-surface cursor-pointer motion-press"
             >
               <Plus className="w-3.5 h-3.5 text-zinc-400" />
               <span>Создать запись</span>
@@ -435,8 +439,11 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
 export const FolderInfoModal: React.FC = () => {
   const { isFolderInfoModalOpen, folderInfoTarget, currentFolder } = useApp();
 
-  if (!isFolderInfoModalOpen) return null;
-
+  const presence = usePresence(isFolderInfoModalOpen);
   const target = folderInfoTarget || currentFolder || DEFAULT_INBOX_FOLDER;
-  return <FolderInfoModalDialog key={target} targetFolder={target} />;
+  const [snapshot, setSnapshot] = useState(target);
+  if (isFolderInfoModalOpen && snapshot !== target) setSnapshot(target);
+  if (!presence.isPresent) return null;
+
+  return <FolderInfoModalDialog key={snapshot} targetFolder={snapshot} presence={presence} />;
 };

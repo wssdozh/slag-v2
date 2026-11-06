@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import { SecretKeyField } from '../Settings/SecretKeyField';
 import { storage } from '../../lib/storage';
@@ -67,6 +68,8 @@ export const SettingsModal: React.FC = () => {
     updateBackupSettings,
   } = useApp();
 
+  const presence = usePresence(isSettingsOpen);
+
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<'desktop' | 'mobile'>(isMobile ? 'mobile' : 'desktop');
@@ -100,10 +103,10 @@ export const SettingsModal: React.FC = () => {
   const [isUpdatingHotkey, setIsUpdatingHotkey] = useState(false);
 
   useEffect(() => {
-    if (activeTab === 'shortcuts') {
+    if (isSettingsOpen && activeTab === 'shortcuts') {
       void getPlatformInfo().then(setPlatformInfo);
     }
-  }, [activeTab]);
+  }, [activeTab, isSettingsOpen]);
 
   const handleSetupHotkey = async () => {
     setIsUpdatingHotkey(true);
@@ -139,13 +142,15 @@ export const SettingsModal: React.FC = () => {
   // на прежней позиции, и выбранный раздел оказывался за правым краем.
   const tabsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (!isSettingsOpen) return;
     const box = tabsRef.current;
     const el = box?.querySelector<HTMLElement>(`[data-tab="${activeTab}"]`);
     if (!box || !el || box.scrollWidth <= box.clientWidth) return;
     box.scrollTo({ left: el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2 });
-  }, [activeTab]);
+  }, [activeTab, isSettingsOpen]);
 
-  if (!isSettingsOpen) return null;
+  // Desktop dialog keeps its DOM through the exit; the mobile branch unmounts itself.
+  if (!isMobile && !presence.isPresent) return null;
 
   const handleProviderChange = (newProvider: AiProvider) => {
     setProvider(newProvider);
@@ -293,7 +298,7 @@ export const SettingsModal: React.FC = () => {
           type="button"
           data-tab="ai"
           onClick={() => setActiveTab('ai')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'ai'
               ? 'bg-white/10 text-white font-medium'
               : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -307,7 +312,7 @@ export const SettingsModal: React.FC = () => {
           type="button"
           data-tab="vault"
           onClick={() => setActiveTab('vault')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'vault'
               ? 'bg-white/10 text-white font-medium'
               : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -322,7 +327,7 @@ export const SettingsModal: React.FC = () => {
           data-tab="devices"
           onClick={() => setActiveTab('devices')}
           data-testid="settings-tab-devices"
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'devices'
               ? 'bg-white/10 text-white font-medium'
               : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -337,7 +342,7 @@ export const SettingsModal: React.FC = () => {
           data-tab="sync"
           onClick={() => setActiveTab('sync')}
           data-testid="settings-tab-sync"
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'sync'
               ? 'bg-white/10 text-white font-medium'
               : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -351,7 +356,7 @@ export const SettingsModal: React.FC = () => {
           type="button"
           data-tab="ui"
           onClick={() => setActiveTab('ui')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'ui'
               ? 'bg-white/10 text-white font-medium'
               : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -365,7 +370,7 @@ export const SettingsModal: React.FC = () => {
           type="button"
           data-tab="shortcuts"
           onClick={() => setActiveTab('shortcuts')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'shortcuts'
               ? 'bg-white/10 text-white font-medium'
               : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -380,7 +385,7 @@ export const SettingsModal: React.FC = () => {
           data-tab="logs"
           onClick={() => setActiveTab('logs')}
           data-testid="settings-tab-logs"
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer active:scale-95 ${
+          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'logs'
               ? 'bg-white/10 text-white font-medium'
               : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
@@ -413,7 +418,7 @@ export const SettingsModal: React.FC = () => {
                         data-testid="ai-source-subscription"
                         disabled={isFreePlan}
                         onClick={() => setSourceMode('subscription')}
-                        className={`py-1.5 px-2 sm:px-3 rounded-md text-[11px] sm:text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap ${
+                        className={`py-1.5 px-2 sm:px-3 rounded-md text-[11px] sm:text-xs font-medium motion-surface cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap ${
                           sourceMode === 'subscription' && !isFreePlan
                             ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                             : isFreePlan
@@ -438,7 +443,7 @@ export const SettingsModal: React.FC = () => {
                         type="button"
                         data-testid="ai-source-byok"
                         onClick={() => setSourceMode('byok')}
-                        className={`py-1.5 px-2 sm:px-3 rounded-md text-[11px] sm:text-xs font-medium transition-all cursor-pointer flex items-center justify-center whitespace-nowrap ${
+                        className={`py-1.5 px-2 sm:px-3 rounded-md text-[11px] sm:text-xs font-medium motion-surface cursor-pointer flex items-center justify-center whitespace-nowrap ${
                           sourceMode === 'byok' || isFreePlan
                             ? 'bg-white/10 text-white shadow-sm font-semibold border border-white/[0.08]'
                             : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
@@ -469,7 +474,7 @@ export const SettingsModal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setSubscriptionModel('fast')}
-                          className={`py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                          className={`py-1.5 text-xs font-medium rounded-md motion-surface cursor-pointer ${
                             subscriptionModel === 'fast'
                               ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -480,7 +485,7 @@ export const SettingsModal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setSubscriptionModel('smart')}
-                          className={`py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                          className={`py-1.5 text-xs font-medium rounded-md motion-surface cursor-pointer ${
                             subscriptionModel === 'smart'
                               ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -491,7 +496,7 @@ export const SettingsModal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setSubscriptionModel('deep')}
-                          className={`py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                          className={`py-1.5 text-xs font-medium rounded-md motion-surface cursor-pointer ${
                             subscriptionModel === 'deep'
                               ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -519,7 +524,7 @@ export const SettingsModal: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleProviderChange('groq')}
-                            className={`py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                            className={`py-1.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
                               provider === 'groq'
                                 ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                                 : 'text-zinc-400 hover:text-zinc-200'
@@ -531,7 +536,7 @@ export const SettingsModal: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleProviderChange('kie')}
-                            className={`py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                            className={`py-1.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
                               provider === 'kie'
                                 ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                                 : 'text-zinc-400 hover:text-zinc-200'
@@ -984,7 +989,7 @@ export const SettingsModal: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedDevice('desktop')}
-                        className={`h-full px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        className={`h-full px-2.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
                           selectedDevice === 'desktop'
                             ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
@@ -995,7 +1000,7 @@ export const SettingsModal: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedDevice('mobile')}
-                        className={`h-full px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        className={`h-full px-2.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
                           selectedDevice === 'mobile'
                             ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
                             : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
@@ -1024,7 +1029,7 @@ export const SettingsModal: React.FC = () => {
                           key={scaleKey}
                           type="button"
                           onClick={() => updateUiConfig(selectedDevice, { fontScale: scaleKey })}
-                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
                             isSelected
                               ? 'bg-white/10 text-white border-white/20 shadow-sm'
                               : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
@@ -1054,7 +1059,7 @@ export const SettingsModal: React.FC = () => {
                           key={famKey}
                           type="button"
                           onClick={() => updateUiConfig(selectedDevice, { fontFamily: famKey })}
-                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
                             isSelected
                               ? 'bg-white/10 text-white border-white/20 shadow-sm'
                               : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
@@ -1116,7 +1121,7 @@ export const SettingsModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => updateUiConfig(selectedDevice, { density: 'compact' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
                         uiConfig[selectedDevice].density === 'compact'
                           ? 'bg-white/10 text-white border-white/20'
                           : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
@@ -1127,7 +1132,7 @@ export const SettingsModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => updateUiConfig(selectedDevice, { density: 'normal' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
                         uiConfig[selectedDevice].density === 'normal'
                           ? 'bg-white/10 text-white border-white/20'
                           : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
@@ -1138,7 +1143,7 @@ export const SettingsModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => updateUiConfig(selectedDevice, { density: 'spacious' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
                         uiConfig[selectedDevice].density === 'spacious'
                           ? 'bg-white/10 text-white border-white/20'
                           : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
@@ -1204,7 +1209,7 @@ export const SettingsModal: React.FC = () => {
                           type="button"
                           disabled={isUpdatingHotkey}
                           onClick={handleSetupHotkey}
-                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-zinc-200 transition-colors cursor-pointer active:scale-95 disabled:opacity-50"
+                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-zinc-200 transition-colors cursor-pointer motion-press disabled:opacity-50"
                         >
                           {platformInfo.isHotkeyRegistered ? 'Актуализировать путь' : 'Привязать хоткей в GNOME'}
                         </button>
@@ -1213,7 +1218,7 @@ export const SettingsModal: React.FC = () => {
                             type="button"
                             disabled={isUpdatingHotkey}
                             onClick={handleRemoveHotkey}
-                            className="px-2.5 py-1 rounded-lg hover:bg-red-500/10 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer active:scale-95 disabled:opacity-50"
+                            className="px-2.5 py-1 rounded-lg hover:bg-red-500/10 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer motion-press disabled:opacity-50"
                           >
                             Отвязать
                           </button>
@@ -1326,7 +1331,7 @@ export const SettingsModal: React.FC = () => {
               {activeTab !== 'logs' && activeTab !== 'shortcuts' && activeTab !== 'devices' && (
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shadow-sm active:scale-95"
+                  className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shadow-sm motion-press"
                 >
                   Сохранить
                 </button>
@@ -1337,8 +1342,16 @@ export const SettingsModal: React.FC = () => {
   );
 
   if (isMobile) {
+    // Fullscreen navigation, not an overlay: unmount on close so the settings root
+    // underneath is not duplicated while a fading copy of this screen lingers.
+    if (!isSettingsOpen) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-canvas flex flex-col select-none animate-in slide-in-from-right duration-200 overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Настройки"
+        className="fixed inset-0 z-50 bg-canvas flex flex-col select-none motion-fade overflow-hidden"
+      >
         {/* Top Header */}
         <div
           className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
@@ -1347,7 +1360,7 @@ export const SettingsModal: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSettingsOpen(false)}
-              className="p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer active:scale-95"
+              className="p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer motion-press"
               title="Назад"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -1377,6 +1390,7 @@ export const SettingsModal: React.FC = () => {
 
   return (
     <BaseModal
+      presence={presence}
       isOpen={isSettingsOpen}
       onClose={() => setIsSettingsOpen(false)}
       hideHeader

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import {
   Maximize2,
@@ -27,20 +28,29 @@ export const MobileActionSheet: React.FC = () => {
     setMobileActionSheetItem(null);
   };
 
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(mobileActionSheetItem !== null);
+  const [lastItem, setLastItem] = useState(mobileActionSheetItem);
+  if (mobileActionSheetItem && mobileActionSheetItem !== lastItem) setLastItem(mobileActionSheetItem);
   const actions = useItemActions(mobileActionSheetItem, handleClose);
 
-  if (!mobileActionSheetItem) return null;
+  if (!isPresent || !lastItem) return null;
 
-  const item = mobileActionSheetItem;
+  const item = mobileActionSheetItem || lastItem;
 
   return (
     <div
+      ref={ref}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={mobileActionSheetItem === null}
+      aria-hidden={mobileActionSheetItem === null || undefined}
       onClick={handleClose}
-      className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end motion-fade select-none"
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full bg-surface-elevated border-t border-white/[0.08] rounded-t-2xl p-3 flex flex-col gap-2 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
+        data-motion-state={phase}
+        className="w-full bg-surface-elevated border-t border-white/[0.08] rounded-t-2xl p-3 flex flex-col gap-2 max-h-[85vh] overflow-y-auto motion-sheet"
         style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
       >
         {/* Drag handle */}
@@ -74,7 +84,7 @@ export const MobileActionSheet: React.FC = () => {
           <button
             type="button"
             onClick={() => actions.handleChangeType('note')}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-colors cursor-pointer ${
               item.type === 'note'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -86,7 +96,7 @@ export const MobileActionSheet: React.FC = () => {
           <button
             type="button"
             onClick={() => actions.handleChangeType('task')}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-colors cursor-pointer ${
               item.type === 'task'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -98,7 +108,7 @@ export const MobileActionSheet: React.FC = () => {
           <button
             type="button"
             onClick={() => actions.handleChangeType('article')}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-colors cursor-pointer ${
               item.type === 'article'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -204,7 +214,7 @@ export const MobileActionSheet: React.FC = () => {
         {/* Cancel Button */}
         <button
           onClick={handleClose}
-          className="w-full h-10 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] active:bg-white/10 text-zinc-300 hover:text-white font-medium text-xs flex items-center justify-center transition-all cursor-pointer"
+          className="w-full h-10 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] active:bg-white/10 text-zinc-300 hover:text-white font-medium text-xs flex items-center justify-center transition-colors cursor-pointer"
         >
           Отмена
         </button>

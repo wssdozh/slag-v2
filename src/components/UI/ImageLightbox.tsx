@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { LightboxImage } from '../../types';
+import { usePresence } from '../../hooks/usePresence';
 
 export type { LightboxImage };
 
@@ -33,6 +34,15 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
   onNavigate,
   onRetryEnrich,
 }) => {
+  const { ref: containerRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
+  const [payloadSnapshot, setPayloadSnapshot] = useState({ images, currentIndex });
+  if (isOpen && (payloadSnapshot.images !== images || payloadSnapshot.currentIndex !== currentIndex)) {
+    setPayloadSnapshot({ images, currentIndex });
+  }
+  const activePayload = isOpen ? { images, currentIndex } : payloadSnapshot;
+  const activeImages = activePayload.images;
+  const activeIndex = activePayload.currentIndex;
+
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -40,11 +50,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [isCopied, setIsCopied] = useState(false);
 
   const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number } | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const [prevIndex, setPrevIndex] = useState(currentIndex);
-  if (prevIndex !== currentIndex) {
-    setPrevIndex(currentIndex);
+  const [prevIndex, setPrevIndex] = useState(activeIndex);
+  if (prevIndex !== activeIndex) {
+    setPrevIndex(activeIndex);
     setScale(1);
     setPosition({ x: 0, y: 0 });
   }
@@ -71,22 +79,22 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   // Navigate left / right
   const handlePrev = useCallback(() => {
-    if (images.length > 1) {
+    if (isOpen && images.length > 1) {
       onNavigate((currentIndex - 1 + images.length) % images.length);
     }
-  }, [currentIndex, images.length, onNavigate]);
+  }, [isOpen, currentIndex, images.length, onNavigate]);
 
   const handleNext = useCallback(() => {
-    if (images.length > 1) {
+    if (isOpen && images.length > 1) {
       onNavigate((currentIndex + 1) % images.length);
     }
-  }, [currentIndex, images.length, onNavigate]);
+  }, [isOpen, currentIndex, images.length, onNavigate]);
 
-  const currentImage = images[currentIndex];
+  const currentImage = activeImages[activeIndex];
   const hasText = Boolean(currentImage?.extractedText || currentImage?.summary);
 
   const handleCopyText = useCallback(async () => {
-    if (!currentImage) return;
+    if (!isOpen || !currentImage) return;
     const parts = [
       currentImage.summary ? `Суть: ${currentImage.summary}` : '',
       currentImage.extractedText || '',
@@ -101,7 +109,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
     } catch {
       // Fallback
     }
-  }, [currentImage]);
+  }, [isOpen, currentImage]);
 
   // Keyboard navigation & controls
   useEffect(() => {
@@ -164,11 +172,11 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [isOpen]);
+  }, [isOpen, containerRef]);
 
   // Pointer drag & pan when zoomed
   const handlePointerDown = (e: React.PointerEvent<HTMLImageElement>) => {
-    if (scale <= 1 || e.button !== 0) return;
+    if (!isOpen || scale <= 1 || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
@@ -182,7 +190,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLImageElement>) => {
-    if (!isDragging || !dragStartRef.current) return;
+    if (!isOpen || !isDragging || !dragStartRef.current) return;
     const dx = e.clientX - dragStartRef.current.startX;
     const dy = e.clientY - dragStartRef.current.startY;
     setPosition({
@@ -205,6 +213,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isOpen) return;
     if (scale === 1) {
       setScale(2);
     } else {
@@ -212,14 +221,19 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
     }
   };
 
-  if (!isOpen || images.length === 0) return null;
+  if (!isPresent || activeImages.length === 0) return null;
   if (!currentImage) return null;
 
   return (
     <div
       ref={containerRef}
-      onClick={onClose}
-      className="fixed inset-0 z-50 z-[130] bg-black/95 backdrop-blur-xl flex flex-col justify-between select-none animate-in fade-in duration-200 outline-none"
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isOpen}
+      aria-hidden={!isOpen || undefined}
+      onClick={isOpen ? onClose : undefined}
+      data-testid="image-lightbox"
+      className="fixed inset-0 z-[130] bg-black/95 backdrop-blur-xl flex flex-col justify-between select-none motion-fade outline-none"
     >
       {/* 3. Upper Toolbar */}
       <div
@@ -235,7 +249,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             {currentImage.name}
           </span>
           <span className="text-zinc-400 font-mono text-xs px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.06] shrink-0">
-            {currentIndex + 1} из {images.length}
+            {activeIndex + 1} из {activeImages.length}
           </span>
         </div>
 
@@ -247,7 +261,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             onClick={() => setIsTextPanelOpen(prev => !prev)}
             title={isTextPanelOpen ? 'Скрыть текст (T)' : 'Распознанный текст и описание (T)'}
             aria-label="Распознанный текст"
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all outline-none cursor-pointer active:scale-95 ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 outline-none cursor-pointer motion-press ${
               isTextPanelOpen
                 ? 'bg-white/15 text-white'
                 : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -265,7 +279,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             disabled={scale <= 0.5}
             title="Уменьшить (Zoom -)"
             aria-label="Уменьшить"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all outline-none disabled:opacity-25 disabled:pointer-events-none"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none disabled:opacity-25 disabled:pointer-events-none"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
@@ -284,7 +298,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             disabled={scale >= 3}
             title="Увеличить (Zoom +)"
             aria-label="Увеличить"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all outline-none disabled:opacity-25 disabled:pointer-events-none"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none disabled:opacity-25 disabled:pointer-events-none"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
@@ -294,7 +308,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             onClick={resetZoom}
             title="Сбросить масштаб (RotateCcw)"
             aria-label="Сбросить"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all outline-none"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -306,7 +320,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             onClick={onClose}
             title="Закрыть (Esc)"
             aria-label="Закрыть"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all outline-none"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none"
           >
             <X className="w-4 h-4" />
           </button>
@@ -318,7 +332,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         {/* Left: Image Canvas */}
         <div className="relative flex-1 flex items-center justify-center overflow-hidden h-full min-w-0">
           {/* Previous Button (ChevronLeft) */}
-          {images.length > 1 && (
+          {activeImages.length > 1 && (
             <button
               type="button"
               onClick={e => {
@@ -327,7 +341,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               title="Предыдущее (←)"
               aria-label="Предыдущее изображение"
-              className="absolute left-6 z-20 p-2.5 rounded-full bg-black/40 hover:bg-white/10 active:scale-95 text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md transition-all shadow-xl outline-none"
+              className="absolute left-6 z-20 p-2.5 rounded-full bg-black/40 hover:bg-white/10 motion-press text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md shadow-xl outline-none"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -349,9 +363,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               onDoubleClick={handleDoubleClick}
               style={{
                 transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
-                transition: isDragging ? 'none' : 'transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+                transition: isDragging ? 'none' : 'transform var(--slag-motion-base) var(--ease-press)'
               }}
-              className={`max-h-[80vh] ${isTextPanelOpen ? 'max-w-[calc(85vw-360px)]' : 'max-w-[85vw]'} object-contain select-none rounded-md shadow-2xl transition-all duration-200 ${
+              className={`max-h-[80vh] ${isTextPanelOpen ? 'max-w-[calc(85vw-360px)]' : 'max-w-[85vw]'} object-contain select-none rounded-md shadow-2xl transition-transform duration-200 ${
                 scale > 1
                   ? isDragging
                     ? 'cursor-grabbing'
@@ -362,7 +376,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           </div>
 
           {/* Next Button (ChevronRight) */}
-          {images.length > 1 && (
+          {activeImages.length > 1 && (
             <button
               type="button"
               onClick={e => {
@@ -371,7 +385,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               title="Следующее (→)"
               aria-label="Следующее изображение"
-              className="absolute right-6 z-20 p-2.5 rounded-full bg-black/40 hover:bg-white/10 active:scale-95 text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md transition-all shadow-xl outline-none"
+              className="absolute right-6 z-20 p-2.5 rounded-full bg-black/40 hover:bg-white/10 motion-press text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md shadow-xl outline-none"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -382,7 +396,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         {isTextPanelOpen && (
           <aside
             onClick={e => e.stopPropagation()}
-            className="w-full sm:w-80 md:w-96 border-l border-white/[0.08] bg-panel/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 animate-in slide-in-from-right-4 duration-200 min-h-0 select-text"
+            className="w-full sm:w-80 md:w-96 border-l border-white/[0.08] bg-panel/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 motion-fade min-h-0 select-text"
           >
             {/* Header */}
             <div className="h-12 px-5 border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">
@@ -393,7 +407,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     type="button"
                     onClick={handleCopyText}
                     title="Скопировать текст в буфер"
-                    className="px-2 py-1 rounded-md text-[11px] text-zinc-400 hover:text-white hover:bg-white/[0.08] flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                    className="px-2 py-1 rounded-md text-[11px] text-zinc-400 hover:text-white hover:bg-white/[0.08] flex items-center gap-1.5 motion-press cursor-pointer"
                   >
                     {isCopied ? (
                       <>
@@ -412,7 +426,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   type="button"
                   onClick={() => setIsTextPanelOpen(false)}
                   title="Закрыть панель (T)"
-                  className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
+                  className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -471,7 +485,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     <button
                       type="button"
                       onClick={() => onRetryEnrich(currentImage)}
-                      className="mt-1 px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 text-xs font-medium self-start flex items-center gap-1.5 cursor-pointer active:scale-95"
+                      className="mt-1 px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 text-xs font-medium self-start flex items-center gap-1.5 cursor-pointer motion-press"
                     >
                       <RotateCcw className="w-3 h-3" /> Повторить OCR
                     </button>
@@ -488,7 +502,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     <button
                       type="button"
                       onClick={() => onRetryEnrich(currentImage)}
-                      className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 text-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 text-zinc-200 text-xs font-medium flex items-center gap-1.5 cursor-pointer motion-press"
                     >
                       <FileText className="w-3.5 h-3.5 text-zinc-400" /> Распознать текст
                     </button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import { triageInboxItems } from '../../lib/aiService';
 import type { TriageSuggestion } from '../../lib/aiService';
@@ -15,8 +16,10 @@ import { Checkbox } from '../UI/Checkbox';
 import { Select } from '../UI/Select';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
-const TriageModalDialog: React.FC = () => {
+const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ presence }) => {
+  const { isPresent } = presence;
   const {
+    isTriageModalOpen,
     setIsTriageModalOpen,
     items,
     folders,
@@ -59,7 +62,7 @@ const TriageModalDialog: React.FC = () => {
   useEffect(() => {
     let isCancelled = false;
 
-    if (inboxItems.length === 0) {
+    if (!isTriageModalOpen || inboxItems.length === 0) {
       return;
     }
 
@@ -98,13 +101,13 @@ const TriageModalDialog: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [inboxItems, folders, aiSettings]);
+  }, [isTriageModalOpen, inboxItems, folders, aiSettings]);
 
   useEffect(() => {
-    if (activeTagInputId && tagInputRef.current) {
+    if (isTriageModalOpen && activeTagInputId && tagInputRef.current) {
       tagInputRef.current.focus();
     }
-  }, [activeTagInputId]);
+  }, [isTriageModalOpen, activeTagInputId]);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
@@ -250,7 +253,7 @@ const TriageModalDialog: React.FC = () => {
                 <div
                   key={s.itemId}
                   onClick={() => toggleSelect(s.itemId)}
-                  className={`group flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                  className={`group flex items-start gap-3 p-3 rounded-xl border motion-surface cursor-pointer ${
                     isChecked
                       ? 'bg-white/[0.03] border-white/[0.08] text-zinc-200'
                       : 'bg-transparent border-transparent text-zinc-500 opacity-40 hover:opacity-75'
@@ -314,7 +317,7 @@ const TriageModalDialog: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => removeSuggestionTag(s.itemId, t)}
-                            className="text-zinc-600 hover:text-rose-400 opacity-60 group-hover/tag:opacity-100 transition-all cursor-pointer p-0.5"
+                            className="text-zinc-600 hover:text-rose-400 opacity-60 group-hover/tag:opacity-100 motion-surface cursor-pointer p-0.5"
                             title={`Удалить тег #${t}`}
                             aria-label={`Удалить тег #${t}`}
                           >
@@ -377,9 +380,18 @@ const TriageModalDialog: React.FC = () => {
     </>
   );
 
+  if (!isPresent) return null;
+
   if (isMobile) {
+    // Fullscreen navigation, not an overlay: unmount on close.
+    if (!isTriageModalOpen) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-canvas flex flex-col select-none animate-in slide-in-from-bottom duration-200 overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Сортировка входящих"
+        className="fixed inset-0 z-50 bg-canvas flex flex-col select-none motion-fade overflow-hidden"
+      >
         {/* Mobile Header */}
         <div
           className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
@@ -388,7 +400,7 @@ const TriageModalDialog: React.FC = () => {
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => setIsTriageModalOpen(false)}
-              className="p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer active:scale-95"
+              className="p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer motion-press"
               title="Закрыть"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -430,7 +442,7 @@ const TriageModalDialog: React.FC = () => {
               type="button"
               onClick={handleApply}
               disabled={selectedIds.size === 0}
-              className="px-4 py-1.5 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm active:scale-95"
+              className="px-4 py-1.5 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm motion-press"
             >
               Применить перемещение
             </button>
@@ -442,7 +454,8 @@ const TriageModalDialog: React.FC = () => {
 
   return (
     <BaseModal
-      isOpen={true}
+      presence={presence}
+      isOpen={isTriageModalOpen}
       onClose={() => setIsTriageModalOpen(false)}
       title="AI Triage — Сортировка Входящих"
       subtitle={modalSubtitle}
@@ -460,7 +473,12 @@ const TriageModalDialog: React.FC = () => {
 export const TriageModal: React.FC = () => {
   const { isTriageModalOpen } = useApp();
 
-  if (!isTriageModalOpen) return null;
+  const presence = usePresence(isTriageModalOpen);
+  const [session, setSession] = useState({ open: isTriageModalOpen, id: 0 });
+  if (session.open !== isTriageModalOpen) {
+    setSession({ open: isTriageModalOpen, id: session.id + (isTriageModalOpen ? 1 : 0) });
+  }
+  if (!presence.isPresent) return null;
 
-  return <TriageModalDialog />;
+  return <TriageModalDialog key={session.id} presence={presence} />;
 };

@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from '../UI/IconButton';
+import { usePresence } from '../../hooks/usePresence';
 
 export interface BaseModalProps {
   isOpen: boolean;
+  presence?: ReturnType<typeof usePresence>;
   onClose: () => void;
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -19,7 +21,6 @@ export interface BaseModalProps {
   showCloseButton?: boolean;
   headerRightSlot?: React.ReactNode;
   closeOnBackdropClick?: boolean;
-  closeOnEsc?: boolean;
   role?: 'dialog' | 'alertdialog';
   ariaLabel?: string;
   footer?: React.ReactNode;
@@ -27,6 +28,7 @@ export interface BaseModalProps {
 
 export const BaseModal: React.FC<BaseModalProps> = ({
   isOpen,
+  presence: providedPresence,
   onClose,
   title,
   subtitle,
@@ -42,31 +44,29 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   showCloseButton = true,
   headerRightSlot,
   closeOnBackdropClick = true,
-  closeOnEsc = true,
   role = 'dialog',
   ariaLabel,
   footer,
 }) => {
-  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const internalPresence = usePresence(isOpen && !providedPresence);
+  const { ref: overlayRef, phase, isPresent, onTransitionEnd } = providedPresence || internalPresence;
+  const triggerRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (!isOpen || !closeOnEsc) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const overlay = overlayRef.current;
+    return () => {
+      const focused = document.activeElement;
+      const focusStillOwned = focused === document.body || (focused !== null && overlay !== null && overlay.contains(focused));
+      if (triggerRef.current?.isConnected && focusStillOwned) triggerRef.current.focus();
     };
+  }, [isOpen, overlayRef]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, closeOnEsc, onClose]);
-
-  if (!isOpen) return null;
+  if (!isPresent) return null;
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (closeOnBackdropClick && e.target === overlayRef.current) {
+    if (isOpen && closeOnBackdropClick && e.target === overlayRef.current) {
       onClose();
     }
   };
@@ -76,14 +76,19 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   return (
     <div
       ref={overlayRef}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isOpen}
+      aria-hidden={!isOpen || undefined}
       onClick={handleBackdropClick}
       role={role}
       aria-modal="true"
       aria-label={ariaLabelString}
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none ${className}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md motion-fade select-none ${className}`}
     >
       <div
-        className={`w-full ${maxWidth} ${maxHeight || 'max-h-[calc(100dvh-2rem)]'} rounded-2xl bg-surface border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-100 ${containerClassName}`}
+        data-motion-state={phase}
+        className={`w-full ${maxWidth} ${maxHeight || 'max-h-[calc(100dvh-2rem)]'} rounded-2xl bg-surface border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden motion-dialog ${containerClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

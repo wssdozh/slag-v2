@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
@@ -8,9 +9,12 @@ import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
-const FolderModalDialog: React.FC = () => {
+const FolderModalDialog: React.FC<{
+  editingFolder: FolderMeta | null;
+  presence: ReturnType<typeof usePresence>;
+}> = ({ editingFolder, presence }) => {
   const {
-    editingFolder,
+    isFolderModalOpen,
     closeFolderModal,
     saveFolder,
     deleteFolder,
@@ -95,7 +99,8 @@ const FolderModalDialog: React.FC = () => {
 
   return (
     <BaseModal
-      isOpen={true}
+      presence={presence}
+      isOpen={isFolderModalOpen}
       onClose={closeFolderModal}
       title={isEditing ? 'Настройки папки' : 'Создать новую папку'}
       icon={<CurrentIconComp className="w-4 h-4" />}
@@ -125,7 +130,7 @@ const FolderModalDialog: React.FC = () => {
                 key={key}
                 type="button"
                 onClick={() => setSelectedIcon(key)}
-                className={`p-1.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+                className={`p-1.5 rounded-md flex items-center justify-center motion-surface cursor-pointer ${
                   selectedIcon === key
                     ? 'bg-white text-black font-medium'
                     : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
@@ -172,7 +177,16 @@ const FolderModalDialog: React.FC = () => {
 export const FolderModal: React.FC = () => {
   const { isFolderModalOpen, editingFolder } = useApp();
 
-  if (!isFolderModalOpen) return null;
+  const presence = usePresence(isFolderModalOpen);
+  const [snapshot, setSnapshot] = useState({ open: isFolderModalOpen, session: 0, folder: editingFolder });
+  if (snapshot.open !== isFolderModalOpen || (isFolderModalOpen && snapshot.folder !== editingFolder)) {
+    setSnapshot({
+      open: isFolderModalOpen,
+      session: snapshot.session + (isFolderModalOpen && !snapshot.open ? 1 : 0),
+      folder: isFolderModalOpen ? editingFolder : snapshot.folder,
+    });
+  }
+  if (!presence.isPresent) return null;
 
-  return <FolderModalDialog key={editingFolder?.path || 'new-folder'} />;
+  return <FolderModalDialog key={`${snapshot.session}:${snapshot.folder?.path || 'new-folder'}`} editingFolder={snapshot.folder} presence={presence} />;
 };

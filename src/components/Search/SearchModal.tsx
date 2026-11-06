@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
 import { querySearch, initSearchIndex } from '../../lib/searchService';
@@ -31,8 +32,10 @@ type CombinedItem =
   | { kind: 'command'; command: AppCommand }
   | { kind: 'note'; item: SlagItem };
 
-const SearchDialog: React.FC = () => {
+const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ presence }) => {
+  const { isPresent } = presence;
   const {
+    isSearchOpen,
     setIsSearchOpen,
     items,
     setCurrentFolder,
@@ -66,9 +69,10 @@ const SearchDialog: React.FC = () => {
   );
 
   useEffect(() => {
+    if (!isSearchOpen) return;
     const timer = setTimeout(() => inputRef.current?.focus(), 50);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isSearchOpen]);
 
   const isExplicitCommandMode = query.startsWith('>') || filterType === 'commands';
 
@@ -92,7 +96,7 @@ const SearchDialog: React.FC = () => {
   }, [query, filterType, isExplicitCommandMode]);
 
   useEffect(() => {
-    if (isExplicitCommandMode) {
+    if (!isSearchOpen || isExplicitCommandMode) {
       return;
     }
 
@@ -112,7 +116,7 @@ const SearchDialog: React.FC = () => {
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [query, filterType, items, isExplicitCommandMode]);
+  }, [isSearchOpen, query, filterType, items, isExplicitCommandMode]);
 
   const combinedItems: CombinedItem[] = useMemo(() => {
     const cmds: CombinedItem[] = matchingCommands.map(command => ({
@@ -170,7 +174,7 @@ const SearchDialog: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsSearchOpen(false)}
-        className="md:hidden w-10 h-10 -ml-2 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white active:scale-95 transition-all cursor-pointer shrink-0"
+        className="md:hidden w-10 h-10 -ml-2 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white motion-press motion-surface cursor-pointer shrink-0"
         title="Назад"
         aria-label="Закрыть поиск"
       >
@@ -370,9 +374,19 @@ const SearchDialog: React.FC = () => {
     </>
   );
 
+  if (!isPresent) return null;
+
   if (isMobile) {
+    // Fullscreen navigation, not an overlay: a fading ghost of the previous screen
+    // would duplicate the settings rows underneath for as long as it lives.
+    if (!isSearchOpen) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-canvas flex flex-col select-none animate-in fade-in duration-150">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Поиск"
+        className="fixed inset-0 z-50 bg-canvas flex flex-col select-none motion-fade"
+      >
         {customHeader}
         {searchBody}
       </div>
@@ -381,7 +395,8 @@ const SearchDialog: React.FC = () => {
 
   return (
     <BaseModal
-      isOpen={true}
+      presence={presence}
+      isOpen={isSearchOpen}
       onClose={() => setIsSearchOpen(false)}
       customHeader={customHeader}
       footer={footer}
@@ -407,7 +422,12 @@ export const SearchModal: React.FC = () => {
     return () => clearTimeout(timer);
   }, [items, isSearchOpen]);
 
-  if (!isSearchOpen) return null;
+  const presence = usePresence(isSearchOpen);
+  const [session, setSession] = useState({ open: isSearchOpen, id: 0 });
+  if (session.open !== isSearchOpen) {
+    setSession({ open: isSearchOpen, id: session.id + (isSearchOpen ? 1 : 0) });
+  }
+  if (!presence.isPresent) return null;
 
-  return <SearchDialog />;
+  return <SearchDialog key={session.id} presence={presence} />;
 };

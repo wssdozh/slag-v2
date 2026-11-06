@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
@@ -24,7 +25,8 @@ export const VaultModal: React.FC = () => {
   const [diskMode, setDiskMode] = useState<'tauri' | 'fsa'>('indexeddb' as any);
   const [isPicking, setIsPicking] = useState(false);
 
-  if (!isVaultModalOpen) return null;
+  const presence = usePresence(isVaultModalOpen);
+  if (!presence.isPresent) return null;
 
   const handlePickFolder = async () => {
     setIsPicking(true);
@@ -91,6 +93,7 @@ export const VaultModal: React.FC = () => {
 
   return (
     <BaseModal
+      presence={presence}
       isOpen={isVaultModalOpen}
       onClose={closeVaultModal}
       title="Новое хранилище"
@@ -178,7 +181,7 @@ export const VaultModal: React.FC = () => {
           <button
             type="button"
             onClick={() => setStorageType('indexeddb')}
-            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[86px] ${
+            className={`p-3.5 rounded-xl border text-left motion-surface cursor-pointer flex flex-col justify-between min-h-[86px] ${
               storageType === 'indexeddb'
                 ? 'bg-white/[0.08] border-white/20 text-white shadow-sm'
                 : 'bg-white/[0.02] border-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
@@ -199,7 +202,7 @@ export const VaultModal: React.FC = () => {
           <button
             type="button"
             onClick={() => setStorageType('disk')}
-            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[86px] ${
+            className={`p-3.5 rounded-xl border text-left motion-surface cursor-pointer flex flex-col justify-between min-h-[86px] ${
               storageType === 'disk'
                 ? 'bg-white/[0.08] border-white/20 text-white shadow-sm'
                 : 'bg-white/[0.02] border-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
@@ -222,7 +225,7 @@ export const VaultModal: React.FC = () => {
         {storageType === 'disk' && (
           <div
             onClick={!diskPath ? handlePickFolder : undefined}
-            className={`p-3 rounded-xl bg-black/30 border border-white/[0.08] flex items-center justify-between gap-3 animate-in fade-in duration-150 ${
+            className={`p-3 rounded-xl bg-black/30 border border-white/[0.08] flex items-center justify-between gap-3 motion-fade ${
               !diskPath ? 'cursor-pointer hover:border-white/20 hover:bg-black/40 transition-colors' : ''
             }`}
           >
