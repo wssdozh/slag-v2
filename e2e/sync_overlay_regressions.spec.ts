@@ -104,3 +104,25 @@ for (const overlay of ['pair', 'access'] as const) {
     await expect(settings).toBeHidden();
   });
 }
+
+test('a slow draft throttle never delays a note push', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  const result = await page.evaluate(async () => {
+    const { SyncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+    const engine = new SyncEngine();
+    let fires = 0;
+    engine.pushLocalChanges = async () => { fires++; };
+    engine.scheduleDebouncedPush(1000);
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    engine.scheduleDebouncedPush(50);
+    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    const early = fires;
+    await new Promise<void>((resolve) => setTimeout(resolve, 900));
+    const afterDraftWindow = fires;
+    engine.disconnect();
+    return { early, afterDraftWindow };
+  });
+  // The note's 50 ms deadline wins; the 1 s draft timer must not fire a second time.
+  expect(result).toEqual({ early: 1, afterDraftWindow: 1 });
+});

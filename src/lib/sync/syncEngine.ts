@@ -76,6 +76,7 @@ export class SyncEngine {
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   private currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private pushDebounceDeadline = 0;
   private pendingPushes = new Map<string, PendingPush>();
   private wsSupportsBinary = false;
   private pushDirty = false;
@@ -215,9 +216,15 @@ export class SyncEngine {
   }
 
   public scheduleDebouncedPush(delayMs: number = SYNC_INTERVALS.PUSH_DEBOUNCE_MS): void {
+    const deadline = Date.now() + delayMs;
+    // A slow draft timer must never hold back a note: keep whichever fires first. Without
+    // this, saving a note right after typing waited for the 1 s draft throttle.
+    if (this.pushDebounceTimer && this.pushDebounceDeadline <= deadline) return;
     if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
+    this.pushDebounceDeadline = deadline;
     this.pushDebounceTimer = setTimeout(() => {
       this.pushDebounceTimer = null;
+      this.pushDebounceDeadline = 0;
       void this.pushLocalChanges();
     }, delayMs);
   }
@@ -1432,6 +1439,9 @@ export class SyncEngine {
 
   public disconnect(): void {
     ++this.initGeneration;
+    if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
+    this.pushDebounceTimer = null;
+    this.pushDebounceDeadline = 0;
     this.appliedBundleIds.clear();
     this.entityHashes.clear();
     this.wsSupportsBinary = false;
