@@ -10,7 +10,6 @@ import {
   MoreVertical,
   Calendar,
   ChevronDown,
-  ChevronUp,
   FileText,
   CornerUpLeft,
   Pin,
@@ -459,7 +458,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         >
           <button
             onClick={() => setReplyTarget(item)}
-            className="h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity] duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100"
+            className="h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100"
             title="Ответить (R)"
           >
             <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
@@ -481,7 +480,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 });
               }
             }}
-            className="w-9 h-9 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity] duration-150 cursor-pointer flex items-center justify-center shrink-0"
+            className="w-9 h-9 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer flex items-center justify-center shrink-0"
             title="Действия"
           >
             <MoreVertical className="w-3.5 h-3.5 shrink-0" />
@@ -574,11 +573,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 <span>
                   Подзадачи: {completedSubtasksCount} из {totalSubtasksCount}
                 </span>
-                {isSubtasksExpanded ? <ChevronUp className="w-3 h-3 text-zinc-500" /> : <ChevronDown className="w-3 h-3 text-zinc-500" />}
+                <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform duration-200 ease-out ${isSubtasksExpanded ? 'rotate-180' : ''}`} />
               </button>
 
-              {isSubtasksExpanded && (
-                <div className="flex flex-col gap-1.5">
+              <div
+                className="motion-accordion"
+                data-expanded={isSubtasksExpanded}
+                aria-hidden={!isSubtasksExpanded}
+              >
+                <div className="motion-accordion-inner flex flex-col gap-1.5 pt-0.5">
                   {item.subtasks.map(st => (
                     <div
                       key={st.id}
@@ -607,7 +610,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     </div>
                   ))}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
@@ -730,9 +733,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               </div>
 
               {/* Extracted text accordion directly under the image */}
-              {imageAttachments[0].extractedText && expandedOcrIds.has(imageAttachments[0].id) && (
-                <div className="w-full mt-1.5 pt-1.5 border-t border-white/[0.08] text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
-                  {imageAttachments[0].extractedText}
+              {imageAttachments[0].extractedText && (
+                <div
+                  className="motion-accordion w-full"
+                  data-expanded={expandedOcrIds.has(imageAttachments[0].id)}
+                  aria-hidden={!expandedOcrIds.has(imageAttachments[0].id)}
+                >
+                  <div className="motion-accordion-inner w-full mt-1.5 pt-1.5 border-t border-white/[0.08] text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+                    {imageAttachments[0].extractedText}
+                  </div>
                 </div>
               )}
             </div>
@@ -773,11 +782,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                         <span>{expandedOcrIds.has(img.id) ? 'Скрыть текст' : 'Текст'}</span>
                         <ChevronDown className={`w-2.5 h-2.5 transition-transform ${expandedOcrIds.has(img.id) ? 'rotate-180' : ''}`} />
                       </button>
-                      {expandedOcrIds.has(img.id) && (
-                        <div className="mt-0.5 pt-0.5 pl-2 border-l border-white/10 text-2xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+                      <div
+                        className="motion-accordion w-full"
+                        data-expanded={expandedOcrIds.has(img.id)}
+                        aria-hidden={!expandedOcrIds.has(img.id)}
+                      >
+                        <div className="motion-accordion-inner mt-0.5 pt-0.5 pl-2 border-l border-white/10 text-2xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
                           {img.extractedText}
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>

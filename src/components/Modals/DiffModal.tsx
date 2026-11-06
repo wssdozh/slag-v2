@@ -8,6 +8,7 @@ import {
 import type { SlagItem, ItemUpdates } from '../../types';
 import { applyItemUpdates } from '../../context/AppContext';
 import { computeSideBySideDiff, computeMetadataDiff } from '../../lib/diffUtils';
+import { usePresence } from '../../hooks/usePresence';
 
 export interface DiffModalItemEntry {
   title: string;
@@ -32,6 +33,7 @@ interface FullscreenDiffEditorProps {
   initialIndex: number;
   onApply?: () => void;
   isApplied: boolean;
+  presencePhase?: string;
 }
 
 /**
@@ -113,6 +115,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
   initialIndex,
   onApply,
   isApplied,
+  presencePhase,
 }) => {
   const [selectedIndex, setSelectedIndex] = useState<number>(() =>
     Math.min(Math.max(initialIndex, 0), Math.max(0, items.length - 1))
@@ -174,6 +177,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Сравнение изменений"
+      data-motion-state={presencePhase}
       className="fixed inset-0 z-[100] bg-canvas flex flex-col text-fg-primary motion-fade select-none overflow-hidden"
     >
       {/* Top Control Bar */}
@@ -491,19 +495,37 @@ export const DiffModal: React.FC<DiffModalProps> = ({
   onApply,
   isApplied = false,
 }) => {
-  if (!isOpen || items.length === 0) return null;
+  const isDiffOpen = isOpen && items.length > 0;
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isDiffOpen);
 
-  const instanceKey = items.map(it => it.title).join('|') + `_${initialIndex}`;
+  const [cachedItems, setCachedItems] = useState(items);
+  if (items.length > 0 && items !== cachedItems) {
+    setCachedItems(items);
+  }
+  const effectiveItems = items.length > 0 ? items : cachedItems;
+
+  if (!isPresent || effectiveItems.length === 0) return null;
+
+  const instanceKey = effectiveItems.map(it => it.title).join('|') + `_${initialIndex}`;
 
   return (
-    <FullscreenDiffEditor
-      key={instanceKey}
-      onClose={onClose}
-      title={title}
-      items={items}
-      initialIndex={initialIndex}
-      onApply={onApply}
-      isApplied={isApplied}
-    />
+    <div
+      ref={ref}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isDiffOpen}
+      className="fixed inset-0 z-[100]"
+    >
+      <FullscreenDiffEditor
+        key={instanceKey}
+        onClose={onClose}
+        title={title}
+        items={effectiveItems}
+        initialIndex={initialIndex}
+        onApply={onApply}
+        isApplied={isApplied}
+        presencePhase={phase}
+      />
+    </div>
   );
 };

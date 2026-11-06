@@ -7,7 +7,6 @@ import {
   Loader2,
   Trash2,
   Globe,
-  ChevronDown,
   ChevronRight,
   Plus,
   Terminal,
@@ -660,19 +659,19 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                       onClick={() => toggleReasoning(msg.id)}
                       className="flex items-center gap-1 text-2xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer w-fit"
                     >
-                      {expandedReasoningIds.has(msg.id) ? (
-                        <ChevronDown className="w-3 h-3 text-amber-400" />
-                      ) : (
-                        <ChevronRight className="w-3 h-3 text-amber-400" />
-                      )}
+                      <ChevronRight className={`w-3 h-3 text-amber-400 transition-transform duration-200 ${expandedReasoningIds.has(msg.id) ? 'rotate-90' : ''}`} />
                       <span>Рассуждения {msg.reasoningTimeMs ? `(${(msg.reasoningTimeMs / 1000).toFixed(1)}s)` : ''}</span>
                     </button>
 
-                    {expandedReasoningIds.has(msg.id) && (
-                      <div className="pl-3 py-0.5 text-2xs font-mono text-zinc-500 whitespace-pre-wrap leading-relaxed select-text">
+                    <div
+                      className="motion-accordion w-full"
+                      data-expanded={expandedReasoningIds.has(msg.id)}
+                      aria-hidden={!expandedReasoningIds.has(msg.id)}
+                    >
+                      <div className="motion-accordion-inner pl-3 py-0.5 text-2xs font-mono text-zinc-500 whitespace-pre-wrap leading-relaxed select-text">
                         {msg.reasoning}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
@@ -1059,18 +1058,18 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             <span>Найдено {count} в хранилище</span>
                           </div>
                           <div className="flex items-center gap-1 text-2xs font-mono text-zinc-500">
-                            {isExpanded ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-                            ) : (
-                              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
-                            )}
+                            <ChevronRight className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                           </div>
                         </button>
                       )}
 
                       {/* Items list: always rendered when count <= 3, or when isExpanded */}
-                      {(isExpanded || !showHeader) && (
-                        <div className={`flex flex-col divide-y divide-white/[0.04] ${showHeader ? 'border-t border-white/[0.06]' : ''}`}>
+                      <div
+                        className={showHeader ? "motion-accordion w-full" : "w-full"}
+                        data-expanded={!showHeader || isExpanded}
+                        aria-hidden={showHeader && !isExpanded}
+                      >
+                        <div className={`motion-accordion-inner flex flex-col divide-y divide-white/[0.04] ${showHeader ? 'border-t border-white/[0.06]' : ''}`}>
                           {searchResults.map((res, rIdx) => (
                             <button
                               key={res.id || rIdx}
@@ -1112,7 +1111,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                             </button>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })()}

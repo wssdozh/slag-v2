@@ -390,8 +390,6 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
   if (!isPresent) return null;
 
   if (isMobile) {
-    // Fullscreen navigation, not an overlay: a fading ghost of the previous screen
-    // would duplicate the settings rows underneath for as long as it lives.
     if (!isSearchOpen) return null;
     return (
       <div

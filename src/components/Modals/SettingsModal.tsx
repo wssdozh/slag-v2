@@ -398,7 +398,7 @@ export const SettingsModal: React.FC = () => {
 
           {/* Right Tab Content */}
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-surface">
-            <div className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4">
+            <div key={activeTab} className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4 motion-fade">
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
                   {/* Top Switcher: Подписка vs Свой ключ */}
@@ -1342,8 +1342,6 @@ export const SettingsModal: React.FC = () => {
   );
 
   if (isMobile) {
-    // Fullscreen navigation, not an overlay: unmount on close so the settings root
-    // underneath is not duplicated while a fading copy of this screen lingers.
     if (!isSettingsOpen) return null;
     return (
       <div

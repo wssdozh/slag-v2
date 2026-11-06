@@ -10,6 +10,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { usePresence } from '../../hooks/usePresence';
 
 export const FolderViewModal: React.FC = () => {
   const {
@@ -30,6 +31,13 @@ export const FolderViewModal: React.FC = () => {
 
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
   const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
+  const [cachedCoords, setCachedCoords] = useState<{ top: number; right: number } | null>(null);
+  if (coords && coords !== cachedCoords) {
+    setCachedCoords(coords);
+  }
+  const effectiveCoords = coords || cachedCoords;
+
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isFolderViewModalOpen);
 
   // Position popover directly under the 3-dots button in the active header
   useEffect(() => {
@@ -69,7 +77,7 @@ export const FolderViewModal: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFolderViewModalOpen, closeFolderViewModal]);
 
-  if (!isFolderViewModalOpen) return null;
+  if (!isPresent) return null;
 
   const viewModes: { id: FeedViewMode; label: string; icon: React.ReactNode }[] = [
     { id: 'feed', label: 'Лента', icon: <Layers className="w-3.5 h-3.5 shrink-0" /> },
@@ -116,13 +124,17 @@ export const FolderViewModal: React.FC = () => {
 
       {/* Lightweight Linear Dark dropdown popover */}
       <div
+        ref={ref}
         role="dialog"
         aria-label="Вид и фильтры"
         aria-modal="true"
+        data-motion-state={phase}
+        onTransitionEnd={onTransitionEnd}
+        inert={!isFolderViewModalOpen}
         style={{
           position: 'fixed',
-          top: coords ? `${coords.top}px` : '56px',
-          right: coords ? `${coords.right}px` : '16px',
+          top: effectiveCoords ? `${effectiveCoords.top}px` : '56px',
+          right: effectiveCoords ? `${effectiveCoords.right}px` : '16px',
         }}
         className="pointer-events-auto w-[310px] max-w-[calc(100vw-16px)] rounded-2xl bg-surface-elevated/98 border border-white/[0.08] shadow-2xl shadow-black/90 backdrop-blur-xl p-3 space-y-3 motion-popover text-xs text-zinc-200"
       >

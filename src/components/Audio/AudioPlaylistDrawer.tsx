@@ -5,6 +5,7 @@ import { formatAudioDuration } from '../../lib/audioHelper';
 import type { FolderMeta } from '../../types';
 import { IconButton } from '../UI/IconButton';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { usePresence } from '../../hooks/usePresence';
 
 interface AudioPlaylistDrawerProps {
   isOpen: boolean;
@@ -52,10 +53,18 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
     );
   }, [tracks, searchQuery]);
 
-  if (!isOpen) return null;
+  const { ref: drawerRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
+
+  if (!isPresent) return null;
 
   return (
-    <div className="absolute inset-0 z-30 bg-panel/95 backdrop-blur-xl flex flex-col overflow-hidden motion-fade">
+    <div
+      ref={drawerRef}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isOpen}
+      className="absolute inset-0 z-30 bg-panel/95 backdrop-blur-xl flex flex-col overflow-hidden motion-fade"
+    >
       {/* Drawer Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
         <div className="flex items-center gap-2">
@@ -115,7 +124,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
               <span className="max-w-[100px] truncate">{pinnedFolder}</span>
             </button>
             {isFolderSelectOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto motion-popover">
                 {Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)])).map(
                   (folderPath) => (
                     <button

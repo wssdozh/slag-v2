@@ -393,11 +393,15 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         </div>
 
         {/* Right: Text / OCR Side Panel (Flat Anti-Matryoshka Canvas) */}
-        {isTextPanelOpen && (
-          <aside
-            onClick={e => e.stopPropagation()}
-            className="w-full sm:w-80 md:w-96 border-l border-white/[0.08] bg-panel/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 motion-fade min-h-0 select-text"
-          >
+        <aside
+          onClick={e => e.stopPropagation()}
+          aria-hidden={!isTextPanelOpen}
+          inert={!isTextPanelOpen}
+          className={`border-l border-white/[0.08] bg-panel/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 min-h-0 select-text overflow-hidden transition-[width] duration-200 ease-out ${
+            isTextPanelOpen ? 'w-full sm:w-80 md:w-96' : 'w-0 border-l-0'
+          }`}
+        >
+          <div className="w-full sm:w-80 md:w-96 flex flex-col h-full shrink-0">
             {/* Header */}
             <div className="h-12 px-5 border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">
               <span className="text-xs font-medium text-zinc-200">Текст изображения</span>
@@ -510,8 +514,8 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 </div>
               )}
             </div>
-          </aside>
-        )}
+          </div>
+        </aside>
       </div>
 
       {/* 5. Lower Panel */}

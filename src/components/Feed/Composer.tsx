@@ -21,6 +21,8 @@ import { SlashCommandMenu } from './SlashCommandMenu';
 import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { TagSuggestionMenu, type TagMeta } from './TagSuggestionMenu';
+import { SuggestionMenuShell } from './SuggestionMenuShell';
+import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
 import {
@@ -1464,64 +1466,90 @@ export const Composer: React.FC<ComposerProps> = ({
     </>
   );
 
+  const [lastFolderQuery, setLastFolderQuery] = useState('');
+  const [lastMatchingFolders, setLastMatchingFolders] = useState<FolderMeta[]>([]);
+  if (folderQuery !== null) {
+    if (folderQuery !== lastFolderQuery) setLastFolderQuery(folderQuery);
+    if (matchingFolders !== lastMatchingFolders) setLastMatchingFolders(matchingFolders);
+  }
+
+  const [lastSlashQuery, setLastSlashQuery] = useState('');
+  if (slashQuery !== null && slashQuery !== lastSlashQuery) {
+    setLastSlashQuery(slashQuery);
+  }
+
+  const [lastTagQuery, setLastTagQuery] = useState('');
+  const [lastMatchingTags, setLastMatchingTags] = useState<TagMeta[]>([]);
+  if (tagQuery !== null) {
+    if (tagQuery !== lastTagQuery) setLastTagQuery(tagQuery);
+    if (matchingAutocompleteTags !== lastMatchingTags) setLastMatchingTags(matchingAutocompleteTags);
+  }
+
+  const [lastMatchingWikiItems, setLastMatchingWikiItems] = useState<SlagItem[]>([]);
+  if (wikiQuery !== null && matchingWikiItems.length > 0) {
+    if (matchingWikiItems !== lastMatchingWikiItems) setLastMatchingWikiItems(matchingWikiItems);
+  }
+
   const overlaySlot = (
     <>
-      {folderQuery !== null && (
-        <FolderSuggestionMenu
-          query={folderQuery}
-          folders={matchingFolders}
-          currentFolder={effectiveDefaultFolder}
-          selectedFolder={targetFolder}
-          selectedIndex={folderSelectedIndex}
-          onSelect={selectFolder}
-          placement="top"
-          isModal={isModal}
-        />
-      )}
-      {slashQuery !== null && (
-        <SlashCommandMenu
-          query={slashQuery}
-          selectedIndex={slashSelectedIndex}
-          onSelect={executeSlashCommand}
-          placement="top"
-          isModal={isModal}
-        />
-      )}
-      {wikiQuery !== null && matchingWikiItems.length > 0 && (
-        <div className={`absolute left-0 ${isModal ? 'bottom-[calc(100%+55px)]' : 'bottom-[calc(100%+14px)]'} w-72 max-h-52 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.08] shadow-2xl p-1 z-50 flex flex-col gap-0.5 motion-popover pointer-events-auto`}>
-          <div className="px-2 py-1 text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
-            Связать заметку [[...]]
-          </div>
-          {matchingWikiItems.map((wikiItem, idx) => {
-            const isSelected = idx === wikiSelectedIndex;
-            return (
-              <button
-                key={wikiItem.id}
-                type="button"
-                onClick={() => insertWikiLink(wikiItem)}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate cursor-pointer ${
-                  isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
-                }`}
-              >
-                {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-                {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-                <span className="truncate">{wikiItem.title || wikiItem.id}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {tagQuery !== null && (
-        <TagSuggestionMenu
-          query={tagQuery}
-          tags={matchingAutocompleteTags}
-          selectedIndex={tagSelectedIndex}
-          onSelect={insertTag}
-          placement="top"
-          isModal={isModal}
-        />
-      )}
+      <FolderSuggestionMenu
+        isOpen={folderQuery !== null}
+        query={folderQuery ?? lastFolderQuery}
+        folders={folderQuery !== null ? matchingFolders : lastMatchingFolders}
+        currentFolder={effectiveDefaultFolder}
+        selectedFolder={targetFolder}
+        selectedIndex={folderSelectedIndex}
+        onSelect={selectFolder}
+        placement="top"
+        isModal={isModal}
+      />
+      <SlashCommandMenu
+        isOpen={slashQuery !== null}
+        query={slashQuery ?? lastSlashQuery}
+        selectedIndex={slashSelectedIndex}
+        onSelect={executeSlashCommand}
+        placement="top"
+        isModal={isModal}
+      />
+      <SuggestionMenuShell
+        isOpen={wikiQuery !== null && (matchingWikiItems.length > 0 || lastMatchingWikiItems.length > 0)}
+        selectedIndex={wikiSelectedIndex}
+        placement="top"
+        isModal={isModal}
+        isEmpty={(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).length === 0}
+        emptyContent={<span>Заметка не найдена</span>}
+        header={<SuggestionMenuHeader icon={<FileText className="w-3 h-3 text-zinc-400" />} title="Связать заметку [[...]]" />}
+      >
+        {(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).map((wikiItem, idx) => {
+          const isSelected = idx === wikiSelectedIndex;
+          return (
+            <button
+              key={wikiItem.id}
+              type="button"
+              data-selected={isSelected}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => insertWikiLink(wikiItem)}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate cursor-pointer ${
+                isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
+              }`}
+            >
+              {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+              {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+              {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+              <span className="truncate">{wikiItem.title || wikiItem.id}</span>
+            </button>
+          );
+        })}
+      </SuggestionMenuShell>
+      <TagSuggestionMenu
+        isOpen={tagQuery !== null}
+        query={tagQuery ?? lastTagQuery}
+        tags={tagQuery !== null ? matchingAutocompleteTags : lastMatchingTags}
+        selectedIndex={tagSelectedIndex}
+        onSelect={insertTag}
+        placement="top"
+        isModal={isModal}
+      />
     </>
   );
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { usePresence } from '../../hooks/usePresence';
 import {
   FolderCheck,
   Inbox,
@@ -48,12 +49,23 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
     Boolean(activeTagFilter) ||
     Boolean(aiItemFilter);
 
-  if (!hasAnyFilter) {
+  const { ref: filterBarRef, phase: filterBarPhase, isPresent: isFilterBarPresent, onTransitionEnd: onFilterBarTransitionEnd } =
+    usePresence(hasAnyFilter);
+
+  if (!isFilterBarPresent) {
     return null;
   }
 
   return (
-    <div className={`flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none py-0.5 ${className}`}>
+    <div
+      ref={filterBarRef}
+      data-motion-state={filterBarPhase}
+      onTransitionEnd={onFilterBarTransitionEnd}
+      inert={!hasAnyFilter}
+      className={`motion-accordion w-full min-w-0 ${className}`}
+      data-expanded={hasAnyFilter}
+    >
+      <div className="motion-accordion-inner flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none py-0.5">
       {/* Type Filter Badge */}
       {activeTypeFilter !== 'all' && (
         <div
@@ -177,6 +189,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 };

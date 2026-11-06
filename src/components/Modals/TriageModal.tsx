@@ -383,7 +383,6 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
   if (!isPresent) return null;
 
   if (isMobile) {
-    // Fullscreen navigation, not an overlay: unmount on close.
     if (!isTriageModalOpen) return null;
     return (
       <div

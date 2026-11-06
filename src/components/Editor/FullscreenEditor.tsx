@@ -54,7 +54,8 @@ import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../lib/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/windowControls';
-import { expandFromRect } from '../../lib/motion';
+import { expandFromRect, collapseToRect } from '../../lib/motion';
+import { usePresence } from '../../hooks/usePresence';
 
 let activeEditorView: EditorView | null = null;
 
@@ -73,9 +74,10 @@ const editorExtensions = [
 
 interface FullscreenEditorContentProps {
   item: SlagItem;
+  presencePhase?: string;
 }
 
-const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item }) => {
+const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item, presencePhase }) => {
   const {
     setIsFullscreenEditorOpen,
     saveItem,
@@ -118,16 +120,22 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const rootRef = useRef<HTMLDivElement>(null);
   const hasExpandedRef = useRef(false);
 
-  // Unfold out of the card that was tapped. Search and the other views have no
-  // card on screen, so they keep the plain fade.
+  // Unfold out of the card that was tapped and collapse symmetrically on exit.
   useLayoutEffect(() => {
+    if (presencePhase === 'exiting') {
+      const target = rootRef.current;
+      if (!target || isSearchOpen) return;
+      const origin = document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`);
+      if (origin) collapseToRect(target, origin);
+      return;
+    }
     if (hasExpandedRef.current) return;
     hasExpandedRef.current = true;
     const target = rootRef.current;
     if (!target || isSearchOpen) return;
     const origin = document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`);
     if (origin) expandFromRect(origin, target);
-  }, [item.id, isSearchOpen]);
+  }, [item.id, isSearchOpen, presencePhase]);
 
   // Zen mode & layout controls (persisting user's width preference)
   const [isFullWidth, setIsFullWidth] = useState(() => initialFullWidth);
@@ -642,6 +650,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
     <div
       ref={rootRef}
       data-testid="fullscreen-editor-modal"
+      data-motion-state={presencePhase}
       onDragOver={handleDragOver}
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -1264,8 +1273,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                     </button>
                   )}
 
-                  {isDatePickerOpen && (
                     <DatePickerPopover
+                      isOpen={isDatePickerOpen}
                       value={dueDate}
                       onChange={(newDate) => {
                         setDueDate(newDate);
@@ -1278,7 +1287,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                       onClose={() => setIsDatePickerOpen(false)}
                       direction="down"
                     />
-                  )}
                 </div>
 
                 {/* Duration Selector */}
@@ -1930,7 +1938,30 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 export const FullscreenEditor: React.FC = () => {
   const { isFullscreenEditorOpen, selectedItem } = useApp();
 
-  if (!isFullscreenEditorOpen || !selectedItem) return null;
+  const isOpen = isFullscreenEditorOpen && Boolean(selectedItem);
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
 
-  return <FullscreenEditorContent key={selectedItem.id} item={selectedItem} />;
+  const [cachedItem, setCachedItem] = useState(selectedItem);
+  if (selectedItem && selectedItem !== cachedItem) {
+    setCachedItem(selectedItem);
+  }
+  const effectiveItem = selectedItem || cachedItem;
+
+  if (!isPresent || !effectiveItem) return null;
+
+  return (
+    <div
+      ref={ref}
+      data-motion-state={phase}
+      onTransitionEnd={onTransitionEnd}
+      inert={!isOpen}
+      className="fixed inset-0 z-[100]"
+    >
+      <FullscreenEditorContent
+        key={effectiveItem.id}
+        item={effectiveItem}
+        presencePhase={phase}
+      />
+    </div>
+  );
 };
