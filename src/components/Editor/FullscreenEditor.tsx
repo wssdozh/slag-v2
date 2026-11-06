@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, ComposerDraft } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
@@ -225,14 +225,14 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
   const syncDraftBackToComposer = useCallback(() => {
     if (!item.id.startsWith('draft_')) return;
     const targetFolderVal = folder !== DEFAULT_INBOX_FOLDER ? folder : undefined;
-    const draftData = {
+    const draftData: ComposerDraft = {
       content: content.trim(),
       itemType: type,
       priority: type === 'task' ? priority : 'none',
       dueDate: type === 'task' ? (dueDate || '') : '',
       tags,
       attachments,
-      replyTarget: item.replyToId ? { id: item.replyToId, title: '' } : null,
+      replyTarget: item.replyToId ? { id: item.replyToId, title: '', content: '', type: 'note' } : null,
       targetFolder: targetFolderVal,
       duration: type === 'task' ? duration : undefined,
       recurrence: type === 'task' ? recurrence : undefined,

@@ -279,6 +279,9 @@ export interface AppUiConfig {
 
 export type FolderMediaTabId = 'media' | 'audio' | 'files' | 'links' | 'tags';
 
+/** What the composer needs to show and send a reply. A full item satisfies it. */
+export type ReplyTarget = Pick<SlagItem, 'id' | 'type' | 'title' | 'content'>;
+
 export interface ComposerDraft {
   content: string;
   itemType: SlagItemType;
@@ -286,7 +289,7 @@ export interface ComposerDraft {
   dueDate: string;
   tags: string[];
   attachments: SlagAttachment[];
-  replyTarget: { id: string; title: string } | null;
+  replyTarget: ReplyTarget | null;
   targetFolder?: string | null;
   duration?: number;
   recurrence?: RecurrenceRule;

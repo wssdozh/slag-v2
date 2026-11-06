@@ -1,6 +1,7 @@
 /* oxlint-disable react/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
+  ReplyTarget,
   SlagItem,
   FolderMeta,
   VaultMeta,
@@ -137,8 +138,8 @@ interface AppContextType {
   closeContextMenu: () => void;
 
   // Replies & Linking
-  replyTarget: SlagItem | null;
-  setReplyTarget: (item: SlagItem | null) => void;
+  replyTarget: ReplyTarget | null;
+  setReplyTarget: (target: ReplyTarget | null) => void;
   highlightedItemId: string | null;
   scrollToItem: (idOrTitle: string) => void;
   navigateToFolder: (folder: string, itemId?: string) => void;
@@ -537,7 +538,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComposerModalOptions(null);
   }, []);
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
-  const [replyTarget, setReplyTarget] = useState<SlagItem | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
 
   // Resizable panel widths

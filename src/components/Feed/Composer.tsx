@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, FolderMeta, ComposerDraft } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, FolderMeta, ComposerDraft, ReplyTarget } from '../../types';
 import { storage } from '../../lib/storage';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
@@ -50,6 +50,19 @@ export interface ComposerProps {
   onComplete?: () => void;
   onCancel?: () => void;
 }
+
+/**
+ * Drafts written before the reply text was persisted only carried an id and a title.
+ * A stub without any text cannot describe what it replies to, and an empty banner is
+ * worse than no banner, so it is dropped.
+ */
+const reviveReplyTarget = (target: ReplyTarget | null | undefined): ReplyTarget | null => {
+  if (!target) return null;
+  const title = target.title ?? '';
+  const content = target.content ?? '';
+  if (!title && !content) return null;
+  return { ...target, title, content, type: target.type ?? 'note' };
+};
 
 export const Composer: React.FC<ComposerProps> = ({
   isModal = false,
@@ -226,7 +239,7 @@ export const Composer: React.FC<ComposerProps> = ({
   // Initialize replyTarget from draft on initial mount if available
   useEffect(() => {
     if (initialDraft?.replyTarget && !replyTarget) {
-      setReplyTarget(initialDraft.replyTarget as any);
+      setReplyTarget(reviveReplyTarget(initialDraft.replyTarget));
     }
   }, [initialDraft?.replyTarget, replyTarget, setReplyTarget]);
 
@@ -253,7 +266,7 @@ export const Composer: React.FC<ComposerProps> = ({
           setDueDate(currentStored.dueDate || '');
           setTags(currentStored.tags || []);
           setAttachments(currentStored.attachments || []);
-          if (currentStored.replyTarget) setReplyTarget(currentStored.replyTarget as any);
+          if (currentStored.replyTarget) setReplyTarget(reviveReplyTarget(currentStored.replyTarget));
           setTargetFolder(currentStored.targetFolder || null);
           setDuration(currentStored.duration);
           setRecurrence(currentStored.recurrence);
@@ -300,7 +313,7 @@ export const Composer: React.FC<ComposerProps> = ({
           dueDate: d.dueDate,
           tags: d.tags,
           attachments: d.attachments,
-          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title } : null,
+          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title, content: d.replyTarget.content, type: d.replyTarget.type } : null,
           targetFolder: d.targetFolder,
           duration: d.duration,
           recurrence: d.recurrence,
@@ -334,7 +347,7 @@ export const Composer: React.FC<ComposerProps> = ({
           dueDate,
           tags,
           attachments,
-          replyTarget: replyTarget ? { id: replyTarget.id, title: replyTarget.title } : null,
+          replyTarget: replyTarget ? { id: replyTarget.id, title: replyTarget.title, content: replyTarget.content, type: replyTarget.type } : null,
           targetFolder,
           duration,
           recurrence,
@@ -361,7 +374,7 @@ export const Composer: React.FC<ComposerProps> = ({
           dueDate: d.dueDate,
           tags: d.tags,
           attachments: d.attachments,
-          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title } : null,
+          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title, content: d.replyTarget.content, type: d.replyTarget.type } : null,
           targetFolder: d.targetFolder,
           duration: d.duration,
           recurrence: d.recurrence,
