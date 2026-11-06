@@ -49,8 +49,8 @@ export const MobileActionSheet: React.FC = () => {
         {/* Item Title Header */}
         <div className="px-3 py-1.5 flex items-center justify-between border-b border-white/[0.05]">
           <div className="flex items-center gap-2 min-w-0">
-            {item.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-            {item.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+            {item.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+            {item.type === 'article' && <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
             {item.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
             <span className="text-xs font-semibold text-zinc-200 truncate">
               {item.title || item.content.slice(0, 40) || 'Без названия'}
@@ -88,11 +88,11 @@ export const MobileActionSheet: React.FC = () => {
             onClick={() => actions.handleChangeType('task')}
             className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
               item.type === 'task'
-                ? 'bg-amber-400/20 text-amber-300 shadow-sm'
+                ? 'bg-white/10 text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span>Таска</span>
           </button>
           <button
@@ -100,11 +100,11 @@ export const MobileActionSheet: React.FC = () => {
             onClick={() => actions.handleChangeType('article')}
             className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg font-medium transition-all cursor-pointer ${
               item.type === 'article'
-                ? 'bg-blue-400/20 text-blue-300 shadow-sm'
+                ? 'bg-white/10 text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span>Статья</span>
           </button>
         </div>

@@ -112,8 +112,8 @@ const AppContent: React.FC = () => {
 
   if (currentPage === 'landing') {
     return (
-      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
-        <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-canvas-subtle select-text">
+        <Suspense fallback={<div className="min-h-screen bg-canvas-subtle" />}>
           <LandingPage onNavigateToAccount={() => navigatePage('account')} />
         </Suspense>
       </div>
@@ -122,8 +122,8 @@ const AppContent: React.FC = () => {
 
   if (currentPage === 'account') {
     return (
-      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
-        <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-canvas-subtle select-text">
+        <Suspense fallback={<div className="min-h-screen bg-canvas-subtle" />}>
           <AccountCabinet />
         </Suspense>
       </div>
@@ -132,8 +132,8 @@ const AppContent: React.FC = () => {
 
   if (currentPage === 'admin') {
     return (
-      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-[#08090a] select-text">
-        <Suspense fallback={<div className="min-h-screen bg-[#08090a]" />}>
+      <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-canvas-subtle select-text">
+        <Suspense fallback={<div className="min-h-screen bg-canvas-subtle" />}>
           <AdminPanel />
         </Suspense>
       </div>

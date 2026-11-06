@@ -60,7 +60,7 @@ export const QuickComposerWindow: React.FC = () => {
       }}
       className="w-screen h-screen bg-transparent select-none overflow-visible flex flex-col items-center justify-center p-2 cursor-default"
     >
-      <div className="w-full bg-[#141417] border border-white/[0.12] rounded-2xl flex flex-col overflow-visible shadow-2xl relative">
+      <div className="w-full bg-surface border border-white/[0.12] rounded-2xl flex flex-col overflow-visible shadow-2xl relative">
         {/* Island Header */}
         <div
           data-tauri-drag-region

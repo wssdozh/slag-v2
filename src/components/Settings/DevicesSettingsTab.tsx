@@ -466,7 +466,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
                   {device.platform === 'mobile' ? <Smartphone className="w-4 h-4 text-zinc-400 shrink-0" /> : <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />}
                   <div className="min-w-0">
                     {editingDeviceId === device.id ? (
-                      <input autoFocus value={editingDeviceName} onChange={(event) => setEditingDeviceName(event.target.value)} onBlur={() => void handleSaveRename()} onKeyDown={(event) => { if (event.key === 'Enter') void handleSaveRename(); }} className="bg-[#0c0c0e] border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none" />
+                      <input autoFocus value={editingDeviceName} onChange={(event) => setEditingDeviceName(event.target.value)} onBlur={() => void handleSaveRename()} onKeyDown={(event) => { if (event.key === 'Enter') void handleSaveRename(); }} className="bg-panel border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none" />
                     ) : (
                       <button type="button" onClick={() => { setEditingDeviceId(device.id); setEditingDeviceName(device.name); }} className="text-xs text-zinc-200 flex items-center gap-1.5 cursor-pointer hover:text-white">
                         <span className="truncate">{device.name}</span><Edit2 className="w-3 h-3 text-zinc-600" />
@@ -516,13 +516,13 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       {/* Pairing Modal */}
       {isPairModalOpen && (
         <div className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
-          <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
+          <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
               <span className="text-xs font-semibold text-white">Привязка устройства</span>
               <button type="button" aria-label="Закрыть привязку" onClick={() => setIsPairModalOpen(false)} className="p-1 text-zinc-400 cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-4 flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-1 bg-[#0c0c0e] p-1 rounded-xl border border-white/[0.06]">
+              <div className="grid grid-cols-2 gap-1 bg-canvas-subtle p-1 rounded-xl border border-white/[0.06]">
                 <button type="button" data-testid="pair-modal-tab-host" onClick={() => { setPairMode('host'); if (!hostPin) void handleGeneratePin(); }} className={`py-1.5 rounded-lg text-xs cursor-pointer ${pairMode === 'host' ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>Показать PIN</button>
                 <button type="button" data-testid="pair-modal-tab-guest" onClick={() => { setPairMode('guest'); setPendingApproval(null); }} className={`py-1.5 rounded-lg text-xs cursor-pointer ${pairMode === 'guest' ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>Ввести PIN</button>
               </div>
@@ -556,7 +556,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
                   <input autoFocus placeholder="123-456" value={guestInputPin} onChange={(event) => {
                     const digits = event.target.value.replace(/\D/g, '').slice(0, 6);
                     setGuestInputPin(digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
-                  }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleClaimGuestPin(); } }} maxLength={7} className="w-full bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-3 py-2 text-center font-mono text-lg tracking-widest text-white outline-none" />
+                  }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleClaimGuestPin(); } }} maxLength={7} className="w-full bg-panel border border-white/[0.08] rounded-xl px-3 py-2 text-center font-mono text-lg tracking-widest text-white outline-none" />
                   <button type="button" disabled={isClaimingPin || guestInputPin.length !== 7} onClick={() => void handleClaimGuestPin()} className="w-full py-2 bg-white text-black font-semibold text-xs rounded-xl disabled:opacity-50 cursor-pointer">{isClaimingPin ? 'Связывание…' : 'Подключить устройство'}</button>
                 </div>
               )}
@@ -568,7 +568,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       {/* Managing Vault Access Modal */}
       {managingDevice && (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setManagingDevice(null); }}>
-          <div className="w-full max-w-sm bg-[#121215] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-sm bg-surface-elevated border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
               <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-emerald-400" /><span className="text-xs font-semibold">Доступ к хранилищам</span></div>
               <button type="button" aria-label="Закрыть доступ" onClick={() => setManagingDevice(null)} className="p-1 text-zinc-400 cursor-pointer"><X className="w-4 h-4" /></button>
@@ -576,7 +576,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
             <div className="p-4 flex flex-col gap-3">
               <div><div className="text-xs text-white">{managingDevice.name}</div><div className="font-mono text-2xs text-zinc-500">{managingDevice.id}</div></div>
               {'status' in managingDevice && (
-                <div className="flex gap-1 bg-[#0c0c0e] p-0.5 rounded-lg border border-white/[0.06]">
+                <div className="flex gap-1 bg-canvas-subtle p-0.5 rounded-lg border border-white/[0.06]">
                   {(['read-write', 'receive-only'] as const).map((mode) => <button key={mode} type="button" onClick={() => setGrantMode(mode)} className={`flex-1 py-1 text-2xs rounded cursor-pointer ${grantMode === mode ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{mode === 'read-write' ? 'Чтение и изменение' : 'Только чтение'}</button>)}
                 </div>
               )}

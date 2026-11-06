@@ -76,7 +76,7 @@ function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
       };
     default:
       return {
-        bg: 'bg-surface-elevated hover:bg-[#202024]',
+        bg: 'bg-surface-elevated hover:bg-surface-hover',
         border: 'border-white/[0.08]',
         text: 'text-zinc-200',
         dot: 'bg-zinc-500',
@@ -1141,7 +1141,7 @@ export const CalendarView: React.FC = () => {
                   onDoubleClick={handleTimelineDoubleClick}
                   onWheel={handleTimelineRulerWheel}
                   title={`Шкала времени: зажмите и тяните для приближения делений (сейчас шаг ${slotStepMinutes}м). Двойной клик — сброс.`}
-                  className="w-14 shrink-0 border-r border-white/[0.04] bg-panel select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-ns-resize hover:bg-[#101014] transition-colors"
+                  className="w-14 shrink-0 border-r border-white/[0.04] bg-panel select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-ns-resize hover:bg-surface-hover transition-colors"
                 >
                   {HOURS.map(hour => (
                     <div
@@ -1345,7 +1345,7 @@ export const CalendarView: React.FC = () => {
                         });
                       }}
                       className={`min-h-[96px] p-1.5 border-b border-r border-white/[0.04] flex flex-col justify-between transition-colors cursor-pointer group ${
-                        cell.isCurrentMonth ? 'bg-canvas hover:bg-panel' : 'bg-[#070709] text-zinc-600'
+                        cell.isCurrentMonth ? 'bg-canvas hover:bg-panel' : 'bg-canvas-subtle text-zinc-600'
                       } ${isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 border-blue-500/30' : ''}`}
                     >
                       {/* Cell Header: Day Number */}
@@ -1456,7 +1456,7 @@ export const CalendarView: React.FC = () => {
         {timelineResizing && (
           <div
             data-testid="timeline-resize-tooltip"
-            className={`fixed z-50 pointer-events-none px-3.5 py-2 rounded-xl bg-[#141418]/95 border text-xs font-mono text-zinc-100 shadow-2xl backdrop-blur-md flex items-center gap-2.5 transition-all duration-75 select-none ${
+            className={`fixed z-50 pointer-events-none px-3.5 py-2 rounded-xl bg-surface-elevated/95 border text-xs font-mono text-zinc-100 shadow-2xl backdrop-blur-md flex items-center gap-2.5 transition-all duration-75 select-none ${
               timelineResizing.isSnapped
                 ? 'border-blue-400 shadow-blue-500/30 scale-105'
                 : 'border-white/15'

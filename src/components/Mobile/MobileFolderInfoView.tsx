@@ -112,7 +112,7 @@ export const MobileFolderInfoView: React.FC = () => {
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-xs font-medium active:scale-95 transition-all cursor-pointer border border-blue-500/20"
                 title="AI Triage — сортировка входящих"
               >
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                <Sparkles className="w-3.5 h-3.5 text-accent" />
                 <span>Сортировка</span>
               </button>
             )}
@@ -126,11 +126,11 @@ export const MobileFolderInfoView: React.FC = () => {
             <span className="text-[10px] font-mono text-zinc-500 uppercase">Заметки</span>
           </div>
           <div className="py-1.5 flex flex-col items-center border-x border-white/[0.06]">
-            <span className="text-sm font-bold text-amber-400">{tasksCount}</span>
+            <span className="text-sm font-bold text-zinc-200">{tasksCount}</span>
             <span className="text-[10px] font-mono text-zinc-500 uppercase">Таски</span>
           </div>
           <div className="py-1.5 flex flex-col items-center">
-            <span className="text-sm font-bold text-blue-400">{articlesCount}</span>
+            <span className="text-sm font-bold text-zinc-200">{articlesCount}</span>
             <span className="text-[10px] font-mono text-zinc-500 uppercase">Статьи</span>
           </div>
         </div>

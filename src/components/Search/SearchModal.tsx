@@ -264,8 +264,8 @@ const SearchDialog: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="w-6 h-6 rounded bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
-                      <Command className="w-3.5 h-3.5 text-purple-400" />
+                    <div className="w-6 h-6 rounded bg-white/[0.04] border border-white/[0.08] flex items-center justify-center shrink-0">
+                      <Command className="w-3.5 h-3.5 text-zinc-400" />
                     </div>
 
                     <div className="flex flex-col min-w-0 flex-1">

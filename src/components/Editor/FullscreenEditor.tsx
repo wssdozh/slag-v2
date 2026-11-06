@@ -642,8 +642,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
 
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
-        <div className="fixed inset-4 z-[120] rounded-3xl bg-surface/95 backdrop-blur-md border-2 border-dashed border-[#2a82e4] flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
-          <UploadCloud className="w-12 h-12 text-[#529ee8] animate-bounce" />
+        <div className="fixed inset-4 z-[120] rounded-3xl bg-surface/95 backdrop-blur-md border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none animate-in fade-in duration-100">
+          <UploadCloud className="w-12 h-12 text-accent animate-bounce" />
           <span className="text-base font-semibold text-white">
             Перетащите медиафайлы сюда
           </span>
@@ -1545,7 +1545,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item 
                         className="flex items-center gap-1 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white text-[11px] font-mono transition-colors cursor-pointer"
                         title="Вставить ссылку ![[файл]] в позицию курсора markdown для структурирования заметки"
                       >
-                        <Link2 className="w-3 h-3 text-[#529ee8]" />
+                        <Link2 className="w-3 h-3 text-accent" />
                         <span>Вставить в текст</span>
                       </button>
 

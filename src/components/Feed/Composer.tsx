@@ -1566,7 +1566,7 @@ export const Composer: React.FC<ComposerProps> = ({
       {/* Lock Hint Banner when holding mic/video button */}
       {lockHint && recordMode === 'holding' && (
         <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-surface border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
-          <Lock className="w-3.5 h-3.5 text-[#529ee8] animate-bounce" />
+          <Lock className="w-3.5 h-3.5 text-accent animate-bounce" />
           <span>Потяните вверх для фиксации</span>
         </div>
       )}

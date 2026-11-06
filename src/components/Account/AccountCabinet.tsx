@@ -123,7 +123,7 @@ export const AccountCabinet: React.FC = () => {
   }, 'Название устройства сохранено');
 
   return (
-    <div className="min-h-screen bg-[#08090a] text-zinc-100">
+    <div className="min-h-screen bg-canvas-subtle text-fg-primary">
       <header
         className="border-b border-white/[0.06] px-5 pb-4 flex items-center justify-between gap-4"
         style={{ paddingTop: 'max(var(--sat), 1rem)' }}
@@ -164,7 +164,7 @@ export const AccountCabinet: React.FC = () => {
               <button type="button" onClick={() => { setMode('register'); setSeed(generateMnemonic()); setSavedSeed(false); setPending(false); }} className={`pb-3 text-sm ${mode === 'register' ? 'text-white border-b border-white' : 'text-zinc-500'}`}>Создать аккаунт</button>
             </div>
             <label htmlFor="login-device-name" className="text-sm text-zinc-300">Имя этого устройства</label>
-            <input id="login-device-name" value={loginDeviceName} onChange={(event) => setLoginDeviceName(event.target.value)} maxLength={64} className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] p-3 text-sm outline-none ring-0" />
+            <input id="login-device-name" value={loginDeviceName} onChange={(event) => setLoginDeviceName(event.target.value)} maxLength={64} className="rounded-lg border border-white/[0.08] bg-panel p-3 text-sm outline-none ring-0" />
             {mode === 'register' ? (
               <>
                 <h2 className="text-base font-medium">Сохраните фразу восстановления</h2>
@@ -178,7 +178,7 @@ export const AccountCabinet: React.FC = () => {
             ) : (
               <>
                 <label htmlFor="account-seed" className="text-sm text-zinc-300">Seed-фраза аккаунта</label>
-                <textarea id="account-seed" data-testid="account-seed-input" value={seed} onChange={(event) => setSeed(event.target.value)} rows={4} spellCheck={false} autoCorrect="off" autoCapitalize="none" autoComplete="off" className="w-full resize-none rounded-lg border border-white/[0.08] bg-[#0c0c0e] p-3 text-sm font-mono outline-none focus:border-white/25" placeholder="12 или 24 слова" />
+                <textarea id="account-seed" data-testid="account-seed-input" value={seed} onChange={(event) => setSeed(event.target.value)} rows={4} spellCheck={false} autoCorrect="off" autoCapitalize="none" autoComplete="off" className="w-full resize-none rounded-lg border border-white/[0.08] bg-panel p-3 text-sm font-mono outline-none focus:border-white/25" placeholder="12 или 24 слова" />
                 <p className="text-xs text-zinc-500">Фраза проверяется на вашем устройстве и не отправляется на сервер. На новом устройстве потребуется подтверждение с уже подключённого.</p>
               </>
             )}
@@ -203,7 +203,7 @@ export const AccountCabinet: React.FC = () => {
               <h2 className="text-sm font-semibold text-amber-300">Ожидают разрешения · {pendingDevices.length}</h2>
               <p className="text-xs text-zinc-400">Разрешайте только знакомые устройства. Доступ к хранилищам выдаётся отдельно.</p>
               {pendingDevices.map((device) => <div key={device.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.05] py-3">
-                <div>{editingDevice === device.id ? <form className="flex flex-wrap gap-3 items-center" onSubmit={(event) => { event.preventDefault(); if (!busy) void saveDeviceName(device.id); }} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setEditingDevice(null); } }}><input autoFocus aria-label="Название устройства, от 1 до 64 символов" required maxLength={64} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} className="w-48 bg-[#0c0c0e] border border-white/[0.12] px-2 py-1 text-sm outline-none ring-0" /><button type="submit" disabled={busy || !deviceName.trim()} className="text-xs disabled:opacity-40">Сохранить</button><button type="button" disabled={busy} onClick={() => setEditingDevice(null)} className="text-xs text-zinc-400">Отмена</button></form> : <div className="flex flex-wrap items-center gap-3"><p className="text-sm">{device.name}</p><button type="button" disabled={busy} onClick={() => { setEditingDevice(device.id); setDeviceName(device.name); }} className="text-xs text-zinc-400">Переименовать</button></div>}<p className="text-xs font-mono text-zinc-500" title={device.id}>{shortId(device.id)} · запрос на вход</p></div>
+                <div>{editingDevice === device.id ? <form className="flex flex-wrap gap-3 items-center" onSubmit={(event) => { event.preventDefault(); if (!busy) void saveDeviceName(device.id); }} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setEditingDevice(null); } }}><input autoFocus aria-label="Название устройства, от 1 до 64 символов" required maxLength={64} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} className="w-48 bg-panel border border-white/[0.12] px-2 py-1 text-sm outline-none ring-0" /><button type="submit" disabled={busy || !deviceName.trim()} className="text-xs disabled:opacity-40">Сохранить</button><button type="button" disabled={busy} onClick={() => setEditingDevice(null)} className="text-xs text-zinc-400">Отмена</button></form> : <div className="flex flex-wrap items-center gap-3"><p className="text-sm">{device.name}</p><button type="button" disabled={busy} onClick={() => { setEditingDevice(device.id); setDeviceName(device.name); }} className="text-xs text-zinc-400">Переименовать</button></div>}<p className="text-xs font-mono text-zinc-500" title={device.id}>{shortId(device.id)} · запрос на вход</p></div>
                 <div className="flex gap-4"><button type="button" disabled={busy} onClick={() => void perform(() => accountClient.approveDevice(device.id), 'Устройство разрешено. Доступ к хранилищам выдаётся отдельно.')} className="text-xs text-zinc-100">Разрешить</button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Отклонить запрос устройства «${device.name}»?`)) void perform(() => accountClient.revokeDevice(device.id), 'Запрос отклонён'); }} className="text-xs text-rose-400">Отклонить</button></div>
               </div>)}
             </section>}
@@ -217,7 +217,7 @@ export const AccountCabinet: React.FC = () => {
                     <div className="flex items-center gap-3 min-w-0">{device.platform === 'mobile' ? <Smartphone className="w-4 h-4 text-zinc-500 shrink-0" /> : <Laptop className="w-4 h-4 text-zinc-500 shrink-0" />}<div className="min-w-0">
                       {editingDevice === device.id ? <form className="flex flex-wrap items-center gap-3" onSubmit={(event) => { event.preventDefault(); if (!busy) void saveDeviceName(device.id); }} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setEditingDevice(null); } }}>
                         <label className="sr-only" htmlFor={`device-name-${device.id}`}>Название устройства, от 1 до 64 символов</label>
-                        <input id={`device-name-${device.id}`} autoFocus required maxLength={64} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} className="min-w-0 w-48 bg-[#0c0c0e] border border-white/[0.12] px-2 py-1 text-sm outline-none ring-0" />
+                        <input id={`device-name-${device.id}`} autoFocus required maxLength={64} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} className="min-w-0 w-48 bg-panel border border-white/[0.12] px-2 py-1 text-sm outline-none ring-0" />
                         <button type="submit" disabled={busy || !deviceName.trim() || deviceName.trim().length > 64} className="text-xs disabled:opacity-40">Сохранить</button><button type="button" disabled={busy} onClick={() => setEditingDevice(null)} className="text-xs text-zinc-400">Отмена</button>
                       </form> : <div className="text-sm break-words">{device.name}{device.id === currentId && <span className="text-zinc-100 text-xs ml-2 font-medium">вы сейчас здесь</span>}</div>}
                       <div className="font-mono text-[11px] text-zinc-500" title={device.id}>{shortId(device.id)} · вход разрешён</div>
@@ -269,8 +269,8 @@ export const AccountCabinet: React.FC = () => {
                     await shareVaultWithDevice(vault, device, readOnly ? 'receive-only' : 'read-write');
                     setSharingVault(null);
                   }, 'Приглашение отправлено. Подключите хранилище на выбранном устройстве.'); }}>
-                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Устройство<select aria-label={`Устройство для хранилища ${getVaultDisplayName(vault, vaults)}`} value={selectedDevice} onChange={(event) => setSelectedDevice(event.target.value)} required className="bg-[#0c0c0e] border border-white/[0.08] px-2 py-2 outline-none ring-0"><option value="">Выберите устройство</option>{recipients.filter((device) => !grants.some((grant) => grant.deviceId === device.id && grant.status !== 'revoked')).map((device) => <option key={device.id} value={device.id}>{device.name} · {shortId(device.id)}</option>)}</select></label>
-                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Права<select aria-label="Права" value={readOnly ? 'receive-only' : 'read-write'} onChange={(event) => setReadOnly(event.target.value === 'receive-only')} className="bg-[#0c0c0e] border border-white/[0.08] px-2 py-2 outline-none ring-0"><option value="read-write">Чтение и изменение</option><option value="receive-only">Только чтение</option></select></label>
+                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Устройство<select aria-label={`Устройство для хранилища ${getVaultDisplayName(vault, vaults)}`} value={selectedDevice} onChange={(event) => setSelectedDevice(event.target.value)} required className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0"><option value="">Выберите устройство</option>{recipients.filter((device) => !grants.some((grant) => grant.deviceId === device.id && grant.status !== 'revoked')).map((device) => <option key={device.id} value={device.id}>{device.name} · {shortId(device.id)}</option>)}</select></label>
+                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Права<select aria-label="Права" value={readOnly ? 'receive-only' : 'read-write'} onChange={(event) => setReadOnly(event.target.value === 'receive-only')} className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0"><option value="read-write">Чтение и изменение</option><option value="receive-only">Только чтение</option></select></label>
                     <button type="submit" disabled={busy || !selectedDevice} className="text-xs py-2 text-zinc-100 disabled:opacity-40">Отправить приглашение</button><button type="button" disabled={busy} onClick={() => setSharingVault(null)} className="text-xs py-2 text-zinc-400">Отмена</button>
                     {recipients.length === 0 && <p className="w-full text-xs text-zinc-500">Сначала разрешите другое устройство в разделе устройств.</p>}
                   </form>}

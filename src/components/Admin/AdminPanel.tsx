@@ -640,7 +640,7 @@ export const AdminPanel: React.FC = () => {
 
   if (isTauri) {
     return (
-      <div className="min-h-screen bg-[#08090a] text-zinc-100 flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-canvas-subtle text-zinc-100 flex flex-col items-center justify-center p-6 text-center">
         <Shield className="w-10 h-10 text-amber-400 mb-4" />
         <p className="text-sm font-medium text-zinc-200">доступно только в веб-версии</p>
         <p className="text-xs text-zinc-500 mt-1 mb-6">админ-панель релея работает только на сайте</p>
@@ -696,8 +696,8 @@ export const AdminPanel: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#08090a] text-zinc-100 selection:bg-white/20 selection:text-white">
-      <header className="border-b border-white/[0.06] bg-[#0c0c0e] px-6 h-14 flex items-center justify-between">
+    <div className="min-h-screen bg-canvas-subtle text-zinc-100 selection:bg-white/20 selection:text-white">
+      <header className="border-b border-white/[0.06] bg-panel px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
             <Server className="w-4 h-4 text-zinc-400" />
@@ -777,7 +777,7 @@ export const AdminPanel: React.FC = () => {
           {isAuthenticated ? (
             <>
               {/* Period toggle */}
-              <div className="flex items-center bg-[#141417] p-0.5 rounded-lg border border-white/[0.06] text-[11px] font-mono">
+              <div className="flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.06] text-[11px] font-mono">
                 <button
                   type="button"
                   onClick={() => setPeriod('7d')}
@@ -858,7 +858,7 @@ export const AdminPanel: React.FC = () => {
                   value={inputServerUrl}
                   onChange={(e) => setInputServerUrl(e.target.value)}
                   required
-                  className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-3 py-2 text-sm text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
+                  className="rounded-lg border border-white/[0.08] bg-panel px-3 py-2 text-sm text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -873,7 +873,7 @@ export const AdminPanel: React.FC = () => {
                   placeholder="токен из SLAG_ADMIN_TOKEN"
                   autoFocus
                   required
-                  className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-3 py-2 text-sm text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
+                  className="rounded-lg border border-white/[0.08] bg-panel px-3 py-2 text-sm text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
                 />
               </div>
               <button
@@ -892,7 +892,7 @@ export const AdminPanel: React.FC = () => {
             {/* Charts: User Growth & App Launches */}
             {analytics && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs font-medium text-white">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
@@ -909,7 +909,7 @@ export const AdminPanel: React.FC = () => {
                   />
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs font-medium text-white">
                     <div className="flex items-center gap-2">
                       <Zap className="w-3.5 h-3.5 text-sky-400" />
@@ -929,14 +929,14 @@ export const AdminPanel: React.FC = () => {
             )}
 
             {/* Filter controls */}
-            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+            <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="поиск по id или имени устройства..."
-                  className="w-full sm:max-w-xs rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-3 py-1.5 text-xs text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
+                  className="w-full sm:max-w-xs rounded-lg border border-white/[0.08] bg-panel px-3 py-1.5 text-xs text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
                 />
                 <span className="text-xs font-mono text-zinc-500 shrink-0">
                   найдено: {filteredAccounts.length} / {accounts.length}
@@ -1026,7 +1026,7 @@ export const AdminPanel: React.FC = () => {
                 const isInlineOpen = inlineGrantAccountId === acc.id;
 
                 return (
-                  <div key={acc.id} className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+                  <div key={acc.id} className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xs font-mono font-medium text-white break-all" title={acc.id}>
@@ -1098,7 +1098,7 @@ export const AdminPanel: React.FC = () => {
 
                     {/* Inline Quick Grant Drawer */}
                     {isInlineOpen && (
-                      <div className="p-3 rounded-lg bg-[#0c0c0e] border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
+                      <div className="p-3 rounded-lg bg-panel border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2 text-xs text-zinc-300">
                           <Zap className="w-3.5 h-3.5 text-emerald-400" />
                           <span>быстрое продление:</span>
@@ -1107,7 +1107,7 @@ export const AdminPanel: React.FC = () => {
                           <select
                             value={inlinePlan}
                             onChange={(e) => setInlinePlan(e.target.value as 'smile' | 'angry')}
-                            className="rounded bg-[#141417] border border-white/[0.08] px-2 py-1 text-white outline-none"
+                            className="rounded bg-surface border border-white/[0.08] px-2 py-1 text-white outline-none"
                           >
                             <option value="smile">Smile (190 ₽)</option>
                             <option value="angry">Angry (490 ₽)</option>
@@ -1115,7 +1115,7 @@ export const AdminPanel: React.FC = () => {
                           <select
                             value={inlineDays}
                             onChange={(e) => setInlineDays(e.target.value)}
-                            className="rounded bg-[#141417] border border-white/[0.08] px-2 py-1 text-white outline-none"
+                            className="rounded bg-surface border border-white/[0.08] px-2 py-1 text-white outline-none"
                           >
                             <option value="30">30 дней</option>
                             <option value="90">90 дней</option>
@@ -1228,19 +1228,19 @@ export const AdminPanel: React.FC = () => {
           <div className="flex flex-col gap-6">
             {billingStats && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">MRR (выручка/мес)</span>
                   <span className="text-sm font-semibold text-emerald-400">{billingStats.mrr.toLocaleString('ru-RU')} ₽</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">платных аккаунтов</span>
                   <span className="text-sm font-semibold text-white">{billingStats.paidAccounts}</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">бесплатных</span>
                   <span className="text-sm font-semibold text-zinc-400">{billingStats.freeAccounts}</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">конверсия</span>
                   <span className="text-sm font-semibold text-white">{billingStats.conversionRate}%</span>
                 </div>
@@ -1249,7 +1249,7 @@ export const AdminPanel: React.FC = () => {
 
             {/* Actionable queue: Expiring within 7 days */}
             {expiringAccounts.length > 0 && (
-              <div className="p-4 rounded-xl bg-[#141417] border border-amber-500/20 flex flex-col gap-3">
+              <div className="p-4 rounded-xl bg-surface border border-amber-500/20 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
                     <Clock className="w-4 h-4 text-amber-400" />
@@ -1262,7 +1262,7 @@ export const AdminPanel: React.FC = () => {
                   {expiringAccounts.map((acc) => (
                     <div
                       key={acc.id}
-                      className="p-2.5 rounded-lg bg-[#0c0c0e] border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
+                      className="p-2.5 rounded-lg bg-panel border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-mono text-white">{shortId(acc.id)}</span>
@@ -1297,7 +1297,7 @@ export const AdminPanel: React.FC = () => {
             {/* Charts: Revenue Trend & Drop-off Funnel */}
             {analytics && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs font-medium text-white">
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
@@ -1314,7 +1314,7 @@ export const AdminPanel: React.FC = () => {
                   />
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
                   <FunnelChart
                     steps={analytics.funnel.steps}
                     dropOffRate={analytics.funnel.dropOffRate}
@@ -1324,7 +1324,7 @@ export const AdminPanel: React.FC = () => {
             )}
 
             {/* Manual Grant Form with Searchable Autocomplete */}
-            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+            <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
               <div className="flex items-center gap-2 text-xs font-medium text-white">
                 <CreditCard className="w-3.5 h-3.5 text-zinc-400" />
                 <span>ручное начисление / продление подписки</span>
@@ -1345,7 +1345,7 @@ export const AdminPanel: React.FC = () => {
                       setIsAccountDropdownOpen(true);
                     }}
                     onFocus={() => setIsAccountDropdownOpen(true)}
-                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                    className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
                   />
 
                   {/* Hidden select for compatibility with tests and form submission */}
@@ -1364,7 +1364,7 @@ export const AdminPanel: React.FC = () => {
 
                   {/* Live dropdown list */}
                   {isAccountDropdownOpen && (
-                    <div className="absolute top-[58px] left-0 right-0 z-40 max-h-48 overflow-y-auto rounded-lg bg-[#141417] border border-white/[0.12] shadow-2xl p-1 flex flex-col gap-0.5">
+                    <div className="absolute top-[58px] left-0 right-0 z-40 max-h-48 overflow-y-auto rounded-lg bg-surface border border-white/[0.12] shadow-2xl p-1 flex flex-col gap-0.5">
                       {autocompleteAccounts.map((a) => (
                         <button
                           key={a.id}
@@ -1408,7 +1408,7 @@ export const AdminPanel: React.FC = () => {
                       setGrantPlan(p);
                       setGrantAmount(p === 'smile' ? '190' : '490');
                     }}
-                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                    className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
                   >
                     <option value="smile">Smile (190 ₽)</option>
                     <option value="angry">Angry (490 ₽)</option>
@@ -1421,7 +1421,7 @@ export const AdminPanel: React.FC = () => {
                     id="grant-days"
                     value={grantDays}
                     onChange={(e) => setGrantDays(e.target.value)}
-                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                    className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
                   >
                     <option value="30">30 дней</option>
                     <option value="90">90 дней</option>
@@ -1437,7 +1437,7 @@ export const AdminPanel: React.FC = () => {
                     value={grantAmount}
                     onChange={(e) => setGrantAmount(e.target.value)}
                     required
-                    className="rounded-lg border border-white/[0.08] bg-[#0c0c0e] px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+                    className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
                   />
                 </div>
 
@@ -1458,7 +1458,7 @@ export const AdminPanel: React.FC = () => {
                 {transactions.map((tx) => (
                   <div
                     key={tx.id}
-                    className="p-3 rounded-lg bg-[#141417] border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+                    className="p-3 rounded-lg bg-surface border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-mono text-zinc-400">{tx.id}</span>
@@ -1488,21 +1488,21 @@ export const AdminPanel: React.FC = () => {
           <div className="flex flex-col gap-6">
             {aiStats && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">статус шлюза</span>
                   <span className={`text-sm font-semibold ${aiStats.gatewayStatus === 'operational' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {aiStats.gatewayStatus}
                   </span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">всего запросов</span>
                   <span className="text-sm font-semibold text-white">{aiStats.totalRequests}</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">суммарно токенов</span>
                   <span className="text-sm font-semibold text-white">{aiStats.totalTokens.toLocaleString('ru-RU')}</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">активные модели</span>
                   <span className="text-xs font-mono text-zinc-300 truncate">
                     {aiStats.activeModels.join(', ')}
@@ -1514,7 +1514,7 @@ export const AdminPanel: React.FC = () => {
             {/* Distribution and Unit-economics */}
             {analytics && analytics.aiDistribution && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
                   <div className="flex items-center justify-between text-xs font-medium text-white">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
@@ -1530,7 +1530,7 @@ export const AdminPanel: React.FC = () => {
                   />
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col justify-between gap-3">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col justify-between gap-3">
                   <div className="flex items-center justify-between text-xs font-medium text-white">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
@@ -1569,7 +1569,7 @@ export const AdminPanel: React.FC = () => {
 
             {/* Top Spenders Table */}
             {analytics && analytics.aiDistribution && analytics.aiDistribution.topUsers.length > 0 && (
-              <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+              <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
                 <span className="text-xs font-medium text-white">топ транжир токенов (риск перерасхода)</span>
                 <div className="flex flex-col gap-1.5">
                   {analytics.aiDistribution.topUsers.map((u) => {
@@ -1579,7 +1579,7 @@ export const AdminPanel: React.FC = () => {
                     return (
                       <div
                         key={u.accountId}
-                        className="p-2.5 rounded-lg bg-[#0c0c0e] border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
+                        className="p-2.5 rounded-lg bg-panel border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-mono text-white">{shortId(u.accountId)}</span>
@@ -1602,7 +1602,7 @@ export const AdminPanel: React.FC = () => {
             )}
 
             {/* AI Benchmark Ping Action */}
-            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex items-center justify-between gap-4">
+            <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex items-center justify-between gap-4">
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-white">диагностика апстрима</span>
                 <span className="text-xs text-zinc-500">проверка задержки и доступности шлюза к моделям</span>
@@ -1626,7 +1626,7 @@ export const AdminPanel: React.FC = () => {
                 {aiLogs.map((log) => (
                   <div
                     key={log.id}
-                    className="p-3 rounded-lg bg-[#141417] border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+                    className="p-3 rounded-lg bg-surface border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-mono text-zinc-400">{log.id}</span>
@@ -1657,19 +1657,19 @@ export const AdminPanel: React.FC = () => {
           <div className="flex flex-col gap-6">
             {stats && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">uptime</span>
                   <span className="text-sm font-semibold text-white">{formatUptime(stats.uptime)}</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">размер базы</span>
                   <span className="text-sm font-semibold text-white">{formatBytes(stats.dbSizeBytes) || '0 B'}</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">активные сессии</span>
                   <span className="text-sm font-semibold text-white">{stats.activeSessions}</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">пакетов в очереди</span>
                   <span className="text-sm font-semibold text-white">{stats.totalBundles}</span>
                 </div>
@@ -1679,7 +1679,7 @@ export const AdminPanel: React.FC = () => {
             {/* Sync health metrics & Traffic chart */}
             {analytics && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-2">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs font-medium text-white">
                     <div className="flex items-center gap-2">
                       <Radio className="w-3.5 h-3.5 text-emerald-400" />
@@ -1696,7 +1696,7 @@ export const AdminPanel: React.FC = () => {
                   />
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col justify-between gap-3">
+                <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col justify-between gap-3">
                   <div className="flex items-center justify-between text-xs font-medium text-white">
                     <div className="flex items-center gap-2">
                       <Activity className="w-3.5 h-3.5 text-emerald-400" />
@@ -1731,7 +1731,7 @@ export const AdminPanel: React.FC = () => {
 
             {/* Storage Runaway Inspector */}
             {analytics && analytics.syncHealth.topHeavyRooms.length > 0 && (
-              <div className="p-4 rounded-xl bg-[#141417] border border-amber-500/20 flex flex-col gap-3">
+              <div className="p-4 rounded-xl bg-surface border border-amber-500/20 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
                     <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -1744,7 +1744,7 @@ export const AdminPanel: React.FC = () => {
                   {analytics.syncHealth.topHeavyRooms.map((room) => (
                     <div
                       key={room.roomId}
-                      className="p-2.5 rounded-lg bg-[#0c0c0e] border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
+                      className="p-2.5 rounded-lg bg-panel border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-mono text-white">{shortId(room.roomId)}</span>
@@ -1777,7 +1777,7 @@ export const AdminPanel: React.FC = () => {
             )}
 
             {/* Maintenance Actions */}
-            <div className="p-4 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+            <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
               <div className="flex items-center gap-2 text-xs font-medium text-white">
                 <Wrench className="w-3.5 h-3.5 text-zinc-400" />
                 <span>инструменты обслуживания</span>
@@ -1817,7 +1817,7 @@ export const AdminPanel: React.FC = () => {
                 {rooms.map((r) => (
                   <div
                     key={r.roomId}
-                    className="p-3 rounded-lg bg-[#141417] border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+                    className="p-3 rounded-lg bg-surface border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-mono text-zinc-200 truncate" title={r.roomId}>
@@ -1852,19 +1852,19 @@ export const AdminPanel: React.FC = () => {
           <div className="flex flex-col gap-6">
             {securityStats && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">заблокировано аккаунтов</span>
                   <span className={`text-sm font-semibold ${securityStats.blockedAccountsCount > 0 ? 'text-rose-400' : 'text-zinc-400'}`}>
                     {securityStats.blockedAccountsCount}
                   </span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
                   <span className="text-[11px] font-mono text-zinc-500">отозвано устройств</span>
                   <span className="text-sm font-semibold text-zinc-400">
                     {securityStats.revokedDevicesCount}
                   </span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#141417] border border-white/[0.06] flex flex-col gap-1 col-span-2 sm:col-span-1">
+                <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1 col-span-2 sm:col-span-1">
                   <span className="text-[11px] font-mono text-zinc-500">политика шифрования</span>
                   <span className="text-sm font-semibold text-emerald-400">P-256 E2EE (Zero-Knowledge)</span>
                 </div>
@@ -1878,7 +1878,7 @@ export const AdminPanel: React.FC = () => {
                 {auditLogs.map((item) => (
                   <div
                     key={item.id}
-                    className="p-3 rounded-lg bg-[#141417] border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+                    className="p-3 rounded-lg bg-surface border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[11px] font-mono text-zinc-300">

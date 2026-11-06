@@ -188,7 +188,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
               }}
               className={`h-7 rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-[#2a82e4] text-white font-bold shadow-sm'
+                  ? 'bg-accent text-white font-bold shadow-sm'
                   : isToday
                   ? 'border border-blue-500/50 text-blue-400 font-semibold hover:bg-blue-500/10'
                   : cell.isCurrentMonth

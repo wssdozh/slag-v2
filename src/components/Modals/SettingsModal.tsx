@@ -407,7 +407,7 @@ export const SettingsModal: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1.5 bg-[#0c0c0e] p-1 rounded-lg border border-white/[0.06]">
+                    <div className="grid grid-cols-2 gap-1.5 bg-canvas-subtle p-1 rounded-lg border border-white/[0.06]">
                       <button
                         type="button"
                         data-testid="ai-source-subscription"
@@ -465,7 +465,7 @@ export const SettingsModal: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-1 bg-[#0c0c0e] p-1 rounded-lg border border-white/[0.06]">
+                      <div className="grid grid-cols-3 gap-1 bg-canvas-subtle p-1 rounded-lg border border-white/[0.06]">
                         <button
                           type="button"
                           onClick={() => setSubscriptionModel('fast')}
@@ -515,7 +515,7 @@ export const SettingsModal: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-1.5 bg-[#0c0c0e] p-1 rounded-lg border border-white/[0.06]">
+                        <div className="grid grid-cols-2 gap-1.5 bg-canvas-subtle p-1 rounded-lg border border-white/[0.06]">
                           <button
                             type="button"
                             onClick={() => handleProviderChange('groq')}

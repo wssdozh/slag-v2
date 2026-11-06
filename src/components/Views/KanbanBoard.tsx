@@ -358,10 +358,10 @@ export const KanbanBoard: React.FC = () => {
               data-testid={`kanban-column-${column.id}`}
               data-drop-zone="kanban-column"
               data-drop-column={column.id}
-              className={`w-[calc(100vw-2.5rem)] sm:w-72 max-w-[340px] shrink-0 flex flex-col rounded-xl bg-[#0f0f12]/70 border transition-colors max-h-full overflow-hidden ${
+              className={`w-[calc(100vw-2.5rem)] sm:w-72 max-w-[340px] shrink-0 flex flex-col rounded-xl bg-surface/70 border transition-colors max-h-full overflow-hidden ${
                 isMobile ? 'snap-center' : ''
               } ${
-                isOver ? 'border-blue-500/50 bg-[#12141a]' : 'border-white/[0.06]'
+                isOver ? 'border-accent/50 bg-surface-elevated' : 'border-white/[0.06]'
               }`}
             >
               {/* Column Header */}

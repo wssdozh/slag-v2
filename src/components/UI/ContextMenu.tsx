@@ -317,9 +317,9 @@ export const ContextMenu: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 {item.type === 'task' ? (
-                  <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+                  <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
                 ) : item.type === 'article' ? (
-                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <FileText className="w-3.5 h-3.5 text-zinc-400" />
                 ) : (
                   <StickyNote className="w-3.5 h-3.5 text-zinc-400" />
                 )}
@@ -556,39 +556,39 @@ export const ContextMenu: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-zinc-500 font-mono">1</span>
-              {item.type === 'note' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+              {item.type === 'note' && <Check className="w-3.5 h-3.5 text-accent" />}
             </div>
           </button>
 
           <button
             onClick={() => actions.handleChangeType('task')}
             className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
-              item.type === 'task' ? 'text-amber-300 bg-amber-400/10' : 'text-zinc-300 hover:text-white'
+              item.type === 'task' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
             }`}
           >
             <div className="flex items-center gap-2">
-              <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+              <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
               <span>Таска</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-zinc-500 font-mono">2</span>
-              {item.type === 'task' && <Check className="w-3.5 h-3.5 text-amber-400" />}
+              {item.type === 'task' && <Check className="w-3.5 h-3.5 text-accent" />}
             </div>
           </button>
 
           <button
             onClick={() => actions.handleChangeType('article')}
             className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
-              item.type === 'article' ? 'text-blue-300 bg-blue-400/10' : 'text-zinc-300 hover:text-white'
+              item.type === 'article' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
             }`}
           >
             <div className="flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              <FileText className="w-3.5 h-3.5 text-zinc-400" />
               <span>Статья</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-zinc-500 font-mono">3</span>
-              {item.type === 'article' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              {item.type === 'article' && <Check className="w-3.5 h-3.5 text-accent" />}
             </div>
           </button>
         </div>

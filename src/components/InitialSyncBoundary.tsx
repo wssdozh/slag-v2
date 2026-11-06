@@ -33,7 +33,7 @@ export function InitialSyncBoundary({ children }: { children: ReactNode }) {
   };
 
   return (
-    <main className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#08090a] px-6 text-center text-zinc-100" aria-busy={initial.state === 'loading'}>
+    <main className="flex h-full w-full flex-col items-center justify-center gap-4 bg-canvas-subtle px-6 text-center text-fg-primary" aria-busy={initial.state === 'loading'}>
       <div role="status" aria-live="polite">
         <h1 className="text-lg font-medium">{initial.state === 'loading' ? 'загружаем хранилище…' : 'не удалось загрузить хранилище'}</h1>
         <p className="mt-2 text-sm text-zinc-400">обработано пакетов: {initial.processed}</p>

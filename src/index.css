@@ -164,11 +164,11 @@
 
   /* Default dark styling for native select options and checkboxes if ever invoked */
   select option {
-    background-color: #141416;
-    color: #f4f4f5;
+    background-color: var(--color-surface);
+    color: var(--color-fg-primary);
   }
   input[type="checkbox"] {
-    accent-color: #ffffff;
+    accent-color: var(--color-accent);
   }
 
   /* Prevent iOS automatic zoom on focus when font-size is below 16px */
@@ -336,14 +336,14 @@
   --atomic-editor-fg-muted: var(--color-fg-secondary);
   --atomic-editor-fg-faint: var(--color-fg-muted);
   --atomic-editor-border: var(--border-subtle);
-  --atomic-editor-accent: #71717a; /* zinc-500 neutral linear */
-  --atomic-editor-accent-bright: #a1a1aa; /* zinc-400 */
+  --atomic-editor-accent: var(--color-fg-muted); /* zinc-500 neutral linear */
+  --atomic-editor-accent-bright: var(--color-fg-secondary); /* zinc-400 */
   --atomic-editor-accent-soft: rgba(255, 255, 255, 0.06);
   --atomic-editor-code-rail: rgba(255, 255, 255, 0.12); /* clean neutral monochrome rail */
-  --atomic-editor-link: #60a5fa;
+  --atomic-editor-link: var(--color-accent);
   --atomic-editor-link-hover: #93c5fd;
   --atomic-editor-code-bg: rgba(255, 255, 255, 0.03);
-  --atomic-editor-selection-bg: rgba(59, 130, 246, 0.25);
+  --atomic-editor-selection-bg: var(--color-accent-subtle);
   --atomic-editor-measure: 100%;
   --atomic-editor-font: var(--slag-font-sans);
   --atomic-editor-body-size: calc(0.875rem * var(--slag-font-scale, 1));
@@ -390,7 +390,7 @@
   width: 1.05em !important;
   height: 1.05em !important;
   border-radius: 9999px !important;
-  border: 1.5px solid #52525b !important; /* zinc-600 */
+  border: 1.5px solid var(--color-fg-dim) !important;
   background-color: transparent !important;
   cursor: pointer !important;
   position: relative !important;
@@ -405,20 +405,20 @@
 }
 
 .cm-atomic-task-checkbox:hover {
-  border-color: #a1a1aa !important; /* zinc-400 */
+  border-color: var(--color-fg-secondary) !important;
 }
 
 .cm-atomic-task-checkbox:checked {
-  background-color: rgba(16, 185, 129, 0.15) !important; /* emerald-500/15 */
-  border-color: #34d399 !important; /* emerald-400 */
+  background-color: var(--color-success-subtle) !important;
+  border-color: var(--color-success) !important;
 }
 
 .cm-atomic-task-checkbox::after {
   content: "" !important;
   width: 0.26em !important;
   height: 0.5em !important;
-  border-right: 1.75px solid #34d399 !important; /* emerald-400 */
-  border-bottom: 1.75px solid #34d399 !important;
+  border-right: 1.75px solid var(--color-success) !important;
+  border-bottom: 1.75px solid var(--color-success) !important;
   transform: rotate(45deg) translate(-0.02em, -0.04em) !important;
   opacity: 0 !important;
   transition: opacity 120ms ease !important;
@@ -436,7 +436,7 @@
 
 /* Whole-line strike for completed task items matching ItemCard */
 .cm-line.cm-atomic-task-done {
-  color: #71717a !important; /* zinc-500 */
+  color: var(--color-fg-muted) !important;
   text-decoration: line-through !important;
 }
 

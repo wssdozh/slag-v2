@@ -8,21 +8,21 @@
   isolation: isolate;
   position: relative;
   z-index: 0;
-  --dv-group-view-background-color: var(--color-canvas, #121316);
-  --dv-tabs-and-actions-container-background-color: var(--color-panel, #16171c);
+  --dv-group-view-background-color: var(--color-canvas, #0c0c0e);
+  --dv-tabs-and-actions-container-background-color: var(--color-panel, #0c0c0e);
   --dv-activegroup-visiblepanel-tab-background-color: rgba(255, 255, 255, 0.08);
   --dv-activegroup-hiddenpanel-tab-background-color: transparent;
   --dv-inactivegroup-visiblepanel-tab-background-color: rgba(255, 255, 255, 0.05);
   --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
 
-  --dv-activegroup-visiblepanel-tab-color: #ffffff;
-  --dv-activegroup-hiddenpanel-tab-color: #71717a;
-  --dv-inactivegroup-visiblepanel-tab-color: #e4e4e7;
-  --dv-inactivegroup-hiddenpanel-tab-color: #52525b;
+  --dv-activegroup-visiblepanel-tab-color: var(--color-fg-primary, #f4f4f5);
+  --dv-activegroup-hiddenpanel-tab-color: var(--color-fg-muted, #71717a);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--color-fg-secondary, #a1a1aa);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--color-fg-dim, #52525b);
 
-  --dv-separator-border: 1px solid rgba(255, 255, 255, 0.06);
-  --dv-sash-color: rgba(255, 255, 255, 0.06);
-  --dv-active-sash-color: rgba(59, 130, 246, 0.75);
+  --dv-separator-border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  --dv-sash-color: var(--border-subtle, rgba(255, 255, 255, 0.06));
+  --dv-active-sash-color: var(--color-accent, #3b82f6);
   --dv-active-sash-transition-duration: 0.1s;
   --dv-active-sash-transition-delay: 0s;
   --dv-tab-divider-color: transparent;
@@ -31,11 +31,11 @@
   --dv-tab-border-radius: 6px;
 
   --dv-drag-over-background-color: transparent;
-  --dv-drag-over-border-color: rgba(59, 130, 246, 0.5);
-  --dv-edge-dock-indicator-color: rgba(59, 130, 246, 0.8);
+  --dv-drag-over-border-color: var(--color-accent, #3b82f6);
+  --dv-edge-dock-indicator-color: var(--color-accent, #3b82f6);
 
-  --dv-floating-border: 1px solid rgba(255, 255, 255, 0.1);
-  --dv-floating-titlebar-background-color: var(--color-panel, #16171c);
+  --dv-floating-border: 1px solid var(--border-hover, rgba(255, 255, 255, 0.12));
+  --dv-floating-titlebar-background-color: var(--color-panel, #0c0c0e);
   --dv-border-radius: 8px;
   --dv-icon-hover-background-color: rgba(255, 255, 255, 0.08);
 }
@@ -288,7 +288,7 @@
   height: 18px !important;
   width: 2px !important;
   border-radius: 9999px !important;
-  background-color: #3b82f6 !important;
+  background-color: var(--color-accent, #3b82f6) !important;
   box-shadow: none !important;
   pointer-events: none !important;
   z-index: 100 !important;
@@ -320,7 +320,7 @@
   height: 18px !important;
   width: 2px !important;
   border-radius: 9999px !important;
-  background-color: #3b82f6 !important;
+  background-color: var(--color-accent, #3b82f6) !important;
   box-shadow: none !important;
   pointer-events: none !important;
   z-index: 100 !important;
@@ -514,14 +514,14 @@
 .dv-resize-container {
   border-radius: 8px !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  background-color: var(--color-canvas, #121316) !important;
+  background-color: var(--color-canvas, #0c0c0e) !important;
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   overflow: hidden;
 }
 
 .dockview-theme-slag .dv-resize-container-with-titlebar > .dv-floating-titlebar,
 .dv-resize-container-with-titlebar > .dv-floating-titlebar {
-  background-color: var(--color-panel, #16171c) !important;
+  background-color: var(--color-panel, #0c0c0e) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
   height: 28px !important;
 }
@@ -531,7 +531,7 @@
  */
 .dockview-theme-slag .dv-context-menu,
 .dv-context-menu {
-  background-color: var(--color-surface-elevated, #252630) !important;
+  background-color: var(--color-surface-elevated, #18181c) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 8px !important;
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.7) !important;

@@ -37,9 +37,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
   };
 
   return (
-    <div className="min-h-screen bg-[#08090a] text-zinc-100 selection:bg-white/20 selection:text-white font-sans antialiased">
+    <div className="min-h-screen bg-canvas-subtle text-zinc-100 selection:bg-white/20 selection:text-white font-sans antialiased">
       {/* 1. Header */}
-      <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-[#08090a]/80 border-b border-white/[0.05]">
+      <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-canvas-subtle/80 border-b border-white/[0.05]">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 rounded-md bg-white/[0.06] border border-white/[0.08] flex items-center justify-center overflow-hidden">
@@ -130,8 +130,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
         </span>
 
         {/* Interactive App Mockup Preview */}
-        <div className="mt-14 w-full rounded-2xl border border-white/[0.08] bg-[#0c0c0e] p-2 shadow-2xl overflow-hidden text-left">
-          <div className="h-7 border-b border-white/[0.06] px-3 flex items-center justify-between bg-[#08090a] rounded-t-xl">
+        <div className="mt-14 w-full rounded-2xl border border-white/[0.08] bg-panel p-2 shadow-2xl overflow-hidden text-left">
+          <div className="h-7 border-b border-white/[0.06] px-3 flex items-center justify-between bg-canvas-subtle rounded-t-xl">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-white/10" />
               <span className="w-2.5 h-2.5 rounded-full bg-white/10" />
@@ -143,7 +143,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 min-h-[320px] bg-[#08090a]">
+          <div className="grid grid-cols-1 md:grid-cols-4 min-h-[320px] bg-canvas-subtle">
             {/* Sidebar mock */}
             <div className="hidden md:flex flex-col border-r border-white/[0.06] p-3 gap-1 text-xs">
               <div className="text-[10px] font-mono uppercase text-zinc-500 px-2 py-1">Папки</div>
@@ -164,7 +164,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             {/* Chat feed mock */}
             <div className="md:col-span-3 p-4 flex flex-col justify-between gap-4">
               <div className="flex flex-col gap-2.5">
-                <div className="max-w-lg bg-[#141417] border border-white/[0.06] rounded-xl p-3 text-xs space-y-1">
+                <div className="max-w-lg bg-surface border border-white/[0.06] rounded-xl p-3 text-xs space-y-1">
                   <div className="flex items-center justify-between text-zinc-500 text-[10px] font-mono">
                     <span>#архитектура</span>
                     <span>10:42 PM</span>
@@ -174,7 +174,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
                   </p>
                 </div>
 
-                <div className="max-w-lg bg-[#141417] border border-white/[0.06] rounded-xl p-3 text-xs space-y-1">
+                <div className="max-w-lg bg-surface border border-white/[0.06] rounded-xl p-3 text-xs space-y-1">
                   <div className="flex items-center justify-between text-zinc-500 text-[10px] font-mono">
                     <span className="text-emerald-400 font-medium">✓ Таска выполнена</span>
                     <span>10:45 PM</span>
@@ -186,7 +186,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
               </div>
 
               {/* Composer input mock */}
-              <div className="p-2.5 rounded-xl bg-[#141417] border border-white/[0.08] flex items-center justify-between text-xs text-zinc-500 font-mono">
+              <div className="p-2.5 rounded-xl bg-surface border border-white/[0.08] flex items-center justify-between text-xs text-zinc-500 font-mono">
                 <span>Напишите мысль или задачу... (Enter для отправки)</span>
                 <span className="text-[10px] bg-white/[0.06] px-2 py-0.5 rounded text-zinc-400">⌘K меню</span>
               </div>
@@ -208,7 +208,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-5 rounded-2xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+          <div className="p-5 rounded-2xl bg-surface border border-white/[0.06] flex flex-col gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-200">
               <FileCode className="w-4 h-4" />
             </div>
@@ -219,7 +219,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+          <div className="p-5 rounded-2xl bg-surface border border-white/[0.06] flex flex-col gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-200">
               <Shield className="w-4 h-4" />
             </div>
@@ -230,7 +230,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[#141417] border border-white/[0.06] flex flex-col gap-3">
+          <div className="p-5 rounded-2xl bg-surface border border-white/[0.06] flex flex-col gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-200">
               <Search className="w-4 h-4" />
             </div>
@@ -252,9 +252,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
           </h2>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#0c0c0e]">
+        <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-panel">
           <table className="w-full text-left text-xs text-zinc-300">
-            <thead className="bg-[#141417] text-zinc-400 font-mono text-[11px] border-b border-white/[0.06]">
+            <thead className="bg-surface text-zinc-400 font-mono text-[11px] border-b border-white/[0.06]">
               <tr>
                 <th className="py-3 px-4 font-normal">Возможность</th>
                 <th className="py-3 px-4 font-semibold text-white">SLAG v2</th>
@@ -319,7 +319,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
         {/* 3 Tiers Grid: Free / Smile / Angry */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* 1. Free */}
-          <div className="p-6 rounded-2xl bg-[#141417] border border-white/[0.06] flex flex-col justify-between gap-6">
+          <div className="p-6 rounded-2xl bg-surface border border-white/[0.06] flex flex-col justify-between gap-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-white">Free</span>
@@ -356,7 +356,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
           </div>
 
           {/* 2. Smile (Hit / Former Pro) */}
-          <div className="p-6 rounded-2xl bg-[#141417] border border-emerald-500/30 flex flex-col justify-between gap-6 relative overflow-hidden shadow-lg shadow-emerald-950/20">
+          <div className="p-6 rounded-2xl bg-surface border border-emerald-500/30 flex flex-col justify-between gap-6 relative overflow-hidden shadow-lg shadow-emerald-950/20">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -404,7 +404,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAccount })
           </div>
 
           {/* 3. Angry */}
-          <div className="p-6 rounded-2xl bg-[#141417] border border-amber-500/20 flex flex-col justify-between gap-6">
+          <div className="p-6 rounded-2xl bg-surface border border-amber-500/20 flex flex-col justify-between gap-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

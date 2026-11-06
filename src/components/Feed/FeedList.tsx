@@ -546,7 +546,7 @@ export const FeedList: React.FC = () => {
           <button
             type="button"
             onClick={scrollToBottom}
-            className="pointer-events-auto w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-[#27272a] active:bg-[#323238] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer transition-all active:scale-90 animate-in fade-in zoom-in-95 group"
+            className="pointer-events-auto w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer transition-all active:scale-90 animate-in fade-in zoom-in-95 group"
             title="К последним заметкам"
             aria-label="Прокрутить к последним заметкам"
           >
