@@ -144,7 +144,7 @@ const ToastCard: React.FC<{ toast: ToastMessage }> = ({ toast }) => {
           type="button"
           aria-label={toast.action.label}
           title={toast.action.label}
-          className="ml-1 flex shrink-0 items-center justify-center w-8 h-8 max-sm:w-11 max-sm:h-11 rounded-md text-fg-secondary hover:text-fg-primary focus-visible:text-fg-primary cursor-pointer"
+          className="relative ml-1 flex shrink-0 items-center justify-center w-4 h-4 rounded-md text-fg-secondary hover:text-fg-primary focus-visible:text-fg-primary cursor-pointer after:absolute after:inset-1/2 after:w-11 after:h-11 after:-translate-x-1/2 after:-translate-y-1/2"
         >
           {toast.action.kind === 'undo' ? <Undo2 className="w-4 h-4" /> : <ArchiveRestore className="w-4 h-4" />}
         </button>
