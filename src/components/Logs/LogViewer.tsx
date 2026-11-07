@@ -22,24 +22,12 @@ interface LogViewerProps {
   onClose?: () => void;
 }
 
-// Flat, muted text colors without heavy background fills or thick borders
-const SCOPE_COLORS: Record<LogScope, string> = {
-  AI: 'text-indigo-400/90',
-  FS: 'text-emerald-400/90',
-  SEARCH: 'text-amber-400/90',
-  UI: 'text-zinc-400',
-  APP: 'text-purple-400/90',
-  SYNC: 'text-cyan-400/90',
-  MEDIA: 'text-pink-400/90',
-  WORKSPACE: 'text-sky-400/90',
-};
-
 const LEVEL_COLORS: Record<LogLevel, { text: string; labelColor: string }> = {
-  trace: { text: 'text-zinc-500', labelColor: 'text-zinc-600' },
-  debug: { text: 'text-zinc-400', labelColor: 'text-zinc-500' },
-  info: { text: 'text-zinc-300', labelColor: 'text-zinc-500' },
-  warn: { text: 'text-amber-300/90', labelColor: 'text-amber-500' },
-  error: { text: 'text-rose-300/95', labelColor: 'text-rose-400' },
+  trace: { text: 'text-fg-muted', labelColor: 'text-fg-dim' },
+  debug: { text: 'text-fg-secondary', labelColor: 'text-fg-muted' },
+  info: { text: 'text-fg-primary', labelColor: 'text-fg-muted' },
+  warn: { text: 'text-warning', labelColor: 'text-warning' },
+  error: { text: 'text-danger', labelColor: 'text-danger' },
 };
 
 const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC', 'MEDIA', 'WORKSPACE'];
@@ -177,26 +165,26 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
   return (
     <div
       data-testid="log-viewer"
-      className={`flex flex-col h-full w-full bg-canvas text-zinc-300 select-text font-sans ${
-        variant === 'modal' ? 'rounded-lg border border-white/[0.08] shadow-2xl overflow-hidden' : ''
+      className={`flex flex-col h-full w-full bg-surface text-fg-primary select-text font-sans ${
+        variant === 'modal' ? 'rounded-2xl shadow-2xl overflow-hidden' : ''
       }`}
     >
       {/* Flat Unified Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 border-b border-white/[0.06] bg-panel shrink-0 select-none">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 border-b border-border-subtle shrink-0 select-none">
         {/* Title and stats */}
         <div className="flex items-center gap-2">
-          <Terminal className="w-3.5 h-3.5 text-zinc-500" />
-          <span className="text-xs font-medium text-zinc-200">Логи & HUD</span>
-          <span className="text-[11px] font-mono text-zinc-500">
+          <Terminal className="w-3.5 h-3.5 text-fg-muted" />
+          <span className="text-xs font-medium text-fg-primary">Логи & HUD</span>
+          <span className="text-[11px] font-mono text-fg-muted">
             {counts.total}
-            {counts.errors > 0 && <span className="text-rose-400 ml-1">· {counts.errors}e</span>}
-            {counts.warns > 0 && <span className="text-amber-400 ml-1">· {counts.warns}w</span>}
+            {counts.errors > 0 && <span className="text-danger ml-1">· {counts.errors}e</span>}
+            {counts.warns > 0 && <span className="text-warning ml-1">· {counts.warns}w</span>}
           </span>
           <span
             className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
               storageHealth.isNearQuota
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                : 'text-zinc-500 bg-white/[0.03]'
+                ? 'text-danger'
+                : 'text-fg-muted'
             }`}
             title={`Использование localStorage: ${storageHealth.usedKb} KB (${storageHealth.totalKeys} ключей)`}
           >
@@ -206,18 +194,18 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
 
         {/* Flat Minimal Search Input */}
         <div className="flex-1 max-w-xs min-w-[140px] relative">
-          <Search className="w-3 h-3 text-zinc-600 absolute left-2 top-1/2 -translate-y-1/2" />
+          <Search className="w-3 h-3 text-fg-dim absolute left-2 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по логам..."
-            className="w-full bg-white/[0.03] text-xs text-zinc-200 pl-7 pr-6 py-1 rounded border border-transparent focus:border-white/10 focus:bg-white/[0.05] outline-none transition-colors placeholder-zinc-600"
+            className="w-full text-xs text-fg-primary bg-surface-hover pl-7 pr-6 py-1 rounded-md border border-transparent focus:border-border-hover outline-none ring-0 transition-colors placeholder-fg-dim"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-dim hover:text-fg-secondary"
             >
               <X className="w-3 h-3" />
             </button>
@@ -230,19 +218,19 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             onClick={() => setAutoScroll(prev => !prev)}
             title={autoScroll ? 'Автопрокрутка включена' : 'Автопрокрутка выключена'}
             className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
-              autoScroll ? 'text-zinc-200 bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-300'
+              autoScroll ? 'text-fg-primary bg-surface-active' : 'text-fg-muted hover:text-fg-primary'
             }`}
           >
-            <ArrowDown className={`w-3 h-3 ${autoScroll ? 'text-zinc-200' : 'text-zinc-600'}`} />
+            <ArrowDown className={`w-3 h-3 ${autoScroll ? 'text-fg-primary' : 'text-fg-dim'}`} />
             <span className="text-[11px]">Авто</span>
           </button>
 
           <button
             onClick={handleCopyReport}
             title="Копировать отчёт для баг-репорта (Markdown)"
-            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
+            className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
-            {reportCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {reportCopied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
             <span className="text-[11px] hidden sm:inline">Отчёт</span>
           </button>
 
@@ -250,7 +238,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             onClick={() => handleDownloadLog('log')}
             title="Скачать структурированный лог (.log)"
             data-testid="log-download-plain"
-            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
+            className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
             <FileText className="w-3 h-3" />
             <span className="text-[11px] hidden sm:inline">.log</span>
@@ -260,7 +248,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             onClick={() => handleDownloadLog('json')}
             title="Скачать машинный массив (.json)"
             data-testid="log-download-json"
-            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
+            className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
             <Download className="w-3 h-3" />
             <span className="text-[11px] hidden sm:inline">JSON</span>
@@ -270,7 +258,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             onClick={handleOpenFolder}
             title="Открыть папку с логами"
             data-testid="log-open-folder"
-            className="flex items-center gap-1 px-1.5 py-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors"
+            className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
             <FolderOpen className="w-3 h-3" />
             <span className="text-[11px] hidden sm:inline">Папка</span>
@@ -279,7 +267,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
           <button
             onClick={handleClear}
             title="Очистить буфер"
-            className="p-1 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] rounded transition-colors"
+            className="p-1 text-fg-muted hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
             <Trash2 className="w-3 h-3" />
           </button>
@@ -288,7 +276,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             <button
               onClick={onClose}
               title="Закрыть"
-              className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04] rounded transition-colors ml-1"
+              className="p-1 text-fg-muted hover:text-fg-primary hover:bg-surface-hover rounded transition-colors ml-1"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -297,14 +285,14 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
       </div>
 
       {/* Flat Single-line Filters (No Chips-on-Chips, pure text buttons) */}
-      <div className="flex flex-wrap items-center gap-1 px-3 py-1 border-b border-white/[0.04] bg-panel/50 text-[11px] font-mono shrink-0 select-none">
-        <span className="text-zinc-600 text-[10px] mr-1">LEVEL:</span>
+      <div className="flex flex-wrap items-center gap-1 px-3 py-1 text-[11px] font-mono shrink-0 select-none">
+        <span className="text-fg-dim text-[10px] mr-1">LEVEL:</span>
         <button
           onClick={() => setSelectedLevel('ALL')}
           className={`px-1.5 py-0.5 rounded transition-colors ${
             selectedLevel === 'ALL'
-              ? 'text-zinc-100 bg-white/[0.08] font-medium'
-              : 'text-zinc-500 hover:text-zinc-300'
+              ? 'text-fg-primary bg-surface-active font-medium'
+              : 'text-fg-muted hover:text-fg-primary'
           }`}
         >
           ALL
@@ -315,23 +303,23 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             onClick={() => setSelectedLevel(lvl)}
             className={`px-1.5 py-0.5 rounded uppercase transition-colors ${
               selectedLevel === lvl
-                ? 'text-zinc-100 bg-white/[0.08] font-medium'
-                : 'text-zinc-500 hover:text-zinc-300'
+                ? 'text-fg-primary bg-surface-active font-medium'
+                : 'text-fg-muted hover:text-fg-primary'
             }`}
           >
             {lvl}
           </button>
         ))}
 
-        <div className="w-[1px] h-2.5 bg-white/[0.08] mx-1.5" />
+        <div className="w-px h-2.5 bg-border-subtle mx-1.5" />
 
-        <span className="text-zinc-600 text-[10px] mr-1">SCOPE:</span>
+        <span className="text-fg-dim text-[10px] mr-1">SCOPE:</span>
         <button
           onClick={() => setSelectedScope('ALL')}
           className={`px-1.5 py-0.5 rounded transition-colors ${
             selectedScope === 'ALL'
-              ? 'text-zinc-100 bg-white/[0.08] font-medium'
-              : 'text-zinc-500 hover:text-zinc-300'
+              ? 'text-fg-primary bg-surface-active font-medium'
+              : 'text-fg-muted hover:text-fg-primary'
           }`}
         >
           ALL
@@ -342,8 +330,8 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             onClick={() => setSelectedScope(sc)}
             className={`px-1.5 py-0.5 rounded transition-colors ${
               selectedScope === sc
-                ? 'text-zinc-100 bg-white/[0.08] font-medium'
-                : 'text-zinc-500 hover:text-zinc-300'
+                ? 'text-fg-primary bg-surface-active font-medium'
+                : 'text-fg-muted hover:text-fg-primary'
             }`}
           >
             {sc}
@@ -358,8 +346,8 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
         className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-0.5 font-mono text-[11px] leading-relaxed"
       >
         {filteredEntries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-44 text-zinc-600 text-xs">
-            <Terminal className="w-6 h-6 stroke-1 text-zinc-700 mb-1.5" />
+          <div className="flex flex-col items-center justify-center h-44 text-fg-dim text-xs">
+            <Terminal className="w-6 h-6 stroke-1 text-fg-dim mb-1.5" />
             <p>Логов нет или фильтр пуст</p>
           </div>
         ) : (
@@ -375,19 +363,18 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             });
 
             const levelCfg = LEVEL_COLORS[entry.level];
-            const scopeColor = SCOPE_COLORS[entry.scope];
 
             return (
               <div
                 key={entry.id}
                 onClick={() => hasData && toggleExpand(entry.id)}
-                className={`group flex flex-col px-2 py-1 rounded transition-colors hover:bg-white/[0.025] ${
+                className={`group flex flex-col px-2 py-1 rounded transition-colors hover:bg-surface-hover ${
                   hasData ? 'cursor-pointer' : ''
                 }`}
               >
-                <div className="flex items-baseline gap-2">
+                <div className="flex flex-wrap sm:flex-nowrap items-baseline gap-x-2 gap-y-0.5">
                   {/* Timestamp */}
-                  <span className="text-zinc-600 shrink-0 text-[10px]">
+                  <span className="text-fg-dim shrink-0 text-[10px]">
                     {timeStr}
                   </span>
 
@@ -396,19 +383,19 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
                     {entry.level}
                   </span>
 
-                  {/* Scope (subtle colored text) */}
-                  <span className={`w-14 shrink-0 text-[10px] uppercase font-medium ${scopeColor}`}>
+                  {/* Scope */}
+                  <span className="w-14 shrink-0 text-[10px] uppercase font-medium text-fg-secondary">
                     [{entry.scope}]
                   </span>
 
                   {/* Message (clean typography) */}
-                  <span className={`flex-1 break-all ${levelCfg.text}`}>
+                  <span className={`order-last sm:order-none w-full sm:w-auto sm:flex-1 min-w-0 break-words ${levelCfg.text}`}>
                     {entry.message}
                   </span>
 
                   {/* Duration if available */}
                   {entry.durationMs !== undefined && (
-                    <span className="text-zinc-600 text-[10px] shrink-0">
+                    <span className="text-fg-dim text-[10px] shrink-0">
                       +{Math.round(entry.durationMs)}ms
                     </span>
                   )}
@@ -418,17 +405,17 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
                     <button
                       onClick={(e) => handleCopyItem(entry, e)}
                       title="Копировать строку"
-                      className="text-zinc-500 hover:text-zinc-300 p-0.5"
+                      className="text-fg-muted hover:text-fg-primary p-0.5"
                     >
                       {copiedId === entry.id ? (
-                        <Check className="w-3 h-3 text-emerald-400" />
+                        <Check className="w-3 h-3 text-success" />
                       ) : (
                         <Copy className="w-3 h-3" />
                       )}
                     </button>
                     {hasData && (
-                      <span className="text-zinc-500 p-0.5">
-                        <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-zinc-300' : ''}`} />
+                      <span className="text-fg-muted p-0.5">
+                        <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-fg-primary' : ''}`} />
                       </span>
                     )}
                   </div>
@@ -443,7 +430,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
                   >
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="motion-accordion-inner mt-1.5 p-2 bg-black/40 rounded border border-white/[0.04] overflow-x-auto text-[10px] text-zinc-400"
+                      className="motion-accordion-inner mt-1.5 px-2 overflow-x-auto text-[10px] text-fg-secondary"
                     >
                       <pre className="whitespace-pre-wrap font-mono">
                         {JSON.stringify(entry.data, null, 2)}

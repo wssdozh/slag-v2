@@ -37,6 +37,7 @@ import type {
 } from '../../lib/sync/types';
 import { acceptSharedVault, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
+import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
 interface DevicesSettingsTabProps {
   addToast?: (text: string, type?: 'info' | 'success' | 'error') => void;
@@ -388,176 +389,109 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
   const limitsKnown = Boolean(account) || maxDevices > 0;
 
   return (
-    <div className="flex flex-col gap-3 text-zinc-100">
-      {/* Pending Vault Invitations */}
+    <div className="flex flex-col gap-3 text-fg-primary">
       {hosted && accountState.invitations.length > 0 && (
-        <section className="p-3.5 rounded-xl bg-white/[0.02] border border-emerald-500/20 flex flex-col gap-2">
-          <span className="text-xs font-semibold text-fg-primary">Приглашения в хранилища</span>
-          {accountState.invitations.map((invitation) => (
-            <div key={invitation.vaultId} className="flex items-center justify-between gap-3 py-1.5 border-t border-white/[0.04]">
-              <div className="min-w-0">
-                <div className="text-xs text-white truncate">{invitation.vaultName || invitation.vaultId}</div>
-                <div className="text-2xs text-zinc-500">{invitation.mode === 'receive-only' ? 'только чтение' : 'чтение и изменение'}</div>
-              </div>
-              <div className="flex gap-1.5 shrink-0">
-                <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleDeclineInvitation(invitation.vaultId)} className="px-2 py-1 text-2xs text-zinc-400">Скрыть</button>
-                <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleAcceptInvitation(invitation.vaultId)} className="px-2.5 py-1 text-2xs bg-white text-black rounded-md font-medium disabled:opacity-50">
-                  {busyVaultId === invitation.vaultId ? 'Подключение…' : 'Подключить'}
-                </button>
-              </div>
-            </div>
+        <SettingsGroup title="Приглашения в хранилища">
+          {accountState.invitations.map((invitation, index) => (
+            <React.Fragment key={invitation.vaultId}>
+              {index > 0 && <SettingsDivider />}
+              <SettingsRow icon={<Database className="w-4 h-4" />} label={invitation.vaultName || invitation.vaultId} description={invitation.mode === 'receive-only' ? 'Только чтение' : 'Чтение и изменение'} right={
+                <span className="flex gap-1.5">
+                  <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleDeclineInvitation(invitation.vaultId)} className="px-2 py-1 text-2xs text-fg-muted disabled:opacity-50 cursor-pointer">Скрыть</button>
+                  <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleAcceptInvitation(invitation.vaultId)} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{busyVaultId === invitation.vaultId ? 'Подключение…' : 'Подключить'}</button>
+                </span>
+              } />
+            </React.Fragment>
           ))}
-        </section>
+        </SettingsGroup>
       )}
 
-      {/* Devices List */}
-      <section className="settings-card p-3.5 flex flex-col gap-2">
-        <div className="flex items-center justify-between pb-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-fg-primary">Подключённые устройства</span>
-            <span
-              className="text-[11px] font-mono text-zinc-500"
-              title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}
-            >
-              {limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices}
-            </span>
-          </div>
-          <button
-            type="button"
-            data-testid="btn-open-pair-modal"
-            disabled={locked}
-            onClick={handleOpenPairModal}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-2xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] rounded-md disabled:opacity-40 whitespace-nowrap shrink-0 cursor-pointer motion-press"
-          >
-            <Plus className="w-3.5 h-3.5" /> Привязать устройство
-          </button>
-        </div>
-
-        <div className="divide-y divide-white/[0.04]">
-          {/* This device */}
-          <div className="py-2.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              {isMobile ? <Smartphone className="w-4 h-4 text-zinc-400 shrink-0" /> : <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />}
-              <div className="min-w-0">
-                <div className="text-xs text-zinc-200">{config.deviceName}</div>
-                <div className="text-[11px] font-mono text-zinc-500 truncate">{config.deviceId} · это устройство</div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const next = config.localSyncMode === 'receive-only' ? 'read-write' : 'receive-only';
-                syncEngine.setDeviceSyncMode(config.deviceId, next);
-                setConfig(syncEngine.getConfig());
-              }}
-              title="Локальный режим синхронизации этого устройства"
-              className="text-[11px] font-mono text-zinc-400 whitespace-nowrap shrink-0 hover:text-white transition-colors cursor-pointer"
-            >
-              {config.localSyncMode === 'receive-only' ? 'Только чтение' : 'Чтение и запись'}
-            </button>
-          </div>
-
-          {/* Other devices */}
-          {(hosted ? accountState.devices.filter((device) => device.id !== config.deviceId && device.status !== 'revoked') : config.trustedDevices).map((device) => {
-            const isAccountDevice = 'status' in device;
-            return (
-              <div key={device.id} className="py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  {device.platform === 'mobile' ? <Smartphone className="w-4 h-4 text-zinc-400 shrink-0" /> : <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />}
-                  <div className="min-w-0">
-                    {editingDeviceId === device.id ? (
-                      <input autoFocus value={editingDeviceName} onChange={(event) => setEditingDeviceName(event.target.value)} onBlur={() => void handleSaveRename()} onKeyDown={(event) => { if (event.key === 'Enter') void handleSaveRename(); }} className="bg-panel border border-white/20 rounded px-1.5 py-0.5 text-xs text-white outline-none" />
-                    ) : (
-                      <button type="button" onClick={() => { setEditingDeviceId(device.id); setEditingDeviceName(device.name); }} className="text-xs text-zinc-200 flex items-center gap-1.5 cursor-pointer hover:text-white">
-                        <span className="truncate">{device.name}</span><Edit2 className="w-3 h-3 text-zinc-600" />
-                      </button>
-                    )}
-                    <div className="text-[11px] font-mono text-zinc-500 truncate">
-                      {device.id}{isAccountDevice && device.status === 'pending' ? ' · ожидает подтверждения' : ''}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
+      <SettingsGroup title="Подключённые устройства" action={<span className="text-2xs font-mono text-fg-muted" title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}>{limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices}</span>}>
+        <SettingsRow icon={isMobile ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />} label={config.deviceName} description={<span className="font-mono">{config.deviceId} · это устройство</span>} />
+        <SettingsDivider />
+        <SettingsSelect label="Локальная синхронизация" value={config.localSyncMode ?? 'read-write'} onChange={(next) => { syncEngine.setDeviceSyncMode(config.deviceId, next as DeviceSyncMode); setConfig(syncEngine.getConfig()); }} options={[
+          { value: 'read-write', label: 'Чтение и запись' },
+          { value: 'receive-only', label: 'Только чтение' },
+        ]} />
+        {(hosted ? accountState.devices.filter((device) => device.id !== config.deviceId && device.status !== 'revoked') : config.trustedDevices).map((device) => {
+          const isAccountDevice = 'status' in device;
+          return (
+            <React.Fragment key={device.id}>
+              <SettingsDivider />
+              <SettingsRow
+                icon={device.platform === 'mobile' ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />}
+                label={editingDeviceId === device.id ? (
+                  <input autoFocus aria-label="Имя устройства" value={editingDeviceName} onChange={(event) => setEditingDeviceName(event.target.value)} onBlur={() => void handleSaveRename()} onKeyDown={(event) => { if (event.key === 'Enter') void handleSaveRename(); }} className="w-full px-1.5 py-0.5 text-xs text-fg-primary bg-transparent border border-border-subtle rounded-md outline-none" />
+                ) : (
+                  <button type="button" onClick={() => { setEditingDeviceId(device.id); setEditingDeviceName(device.name); }} className="flex items-center gap-1.5 text-xs text-fg-primary cursor-pointer"><span className="truncate">{device.name}</span><Edit2 className="w-3 h-3 text-fg-dim" /></button>
+                )}
+                description={<span className="font-mono break-all">{device.id}{isAccountDevice && device.status === 'pending' ? ' · ожидает подтверждения' : ''}</span>}
+                right={<span className="flex items-center gap-2">
                   {isAccountDevice && device.status === 'pending' ? (
-                    <button type="button" onClick={() => void accountClient.approveDevice(device.id)} className="text-[11px] text-emerald-400 cursor-pointer">Подтвердить</button>
+                    <button type="button" onClick={() => void accountClient.approveDevice(device.id)} className="text-2xs text-fg-secondary cursor-pointer">Подтвердить</button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setManagingDevice(device)}
-                      title="Доступ к хранилищам"
-                      aria-label={`Доступ ${device.name} к хранилищам`}
-                      className="px-2 py-1 text-2xs text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded transition-colors cursor-pointer"
-                    >
-                      Доступ к базам
-                    </button>
+                    <button type="button" onClick={() => setManagingDevice(device)} title="Доступ к хранилищам" aria-label={`Доступ ${device.name} к хранилищам`} className="px-2 py-1 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover cursor-pointer">Доступ к базам</button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isAccountDevice) void accountClient.revokeDevice(device.id);
-                      else {
-                        syncEngine.removeTrustedDevice(device.id);
-                        setConfig(syncEngine.getConfig());
-                      }
-                    }}
-                    title="Отозвать устройство"
-                    aria-label={`Отозвать ${device.name}`}
-                    className="p-1 text-zinc-600 hover:text-rose-400 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+                  <button type="button" onClick={() => {
+                    if (isAccountDevice) void accountClient.revokeDevice(device.id);
+                    else { syncEngine.removeTrustedDevice(device.id); setConfig(syncEngine.getConfig()); }
+                  }} title="Отозвать устройство" aria-label={`Отозвать ${device.name}`} className="p-1 text-fg-dim hover:text-danger cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                </span>}
+              />
+            </React.Fragment>
+          );
+        })}
+        <SettingsDivider />
+        <SettingsRow icon={<Plus className="w-4 h-4" />} label="Новое устройство" right={
+          <button type="button" data-testid="btn-open-pair-modal" disabled={locked} onClick={handleOpenPairModal} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">Привязать устройство</button>
+        } />
+      </SettingsGroup>
 
       {/* Pairing Modal */}
       {isPairModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
-          <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+        <div className="fixed inset-0 z-[70] bg-canvas/85 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
+          <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-border-subtle rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
               <span className="text-xs font-semibold text-fg-primary">Привязка устройства</span>
-              <button type="button" aria-label="Закрыть привязку" onClick={() => setIsPairModalOpen(false)} className="p-1 text-zinc-400 cursor-pointer"><X className="w-4 h-4" /></button>
+              <button type="button" aria-label="Закрыть привязку" onClick={() => setIsPairModalOpen(false)} className="p-1 text-fg-secondary cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-4 flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-1 bg-canvas-subtle p-1 rounded-xl border border-white/[0.06]">
-                <button type="button" data-testid="pair-modal-tab-host" onClick={() => { setPairMode('host'); if (!hostPin) void handleGeneratePin(); }} className={`py-1.5 rounded-lg text-xs cursor-pointer ${pairMode === 'host' ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>Показать PIN</button>
-                <button type="button" data-testid="pair-modal-tab-guest" onClick={() => { setPairMode('guest'); setPendingApproval(null); }} className={`py-1.5 rounded-lg text-xs cursor-pointer ${pairMode === 'guest' ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>Ввести PIN</button>
+              <div className="grid grid-cols-2 gap-1 border-b border-border-subtle pb-2">
+                <button type="button" data-testid="pair-modal-tab-host" onClick={() => { setPairMode('host'); if (!hostPin) void handleGeneratePin(); }} className={`py-1.5 rounded-md text-xs cursor-pointer ${pairMode === 'host' ? 'bg-surface-hover text-fg-primary' : 'text-fg-secondary'}`}>Показать PIN</button>
+                <button type="button" data-testid="pair-modal-tab-guest" onClick={() => { setPairMode('guest'); setPendingApproval(null); }} className={`py-1.5 rounded-md text-xs cursor-pointer ${pairMode === 'guest' ? 'bg-surface-hover text-fg-primary' : 'text-fg-secondary'}`}>Ввести PIN</button>
               </div>
-              {pairError && <p className="text-2xs text-rose-400">{pairError}</p>}
+              {pairError && <p className="text-2xs text-danger">{pairError}</p>}
               {pairMode === 'host' ? (
                 pendingApproval ? (
                   <div className="flex flex-col gap-3 py-2">
-                    <div className="text-xs text-white">Запрос на подключение</div>
-                    <div className="font-mono text-lg text-emerald-400">Код проверки: <strong>{pendingApproval.sas}</strong></div>
-                    <p className="text-2xs text-zinc-400">Сверьте код на втором устройстве. Будет открыт доступ только к текущему хранилищу.</p>
+                    <div className="text-xs text-fg-primary">Запрос на подключение</div>
+                    <div className="font-mono text-lg text-success">Код проверки: <strong>{pendingApproval.sas}</strong></div>
+                    <p className="text-2xs text-fg-secondary">Сверьте код на втором устройстве. Будет открыт доступ только к текущему хранилищу.</p>
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => void handleRejectPairing()} className="px-3 py-1.5 text-xs text-zinc-400 cursor-pointer">Отклонить</button>
-                      <button type="button" disabled={isApproving} onClick={() => void handleApprovePairing()} className="px-3.5 py-1.5 bg-white text-black font-semibold text-xs rounded-lg disabled:opacity-50 cursor-pointer">{isApproving ? 'Подтверждение…' : 'Разрешить доступ'}</button>
+                      <button type="button" onClick={() => void handleRejectPairing()} className="px-3 py-1.5 text-xs text-fg-secondary cursor-pointer">Отклонить</button>
+                      <button type="button" disabled={isApproving} onClick={() => void handleApprovePairing()} className="px-3.5 py-1.5 bg-fg-primary text-canvas font-semibold text-xs rounded-md disabled:opacity-50 cursor-pointer">{isApproving ? 'Подтверждение…' : 'Разрешить доступ'}</button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3 py-3">
-                    <span className="text-2xs text-zinc-500 font-mono">ОДНОРАЗОВЫЙ КОД</span>
+                    <span className="text-2xs text-fg-muted font-mono">ОДНОРАЗОВЫЙ КОД</span>
                     <div className="flex items-center gap-3">
-                      <span className="font-mono text-2xl font-bold tracking-widest text-white">{isGeneratingPin ? '…' : hostPin || '000-000'}</span>
-                      {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin, 'pin')} className="p-1.5 text-zinc-400 cursor-pointer">{copiedKey === 'pin' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}</button>}
+                      <span className="font-mono text-2xl font-bold tracking-widest text-fg-primary">{isGeneratingPin ? '…' : hostPin || '000-000'}</span>
+                      {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin, 'pin')} className="p-1.5 text-fg-secondary cursor-pointer">{copiedKey === 'pin' ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}</button>}
                     </div>
-                    <span className="font-mono text-2xs text-zinc-500">Действует: {formatTtl(hostPinTtl)}</span>
+                    <span className="font-mono text-2xs text-fg-muted">Действует: {formatTtl(hostPinTtl)}</span>
                   </div>
                 )
               ) : guestSasCode ? (
-                <div className="flex flex-col items-center gap-3 py-6"><Loader2 className="w-6 h-6 text-emerald-400 animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-emerald-400">{guestSasCode}</strong></span><span className="text-2xs text-zinc-500">Подтвердите подключение на первом устройстве</span></div>
+                <div className="flex flex-col items-center gap-3 py-6"><Loader2 className="w-6 h-6 text-success animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-success">{guestSasCode}</strong></span><span className="text-2xs text-fg-muted">Подтвердите подключение на первом устройстве</span></div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <label className="text-2xs text-zinc-400">PIN с первого устройства</label>
+                  <label className="text-2xs text-fg-secondary">PIN с первого устройства</label>
                   <input autoFocus placeholder="123-456" value={guestInputPin} onChange={(event) => {
                     const digits = event.target.value.replace(/\D/g, '').slice(0, 6);
                     setGuestInputPin(digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
-                  }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleClaimGuestPin(); } }} maxLength={7} className="w-full bg-panel border border-white/[0.08] rounded-xl px-3 py-2 text-center font-mono text-lg tracking-widest text-white outline-none" />
-                  <button type="button" disabled={isClaimingPin || guestInputPin.length !== 7} onClick={() => void handleClaimGuestPin()} className="w-full py-2 bg-white text-black font-semibold text-xs rounded-xl disabled:opacity-50 cursor-pointer">{isClaimingPin ? 'Связывание…' : 'Подключить устройство'}</button>
+                  }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleClaimGuestPin(); } }} maxLength={7} className="w-full bg-transparent border border-border-subtle rounded-md px-3 py-2 text-center font-mono text-lg tracking-widest text-fg-primary outline-none" />
+                  <button type="button" disabled={isClaimingPin || guestInputPin.length !== 7} onClick={() => void handleClaimGuestPin()} className="w-full py-2 bg-fg-primary text-canvas font-semibold text-xs rounded-md disabled:opacity-50 cursor-pointer">{isClaimingPin ? 'Связывание…' : 'Подключить устройство'}</button>
                 </div>
               )}
             </div>
@@ -567,21 +501,24 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
 
       {/* Managing Vault Access Modal */}
       {managingDevice && (
-        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setManagingDevice(null); }}>
-          <div className="w-full max-w-sm bg-surface-elevated border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-emerald-400" /><span className="text-xs font-semibold">Доступ к хранилищам</span></div>
-              <button type="button" aria-label="Закрыть доступ" onClick={() => setManagingDevice(null)} className="p-1 text-zinc-400 cursor-pointer"><X className="w-4 h-4" /></button>
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-canvas/60 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setManagingDevice(null); }}>
+          <div className="w-full max-w-sm bg-surface-elevated border border-border-subtle rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+              <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-success" /><span className="text-xs font-semibold">Доступ к хранилищам</span></div>
+              <button type="button" aria-label="Закрыть доступ" onClick={() => setManagingDevice(null)} className="p-1 text-fg-secondary cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-4 flex flex-col gap-3">
-              <div><div className="text-xs text-white">{managingDevice.name}</div><div className="font-mono text-2xs text-zinc-500">{managingDevice.id}</div></div>
+              <div><div className="text-xs text-fg-primary">{managingDevice.name}</div><div className="font-mono text-2xs text-fg-muted">{managingDevice.id}</div></div>
               {'status' in managingDevice && (
-                <div className="flex gap-1 bg-canvas-subtle p-0.5 rounded-lg border border-white/[0.06]">
-                  {(['read-write', 'receive-only'] as const).map((mode) => <button key={mode} type="button" onClick={() => setGrantMode(mode)} className={`flex-1 py-1 text-2xs rounded cursor-pointer ${grantMode === mode ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{mode === 'read-write' ? 'Чтение и изменение' : 'Только чтение'}</button>)}
-                </div>
+                <SettingsGroup title="Приглашение">
+                  <SettingsSelect label="Режим доступа" value={grantMode} onChange={(mode) => setGrantMode(mode as DeviceSyncMode)} options={[
+                    { value: 'read-write', label: 'Чтение и изменение' },
+                    { value: 'receive-only', label: 'Только чтение' },
+                  ]} />
+                </SettingsGroup>
               )}
-              <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
-                {vaults.map((vault) => {
+              <SettingsGroup title="Хранилища" className="max-h-56 overflow-y-auto">
+                {vaults.map((vault, index) => {
                   const grant = 'status' in managingDevice
                     ? accountState.vaults.find((item) => item.id === (vault.syncId || vault.id))?.grants.find((item) => item.deviceId === managingDevice.id)
                     : undefined;
@@ -589,13 +526,13 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
                     ? Boolean(grant && grant.status !== 'revoked')
                     : Boolean(managingDevice.allowedVaults?.includes(vault.id));
                   return (
-                    <button key={vault.id} type="button" onClick={() => void handleToggleVaultAccess(vault.id)} className="flex items-center justify-between py-2 border-t border-white/[0.04] text-left cursor-pointer hover:bg-white/[0.02] px-1 rounded">
-                      <div className="flex items-center gap-2 min-w-0"><Database className="w-3.5 h-3.5 text-zinc-500" /><span className="text-xs text-white truncate">{getVaultDisplayName(vault, vaults)}</span></div>
-                      <span className={`text-[10px] font-mono ${allowed ? 'text-emerald-400' : 'text-zinc-500'}`}>{grant?.status === 'pending' ? 'Ожидает' : grant?.status === 'accepted' ? (grant.mode === 'receive-only' ? 'Только чтение' : 'Подключено') : allowed ? 'Разрешено' : 'Запрещено'}</span>
-                    </button>
+                    <React.Fragment key={vault.id}>
+                      {index > 0 && <SettingsDivider />}
+                      <SettingsRow icon={<Database className="w-3.5 h-3.5" />} label={getVaultDisplayName(vault, vaults)} description={grant?.status === 'pending' ? 'Ожидает' : grant?.status === 'accepted' ? (grant.mode === 'receive-only' ? 'Только чтение' : 'Подключено') : undefined} right={<SettingsSwitch checked={allowed} onChange={() => void handleToggleVaultAccess(vault.id)} label={`Доступ к ${getVaultDisplayName(vault, vaults)}`} />} />
+                    </React.Fragment>
                   );
                 })}
-              </div>
+              </SettingsGroup>
             </div>
           </div>
         </div>

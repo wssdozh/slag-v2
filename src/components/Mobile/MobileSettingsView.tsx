@@ -9,7 +9,6 @@ import {
   Sparkles,
   Database,
   Terminal,
-  ChevronRight,
   Shield,
   Folder,
   CheckSquare,
@@ -26,6 +25,7 @@ import {
 } from 'lucide-react';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
+import { SettingsGroup, SettingsRow, SettingsDivider } from '../Settings/SettingsUI';
 
 const ALL_AVAILABLE_TABS: { id: MobileTabId; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'folders', label: 'Папки', icon: Folder },
@@ -169,215 +169,53 @@ export const MobileSettingsView: React.FC = () => {
 
       {/* Main Settings List (Matching iOS/Telegram grouped style) */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">
-        {/* Profile / Vault Card (Horizontal, Compact, Clickable to open Vault Switcher) */}
-        <button
-          type="button"
-          onClick={() => setIsVaultSwitcherOpen(true)}
-          className="w-full flex items-center justify-between gap-3.5 p-3.5 rounded-2xl bg-surface/80 border border-white/[0.06] shadow-sm hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-3.5 min-w-0 flex-1">
-            <div className="w-12 h-12 rounded-full bg-white/[0.06] border border-white/[0.1] flex items-center justify-center text-white text-base font-bold font-mono shrink-0 shadow-inner">
-              {vault.name ? vault.name.slice(0, 2).toUpperCase() : 'SL'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-white tracking-tight truncate">{vault.name || 'SLAG Vault'}</h2>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.06] text-[10px] font-mono shrink-0">
-                  <Shield className="w-2.5 h-2.5" />
-                  <span>Obsidian</span>
-                </span>
-              </div>
-              <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate">
-                {folders.length} {folders.length === 1 ? 'папка' : folders.length < 5 ? 'папки' : 'папок'} • {items.length} {items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-        </button>
+        <SettingsGroup title="Хранилище">
+          <SettingsRow icon={<Database className="w-4 h-4" />} label={vault.name || 'SLAG Vault'} description={`${folders.length} ${folders.length === 1 ? 'папка' : folders.length < 5 ? 'папки' : 'папок'} · ${items.length} ${items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}`} value="Obsidian" onClick={() => setIsVaultSwitcherOpen(true)} chevron />
+        </SettingsGroup>
+        <VaultSwitcherMenu isOpen={isVaultSwitcherOpen} onClose={() => setIsVaultSwitcherOpen(false)} variant="sheet" />
 
-        <VaultSwitcherMenu
-          isOpen={isVaultSwitcherOpen}
-          onClose={() => setIsVaultSwitcherOpen(false)}
-          variant="sheet"
-        />
-
-        {/* Pending Vault Invitations */}
         {accountState.invitations.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {accountState.invitations.map((inv) => (
-              <div
-                key={inv.vaultId}
-                className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-emerald-500/30 shadow-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-2xs font-mono text-emerald-400 uppercase tracking-wider">Приглашение в хранилище</div>
-                  <div className="text-xs font-semibold text-white truncate mt-0.5">{inv.vaultName || inv.vaultId}</div>
-                  <div className="text-2xs text-zinc-500">{inv.mode === 'receive-only' ? 'Только чтение' : 'Полный доступ'}</div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => void handleDeclineInvitation(inv.vaultId)}
-                    className="px-2.5 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    Скрыть
-                  </button>
-                  <button
-                    type="button"
-                    disabled={acceptingVaultId !== null}
-                    onClick={() => void handleAcceptInvitation(inv.vaultId)}
-                    className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold hover:bg-zinc-200 cursor-pointer motion-press"
-                  >
-                    {acceptingVaultId === inv.vaultId ? 'подключаем…' : 'Принять'}
-                  </button>
-                </div>
-              </div>
+          <SettingsGroup title="Приглашения в хранилища">
+            {accountState.invitations.map((inv, index) => (
+              <React.Fragment key={inv.vaultId}>
+                {index > 0 && <SettingsDivider />}
+                <SettingsRow label={inv.vaultName || inv.vaultId} description={inv.mode === 'receive-only' ? 'Только чтение' : 'Полный доступ'} right={
+                  <span className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => void handleDeclineInvitation(inv.vaultId)} className="px-2 py-1.5 text-2xs text-fg-muted cursor-pointer">Скрыть</button>
+                    <button type="button" disabled={acceptingVaultId !== null} onClick={() => void handleAcceptInvitation(inv.vaultId)} className="px-2 py-1.5 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{acceptingVaultId === inv.vaultId ? 'подключаем…' : 'Принять'}</button>
+                  </span>
+                } />
+              </React.Fragment>
             ))}
-          </div>
+          </SettingsGroup>
         )}
-
-        {/* SLAG ID Banner (When not logged in) */}
         {isLocked && (
-          <div className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface/80 border border-white/[0.06] shadow-sm">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white shrink-0">
-                <Shield className="w-4 h-4 text-zinc-300" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-white tracking-tight">SLAG ID</div>
-                <div className="text-2xs text-zinc-400 mt-0.5 truncate">Синхронизация и облачный ИИ</div>
-              </div>
-            </div>
-            <button
-              type="button"
-              data-testid="mobile-settings-login-btn"
-              onClick={() => navigatePage('account')}
-              className="h-ctrl-sm px-3.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 cursor-pointer shrink-0 motion-press"
-            >
-              Войти
-            </button>
-          </div>
+          <SettingsGroup title="Аккаунт">
+            <SettingsRow icon={<Shield className="w-4 h-4" />} label="SLAG ID" description="Синхронизация и облачный ИИ" right={<button type="button" data-testid="mobile-settings-login-btn" onClick={() => navigatePage('account')} className="px-3 py-1.5 text-xs text-fg-primary rounded-md hover:bg-surface-hover cursor-pointer">Войти</button>} />
+          </SettingsGroup>
         )}
-
         {!isLocked && account && (
-          <div
-            onClick={() => navigatePage('account')}
-            className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-surface/60 border border-white/[0.05] hover:bg-surface/80 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                <Shield className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-white truncate">{account.planLabel || 'SLAG ID'}</div>
-                <div className="text-[10px] font-mono text-zinc-500 truncate">Аккаунт подключен</div>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-          </div>
+          <SettingsGroup title="Аккаунт"><SettingsRow icon={<Shield className="w-4 h-4" />} label={account.planLabel || 'SLAG ID'} description="Аккаунт подключен" onClick={() => navigatePage('account')} chevron /></SettingsGroup>
         )}
+        <SettingsGroup title="Параметры">
+          <SettingsRow icon={<Sparkles className="w-4 h-4" />} label="ИИ & Провайдеры" onClick={() => openSettingsModal('ai')} chevron />
+          <SettingsDivider inset />
+          <SettingsRow icon={<Database className="w-4 h-4" />} label="Хранилище & Бэкап" onClick={() => openSettingsModal('vault')} chevron />
+          <SettingsDivider inset />
+          <SettingsRow icon={<Laptop className="w-4 h-4" />} label="Устройства & Доступ" onClick={() => openSettingsModal('devices')} chevron />
+          <SettingsDivider inset />
+          <SettingsRow icon={<RotateCcw className="w-4 h-4" />} label="Синхронизация & Сервер" onClick={() => openSettingsModal('sync')} chevron />
+          <SettingsDivider inset />
+          <SettingsRow icon={<Sliders className="w-4 h-4" />} label="Интерфейс, масштаб и плотность" onClick={() => openSettingsModal('ui')} chevron />
+          <SettingsDivider inset />
+          <SettingsRow icon={<Keyboard className="w-4 h-4" />} label="Горячие клавиши" onClick={() => openSettingsModal('shortcuts')} chevron />
+        </SettingsGroup>
 
-        {/* Group 1: Quick Settings Navigation (Opens specific tab in SettingsModal) */}
-        <div className="flex flex-col gap-1.5">
-          <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
-            Параметры
-          </div>
-          <div className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]">
-            <button
-              onClick={() => openSettingsModal('ai')}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-semibold text-zinc-200">ИИ & Провайдеры</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-            </button>
-
-            <button
-              onClick={() => openSettingsModal('vault')}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
-                  <Database className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-semibold text-zinc-200">Хранилище & Бэкап</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-            </button>
-
-            <button
-              onClick={() => openSettingsModal('devices')}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
-                  <Laptop className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-semibold text-zinc-200">Устройства & Доступ</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-            </button>
-
-            <button
-              onClick={() => openSettingsModal('sync')}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
-                  <RotateCcw className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-semibold text-zinc-200">Синхронизация & Сервер</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-            </button>
-
-            <button
-              onClick={() => openSettingsModal('ui')}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
-                  <Sliders className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-semibold text-zinc-200">Интерфейс, масштаб и плотность</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-            </button>
-
-            <button
-              onClick={() => openSettingsModal('shortcuts')}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
-                  <Keyboard className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-semibold text-zinc-200">Горячие клавиши</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-            </button>
-          </div>
-        </div>
-
-        {/* Group 2: Dock Customization & Drag Ordering (Clean Vertical List, Zero Blue) */}
-        <div className="flex flex-col gap-1.5">
-          <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-            <span>Нижняя панель (Dock)</span>
-            <button
-              onClick={() => setMobileDockTabs(['folders', 'tasks', 'assistant', 'settings'])}
-              className="text-zinc-500 hover:text-white flex items-center gap-1 cursor-pointer text-[10px]"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Сбросить</span>
-            </button>
-          </div>
-
+        <SettingsGroup title="Нижняя панель (Dock)" action={
+          <button type="button" onClick={() => setMobileDockTabs(['folders', 'tasks', 'assistant', 'settings'])} className="flex items-center gap-1 text-2xs text-fg-muted hover:text-fg-primary cursor-pointer"><RotateCcw className="w-3 h-3" />Сбросить</button>
+        }>
           <div
-            className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]"
+            className="divide-y divide-border-subtle"
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
@@ -397,18 +235,18 @@ export const MobileSettingsView: React.FC = () => {
                   onTouchStart={() => handleTouchStart(idx)}
                   className={`w-full flex items-center justify-between p-3.5 transition-colors select-none ${
                     isDragging
-                      ? 'bg-white/[0.08] opacity-60'
-                      : 'hover:bg-white/[0.02] active:bg-white/[0.04]'
+                      ? 'bg-surface-active opacity-60'
+                      : 'hover:bg-surface-hover active:bg-surface-hover'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-0.5 shrink-0">
+                    <div className="text-fg-muted hover:text-fg-secondary cursor-grab active:cursor-grabbing p-0.5 shrink-0">
                       <GripVertical className="w-4 h-4" />
                     </div>
-                    <div className="w-5 h-5 flex items-center justify-center shrink-0 text-zinc-400">
+                    <div className="w-5 h-5 flex items-center justify-center shrink-0 text-fg-secondary">
                       <Icon className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-semibold text-zinc-200 truncate">
+                    <span className="text-xs font-semibold text-fg-primary truncate">
                       {tab.label}
                     </span>
                   </div>
@@ -419,11 +257,11 @@ export const MobileSettingsView: React.FC = () => {
                       e.stopPropagation();
                       toggleDockTab(tab.id);
                     }}
-                    className="p-1 rounded text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                    className="p-1 rounded text-fg-secondary hover:text-fg-primary transition-colors cursor-pointer"
                     title="Отключить"
                     aria-label={`Отключить ${tab.label}`}
                   >
-                    <Check className="w-4 h-4 text-white" />
+                    <Check className="w-4 h-4 text-fg-primary" />
                   </button>
                 </div>
               );
@@ -436,53 +274,42 @@ export const MobileSettingsView: React.FC = () => {
                 <div
                   key={tab.id}
                   onClick={() => toggleDockTab(tab.id)}
-                  className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors cursor-pointer select-none opacity-50 hover:opacity-90"
+                  className="w-full flex items-center justify-between p-3.5 hover:bg-surface-hover active:bg-surface-hover transition-colors cursor-pointer select-none opacity-50 hover:opacity-90"
                   role="button"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      toggleDockTab(tab.id);
+                    }
+                  }}
                   tabIndex={0}
                   aria-label={`Добавить ${tab.label}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-4 h-4 shrink-0" />
-                    <div className="w-5 h-5 flex items-center justify-center shrink-0 text-zinc-500">
+                    <div className="w-5 h-5 flex items-center justify-center shrink-0 text-fg-muted">
                       <Icon className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-medium text-zinc-400 truncate">
+                    <span className="text-xs font-medium text-fg-secondary truncate">
                       {tab.label}
                     </span>
                   </div>
 
-                  <div className="p-1 text-zinc-500">
+                  <div className="p-1 text-fg-muted">
                     <Plus className="w-4 h-4" />
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </SettingsGroup>
 
-        {/* Group 3: Diagnostics & HUD */}
-        <div className="flex flex-col gap-1.5">
-          <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
-            Отладка & Диагностика
-          </div>
-          <div className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden divide-y divide-white/[0.04]">
-            <button
-              onClick={() => setIsLogViewerOpen(true)}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 flex items-center justify-center shrink-0 text-zinc-400">
-                  <Terminal className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-semibold text-zinc-200">Логи & Dev HUD</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
-            </button>
-          </div>
-        </div>
+        <SettingsGroup title="Отладка & Диагностика">
+          <SettingsRow icon={<Terminal className="w-4 h-4" />} label="Логи & Dev HUD" onClick={() => setIsLogViewerOpen(true)} chevron />
+        </SettingsGroup>
 
         {/* Version info footer */}
-        <div className="text-center text-xs text-zinc-600 font-mono py-2">
+        <div className="text-center text-xs text-fg-dim font-mono py-2">
           SLAG v2.0 • Local-First Minimal Notes
         </div>
       </div>

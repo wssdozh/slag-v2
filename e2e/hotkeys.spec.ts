@@ -132,13 +132,13 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
     await page.locator('button:has-text("Горячие клавиши")').click();
 
     // Verify displayed hotkeys
-    await expect(page.locator('span:has-text("Быстрый поиск и команды")')).toBeVisible();
+    await expect(page.getByText('Быстрый поиск и команды', { exact: true })).toBeVisible();
     await expect(page.locator('kbd:has-text("Ctrl+F / Ctrl+K")')).toBeVisible();
-    await expect(page.locator('span:has-text("Переключить Ассистента")')).toBeVisible();
+    await expect(page.getByText('Переключить Ассистента', { exact: true })).toBeVisible();
     await expect(page.locator('kbd:has-text("Ctrl+J")')).toBeVisible();
-    await expect(page.locator('span:has-text("Создать таску")')).toBeVisible();
+    await expect(page.getByText('Создать таску', { exact: true })).toBeVisible();
     await expect(page.locator('kbd:text-is("C")')).toBeVisible();
-    await expect(page.locator('span:has-text("Создать заметку")')).toBeVisible();
+    await expect(page.getByText('Создать заметку', { exact: true })).toBeVisible();
     await expect(page.locator('kbd:text-is("N")')).toBeVisible();
 
     // Take audit screenshot

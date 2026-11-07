@@ -75,6 +75,7 @@ interface SettingsRowProps {
   /** Renders below the row instead of beside the label. */
   children?: React.ReactNode;
   className?: string;
+  testId?: string;
 }
 
 export const SettingsRow: React.FC<SettingsRowProps> = ({
@@ -90,12 +91,14 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
   disabled = false,
   children,
   className = '',
+  testId,
 }) => {
-  const interactive = Boolean(onClick) && !disabled;
+  const interactive = Boolean(onClick);
   const Element = interactive ? 'button' : 'div';
 
   return (
     <Element
+      data-testid={testId}
       {...(interactive
         ? { type: 'button' as const, onClick, disabled, 'aria-disabled': disabled }
         : {})}
@@ -160,7 +163,7 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
     } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
   >
     <span
-      className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform"
+      className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-fg-primary shadow-sm transition-transform"
       style={{ transform: checked ? 'translateX(16px)' : 'none' }}
     />
   </button>

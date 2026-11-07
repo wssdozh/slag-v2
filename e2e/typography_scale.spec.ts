@@ -34,23 +34,15 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     await page.waitForTimeout(300);
 
     // Verify live preview card is visible
-    const livePreviewTitle = page.locator('text=Интерактивный образец иерархии внимания').first();
+    const livePreviewTitle = page.locator('text=Предпросмотр').first();
     await expect(livePreviewTitle).toBeVisible();
 
-    // Verify font scale buttons
-    const smallBtn = page.locator('button:has-text("Компактный (92%)")').first();
-    const normalBtn = page.locator('button:has-text("Обычный (100%)")').first();
-    const comfortableBtn = page.locator('button:has-text("Комфортный (110%)")').first();
-    const largeBtn = page.locator('button:has-text("Крупный (120%)")').first();
-
-    await expect(smallBtn).toBeVisible();
-    await expect(normalBtn).toBeVisible();
-    await expect(comfortableBtn).toBeVisible();
-    await expect(largeBtn).toBeVisible();
-
-    // 3. Test Scale Switching: Comfortable (110%)
-    await comfortableBtn.click();
-    await page.waitForTimeout(200);
+    const scaleSelect = page.getByTestId('font-scale-select');
+    await scaleSelect.click();
+    await expect(page.getByRole('option', { name: 'Компактный (92%)', exact: true })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Обычный (100%)', exact: true })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Крупный (120%)', exact: true })).toBeVisible();
+    await page.getByRole('option', { name: 'Комфортный (110%)', exact: true }).click();
 
     const comfortableScale = await page.evaluate(() => {
       return getComputedStyle(document.documentElement).getPropertyValue('--slag-font-scale').trim();
@@ -58,7 +50,8 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     expect(comfortableScale).toBe('1.1');
 
     // 4. Test Scale Switching: Large (120%)
-    await largeBtn.click();
+    await scaleSelect.click();
+    await page.getByRole('option', { name: 'Крупный (120%)', exact: true }).click();
     await page.waitForTimeout(200);
 
     const largeScale = await page.evaluate(() => {
@@ -67,6 +60,7 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     expect(largeScale).toBe('1.2');
 
     // 5. Test Font Family Switching: System OS
+    await page.getByRole('button', { name: 'Гарнитура', exact: true }).click();
     const systemFontBtn = page.locator('button:has-text("Системный (OS Native)")').first();
     await expect(systemFontBtn).toBeVisible();
     await systemFontBtn.click();
@@ -78,15 +72,17 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     expect(systemSans).toContain('-apple-system');
 
     // Scroll preview into view and capture settings screenshot
-    const previewCard = page.locator('text=Интерактивный образец иерархии внимания').first();
+    const previewCard = page.locator('text=Предпросмотр').first();
     await previewCard.scrollIntoViewIfNeeded();
     await page.waitForTimeout(200);
     await page.screenshot({ path: 'test-results/screenshots/typography_settings_preview.png' });
 
     // Switch back to Inter and Normal
+    await page.getByRole('button', { name: 'Гарнитура', exact: true }).click();
     const interFontBtn = page.locator('button:has-text("Inter (Linear)")').first();
     await interFontBtn.click();
-    await normalBtn.click();
+    await scaleSelect.click();
+    await page.getByRole('option', { name: 'Обычный (100%)', exact: true }).click();
     await page.waitForTimeout(200);
 
     // Close Settings

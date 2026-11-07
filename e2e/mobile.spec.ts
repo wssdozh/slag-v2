@@ -292,7 +292,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
 
     // Verify UI settings panel opened
-    await expect(page.locator('span', { hasText: 'Внешний вид, масштабы и плотность' })).toBeVisible();
+    await expect(page.getByTestId('font-scale-select')).toBeVisible();
 
     // Choices are dropdown rows: open, pick, close.
     const pick = async (rowTestId: string, option: string) => {

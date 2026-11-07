@@ -3,7 +3,6 @@ import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import { SecretKeyField } from '../Settings/SecretKeyField';
 import { storage } from '../../lib/storage';
-import { logger } from '../../lib/logger';
 import { openAppFolder } from '../../lib/folderOpener';
 import { getPlatformInfo, setupSystemHotkey, removeSystemHotkey, type PlatformInfo } from '../../lib/platform';
 import type { AiProvider } from '../../types';
@@ -21,16 +20,13 @@ import {
   Terminal,
   ArrowLeft,
   FolderOpen,
-  FileText,
   Archive,
   Trash2,
-  Clock,
   HardDrive,
   RefreshCw,
   Laptop
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
-import { Checkbox } from '../UI/Checkbox';
 import { BaseModal } from './BaseModal';
 import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSwitch, SettingsSelect, SettingsNumber, SettingsInput } from '../Settings/SettingsUI';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
@@ -186,7 +182,7 @@ export const SettingsModal: React.FC = () => {
       webSearchEnabled,
       maxTagsPerNote: Number(maxTags) || 3,
       allowNewTags,
-      tagCaseStyle: tagCaseStyle as any,
+      tagCaseStyle,
       customTagRules: customTagRules.trim(),
     });
     setIsSettingsOpen(false);
@@ -272,22 +268,6 @@ export const SettingsModal: React.FC = () => {
     addToast(res.message, res.success ? 'success' : 'info');
   };
 
-  const handleOpenLogsFolder = async () => {
-    const res = await openAppFolder('logs');
-    addToast(res.message, res.success ? 'success' : 'info');
-  };
-
-  const handleDownloadLogFile = () => {
-    try {
-      const filename = logger.downloadLog('log');
-      if (filename) {
-        addToast(`Лог сохранён (${filename})`, 'success');
-      }
-    } catch {
-      addToast('Ошибка выгрузки лога', 'error');
-    }
-  };
-
   const resetPanelSizes = () => {
     setSidebarWidth(256);
     setRightPanelWidth(288);
@@ -299,7 +279,7 @@ export const SettingsModal: React.FC = () => {
       {/* Tabs Nav: Horizontal scroll on mobile, vertical left column on desktop */}
       <div
         ref={tabsRef}
-        className="flex md:flex-col overflow-x-auto md:overflow-visible md:w-48 border-b md:border-b-0 md:border-r border-white/[0.06] bg-panel p-2 gap-1 select-none shrink-0 scrollbar-none"
+        className="flex md:flex-col overflow-x-auto md:overflow-visible md:w-48 border-b md:border-b-0 md:border-r border-border-subtle bg-panel p-2 gap-1 select-none shrink-0 scrollbar-none"
       >
         <button
           type="button"
@@ -307,11 +287,11 @@ export const SettingsModal: React.FC = () => {
           onClick={() => setActiveTab('ai')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'ai'
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              ? 'bg-surface-active text-fg-primary font-medium'
+              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-fg-muted shrink-0" />
           <span>ИИ & Провайдеры</span>
         </button>
 
@@ -321,11 +301,11 @@ export const SettingsModal: React.FC = () => {
           onClick={() => setActiveTab('vault')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'vault'
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              ? 'bg-surface-active text-fg-primary font-medium'
+              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
           }`}
         >
-          <Database className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <Database className="w-3.5 h-3.5 text-fg-muted shrink-0" />
           <span>Хранилище & Бэкап</span>
         </button>
 
@@ -336,11 +316,11 @@ export const SettingsModal: React.FC = () => {
           data-testid="settings-tab-devices"
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'devices'
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              ? 'bg-surface-active text-fg-primary font-medium'
+              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
           }`}
         >
-          <Laptop className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <Laptop className="w-3.5 h-3.5 text-fg-muted shrink-0" />
           <span>Устройства</span>
         </button>
 
@@ -351,11 +331,11 @@ export const SettingsModal: React.FC = () => {
           data-testid="settings-tab-sync"
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'sync'
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              ? 'bg-surface-active text-fg-primary font-medium'
+              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
           }`}
         >
-          <RefreshCw className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <RefreshCw className="w-3.5 h-3.5 text-fg-muted shrink-0" />
           <span>Синхронизация</span>
         </button>
 
@@ -365,11 +345,11 @@ export const SettingsModal: React.FC = () => {
           onClick={() => setActiveTab('ui')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'ui'
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              ? 'bg-surface-active text-fg-primary font-medium'
+              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
           }`}
         >
-          <Sliders className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <Sliders className="w-3.5 h-3.5 text-fg-muted shrink-0" />
           <span>Интерфейс & Панели</span>
         </button>
 
@@ -379,11 +359,11 @@ export const SettingsModal: React.FC = () => {
           onClick={() => setActiveTab('shortcuts')}
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'shortcuts'
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              ? 'bg-surface-active text-fg-primary font-medium'
+              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
           }`}
         >
-          <Keyboard className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <Keyboard className="w-3.5 h-3.5 text-fg-muted shrink-0" />
           <span>Горячие клавиши</span>
         </button>
 
@@ -394,11 +374,11 @@ export const SettingsModal: React.FC = () => {
           data-testid="settings-tab-logs"
           className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
             activeTab === 'logs'
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+              ? 'bg-surface-active text-fg-primary font-medium'
+              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
           }`}
         >
-          <Terminal className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <Terminal className="w-3.5 h-3.5 text-fg-muted shrink-0" />
           <span>Логи & Диагностика</span>
         </button>
       </div>
@@ -625,68 +605,32 @@ export const SettingsModal: React.FC = () => {
               )}
 
             {activeTab === 'vault' && (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-fg-primary">
-                    Резервное копирование и точки отката
-                  </span>
-                </div>
+              <div className="flex flex-col gap-3">
+                <SettingsGroup title="Резервное копирование">
+                  <SettingsRow
+                    label="Автобэкап раз в сутки"
+                    description="Хранятся последние 7 снимков"
+                    right={<SettingsSwitch checked={backupSettings.autoBackupEnabled} onChange={(checked) => updateBackupSettings({ autoBackupEnabled: checked })} label="Автобэкап раз в сутки" />}
+                  />
+                  <SettingsDivider />
+                  <SettingsRow
+                    label="Создать снимок"
+                    value={isCreatingSnapshot ? 'Создание…' : undefined}
+                    disabled={isCreatingSnapshot}
+                    onClick={() => void handleCreateSnapshot()}
+                    icon={<RefreshCw className={`w-4 h-4 ${isCreatingSnapshot ? 'animate-spin' : ''}`} />}
+                    testId="btn-create-snapshot"
+                  />
+                  {backupSettings.lastBackupAt && <p className="px-3 pb-3 sm:px-4 text-2xs text-fg-muted">Последний снимок: {new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU')}</p>}
+                </SettingsGroup>
 
-                {/* Auto-backup settings card */}
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
-                      <div className="flex flex-col">
-                        <span className="text-xs font-medium text-zinc-200">Автобэкап раз в сутки</span>
-                        <span className="text-[10px] text-zinc-500">Хранятся последние 7 снимков с автоудалением старых</span>
-                      </div>
-                    </div>
-                    <Checkbox
-                      checked={backupSettings.autoBackupEnabled}
-                      onChange={(checked) => updateBackupSettings({ autoBackupEnabled: checked })}
-                      aria-label="Автобэкап раз в сутки"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
-                    <span className="text-[11px] font-mono text-zinc-500">
-                      {backupSettings.lastBackupAt
-                        ? `Последний снимок: ${new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU', {
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}`
-                        : 'Снимков пока нет'}
-                    </span>
-                    <button
-                      type="button"
-                      data-testid="btn-create-snapshot"
-                      onClick={handleCreateSnapshot}
-                      disabled={isCreatingSnapshot}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/15 transition-colors disabled:opacity-50 cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isCreatingSnapshot ? 'animate-spin' : ''}`} />
-                      <span>{isCreatingSnapshot ? 'Создание...' : 'Создать снимок'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Snapshots list */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-zinc-400">
-                      Точки восстановления ({backupSnapshots.length})
-                    </span>
-                  </div>
-
+                <SettingsGroup title={`Точки восстановления (${backupSnapshots.length})`}>
                   {backupSnapshots.length === 0 ? (
-                    <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] text-center text-xs text-zinc-500">
+                    <div className="px-3 py-3 text-center text-xs text-fg-dim">
                       Точек восстановления пока нет. Создайте первый снимок или дождитесь автобэкапа.
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-1">
+                    <div className="flex flex-col divide-y divide-border-subtle max-h-56 overflow-y-auto">
                       {backupSnapshots.map((snap) => {
                         const dateStr = new Date(snap.createdAt).toLocaleString('ru-RU', {
                           day: 'numeric',
@@ -699,18 +643,18 @@ export const SettingsModal: React.FC = () => {
                           <div
                             key={snap.id}
                             data-testid={`snapshot-item-${snap.id}`}
-                            className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.05] transition-colors"
+                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-4 hover:bg-surface-hover"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Archive className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                              <Archive className="w-3.5 h-3.5 text-fg-muted shrink-0" />
                               <div className="flex flex-col min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-zinc-200 truncate">{dateStr}</span>
-                                  <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
+                                  <span className="text-xs font-medium text-fg-primary truncate">{dateStr}</span>
+                                  <span className="text-2xs font-mono text-fg-muted">
                                     {snap.trigger === 'auto' ? 'Авто' : 'Ручной'}
                                   </span>
                                 </div>
-                                <div className="text-[11px] font-mono text-zinc-500">
+                                <div className="text-2xs font-mono text-fg-dim">
                                   {snap.notesCount} зам. · {snap.attachmentsCount} мед. · {sizeKb} КБ
                                 </div>
                               </div>
@@ -722,7 +666,7 @@ export const SettingsModal: React.FC = () => {
                                 data-testid={`btn-restore-snapshot-${snap.id}`}
                                 onClick={() => handleRestoreSnapshot(snap.id)}
                                 disabled={isRestoring}
-                                className="px-2 py-1 rounded text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50 cursor-pointer"
+                                className="px-2 py-1 rounded text-xs font-medium text-fg-secondary hover:text-fg-primary hover:bg-surface-hover transition-colors disabled:opacity-50 cursor-pointer"
                                 title="Восстановить хранилище из этого снимка"
                               >
                                 Восстановить
@@ -730,7 +674,7 @@ export const SettingsModal: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => downloadSnapshot(snap.id)}
-                                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                                className="p-1.5 rounded text-fg-muted hover:text-fg-primary hover:bg-surface-hover transition-colors cursor-pointer"
                                 title="Скачать ZIP архива"
                               >
                                 <Download className="w-3.5 h-3.5" />
@@ -738,7 +682,7 @@ export const SettingsModal: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => deleteSnapshot(snap.id)}
-                                className="p-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                className="p-1.5 rounded text-fg-dim hover:text-danger hover:bg-surface-hover transition-colors cursor-pointer"
                                 title="Удалить снимок"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -749,98 +693,25 @@ export const SettingsModal: React.FC = () => {
                       })}
                     </div>
                   )}
-                </div>
+                </SettingsGroup>
 
-                {/* Export & Import actions */}
-                <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.04]">
-                  <span className="text-[11px] font-medium text-zinc-400">Экспорт и импорт</span>
-
-                  <button
-                    type="button"
-                    data-testid="btn-export-zip"
-                    onClick={handleExportZip}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Download className="w-4 h-4 text-zinc-400 shrink-0" />
-                      <span className="font-medium">Экспорт в ZIP (заметки и медиа)</span>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleExportJson}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Download className="w-4 h-4 text-zinc-400 shrink-0" />
-                      <span className="font-medium">Экспорт структуры в JSON</span>
-                    </div>
-                  </button>
-
-                  <label className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <Upload className="w-4 h-4 text-zinc-400 shrink-0" />
-                      <span className="font-medium">Восстановить из файла (.zip / .json)</span>
-                    </div>
-                    <input
-                      type="file"
-                      accept=".zip,.json"
-                      className="hidden"
-                      onChange={handleFileImport}
-                    />
+                <SettingsGroup title="Экспорт и импорт">
+                  <SettingsRow label="Экспорт в ZIP (заметки и медиа)" icon={<Download className="w-4 h-4" />} onClick={() => void handleExportZip()} testId="btn-export-zip" external />
+                  <SettingsDivider inset />
+                  <SettingsRow label="Экспорт структуры в JSON" icon={<Download className="w-4 h-4" />} onClick={handleExportJson} external />
+                  <SettingsDivider inset />
+                  <label className="flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-xs font-medium text-fg-primary hover:bg-surface-hover cursor-pointer">
+                    <Upload className="w-4 h-4 shrink-0 text-fg-muted" />
+                    Восстановить из файла (.zip / .json)
+                    <input type="file" accept=".zip,.json" className="hidden" onChange={handleFileImport} />
                   </label>
-                </div>
-
-                {/* System folders (Desktop Only) */}
+                </SettingsGroup>
                 {!isMobile && (
-                  <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.04]">
-                    <span className="text-[11px] font-medium text-zinc-400">Системные каталоги</span>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenNotesFolder}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FolderOpen className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="font-medium">Открыть папку заметок на диске</span>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenBackupsFolder}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <HardDrive className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="font-medium">Открыть папку бэкапов на диске</span>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleOpenLogsFolder}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="font-medium">Открыть папку системных логов</span>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleDownloadLogFile}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs text-zinc-200 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span className="font-medium">Скачать системный лог (.log)</span>
-                      </div>
-                    </button>
-                  </div>
+                  <SettingsGroup title="Системные каталоги">
+                    <SettingsRow label="Открыть папку заметок на диске" icon={<FolderOpen className="w-4 h-4" />} onClick={() => void handleOpenNotesFolder()} external />
+                    <SettingsDivider inset />
+                    <SettingsRow label="Открыть папку бэкапов на диске" icon={<HardDrive className="w-4 h-4" />} onClick={() => void handleOpenBackupsFolder()} external />
+                  </SettingsGroup>
                 )}
               </div>
             )}
@@ -854,39 +725,12 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {activeTab === 'ui' && (
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-fg-primary">
-                    Внешний вид, масштабы и плотность
-                  </span>
-                  {/* Device profile switcher */}
-                  {!isMobile && (
-                    <div className="flex items-center h-ctrl-sm bg-canvas p-0.5 rounded-lg border border-white/[0.08]">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDevice('desktop')}
-                        className={`h-full px-2.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
-                          selectedDevice === 'desktop'
-                            ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                            : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-                        }`}
-                      >
-                        Десктоп
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDevice('mobile')}
-                        className={`h-full px-2.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
-                          selectedDevice === 'mobile'
-                            ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                            : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
-                        }`}
-                      >
-                        Смартфон
-                      </button>
-                    </div>
-                  )}
-                </div>
+              <div className="flex flex-col gap-3">
+                {!isMobile && (
+                  <SettingsGroup title="Профиль интерфейса">
+                    <SettingsSelect label="Устройство" value={selectedDevice} onChange={(device) => setSelectedDevice(device as typeof selectedDevice)} options={[{ value: 'desktop', label: 'Десктоп' }, { value: 'mobile', label: 'Смартфон' }]} />
+                  </SettingsGroup>
+                )}
 
                 {/* Font Scale Control */}
                 <SettingsGroup title="Шрифт">
@@ -920,231 +764,72 @@ export const SettingsModal: React.FC = () => {
                   />
                 </SettingsGroup>
 
-                {/* Live Interactive Hierarchy Preview Card (Desktop Only) */}
                 {!isMobile && (
-                  <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-surface border border-white/[0.08] shadow-inner select-none">
-                    <div className="flex items-center justify-between border-b border-white/[0.05] pb-2">
-                      <span className="text-2xs font-mono uppercase tracking-wider text-zinc-500">
-                        Интерактивный образец иерархии внимания
-                      </span>
-                      <span className="text-2xs font-mono text-blue-400/90">
-                        Live Preview
-                      </span>
-                    </div>
-
-                    {/* Sample Card */}
-                    <div className="flex flex-col gap-1.5 pt-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-base font-medium text-zinc-100 tracking-tight">
-                          Заголовок заметки или ключевая задача
-                        </span>
+                  <>
+                    <SettingsGroup title="Предпросмотр">
+                      <div className="flex flex-col gap-2 px-4 py-3 select-none">
+                        <span className="text-base font-medium text-fg-primary">Заголовок заметки или ключевая задача</span>
+                        <p className="text-sm leading-relaxed text-fg-secondary">Основной текст заметки с комфортным размером и межстрочным интервалом для чтения.</p>
+                        <span className="text-2xs text-fg-muted">Входящие · #дизайн #типографика</span>
                       </div>
-                      <p className="text-sm text-zinc-300 leading-relaxed font-normal">
-                        Основной текст заметки с комфортным размером и межстрочным интервалом для чтения.
-                      </p>
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
-                        <span className="text-xs text-zinc-400">
-                          Входящие • #дизайн #типографика
-                        </span>
-                        <span className="text-2xs font-mono text-zinc-500">
-                          14:30 • Статья
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Live Interactive Hierarchy Preview Card (Desktop Only) */}
-                {!isMobile && (
-                  <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-surface border border-white/[0.08] shadow-inner select-none">
-                    <div className="flex items-center justify-between border-b border-white/[0.05] pb-2">
-                      <span className="text-2xs font-mono uppercase tracking-wider text-zinc-500">
-                        Интерактивный образец иерархии внимания
-                      </span>
-                      <span className="text-2xs font-mono text-blue-400/90">
-                        Live Preview
-                      </span>
-                    </div>
-
-                    {/* Sample Card */}
-                    <div className="flex flex-col gap-1.5 pt-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-base font-medium text-zinc-100 tracking-tight">
-                          Заголовок заметки или ключевая задача
-                        </span>
-                      </div>
-                      <p className="text-sm text-zinc-300 leading-relaxed font-normal">
-                        Основной текст заметки с комфортным размером и межстрочным интервалом для чтения.
-                      </p>
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
-                        <span className="text-xs text-zinc-400">
-                          Входящие • #дизайн #типографика
-                        </span>
-                        <span className="text-2xs font-mono text-zinc-500">
-                          14:30 • Статья
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Panel Resizing Reset (Desktop Only) */}
-                {!isMobile && (
-                  <div className="settings-card flex flex-col gap-2 p-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-zinc-300">Размеры панелей:</span>
-                      <button
-                        type="button"
-                        onClick={resetPanelSizes}
-                        className="h-ctrl-sm flex items-center gap-1 px-2.5 rounded-md bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-xs transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Сбросить размеры</span>
-                      </button>
-                    </div>
-                  </div>
+                    </SettingsGroup>
+                    <SettingsGroup title="Панели">
+                      <SettingsRow label="Сбросить размеры" icon={<RotateCcw className="w-4 h-4" />} onClick={resetPanelSizes} />
+                    </SettingsGroup>
+                  </>
                 )}
               </div>
             )}
 
             {activeTab === 'shortcuts' && (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                 {/* System-level OS Integration Card (Desktop Only) */}
                 {!isMobile && platformInfo && (
-                  <div className="settings-card flex flex-col gap-2 p-3.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-fg-primary">
-                          Глобальный вызов в операционной системе
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase bg-white/5 border border-white/[0.08] text-zinc-400">
-                          {platformInfo.os} • {platformInfo.desktopEnvironment} ({platformInfo.sessionType})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            platformInfo.isHotkeyRegistered ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                          }`}
-                        />
-                        <span className="text-[11px] font-mono text-zinc-300">
-                          {platformInfo.shortcut}
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      {platformInfo.details}
-                    </p>
-
+                  <SettingsGroup title="Глобальный вызов в операционной системе">
+                    <SettingsRow label="Системный хоткей" value={platformInfo.shortcut} description={platformInfo.details} />
+                    <SettingsDivider />
+                    <SettingsRow label="Окружение" value={`${platformInfo.os} · ${platformInfo.desktopEnvironment} (${platformInfo.sessionType})`} />
                     {platformInfo.hotkeyBackend === 'gnome_gsettings' && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          disabled={isUpdatingHotkey}
-                          onClick={handleSetupHotkey}
-                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-zinc-200 transition-colors cursor-pointer motion-press disabled:opacity-50"
-                        >
-                          {platformInfo.isHotkeyRegistered ? 'Актуализировать путь' : 'Привязать хоткей в GNOME'}
-                        </button>
-                        {platformInfo.isHotkeyRegistered && (
-                          <button
-                            type="button"
-                            disabled={isUpdatingHotkey}
-                            onClick={handleRemoveHotkey}
-                            className="px-2.5 py-1 rounded-lg hover:bg-red-500/10 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer motion-press disabled:opacity-50"
-                          >
-                            Отвязать
-                          </button>
-                        )}
-                      </div>
+                      <>
+                        <SettingsDivider />
+                        <SettingsRow label={platformInfo.isHotkeyRegistered ? 'Актуализировать путь' : 'Привязать хоткей в GNOME'} disabled={isUpdatingHotkey} onClick={() => void handleSetupHotkey()} />
+                        {platformInfo.isHotkeyRegistered && <><SettingsDivider /><SettingsRow label="Отвязать" danger disabled={isUpdatingHotkey} onClick={() => void handleRemoveHotkey()} /></>}
+                      </>
                     )}
-
                     {platformInfo.hotkeyBackend === 'custom_launcher' && (
-                      <div className="flex flex-col gap-1.5 pt-1">
-                        <span className="text-[10px] text-zinc-500 font-mono">
-                          Команда для вызова в конфиге вашего WM (Hyprland / Sway / i3):
-                        </span>
-                        <code className="text-[11px] font-mono p-1.5 rounded bg-black/40 text-emerald-400 border border-white/[0.05] select-all">
-                          {platformInfo.executablePath} --quick
-                        </code>
-                      </div>
+                      <><SettingsDivider /><SettingsRow label="Команда запуска" value={<code className="select-all">{platformInfo.executablePath} --quick</code>} /></>
                     )}
-                  </div>
+                  </SettingsGroup>
                 )}
 
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-fg-primary">
-                    Глобальные команды и шорткаты
-                  </span>
-                  <span className="text-[11px] text-zinc-500">
-                    Работают в любом месте приложения (одиночные клавиши срабатывают вне полей ввода)
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1 text-xs">
-                  {APP_COMMANDS.filter(c => c.shortcut).map(cmd => {
-                    const shortcuts = [cmd.shortcut, ...(cmd.aliases || [])]
-                      .filter(Boolean)
-                      .map(s => formatShortcut(s!))
-                      .join(' / ');
-                    return (
-                      <div key={cmd.id} className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                        <div className="flex flex-col">
-                          <span className="text-zinc-300 font-medium">{cmd.title}</span>
-                          {!isMobile && cmd.description && (
-                            <span className="text-[10px] text-zinc-500">{cmd.description}</span>
-                          )}
-                        </div>
-                        <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06] shrink-0 ml-3">
-                          {shortcuts}
-                        </kbd>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex flex-col gap-1 pt-2">
-                  <span className="text-xs font-semibold text-fg-primary">
-                    Редактор, модальные окна и ввод
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1 text-xs">
-                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Сохранить запись (редактор)</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">
-                      {formatShortcut('mod+s')}
-                    </kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Применить AI Diff</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">
-                      {formatShortcut('mod+enter')}
-                    </kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Отправить запись (композер)</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">Enter</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Перенос строки</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">Shift + Enter</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Закрыть окно / Esc</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">Esc</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
-                    <span className="text-zinc-400">Контекстное меню</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-zinc-200 border border-white/[0.06]">ПКМ</kbd>
-                  </div>
-                </div>
+                <SettingsGroup title="Глобальные команды и шорткаты">
+                  {APP_COMMANDS.filter(c => c.shortcut).map((cmd, index) => (
+                    <React.Fragment key={cmd.id}>
+                      {index > 0 && <SettingsDivider />}
+                      <SettingsRow label={cmd.title} value={<kbd>{[cmd.shortcut, ...(cmd.aliases || [])].filter(Boolean).map(shortcut => formatShortcut(shortcut!)).join(' / ')}</kbd>} />
+                    </React.Fragment>
+                  ))}
+                </SettingsGroup>
+                <SettingsGroup title="Редактор, модальные окна и ввод">
+                  {[
+                    ['Сохранить запись (редактор)', formatShortcut('mod+s')],
+                    ['Применить AI Diff', formatShortcut('mod+enter')],
+                    ['Отправить запись (композер)', 'Enter'],
+                    ['Перенос строки', 'Shift + Enter'],
+                    ['Закрыть окно / Esc', 'Esc'],
+                    ['Контекстное меню', 'ПКМ'],
+                  ].map(([label, shortcut], index) => (
+                    <React.Fragment key={label}>
+                      {index > 0 && <SettingsDivider />}
+                      <SettingsRow label={label} value={<kbd>{shortcut}</kbd>} />
+                    </React.Fragment>
+                  ))}
+                </SettingsGroup>
               </div>
             )}
 
             {activeTab === 'logs' && (
-              <div className="h-[490px] -m-5 flex flex-col">
+              <div className="h-full min-h-0 flex flex-col overflow-hidden rounded-xl border border-border-subtle">
                 <LogViewer variant="dock" />
               </div>
             )}
@@ -1152,20 +837,20 @@ export const SettingsModal: React.FC = () => {
 
             {/* Bottom Form Actions */}
             <div
-              className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06] bg-panel shrink-0"
+              className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle bg-panel shrink-0"
               style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
             >
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(false)}
-                className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs text-fg-muted hover:text-fg-primary transition-colors cursor-pointer"
               >
                 Закрыть
               </button>
-              {activeTab !== 'logs' && activeTab !== 'shortcuts' && activeTab !== 'devices' && (
+              {activeTab === 'ai' && (
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shadow-sm motion-press"
+                  className="px-4 py-1.5 rounded-md bg-fg-primary text-canvas font-semibold text-xs hover:bg-fg-secondary transition-colors cursor-pointer shadow-sm motion-press"
                 >
                   Сохранить
                 </button>
@@ -1188,20 +873,20 @@ export const SettingsModal: React.FC = () => {
       >
         {/* Top Header */}
         <div
-          className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
+          className="px-4 py-3 border-b border-border-subtle flex items-center justify-between shrink-0 bg-panel"
           style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
         >
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSettingsOpen(false)}
-              className="p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer motion-press"
+              className="p-1.5 -ml-1 text-fg-muted hover:text-fg-primary cursor-pointer motion-press"
               title="Назад"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h3 className="text-sm font-semibold text-white">
+            <h3 className="text-sm font-semibold text-fg-primary">
               Настройки
-              <span className="text-zinc-500 font-normal ml-2">
+              <span className="text-fg-dim font-normal ml-2">
                 / {
                   activeTab === 'ai' ? 'ИИ & Провайдеры' :
                   activeTab === 'vault' ? 'Хранилище & Бэкап' :
@@ -1231,24 +916,24 @@ export const SettingsModal: React.FC = () => {
       maxWidth="md:max-w-[740px]"
       maxHeight="h-full md:h-[720px] md:max-h-[88vh]"
       contentClassName="flex flex-col h-full overflow-hidden"
-      containerClassName="rounded-none md:rounded-2xl border-0 md:border md:border-white/[0.08]"
+      containerClassName="rounded-none md:rounded-2xl border-0 md:border md:border-border-subtle"
     >
       {/* Top Header */}
       <div
-        className="px-4 md:px-5 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
+        className="px-4 md:px-5 py-3 border-b border-border-subtle flex items-center justify-between shrink-0 bg-panel"
         style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
       >
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white hidden md:flex">
+          <div className="w-6 h-6 items-center justify-center text-fg-muted hidden md:flex">
             <Settings className="w-3.5 h-3.5" />
           </div>
-          <h3 className="text-sm font-semibold text-white">
+          <h3 className="text-sm font-semibold text-fg-primary">
             Настройки
           </h3>
         </div>
         <button
           onClick={() => setIsSettingsOpen(false)}
-          className="p-1 rounded text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-colors hidden md:block cursor-pointer"
+          className="p-1 rounded text-fg-dim hover:text-fg-primary hover:bg-surface-hover transition-colors hidden md:block cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>

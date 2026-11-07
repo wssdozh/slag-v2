@@ -49,8 +49,8 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
 
     // 4. Verify Unified Single Card (Subscription + Sync Status + Manual Sync button)
     await expect(settingsModal.getByText('Self-hosted', { exact: false }).first()).toBeVisible();
-    await expect(settingsModal.getByText('свой сервер', { exact: true })).toBeVisible();
-    await expect(settingsModal.locator('text=кеш')).toBeVisible();
+    await expect(settingsModal.getByText('Свой сервер', { exact: true })).toBeVisible();
+    await expect(settingsModal.getByText('Кеш', { exact: true })).toBeVisible();
     await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
 
     // Screenshot of Unified Header Card & Clean Sync Tab

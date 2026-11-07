@@ -56,10 +56,12 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
     const syncModeBtn = settingsModal.locator('button', { hasText: /Чтение и запись|Полный доступ/ }).first();
     await expect(syncModeBtn).toBeVisible();
     await syncModeBtn.click();
-    await expect(settingsModal.locator('button', { hasText: 'Только чтение' }).first()).toBeVisible();
+    await page.getByRole('option', { name: 'Только чтение', exact: true }).click();
+    await expect(settingsModal.getByRole('button', { name: 'Локальная синхронизация' })).toContainText('Только чтение');
 
-    // Toggle back to Read-Write
-    await settingsModal.locator('button', { hasText: 'Только чтение' }).first().click();
+    // Toggle back to Read-Write through the shared dropdown.
+    await settingsModal.getByRole('button', { name: 'Локальная синхронизация' }).click();
+    await page.getByRole('option', { name: 'Чтение и запись', exact: true }).click();
     await expect(settingsModal.locator('button', { hasText: /Чтение и запись|Полный доступ/ }).first()).toBeVisible();
 
     // Take screenshot of Device Actions UI

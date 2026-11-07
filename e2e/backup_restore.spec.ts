@@ -37,7 +37,7 @@ test.describe('Backup & Restore System Verification', () => {
     // 4. Switch to "Хранилище & Бэкап" tab
     const vaultTabBtn = settingsModal.locator('button', { hasText: 'Хранилище & Бэкап' });
     await vaultTabBtn.click();
-    await expect(settingsModal.locator('text=Резервное копирование и точки отката')).toBeVisible();
+    await expect(settingsModal.locator('text=Резервное копирование')).toBeVisible();
 
     // 5. Create a snapshot
     const createSnapshotBtn = settingsModal.locator('[data-testid="btn-create-snapshot"]');
@@ -102,7 +102,7 @@ test.describe('Backup & Restore System Verification', () => {
     // 2. Switch to "Хранилище & Бэкап" tab
     const vaultTabBtn = settingsModal.locator('button', { hasText: 'Хранилище & Бэкап' });
     await vaultTabBtn.click();
-    await expect(settingsModal.locator('text=Резервное копирование и точки отката')).toBeVisible();
+    await expect(settingsModal.locator('text=Резервное копирование')).toBeVisible();
 
     // 3. Inject simulated duplicate snapshots into IndexedDB (like the user had from React StrictMode race condition)
     await page.evaluate(async () => {

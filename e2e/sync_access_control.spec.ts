@@ -61,7 +61,9 @@ test.describe('Sync Device Access Control & Registration', () => {
     const accessModal = page.locator('div[role="dialog"]').filter({ hasText: 'Доступ к хранилищам' }).last();
     await expect(accessModal).toBeVisible();
     await expect(accessModal.locator('text=Ноутбук (Linux)')).toBeVisible();
-    await expect(accessModal.getByRole('button', { name: 'main Разрешено', exact: true })).toBeVisible();
+    const vaultAccess = accessModal.getByRole('switch', { name: 'Доступ к main', exact: true });
+    await expect(vaultAccess).toBeVisible();
+    await expect(vaultAccess).toHaveAttribute('aria-checked', 'true');
 
     // Verify vault rows and toggle button
     const vaultRow = accessModal.locator('text=main').first();

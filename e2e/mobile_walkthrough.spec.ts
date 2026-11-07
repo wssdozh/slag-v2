@@ -234,24 +234,28 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await expect(page.locator('h3', { hasText: 'Настройки' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/26_settings_ai_modal.png' });
     await page.locator('button[title="Назад"]').click();
+    await expect(page.getByRole('dialog', { name: 'Настройки', exact: true })).toBeHidden();
 
     // Open Storage & Obsidian Settings
     await page.locator('button', { hasText: 'Хранилище & Бэкап' }).click();
     await expect(page.locator('h3', { hasText: 'Настройки' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/27_settings_vault_modal.png' });
     await page.locator('button[title="Назад"]').click();
+    await expect(page.getByRole('dialog', { name: 'Настройки', exact: true })).toBeHidden();
 
     // Open UI Scale & Density Settings
     await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
     await expect(page.locator('h3', { hasText: 'Настройки' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/28_settings_ui_modal.png' });
     await page.locator('button[title="Назад"]').click();
+    await expect(page.getByRole('dialog', { name: 'Настройки', exact: true })).toBeHidden();
 
     // Open Hotkeys Settings
     await page.locator('button', { hasText: 'Горячие клавиши' }).click();
     await expect(page.locator('h3', { hasText: 'Настройки' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/29_settings_hotkeys_modal.png' });
     await page.locator('button[title="Назад"]').click();
+    await expect(page.getByRole('dialog', { name: 'Настройки', exact: true })).toBeHidden();
 
     // Open Log Modal / Dev HUD
     await page.locator('button', { hasText: 'Логи & Dev HUD' }).click();
