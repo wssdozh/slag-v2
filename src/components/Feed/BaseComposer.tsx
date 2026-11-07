@@ -159,7 +159,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         )}
         {/* Кнопка в правом верхнем углу (раскрытие в полноэкранный редактор) */}
         {topRightSlot && (
-          <div className="absolute top-2.5 right-2.5 z-10 flex items-center">
+          <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-10 flex items-center gap-1">
             {topRightSlot}
           </div>
         )}

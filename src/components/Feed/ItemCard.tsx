@@ -457,15 +457,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       >
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
         <div
-          className={`absolute top-2.5 right-2.5 ${
+          className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 ${
             isPureVoice || isPureFile
               ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
-              : 'sm:top-3 sm:right-3 flex items-center'
+              : 'flex items-center'
           } gap-1 sm:gap-0 sm:group-hover:gap-1 z-20 pointer-events-auto`}
         >
           <button
             onClick={() => setReplyTarget(item)}
-            className="h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100"
+            className="w-7 h-7 sm:w-0 sm:h-6 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0"
             title="Ответить (R)"
           >
             <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
@@ -487,7 +487,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 });
               }
             }}
-            className="w-9 h-9 sm:w-0 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer flex items-center justify-center shrink-0"
+            className="w-7 h-7 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer flex items-center justify-center shrink-0"
             title="Действия"
           >
             <MoreVertical className="w-3.5 h-3.5 shrink-0" />
@@ -498,7 +498,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <button
               type="button"
               onClick={handleOpenArticle}
-              className="w-9 h-9 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              className="w-7 h-7 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
               title="Открыть в фокус-редакторе (⌘E)"
               aria-label="Открыть в фокус-редакторе"
             >

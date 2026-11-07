@@ -1375,7 +1375,7 @@ export const Composer: React.FC<ComposerProps> = ({
         <div className="motion-accordion w-full" data-expanded={Boolean(replyTarget)}>
         <div className="motion-accordion-inner">
         {bannerReply && (
-        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none pr-8">
+        <div className="flex items-center px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none pr-20 min-h-[28px]">
           <div className="flex items-center gap-1.5 truncate min-w-0">
             <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="text-[11px] font-mono text-zinc-500 shrink-0">
@@ -1385,13 +1385,6 @@ export const Composer: React.FC<ComposerProps> = ({
               {bannerReply.title || bannerReply.content.slice(0, 45)}
             </span>
           </div>
-          <button
-            onClick={() => setReplyTarget(null)}
-            className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 cursor-pointer"
-            title="Отменить ответ"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
         )}
         </div>
@@ -1802,15 +1795,29 @@ export const Composer: React.FC<ComposerProps> = ({
       submitTitle="Отправить (Enter)"
       topSlot={topSlot}
       topRightSlot={
-        !isModal ? (
-          <ToolbarButton
-            size="sm"
-            onClick={handleExpandToFullscreen}
-            title="Раскрыть в полноэкранный редактор"
-            aria-label="Раскрыть в полноэкранный редактор"
-            className="flex text-zinc-500 hover:text-zinc-200"
-            icon={<Maximize2 className="w-3.5 h-3.5" />}
-          />
+        replyTarget || !isModal ? (
+          <div className="flex items-center gap-1">
+            {replyTarget && (
+              <ToolbarButton
+                size="sm"
+                onClick={() => setReplyTarget(null)}
+                title="Отменить ответ"
+                aria-label="Отменить ответ"
+                className="text-zinc-400 hover:text-zinc-200"
+                icon={<X className="w-3.5 h-3.5" />}
+              />
+            )}
+            {!isModal && (
+              <ToolbarButton
+                size="sm"
+                onClick={handleExpandToFullscreen}
+                title="Раскрыть в полноэкранный редактор"
+                aria-label="Раскрыть в полноэкранный редактор"
+                className="flex text-zinc-400 hover:text-zinc-200"
+                icon={<Maximize2 className="w-3.5 h-3.5" />}
+              />
+            )}
+          </div>
         ) : undefined
       }
       propertiesSlot={propertiesSlot}
