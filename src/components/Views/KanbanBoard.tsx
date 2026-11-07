@@ -216,10 +216,15 @@ export const KanbanBoard: React.FC = () => {
       {/* TRIZ Dock on the left: [ 📚 Материалы папки ] (collapsible)   */}
       {/* ============================================================== */}
       {/* On mobile: backdrop overlay when materials drawer is open */}
-      {isMobile && isKanbanMaterialsOpen && (
+      {/* Kept mounted on purpose: the drawer slides for 200ms, and a scrim that
+          unmounts on the first frame of that slide leaves the board undimmed. */}
+      {isMobile && (
         <div
           onClick={() => setIsKanbanMaterialsOpen(false)}
-          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-30 motion-fade"
+          aria-hidden={!isKanbanMaterialsOpen}
+          className={`absolute inset-0 bg-black/60 backdrop-blur-xs z-30 transition-opacity duration-200 ${
+            isKanbanMaterialsOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
         />
       )}
 
