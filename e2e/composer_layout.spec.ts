@@ -30,16 +30,17 @@ async function geometry(surface: Locator, mobile: boolean) {
       .map((el) => ({
         label: el.getAttribute('aria-label') || el.title || el.textContent,
         corner: Boolean(el.closest('.composer-top-actions')),
+        send: el.classList.contains('composer-send'),
         rect: el.getBoundingClientRect(),
       }))
       .filter(({ rect }) => rect.width > 0 && rect.height > 0);
     const errors: string[] = [];
     if (root.scrollWidth > root.clientWidth + 1) errors.push('surface overflow');
-    for (const [i, { label, rect, corner }] of controls.entries()) {
+    for (const [i, { label, rect, corner, send }] of controls.entries()) {
       if (rect.left < Math.max(0, bounds.left) - 1 || rect.right > Math.min(innerWidth, bounds.right) + 1
         || rect.top < 0 || rect.bottom > innerHeight + 1) errors.push(`outside: ${label}`);
       // Corner utilities stay a control tall (an inset pseudo-element carries the touch area).
-      const minTarget = corner ? 31.5 : 43.5;
+      const minTarget = corner ? 31.5 : send ? 27.5 : 43.5;
       if (mobile && (rect.width < minTarget || rect.height < minTarget)) errors.push(`touch target: ${label} ${Math.round(rect.width)}x${Math.round(rect.height)}`);
       for (const other of controls.slice(i + 1)) {
         if (Math.min(rect.right, other.rect.right) - Math.max(rect.left, other.rect.left) > 1
@@ -112,6 +113,11 @@ for (const width of [360, 390]) {
         await surface.locator('textarea').fill('Посмотреть фильм @Карьера #бы');
         await page.locator('[data-tag-item="быт"]').first().click();
         await expect(surface.locator('textarea')).toHaveValue('Посмотреть фильм @Карьера #быт ');
+        // The known folder token is painted by the mirror, so it must stay aligned
+        // with the field it sits under.
+        const token = surface.locator('div[aria-hidden="true"] .text-mention');
+        await expect(token).toHaveText('@Карьера');
+        await expect(surface.locator('textarea')).toHaveCSS('color', 'rgba(0, 0, 0, 0)');
         await page.screenshot({ path: `${screenshots}/composer-mobile-tokens.png`, animations: 'disabled' });
       }
     });

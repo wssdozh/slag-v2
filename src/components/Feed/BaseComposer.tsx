@@ -56,6 +56,8 @@ export interface BaseComposerProps {
   onDragLeave?: React.DragEventHandler<HTMLDivElement>;
   /** Обработчик сброса файлов */
   onDrop?: React.DragEventHandler<HTMLDivElement>;
+  /** Диапазон в тексте для подсветки (например, @папка); красный цвет — от тона mention */
+  highlightRange?: { start: number; end: number } | null;
   /** Дополнительные классы для контейнера-каркаса */
   className?: string;
 }
@@ -89,6 +91,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   variant = 'card',
   hideTextarea = false,
   isDraggingOver = false,
+  highlightRange = null,
   onDragEnter,
   onDragOver,
   onDragLeave,
@@ -96,6 +99,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   className = '',
 }) => {
   const localRef = useRef<HTMLTextAreaElement | null>(null);
+  const mirrorRef = useRef<HTMLDivElement | null>(null);
   const effectiveRef = textareaRef || localRef;
 
   // Динамический авто-ресайз поля ввода по содержимому без лишних reflow
@@ -110,6 +114,13 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       effectiveRef.current.style.height = `${Math.max(minHeight, targetHeight)}px`;
     }
   }, [value, minHeight, maxHeight, effectiveRef]);
+
+  // The mirror has to scroll with the field, or the highlight drifts.
+  useLayoutEffect(() => {
+    if (mirrorRef.current && effectiveRef.current) {
+      mirrorRef.current.scrollTop = effectiveRef.current.scrollTop;
+    }
+  }, [value, highlightRange, effectiveRef]);
 
   const handleKeyDownInternal = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (onKeyDown) {
@@ -174,20 +185,44 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {/* Зона ввода */}
         {!hideTextarea && (
           <div className="flex min-w-0 items-center gap-1.5">
+            <div className="relative flex min-w-0 flex-1">
+            {highlightRange && (
+              /* A textarea cannot colour a substring, so the same text is mirrored
+                 underneath it and the field renders its own glyphs transparent. */
+              <div
+                ref={mirrorRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden whitespace-pre-wrap break-words px-1 py-0 text-base md:text-sm leading-normal text-fg-primary"
+              >
+                {value.slice(0, highlightRange.start)}
+                <span className="text-mention">{value.slice(highlightRange.start, highlightRange.end)}</span>
+                {value.slice(highlightRange.end)}
+              </div>
+            )}
             <textarea
               ref={effectiveRef}
               value={value}
               onChange={onChange}
               onKeyDown={handleKeyDownInternal}
               onPaste={onPaste}
+              onScroll={(e) => {
+                if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop;
+              }}
               rows={1}
               placeholder={placeholder}
               disabled={disabled}
               className={`min-w-0 flex-1 w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-zinc-500 placeholder:truncate resize-none  ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } leading-normal px-1 py-0 outline-none border-none`}
-              style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
+              } relative z-10 leading-normal px-1 py-0 outline-none border-none`}
+              style={{
+                minHeight: `${minHeight}px`,
+                maxHeight: `${maxHeight}px`,
+                // The mirror paints the glyphs; the field keeps the caret, the
+                // selection and the hit area only.
+                ...(highlightRange ? { color: 'transparent', caretColor: 'var(--color-fg-primary)' } : {}),
+              }}
             />
+            </div>
             {topRightSlot && (
               <div className="composer-top-actions flex shrink-0 items-center gap-1">
                 {topRightSlot}
@@ -228,14 +263,14 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                     }
                   }}
                   disabled={isSubmitDisabled}
-                  className={`composer-toolbar-control composer-toolbar-icon w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center motion-press shrink-0 ${
+                  className={`composer-toolbar-control composer-send flex items-center justify-center motion-press shrink-0 ${
                     !isSubmitDisabled
-                      ? 'bg-fg-primary text-canvas hover:bg-fg-primary/90 shadow-sm cursor-pointer'
+                      ? 'bg-accent text-white hover:bg-accent/90 shadow-sm cursor-pointer'
                       : 'bg-surface-active text-fg-dim cursor-not-allowed'
                   }`}
                   title={submitTitle}
                 >
-                  <Send className="w-4 h-4 ml-0.5" strokeWidth={1.5} />
+                  <Send className="w-4 h-4 ml-0.5 fill-current" strokeWidth={1.5} />
                 </button>
               )}
             </div>

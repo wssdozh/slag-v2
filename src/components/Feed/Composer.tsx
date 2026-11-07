@@ -114,6 +114,12 @@ export const Composer: React.FC<ComposerProps> = ({
   // The @token in the text is the folder indicator: deleting it drops the
   // destination, so it is derived rather than mirrored into state.
   const inlineFolder = useMemo(() => extractFolderToken(content, folders).folder, [content, folders]);
+  const folderTokenRange = useMemo(() => {
+    if (!inlineFolder) return null;
+    const needle = `@${inlineFolder.name}`;
+    const start = content.toLowerCase().indexOf(needle.toLowerCase());
+    return start === -1 ? null : { start, end: start + needle.length };
+  }, [content, inlineFolder]);
   const targetFolder = inlineFolder?.path
     ?? (targetFolderOverride?.forCurrent === effectiveDefaultFolder ? targetFolderOverride.folder : null);
   const setTargetFolder = useCallback((folder: string | null) => {
@@ -1744,6 +1750,7 @@ export const Composer: React.FC<ComposerProps> = ({
           : 'Мысль, заметка или код... (@ папка, # тег, / команды, [[ ссылки)'
       }
       textareaRef={textareaRef}
+      highlightRange={folderTokenRange}
       hideTextarea={isRecordingAudio && !content.trim()}
       isSubmitDisabled={!content.trim() && attachments.length === 0}
       submitTitle="Отправить (Enter)"
