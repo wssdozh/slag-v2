@@ -137,8 +137,8 @@
   .motion-sheet { translate: 0 100%; }
 }
 
-:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet)[data-motion-state="entering"],
-:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet)[data-motion-state="exiting"] {
+:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet, .motion-toast)[data-motion-state="entering"],
+:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet, .motion-toast)[data-motion-state="exiting"] {
   opacity: 0;
 }
 

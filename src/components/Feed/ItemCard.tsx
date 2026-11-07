@@ -24,6 +24,11 @@ import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
 
+const CARD_TRANSITION =
+  'transform var(--slag-motion-base) var(--ease-standard), ' +
+  'background-color var(--slag-motion-base) var(--ease-standard), ' +
+  'border-color var(--slag-motion-base) var(--ease-standard)';
+
 export interface ItemCardProps {
   item: SlagItem;
   isHighlighted?: boolean;
@@ -438,11 +443,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         onTouchCancel={handleTouchEnd}
         style={{
           transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined,
-          transition: swipeOffset ? 'none' : 'transform var(--slag-motion-base) var(--ease-standard)',
+          // One declaration for the card: a separate `transition-colors` class would
+          // be overridden here, which is why the hover colour used to snap.
+          transition: swipeOffset ? 'none' : CARD_TRANSITION,
         }}
         className={`group relative flex flex-col ${
           isPureVoice || isPureFile ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'
-        } p-2.5 sm:p-3 rounded-xl transition-colors duration-150 ease-standard cursor-default select-none ${
+        } p-2.5 sm:p-3 rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
             : 'bg-surface/80 hover:bg-surface-hover border border-white/[0.05]'
