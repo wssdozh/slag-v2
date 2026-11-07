@@ -109,9 +109,21 @@
   }
 
   html, body {
+    height: 100%;
     overscroll-behavior-y: none;
     -webkit-text-size-adjust: 100%;
     touch-action: manipulation;
+  }
+
+  /* The window never scrolls: the shell is exactly the visual viewport, so the
+     keyboard shrinks the app instead of pushing the page up. */
+  html,
+  body {
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: var(--vvh, 100dvh);
   }
 
   * {

@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { navigatePage } from './lib/navigation';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
+import { useVisualViewportHeight } from './hooks/useVisualViewportHeight';
 import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
 import { SearchModal } from './components/Search/SearchModal';
@@ -85,6 +86,8 @@ const AppContent: React.FC = () => {
     }
   }, [items, updateItem, aiSettings, updateLightboxImage]);
 
+  useVisualViewportHeight();
+
   const [currentPage, setCurrentPage] = useState<string | null>(() => {
     return typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('page') : null;
   });
@@ -142,7 +145,7 @@ const AppContent: React.FC = () => {
 
   if (standalonePanelId) {
     return (
-      <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative">
+      <div className="w-screen app-shell overflow-hidden bg-canvas text-fg-primary select-none relative">
         <InitialSyncBoundary>
           <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
         </InitialSyncBoundary>
@@ -197,7 +200,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative">
+    <div className="w-screen app-shell overflow-hidden bg-canvas text-fg-primary select-none relative">
       <InitialSyncBoundary>
       {isMobile ? <MobileShell /> : <WorkspaceShell />}
 
