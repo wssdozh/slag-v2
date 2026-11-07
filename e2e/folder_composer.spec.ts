@@ -34,16 +34,12 @@ test.describe('Composer @ Folder Selection E2E', () => {
     // Menu should disappear
     await expect(folderMenuHeader).toBeHidden();
 
-    // Text in textarea should no longer contain '@про'
+    // The folder stays in the draft as an @token instead of a separate chip row
     const value = await textarea.inputValue();
-    expect(value.trim()).toBe('Тестовая таска');
+    expect(value.trim()).toBe('Тестовая таска @Проекты');
+    await expect(page.locator('span[title*="Целевая папка для сохранения"]')).toHaveCount(0);
 
-    // Target folder chip should be visible in composer properties
-    const folderChip = page.locator('span[title*="Целевая папка для сохранения"]');
-    await expect(folderChip).toBeVisible();
-    await expect(folderChip).toContainText('Проекты');
-
-    // Visual screenshot of composer with folder chip
+    // Visual screenshot of composer with the folder token in the text
     await page.screenshot({ path: 'test-results/screenshots/folder_chip_active.png' });
 
     // Send the note
@@ -51,6 +47,17 @@ test.describe('Composer @ Folder Selection E2E', () => {
 
     // Toast or note created
     await expect(page.locator('text=Папка «Проекты» выбрана')).toBeVisible({ timeout: 3000 });
+
+    // The token routed the note and never reached the saved body
+    await expect(textarea).toHaveValue('');
+    const saved = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find(k => k.startsWith('slag_items_'));
+      return JSON.parse(localStorage.getItem(key || '') || '[]') as Array<{ title: string; content: string; folder: string }>;
+    });
+    const note = saved.find(i => i.title === 'Тестовая таска');
+    expect(note).toBeTruthy();
+    expect(note!.folder).toBe('Проекты');
+    expect(note!.content).not.toContain('@Проекты');
   });
 
   test('2. Folder button is permanently absent from toolbar, typing @ opens menu', async ({ page }) => {
@@ -76,19 +83,13 @@ test.describe('Composer @ Folder Selection E2E', () => {
     // Folder menu closes
     await expect(folderMenuHeader).toBeHidden();
 
-    // Chip appears
-    const folderChip = page.locator('span[title*="Целевая папка для сохранения"]');
-    await expect(folderChip).toBeVisible();
-    await expect(folderChip).toContainText('Личное');
+    // The token lands in the text; no separate chip row is rendered
+    await expect(textarea).toHaveValue('@Личное ');
+    await expect(page.locator('span[title*="Целевая папка для сохранения"]')).toHaveCount(0);
 
-    // Click close button on chip to dismiss target folder
-    const chipCloseBtn = folderChip.locator('button');
-    await chipCloseBtn.click();
-    // The properties row collapses instead of deleting the chip, so the chip node
-    // survives the animation. What has to happen is the row reaching zero height.
-    const propertiesRow = page.locator('.motion-accordion', { has: folderChip }).first();
-    await expect(propertiesRow).toHaveAttribute('data-expanded', 'false');
-    await expect.poll(async () => (await propertiesRow.boundingBox())?.height ?? 0).toBeLessThan(1);
+    // Deleting the token in the text is how the destination is dropped
+    await textarea.fill('');
+    await expect(textarea).toHaveValue('');
   });
 
   test('3. Drag and drop file from explorer directly into Composer', async ({ page }) => {

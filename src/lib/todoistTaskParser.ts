@@ -365,3 +365,24 @@ export function extractAndStripTags(text: string): { cleanContent: string; tags:
     tags,
   };
 }
+
+/**
+ * `@Папка` is composer syntax for the destination folder, the same way `#tag`
+ * is for tags: it is resolved on send and never written into the note body.
+ * Names may contain spaces, so the token is matched against the known folders
+ * instead of a character class.
+ */
+export function extractFolderToken<T extends { name: string; path: string }>(
+  text: string,
+  folders: T[]
+): { cleanContent: string; folder: T | null } {
+  if (!text) return { cleanContent: '', folder: null };
+  const byLongestName = [...folders].sort((a, b) => b.name.length - a.name.length);
+  for (const folder of byLongestName) {
+    const name = folder.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const token = new RegExp(`(^|\\s)@${name}(?=\\s|$)`, 'i');
+    if (!token.test(text)) continue;
+    return { cleanContent: text.replace(token, '$1').trim(), folder };
+  }
+  return { cleanContent: text, folder: null };
+}

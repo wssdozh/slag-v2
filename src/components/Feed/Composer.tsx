@@ -10,13 +10,12 @@ import { useComposerMedia } from '../../hooks/useComposerMedia';
 import { processFileListToAttachments } from '../../lib/fileDropHelper';
 import { categorizeDraft } from '../../lib/aiService';
 import { enrichItemAttachments, downscaleImageDataUrl } from '../../lib/attachmentEnrichment';
-import { parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
+import { extractFolderToken, parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
 import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
 import { ToolbarButton } from '../UI/ToolbarButton';
 import { ComposerTaskControls } from './ComposerTaskControls';
-import { TagChip } from '../UI/TagChip';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
@@ -30,7 +29,6 @@ import {
   Mic,
   Video,
   Sparkles,
-  Folder,
   CheckSquare,
   X,
   Loader2,
@@ -113,7 +111,11 @@ export const Composer: React.FC<ComposerProps> = ({
       ? { folder: initialFolder, forCurrent: effectiveDefaultFolder }
       : null
   );
-  const targetFolder = targetFolderOverride?.forCurrent === effectiveDefaultFolder ? targetFolderOverride.folder : null;
+  // The @token in the text is the folder indicator: deleting it drops the
+  // destination, so it is derived rather than mirrored into state.
+  const inlineFolder = useMemo(() => extractFolderToken(content, folders).folder, [content, folders]);
+  const targetFolder = inlineFolder?.path
+    ?? (targetFolderOverride?.forCurrent === effectiveDefaultFolder ? targetFolderOverride.folder : null);
   const setTargetFolder = useCallback((folder: string | null) => {
     setTargetFolderOverride(folder ? { folder, forCurrent: effectiveDefaultFolder } : null);
   }, [effectiveDefaultFolder]);
@@ -474,16 +476,6 @@ export const Composer: React.FC<ComposerProps> = ({
     return allVaultTags.filter(t => t.tag.toLowerCase().includes(q));
   }, [tagQuery, allVaultTags]);
 
-  // Live tags recognized from content (excluding dismissed)
-  const currentInlineTags = React.useMemo(() => {
-    return extractAndStripTags(content).tags.filter(t => !dismissedTags.has(t));
-  }, [content, dismissedTags]);
-
-  // Combined preview tags (manually selected + live inline hashtags)
-  const allPreviewTags = React.useMemo(() => {
-    return Array.from(new Set([...tags, ...currentInlineTags]));
-  }, [tags, currentInlineTags]);
-
   // WikiLink items matching current query
   const matchingWikiItems = wikiQuery !== null
     ? items
@@ -678,9 +670,12 @@ export const Composer: React.FC<ComposerProps> = ({
     setIsGeneratingAiTags(true);
     try {
       const res = await categorizeDraft(content, currentFolder, folders, aiSettings);
-      if (res.tags.length > 0) {
-        const merged = Array.from(new Set([...tags, ...res.tags]));
-        setTags(merged);
+      const folderToken = res.targetFolder && res.targetFolder !== currentFolder
+        ? `@${folders.find(f => f.path === res.targetFolder)?.name ?? res.targetFolder}`
+        : '';
+      const tokens = [folderToken, ...res.tags.map(t => `#${t}`)].filter(Boolean).join(' ');
+      if (tokens) {
+        setContent(prev => `${prev.trimEnd()}${prev.trim() ? ' ' : ''}${tokens} `);
       }
       if (res.targetFolder && res.targetFolder !== currentFolder) {
         setTargetFolder(res.targetFolder);
@@ -704,33 +699,33 @@ export const Composer: React.FC<ComposerProps> = ({
       : content.length;
     const textBefore = content.slice(0, cursorPos);
     const textAfter = content.slice(cursorPos);
-    let atMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
+    const atMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
 
+    // The folder stays in the text as an @token, so the draft shows where it
+    // goes without a second row of chips.
+    const inserted = `@${folder.name} `;
     if (atMatch && atMatch.index !== undefined) {
       const isStartOfLine = atMatch[0].startsWith('@');
       const replaceStart = isStartOfLine ? atMatch.index : atMatch.index + 1;
-      const newText = textBefore.slice(0, replaceStart) + textAfter;
-      setContent(newText);
+      setContent(textBefore.slice(0, replaceStart) + inserted + textAfter);
+      const newCursor = replaceStart + inserted.length;
       setTimeout(() => {
         if (el) {
           el.focus({ preventScroll: true });
-          el.setSelectionRange(replaceStart, replaceStart);
+          el.setSelectionRange(newCursor, newCursor);
         }
       }, 0);
     } else {
-      const globalMatch = content.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
-      if (globalMatch && globalMatch.index !== undefined) {
-        const isStartOfLine = globalMatch[0].startsWith('@');
-        const replaceStart = isStartOfLine ? globalMatch.index : globalMatch.index + 1;
-        const newText = content.slice(0, replaceStart);
-        setContent(newText);
-        setTimeout(() => {
-          if (el) {
-            el.focus({ preventScroll: true });
-            el.setSelectionRange(replaceStart, replaceStart);
-          }
-        }, 0);
-      }
+      const joiner = content && !/\s$/.test(content) ? ' ' : '';
+      const newText = content + joiner + inserted;
+      setContent(newText);
+      const newCursor = newText.length;
+      setTimeout(() => {
+        if (el) {
+          el.focus({ preventScroll: true });
+          el.setSelectionRange(newCursor, newCursor);
+        }
+      }, 0);
     }
 
     setTargetFolder(folder.path);
@@ -828,10 +823,6 @@ export const Composer: React.FC<ComposerProps> = ({
         el.setSelectionRange(newCursor, newCursor);
       }
     }, 10);
-  };
-
-  const removeTag = (t: string) => {
-    setTags(tags.filter(tag => tag !== t));
   };
 
   const removeAttachment = (id: string) => {
@@ -1004,9 +995,10 @@ export const Composer: React.FC<ComposerProps> = ({
     // Parse Todoist input synchronously for immediate state accuracy
     const currentParsed = parseTodoistInput(content);
 
-    // Extract and strip hashtags from content
-    const { cleanContent, tags: extractedTags } = extractAndStripTags(content);
-    const finalContent = (cleanContent || content).trim();
+    // `@Папка` and `#тег` are composer syntax: both are stripped before saving.
+    const { cleanContent: withoutFolder, folder: inlineFolder } = extractFolderToken(content, folders);
+    const { cleanContent, tags: extractedTags } = extractAndStripTags(withoutFolder);
+    const finalContent = (cleanContent || withoutFolder || content).trim();
 
     let title = '';
     const lines = finalContent.split('\n');
@@ -1064,7 +1056,7 @@ export const Composer: React.FC<ComposerProps> = ({
           : duration)
       : undefined;
 
-    const destinationFolder = targetFolder || effectiveDefaultFolder;
+    const destinationFolder = inlineFolder?.path || targetFolder || effectiveDefaultFolder;
     const saved = saveItem({
       type: itemType,
       title,
@@ -1146,8 +1138,9 @@ export const Composer: React.FC<ComposerProps> = ({
 
   // Expand into Fullscreen Focus Mode directly from composer
   const handleExpandToFullscreen = () => {
-    const { cleanContent, tags: extractedTags } = extractAndStripTags(content);
-    const finalContent = (cleanContent || content).trim();
+    const { cleanContent: withoutFolder, folder: inlineFolder } = extractFolderToken(content, folders);
+    const { cleanContent, tags: extractedTags } = extractAndStripTags(withoutFolder);
+    const finalContent = (cleanContent || withoutFolder || content).trim();
     const lines = finalContent.split('\n');
     const firstLine = lines[0]?.replace(/^#+\s*/, '').trim() || (itemType === 'article' ? 'Новая статья' : 'Черновик');
     const currentParsed = parseTodoistInput(content);
@@ -1196,7 +1189,7 @@ export const Composer: React.FC<ComposerProps> = ({
       type: itemType,
       title: taskTitle,
       content: finalContent,
-      folder: currentFolder,
+      folder: inlineFolder?.path || targetFolder || currentFolder,
       tags: finalTags,
       attachments,
       replyToId: replyTarget?.id,
@@ -1582,21 +1575,9 @@ export const Composer: React.FC<ComposerProps> = ({
     </div>
   ) : undefined;
 
-  const hasActiveProperties = Boolean(targetFolder) || allPreviewTags.length > 0;
-
-  // Clearing the folder or the last tag has to collapse the row, not delete it.
-  const propertiesKey = `${targetFolder ?? ''}|${allPreviewTags.join('|')}`;
-  const [stickyProperties, setStickyProperties] = useState({ key: propertiesKey, targetFolder, tags: allPreviewTags });
-  if (hasActiveProperties && stickyProperties.key !== propertiesKey) {
-    setStickyProperties({ key: propertiesKey, targetFolder, tags: allPreviewTags });
-  }
-  const shownProperties = hasActiveProperties
-    ? { targetFolder, tags: allPreviewTags }
-    : { targetFolder: stickyProperties.targetFolder, tags: stickyProperties.tags };
-
   const propertiesSlot = (
     <>
-      {/* Task properties have their own wrapping row. */}
+      {/* Task properties have their own wrapping row; folder and tags live in the text as tokens. */}
       {itemType === 'task' && (
         <div data-composer-properties="" className="px-1">
           <ComposerTaskControls
@@ -1628,40 +1609,6 @@ export const Composer: React.FC<ComposerProps> = ({
           />
         </div>
       )}
-    <div className="motion-accordion w-full" data-expanded={hasActiveProperties}>
-    <div className="motion-accordion-inner">
-    <div className="flex items-center gap-2 px-1 pt-1 pb-1 overflow-x-auto scrollbar-none whitespace-nowrap text-xs">
-      {/* Target Folder */}
-      {shownProperties.targetFolder && (
-        <span
-          className="shrink-0 inline-flex items-center gap-1.5 text-zinc-400 text-[11px] font-mono select-none"
-          title={`Целевая папка для сохранения: «${shownProperties.targetFolder}»`}
-        >
-          <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          <span>{shownProperties.targetFolder}</span>
-          <button
-            type="button"
-            onClick={() => setTargetFolder(null)}
-            className="text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer p-0.5 ml-0.5"
-            title="Сбросить целевую папку"
-          >
-            <X className="w-2.5 h-2.5" />
-          </button>
-        </span>
-      )}
-
-      {/* Tags */}
-      {shownProperties.tags.map(tag => (
-        <TagChip
-          key={tag}
-          tag={tag}
-          variant="flat"
-          onRemove={() => removeTag(tag)}
-        />
-      ))}
-    </div>
-    </div>
-    </div>
     </>
   );
 

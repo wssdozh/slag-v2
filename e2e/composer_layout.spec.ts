@@ -108,6 +108,11 @@ for (const width of [360, 390]) {
         await typeMenu(page).getByRole('button', { name: 'Заметка', exact: true }).click();
         await surface.locator('textarea').fill('');
         await page.screenshot({ path: `${screenshots}/composer-mobile-empty.png`, animations: 'disabled' });
+        // Folder and tag live in the text as tokens, with no extra chip row.
+        await surface.locator('textarea').fill('Посмотреть фильм @Карьера #бы');
+        await page.locator('[data-tag-item="быт"]').first().click();
+        await expect(surface.locator('textarea')).toHaveValue('Посмотреть фильм @Карьера #быт ');
+        await page.screenshot({ path: `${screenshots}/composer-mobile-tokens.png`, animations: 'disabled' });
       }
     });
   }

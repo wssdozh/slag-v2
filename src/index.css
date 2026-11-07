@@ -334,11 +334,11 @@
 }
 
 /* Composer rules stay local: shared controls elsewhere keep their own density. */
-.composer-context:not(:has([data-expanded="true"], [data-composer-properties], [data-composer-attachments])) {
+.composer-context:not(:has([data-expanded="true"], [data-composer-attachments])) {
   display: none;
 }
 
-.composer-context > :is([data-expanded="true"], [data-composer-properties], [data-composer-attachments]) ~ :is([data-expanded="true"], [data-composer-properties], [data-composer-attachments]) {
+.composer-context > :is([data-expanded="true"], [data-composer-attachments]) ~ :is([data-expanded="true"], [data-composer-attachments]) {
   margin-top: 8px;
 }
 
