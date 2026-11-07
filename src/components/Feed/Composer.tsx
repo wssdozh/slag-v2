@@ -1394,7 +1394,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Attachments Preview Strip */}
       {attachments.length > 0 && (
-        <div className="flex items-center gap-2 px-1 py-1 overflow-x-auto scrollbar-none whitespace-nowrap">
+        <div data-composer-attachments="" className="flex items-center gap-2 px-1 py-1 overflow-x-auto scrollbar-none whitespace-nowrap">
           {attachments.map(att => (
             <div key={att.id} className="shrink-0 flex items-center">
               {att.type === 'audio' ? (
@@ -1404,8 +1404,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     duration={att.duration}
                     size={att.size}
                     waveform={att.waveform}
-                    triggerClassName="composer-toolbar-control composer-record-type"
-        compact={true}
+                    compact={true}
                   />
                   <button
                     type="button"
@@ -1599,7 +1598,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <>
       {/* Task properties have their own wrapping row. */}
       {itemType === 'task' && (
-        <div className="px-1">
+        <div data-composer-properties="" className="px-1">
           <ComposerTaskControls
             effectiveDueDate={effectiveDueDate}
             effectiveDateLabel={effectiveDateLabel}

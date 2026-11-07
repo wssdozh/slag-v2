@@ -1194,7 +1194,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
                 {/* Reasoning Selector - Embedded ghost */}
                 <div
-                  className="composer-toolbar-group flex shrink-0 items-center gap-0.5 text-xs font-mono text-fg-secondary"
+                  className="flex shrink-0 items-center gap-0.5 text-xs font-mono text-fg-secondary"
                   role="group"
                   aria-label="Глубина рассуждений модели"
                   title="Глубина рассуждений модели: Off / Low / Med / High"
@@ -1220,7 +1220,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 <button
                   type="button"
                   onClick={() => saveAiSettings({ webSearchEnabled: !aiSettings.webSearchEnabled })}
-                  className={`composer-toolbar-control composer-toolbar-icon flex h-ctrl-md shrink-0 items-center justify-center gap-1 rounded-md px-2 text-xs font-mono outline-none ring-0 transition-colors cursor-pointer ${
+                  className={`composer-toolbar-control flex h-ctrl-md shrink-0 items-center justify-center gap-1 rounded-md px-2 text-xs font-mono outline-none ring-0 transition-colors cursor-pointer ${
                     aiSettings.webSearchEnabled
                       ? 'text-sky-400 bg-sky-500/10 hover:bg-sky-500/15 font-medium'
                       : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-hover'

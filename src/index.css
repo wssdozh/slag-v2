@@ -334,6 +334,14 @@
 }
 
 /* Composer rules stay local: shared controls elsewhere keep their own density. */
+.composer-context:not(:has([data-expanded="true"], [data-composer-properties], [data-composer-attachments])) {
+  display: none;
+}
+
+.composer-context > :is([data-expanded="true"], [data-composer-properties], [data-composer-attachments]) ~ :is([data-expanded="true"], [data-composer-properties], [data-composer-attachments]) {
+  margin-top: 8px;
+}
+
 .composer-surface .composer-toolbar-group {
   display: flex;
   min-width: 0;
@@ -376,9 +384,24 @@
   font-weight: 400;
 }
 
+/* The corner actions stay one control square so they never inflate the text row;
+   the extra touch area comes from an invisible inset instead of layout height. */
+.composer-surface .composer-top-actions button {
+  position: relative;
+  width: var(--slag-ctrl-md);
+  height: var(--slag-ctrl-md);
+  padding-inline: 0;
+  justify-content: center;
+}
+
+.composer-surface .composer-top-actions button::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
 @media (max-width: 767px) {
-  .composer-surface .composer-toolbar-control,
-  .composer-surface .composer-top-actions button {
+  .composer-surface .composer-toolbar-control {
     min-height: 44px;
     min-width: 44px;
   }

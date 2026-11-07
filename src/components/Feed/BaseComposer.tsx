@@ -162,7 +162,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {/* Both slots collapse to zero height instead of unmounting, so they share
             one gap-less column: a closed slot must not leave a permanent gap. */}
         {(topSlot || propertiesSlot) && (
-          <div className="flex flex-col">
+          <div className="composer-context flex min-w-0 flex-col">
             {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
             {topSlot}
 
@@ -173,7 +173,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
 
         {/* Зона ввода */}
         {!hideTextarea && (
-          <div className="flex min-w-0 items-start gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
             <textarea
               ref={effectiveRef}
               value={value}
@@ -185,7 +185,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               disabled={disabled}
               className={`min-w-0 flex-1 w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-zinc-500 placeholder:truncate resize-none  ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } leading-normal px-1 py-1.5 outline-none border-none`}
+              } leading-normal px-1 py-0 outline-none border-none`}
               style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
             />
             {topRightSlot && (
