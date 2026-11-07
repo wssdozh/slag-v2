@@ -1,5 +1,5 @@
 import React, { useRef, useLayoutEffect } from 'react';
-import { Send, UploadCloud } from 'lucide-react';
+import { ArrowUp, UploadCloud } from 'lucide-react';
 
 export interface BaseComposerProps {
   /** Текстовое значение поля ввода */
@@ -145,6 +145,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
     <div data-composer-root="" className="composer-surface relative flex w-full min-w-0 justify-center select-none">
       {overlaySlot}
       <div
+        data-composer-panel=""
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -265,12 +266,12 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                   disabled={isSubmitDisabled}
                   className={`composer-toolbar-control composer-send flex items-center justify-center motion-press shrink-0 ${
                     !isSubmitDisabled
-                      ? 'bg-accent text-white hover:bg-accent/90 shadow-sm cursor-pointer'
+                      ? 'bg-accent-strong text-white hover:bg-accent-strong/90 shadow-sm cursor-pointer'
                       : 'bg-surface-active text-fg-dim cursor-not-allowed'
                   }`}
                   title={submitTitle}
                 >
-                  <Send className="w-4 h-4 ml-0.5 fill-current" strokeWidth={1.5} />
+                  <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
                 </button>
               )}
             </div>

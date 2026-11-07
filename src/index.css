@@ -410,10 +410,22 @@
   padding: 0;
 }
 
+/* Phones get the tighter frame: the composer is the main surface there and a
+   30% shorter box reads lighter without touching the desktop layout. */
 @media (max-width: 767px) {
-  .composer-surface .composer-toolbar-control:not(.composer-send) {
-    min-height: 44px;
-    min-width: 44px;
+  .composer-surface [data-composer-panel] {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .composer-surface .composer-top-actions button {
+    width: var(--slag-ctrl-sm);
+    height: var(--slag-ctrl-sm);
+  }
+
+  /* The inset must not outgrow the tighter frame, or it scrolls the panel. */
+  .composer-surface .composer-top-actions button::after {
+    inset: -3px;
   }
 }
 

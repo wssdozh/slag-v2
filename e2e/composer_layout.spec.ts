@@ -31,17 +31,26 @@ async function geometry(surface: Locator, mobile: boolean) {
         label: el.getAttribute('aria-label') || el.title || el.textContent,
         corner: Boolean(el.closest('.composer-top-actions')),
         send: el.classList.contains('composer-send'),
+        square: el.classList.contains('composer-toolbar-icon'),
         rect: el.getBoundingClientRect(),
       }))
       .filter(({ rect }) => rect.width > 0 && rect.height > 0);
     const errors: string[] = [];
     if (root.scrollWidth > root.clientWidth + 1) errors.push('surface overflow');
-    for (const [i, { label, rect, corner, send }] of controls.entries()) {
+    for (const [i, { label, rect, corner, send, square }] of controls.entries()) {
       if (rect.left < Math.max(0, bounds.left) - 1 || rect.right > Math.min(innerWidth, bounds.right) + 1
         || rect.top < 0 || rect.bottom > innerHeight + 1) errors.push(`outside: ${label}`);
-      // Corner utilities stay a control tall (an inset pseudo-element carries the touch area).
-      const minTarget = corner ? 31.5 : send ? 27.5 : 43.5;
-      if (mobile && (rect.width < minTarget || rect.height < minTarget)) errors.push(`touch target: ${label} ${Math.round(rect.width)}x${Math.round(rect.height)}`);
+      // Everything is sized from the density token; corner utilities and the
+      // send plate are one step smaller than the main controls.
+      const style = getComputedStyle(root);
+      const control = parseFloat(style.getPropertyValue('--slag-ctrl-md')) || 32;
+      const small = parseFloat(style.getPropertyValue('--slag-ctrl-sm')) || 28;
+      // Corner utilities and the send plate run one step smaller than the row.
+      const isSmall = corner || send;
+      const minHeight = (isSmall ? small : control) - 0.5;
+      // Only square controls owe us a square; labelled ones may be wider or narrower.
+      const minWidth = isSmall || square ? (isSmall ? small : control) - 0.5 : 0;
+      if (mobile && (rect.height < minHeight || rect.width < minWidth)) errors.push(`touch target: ${label} ${Math.round(rect.width)}x${Math.round(rect.height)}`);
       for (const other of controls.slice(i + 1)) {
         if (Math.min(rect.right, other.rect.right) - Math.max(rect.left, other.rect.left) > 1
           && Math.min(rect.bottom, other.rect.bottom) - Math.max(rect.top, other.rect.top) > 1) {

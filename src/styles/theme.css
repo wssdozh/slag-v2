@@ -46,6 +46,8 @@
   --color-accent-subtle: rgba(59, 130, 246, 0.15);
   /* @mention token in composer drafts: light blue, not a fill. */
   --color-mention: #38bdf8;
+  /* Deeper accent for filled controls that need to sit quietly on dark. */
+  --color-accent-strong: #2563eb;
   --color-success: #10b981;
   --color-success-subtle: rgba(16, 185, 129, 0.15);
   --color-warning: #f59e0b;
