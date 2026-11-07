@@ -146,3 +146,45 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     await expect(page.locator('text=Путь к папке скопирован')).toBeVisible();
   });
 });
+
+test.describe('Context Menu flyout exit', () => {
+  test('a side panel keeps its node while it fades instead of vanishing', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(600);
+
+    await page.locator('[id^="item-"]').first().click({ button: 'right' });
+    const typeBtn = page.locator('button', { hasText: 'Сменить тип' }).first();
+    await expect(typeBtn).toBeVisible();
+    await typeBtn.hover();
+
+    const flyout = page.locator('.motion-popover[data-motion-state="open"]').last();
+    await expect(flyout).toBeVisible();
+
+    // Leaving the panel must start an exit, not delete the node: the guard that
+    // rendered it must not disappear before the animation does.
+    const [exit] = await Promise.all([
+      flyout.evaluate(element => new Promise<{ phase: string; alive: boolean }>(resolve => {
+        const finish = () => resolve({
+          phase: element.getAttribute('data-motion-state') ?? 'gone',
+          alive: document.body.contains(element),
+        });
+        const observer = new MutationObserver(() => {
+          if (element.getAttribute('data-motion-state') !== 'exiting') return;
+          observer.disconnect();
+          window.setTimeout(finish, 60);
+        });
+        observer.observe(element, { attributes: true, attributeFilter: ['data-motion-state'] });
+        window.setTimeout(() => { observer.disconnect(); finish(); }, 3000);
+      })),
+      (async () => {
+        await page.waitForTimeout(80);
+        await page.mouse.move(4, 4, { steps: 4 });
+      })(),
+    ]);
+
+    expect(exit.phase).toBe('exiting');
+    expect(exit.alive).toBe(true);
+  });
+});

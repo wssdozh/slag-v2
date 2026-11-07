@@ -565,7 +565,7 @@ export const ContextMenu: React.FC = () => {
       </div>
 
       {/* Side Submenu Panel: Quick Type Change */}
-      {type === 'item' && item && activeSubmenu === 'type' && triggerRect && (
+      {type === 'item' && item && triggerRect && (
         <Flyout
           open={activeSubmenu === 'type'}
           style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
@@ -631,7 +631,7 @@ export const ContextMenu: React.FC = () => {
       )}
 
       {/* Side Submenu Panel: Explorer / File System */}
-      {((type === 'item' && item) || (type === 'folder' && folder)) && activeSubmenu === 'explorer' && triggerRect && (
+      {((type === 'item' && item) || (type === 'folder' && folder)) && triggerRect && (
         <Flyout
           open={activeSubmenu === 'explorer'}
           style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
@@ -724,7 +724,7 @@ export const ContextMenu: React.FC = () => {
       )}
 
       {/* Side Submenu Panel: Additional Utilities */}
-      {type === 'item' && item && activeSubmenu === 'more' && triggerRect && (
+      {type === 'item' && item && triggerRect && (
         <Flyout
           open={activeSubmenu === 'more'}
           style={{ left: `${submenuX}px`, top: `${submenuY}px` }}

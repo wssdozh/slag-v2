@@ -545,19 +545,25 @@ export const FeedList: React.FC = () => {
       </div>
 
       {/* Floating scroll to bottom button: centered comfortably above the composer island */}
-      {showScrollBottom && (
-        <div className="absolute bottom-28 inset-x-0 pointer-events-none z-30 flex justify-center px-4 motion-fade">
+      {/* Mounted on purpose: it fades in when you scroll up, and a node that is
+          deleted on the first frame of the way back can only blink out. */}
+      <div
+        aria-hidden={!showScrollBottom}
+        className={`absolute bottom-28 inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
+          showScrollBottom ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
           <button
             type="button"
             onClick={scrollToBottom}
-            className="pointer-events-auto w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer motion-press group"
+            tabIndex={showScrollBottom ? 0 : -1}
+            className={`${showScrollBottom ? 'pointer-events-auto' : 'pointer-events-none'} w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer motion-press group`}
             title="К последним заметкам"
             aria-label="Прокрутить к последним заметкам"
           >
             <ChevronDown className="w-5 h-5 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-y-0.5" />
           </button>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

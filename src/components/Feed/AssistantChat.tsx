@@ -64,7 +64,10 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     initialIndex?: number;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const lastMessageCountRef = useRef(0);
+  // Seeded with the history that is already there: opening the panel is not the
+  // arrival of a message, and a smooth scroll across the whole log on open reads
+  // as a glitch.
+  const lastMessageCountRef = useRef(chatMessages.length);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const prevLoadingRef = useRef(isChatLoading);
 

@@ -316,12 +316,21 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         </div>
       </div>
 
-      {/* Telegram-style Transcript with user-approved divider line */}
-      {isExpanded && transcript && (
-        <div className="mt-2 pt-2 border-t border-white/[0.08] text-xs sm:text-[13px] text-zinc-200 font-sans leading-relaxed select-text flex flex-col motion-fade">
-          <p className="whitespace-pre-wrap">{transcript}</p>
+      {/* Telegram-style Transcript with user-approved divider line. Collapses by
+          height, so folding it back does not snap the whole card. */}
+      <div
+        className="motion-accordion w-full"
+        data-expanded={Boolean(isExpanded && transcript)}
+        aria-hidden={!(isExpanded && transcript)}
+      >
+        <div className="motion-accordion-inner">
+          {transcript && (
+            <div className="mt-2 pt-2 border-t border-white/[0.08] text-xs sm:text-[13px] text-zinc-200 font-sans leading-relaxed select-text flex flex-col">
+              <p className="whitespace-pre-wrap">{transcript}</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
