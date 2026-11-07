@@ -1065,7 +1065,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
 
                       {/* Items list: always rendered when count <= 3, or when isExpanded */}
                       <div
-                        className={showHeader ? "motion-accordion w-full" : "w-full"}
+                        className="motion-accordion w-full"
                         data-expanded={!showHeader || isExpanded}
                         aria-hidden={showHeader && !isExpanded}
                       >

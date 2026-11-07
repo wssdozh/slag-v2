@@ -57,6 +57,8 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
             <button
               type="button"
               data-selected={isSelected}
+              // Keep the caret in the textarea: the command reads its selection.
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => onSelect(cmd)}
               className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
                 isSelected

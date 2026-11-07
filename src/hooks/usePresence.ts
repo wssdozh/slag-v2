@@ -24,6 +24,9 @@ export function usePresence(open: boolean) {
       : current);
   }, []);
 
+  /** End of the longest transition the exit started; never cut it short. */
+  const exitDeadlineRef = useRef(0);
+
   useLayoutEffect(() => {
     const element = ref.current;
     // Every consumer renders the element while present, so a missing ref means the
@@ -46,17 +49,22 @@ export function usePresence(open: boolean) {
       ? parseFloat(value) : parseFloat(value) * 1000;
     const durations = style.transitionDuration.split(',').map(milliseconds);
     const delays = style.transitionDelay.split(',').map(milliseconds);
-    const deadline = Math.max(0, ...durations.map((duration, index) =>
+    const windowMs = Math.max(0, ...durations.map((duration, index) =>
       duration + delays[index % delays.length]));
     // Events may not fire (no property changed, cancelled transition, hidden tab).
     // The fallback follows the actual CSS, including reduced-motion overrides.
-    const timer = window.setTimeout(finishExit, deadline);
+    exitDeadlineRef.current = performance.now() + windowMs;
+    const timer = window.setTimeout(finishExit, windowMs);
     return () => window.clearTimeout(timer);
   }, [state.phase, finishExit]);
 
   const onTransitionEnd = useCallback((event: TransitionEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
-    if (getComputedStyle(event.currentTarget).opacity === '0') finishExit();
+    if (getComputedStyle(event.currentTarget).opacity !== '0') return;
+    // A surface can run a slower exit beside its fade (height, translate). The fade
+    // ending first is not the end of the exit, so bind the finish to the window.
+    if (performance.now() < exitDeadlineRef.current) return;
+    finishExit();
   }, [finishExit]);
 
   return {

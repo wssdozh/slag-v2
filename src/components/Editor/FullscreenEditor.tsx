@@ -1955,7 +1955,7 @@ export const FullscreenEditor: React.FC = () => {
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
-      className="fixed inset-0 z-[100]"
+      className="fixed inset-0 z-[100] motion-presence-hold"
     >
       <FullscreenEditorContent
         key={effectiveItem.id}

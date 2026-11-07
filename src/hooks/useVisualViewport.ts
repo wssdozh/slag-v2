@@ -1,43 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+
+/** Below this the visual viewport moved for a tap or the URL bar, not the keyboard. */
+const KEYBOARD_FLOOR = 48;
 
 /**
- * Hook to reactively track visual viewport height and virtual keyboard insets.
- * Updates CSS variable `--keyboard-inset-bottom` for seamless fluid positioning.
+ * Publishes the virtual keyboard inset as `--keyboard-inset-bottom`.
+ *
+ * Nothing renders from it: the value is written straight to the root element, so a
+ * keyboard slide does not re-render the tree. Events are coalesced to one write per
+ * frame, because the OS reports intermediate viewport sizes while the keyboard
+ * travels and an unthrottled write makes the composer shake.
  */
 export function useVisualViewport() {
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
 
-    const vv = window.visualViewport;
+    const viewport = window.visualViewport;
+    const root = document.documentElement;
+    let frame = 0;
+    let applied = -1;
 
-    const handleViewportChange = () => {
-      // Calculate how much the visual viewport is offset or shrunk by virtual keyboard
-      const currentHeight = vv.height;
-      const windowHeight = window.innerHeight;
-      const offsetTop = vv.offsetTop;
-
-      // Virtual keyboard height in pixels
-      const insetBottom = Math.max(0, windowHeight - (currentHeight + offsetTop));
-      setKeyboardHeight(insetBottom);
-
-      document.documentElement.style.setProperty(
-        '--keyboard-inset-bottom',
-        `${Math.round(insetBottom)}px`
-      );
+    const publish = () => {
+      frame = 0;
+      const overlap = window.innerHeight - (viewport.height + viewport.offsetTop);
+      const inset = overlap > KEYBOARD_FLOOR ? Math.round(overlap) : 0;
+      if (inset === applied) return;
+      applied = inset;
+      root.style.setProperty('--keyboard-inset-bottom', `${inset}px`);
     };
 
-    vv.addEventListener('resize', handleViewportChange);
-    vv.addEventListener('scroll', handleViewportChange);
-    handleViewportChange();
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(publish);
+    };
+
+    viewport.addEventListener('resize', schedule);
+    viewport.addEventListener('scroll', schedule);
+    publish();
 
     return () => {
-      vv.removeEventListener('resize', handleViewportChange);
-      vv.removeEventListener('scroll', handleViewportChange);
-      document.documentElement.style.setProperty('--keyboard-inset-bottom', '0px');
+      if (frame) cancelAnimationFrame(frame);
+      viewport.removeEventListener('resize', schedule);
+      viewport.removeEventListener('scroll', schedule);
+      root.style.setProperty('--keyboard-inset-bottom', '0px');
     };
   }, []);
-
-  return { keyboardHeight };
 }

@@ -62,10 +62,12 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       data-motion-state={filterBarPhase}
       onTransitionEnd={onFilterBarTransitionEnd}
       inert={!hasAnyFilter}
-      className={`motion-accordion w-full min-w-0 ${className}`}
+      className="motion-accordion w-full min-w-0"
       data-expanded={hasAnyFilter}
     >
-      <div className="motion-accordion-inner flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none py-0.5">
+      {/* Padding and the divider live inside the clipped row, so a collapsed bar
+          takes no height at all instead of leaving a 9px strip. */}
+      <div className={`motion-accordion-inner flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none py-0.5 ${className}`}>
       {/* Type Filter Badge */}
       {activeTypeFilter !== 'all' && (
         <div

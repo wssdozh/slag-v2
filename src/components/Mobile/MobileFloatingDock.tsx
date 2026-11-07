@@ -54,13 +54,14 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
   const updateIndicator = useCallback(() => {
     if (!navRef.current) return;
     const activeBtn = navRef.current.querySelector<HTMLButtonElement>(`[data-tab-id="${activeMobileTab}"]`);
-    if (activeBtn) {
-      setIndicatorStyle({
-        left: activeBtn.offsetLeft,
-        width: activeBtn.offsetWidth,
-        ready: true,
-      });
-    }
+    // A tab can be removed from the dock while it is the active one; never leave
+    // the pill hanging over a neighbour it no longer belongs to.
+    const next = activeBtn
+      ? { left: activeBtn.offsetLeft, width: activeBtn.offsetWidth, ready: true }
+      : { left: 0, width: 0, ready: false };
+    setIndicatorStyle(current => (current.left === next.left && current.width === next.width && current.ready === next.ready)
+      ? current
+      : next);
   }, [activeMobileTab]);
 
   useLayoutEffect(() => {

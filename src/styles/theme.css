@@ -164,6 +164,18 @@
 .motion-sheet[data-motion-state="exiting"] {
   transition-duration: var(--slag-motion-slow);
 }
+/* A scrim that carries a sheet has to outlive it, otherwise the backdrop is gone
+   while the panel is still on its way down. */
+.motion-fade:has(.motion-sheet[data-motion-state="exiting"]) {
+  transition-duration: var(--slag-motion-slow);
+}
+
+/* Presence-only host: no exit of its own, but it must stay mounted long enough
+   for the child animation it is waiting on (a clip collapse, a sheet slide). */
+.motion-presence-hold {
+  transition-property: opacity;
+  transition-duration: var(--slag-motion-slow);
+}
 
 /* Floating capsule dock: glides down into hiding when opening a folder or assistant,
    and surfaces cleanly on return. */
@@ -319,6 +331,30 @@ html[data-motion-swap]::view-transition-new(mobile-screen) {
 }
 :root:has(.mobile-screen-view)[data-motion-swap^="tab"] .mobile-screen-view {
   view-transition-name: mobile-screen;
+}
+/* The screen snapshot paints above everything on the page, so a live dock sitting
+   over it would be erased for the whole swap. Naming the dock lifts it into its own
+   group, where it is pinned instead of blended. */
+:root:has(.mobile-screen-view)[data-motion-swap^="tab"] .motion-dock {
+  view-transition-name: mobile-dock;
+}
+html[data-motion-swap^="tab"]::view-transition-group(mobile-dock) {
+  animation-duration: var(--slag-motion-base);
+}
+/* The dock does not move during a swap, so its two snapshots must not fade:
+   the newer one simply replaces the older in the same place. */
+html[data-motion-swap^="tab"]::view-transition-old(mobile-dock) {
+  animation: none;
+  opacity: 0;
+}
+html[data-motion-swap^="tab"]::view-transition-new(mobile-dock) {
+  animation: none;
+  opacity: 1;
+}
+/* The pill is a snapshot for the length of the swap, so sliding it underneath
+   would only be visible as a jump once the swap ends. */
+html[data-motion-swap] [data-testid="dock-active-pill"] {
+  transition: none;
 }
 
 html[data-motion-swap^="tab"]::view-transition-old(root),

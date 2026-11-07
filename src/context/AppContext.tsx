@@ -627,11 +627,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setMobileActiveFolder = useCallback((folder: string | null) => {
     const previous = mobileFolderRef.current;
     mobileFolderRef.current = folder;
-    const kind = folder === null
-      ? 'pop'
-      : previous === null || folderDepth(folder) > folderDepth(previous)
-        ? 'push'
-        : 'pop';
+    // Depth decides the direction: deeper is a push, shallower a pop, and a sibling
+    // folder is a lateral move, not a step back.
+    const previousDepth = previous === null ? 0 : folderDepth(previous);
+    const nextDepth = folder === null ? 0 : folderDepth(folder);
+    const kind: ScreenSwap =
+      folder === null || nextDepth < previousDepth
+        ? 'pop'
+        : previous === null || nextDepth > previousDepth
+          ? 'push'
+          : 'tab';
     swapScreen(kind, () => {
       setMobileActiveFolderState(folder);
       if (folder) {

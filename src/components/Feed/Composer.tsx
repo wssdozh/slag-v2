@@ -234,7 +234,7 @@ export const Composer: React.FC<ComposerProps> = ({
   // Focus textarea when replying or when mounted in modal
   useEffect(() => {
     if ((replyTarget || isModal) && textareaRef.current) {
-      textareaRef.current.focus();
+      textareaRef.current.focus({ preventScroll: true });
     }
   }, [replyTarget, isModal]);
 
@@ -595,7 +595,7 @@ export const Composer: React.FC<ComposerProps> = ({
       setTagQuery(null);
       setTimeout(() => {
         if (el) {
-          el.focus();
+          el.focus({ preventScroll: true });
           const newCursor = hashIndex + selectedTag.length + 2;
           el.setSelectionRange(newCursor, newCursor);
         }
@@ -608,7 +608,7 @@ export const Composer: React.FC<ComposerProps> = ({
         setTagQuery(null);
         setTimeout(() => {
           if (el) {
-            el.focus();
+            el.focus({ preventScroll: true });
             const newCursor = newText.length;
             el.setSelectionRange(newCursor, newCursor);
           }
@@ -631,7 +631,7 @@ export const Composer: React.FC<ComposerProps> = ({
       setContent(newText);
       setWikiQuery(null);
       setTimeout(() => {
-        el.focus();
+        el.focus({ preventScroll: true });
         const newCursor = startIdx + cleanTitle.length + 5;
         el.setSelectionRange(newCursor, newCursor);
       }, 10);
@@ -711,7 +711,7 @@ export const Composer: React.FC<ComposerProps> = ({
       setContent(newText);
       setTimeout(() => {
         if (el) {
-          el.focus();
+          el.focus({ preventScroll: true });
           el.setSelectionRange(replaceStart, replaceStart);
         }
       }, 0);
@@ -724,7 +724,7 @@ export const Composer: React.FC<ComposerProps> = ({
         setContent(newText);
         setTimeout(() => {
           if (el) {
-            el.focus();
+            el.focus({ preventScroll: true });
             el.setSelectionRange(replaceStart, replaceStart);
           }
         }, 0);
@@ -822,7 +822,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
     setTimeout(() => {
       if (el) {
-        el.focus();
+        el.focus({ preventScroll: true });
         el.setSelectionRange(newCursor, newCursor);
       }
     }, 10);
@@ -876,9 +876,9 @@ export const Composer: React.FC<ComposerProps> = ({
       if (processed.length > 0) {
         setAttachments(prev => [...prev, ...processed]);
         addToast(`Прикреплено: ${processed.length === 1 ? processed[0].name : `${processed.length} файла`}`, 'success');
-        setTimeout(() => {
-          textareaRef.current?.focus();
-        }, 50);
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus({ preventScroll: true });
+        });
       }
     } catch {
       addToast('Не удалось обработать прикрепленные файлы', 'error');
@@ -1101,7 +1101,7 @@ export const Composer: React.FC<ComposerProps> = ({
       onComplete();
     } else {
       requestAnimationFrame(() => {
-        textareaRef.current?.focus();
+        textareaRef.current?.focus({ preventScroll: true });
       });
     }
   };
@@ -1357,18 +1357,26 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
+  // The banner collapses instead of vanishing, so sending or cancelling a reply
+  // does not yank the whole composer up by the height of the row.
+  const [stickyReply, setStickyReply] = useState(replyTarget);
+  if (replyTarget && replyTarget !== stickyReply) setStickyReply(replyTarget);
+  const bannerReply = replyTarget ?? stickyReply;
+
   const topSlot = (
     <>
         {/* Reply Banner (Flat, Anti-Matryoshka) */}
-        {replyTarget && (
-        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 motion-fade select-none">
+        <div className="motion-accordion w-full" data-expanded={Boolean(replyTarget)}>
+        <div className="motion-accordion-inner">
+        {bannerReply && (
+        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none">
           <div className="flex items-center gap-1.5 truncate min-w-0">
             <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="text-[11px] font-mono text-zinc-500 shrink-0">
-              {replyTarget.type === 'task' ? 'Ответ на таску:' : replyTarget.type === 'article' ? 'Ответ на статью:' : 'Ответ:'}
+              {bannerReply.type === 'task' ? 'Ответ на таску:' : bannerReply.type === 'article' ? 'Ответ на статью:' : 'Ответ:'}
             </span>
             <span className="truncate text-zinc-300 font-medium text-xs">
-              {replyTarget.title || replyTarget.content.slice(0, 45)}
+              {bannerReply.title || bannerReply.content.slice(0, 45)}
             </span>
           </div>
           <button
@@ -1379,7 +1387,9 @@ export const Composer: React.FC<ComposerProps> = ({
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
-      )}
+        )}
+        </div>
+        </div>
 
       {/* Attachments Preview Strip */}
       {attachments.length > 0 && (
@@ -1573,16 +1583,28 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const hasActiveProperties = Boolean(targetFolder) || allPreviewTags.length > 0;
 
-  const propertiesSlot = hasActiveProperties ? (
-    <div className="flex items-center gap-2 px-1 pt-1 pb-1 overflow-x-auto scrollbar-none whitespace-nowrap motion-fade text-xs">
+  // Clearing the folder or the last tag has to collapse the row, not delete it.
+  const propertiesKey = `${targetFolder ?? ''}|${allPreviewTags.join('|')}`;
+  const [stickyProperties, setStickyProperties] = useState({ key: propertiesKey, targetFolder, tags: allPreviewTags });
+  if (hasActiveProperties && stickyProperties.key !== propertiesKey) {
+    setStickyProperties({ key: propertiesKey, targetFolder, tags: allPreviewTags });
+  }
+  const shownProperties = hasActiveProperties
+    ? { targetFolder, tags: allPreviewTags }
+    : { targetFolder: stickyProperties.targetFolder, tags: stickyProperties.tags };
+
+  const propertiesSlot = (
+    <div className="motion-accordion w-full" data-expanded={hasActiveProperties}>
+    <div className="motion-accordion-inner">
+    <div className="flex items-center gap-2 px-1 pt-1 pb-1 overflow-x-auto scrollbar-none whitespace-nowrap text-xs">
       {/* Target Folder */}
-      {targetFolder && (
+      {shownProperties.targetFolder && (
         <span
           className="shrink-0 inline-flex items-center gap-1.5 text-zinc-400 text-[11px] font-mono select-none"
-          title={`Целевая папка для сохранения: «${targetFolder}»`}
+          title={`Целевая папка для сохранения: «${shownProperties.targetFolder}»`}
         >
           <Folder className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          <span>{targetFolder}</span>
+          <span>{shownProperties.targetFolder}</span>
           <button
             type="button"
             onClick={() => setTargetFolder(null)}
@@ -1595,7 +1617,7 @@ export const Composer: React.FC<ComposerProps> = ({
       )}
 
       {/* Tags */}
-      {allPreviewTags.map(tag => (
+      {shownProperties.tags.map(tag => (
         <TagChip
           key={tag}
           tag={tag}
@@ -1604,7 +1626,9 @@ export const Composer: React.FC<ComposerProps> = ({
         />
       ))}
     </div>
-  ) : null;
+    </div>
+    </div>
+  );
 
   const leftControls = (
     <div className="flex items-center gap-1 shrink-0 relative">

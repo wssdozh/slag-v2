@@ -204,6 +204,7 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
+      className="motion-presence-hold"
     >
       <div
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] motion-fade"

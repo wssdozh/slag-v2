@@ -514,7 +514,7 @@ export const DiffModal: React.FC<DiffModalProps> = ({
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
       inert={!isDiffOpen}
-      className="fixed inset-0 z-[100]"
+      className="fixed inset-0 z-[100] motion-presence-hold"
     >
       <FullscreenDiffEditor
         key={instanceKey}
