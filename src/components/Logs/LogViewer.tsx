@@ -11,7 +11,6 @@ import {
   Download,
   Trash2,
   ChevronRight,
-  Check,
   ArrowDown,
   FolderOpen,
   FileText
@@ -41,8 +40,6 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
   const [selectedLevel, setSelectedLevel] = useState<LogLevel | 'ALL'>('ALL');
   const [autoScroll, setAutoScroll] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [reportCopied, setReportCopied] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -115,9 +112,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
     try {
       const report = logger.exportAsMarkdown();
       await navigator.clipboard.writeText(report);
-      setReportCopied(true);
       addToast('Отчёт скопирован в буфер (Markdown)', 'success');
-      setTimeout(() => setReportCopied(false), 2000);
     } catch {
       addToast('Не удалось скопировать отчёт', 'error');
     }
@@ -155,10 +150,9 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
     try {
       const text = `[${new Date(entry.timestamp).toISOString()}] [${entry.scope}] [${entry.level.toUpperCase()}] ${entry.message}${entry.data ? '\n' + JSON.stringify(entry.data, null, 2) : ''}`;
       await navigator.clipboard.writeText(text);
-      setCopiedId(entry.id);
-      setTimeout(() => setCopiedId(null), 1500);
+      addToast('Строка лога скопирована в буфер', 'success');
     } catch {
-      // ignore
+      addToast('Не удалось скопировать строку лога', 'error');
     }
   };
 
@@ -230,7 +224,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             title="Копировать отчёт для баг-репорта (Markdown)"
             className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
-            {reportCopied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+            <Copy className="w-3 h-3" />
             <span className="text-[11px] hidden sm:inline">Отчёт</span>
           </button>
 
@@ -407,11 +401,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
                       title="Копировать строку"
                       className="text-fg-muted hover:text-fg-primary p-0.5"
                     >
-                      {copiedId === entry.id ? (
-                        <Check className="w-3 h-3 text-success" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
-                      )}
+                      <Copy className="w-3 h-3" />
                     </button>
                     {hasData && (
                       <span className="text-fg-muted p-0.5">

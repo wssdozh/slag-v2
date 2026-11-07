@@ -708,11 +708,11 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {activeTab === 'devices' && (
-              <DevicesSettingsTab addToast={addToast} />
+              <DevicesSettingsTab />
             )}
 
             {activeTab === 'sync' && (
-              <SyncSettingsTab addToast={addToast} />
+              <SyncSettingsTab />
             )}
 
             {activeTab === 'ui' && (

@@ -38,7 +38,9 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
         await expect(scope.getByTestId('sync-to-devices-btn')).toHaveJSProperty('tagName', 'BUTTON');
         await page.route('**/health', route => route.fulfill({ status: 503 }));
         await scope.getByRole('button', { name: 'Проверить', exact: true }).click();
-        await expect(scope.getByRole('status').filter({ hasText: 'не удалось: HTTP 503' })).toBeVisible();
+        await expect(page.getByTestId('toast').filter({ hasText: 'Не удалось проверить сервер: HTTP 503' })).toBeVisible();
+        await expect(scope.getByText(/HTTP 503/)).toHaveCount(0);
+        await expect(page.getByTestId('toast').filter({ hasText: 'Не удалось проверить сервер: HTTP 503' })).toHaveCount(1);
       }
       if (tab === 'vault') {
         await expect(scope.getByText('Последний снимок', { exact: true })).toBeVisible();

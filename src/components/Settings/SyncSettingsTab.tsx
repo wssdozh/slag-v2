@@ -10,19 +10,13 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
-interface SyncSettingsTabProps {
-  addToast?: (text: string, type?: 'info' | 'success' | 'error') => void;
-}
-
-export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) => {
-  const { setSettingsTab } = useApp();
+export const SyncSettingsTab: React.FC = () => {
+  const { setSettingsTab, addToast } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [accountState, setAccountState] = useState(accountClient.getState());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isTestingServer, setIsTestingServer] = useState(false);
-  const [serverStatusMessage, setServerStatusMessage] = useState<string | null>(null);
-  const [serverStatusError, setServerStatusError] = useState(false);
 
   const hosted = status.authRequired || accountClient.isAuthenticated();
   const locked = status.authRequired && !accountClient.isAuthenticated();
@@ -42,22 +36,16 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
 
   const handleTestServerConnection = async () => {
     setIsTestingServer(true);
-    setServerStatusMessage(null);
-    setServerStatusError(false);
     try {
       const cleanUrl = serverUrlInput.replace(/\/+$/, '');
-      const started = Date.now();
       const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(4000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const health = await response.json();
       await accountClient.detectServer(cleanUrl);
       await syncEngine.updateServerUrl(cleanUrl);
       accountClient.startPolling(cleanUrl);
-      setServerStatusMessage(`${health.service} · ${Date.now() - started} мс · ${health.authRequired ? 'SLAG ID' : 'без ЛК'}`);
-      addToast?.('Сервер синхронизации сохранён', 'success');
+      addToast('Сервер синхронизации сохранён', 'success');
     } catch (error) {
-      setServerStatusMessage(error instanceof Error ? error.message : String(error));
-      setServerStatusError(true);
+      addToast(`Не удалось проверить сервер: ${error instanceof Error ? error.message : String(error)}`, 'error');
     } finally {
       setIsTestingServer(false);
     }
@@ -101,7 +89,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
           </span>
         } right={<button type="button" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">Синхронизировать</button>} />
         <SettingsDivider />
-        <SettingsRow label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} description={serverStatusMessage ? <span role="status" className={`font-mono break-words ${serverStatusError ? 'text-danger' : 'text-fg-muted'}`}>{serverStatusError ? `не удалось: ${serverStatusMessage}` : serverStatusMessage}</span> : undefined} right={
+        <SettingsRow label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} right={
           <button type="button" onClick={() => void handleTestServerConnection()} disabled={isTestingServer} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{isTestingServer ? 'Тест…' : 'Проверить'}</button>
         } />
         <SettingsDivider />
@@ -123,7 +111,7 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         <SettingsRow label="Смена ключа хранилища" description="Все устройства потребуют нового приглашения." danger right={
           <button type="button" disabled={locked} onClick={() => {
             if (!window.confirm('Сменить ключ хранилища? Доступ остальных устройств будет остановлен.')) return;
-            void syncEngine.rotateVaultKey().then(() => addToast?.('Ключ хранилища изменён', 'success'));
+            void syncEngine.rotateVaultKey().then(() => addToast('Ключ хранилища изменён', 'success')).catch((error: unknown) => addToast(`Не удалось сменить ключ: ${error instanceof Error ? error.message : String(error)}`, 'error'));
           }} className="px-2 py-1.5 text-2xs text-danger rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">Сменить ключ</button>
         } />
       </SettingsGroup>

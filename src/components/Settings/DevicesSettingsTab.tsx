@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Check,
   Copy,
   Database,
   Edit2,
@@ -38,18 +37,13 @@ import { acceptSharedVault, installSharedVault, shareVaultWithDevice } from '../
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
 import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
-interface DevicesSettingsTabProps {
-  addToast?: (text: string, type?: 'info' | 'success' | 'error') => void;
-}
-
-export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast }) => {
-  const { switchVault, createVault, vaults, isMobile } = useApp();
+export const DevicesSettingsTab: React.FC = () => {
+  const { switchVault, createVault, vaults, isMobile, addToast } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [accountState, setAccountState] = useState(accountClient.getState());
   const [isPairModalOpen, setIsPairModalOpen] = useState(false);
   const [pairMode, setPairMode] = useState<'host' | 'guest'>('host');
-  const [pairError, setPairError] = useState<string | null>(null);
   const [hostPin, setHostPin] = useState<string | null>(null);
   const [hostSessionId, setHostSessionId] = useState<string | null>(null);
   const [hostPinTtl, setHostPinTtl] = useState(300);
@@ -63,7 +57,6 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
   const [editingDeviceName, setEditingDeviceName] = useState('');
   const [managingDevice, setManagingDevice] = useState<AccountDevice | DeviceProfile | null>(null);
   const [grantMode, setGrantMode] = useState<DeviceSyncMode>('read-write');
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [busyVaultId, setBusyVaultId] = useState<string | null>(null);
   const isPollingRef = useRef(false);
 
@@ -121,7 +114,11 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
           setPairMode('host');
         }
       } catch (error) {
-        if (active) setPairError(error instanceof Error ? error.message : String(error));
+        if (active) {
+          addToast(`Не удалось проверить привязку: ${error instanceof Error ? error.message : String(error)}`, 'error');
+          setHostSessionId(null);
+          setHostPin(null);
+        }
       } finally {
         isPollingRef.current = false;
       }
@@ -130,19 +127,21 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       active = false;
       clearInterval(interval);
     };
-  }, [config.serverUrl, hostSessionId, pendingApproval]);
+  }, [config.serverUrl, hostSessionId, pendingApproval, addToast]);
 
-  const copyToClipboard = async (text: string, key: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    addToast?.('Скопировано в буфер обмена', 'success');
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      addToast('Скопировано в буфер обмена', 'success');
+    } catch (error) {
+      addToast(`Не удалось скопировать PIN: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    }
   };
 
   const handleGeneratePin = async () => {
     if (locked) return;
     setIsGeneratingPin(true);
     setPendingApproval(null);
-    setPairError(null);
     try {
       const session = await createPairingSession(config.serverUrl, config.deviceId);
       setHostPin(session.pin);
@@ -150,8 +149,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       setHostPinTtl(session.expiresIn);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setPairError(message);
-      addToast?.(`Ошибка генерации: ${message}`, 'error');
+      addToast(`Ошибка генерации: ${message}`, 'error');
     } finally {
       setIsGeneratingPin(false);
     }
@@ -160,14 +158,12 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
   const handleOpenPairModal = () => {
     setIsPairModalOpen(true);
     setPairMode('host');
-    setPairError(null);
     if (!hostPin) void handleGeneratePin();
   };
 
   const handleApprovePairing = async () => {
     if (!hostSessionId || !pendingApproval) return;
     setIsApproving(true);
-    setPairError(null);
     try {
       const currentVault = storage.getCurrentVault();
       let ok: boolean;
@@ -214,15 +210,14 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       } else {
         await accountClient.refresh();
       }
-      addToast?.(`Устройство подключено к «${currentVault.name}»`, 'success');
+      addToast(`Устройство подключено к «${currentVault.name}»`, 'success');
       setHostPin(null);
       setHostSessionId(null);
       setPendingApproval(null);
       setIsPairModalOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setPairError(message);
-      addToast?.(`Ошибка подтверждения: ${message}`, 'error');
+      addToast(`Ошибка подтверждения: ${message}`, 'error');
     } finally {
       setIsApproving(false);
     }
@@ -237,7 +232,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       setPendingApproval(null);
       setIsPairModalOpen(false);
     } catch (error) {
-      setPairError(error instanceof Error ? error.message : String(error));
+      addToast(`Не удалось отклонить привязку: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
   };
 
@@ -245,7 +240,6 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
     if (!guestInputPin.trim() || locked) return;
     setIsClaimingPin(true);
     setGuestSasCode(null);
-    setPairError(null);
     try {
       const ephemeralPk = `pk_eph_${crypto.getRandomValues(new Uint32Array(2)).join('')}`;
       const claimed = await claimPairingSession(config.serverUrl, guestInputPin.trim(), ephemeralPk, config.deviceId);
@@ -265,7 +259,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
           vaultName: parsed.vaultName,
           encryptedKey: parsed.encryptedKey,
         }, config.deviceId, { createVault, switchVault });
-        addToast?.(
+        addToast(
           `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${parsed.vaultName}»`,
           'success',
         );
@@ -279,7 +273,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
           createVault(parsed.vaultName, 'indexeddb', undefined, parsed.vaultId);
           await syncEngine.switchVault(parsed.vaultId);
         }
-        addToast?.(`Хранилище «${parsed.vaultName}» подключено`, 'success');
+        addToast(`Хранилище «${parsed.vaultName}» подключено`, 'success');
       }
 
       if (!hosted && parsed.hostDeviceId) {
@@ -301,8 +295,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       setIsPairModalOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setPairError(message);
-      addToast?.(message, 'error');
+      addToast(message, 'error');
       setGuestSasCode(null);
     } finally {
       setIsClaimingPin(false);
@@ -319,12 +312,12 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
         vaultName: invitation.vaultName || vaultId,
         encryptedKey: invitation.encryptedKey,
       }, config.deviceId, { createVault, switchVault });
-      addToast?.(
+      addToast(
         `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${invitation.vaultName || vaultId}»`,
         'success',
       );
     } catch (error) {
-      addToast?.(error instanceof Error ? error.message : String(error), 'error');
+      addToast(error instanceof Error ? error.message : String(error), 'error');
     } finally {
       setBusyVaultId(null);
     }
@@ -334,9 +327,9 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
     setBusyVaultId(vaultId);
     try {
       await accountClient.declineVault(vaultId);
-      addToast?.('Приглашение скрыто', 'info');
+      addToast('Приглашение скрыто', 'info');
     } catch (error) {
-      addToast?.(error instanceof Error ? error.message : String(error), 'error');
+      addToast(error instanceof Error ? error.message : String(error), 'error');
     } finally {
       setBusyVaultId(null);
     }
@@ -361,10 +354,10 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
           .find((item) => item.deviceId === managingDevice.id);
         if (grant && grant.status !== 'revoked') {
           await accountClient.revokeVaultGrant(vault.syncId || vault.id, managingDevice.id);
-          addToast?.('Доступ отозван. Локальная копия на другом устройстве не удалена', 'info');
+          addToast('Доступ отозван. Локальная копия на другом устройстве не удалена', 'info');
         } else {
           await shareVaultWithDevice(vault, managingDevice, grantMode);
-          addToast?.('Приглашение отправлено. На другом устройстве нужно принять доступ', 'success');
+          addToast('Приглашение отправлено. На другом устройстве нужно принять доступ', 'success');
         }
       } else {
         const current = managingDevice.allowedVaults ?? [];
@@ -376,7 +369,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
         setConfig(syncEngine.getConfig());
       }
     } catch (error) {
-      addToast?.(error instanceof Error ? error.message : String(error), 'error');
+      addToast(error instanceof Error ? error.message : String(error), 'error');
     }
   };
 
@@ -461,7 +454,6 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
                 <button type="button" data-testid="pair-modal-tab-host" onClick={() => { setPairMode('host'); if (!hostPin) void handleGeneratePin(); }} className={`py-1.5 rounded-md text-xs cursor-pointer ${pairMode === 'host' ? 'bg-surface-hover text-fg-primary' : 'text-fg-secondary'}`}>Показать PIN</button>
                 <button type="button" data-testid="pair-modal-tab-guest" onClick={() => { setPairMode('guest'); setPendingApproval(null); }} className={`py-1.5 rounded-md text-xs cursor-pointer ${pairMode === 'guest' ? 'bg-surface-hover text-fg-primary' : 'text-fg-secondary'}`}>Ввести PIN</button>
               </div>
-              {pairError && <p className="text-2xs text-danger">{pairError}</p>}
               {pairMode === 'host' ? (
                 pendingApproval ? (
                   <div className="flex flex-col gap-3 py-2">
@@ -478,7 +470,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
                     <span className="text-2xs text-fg-muted font-mono">ОДНОРАЗОВЫЙ КОД</span>
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-2xl font-bold tracking-widest text-fg-primary">{isGeneratingPin ? '…' : hostPin || '000-000'}</span>
-                      {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin, 'pin')} className="p-1.5 text-fg-secondary cursor-pointer">{copiedKey === 'pin' ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}</button>}
+                      {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin)} className="p-1.5 text-fg-secondary cursor-pointer"><Copy className="w-4 h-4" /></button>}
                     </div>
                     <span className="font-mono text-2xs text-fg-muted">Действует: {formatTtl(hostPinTtl)}</span>
                   </div>
