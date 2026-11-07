@@ -20,6 +20,7 @@ export interface ResponsiveSegmentedProps<T extends string = string> {
   size?: 'sm' | 'md';
   direction?: 'down' | 'up' | 'auto';
   className?: string;
+  triggerClassName?: string;
   ariaLabel?: string;
 }
 
@@ -31,6 +32,7 @@ export function ResponsiveSegmented<T extends string = string>({
   size = 'sm',
   direction = 'auto',
   className = '',
+  triggerClassName = '',
   ariaLabel,
 }: ResponsiveSegmentedProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
@@ -91,7 +93,7 @@ export function ResponsiveSegmented<T extends string = string>({
           title={selectedOption?.title || selectedOption?.label}
           className={`${heightClass} px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 ${
             isOpen ? 'bg-white/[0.06] text-white' : ''
-          } flex items-center gap-1.5 text-xs transition-colors cursor-pointer shrink-0`}
+          } flex items-center gap-1.5 text-xs transition-colors cursor-pointer shrink-0 ${triggerClassName}`}
         >
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
           {showTriggerLabel && selectedOption?.label && (

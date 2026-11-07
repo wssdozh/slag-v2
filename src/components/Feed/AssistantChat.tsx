@@ -1167,34 +1167,34 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 : `Спросите о «${(folderMeta?.name || currentFolder).length > 20 ? (folderMeta?.name || currentFolder).slice(0, 18) + '…' : folderMeta?.name || currentFolder}»...`
             }
             leftControls={
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="composer-toolbar-group flex min-w-0 flex-1 flex-wrap items-center gap-1">
                 {/* Provider badge - Embedded Linear Monochrome */}
                 {isConnected ? (
                   <button
                     type="button"
                     onClick={() => setIsSettingsOpen(true)}
-                    className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-mono cursor-pointer transition-colors"
+                    className="composer-toolbar-control inline-flex h-ctrl-md min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 text-xs font-mono text-fg-secondary outline-none ring-0 transition-colors hover:bg-surface-hover hover:text-fg-primary cursor-pointer"
                     title={`Провайдер ${aiSettings.provider}: ${aiSettings.model} (нажмите для настроек)`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                    <span>{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
+                    <span className="min-w-0 truncate">{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsSettingsOpen(true)}
-                    className="h-ctrl-md inline-flex items-center gap-1.5 px-2 rounded-md hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-300 text-xs font-mono transition-colors cursor-pointer"
+                    className="composer-toolbar-control inline-flex h-ctrl-md min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 text-xs font-mono text-fg-muted outline-none ring-0 transition-colors hover:bg-surface-hover hover:text-fg-secondary cursor-pointer"
                     title="Локальный режим без ключа. Нажмите, чтобы настроить API-ключ (⌘,)"
                     aria-label="Локальный режим, открыть настройки API-ключа"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
-                    <span>Локальный</span>
+                    <span className="min-w-0 truncate">Локальный</span>
                   </button>
                 )}
 
                 {/* Reasoning Selector - Embedded ghost */}
                 <div
-                  className="flex items-center gap-0.5 text-xs font-mono text-zinc-400"
+                  className="composer-toolbar-group flex shrink-0 items-center gap-0.5 text-xs font-mono text-fg-secondary"
                   role="group"
                   aria-label="Глубина рассуждений модели"
                   title="Глубина рассуждений модели: Off / Low / Med / High"
@@ -1204,6 +1204,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     size="md"
                     variant="ghost"
                     direction="up"
+                    triggerClassName="composer-toolbar-control h-ctrl-md rounded-md outline-none ring-0"
                     value={aiSettings.reasoningEffort || 'low'}
                     onChange={(val) => saveAiSettings({ reasoningEffort: val as any })}
                     options={[
@@ -1219,10 +1220,10 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 <button
                   type="button"
                   onClick={() => saveAiSettings({ webSearchEnabled: !aiSettings.webSearchEnabled })}
-                  className={`h-ctrl-md flex items-center gap-1 px-2 rounded-md text-xs font-mono transition-colors cursor-pointer ${
+                  className={`composer-toolbar-control composer-toolbar-icon flex h-ctrl-md shrink-0 items-center justify-center gap-1 rounded-md px-2 text-xs font-mono outline-none ring-0 transition-colors cursor-pointer ${
                     aiSettings.webSearchEnabled
                       ? 'text-sky-400 bg-sky-500/10 hover:bg-sky-500/15 font-medium'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+                      : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-hover'
                   }`}
                   title={aiSettings.webSearchEnabled ? 'Поиск в интернете включён' : 'Поиск в интернете выключен'}
                   aria-label="Поиск в интернете"

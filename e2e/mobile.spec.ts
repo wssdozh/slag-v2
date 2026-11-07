@@ -53,6 +53,28 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const composerTextarea = page.locator('main textarea, .relative textarea').first();
     await expect(composerTextarea).toBeVisible();
 
+    const composer = page.locator('[data-composer-root]');
+    const composerBox = await composer.boundingBox();
+    expect(composerBox).not.toBeNull();
+    expect(composerBox!.x).toBe(0);
+    expect(composerBox!.width).toBe(390);
+    for (const viewport of [{ width: 360, height: 800 }, { width: 700, height: 390 }]) {
+      await page.setViewportSize(viewport);
+      await expect(composer).toHaveCSS('width', `${viewport.width}px`);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const panel = composer.locator(':scope > div').last();
+    await expect(panel).toHaveCSS('border-radius', '0px');
+    await expect(panel).toHaveClass(/shadow-none/);
+    const feed = page.locator('.overflow-y-auto').filter({ has: page.locator('[id^="item-"]') }).first();
+    await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await composerTextarea.fill(Array.from({ length: 20 }, (_, i) => `строка ${i}`).join('\n'));
+    await expect(composerTextarea).toHaveCSS('height', '220px');
+    await expect.poll(() => feed.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThan(3);
+    const lastCardSpacer = page.locator('[aria-hidden="true"].h-2');
+    await expect(lastCardSpacer).toHaveCount(1);
+
     // Type a note in mobile composer and send
     const testNoteText = 'Мобильная мысль с телефона ' + Date.now();
     await composerTextarea.fill(testNoteText);

@@ -24,6 +24,7 @@ export interface SelectProps {
   direction?: 'down' | 'up' | 'auto';
   className?: string;
   dropdownClassName?: string;
+  triggerClassName?: string;
   disabled?: boolean;
   'aria-label'?: string;
   title?: string;
@@ -41,6 +42,7 @@ export const Select: React.FC<SelectProps> = ({
   direction = 'auto',
   className = '',
   dropdownClassName = '',
+  triggerClassName = '',
   disabled = false,
   'aria-label': ariaLabel,
   title,
@@ -314,7 +316,7 @@ export const Select: React.FC<SelectProps> = ({
             : isSmall
               ? 'h-ctrl-sm px-2 text-xs rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300'
               : 'h-ctrl-md px-3 text-xs rounded-lg bg-black/50 hover:bg-black/70 border border-white/[0.08] focus:border-white/20 text-zinc-200'
-        } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+        } ${disabled ? 'opacity-40 cursor-not-allowed' : ''} ${triggerClassName}`}
       >
         <span className="truncate flex items-center gap-1.5">
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}

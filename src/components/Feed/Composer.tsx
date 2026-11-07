@@ -43,6 +43,7 @@ import {
 
 export interface ComposerProps {
   isModal?: boolean;
+  variant?: 'card' | 'flat' | 'embedded';
   isActive?: boolean;
   initialType?: SlagItemType;
   initialStatus?: SlagItemStatus;
@@ -68,6 +69,7 @@ const reviveReplyTarget = (target: ReplyTarget | null | undefined): ReplyTarget 
 
 export const Composer: React.FC<ComposerProps> = ({
   isModal = false,
+  variant,
   isActive = true,
   initialType,
   initialStatus,
@@ -1375,7 +1377,7 @@ export const Composer: React.FC<ComposerProps> = ({
         <div className="motion-accordion w-full" data-expanded={Boolean(replyTarget)}>
         <div className="motion-accordion-inner">
         {bannerReply && (
-        <div className="flex items-center px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none pr-20 min-h-[28px]">
+        <div className="flex items-center px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none min-h-[28px]">
           <div className="flex items-center gap-1.5 truncate min-w-0">
             <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="text-[11px] font-mono text-zinc-500 shrink-0">
@@ -1402,7 +1404,8 @@ export const Composer: React.FC<ComposerProps> = ({
                     duration={att.duration}
                     size={att.size}
                     waveform={att.waveform}
-                    compact={true}
+                    triggerClassName="composer-toolbar-control composer-record-type"
+        compact={true}
                   />
                   <button
                     type="button"
@@ -1593,6 +1596,39 @@ export const Composer: React.FC<ComposerProps> = ({
     : { targetFolder: stickyProperties.targetFolder, tags: stickyProperties.tags };
 
   const propertiesSlot = (
+    <>
+      {/* Task properties have their own wrapping row. */}
+      {itemType === 'task' && (
+        <div className="px-1">
+          <ComposerTaskControls
+            effectiveDueDate={effectiveDueDate}
+            effectiveDateLabel={effectiveDateLabel}
+            onDateChange={(newDate) => {
+              setDueDate(newDate);
+              setIsDateDismissed(false);
+            }}
+            onDateClear={() => {
+              setIsDateDismissed(true);
+              setDueDate('');
+            }}
+            effectiveDuration={effectiveDuration}
+            onDurationChange={(mins) => {
+              setDuration(mins);
+              setIsDurationDismissed(mins === undefined);
+            }}
+            effectiveRecurrence={effectiveRecurrence}
+            onRecurrenceChange={(rule) => {
+              setRecurrence(rule);
+              setIsRecurrenceDismissed(!rule);
+            }}
+            effectivePriority={effectivePriority}
+            onPriorityChange={(val) => {
+              setPriority(val);
+              setIsPriorityDismissed(false);
+            }}
+          />
+        </div>
+      )}
     <div className="motion-accordion w-full" data-expanded={hasActiveProperties}>
     <div className="motion-accordion-inner">
     <div className="flex items-center gap-2 px-1 pt-1 pb-1 overflow-x-auto scrollbar-none whitespace-nowrap text-xs">
@@ -1627,10 +1663,11 @@ export const Composer: React.FC<ComposerProps> = ({
     </div>
     </div>
     </div>
+    </>
   );
 
   const leftControls = (
-    <div className="flex items-center gap-1 shrink-0 relative">
+    <div className="composer-toolbar-group relative">
       {/* Lock Hint Banner when holding mic/video button */}
       {lockHint && recordMode === 'holding' && (
         <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-surface border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none motion-popover">
@@ -1642,15 +1679,16 @@ export const Composer: React.FC<ComposerProps> = ({
       {/* +AI Smart Tagging Button - Icon Only */}
       <ToolbarButton
         size="md"
+        className="composer-toolbar-control composer-toolbar-icon"
         onClick={handleSmartAiTags}
         disabled={isGeneratingAiTags}
         title="ИИ классификация: папка и теги (+AI)"
         aria-label="ИИ классификация: папка и теги (+AI)"
         icon={
           isGeneratingAiTags ? (
-            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <Sparkles className="w-4 h-4 text-zinc-400" />
+            <Sparkles className="w-4 h-4" />
           )
         }
       >
@@ -1666,7 +1704,7 @@ export const Composer: React.FC<ComposerProps> = ({
             value: 'note',
             label: 'Заметка',
             showLabelInTrigger: true,
-            icon: <StickyNote className="w-4 h-4 text-white" />,
+            icon: <StickyNote className="w-4 h-4" />,
             title: 'Заметка',
             ariaLabel: 'Заметка',
           },
@@ -1674,7 +1712,7 @@ export const Composer: React.FC<ComposerProps> = ({
             value: 'task',
             label: 'Таска',
             showLabelInTrigger: true,
-            icon: <CheckSquare className="w-4 h-4 text-white" />,
+            icon: <CheckSquare className="w-4 h-4" />,
             title: 'Таска',
             ariaLabel: 'Таска',
           },
@@ -1682,50 +1720,19 @@ export const Composer: React.FC<ComposerProps> = ({
             value: 'article',
             label: 'Статья',
             showLabelInTrigger: true,
-            icon: <FileText className="w-4 h-4 text-white" />,
+            icon: <FileText className="w-4 h-4" />,
             title: 'Статья',
             ariaLabel: 'Статья',
           },
         ]}
+        triggerClassName="composer-toolbar-control composer-record-type"
         compact={true}
         size="md"
         direction="up"
         ariaLabel="Сменить тип записи"
       />
 
-      {/* Task Controls: Always visible in toolbar, lights up blue when active */}
-      {itemType === 'task' && (
-        <div className="flex items-center gap-1 shrink-0">
-          <div className="h-3.5 w-px bg-white/[0.1] mx-0.5 shrink-0" />
-          <ComposerTaskControls
-            effectiveDueDate={effectiveDueDate}
-            effectiveDateLabel={effectiveDateLabel}
-            onDateChange={(newDate) => {
-              setDueDate(newDate);
-              setIsDateDismissed(false);
-            }}
-            onDateClear={() => {
-              setIsDateDismissed(true);
-              setDueDate('');
-            }}
-            effectiveDuration={effectiveDuration}
-            onDurationChange={(mins) => {
-              setDuration(mins);
-              setIsDurationDismissed(mins === undefined);
-            }}
-            effectiveRecurrence={effectiveRecurrence}
-            onRecurrenceChange={(rule) => {
-              setRecurrence(rule);
-              setIsRecurrenceDismissed(!rule);
-            }}
-            effectivePriority={effectivePriority}
-            onPriorityChange={(val) => {
-              setPriority(val);
-              setIsPriorityDismissed(false);
-            }}
-          />
-        </div>
-      )}
+
     </div>
   );
 
@@ -1733,6 +1740,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <ToolbarButton
       size="md"
       onClick={() => fileInputRef.current?.click()}
+      className="composer-toolbar-control composer-toolbar-icon"
       title="Прикрепить файл"
       aria-label="Прикрепить файл"
       icon={<Paperclip className="w-4 h-4" />}
@@ -1747,7 +1755,7 @@ export const Composer: React.FC<ComposerProps> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
-        className="w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center motion-press shrink-0 cursor-pointer touch-none bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.2] text-zinc-200 hover:text-white"
+        className="composer-toolbar-control composer-toolbar-icon w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center motion-press shrink-0 cursor-pointer touch-none bg-transparent hover:bg-surface-hover text-fg-secondary hover:text-fg-primary"
         title={
           mobileMediaType === 'audio'
             ? 'Записать аудио (удерживайте) / Кликните для видео'
@@ -1766,7 +1774,7 @@ export const Composer: React.FC<ComposerProps> = ({
   return (
     <BaseComposer
       value={content}
-      variant={isModal ? 'flat' : 'card'}
+      variant={variant ?? (isModal ? 'flat' : 'card')}
       minHeight={24}
       onChange={handleContentChange}
       onSubmit={handleSend}
@@ -1831,7 +1839,7 @@ export const Composer: React.FC<ComposerProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-2xl'}
+      className={variant === 'embedded' ? 'w-full' : isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-2xl'}
     />
   );
 };

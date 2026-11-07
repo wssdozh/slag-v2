@@ -349,17 +349,16 @@ export const MobileFoldersView: React.FC = () => {
           <MobileCalendarView embedded />
         ) : (
           <>
-            <FeedList />
-            {/* Telegram-style Composer Island at the bottom of the feed */}
+            <FeedList hasEmbeddedComposer />
             <div
-              className="absolute inset-x-0 bottom-0 pointer-events-none z-30 px-2 flex justify-center"
+              className="relative z-30 shrink-0 bg-surface"
               style={{
-                paddingBottom: 'max(var(--sab), 0.5rem)',
+                paddingBottom: 'var(--sab)',
+                paddingLeft: 'var(--sal)',
+                paddingRight: 'var(--sar)',
               }}
             >
-              <div className="pointer-events-auto w-full max-w-lg">
-                <Composer key={currentFolder} />
-              </div>
+              <Composer key={currentFolder} variant="embedded" />
             </div>
           </>
         )}

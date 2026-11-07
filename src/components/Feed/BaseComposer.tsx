@@ -43,7 +43,7 @@ export interface BaseComposerProps {
   /** Максимальная высота поля ввода в px (по умолчанию 220) */
   maxHeight?: number;
   /** Вариант отображения: 'card' (со своей рамкой/фоном) или 'flat' (для модалок без матрёшки) */
-  variant?: 'card' | 'flat';
+  variant?: 'card' | 'flat' | 'embedded';
   /** Скрыть поле textarea (например, при активном монохромном режиме войс-записи) */
   hideTextarea?: boolean;
   /** Флаг активного перетаскивания файлов над композером */
@@ -131,7 +131,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   const isFlat = variant === 'flat';
 
   return (
-    <div data-composer-root="" className="w-full select-none relative flex justify-center">
+    <div data-composer-root="" className="composer-surface relative flex w-full min-w-0 justify-center select-none">
       {overlaySlot}
       <div
         onDragEnter={onDragEnter}
@@ -139,15 +139,17 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={
-          isFlat
-            ? `w-full flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none relative ${
+          variant === 'embedded'
+            ? `relative flex w-full flex-col gap-2 border-t border-subtle bg-surface p-2 shadow-none ${className}`
+            : isFlat
+            ? `w-full flex flex-col gap-2 p-0 bg-transparent border-0 shadow-none relative ${
                 isDraggingOver ? 'rounded-2xl ring-2 ring-blue-500/50 bg-blue-500/[0.04]' : ''
               } ${className}`
             : `rounded-2xl bg-surface-elevated border ${
                 isDraggingOver
                   ? 'border-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
                   : 'border-white/[0.12]'
-              } p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
+              } p-2 sm:p-2.5 flex flex-col gap-2 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
         }
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
@@ -157,13 +159,6 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             <span>Отпустите файлы для прикрепления</span>
           </div>
         )}
-        {/* Кнопка в правом верхнем углу (раскрытие в полноэкранный редактор) */}
-        {topRightSlot && (
-          <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-10 flex items-center gap-1">
-            {topRightSlot}
-          </div>
-        )}
-
         {/* Both slots collapse to zero height instead of unmounting, so they share
             one gap-less column: a closed slot must not leave a permanent gap. */}
         {(topSlot || propertiesSlot) && (
@@ -178,7 +173,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
 
         {/* Зона ввода */}
         {!hideTextarea && (
-          <div className="relative">
+          <div className="flex min-w-0 items-start gap-1">
             <textarea
               ref={effectiveRef}
               value={value}
@@ -188,13 +183,16 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               rows={1}
               placeholder={placeholder}
               disabled={disabled}
-              className={`w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-zinc-500 placeholder:truncate resize-none ${
-                topRightSlot ? 'pr-8' : 'pr-1'
-              } ${
+              className={`min-w-0 flex-1 w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-zinc-500 placeholder:truncate resize-none  ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } leading-normal ${isFlat ? 'pt-1.5 pb-0.5 px-0.5' : 'pt-1.5 pb-1 px-1'} outline-none border-none`}
+              } leading-normal px-1 py-1.5 outline-none border-none`}
               style={{ minHeight: `${minHeight}px`, maxHeight: `${maxHeight}px` }}
             />
+            {topRightSlot && (
+              <div className="composer-top-actions flex shrink-0 items-center gap-1">
+                {topRightSlot}
+              </div>
+            )}
           </div>
         )}
 
@@ -202,10 +200,10 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {customControls ? (
           customControls
         ) : (
-          <div className="flex items-center justify-between gap-2 relative min-w-0">
+          <div className="composer-toolbar relative flex min-w-0 items-end justify-between gap-2">
             {leftControls}
 
-            <div className="flex items-center gap-1.5 max-md:gap-2.5 shrink-0 ml-auto">
+            <div className="flex shrink-0 items-center gap-1 ml-auto">
               {rightControls}
 
               {sendButton !== undefined ? (
@@ -230,14 +228,14 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                     }
                   }}
                   disabled={isSubmitDisabled}
-                  className={`w-ctrl-md h-ctrl-md rounded-lg flex items-center justify-center motion-press shrink-0 ${
+                  className={`composer-toolbar-control composer-toolbar-icon w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center motion-press shrink-0 ${
                     !isSubmitDisabled
-                      ? 'bg-white text-black hover:bg-zinc-200 shadow-sm cursor-pointer'
-                      : 'bg-white/[0.06] text-zinc-600 cursor-not-allowed'
+                      ? 'bg-fg-primary text-canvas hover:bg-fg-primary/90 shadow-sm cursor-pointer'
+                      : 'bg-surface-active text-fg-dim cursor-not-allowed'
                   }`}
                   title={submitTitle}
                 >
-                  <Send className="w-4 h-4 ml-0.5 fill-current" />
+                  <Send className="w-4 h-4 ml-0.5" strokeWidth={1.5} />
                 </button>
               )}
             </div>
