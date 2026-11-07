@@ -183,11 +183,13 @@
   }
 
   /* Prevent iOS automatic zoom on focus when font-size is below 16px */
-  @media (max-width: 768px) {
+  @supports (-webkit-touch-callout: none) {
+    @media (max-width: 768px) {
     input:not([type="checkbox"]):not([type="radio"]),
     textarea,
     select {
       font-size: 16px !important;
+    }
     }
   }
 }

@@ -23,11 +23,11 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     const sizeClasses = {
       sm: 'w-6 h-6 rounded-md',
       md: 'w-7 h-7 rounded-lg',
-      lg: 'w-8 h-8 rounded-lg',
+      lg: 'w-8 h-8 max-sm:w-11 max-sm:h-11 rounded-md',
     }[size];
 
     const variantClasses = {
-      ghost: 'text-zinc-400 hover:text-white hover:bg-white/[0.06]',
+      ghost: 'text-fg-muted hover:text-fg-primary',
       danger: 'text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06]',
       secondary: 'text-zinc-300 bg-white/[0.06] hover:bg-white/10',
     }[variant];

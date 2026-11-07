@@ -51,7 +51,7 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     await expect(settingsModal.getByText('Self-hosted', { exact: false }).first()).toBeVisible();
     await expect(settingsModal.getByText('Свой сервер', { exact: true })).toBeVisible();
     await expect(settingsModal.getByText('Кеш', { exact: true })).toBeVisible();
-    await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
+    await expect(settingsModal.getByRole('button', { name: 'Синхронизировать', exact: true })).toBeVisible();
 
     // Screenshot of Unified Header Card & Clean Sync Tab
     await page.screenshot({

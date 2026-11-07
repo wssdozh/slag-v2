@@ -35,6 +35,8 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
       }
       if (tab === 'sync') {
         await expect(scope.getByRole('status')).toBeVisible();
+        await expect(scope.getByRole('textbox', { name: 'Адрес сервера синхронизации' })).toHaveCSS('font-size', '12px');
+        await expect(scope.getByRole('button', { name: 'Проверить', exact: true })).toHaveText('');
         await expect(scope.getByTestId('sync-to-devices-btn')).toHaveJSProperty('tagName', 'BUTTON');
         await page.route('**/health', route => route.fulfill({ status: 503 }));
         await scope.getByRole('button', { name: 'Проверить', exact: true }).click();
@@ -44,7 +46,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
       }
       if (tab === 'vault') {
         await expect(scope.getByText('Последний снимок', { exact: true })).toBeVisible();
-        await expect(scope.getByTestId('btn-create-snapshot')).toHaveText('Создать');
+        await expect(scope.getByTestId('btn-create-snapshot')).toHaveText('');
         await expect(scope.getByTestId('btn-create-snapshot')).toHaveAccessibleName('Создать снимок');
         const labels = scope.locator('section').filter({ hasText: 'Резервное копирование' }).locator('.flex-1 > .text-xs');
         const leftEdges = await labels.evaluateAll(elements => elements.map(element => element.getBoundingClientRect().left));

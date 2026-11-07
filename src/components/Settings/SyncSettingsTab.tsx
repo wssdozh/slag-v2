@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   Laptop,
+  RefreshCw,
+  PlugZap,
   UserRound,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -8,6 +10,7 @@ import { navigatePage } from '../../lib/navigation';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
+import { IconButton } from '../UI/IconButton';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
 export const SyncSettingsTab: React.FC = () => {
@@ -87,10 +90,10 @@ export const SyncSettingsTab: React.FC = () => {
             </span>
             {status.error && <span className="text-danger">{status.error}</span>}
           </span>
-        } right={<button type="button" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">Синхронизировать</button>} />
+        } right={<IconButton size="lg" aria-label="Синхронизировать" title="Синхронизировать" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'}><RefreshCw className={`w-4 h-4 ${status.state === 'syncing' ? 'motion-safe:animate-spin' : ''}`} /></IconButton>} />
         <SettingsDivider />
         <SettingsRow label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} right={
-          <button type="button" onClick={() => void handleTestServerConnection()} disabled={isTestingServer} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{isTestingServer ? 'Тест…' : 'Проверить'}</button>
+          <IconButton size="lg" aria-label="Проверить" title="Проверить соединение с сервером" aria-busy={isTestingServer} onClick={() => void handleTestServerConnection()} disabled={isTestingServer}>{isTestingServer ? <RefreshCw className="w-4 h-4 motion-safe:animate-spin" /> : <PlugZap className="w-4 h-4" />}</IconButton>
         } />
         <SettingsDivider />
         <SettingsRow label="Синхронизировать при сохранении" right={<SettingsSwitch checked={config.autoSync} onChange={(checked) => { syncEngine.saveConfig({ autoSync: checked }); setConfig(syncEngine.getConfig()); }} label="Синхронизировать при сохранении" />} />

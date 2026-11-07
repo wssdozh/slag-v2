@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
 import { BaseModal } from './BaseModal';
+import { IconButton } from '../UI/IconButton';
 import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSwitch, SettingsSelect, SettingsNumber, SettingsInput } from '../Settings/SettingsUI';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
@@ -612,7 +613,7 @@ export const SettingsModal: React.FC = () => {
                   <SettingsRow
                     label="Последний снимок"
                     description={backupSettings.lastBackupAt ? <span className="font-mono">{new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU')}</span> : 'Ещё не создан'}
-                    right={<button type="button" data-testid="btn-create-snapshot" aria-label="Создать снимок" disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()} className="min-h-11 min-w-11 px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">{isCreatingSnapshot ? 'Создание…' : 'Создать'}</button>}
+                    right={<IconButton size="lg" data-testid="btn-create-snapshot" aria-label="Создать снимок" title="Создать снимок" aria-busy={isCreatingSnapshot} disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()}><Archive className={`w-4 h-4 ${isCreatingSnapshot ? 'motion-safe:animate-pulse' : ''}`} /></IconButton>}
                   />
                 </SettingsGroup>
 
