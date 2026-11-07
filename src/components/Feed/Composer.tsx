@@ -1101,7 +1101,13 @@ export const Composer: React.FC<ComposerProps> = ({
       onComplete();
     } else {
       requestAnimationFrame(() => {
-        textareaRef.current?.focus({ preventScroll: true });
+        // Only reclaim focus if it actually left. Retyping the caret into an
+        // already focused field re-opens the keyboard on Android and reads as a
+        // second bounce right after the note lands.
+        const field = textareaRef.current;
+        if (field && document.activeElement !== field) {
+          field.focus({ preventScroll: true });
+        }
       });
     }
   };

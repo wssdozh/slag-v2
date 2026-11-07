@@ -122,7 +122,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       if (!isSubmitDisabled) {
         onSubmit();
         requestAnimationFrame(() => {
-          effectiveRef.current?.focus();
+          effectiveRef.current?.focus({ preventScroll: true });
         });
       }
     }
@@ -164,11 +164,17 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
           </div>
         )}
 
-        {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
-        {topSlot}
+        {/* Both slots collapse to zero height instead of unmounting, so they share
+            one gap-less column: a closed slot must not leave a permanent gap. */}
+        {(topSlot || propertiesSlot) && (
+          <div className="flex flex-col">
+            {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
+            {topSlot}
 
-        {/* Слот свойств: активные свойства задачи, теги, папка над полем ввода */}
-        {propertiesSlot}
+            {/* Слот свойств: активные свойства задачи, теги, папка над полем ввода */}
+            {propertiesSlot}
+          </div>
+        )}
 
         {/* Зона ввода */}
         {!hideTextarea && (
@@ -207,12 +213,19 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               ) : (
                 <button
                   type="button"
+                  // Tapping must not move focus out of the textarea: on Android that
+                  // closes the keyboard, and the refocus below opens it again — two
+                  // animations the user reads as the composer shaking.
+                  onPointerDown={(e) => e.preventDefault()}
                   onClick={(e) => {
                     e.preventDefault();
                     if (!isSubmitDisabled) {
                       onSubmit();
                       requestAnimationFrame(() => {
-                        effectiveRef.current?.focus();
+                        const field = effectiveRef.current;
+                        if (field && document.activeElement !== field) {
+                          field.focus({ preventScroll: true });
+                        }
                       });
                     }
                   }}

@@ -84,7 +84,11 @@ test.describe('Composer @ Folder Selection E2E', () => {
     // Click close button on chip to dismiss target folder
     const chipCloseBtn = folderChip.locator('button');
     await chipCloseBtn.click();
-    await expect(folderChip).toBeHidden();
+    // The properties row collapses instead of deleting the chip, so the chip node
+    // survives the animation. What has to happen is the row reaching zero height.
+    const propertiesRow = page.locator('.motion-accordion', { has: folderChip }).first();
+    await expect(propertiesRow).toHaveAttribute('data-expanded', 'false');
+    await expect.poll(async () => (await propertiesRow.boundingBox())?.height ?? 0).toBeLessThan(1);
   });
 
   test('3. Drag and drop file from explorer directly into Composer', async ({ page }) => {
