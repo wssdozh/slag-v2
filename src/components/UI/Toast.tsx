@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import type { ToastMessage } from '../../context/AppContext';
 import { usePresence } from '../../hooks/usePresence';
 import { UI_DELAYS, UI_GESTURES } from '../../config';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, Undo2, ArchiveRestore } from 'lucide-react';
 
 /* How far the card keeps travelling after a flick. Beyond the viewport edge, so
    the inline translate and the CSS exit never disagree. */
@@ -141,18 +141,14 @@ const ToastCard: React.FC<{ toast: ToastMessage }> = ({ toast }) => {
             toast.action!.onClick();
             dismiss();
           }}
-          className="ml-1.5 px-2 py-0.5 rounded text-2xs font-mono font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+          type="button"
+          aria-label={toast.action.label}
+          title={toast.action.label}
+          className="ml-1 flex shrink-0 items-center justify-center w-8 h-8 max-sm:w-11 max-sm:h-11 rounded-md text-fg-secondary hover:text-fg-primary focus-visible:text-fg-primary cursor-pointer"
         >
-          {toast.action.label}
+          {toast.action.kind === 'undo' ? <Undo2 className="w-4 h-4" /> : <ArchiveRestore className="w-4 h-4" />}
         </button>
       )}
-      <button
-        onClick={dismiss}
-        aria-label="Закрыть уведомление"
-        className="ml-1 p-0.5 rounded text-fg-secondary hover:text-fg-primary transition-colors cursor-pointer"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
     </div>
   );
 };

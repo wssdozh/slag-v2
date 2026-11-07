@@ -14,6 +14,12 @@ test('temporary playground opens real dialogs and toast variants on isolated ori
     await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished));
   });
   await page.screenshot({ path: 'test-results/screenshots/ui-playground.png' });
+  await expect(page.getByRole('button', { name: 'Закрыть уведомление' })).toHaveCount(0);
+  const undo = page.getByTestId('toast').getByRole('button', { name: 'Отменить', exact: true });
+  await expect(undo).toHaveText('');
+  await expect(undo).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await undo.click();
+  await expect(page.getByTestId('toast').filter({ hasText: 'Действие отменено' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Обычная модалка' })).toBeHidden();
   await page.getByRole('button', { name: 'настройки · все вкладки' }).click();

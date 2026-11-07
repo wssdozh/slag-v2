@@ -51,7 +51,7 @@ export function Playground() {
         <button className={button} onClick={() => app.addToast('Настройки сохранены', 'success')}>успех</button>
         <button className={button} onClick={() => app.addToast('Не удалось проверить сервер: HTTP 503', 'error')}>ошибка</button>
         <button className={button} onClick={() => app.addToast('Синхронизация приостановлена', 'info')}>информация</button>
-        <button className={button} onClick={() => app.addToast('Запись в корзине', 'info', { label: 'Отменить', onClick: () => app.addToast('Действие отменено', 'success') })}>с действием</button>
+        <button className={button} onClick={() => app.addToast('Запись в корзине', 'info', { kind: 'undo', label: 'Отменить', onClick: () => app.addToast('Действие отменено', 'success') })}>с действием</button>
       </div><button className={button} onClick={() => app.addToast('Длинное сообщение: сервер временно недоступен. Данные сохранены локально, повторите попытку подключения позже.', 'error')}>длинный текст</button></section>
       <section className="flex flex-col gap-3"><h2 className="text-xs text-fg-muted">модалки</h2><div className="grid sm:grid-cols-2 gap-2">{samples.map(([label, onClick]) => <button key={label} className={button} onClick={onClick}>{label}</button>)}</div></section>
       <p className="text-xs text-fg-muted">для мобильного вида сузь окно или открой ссылку с телефона. свайпни тоаст, чтобы убрать; наведи мышь, чтобы задержать.</p>

@@ -63,6 +63,7 @@ export interface ToastMessage {
   type: 'info' | 'success' | 'error';
   text: string;
   action?: {
+    kind: 'undo' | 'restore';
     label: string;
     onClick: () => void;
   };
@@ -207,7 +208,7 @@ interface AppContextType {
   openVaultModal: () => void;
   closeVaultModal: () => void;
   saveAiSettings: (settings: Partial<AiSettings>) => void;
-  addToast: (text: string, type?: 'info' | 'success' | 'error', action?: { label: string; onClick: () => void }) => void;
+  addToast: (text: string, type?: 'info' | 'success' | 'error', action?: ToastMessage['action']) => void;
   undoLastAction: () => boolean;
   removeToast: (id: string) => void;
   refreshData: () => void;
@@ -722,7 +723,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addToast = useCallback((
     text: string,
     type: 'info' | 'success' | 'error' = 'info',
-    action?: { label: string; onClick: () => void }
+    action?: ToastMessage['action']
   ) => {
     const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
     setToasts(prev => [...prev.slice(-2), { id, text, type, action }]);
@@ -1448,6 +1449,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
     // Единственный источник уведомления об удалении: слой модели, а не каждый вызывающий.
     addToast('Запись в корзине', 'info', {
+      kind: 'restore',
       label: 'восстановить',
       onClick: () => {
         storage.restoreFromTrash(id);
@@ -1693,6 +1695,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         addToast(toastMsg, 'success', {
+          kind: 'undo',
           label: 'Отменить',
           onClick: () => undoLastAction(),
         });
@@ -1744,6 +1747,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           itemSnapshots: snapshots,
         });
         addToast(`Применено задач: ${updatedCount}`, 'success', {
+          kind: 'undo',
           label: 'Отменить',
           onClick: () => undoLastAction(),
         });
