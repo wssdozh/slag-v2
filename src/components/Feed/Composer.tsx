@@ -1808,7 +1808,7 @@ export const Composer: React.FC<ComposerProps> = ({
             onClick={handleExpandToFullscreen}
             title="Раскрыть в полноэкранный редактор"
             aria-label="Раскрыть в полноэкранный редактор"
-            className="hidden sm:flex text-zinc-500 hover:text-zinc-200"
+            className="flex text-zinc-500 hover:text-zinc-200"
             icon={<Maximize2 className="w-3.5 h-3.5" />}
           />
         ) : undefined

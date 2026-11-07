@@ -413,3 +413,30 @@ test('closing the editor collapses it back into the card instead of unmounting',
   expect(exit.collapsed).toBe(true);
   expect(exit.aliveMs).toBeGreaterThanOrEqual(150);
 });
+
+test('the editor slides in when it has no card to unfold from', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+  await page.locator('main textarea').first().fill('Выезд ' + Date.now());
+  await page.locator('button[aria-label="Раскрыть в полноэкранный редактор"]').first().click();
+
+  const editor = page.getByTestId('fullscreen-editor-modal');
+  await expect(editor).toBeVisible();
+  // Opened from the composer there is no `data-flip-id` to unfold out of, and the
+  // editor used to appear with no motion at all.
+  const travelled = await editor.evaluate(element => element.getAnimations().some(animation =>
+    animation.effect instanceof KeyframeEffect &&
+    animation.effect.getKeyframes().some(keyframe => String(keyframe.transform ?? '').includes('translateY'))));
+  expect(travelled).toBe(true);
+});
+
+test.describe('the composer on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('offers the fullscreen editor button', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('header').first()).toBeVisible({ timeout: 15000 });
+    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    await expect(page.locator('button[aria-label="Раскрыть в полноэкранный редактор"]').first()).toBeVisible();
+  });
+});

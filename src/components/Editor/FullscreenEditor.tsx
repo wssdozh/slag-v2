@@ -54,7 +54,7 @@ import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../lib/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/windowControls';
-import { expandFromRect, collapseToRect } from '../../lib/motion';
+import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/usePresence';
 
 let activeEditorView: EditorView | null = null;
@@ -122,19 +122,28 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
   // Unfold out of the card that was tapped and collapse symmetrically on exit.
   useLayoutEffect(() => {
+    // A wide surface lifts further than a phone screen, where the editor is the
+    // whole window and reads as a sheet.
+    const travel = window.matchMedia('(max-width: 767px)').matches ? 56 : 18;
+    const originOf = () => document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`);
+
     if (presencePhase === 'exiting') {
       const target = rootRef.current;
       if (!target || isSearchOpen) return;
-      const origin = document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`);
+      const origin = originOf();
       if (origin) collapseToRect(target, origin);
+      else exitToEdge(target, travel);
       return;
     }
     if (hasExpandedRef.current) return;
     hasExpandedRef.current = true;
     const target = rootRef.current;
     if (!target || isSearchOpen) return;
-    const origin = document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`);
+    const origin = originOf();
+    // Opened from the card: unfold out of it. Opened from the composer or a draft
+    // there is no card, and doing nothing looked like the editor just appeared.
     if (origin) expandFromRect(origin, target);
+    else enterFromEdge(target, travel);
   }, [item.id, isSearchOpen, presencePhase]);
 
   // Zen mode & layout controls (persisting user's width preference)

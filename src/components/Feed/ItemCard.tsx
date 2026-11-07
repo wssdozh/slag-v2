@@ -457,10 +457,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       >
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
         <div
-          className={`absolute top-2 right-2 ${
+          className={`absolute top-2.5 right-2.5 ${
             isPureVoice || isPureFile
               ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
-              : 'sm:top-2.5 sm:right-2.5 flex items-center'
+              : 'sm:top-3 sm:right-3 flex items-center'
           } gap-1 sm:gap-0 sm:group-hover:gap-1 z-20 pointer-events-auto`}
         >
           <button

@@ -67,6 +67,34 @@ export function expandFromRect(origin: HTMLElement, target: HTMLElement): void {
 }
 
 /**
+ * Rise-into-place for a surface with no origin card to unfold from — opened from
+ * the composer, from a draft, or from a search hit. CSS owns the fade; this only
+ * gives the surface a direction to travel.
+ */
+export function enterFromEdge(target: HTMLElement, distance = 18): Animation | undefined {
+  if (prefersReducedMotion()) return undefined;
+  return target.animate(
+    [
+      { transform: `translateY(${distance}px) scale(0.99)` },
+      { transform: 'none' },
+    ],
+    { duration: motionMs('slow'), easing: motionEase('entrance') },
+  );
+}
+
+/** The matching way back for a surface that has no card to collapse into. */
+export function exitToEdge(target: HTMLElement, distance = 18): Animation | undefined {
+  if (prefersReducedMotion()) return undefined;
+  return target.animate(
+    [
+      { transform: 'none', opacity: 1 },
+      { transform: `translateY(${distance}px) scale(0.99)`, opacity: 0 },
+    ],
+    { duration: motionMs('base'), easing: motionEase('standard'), fill: 'forwards' },
+  );
+}
+
+/**
  * Collapses the full-bleed surface back into the origin card on exit,
  * providing symmetric reverse motion.
  */
