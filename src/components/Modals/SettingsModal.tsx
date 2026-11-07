@@ -381,7 +381,7 @@ export const SettingsModal: React.FC = () => {
 
           {/* Right Tab Content */}
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-panel">
-            <div key={activeTab} className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4 motion-fade">
+            <div key={activeTab} className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4 motion-fade motion-settings-tab">
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
                   {/* Top Switcher: Подписка vs Свой ключ */}

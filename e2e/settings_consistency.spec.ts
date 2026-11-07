@@ -50,6 +50,15 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
       }
       expect(await scope.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
       await expect(scope.locator(`[data-tab="${tab}"]`)).toHaveClass(/bg-surface-active/);
+      if (viewport.width < 768) {
+        const pane = scope.locator('.motion-settings-tab');
+        await expect(pane).toHaveCSS('transition-property', 'opacity, scale, translate');
+        if (tab === 'devices') {
+          await page.emulateMedia({ reducedMotion: 'reduce' });
+          await expect(pane).toHaveCSS('translate', 'none');
+          await page.emulateMedia({ reducedMotion: 'no-preference' });
+        }
+      }
       await scope.locator('form > .motion-fade').evaluate(async (element) => {
         await Promise.all(element.getAnimations().map(animation => animation.finished));
       });

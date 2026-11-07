@@ -105,6 +105,14 @@
   --slag-motion-slow: 200ms;
 }
 
+/* Mobile settings keep their chrome still; only the new pane settles in. */
+@media (max-width: 767px) {
+  .motion-settings-tab { translate: 0 0; }
+  @starting-style {
+    .motion-settings-tab { translate: 0 6px; }
+  }
+}
+
 /* Entry-only consumers use @starting-style. Controlled overlays additionally
    set data-motion-state through usePresence, including on older WebViews. */
 .motion-fade,
