@@ -15,7 +15,6 @@ import { QuickComposerWindow } from './components/Composer/QuickComposerWindow';
 import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
-import { useVisualViewport } from './hooks/useVisualViewport';
 import { Monitor } from 'lucide-react';
 import { enrichAttachment, extractFocalContext } from './lib/attachmentEnrichment';
 import type { LightboxImage } from './components/UI/ImageLightbox';
@@ -85,8 +84,6 @@ const AppContent: React.FC = () => {
       });
     }
   }, [items, updateItem, aiSettings, updateLightboxImage]);
-
-  useVisualViewport();
 
   const [currentPage, setCurrentPage] = useState<string | null>(() => {
     return typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('page') : null;

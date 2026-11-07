@@ -352,10 +352,9 @@ export const MobileFoldersView: React.FC = () => {
             <FeedList />
             {/* Telegram-style Composer Island at the bottom of the feed */}
             <div
-              className="absolute inset-x-0 bottom-0 pointer-events-none z-30 px-2 flex justify-center motion-keyboard"
+              className="absolute inset-x-0 bottom-0 pointer-events-none z-30 px-2 flex justify-center"
               style={{
                 paddingBottom: 'max(var(--sab), 0.5rem)',
-                transform: `translateY(calc(-1 * var(--keyboard-inset-bottom, 0px)))`,
               }}
             >
               <div className="pointer-events-auto w-full max-w-lg">

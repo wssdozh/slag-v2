@@ -235,10 +235,6 @@
   transition-duration: var(--slag-motion-instant);
 }
 
-.motion-keyboard {
-  transition: transform var(--slag-motion-fast) var(--ease-standard);
-}
-
 /* Task completion: the stroke draws itself, the ring lands over it. Both are
    mount-only animations, so an ordinary re-render never replays them. */
 @keyframes motion-check-draw {
@@ -430,9 +426,6 @@ html[data-motion-swap="pop"]::view-transition-new(root) { animation-name: motion
   }
   /* Functional transforms still reach their target; only interpolation stops. */
   .transition-transform,
-  .motion-keyboard {
-    transition: none !important;
-  }
   .motion-accordion {
     transition: none !important;
   }
