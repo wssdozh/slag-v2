@@ -60,15 +60,16 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     });
 
     // 6. Test Background Sync Interval (Battery Saver)
-    const interval30Btn = settingsModal.locator('[data-testid="sync-interval-30"]');
-    await expect(interval30Btn).toBeVisible();
-    await interval30Btn.scrollIntoViewIfNeeded();
-    await interval30Btn.click();
-    await expect(settingsModal.locator('span', { hasText: '30 мин' })).toBeVisible();
+    const intervalSelect = settingsModal.locator('[data-testid="sync-interval-select"]');
+    await expect(intervalSelect).toBeVisible();
+    await intervalSelect.scrollIntoViewIfNeeded();
+    await intervalSelect.click();
+    await page.locator('[data-testid="sync-interval-30"]').click();
+    await expect(intervalSelect).toContainText('30 мин');
 
-    const intervalRealtimeBtn = settingsModal.locator('[data-testid="sync-interval-0"]');
-    await intervalRealtimeBtn.click();
-    await expect(settingsModal.locator('span', { hasText: 'в реальном времени' })).toBeVisible();
+    await intervalSelect.click();
+    await page.locator('[data-testid="sync-interval-0"]').click();
+    await expect(intervalSelect).toContainText('Мгновенно');
 
     // Screenshot of Battery Saver & Server section
     await page.screenshot({

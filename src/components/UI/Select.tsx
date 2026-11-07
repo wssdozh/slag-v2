@@ -10,6 +10,8 @@ export interface SelectOption {
   color?: string;
   disabled?: boolean;
   dividerBefore?: boolean;
+  /** Stable hook for tests that drive a specific option. */
+  testId?: string;
 }
 
 export interface SelectProps {
@@ -257,6 +259,7 @@ export const Select: React.FC<SelectProps> = ({
                   <button
                     type="button"
                     role="option"
+                    data-testid={opt.testId}
                     aria-selected={isSelected}
                     disabled={opt.disabled}
                     onMouseEnter={() => setHighlightedIndex(idx)}

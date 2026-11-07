@@ -1,5 +1,7 @@
 import React from 'react';
 import { ChevronRight, ArrowUpRight } from 'lucide-react';
+import { Select, type SelectOption } from '../UI/Select';
+import { NumberInput } from '../UI/NumberInput';
 
 /**
  * The one row/group language for every settings tab.
@@ -43,7 +45,7 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
         {action}
       </div>
     )}
-    <div className="rounded-xl bg-surface border border-white/[0.06] overflow-hidden">
+    <div className="rounded-xl bg-surface border border-border-subtle overflow-hidden">
       {children}
     </div>
   </section>
@@ -51,7 +53,7 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
 
 /** A divider between rows. Inset to the label column when the rows carry icons. */
 export const SettingsDivider: React.FC<{ inset?: boolean }> = ({ inset = false }) => (
-  <div className={`h-px bg-white/[0.06] ${inset ? 'ml-11' : ''}`} />
+  <div className={`h-px bg-border-subtle ${inset ? 'ml-11' : ''}`} />
 );
 
 interface SettingsRowProps {
@@ -97,13 +99,13 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
       {...(interactive
         ? { type: 'button' as const, onClick, disabled, 'aria-disabled': disabled }
         : {})}
-      className={`w-full flex items-start gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-left ${
-        interactive ? 'cursor-pointer hover:bg-white/[0.03]' : ''
+      className={`w-full flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-left ${
+        interactive ? 'cursor-pointer hover:bg-surface-hover' : ''
       } ${disabled ? 'opacity-40' : ''} ${className}`}
     >
       {icon && (
         <span
-          className={`w-4 shrink-0 mt-0.5 flex items-center justify-center ${
+          className={`w-4 shrink-0 flex items-center justify-center ${
             danger ? 'text-danger' : 'text-fg-muted'
           }`}
         >
@@ -119,11 +121,11 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         )}
       </span>
       {value !== undefined && (
-        <span className="text-2xs text-fg-muted font-mono shrink-0 mt-0.5">{value}</span>
+        <span className="text-2xs text-fg-muted font-mono shrink-0">{value}</span>
       )}
-      {right && <span className="shrink-0 mt-0.5">{right}</span>}
-      {chevron && <ChevronRight className="w-3.5 h-3.5 mt-0.5 shrink-0 text-fg-dim" />}
-      {external && <ArrowUpRight className="w-3.5 h-3.5 mt-0.5 shrink-0 text-fg-dim" />}
+      {right && <span className="shrink-0">{right}</span>}
+      {chevron && <ChevronRight className="w-3.5 h-3.5 shrink-0 text-fg-dim" />}
+      {external && <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-fg-dim" />}
       {children}
     </Element>
   );
@@ -154,7 +156,7 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
     disabled={disabled}
     onClick={() => onChange(!checked)}
     className={`relative w-9 h-5 rounded-full shrink-0 cursor-pointer transition-colors ${
-      checked ? 'bg-accent' : 'bg-white/[0.14]'
+      checked ? 'bg-accent' : 'bg-switch-off'
     } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
   >
     <span
@@ -168,6 +170,10 @@ interface SettingsSegmentedOption<T extends string> {
   value: T;
   label: string;
   disabled?: boolean;
+  /** Why the option is unavailable, shown on the disabled segment. */
+  title?: string;
+  /** Stable hook for tests that drive a specific segment. */
+  testId?: string;
 }
 
 interface SettingsSegmentedProps<T extends string> {
@@ -187,7 +193,7 @@ export function SettingsSegmented<T extends string>({
       /* auto-fit rather than a fixed column count: four options stay four
          columns on a desktop and fold to two on a phone without the caller
          passing breakpoints, which is how every tab drifted apart. */
-      className="grid gap-1 bg-canvas-subtle p-1 rounded-lg border border-white/[0.06]"
+      className="grid gap-1 bg-canvas-subtle p-1 rounded-lg border border-border-subtle"
       style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(76px, 1fr))' }}
     >
       {options.map(option => {
@@ -196,11 +202,13 @@ export function SettingsSegmented<T extends string>({
           <button
             key={option.value}
             type="button"
+            data-testid={option.testId}
+            title={option.title}
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={`py-1.5 px-2 rounded-md text-2xs font-medium whitespace-nowrap motion-surface ${
               selected
-                ? 'bg-white/10 text-white border border-white/[0.08]'
+                ? 'bg-surface-active text-fg-primary border border-border-subtle'
                 : 'text-fg-secondary hover:text-fg-primary border border-transparent'
             } ${option.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
           >
@@ -211,3 +219,142 @@ export function SettingsSegmented<T extends string>({
     </div>
   );
 }
+
+interface SettingsSelectProps {
+  label: React.ReactNode;
+  icon?: React.ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  /** Only for a caveat the label cannot carry. Prefer no description. */
+  description?: React.ReactNode;
+  disabled?: boolean;
+  testId?: string;
+}
+
+/**
+ * A choice reads as `label [value ⌄]` on one line, never as a stack of options
+ * under the label. The whole point of the row is that the eye scans the left
+ * column for a name and the right column for its current value.
+ */
+export const SettingsSelect: React.FC<SettingsSelectProps> = ({
+  label,
+  icon,
+  value,
+  onChange,
+  options,
+  description,
+  disabled = false,
+  testId,
+}) => (
+  <SettingsRow
+    icon={icon}
+    label={label}
+    description={description}
+    disabled={disabled}
+    right={
+      <span data-testid={testId}>
+        <Select
+          variant="ghost"
+          size="sm"
+          value={value}
+          onChange={onChange}
+          options={options}
+          disabled={disabled}
+          aria-label={typeof label === 'string' ? label : undefined}
+        />
+      </span>
+    }
+  />
+);
+
+interface SettingsNumberProps {
+  label: React.ReactNode;
+  icon?: React.ReactNode;
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  description?: React.ReactNode;
+  disabled?: boolean;
+}
+
+/** A number is a value, not a form field: it lives in the right column. */
+export const SettingsNumber: React.FC<SettingsNumberProps> = ({
+  label,
+  icon,
+  value,
+  onChange,
+  min,
+  max,
+  description,
+  disabled = false,
+}) => (
+  <SettingsRow
+    icon={icon}
+    label={label}
+    description={description}
+    disabled={disabled}
+    right={
+      <span className="w-28">
+        <NumberInput
+          value={value}
+          onChange={onChange}
+          min={min}
+          max={max}
+          disabled={disabled}
+          aria-label={typeof label === 'string' ? label : undefined}
+        />
+      </span>
+    }
+  />
+);
+
+interface SettingsInputProps {
+  label: React.ReactNode;
+  icon?: React.ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  description?: React.ReactNode;
+  mono?: boolean;
+  disabled?: boolean;
+  inputClassName?: string;
+  'aria-label'?: string;
+}
+
+/** Free text, right-aligned in the value column, so rows stay one list. */
+export const SettingsInput: React.FC<SettingsInputProps> = ({
+  label,
+  icon,
+  value,
+  onChange,
+  placeholder,
+  description,
+  mono = false,
+  disabled = false,
+  inputClassName = '',
+  'aria-label': ariaLabel,
+}) => (
+  <SettingsRow
+    icon={icon}
+    label={label}
+    description={description}
+    disabled={disabled}
+    right={
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel ?? (typeof label === 'string' ? label : undefined)}
+        disabled={disabled}
+        spellCheck={false}
+        autoComplete="off"
+        className={`w-40 bg-transparent text-right text-2xs text-fg-secondary placeholder:text-fg-dim outline-none truncate ${
+          mono ? 'font-mono' : ''
+        } ${inputClassName}`}
+      />
+    }
+  />
+);

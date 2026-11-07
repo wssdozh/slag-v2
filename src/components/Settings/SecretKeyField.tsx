@@ -4,49 +4,45 @@ import { Eye, EyeOff } from 'lucide-react';
 interface SecretKeyFieldProps {
   value: string;
   onChange: (value: string) => void;
+  /** Doubles as the field's only label, so it states what to paste and its prefix. */
   placeholder: string;
-  label?: string;
 }
 
 /**
- * Поле секрета с локальным переключателем видимости.
- * Раньше два разных ключа делили один флаг showKey — открытие одного
- * показывало и второй. Заодно отключаем автокоррекцию: Android иначе
- * капитализирует первый символ ключа.
+ * A secret, rendered as one settings row: the input is the row.
+ * The separate label + bordered box made the group look like a card inside a
+ * card, and cost a line for a word the placeholder already says.
+ *
+ * Visibility is per field: two keys sharing one flag revealed both at once.
+ * Autocorrect is off because Android otherwise capitalises the first character
+ * of a key.
  */
-export const SecretKeyField: React.FC<SecretKeyFieldProps> = ({
-  value,
-  onChange,
-  placeholder,
-  label = 'API Key',
-}) => {
+export const SecretKeyField: React.FC<SecretKeyFieldProps> = ({ value, onChange, placeholder }) => {
   const [visible, setVisible] = useState(false);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-medium text-zinc-300">{label}</label>
-      <div className="relative">
-        <input
-          type={visible ? 'text' : 'password'}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          spellCheck={false}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="none"
-          className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-3 py-2 pr-10 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
-        />
-        <button
-          type="button"
-          onClick={() => setVisible((prev) => !prev)}
-          aria-label={visible ? 'Скрыть ключ' : 'Показать ключ'}
-          aria-pressed={visible}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300 cursor-pointer"
-        >
-          {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-        </button>
-      </div>
+    <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
+      <input
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        spellCheck={false}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        className="flex-1 min-w-0 bg-transparent text-xs font-mono text-fg-primary placeholder:text-fg-dim outline-none truncate"
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((prev) => !prev)}
+        aria-label={visible ? 'Скрыть ключ' : 'Показать ключ'}
+        aria-pressed={visible}
+        className="p-1 shrink-0 text-fg-dim hover:text-fg-muted cursor-pointer"
+      >
+        {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+      </button>
     </div>
   );
 };

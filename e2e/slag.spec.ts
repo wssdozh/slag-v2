@@ -491,21 +491,18 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
 
-    await settingsModal.getByTestId('ai-source-byok').click();
+    await settingsModal.locator('[data-testid="ai-source-mode"]').click();
+    await page.locator('[data-testid="ai-source-byok"]').click();
 
-    // Verify Groq provider is selectable and default recommended
-    const groqProviderBtn = settingsModal.locator('button', { hasText: 'Groq' }).first();
-    await expect(groqProviderBtn).toBeVisible();
-    await page.waitForTimeout(100);
-    await groqProviderBtn.click();
+    // Provider is a dropdown row: Groq is the default, KIE.AI is reachable.
+    const providerRow = settingsModal.locator('[data-testid="ai-provider-select"]');
+    await expect(providerRow).toContainText('Groq');
 
     // Verify Gemini provider tab is cut out / removed from top tabs
     await expect(settingsModal.locator('button', { hasText: '✨ Gemini' })).not.toBeVisible();
 
-    // Verify KIE.AI provider is available and defaults to DeepSeek V4.1 Flash
-    const kieProviderBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
-    await expect(kieProviderBtn).toBeVisible();
-    await kieProviderBtn.click();
+    await providerRow.click();
+    await page.getByRole('option', { name: /^KIE\.AI/ }).click();
     await expect(settingsModal.locator('input[placeholder*="sk-kie"]')).toBeVisible();
 
     // Verify DeepSeek V4.1 Flash model option is visible in KIE.AI
@@ -517,7 +514,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
       path: 'test-results/screenshots/settings-modal-kie-argon.png',
     });
 
-    await groqProviderBtn.click();
+    await providerRow.click();
+    await page.getByRole('option', { name: /^Groq/ }).click();
 
     // Verify gpt-oss-120b model option exists
     const modelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /GPT-OSS 120B/ });
@@ -525,8 +523,8 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
 
     // Verify Tag Taxonomy controls exist
     await expect(settingsModal.locator('text=Правила тегов')).toBeVisible();
-    await expect(settingsModal.locator('text=Лимит тегов на запись')).toBeVisible();
-    await expect(settingsModal.locator('text=Стиль регистра тегов')).toBeVisible();
+    await expect(settingsModal.locator('text=Лимит тегов')).toBeVisible();
+    await expect(settingsModal.locator('text=Стиль регистра')).toBeVisible();
     await expect(settingsModal.locator('text=Разрешить ИИ создавать новые теги')).toBeVisible();
 
     // Take screenshot of settings modal for visual audit
@@ -1407,15 +1405,16 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
 
-    await settingsModal.getByTestId('ai-source-byok').click();
+    await settingsModal.locator('[data-testid="ai-source-mode"]').click();
+    await page.locator('[data-testid="ai-source-byok"]').click();
 
-    // 2. Select KIE.AI
-    const kieBtn = settingsModal.locator('button', { hasText: 'KIE.AI' });
-    await kieBtn.click();
+    // 2. Select KIE.AI from the provider row
+    await settingsModal.locator('[data-testid="ai-provider-select"]').click();
+    await page.getByRole('option', { name: /^KIE\.AI/ }).click();
 
     // 3. Verify KIE model is selected and visible
-    const select = settingsModal.locator('button[aria-haspopup="listbox"]').first();
-    await expect(select).toContainText(/DeepSeek V4\.1 Flash|Gemini 4 Argon/);
+    const select = settingsModal.locator('button[aria-haspopup="listbox"]').filter({ hasText: /DeepSeek V4\.1 Flash|Gemini 4 Argon/ });
+    await expect(select).toBeVisible();
 
     // 4. Fill in token and save
     const keyInput = settingsModal.locator('input[placeholder*="sk-kie"]');
@@ -1451,18 +1450,19 @@ test.describe('SLAG v2 Specification E2E Verification', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
 
-    await settingsModal.getByTestId('ai-source-byok').click();
+    await settingsModal.locator('[data-testid="ai-source-mode"]').click();
+    await page.locator('[data-testid="ai-source-byok"]').click();
 
-    await expect(settingsModal.locator('text=Глубина рассуждений').first()).toBeVisible();
+    await expect(settingsModal.locator('text=Рассуждения').first()).toBeVisible();
     await expect(settingsModal.locator('text=Автоматизация')).toBeVisible();
     await expect(settingsModal.locator('text=Автотегирование новых заметок')).toBeVisible();
-    await expect(settingsModal.locator('text=AI-триаж (папки, задачи, приоритеты)')).toBeVisible();
+    await expect(settingsModal.locator('text=AI-триаж')).toBeVisible();
     await expect(settingsModal.locator('text=Веб-поиск при ответах')).toBeVisible();
 
     // Select Reasoning Effort: high
-    const reasoningSelect = settingsModal.locator('button[aria-haspopup="listbox"]').filter({ hasText: /Отключено|Низкая|Средняя|Высокая/ }).first();
+    const reasoningSelect = settingsModal.locator('button[aria-haspopup="listbox"]').filter({ hasText: /Отключены|Низкие|Средние|Высокие/ }).first();
     await reasoningSelect.click();
-    await page.locator('button[role="option"]', { hasText: /Высокая/ }).click();
+    await page.getByRole('option', { name: 'Высокие', exact: true }).click();
 
     // Take screenshot of rich settings tab
     await page.screenshot({

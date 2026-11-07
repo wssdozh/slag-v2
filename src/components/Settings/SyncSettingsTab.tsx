@@ -10,6 +10,7 @@ import { navigatePage } from '../../lib/navigation';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
+import { SettingsDivider, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
 interface SyncSettingsTabProps {
   addToast?: (text: string, type?: 'info' | 'success' | 'error') => void;
@@ -156,11 +157,8 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       </section>
 
       {/* Relay Server */}
-      <section className="settings-card p-3.5 flex flex-col gap-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-fg-primary">Сервер ретрансляции</span>
-        </div>
-        <div className="flex items-center gap-2">
+      <section className="settings-card flex flex-col">
+        <div className="flex items-center gap-2 px-3 py-3 sm:px-4">
           <div className="relative flex-1 min-w-0">
             <Server className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full bg-panel border border-white/[0.08] rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-mono text-white outline-none truncate" />
@@ -170,25 +168,34 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         {serverStatusMessage && (
           <p
             role="status"
-            className={`font-mono text-2xs leading-snug break-words ${serverStatusError ? 'text-rose-300' : 'text-zinc-400'}`}
+            className={`px-3 pb-3 sm:px-4 font-mono text-2xs leading-snug break-words ${serverStatusError ? 'text-rose-300' : 'text-fg-muted'}`}
           >
             {serverStatusError ? `не удалось: ${serverStatusMessage}` : serverStatusMessage}
           </p>
         )}
-        <label className="flex items-center justify-between text-2xs text-zinc-400 cursor-pointer">
-          Автоматическая синхронизация при сохранении
-          <input type="checkbox" checked={config.autoSync} onChange={(event) => { syncEngine.saveConfig({ autoSync: event.target.checked }); setConfig(syncEngine.getConfig()); }} className="w-3.5 h-3.5 accent-white cursor-pointer" />
-        </label>
-        <div className="flex flex-col gap-1.5 pt-2 border-t border-white/[0.04]">
-          <div className="flex justify-between text-2xs text-zinc-400"><span>Фоновая синхронизация</span><span>{config.bgSyncIntervalMinutes ? `${config.bgSyncIntervalMinutes} мин` : 'в реальном времени'}</span></div>
-          <div className="grid grid-cols-3 gap-1 bg-canvas-subtle p-0.5 rounded-lg border border-white/[0.08]">
-            {([0, 10, 30] as const).map((minutes) => (
-              <button key={minutes} type="button" data-testid={`sync-interval-${minutes}`} onClick={() => { syncEngine.setBgSyncInterval(minutes); setConfig(syncEngine.getConfig()); }} className={`py-1 text-2xs rounded-md cursor-pointer ${config.bgSyncIntervalMinutes === minutes ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>
-                {minutes === 0 ? 'Мгновенно' : minutes === 10 ? '10 мин' : '30 мин (эко)'}
-              </button>
-            ))}
-          </div>
-        </div>
+        <SettingsDivider />
+        <SettingsRow
+          label="Синхронизировать при сохранении"
+          right={
+            <SettingsSwitch
+              checked={config.autoSync}
+              onChange={(checked) => { syncEngine.saveConfig({ autoSync: checked }); setConfig(syncEngine.getConfig()); }}
+              label="Синхронизировать при сохранении"
+            />
+          }
+        />
+        <SettingsDivider />
+        <SettingsSelect
+          label="Частота синхронизации"
+          testId="sync-interval-select"
+          value={String(config.bgSyncIntervalMinutes ?? 0)}
+          onChange={(next) => { syncEngine.setBgSyncInterval(Number(next) as 0 | 10 | 30); setConfig(syncEngine.getConfig()); }}
+          options={[
+            { value: '0', label: 'Мгновенно', testId: 'sync-interval-0' },
+            { value: '10', label: '10 мин', testId: 'sync-interval-10' },
+            { value: '30', label: '30 мин (эко)', testId: 'sync-interval-30' },
+          ]}
+        />
       </section>
 
       {/* Rotate Vault Key */}

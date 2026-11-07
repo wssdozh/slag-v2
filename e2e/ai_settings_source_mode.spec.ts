@@ -28,11 +28,15 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
     await aiTabBtn.click();
 
     // 4. Without a paid account the subscription AI gateway is locked (server-authoritative).
-    const subAiBtn = settingsModal.locator('[data-testid="ai-source-subscription"]');
-    await expect(subAiBtn).toBeVisible();
-    await expect(subAiBtn).toBeDisabled({ timeout: 15000 });
-    await expect(subAiBtn).toContainText('(заблокировано)');
-    await expect(settingsModal.locator('text=На бесплатном тарифе доступен ввод личных ключей Groq или KIE.')).toBeVisible();
+    const sourceSelect = settingsModal.locator('[data-testid="ai-source-mode"]');
+    await expect(sourceSelect).toBeVisible();
+    await expect(settingsModal.locator('text=На тарифе Free доступны только свои ключи.')).toBeVisible();
+
+    await sourceSelect.click();
+    const subOption = page.locator('[data-testid="ai-source-subscription"]');
+    await expect(subOption).toBeVisible();
+    await expect(subOption).toBeDisabled();
+    await expect(subOption).toContainText('Подписка — недоступна');
 
     // Capture screenshot of locked Subscription AI Mode
     await page.screenshot({
@@ -40,12 +44,10 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
       fullPage: false,
     });
 
-    // 5. BYOK (Bring Your Own Key) mode is available and reveals key fields.
-    const byokBtn = settingsModal.locator('[data-testid="ai-source-byok"]');
-    await expect(byokBtn).toBeVisible();
-    await byokBtn.click();
+    // 5. BYOK is available and reveals key fields.
+    await page.locator('[data-testid="ai-source-byok"]').click();
 
-    await expect(settingsModal.locator('input[placeholder="gsk_..."]')).toBeVisible();
+    await expect(settingsModal.locator('input[placeholder*="gsk_"]')).toBeVisible();
     await expect(settingsModal.locator('text=Groq Cloud API')).toBeVisible();
   });
 });

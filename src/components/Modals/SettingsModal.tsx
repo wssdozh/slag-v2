@@ -30,11 +30,9 @@ import {
   Laptop
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
-import { Select } from '../UI/Select';
 import { Checkbox } from '../UI/Checkbox';
-import { NumberInput } from '../UI/NumberInput';
 import { BaseModal } from './BaseModal';
-import { SettingsGroup, SettingsRow, SettingsSegmented } from '../Settings/SettingsUI';
+import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSwitch, SettingsSelect, SettingsNumber, SettingsInput } from '../Settings/SettingsUI';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
 import { syncEngine } from '../../lib/sync/syncEngine';
@@ -411,349 +409,218 @@ export const SettingsModal: React.FC = () => {
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
                   {/* Top Switcher: Подписка vs Свой ключ */}
-                  <div className="settings-card p-3 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-fg-primary">Источник моделей</span>
-                      {isFreePlan ? (
-                        <span className="text-[11px] font-mono text-zinc-500">Free · только свой ключ</span>
-                      ) : (
-                        <span className="text-[11px] font-mono text-emerald-400">Тариф {syncStatus.subscription.planLabel}</span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-1.5 bg-canvas-subtle p-1 rounded-lg border border-white/[0.06]">
-                      <button
-                        type="button"
-                        data-testid="ai-source-subscription"
-                        disabled={isFreePlan}
-                        onClick={() => setSourceMode('subscription')}
-                        className={`py-1.5 px-2 sm:px-3 rounded-md text-[11px] sm:text-xs font-medium motion-surface cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap ${
-                          sourceMode === 'subscription' && !isFreePlan
-                            ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                            : isFreePlan
-                            ? 'opacity-40 text-zinc-600 cursor-not-allowed border border-transparent'
-                            : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
-                        }`}
-                        title={
-                          isFreePlan
-                            ? 'На тарифе Free облачный ИИ релея недоступен. Используйте свои ключи.'
-                            : 'Использовать ИИ из подписки SLAG'
-                        }
-                      >
-                        <span>Подписка SLAG</span>
-                        {isFreePlan && (
-                          <span className="text-[10px] font-mono text-zinc-500">
-                            (заблокировано)
-                          </span>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        data-testid="ai-source-byok"
-                        onClick={() => setSourceMode('byok')}
-                        className={`py-1.5 px-2 sm:px-3 rounded-md text-[11px] sm:text-xs font-medium motion-surface cursor-pointer flex items-center justify-center whitespace-nowrap ${
-                          sourceMode === 'byok' || isFreePlan
-                            ? 'bg-white/10 text-white shadow-sm font-semibold border border-white/[0.08]'
-                            : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
-                        }`}
-                      >
-                        <span>Свой API-ключ</span>
-                      </button>
-                    </div>
-
+                  <SettingsGroup title="Источник моделей">
+                    <SettingsSelect
+                      label="Использовать"
+                      value={isFreePlan ? 'byok' : sourceMode}
+                      onChange={(mode) => setSourceMode(mode as 'subscription' | 'byok')}
+                      testId="ai-source-mode"
+                      options={[
+                        {
+                          value: 'subscription',
+                          label: isFreePlan ? 'Подписка — недоступна' : 'Подписка SLAG',
+                          disabled: isFreePlan,
+                          testId: 'ai-source-subscription',
+                        },
+                        { value: 'byok', label: 'Свой API-ключ', testId: 'ai-source-byok' },
+                      ]}
+                    />
                     {isFreePlan && (
-                      <span className="text-2xs text-zinc-500">
-                        На бесплатном тарифе доступен ввод личных ключей Groq или KIE.
-                      </span>
+                      <p className="px-3 pb-3 text-2xs leading-relaxed text-fg-muted">
+                        На тарифе Free доступны только свои ключи.
+                      </p>
                     )}
-                  </div>
+                  </SettingsGroup>
 
                   {/* Mode A: Subscription Gateway Mode (No API keys needed) */}
                   {sourceMode === 'subscription' && !isFreePlan ? (
-                    <div className="settings-card p-3.5 flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-fg-primary">Режим обработки</span>
-                        <span className="text-[11px] font-mono text-zinc-500">
-                          Шлюз: {syncEngine.getConfig().serverUrl.replace(/https?:\/\//, '')}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-1 bg-canvas-subtle p-1 rounded-lg border border-white/[0.06]">
-                        <button
-                          type="button"
-                          onClick={() => setSubscriptionModel('fast')}
-                          className={`py-1.5 text-xs font-medium rounded-md motion-surface cursor-pointer ${
-                            subscriptionModel === 'fast'
-                              ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                              : 'text-zinc-400 hover:text-zinc-200'
-                          }`}
-                        >
-                          Flash (быстрый)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSubscriptionModel('smart')}
-                          className={`py-1.5 text-xs font-medium rounded-md motion-surface cursor-pointer ${
-                            subscriptionModel === 'smart'
-                              ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                              : 'text-zinc-400 hover:text-zinc-200'
-                          }`}
-                        >
-                          Smart (умный)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSubscriptionModel('deep')}
-                          className={`py-1.5 text-xs font-medium rounded-md motion-surface cursor-pointer ${
-                            subscriptionModel === 'deep'
-                              ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                              : 'text-zinc-400 hover:text-zinc-200'
-                          }`}
-                        >
-                          Deep (логика)
-                        </button>
-                      </div>
-                    </div>
+                    <SettingsGroup title="Режим обработки">
+                      <SettingsSelect
+                        label="Модель"
+                        value={subscriptionModel}
+                        onChange={(tier) => setSubscriptionModel(tier as typeof subscriptionModel)}
+                        options={[
+                          { value: 'fast', label: 'Flash — быстрый' },
+                          { value: 'smart', label: 'Smart — умный' },
+                          { value: 'deep', label: 'Deep — логика' },
+                        ]}
+                      />
+                    </SettingsGroup>
                   ) : (
                     /* Mode B: BYOK (Bring Your Own Key) Settings */
                     <>
                       {/* Section 1: Выбор провайдера ИИ (Groq & KIE.AI) */}
-                      <div className="settings-card p-3 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-fg-primary">Провайдер</span>
-                          <span className="text-[11px] font-mono text-zinc-500">
-                            {provider === 'groq'
-                              ? (groqApiKey ? '● Groq подключен' : '○ Ключ не указан')
-                              : (kieApiKey ? '● KIE подключен' : '○ Ключ не указан')}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-1.5 bg-canvas-subtle p-1 rounded-lg border border-white/[0.06]">
-                          <button
-                            type="button"
-                            onClick={() => handleProviderChange('groq')}
-                            className={`py-1.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
-                              provider === 'groq'
-                                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                                : 'text-zinc-400 hover:text-zinc-200'
-                            }`}
-                          >
-                            Groq
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleProviderChange('kie')}
-                            className={`py-1.5 rounded-md text-xs font-medium motion-surface cursor-pointer ${
-                              provider === 'kie'
-                                ? 'bg-white/10 text-white shadow-sm border border-white/[0.08]'
-                                : 'text-zinc-400 hover:text-zinc-200'
-                            }`}
-                          >
-                            KIE.AI
-                          </button>
-                        </div>
-                      </div>
+                      <SettingsGroup title="Провайдер">
+                        <SettingsSelect
+                          label="Сервис"
+                          testId="ai-provider-select"
+                          value={provider}
+                          onChange={(next) => handleProviderChange(next as typeof provider)}
+                          options={[
+                            { value: 'groq', label: groqApiKey ? 'Groq · подключен' : 'Groq · нет ключа' },
+                            { value: 'kie', label: kieApiKey ? 'KIE.AI · подключен' : 'KIE.AI · нет ключа' },
+                          ]}
+                        />
+                      </SettingsGroup>
 
                       {/* Section 2: Настройки Groq */}
                       {provider === 'groq' && (
-                        <div className="settings-card p-3.5 flex flex-col gap-3">
-                          <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                            <span className="text-xs font-semibold text-zinc-100">Groq Cloud API</span>
+                        <SettingsGroup
+                          title="Groq Cloud API"
+                          action={
                             <a
                               href="https://console.groq.com/keys"
                               target="_blank"
                               rel="noreferrer"
-                              className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
+                              className="text-2xs text-fg-muted hover:text-fg-primary flex items-center gap-1 transition-colors"
                             >
                               <span>Получить ключ</span>
-                              <ExternalLink className="w-3 h-3 text-zinc-500" />
+                              <ExternalLink className="w-3 h-3" />
                             </a>
-                          </div>
-
+                          }
+                        >
                           <SecretKeyField
                             value={groqApiKey}
                             onChange={setGroqApiKey}
-                            placeholder="gsk_..."
+                            placeholder="API Key · gsk_..."
                           />
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[11px] font-medium text-zinc-300">Модель</label>
-                              <Select
-                                value={model}
-                                onChange={(val) => setModel(val)}
-                                options={[
-                                  { value: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B (LPU)' },
-                                  { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile' },
-                                  { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant' },
-                                ]}
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений</label>
-                              <Select
-                                value={reasoningEffort}
-                                onChange={(val) => setReasoningEffort(val as any)}
-                                options={[
-                                  { value: 'none', label: 'Отключено' },
-                                  { value: 'low', label: 'Низкая' },
-                                  { value: 'medium', label: 'Средняя' },
-                                  { value: 'high', label: 'Высокая' },
-                                ]}
-                              />
-                            </div>
-                          </div>
-                        </div>
+                          <SettingsDivider />
+                          <SettingsSelect
+                            label="Модель"
+                            value={model}
+                            onChange={setModel}
+                            options={[
+                              { value: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B' },
+                              { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
+                              { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B' },
+                            ]}
+                          />
+                          <SettingsDivider />
+                          <SettingsSelect
+                            label="Рассуждения"
+                            value={reasoningEffort}
+                            onChange={(val) => setReasoningEffort(val as typeof reasoningEffort)}
+                            options={[
+                              { value: 'none', label: 'Отключены' },
+                              { value: 'low', label: 'Низкие' },
+                              { value: 'medium', label: 'Средние' },
+                              { value: 'high', label: 'Высокие' },
+                            ]}
+                          />
+                        </SettingsGroup>
                       )}
 
                       {/* Section 2: Настройки KIE.AI */}
                       {provider === 'kie' && (
-                        <div className="settings-card p-3.5 flex flex-col gap-3">
-                          <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                            <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
+                        <SettingsGroup
+                          title="KIE Cloud API"
+                          action={
                             <a
                               href="https://kie.ai/api-key"
                               target="_blank"
                               rel="noreferrer"
-                              className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
+                              className="text-2xs text-fg-muted hover:text-fg-primary flex items-center gap-1 transition-colors"
                             >
                               <span>Получить ключ</span>
-                              <ExternalLink className="w-3 h-3 text-zinc-500" />
+                              <ExternalLink className="w-3 h-3" />
                             </a>
-                          </div>
-
+                          }
+                        >
                           <SecretKeyField
                             value={kieApiKey}
                             onChange={setKieApiKey}
-                            placeholder="sk-kie-... или Bearer токен"
+                            placeholder="API Key · sk-kie-..."
                           />
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[11px] font-medium text-zinc-300">Модель</label>
-                              <Select
-                                value={model}
-                                onChange={(val) => setModel(val)}
-                                options={[
-                                  { value: 'deepseek-v4-1-flash', label: 'DeepSeek V4.1 Flash' },
-                                  { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
-                                ]}
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[11px] font-medium text-zinc-300">Глубина рассуждений</label>
-                              <Select
-                                value={reasoningEffort}
-                                onChange={(val) => setReasoningEffort(val as any)}
-                                options={[
-                                  { value: 'none', label: 'Отключено' },
-                                  { value: 'low', label: 'Низкая' },
-                                  { value: 'medium', label: 'Средняя' },
-                                  { value: 'high', label: 'Высокая' },
-                                ]}
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[11px] font-medium text-zinc-300">Base URL</label>
-                              <input
-                                type="text"
-                                value={kieBaseUrl}
-                                onChange={(e) => setKieBaseUrl(e.target.value)}
-                                placeholder="https://api.kie.ai"
-                                className="w-full bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg px-2.5 py-2 text-xs text-white placeholder-zinc-600 font-mono transition-colors"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                          <SettingsDivider />
+                          <SettingsSelect
+                            label="Модель"
+                            value={model}
+                            onChange={setModel}
+                            options={[
+                              { value: 'deepseek-v4-1-flash', label: 'DeepSeek V4.1 Flash' },
+                              { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
+                            ]}
+                          />
+                          <SettingsDivider />
+                          <SettingsSelect
+                            label="Рассуждения"
+                            value={reasoningEffort}
+                            onChange={(val) => setReasoningEffort(val as typeof reasoningEffort)}
+                            options={[
+                              { value: 'none', label: 'Отключены' },
+                              { value: 'low', label: 'Низкие' },
+                              { value: 'medium', label: 'Средние' },
+                              { value: 'high', label: 'Высокие' },
+                            ]}
+                          />
+                          <SettingsDivider />
+                          <SettingsInput
+                            label="Base URL"
+                            value={kieBaseUrl}
+                            onChange={setKieBaseUrl}
+                            placeholder="https://api.kie.ai"
+                            mono
+                          />
+                        </SettingsGroup>
                       )}
                     </>
                   )}
 
                   {/* Section 3: Автоматизация и интеллектуальные сервисы */}
-                  <div className="settings-card p-3.5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                      <span className="text-xs font-semibold text-zinc-100">
-                        Автоматизация
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <Checkbox
-                        checked={autoTagging}
-                        onChange={setAutoTagging}
-                        label="Автотегирование новых заметок"
-                      />
-
-                      <Checkbox
-                        checked={autoTriage}
-                        onChange={setAutoTriage}
-                        label="AI-триаж (папки, задачи, приоритеты)"
-                      />
-
-                      <Checkbox
-                        checked={webSearchEnabled}
-                        onChange={setWebSearchEnabled}
-                        label="Веб-поиск при ответах"
-                      />
-                    </div>
-                  </div>
+                  <SettingsGroup title="Автоматизация">
+                    <SettingsRow
+                      label="Автотегирование новых заметок"
+                      right={<SettingsSwitch checked={autoTagging} onChange={setAutoTagging} label="Автотегирование новых заметок" />}
+                    />
+                    <SettingsDivider />
+                    <SettingsRow
+                      label="AI-триаж"
+                      right={<SettingsSwitch checked={autoTriage} onChange={setAutoTriage} label="AI-триаж" />}
+                    />
+                    <SettingsDivider />
+                    <SettingsRow
+                      label="Веб-поиск при ответах"
+                      right={<SettingsSwitch checked={webSearchEnabled} onChange={setWebSearchEnabled} label="Веб-поиск при ответах" />}
+                    />
+                  </SettingsGroup>
 
                   {/* Section 4: Норма таксономии и правила тегирования */}
-                  <div className="settings-card p-3.5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                      <span className="text-xs font-semibold text-zinc-100">
-                        Правила тегов
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-medium text-zinc-300">Лимит тегов на запись</label>
-                        <NumberInput
-                          min={1}
-                          max={8}
-                          value={maxTags}
-                          onChange={setMaxTags}
-                          aria-label="Лимит тегов на запись"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-medium text-zinc-300">Стиль регистра тегов</label>
-                        <Select
-                          value={tagCaseStyle}
-                          onChange={(val) => setTagCaseStyle(val as any)}
-                          options={[
-                            { value: 'lowercase', label: 'lowercase (#дизайн)' },
-                            { value: 'kebab-case', label: 'kebab-case (#ui-ux)' },
-                          ]}
-                        />
-                      </div>
-                    </div>
-
-                    <Checkbox
-                      checked={allowNewTags}
-                      onChange={setAllowNewTags}
-                      label="Разрешить ИИ создавать новые теги"
-                      className="pt-1"
+                  <SettingsGroup title="Правила тегов">
+                    <SettingsNumber
+                      label="Лимит тегов"
+                      min={1}
+                      max={8}
+                      value={maxTags}
+                      onChange={setMaxTags}
                     />
-
-                    <div className="flex flex-col gap-1.5 pt-1">
-                      <label className="text-[11px] font-medium text-zinc-300">Пользовательские правила промпта</label>
+                    <SettingsDivider />
+                    <SettingsSelect
+                      label="Стиль регистра"
+                      testId="tag-case-select"
+                      value={tagCaseStyle}
+                      onChange={(val) => setTagCaseStyle(val as typeof tagCaseStyle)}
+                      options={[
+                        { value: 'lowercase', label: 'lowercase (#дизайн)' },
+                        { value: 'kebab-case', label: 'kebab-case (#ui-ux)' },
+                      ]}
+                    />
+                    <SettingsDivider />
+                    <SettingsRow
+                      label="Разрешить ИИ создавать новые теги"
+                      right={<SettingsSwitch checked={allowNewTags} onChange={setAllowNewTags} label="Разрешить ИИ создавать новые теги" />}
+                    />
+                    <SettingsDivider />
+                    <div className="px-3 py-3 sm:px-4">
                       <textarea
                         rows={2}
                         value={customTagRules}
                         onChange={(e) => setCustomTagRules(e.target.value)}
-                        placeholder="Например: Не использовать тег #general. Для задач по коду предпочитать #frontend или #backend."
-                        className="bg-black/50 border border-white/[0.08] focus:border-white/20 rounded-lg p-2.5 text-xs text-white placeholder-zinc-600 resize-none transition-colors"
+                        aria-label="Пользовательские правила промпта"
+                        placeholder="Пользовательские правила промпта: чего не тегировать, что предпочитать"
+                        className="w-full bg-transparent text-xs text-fg-primary placeholder:text-fg-dim resize-none outline-none"
                       />
                     </div>
-                  </div>
+                  </SettingsGroup>
                 </div>
               )}
 
@@ -1022,41 +889,35 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 {/* Font Scale Control */}
-                <SettingsGroup title="Масштаб и типографика">
-                  <SettingsRow
-                    label="Масштаб шрифтов"
-                    description="Размер текста во всём интерфейсе"
-                    value={`${FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.label} (${FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.percentage})`}
+                <SettingsGroup title="Шрифт">
+                  <SettingsSelect
+                    label="Масштаб"
+                    testId="font-scale-select"
+                    value={uiConfig[selectedDevice].fontScale}
+                    onChange={(scaleKey) => updateUiConfig(selectedDevice, { fontScale: scaleKey as keyof typeof FONT_SCALE_OPTIONS })}
+                    options={(Object.keys(FONT_SCALE_OPTIONS) as Array<keyof typeof FONT_SCALE_OPTIONS>).map(key => ({
+                      value: key,
+                      label: `${FONT_SCALE_OPTIONS[key].label} (${FONT_SCALE_OPTIONS[key].percentage})`,
+                    }))}
                   />
-                  <div className="px-3 pb-3 sm:px-4">
-                    <SettingsSegmented
-                      value={uiConfig[selectedDevice].fontScale}
-                      onChange={(scaleKey) => updateUiConfig(selectedDevice, { fontScale: scaleKey })}
-                      options={(Object.keys(FONT_SCALE_OPTIONS) as Array<keyof typeof FONT_SCALE_OPTIONS>).map(key => ({
-                        value: key,
-                        label: FONT_SCALE_OPTIONS[key].label,
-                      }))}
-                    />
-                  </div>
-                </SettingsGroup>
-
-                {/* Font Family Control */}
-                <SettingsGroup title="Гарнитура">
-                  <SettingsRow
-                    label="Семейство шрифта"
-                    description={FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.description}
-                    value={FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.label}
+                  <SettingsDivider />
+                  <SettingsSelect
+                    label="Гарнитура"
+                    value={uiConfig[selectedDevice].fontFamily || 'inter'}
+                    onChange={(famKey) => updateUiConfig(selectedDevice, { fontFamily: famKey as keyof typeof FONT_FAMILY_OPTIONS })}
+                    options={(Object.keys(FONT_FAMILY_OPTIONS) as Array<keyof typeof FONT_FAMILY_OPTIONS>).map(key => ({
+                      value: key,
+                      label: FONT_FAMILY_OPTIONS[key].label,
+                    }))}
                   />
-                  <div className="px-3 pb-3 sm:px-4">
-                    <SettingsSegmented
-                      value={uiConfig[selectedDevice].fontFamily || 'inter'}
-                      onChange={(famKey) => updateUiConfig(selectedDevice, { fontFamily: famKey })}
-                      options={(Object.keys(FONT_FAMILY_OPTIONS) as Array<keyof typeof FONT_FAMILY_OPTIONS>).map(key => ({
-                        value: key,
-                        label: FONT_FAMILY_OPTIONS[key].label,
-                      }))}
-                    />
-                  </div>
+                  <SettingsDivider />
+                  <SettingsSelect
+                    label="Плотность сетки"
+                    testId="density-select"
+                    value={uiConfig[selectedDevice].density}
+                    onChange={(density) => updateUiConfig(selectedDevice, { density: density as typeof uiConfig[typeof selectedDevice]['density'] })}
+                    options={DENSITY_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                  />
                 </SettingsGroup>
 
                 {/* Live Interactive Hierarchy Preview Card (Desktop Only) */}
@@ -1093,21 +954,39 @@ export const SettingsModal: React.FC = () => {
                   </div>
                 )}
 
-                {/* Density Control */}
-                <SettingsGroup title="Плотность">
-                  <SettingsRow
-                    label="Плотность сетки и хитбоксов"
-                    description="Высота строк и размер целей для пальца"
-                    value={DENSITY_OPTIONS.find(o => o.value === uiConfig[selectedDevice].density)?.label}
-                  />
-                  <div className="px-3 pb-3 sm:px-4">
-                    <SettingsSegmented
-                      value={uiConfig[selectedDevice].density}
-                      onChange={(density) => updateUiConfig(selectedDevice, { density })}
-                      options={DENSITY_OPTIONS}
-                    />
+                {/* Live Interactive Hierarchy Preview Card (Desktop Only) */}
+                {!isMobile && (
+                  <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-surface border border-white/[0.08] shadow-inner select-none">
+                    <div className="flex items-center justify-between border-b border-white/[0.05] pb-2">
+                      <span className="text-2xs font-mono uppercase tracking-wider text-zinc-500">
+                        Интерактивный образец иерархии внимания
+                      </span>
+                      <span className="text-2xs font-mono text-blue-400/90">
+                        Live Preview
+                      </span>
+                    </div>
+
+                    {/* Sample Card */}
+                    <div className="flex flex-col gap-1.5 pt-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-base font-medium text-zinc-100 tracking-tight">
+                          Заголовок заметки или ключевая задача
+                        </span>
+                      </div>
+                      <p className="text-sm text-zinc-300 leading-relaxed font-normal">
+                        Основной текст заметки с комфортным размером и межстрочным интервалом для чтения.
+                      </p>
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
+                        <span className="text-xs text-zinc-400">
+                          Входящие • #дизайн #типографика
+                        </span>
+                        <span className="text-2xs font-mono text-zinc-500">
+                          14:30 • Статья
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </SettingsGroup>
+                )}
 
                 {/* Panel Resizing Reset (Desktop Only) */}
                 {!isMobile && (

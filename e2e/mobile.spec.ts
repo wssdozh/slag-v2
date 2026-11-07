@@ -255,20 +255,24 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Click "ИИ & Провайдеры" item
     await page.locator('button', { hasText: 'ИИ & Провайдеры' }).click();
 
-    // Verify custom Checkbox elements
-    const autoTagCheckbox = page.locator('div[role="checkbox"]').filter({ hasText: /Автотегирование|Автоматический подбор/ });
-    await expect(autoTagCheckbox).toBeVisible();
-    await autoTagCheckbox.click(); // toggle
+    // Verify a boolean is a switch, sitting on the row's midline
+    const autoTagSwitch = page.getByRole('switch', { name: 'Автотегирование новых заметок' });
+    await expect(autoTagSwitch).toBeVisible();
+    await autoTagSwitch.click(); // toggle
 
     // Verify NumberInput stepper
     const incButton = page.locator('button[aria-label="Увеличить"]').first();
     await expect(incButton).toBeVisible();
     await incButton.click();
 
-    // Verify custom dark Select opens
-    const caseSelect = page.locator('button[aria-haspopup="listbox"]').last();
-    await expect(caseSelect).toBeVisible();
-    await caseSelect.click();
+    // Verify a dropdown row opens
+    const caseSelect = page.locator('[data-testid="tag-case-select"]');
+    if (!(await caseSelect.count())) {
+      // The row is found by its label when no explicit hook is set.
+      await page.getByRole('button', { name: /Стиль регистра/ }).click();
+    } else {
+      await caseSelect.click();
+    }
 
     // Verify custom popover options
     const option = page.locator('button[role="option"]').filter({ hasText: 'kebab-case' });
@@ -290,23 +294,21 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Verify UI settings panel opened
     await expect(page.locator('span', { hasText: 'Внешний вид, масштабы и плотность' })).toBeVisible();
 
-    // Switch Font scale to "Крупный (120%)"
-    const largeFontBtn = page.getByRole('button', { name: 'Крупный (120%)' });
-    await expect(largeFontBtn).toBeVisible();
-    await largeFontBtn.click();
+    // Choices are dropdown rows: open, pick, close.
+    const pick = async (rowTestId: string, option: string) => {
+      await page.locator(`[data-testid="${rowTestId}"]`).click();
+      await page.getByRole('option', { name: option, exact: true }).click();
+    };
 
-    // Verify document root has updated font scale
+    await pick('font-scale-select', 'Крупный (120%)');
+
     const rootFontScale = await page.evaluate(() => {
       return document.documentElement.style.getPropertyValue('--slag-font-scale');
     });
     expect(rootFontScale).toBe('1.2');
 
-    // Switch Density to "Компактный"
-    const compactDensityBtn = page.getByRole('button', { name: 'Компактный', exact: true });
-    await expect(compactDensityBtn).toBeVisible();
-    await compactDensityBtn.click();
+    await pick('density-select', 'Компактный');
 
-    // Verify document root has updated density attribute
     const rootDensity = await page.evaluate(() => {
       return document.documentElement.dataset.density;
     });
@@ -314,9 +316,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_ui_scale_settings.png' });
 
-    // Switch back to "Обычный (100%)" and "Просторный / Тач"
-    await page.getByRole('button', { name: 'Обычный (100%)' }).click();
-    await page.getByRole('button', { name: 'Просторный / Тач' }).click();
+    await pick('font-scale-select', 'Обычный (100%)');
+    await pick('density-select', 'Просторный');
 
     // Dismiss settings modal
     await page.locator('button[title="Назад"]').click();
