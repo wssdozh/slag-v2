@@ -179,7 +179,7 @@ export const MobileSettingsView: React.FC = () => {
             {accountState.invitations.map((inv, index) => (
               <React.Fragment key={inv.vaultId}>
                 {index > 0 && <SettingsDivider />}
-                <SettingsRow label={inv.vaultName || inv.vaultId} description={inv.mode === 'receive-only' ? 'Только чтение' : 'Полный доступ'} right={
+                <SettingsRow icon={<Database className="w-4 h-4" />} label={inv.vaultName || inv.vaultId} description={inv.mode === 'receive-only' ? 'Только чтение' : 'Полный доступ'} right={
                   <span className="flex items-center gap-1.5">
                     <button type="button" onClick={() => void handleDeclineInvitation(inv.vaultId)} className="px-2 py-1.5 text-2xs text-fg-muted cursor-pointer">Скрыть</button>
                     <button type="button" disabled={acceptingVaultId !== null} onClick={() => void handleAcceptInvitation(inv.vaultId)} className="px-2 py-1.5 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{acceptingVaultId === inv.vaultId ? 'подключаем…' : 'Принять'}</button>
@@ -191,7 +191,7 @@ export const MobileSettingsView: React.FC = () => {
         )}
         {isLocked && (
           <SettingsGroup title="Аккаунт">
-            <SettingsRow icon={<Shield className="w-4 h-4" />} label="SLAG ID" description="Синхронизация и облачный ИИ" right={<button type="button" data-testid="mobile-settings-login-btn" onClick={() => navigatePage('account')} className="px-3 py-1.5 text-xs text-fg-primary rounded-md hover:bg-surface-hover cursor-pointer">Войти</button>} />
+            <SettingsRow icon={<Shield className="w-4 h-4" />} label="SLAG ID" description="Войти · синхронизация и облачный ИИ" testId="mobile-settings-login-btn" onClick={() => navigatePage('account')} chevron />
           </SettingsGroup>
         )}
         {!isLocked && account && (

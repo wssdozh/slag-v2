@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  KeyRound,
   Laptop,
-  RefreshCw,
-  Server,
+  UserRound,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { navigatePage } from '../../lib/navigation';
@@ -84,27 +82,28 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         </SettingsGroup>
       )}
 
-      <SettingsGroup title="Состояние синхронизации" action={<span className="text-2xs font-mono text-fg-dim">E2EE</span>}>
-        <SettingsRow
-          icon={<span className={`w-2 h-2 rounded-full ${status.state === 'connected' ? 'bg-success' : status.state === 'syncing' ? 'bg-warning animate-pulse' : 'bg-fg-dim'}`} />}
-          label={planLabel}
-          description={hosted ? (account ? `Тариф до ${account.expiresAt ? new Date(account.expiresAt).toLocaleDateString('ru-RU') : 'бессрочно'}` : 'Требуется вход') : 'Свой сервер'}
-          right={<button type="button" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'} className="flex items-center gap-1.5 px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer"><RefreshCw className={`w-3.5 h-3.5 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />Синхронизировать</button>}
-        />
+      <SettingsGroup title="Аккаунт">
+        <SettingsRow label="Тариф" value={planLabel} />
         <SettingsDivider />
-        <SettingsRow label="Кеш" value={limitsKnown ? `${usedCacheMb} / ${maxCacheMb >= 1024 ? `${Math.round(maxCacheMb / 1024)} ГБ` : `${maxCacheMb} МБ`}` : 'Не синхронизирован'} />
-        {hosted && !locked && <><SettingsDivider /><SettingsRow label="Личный кабинет" onClick={() => navigatePage('account')} external /></>}
+        <SettingsRow label="Срок действия" value={hosted ? (account ? (account.expiresAt ? <span className="font-mono">{new Date(account.expiresAt).toLocaleDateString('ru-RU')}</span> : 'Бессрочно') : 'Требуется вход') : 'Свой сервер'} />
         <SettingsDivider />
-        <SettingsRow icon={<Laptop className="w-4 h-4" />} label="Подключённые устройства" right={
-          <button type="button" data-testid="sync-to-devices-btn" onClick={() => setSettingsTab('devices')} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover cursor-pointer">{limitsKnown ? `${activeDevices} из ${maxDevices}` : activeDevices} →</button>
-        } />
+        <SettingsRow label="Кеш" value={limitsKnown ? <span className="font-mono">{usedCacheMb} МБ / {maxCacheMb >= 1024 ? `${Math.round(maxCacheMb / 1024)} ГБ` : `${maxCacheMb} МБ`}</span> : 'Не синхронизирован'} />
       </SettingsGroup>
 
-      <SettingsGroup title="Сервер и синхронизация">
-        <SettingsRow icon={<Server className="w-4 h-4" />} label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} right={
+      <SettingsGroup title="Синхронизация" action={<span className="text-2xs font-mono text-fg-dim">E2EE</span>}>
+        <SettingsRow label="Статус" description={
+          <span role="status" className="flex flex-col gap-0.5 break-words">
+            <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className={`w-2 h-2 shrink-0 rounded-full ${status.state === 'connected' ? 'bg-success' : status.state === 'syncing' ? 'bg-warning motion-safe:animate-pulse' : status.state === 'error' ? 'bg-danger' : 'bg-fg-dim'}`} />
+            {locked ? 'Требуется вход' : { idle: 'Ожидание', syncing: 'Синхронизация…', connected: 'Подключено', error: 'Ошибка', offline: 'Нет подключения' }[status.state]}
+            </span>
+            {status.error && <span className="text-danger">{status.error}</span>}
+          </span>
+        } right={<button type="button" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">Синхронизировать</button>} />
+        <SettingsDivider />
+        <SettingsRow label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} description={serverStatusMessage ? <span role="status" className={`font-mono break-words ${serverStatusError ? 'text-danger' : 'text-fg-muted'}`}>{serverStatusError ? `не удалось: ${serverStatusMessage}` : serverStatusMessage}</span> : undefined} right={
           <button type="button" onClick={() => void handleTestServerConnection()} disabled={isTestingServer} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{isTestingServer ? 'Тест…' : 'Проверить'}</button>
         } />
-        {serverStatusMessage && <p role="status" className={`px-3 pb-3 sm:px-4 font-mono text-2xs leading-snug break-words ${serverStatusError ? 'text-danger' : 'text-fg-muted'}`}>{serverStatusError ? `не удалось: ${serverStatusMessage}` : serverStatusMessage}</p>}
         <SettingsDivider />
         <SettingsRow label="Синхронизировать при сохранении" right={<SettingsSwitch checked={config.autoSync} onChange={(checked) => { syncEngine.saveConfig({ autoSync: checked }); setConfig(syncEngine.getConfig()); }} label="Синхронизировать при сохранении" />} />
         <SettingsDivider />
@@ -115,8 +114,13 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
         ]} />
       </SettingsGroup>
 
+      <SettingsGroup>
+        {hosted && !locked && <><SettingsRow icon={<UserRound className="w-4 h-4" />} label="Личный кабинет" onClick={() => navigatePage('account')} external /><SettingsDivider inset /></>}
+        <SettingsRow icon={<Laptop className="w-4 h-4" />} label="Подключённые устройства" value={<span className="font-mono">{limitsKnown ? `${activeDevices} из ${maxDevices}` : activeDevices}</span>} testId="sync-to-devices-btn" onClick={() => setSettingsTab('devices')} chevron />
+      </SettingsGroup>
+
       <SettingsGroup title="Безопасность">
-        <SettingsRow icon={<KeyRound className="w-4 h-4" />} label="Смена ключа хранилища" description="Все устройства потребуют нового приглашения." danger right={
+        <SettingsRow label="Смена ключа хранилища" description="Все устройства потребуют нового приглашения." danger right={
           <button type="button" disabled={locked} onClick={() => {
             if (!window.confirm('Сменить ключ хранилища? Доступ остальных устройств будет остановлен.')) return;
             void syncEngine.rotateVaultKey().then(() => addToast?.('Ключ хранилища изменён', 'success'));

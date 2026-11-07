@@ -11,18 +11,14 @@ import {
   X,
   Sparkles,
   Download,
-  Upload,
   ExternalLink,
   Database,
   Sliders,
   Keyboard,
-  RotateCcw,
   Terminal,
   ArrowLeft,
-  FolderOpen,
   Archive,
   Trash2,
-  HardDrive,
   RefreshCw,
   Laptop
 } from 'lucide-react';
@@ -614,14 +610,10 @@ export const SettingsModal: React.FC = () => {
                   />
                   <SettingsDivider />
                   <SettingsRow
-                    label="Создать снимок"
-                    value={isCreatingSnapshot ? 'Создание…' : undefined}
-                    disabled={isCreatingSnapshot}
-                    onClick={() => void handleCreateSnapshot()}
-                    icon={<RefreshCw className={`w-4 h-4 ${isCreatingSnapshot ? 'animate-spin' : ''}`} />}
-                    testId="btn-create-snapshot"
+                    label="Последний снимок"
+                    description={backupSettings.lastBackupAt ? <span className="font-mono">{new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU')}</span> : 'Ещё не создан'}
+                    right={<button type="button" data-testid="btn-create-snapshot" aria-label="Создать снимок" disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()} className="min-h-11 min-w-11 px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">{isCreatingSnapshot ? 'Создание…' : 'Создать'}</button>}
                   />
-                  {backupSettings.lastBackupAt && <p className="px-3 pb-3 sm:px-4 text-2xs text-fg-muted">Последний снимок: {new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU')}</p>}
                 </SettingsGroup>
 
                 <SettingsGroup title={`Точки восстановления (${backupSnapshots.length})`}>
@@ -643,7 +635,7 @@ export const SettingsModal: React.FC = () => {
                           <div
                             key={snap.id}
                             data-testid={`snapshot-item-${snap.id}`}
-                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 sm:px-4 hover:bg-surface-hover"
+                            className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 sm:px-4 sm:py-3 hover:bg-surface-hover"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <Archive className="w-3.5 h-3.5 text-fg-muted shrink-0" />
@@ -696,21 +688,20 @@ export const SettingsModal: React.FC = () => {
                 </SettingsGroup>
 
                 <SettingsGroup title="Экспорт и импорт">
-                  <SettingsRow label="Экспорт в ZIP (заметки и медиа)" icon={<Download className="w-4 h-4" />} onClick={() => void handleExportZip()} testId="btn-export-zip" external />
-                  <SettingsDivider inset />
-                  <SettingsRow label="Экспорт структуры в JSON" icon={<Download className="w-4 h-4" />} onClick={handleExportJson} external />
-                  <SettingsDivider inset />
-                  <label className="flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-xs font-medium text-fg-primary hover:bg-surface-hover cursor-pointer">
-                    <Upload className="w-4 h-4 shrink-0 text-fg-muted" />
+                  <SettingsRow label="Экспорт в ZIP (заметки и медиа)" onClick={() => void handleExportZip()} testId="btn-export-zip" />
+                  <SettingsDivider />
+                  <SettingsRow label="Экспорт структуры в JSON" onClick={handleExportJson} />
+                  <SettingsDivider />
+                  <label className="flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-xs font-medium text-fg-primary hover:bg-surface-hover focus-within:bg-surface-hover cursor-pointer">
                     Восстановить из файла (.zip / .json)
-                    <input type="file" accept=".zip,.json" className="hidden" onChange={handleFileImport} />
+                    <input type="file" accept=".zip,.json" className="sr-only" aria-label="Восстановить из файла (.zip / .json)" onChange={handleFileImport} />
                   </label>
                 </SettingsGroup>
                 {!isMobile && (
                   <SettingsGroup title="Системные каталоги">
-                    <SettingsRow label="Открыть папку заметок на диске" icon={<FolderOpen className="w-4 h-4" />} onClick={() => void handleOpenNotesFolder()} external />
-                    <SettingsDivider inset />
-                    <SettingsRow label="Открыть папку бэкапов на диске" icon={<HardDrive className="w-4 h-4" />} onClick={() => void handleOpenBackupsFolder()} external />
+                    <SettingsRow label="Открыть папку заметок на диске" onClick={() => void handleOpenNotesFolder()} external />
+                    <SettingsDivider />
+                    <SettingsRow label="Открыть папку бэкапов на диске" onClick={() => void handleOpenBackupsFolder()} external />
                   </SettingsGroup>
                 )}
               </div>
@@ -774,7 +765,7 @@ export const SettingsModal: React.FC = () => {
                       </div>
                     </SettingsGroup>
                     <SettingsGroup title="Панели">
-                      <SettingsRow label="Сбросить размеры" icon={<RotateCcw className="w-4 h-4" />} onClick={resetPanelSizes} />
+                      <SettingsRow label="Сбросить размеры" onClick={resetPanelSizes} />
                     </SettingsGroup>
                   </>
                 )}
@@ -806,7 +797,7 @@ export const SettingsModal: React.FC = () => {
                   {APP_COMMANDS.filter(c => c.shortcut).map((cmd, index) => (
                     <React.Fragment key={cmd.id}>
                       {index > 0 && <SettingsDivider />}
-                      <SettingsRow label={cmd.title} value={<kbd>{[cmd.shortcut, ...(cmd.aliases || [])].filter(Boolean).map(shortcut => formatShortcut(shortcut!)).join(' / ')}</kbd>} />
+                      <SettingsRow label={cmd.title} value={<kbd className="font-mono">{[cmd.shortcut, ...(cmd.aliases || [])].filter(Boolean).map(shortcut => formatShortcut(shortcut!)).join(' / ')}</kbd>} />
                     </React.Fragment>
                   ))}
                 </SettingsGroup>
@@ -821,7 +812,7 @@ export const SettingsModal: React.FC = () => {
                   ].map(([label, shortcut], index) => (
                     <React.Fragment key={label}>
                       {index > 0 && <SettingsDivider />}
-                      <SettingsRow label={label} value={<kbd>{shortcut}</kbd>} />
+                      <SettingsRow label={label} value={<kbd className="font-mono">{shortcut}</kbd>} />
                     </React.Fragment>
                   ))}
                 </SettingsGroup>

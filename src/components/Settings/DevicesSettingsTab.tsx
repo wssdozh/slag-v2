@@ -6,7 +6,6 @@ import {
   Edit2,
   Laptop,
   Loader2,
-  Plus,
   Shield,
   Smartphone,
   Trash2,
@@ -408,11 +407,6 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
 
       <SettingsGroup title="Подключённые устройства" action={<span className="text-2xs font-mono text-fg-muted" title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}>{limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices}</span>}>
         <SettingsRow icon={isMobile ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />} label={config.deviceName} description={<span className="font-mono">{config.deviceId} · это устройство</span>} />
-        <SettingsDivider />
-        <SettingsSelect label="Локальная синхронизация" value={config.localSyncMode ?? 'read-write'} onChange={(next) => { syncEngine.setDeviceSyncMode(config.deviceId, next as DeviceSyncMode); setConfig(syncEngine.getConfig()); }} options={[
-          { value: 'read-write', label: 'Чтение и запись' },
-          { value: 'receive-only', label: 'Только чтение' },
-        ]} />
         {(hosted ? accountState.devices.filter((device) => device.id !== config.deviceId && device.status !== 'revoked') : config.trustedDevices).map((device) => {
           const isAccountDevice = 'status' in device;
           return (
@@ -441,10 +435,17 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
             </React.Fragment>
           );
         })}
-        <SettingsDivider />
-        <SettingsRow icon={<Plus className="w-4 h-4" />} label="Новое устройство" right={
-          <button type="button" data-testid="btn-open-pair-modal" disabled={locked} onClick={handleOpenPairModal} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">Привязать устройство</button>
-        } />
+      </SettingsGroup>
+
+      <SettingsGroup title="Это устройство">
+        <SettingsSelect label="Локальная синхронизация" value={config.localSyncMode ?? 'read-write'} onChange={(next) => { syncEngine.setDeviceSyncMode(config.deviceId, next as DeviceSyncMode); setConfig(syncEngine.getConfig()); }} options={[
+          { value: 'read-write', label: 'Чтение и запись' },
+          { value: 'receive-only', label: 'Только чтение' },
+        ]} />
+      </SettingsGroup>
+
+      <SettingsGroup>
+        <SettingsRow label="Привязать устройство" testId="btn-open-pair-modal" disabled={locked} onClick={handleOpenPairModal} />
       </SettingsGroup>
 
       {/* Pairing Modal */}

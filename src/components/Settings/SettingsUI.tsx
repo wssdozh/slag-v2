@@ -14,7 +14,8 @@ import { NumberInput } from '../UI/NumberInput';
  * Rules that hold across the whole surface:
  * - A group is one raised card on the panel background; rows inside it are
  *   separated by dividers, never by their own borders.
- * - An icon is a glyph, never a plate: no rounded background behind it.
+ * - Icons identify navigation or homogeneous entity lists, not parameters or
+ *   commands. Keep one label edge per group; never add icon plates.
  * - The right side carries a value in muted type, or a control, never both.
  * - Destructive rows are the only red thing in the panel.
  */
@@ -72,8 +73,6 @@ interface SettingsRowProps {
   onClick?: () => void;
   danger?: boolean;
   disabled?: boolean;
-  /** Renders below the row instead of beside the label. */
-  children?: React.ReactNode;
   className?: string;
   testId?: string;
 }
@@ -89,7 +88,6 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
   onClick,
   danger = false,
   disabled = false,
-  children,
   className = '',
   testId,
 }) => {
@@ -120,16 +118,15 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
           {label}
         </span>
         {description && (
-          <span className="text-2xs leading-relaxed text-fg-muted">{description}</span>
+          <span className="text-2xs leading-relaxed text-fg-muted break-words">{description}</span>
         )}
       </span>
       {value !== undefined && (
-        <span className="text-2xs text-fg-muted font-mono shrink-0">{value}</span>
+        <span className="max-w-[50%] min-w-0 text-right text-2xs text-fg-muted break-words">{value}</span>
       )}
       {right && <span className="shrink-0">{right}</span>}
       {chevron && <ChevronRight className="w-3.5 h-3.5 shrink-0 text-fg-dim" />}
       {external && <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-fg-dim" />}
-      {children}
     </Element>
   );
 };
@@ -169,63 +166,8 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
   </button>
 );
 
-interface SettingsSegmentedOption<T extends string> {
-  value: T;
-  label: string;
-  disabled?: boolean;
-  /** Why the option is unavailable, shown on the disabled segment. */
-  title?: string;
-  /** Stable hook for tests that drive a specific segment. */
-  testId?: string;
-}
-
-interface SettingsSegmentedProps<T extends string> {
-  value: T;
-  onChange: (value: T) => void;
-  options: SettingsSegmentedOption<T>[];
-}
-
-/** The inline choice: one track, equal segments, the selected one raised. */
-export function SettingsSegmented<T extends string>({
-  value,
-  onChange,
-  options,
-}: SettingsSegmentedProps<T>) {
-  return (
-    <div
-      /* auto-fit rather than a fixed column count: four options stay four
-         columns on a desktop and fold to two on a phone without the caller
-         passing breakpoints, which is how every tab drifted apart. */
-      className="grid gap-1 bg-canvas-subtle p-1 rounded-lg border border-border-subtle"
-      style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(76px, 1fr))' }}
-    >
-      {options.map(option => {
-        const selected = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            data-testid={option.testId}
-            title={option.title}
-            disabled={option.disabled}
-            onClick={() => onChange(option.value)}
-            className={`py-1.5 px-2 rounded-md text-2xs font-medium whitespace-nowrap motion-surface ${
-              selected
-                ? 'bg-surface-active text-fg-primary border border-border-subtle'
-                : 'text-fg-secondary hover:text-fg-primary border border-transparent'
-            } ${option.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 interface SettingsSelectProps {
   label: React.ReactNode;
-  icon?: React.ReactNode;
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
@@ -242,7 +184,6 @@ interface SettingsSelectProps {
  */
 export const SettingsSelect: React.FC<SettingsSelectProps> = ({
   label,
-  icon,
   value,
   onChange,
   options,
@@ -251,7 +192,6 @@ export const SettingsSelect: React.FC<SettingsSelectProps> = ({
   testId,
 }) => (
   <SettingsRow
-    icon={icon}
     label={label}
     description={description}
     disabled={disabled}
@@ -273,7 +213,6 @@ export const SettingsSelect: React.FC<SettingsSelectProps> = ({
 
 interface SettingsNumberProps {
   label: React.ReactNode;
-  icon?: React.ReactNode;
   value: number;
   onChange: (value: number) => void;
   min?: number;
@@ -285,7 +224,6 @@ interface SettingsNumberProps {
 /** A number is a value, not a form field: it lives in the right column. */
 export const SettingsNumber: React.FC<SettingsNumberProps> = ({
   label,
-  icon,
   value,
   onChange,
   min,
@@ -294,7 +232,6 @@ export const SettingsNumber: React.FC<SettingsNumberProps> = ({
   disabled = false,
 }) => (
   <SettingsRow
-    icon={icon}
     label={label}
     description={description}
     disabled={disabled}
@@ -315,32 +252,27 @@ export const SettingsNumber: React.FC<SettingsNumberProps> = ({
 
 interface SettingsInputProps {
   label: React.ReactNode;
-  icon?: React.ReactNode;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   description?: React.ReactNode;
   mono?: boolean;
   disabled?: boolean;
-  inputClassName?: string;
   'aria-label'?: string;
 }
 
 /** Free text, right-aligned in the value column, so rows stay one list. */
 export const SettingsInput: React.FC<SettingsInputProps> = ({
   label,
-  icon,
   value,
   onChange,
   placeholder,
   description,
   mono = false,
   disabled = false,
-  inputClassName = '',
   'aria-label': ariaLabel,
 }) => (
   <SettingsRow
-    icon={icon}
     label={label}
     description={description}
     disabled={disabled}
@@ -356,7 +288,7 @@ export const SettingsInput: React.FC<SettingsInputProps> = ({
         autoComplete="off"
         className={`w-40 bg-transparent text-right text-2xs text-fg-secondary placeholder:text-fg-dim outline-none truncate ${
           mono ? 'font-mono' : ''
-        } ${inputClassName}`}
+        }`}
       />
     }
   />

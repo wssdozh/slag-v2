@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/selfhostFixture';
 
 for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 }]) {
   test(`settings share groups and keep instant settings footer honest at ${viewport.width}px`, async ({ page }) => {
@@ -26,6 +26,27 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-checked', initial === 'true' ? 'false' : 'true');
         await toggle.click();
+      }
+      await expect(scope.locator('button button')).toHaveCount(0);
+      if (tab === 'devices') {
+        const deviceList = scope.locator('section').filter({ hasText: 'Подключённые устройства' });
+        await expect(deviceList.getByText('Локальная синхронизация', { exact: true })).toHaveCount(0);
+        await expect(scope.getByTestId('btn-open-pair-modal')).toHaveText('Привязать устройство');
+      }
+      if (tab === 'sync') {
+        await expect(scope.getByRole('status')).toBeVisible();
+        await expect(scope.getByTestId('sync-to-devices-btn')).toHaveJSProperty('tagName', 'BUTTON');
+        await page.route('**/health', route => route.fulfill({ status: 503 }));
+        await scope.getByRole('button', { name: 'Проверить', exact: true }).click();
+        await expect(scope.getByRole('status').filter({ hasText: 'не удалось: HTTP 503' })).toBeVisible();
+      }
+      if (tab === 'vault') {
+        await expect(scope.getByText('Последний снимок', { exact: true })).toBeVisible();
+        await expect(scope.getByTestId('btn-create-snapshot')).toHaveText('Создать');
+        await expect(scope.getByTestId('btn-create-snapshot')).toHaveAccessibleName('Создать снимок');
+        const labels = scope.locator('section').filter({ hasText: 'Резервное копирование' }).locator('.flex-1 > .text-xs');
+        const leftEdges = await labels.evaluateAll(elements => elements.map(element => element.getBoundingClientRect().left));
+        expect(new Set(leftEdges).size).toBe(1);
       }
       expect(await scope.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
       await expect(scope.locator(`[data-tab="${tab}"]`)).toHaveClass(/bg-surface-active/);
