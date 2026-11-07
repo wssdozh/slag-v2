@@ -38,10 +38,11 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
   const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false);
 
   return (
-    <div className="flex items-center gap-0.5 shrink-0">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
       {/* Due Date Trigger */}
       <div className="relative shrink-0">
         <ToolbarButton
+          className="composer-toolbar-control composer-toolbar-icon"
           size="md"
           active={Boolean(effectiveDueDate)}
           glow="blue"
@@ -85,6 +86,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
         minWidth={140}
         trigger={
           <ToolbarButton
+            className="composer-toolbar-control composer-toolbar-icon"
             size="md"
             active={effectiveDuration !== undefined}
             glow="blue"
@@ -150,6 +152,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
         minWidth={170}
         trigger={
           <ToolbarButton
+            className="composer-toolbar-control composer-toolbar-icon"
             size="md"
             active={Boolean(effectiveRecurrence)}
             glow="blue"
@@ -206,6 +209,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
           variant="ghost"
           direction="up"
           value={effectivePriority}
+          triggerClassName="composer-toolbar-control composer-toolbar-icon"
           showLabel={false}
           showArrow={false}
           title={`Приоритет: ${
