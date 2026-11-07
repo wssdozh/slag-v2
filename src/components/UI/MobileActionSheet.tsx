@@ -53,7 +53,7 @@ export const MobileActionSheet: React.FC = () => {
       inert={mobileActionSheetItem === null}
       aria-hidden={mobileActionSheetItem === null || undefined}
       onClick={handleClose}
-      className="fixed inset-0 z-[110] bg-black/80 flex flex-col justify-end motion-fade select-none"
+      className="fixed inset-0 z-[110] bg-black/80 flex flex-col justify-end motion-fade motion-scrim-hold select-none"
     >
       <div
         ref={panelRef}

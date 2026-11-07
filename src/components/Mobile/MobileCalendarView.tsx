@@ -1007,7 +1007,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
           onTransitionEnd={onMonthPickerTransitionEnd}
           onClick={() => setIsMonthPickerOpen(false)}
           data-testid="month-picker-sheet"
-          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 motion-fade select-none"
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 motion-fade motion-scrim-hold select-none"
         >
           <div
             onClick={e => e.stopPropagation()}

@@ -165,8 +165,10 @@
   transition-duration: var(--slag-motion-slow);
 }
 /* A scrim that carries a sheet has to outlive it, otherwise the backdrop is gone
-   while the panel is still on its way down. */
-.motion-fade:has(.motion-sheet[data-motion-state="exiting"]) {
+   while the panel is still on its way down. Declared by the surface that wraps a
+   sheet, not discovered with `:has()`: the parent already knows what it wraps, and
+   `:has()` pays a subtree-wide style invalidation on every frame to find out. */
+.motion-scrim-hold[data-motion-state="exiting"] {
   transition-duration: var(--slag-motion-slow);
 }
 
@@ -223,11 +225,15 @@
   transition-timing-function: var(--ease-standard);
 }
 
-/* Press and release have different timing. Disabled controls never move. */
+/* Press and release have different timing. Disabled controls never move.
+   Paint lands on `instant`: this is the most-executed class in the app (116
+   buttons), and a 150ms colour fade on every button means several repainted
+   frames per tap for a change nobody is watching. Only `scale` keeps a longer
+   tail, because that is the part the eye actually follows. */
 .motion-press,
 .btn-press {
   transition-property: color, background-color, border-color, opacity, scale;
-  transition-duration: var(--slag-motion-base), var(--slag-motion-base), var(--slag-motion-base), var(--slag-motion-base), var(--slag-motion-fast);
+  transition-duration: var(--slag-motion-instant), var(--slag-motion-instant), var(--slag-motion-instant), var(--slag-motion-instant), var(--slag-motion-fast);
   transition-timing-function: var(--ease-standard), var(--ease-standard), var(--ease-standard), var(--ease-standard), var(--ease-press);
 }
 :is(.motion-press, .btn-press):active:not(:disabled):not([aria-disabled="true"]) {

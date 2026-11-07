@@ -183,7 +183,7 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
         onTransitionEnd={onTransitionEnd}
         inert={!isOpen}
         onClick={onClose}
-        className="fixed inset-0 z-[110] bg-black/80 flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 motion-fade select-none"
+        className="fixed inset-0 z-[110] bg-black/80 flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 motion-fade motion-scrim-hold select-none"
       >
         <div
           onClick={(e) => e.stopPropagation()}
