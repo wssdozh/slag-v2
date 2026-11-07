@@ -1375,7 +1375,7 @@ export const Composer: React.FC<ComposerProps> = ({
         <div className="motion-accordion w-full" data-expanded={Boolean(replyTarget)}>
         <div className="motion-accordion-inner">
         {bannerReply && (
-        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none">
+        <div className="flex items-center justify-between px-1 pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none pr-8">
           <div className="flex items-center gap-1.5 truncate min-w-0">
             <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="text-[11px] font-mono text-zinc-500 shrink-0">
