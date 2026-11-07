@@ -392,7 +392,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       {/* Pending Vault Invitations */}
       {hosted && accountState.invitations.length > 0 && (
         <section className="p-3.5 rounded-xl bg-white/[0.02] border border-emerald-500/20 flex flex-col gap-2">
-          <span className="text-xs font-semibold text-zinc-200">Приглашения в хранилища</span>
+          <span className="text-xs font-semibold text-fg-primary">Приглашения в хранилища</span>
           {accountState.invitations.map((invitation) => (
             <div key={invitation.vaultId} className="flex items-center justify-between gap-3 py-1.5 border-t border-white/[0.04]">
               <div className="min-w-0">
@@ -411,10 +411,10 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
       )}
 
       {/* Devices List */}
-      <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2">
+      <section className="settings-card p-3.5 flex flex-col gap-2">
         <div className="flex items-center justify-between pb-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-zinc-200">Подключённые устройства</span>
+            <span className="text-xs font-semibold text-fg-primary">Подключённые устройства</span>
             <span
               className="text-[11px] font-mono text-zinc-500"
               title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}
@@ -518,7 +518,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
         <div className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
           <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-              <span className="text-xs font-semibold text-white">Привязка устройства</span>
+              <span className="text-xs font-semibold text-fg-primary">Привязка устройства</span>
               <button type="button" aria-label="Закрыть привязку" onClick={() => setIsPairModalOpen(false)} className="p-1 text-zinc-400 cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-4 flex flex-col gap-4">

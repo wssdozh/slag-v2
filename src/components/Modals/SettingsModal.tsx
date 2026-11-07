@@ -34,12 +34,19 @@ import { Select } from '../UI/Select';
 import { Checkbox } from '../UI/Checkbox';
 import { NumberInput } from '../UI/NumberInput';
 import { BaseModal } from './BaseModal';
+import { SettingsGroup, SettingsRow, SettingsSegmented } from '../Settings/SettingsUI';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { AiSourceMode, SubscriptionAiTier } from '../../types';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
 import { FONT_SCALE_OPTIONS, FONT_FAMILY_OPTIONS } from '../../config/typography';
+
+const DENSITY_OPTIONS = [
+  { value: 'compact' as const, label: 'Компактный' },
+  { value: 'normal' as const, label: 'Стандарт' },
+  { value: 'spacious' as const, label: 'Просторный' },
+];
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -69,6 +76,7 @@ export const SettingsModal: React.FC = () => {
   } = useApp();
 
   const presence = usePresence(isSettingsOpen);
+  const { ref: presenceRef, phase: presencePhase, isPresent: isSettingsPresent, onTransitionEnd: onSettingsTransitionEnd } = presence;
 
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -149,8 +157,9 @@ export const SettingsModal: React.FC = () => {
     box.scrollTo({ left: el.offsetLeft - (box.clientWidth - el.offsetWidth) / 2 });
   }, [activeTab, isSettingsOpen]);
 
-  // Desktop dialog keeps its DOM through the exit; the mobile branch unmounts itself.
-  if (!isMobile && !presence.isPresent) return null;
+  // Both branches keep their DOM through the exit: the phone overlay used to
+  // unmount the moment it closed, so it had no exit at all.
+  if (!isSettingsPresent) return null;
 
   const handleProviderChange = (newProvider: AiProvider) => {
     setProvider(newProvider);
@@ -397,14 +406,14 @@ export const SettingsModal: React.FC = () => {
       </div>
 
           {/* Right Tab Content */}
-          <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-surface">
+          <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-panel">
             <div key={activeTab} className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4 motion-fade">
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
                   {/* Top Switcher: Подписка vs Свой ключ */}
-                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2">
+                  <div className="settings-card p-3 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-zinc-200">Источник моделей</span>
+                      <span className="text-xs font-semibold text-fg-primary">Источник моделей</span>
                       {isFreePlan ? (
                         <span className="text-[11px] font-mono text-zinc-500">Free · только свой ключ</span>
                       ) : (
@@ -462,9 +471,9 @@ export const SettingsModal: React.FC = () => {
 
                   {/* Mode A: Subscription Gateway Mode (No API keys needed) */}
                   {sourceMode === 'subscription' && !isFreePlan ? (
-                    <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                    <div className="settings-card p-3.5 flex flex-col gap-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-zinc-200">Режим обработки</span>
+                        <span className="text-xs font-semibold text-fg-primary">Режим обработки</span>
                         <span className="text-[11px] font-mono text-zinc-500">
                           Шлюз: {syncEngine.getConfig().serverUrl.replace(/https?:\/\//, '')}
                         </span>
@@ -510,9 +519,9 @@ export const SettingsModal: React.FC = () => {
                     /* Mode B: BYOK (Bring Your Own Key) Settings */
                     <>
                       {/* Section 1: Выбор провайдера ИИ (Groq & KIE.AI) */}
-                      <div className="bg-panel border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2">
+                      <div className="settings-card p-3 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-zinc-200">Провайдер</span>
+                          <span className="text-xs font-semibold text-fg-primary">Провайдер</span>
                           <span className="text-[11px] font-mono text-zinc-500">
                             {provider === 'groq'
                               ? (groqApiKey ? '● Groq подключен' : '○ Ключ не указан')
@@ -549,7 +558,7 @@ export const SettingsModal: React.FC = () => {
 
                       {/* Section 2: Настройки Groq */}
                       {provider === 'groq' && (
-                        <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                        <div className="settings-card p-3.5 flex flex-col gap-3">
                           <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
                             <span className="text-xs font-semibold text-zinc-100">Groq Cloud API</span>
                             <a
@@ -602,7 +611,7 @@ export const SettingsModal: React.FC = () => {
 
                       {/* Section 2: Настройки KIE.AI */}
                       {provider === 'kie' && (
-                        <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                        <div className="settings-card p-3.5 flex flex-col gap-3">
                           <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
                             <span className="text-xs font-semibold text-zinc-100">KIE Cloud API</span>
                             <a
@@ -666,7 +675,7 @@ export const SettingsModal: React.FC = () => {
                   )}
 
                   {/* Section 3: Автоматизация и интеллектуальные сервисы */}
-                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                  <div className="settings-card p-3.5 flex flex-col gap-3">
                     <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
                         Автоматизация
@@ -695,7 +704,7 @@ export const SettingsModal: React.FC = () => {
                   </div>
 
                   {/* Section 4: Норма таксономии и правила тегирования */}
-                  <div className="bg-panel border border-white/[0.06] rounded-xl p-3.5 flex flex-col gap-3">
+                  <div className="settings-card p-3.5 flex flex-col gap-3">
                     <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
                       <span className="text-xs font-semibold text-zinc-100">
                         Правила тегов
@@ -751,7 +760,7 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'vault' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-zinc-200">
+                  <span className="text-xs font-semibold text-fg-primary">
                     Резервное копирование и точки отката
                   </span>
                 </div>
@@ -980,7 +989,7 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'ui' && (
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-zinc-200">
+                  <span className="text-xs font-semibold text-fg-primary">
                     Внешний вид, масштабы и плотность
                   </span>
                   {/* Device profile switcher */}
@@ -1013,67 +1022,42 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 {/* Font Scale Control */}
-                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-zinc-300">Масштаб шрифтов и типографики:</span>
-                    <span className="text-2xs font-mono text-zinc-400">
-                      {FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.label} ({FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.percentage})
-                    </span>
+                <SettingsGroup title="Масштаб и типографика">
+                  <SettingsRow
+                    label="Масштаб шрифтов"
+                    description="Размер текста во всём интерфейсе"
+                    value={`${FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.label} (${FONT_SCALE_OPTIONS[uiConfig[selectedDevice].fontScale]?.percentage})`}
+                  />
+                  <div className="px-3 pb-3 sm:px-4">
+                    <SettingsSegmented
+                      value={uiConfig[selectedDevice].fontScale}
+                      onChange={(scaleKey) => updateUiConfig(selectedDevice, { fontScale: scaleKey })}
+                      options={(Object.keys(FONT_SCALE_OPTIONS) as Array<keyof typeof FONT_SCALE_OPTIONS>).map(key => ({
+                        value: key,
+                        label: FONT_SCALE_OPTIONS[key].label,
+                      }))}
+                    />
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {(Object.keys(FONT_SCALE_OPTIONS) as Array<keyof typeof FONT_SCALE_OPTIONS>).map((scaleKey) => {
-                      const opt = FONT_SCALE_OPTIONS[scaleKey];
-                      const isSelected = uiConfig[selectedDevice].fontScale === scaleKey;
-                      return (
-                        <button
-                          key={scaleKey}
-                          type="button"
-                          onClick={() => updateUiConfig(selectedDevice, { fontScale: scaleKey })}
-                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
-                            isSelected
-                              ? 'bg-white/10 text-white border-white/20 shadow-sm'
-                              : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                          }`}
-                        >
-                          {opt.label} ({opt.percentage})
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                </SettingsGroup>
 
                 {/* Font Family Control */}
-                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-zinc-300">Гарнитура шрифта (Семейство):</span>
-                    <span className="text-2xs font-mono text-zinc-400">
-                      {FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.label}
-                    </span>
+                <SettingsGroup title="Гарнитура">
+                  <SettingsRow
+                    label="Семейство шрифта"
+                    description={FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.description}
+                    value={FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.label}
+                  />
+                  <div className="px-3 pb-3 sm:px-4">
+                    <SettingsSegmented
+                      value={uiConfig[selectedDevice].fontFamily || 'inter'}
+                      onChange={(famKey) => updateUiConfig(selectedDevice, { fontFamily: famKey })}
+                      options={(Object.keys(FONT_FAMILY_OPTIONS) as Array<keyof typeof FONT_FAMILY_OPTIONS>).map(key => ({
+                        value: key,
+                        label: FONT_FAMILY_OPTIONS[key].label,
+                      }))}
+                    />
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(Object.keys(FONT_FAMILY_OPTIONS) as Array<keyof typeof FONT_FAMILY_OPTIONS>).map((famKey) => {
-                      const opt = FONT_FAMILY_OPTIONS[famKey];
-                      const isSelected = (uiConfig[selectedDevice].fontFamily || 'inter') === famKey;
-                      return (
-                        <button
-                          key={famKey}
-                          type="button"
-                          onClick={() => updateUiConfig(selectedDevice, { fontFamily: famKey })}
-                          className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
-                            isSelected
-                              ? 'bg-white/10 text-white border-white/20 shadow-sm'
-                              : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <span className="text-2xs text-zinc-500 leading-relaxed">
-                    {FONT_FAMILY_OPTIONS[uiConfig[selectedDevice].fontFamily || 'inter']?.description}
-                  </span>
-                </div>
+                </SettingsGroup>
 
                 {/* Live Interactive Hierarchy Preview Card (Desktop Only) */}
                 {!isMobile && (
@@ -1110,53 +1094,24 @@ export const SettingsModal: React.FC = () => {
                 )}
 
                 {/* Density Control */}
-                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-zinc-300">Плотность сетки и хитбоксов:</span>
-                    <span className="text-2xs font-mono text-zinc-500 uppercase">
-                      {uiConfig[selectedDevice].density}
-                    </span>
+                <SettingsGroup title="Плотность">
+                  <SettingsRow
+                    label="Плотность сетки и хитбоксов"
+                    description="Высота строк и размер целей для пальца"
+                    value={DENSITY_OPTIONS.find(o => o.value === uiConfig[selectedDevice].density)?.label}
+                  />
+                  <div className="px-3 pb-3 sm:px-4">
+                    <SettingsSegmented
+                      value={uiConfig[selectedDevice].density}
+                      onChange={(density) => updateUiConfig(selectedDevice, { density })}
+                      options={DENSITY_OPTIONS}
+                    />
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => updateUiConfig(selectedDevice, { density: 'compact' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
-                        uiConfig[selectedDevice].density === 'compact'
-                          ? 'bg-white/10 text-white border-white/20'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                      }`}
-                    >
-                      Компактный
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateUiConfig(selectedDevice, { density: 'normal' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
-                        uiConfig[selectedDevice].density === 'normal'
-                          ? 'bg-white/10 text-white border-white/20'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                      }`}
-                    >
-                      Стандарт
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateUiConfig(selectedDevice, { density: 'spacious' })}
-                      className={`h-ctrl-md px-2 rounded-lg text-xs font-medium motion-surface cursor-pointer border ${
-                        uiConfig[selectedDevice].density === 'spacious'
-                          ? 'bg-white/10 text-white border-white/20'
-                          : 'bg-white/[0.02] text-zinc-400 border-white/[0.04] hover:bg-white/[0.06]'
-                      }`}
-                    >
-                      Просторный / Тач
-                    </button>
-                  </div>
-                </div>
+                </SettingsGroup>
 
                 {/* Panel Resizing Reset (Desktop Only) */}
                 {!isMobile && (
-                  <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
+                  <div className="settings-card flex flex-col gap-2 p-3 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="text-zinc-300">Размеры панелей:</span>
                       <button
@@ -1177,10 +1132,10 @@ export const SettingsModal: React.FC = () => {
               <div className="flex flex-col gap-4">
                 {/* System-level OS Integration Card (Desktop Only) */}
                 {!isMobile && platformInfo && (
-                  <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                  <div className="settings-card flex flex-col gap-2 p-3.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-zinc-200">
+                        <span className="text-xs font-semibold text-fg-primary">
                           Глобальный вызов в операционной системе
                         </span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase bg-white/5 border border-white/[0.08] text-zinc-400">
@@ -1240,7 +1195,7 @@ export const SettingsModal: React.FC = () => {
                 )}
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-zinc-200">
+                  <span className="text-xs font-semibold text-fg-primary">
                     Глобальные команды и шорткаты
                   </span>
                   <span className="text-[11px] text-zinc-500">
@@ -1271,7 +1226,7 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-1 pt-2">
-                  <span className="text-xs font-semibold text-zinc-200">
+                  <span className="text-xs font-semibold text-fg-primary">
                     Редактор, модальные окна и ввод
                   </span>
                 </div>
@@ -1342,13 +1297,15 @@ export const SettingsModal: React.FC = () => {
   );
 
   if (isMobile) {
-    if (!isSettingsOpen) return null;
     return (
       <div
+        ref={presenceRef}
         role="dialog"
         aria-modal="true"
         aria-label="Настройки"
-        className="fixed inset-0 z-50 bg-canvas flex flex-col select-none motion-fade overflow-hidden"
+        data-motion-state={presencePhase}
+        onTransitionEnd={onSettingsTransitionEnd}
+        className="fixed inset-0 z-50 bg-canvas flex flex-col select-none motion-fade motion-screen overflow-hidden"
       >
         {/* Top Header */}
         <div

@@ -76,9 +76,9 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
   return (
     <div className="flex flex-col gap-3 text-zinc-100">
       {locked && (
-        <section className="p-3.5 rounded-xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-between gap-4">
+        <section className="settings-card p-3.5 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="text-xs font-semibold text-white">Синхронизация недоступна</h3>
+            <h3 className="text-xs font-semibold text-fg-primary">Синхронизация недоступна</h3>
             <p className="text-2xs text-zinc-400 mt-0.5">Требуется вход в аккаунт SLAG ID.</p>
           </div>
           <button
@@ -93,11 +93,11 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       )}
 
       {/* Sync Status Card */}
-      <section className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2.5">
+      <section className="settings-card p-3 flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <span className={`w-2 h-2 rounded-full shrink-0 ${status.state === 'connected' ? 'bg-emerald-500' : status.state === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-zinc-600'}`} />
-            <span className="text-xs font-semibold text-white truncate">{planLabel}</span>
+            <span className="text-xs font-semibold text-fg-primary truncate">{planLabel}</span>
             <span className="text-[10px] font-mono text-zinc-500 shrink-0">E2EE</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -135,11 +135,11 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       </section>
 
       {/* Devices Link Banner */}
-      <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+      <section className="settings-card p-3.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <Laptop className="w-4 h-4 text-zinc-400 shrink-0" />
           <div className="min-w-0">
-            <div className="text-xs font-semibold text-zinc-200">Подключённые устройства</div>
+            <div className="text-xs font-semibold text-fg-primary">Подключённые устройства</div>
             <p className="text-2xs text-zinc-500 truncate">
               {activeDevices} {activeDevices === 1 ? 'устройство' : 'устройств'} · привязка и доступ к базам
             </p>
@@ -156,9 +156,9 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       </section>
 
       {/* Relay Server */}
-      <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col gap-2.5">
+      <section className="settings-card p-3.5 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-zinc-200">Сервер ретрансляции</span>
+          <span className="text-xs font-semibold text-fg-primary">Сервер ретрансляции</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
@@ -192,10 +192,10 @@ export const SyncSettingsTab: React.FC<SyncSettingsTabProps> = ({ addToast }) =>
       </section>
 
       {/* Rotate Vault Key */}
-      <section className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3">
+      <section className="settings-card p-3.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <KeyRound className="w-4 h-4 text-rose-400 shrink-0" />
-          <div><div className="text-xs font-semibold text-zinc-200">Смена ключа хранилища</div><p className="text-2xs text-zinc-500">Все устройства потребуют нового приглашения.</p></div>
+          <div><div className="text-xs font-semibold text-fg-primary">Смена ключа хранилища</div><p className="text-2xs text-zinc-500">Все устройства потребуют нового приглашения.</p></div>
         </div>
         <button type="button" disabled={locked} onClick={() => {
           if (!window.confirm('Сменить ключ хранилища? Доступ остальных устройств будет остановлен.')) return;

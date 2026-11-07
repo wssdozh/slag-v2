@@ -397,7 +397,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           onClick={e => e.stopPropagation()}
           aria-hidden={!isTextPanelOpen}
           inert={!isTextPanelOpen}
-          className={`border-l border-white/[0.08] bg-panel/95 backdrop-blur-2xl flex flex-col shrink-0 z-20 min-h-0 select-text overflow-hidden transition-[width] duration-200 ease-out ${
+          className={`border-l border-white/[0.08] bg-panel flex flex-col shrink-0 z-20 min-h-0 select-text overflow-hidden transition-[width] duration-200 ease-out ${
             isTextPanelOpen ? 'w-full sm:w-80 md:w-96' : 'w-0 border-l-0'
           }`}
         >

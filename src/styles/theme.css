@@ -107,6 +107,7 @@
 .motion-fade,
 .motion-dialog,
 .motion-popover,
+.motion-screen,
 .motion-sheet {
   opacity: 1;
   transition-property: opacity, scale, translate;
@@ -119,7 +120,8 @@
   scale: none;
 }
 
-.motion-sheet {
+.motion-sheet,
+.motion-screen {
   translate: 0 0;
 }
 
@@ -132,21 +134,38 @@
   .motion-fade,
   .motion-dialog,
   .motion-popover,
+  .motion-screen,
   .motion-sheet { opacity: 0; }
-  .motion-dialog { scale: 0.98; }
+  .motion-dialog { scale: 0.96; translate: 0 8px; }
+  .motion-popover { translate: 0 -6px; }
   .motion-sheet { translate: 0 100%; }
 }
 
-:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet, .motion-toast)[data-motion-state="entering"],
-:is(.motion-fade, .motion-dialog, .motion-popover, .motion-sheet, .motion-toast)[data-motion-state="exiting"] {
+:is(.motion-fade, .motion-dialog, .motion-popover, .motion-screen, .motion-sheet, .motion-toast)[data-motion-state="entering"],
+:is(.motion-fade, .motion-dialog, .motion-popover, .motion-screen, .motion-sheet, .motion-toast)[data-motion-state="exiting"] {
   opacity: 0;
 }
 
+/* A dialog has to *land*, not only fade. A 2% scale on a dark scrim is a change
+   nobody can see; 0.96 plus an 8px drop reads as a surface arriving. */
 .motion-dialog:is([data-motion-state="entering"], [data-motion-state="exiting"]) {
-  scale: 0.98;
+  scale: 0.96;
+  translate: 0 8px;
+}
+/* A popover stays anchored, so it only leans. Every consumer measures its trigger
+   and never its own box, so a few pixels of travel cannot move the anchor — and
+   it is the only motion a small panel has. */
+.motion-popover:is([data-motion-state="entering"], [data-motion-state="exiting"]) {
+  translate: 0 -6px;
 }
 .motion-sheet:is([data-motion-state="entering"], [data-motion-state="exiting"]) {
   translate: 0 100%;
+}
+/* A full-screen surface that replaces the app instead of floating over it
+   (settings on a phone) rises a little. On a canvas-coloured background a plain
+   fade reads as a pop, because there is no edge moving against anything. */
+.motion-screen:is([data-motion-state="entering"], [data-motion-state="exiting"]) {
+  translate: 0 2%;
 }
 /* An exit is its own gesture: shorter than the entrance, but never so short
    that the surface looks like it was pulled out from under the cursor. */
@@ -216,6 +235,15 @@
 }
 .motion-accordion-inner {
   min-height: 0;
+}
+
+/* The single settings card. Every tab used to hand-roll this as `bg-panel` or
+   `bg-white/[0.02]` with its own padding, radius and border, so openings the same
+   row read as different screens. One definition, one tone. */
+.settings-card {
+  border-radius: 0.75rem;
+  background-color: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Surfaces that swap colour, shadow and a selected scale in one go. */
