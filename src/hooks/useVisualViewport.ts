@@ -22,7 +22,13 @@ export function useVisualViewport() {
 
     const publish = () => {
       frame = 0;
-      const overlap = window.innerHeight - (viewport.height + viewport.offsetTop);
+      // The layout viewport, not `window.innerHeight`: when the keyboard resizes
+      // the layout, a bottom-anchored surface is already above it and the inset
+      // must stay zero. Reading the lagging innerHeight here reported the whole
+      // keyboard height mid-animation, which lifted the composer too far and then
+      // dropped it back onto the keyboard.
+      const layout = root.clientHeight;
+      const overlap = layout - (viewport.height + viewport.offsetTop);
       const inset = overlap > KEYBOARD_FLOOR ? Math.round(overlap) : 0;
       if (inset === applied) return;
       applied = inset;
