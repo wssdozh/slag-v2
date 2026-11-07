@@ -131,7 +131,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   const isFlat = variant === 'flat';
 
   return (
-    <div className="w-full select-none relative flex justify-center">
+    <div data-composer-root="" className="w-full select-none relative flex justify-center">
       {overlaySlot}
       <div
         onDragEnter={onDragEnter}

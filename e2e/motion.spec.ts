@@ -422,11 +422,11 @@ test('the editor slides in when it has no card to unfold from', async ({ page })
 
   const editor = page.getByTestId('fullscreen-editor-modal');
   await expect(editor).toBeVisible();
-  // Opened from the composer there is no `data-flip-id` to unfold out of, and the
-  // editor used to appear with no motion at all.
+  // No `data-flip-id` here, so the editor unfolds out of the composer box instead —
+  // the same clip grow as from a card, not a plain appearance.
   const travelled = await editor.evaluate(element => element.getAnimations().some(animation =>
     animation.effect instanceof KeyframeEffect &&
-    animation.effect.getKeyframes().some(keyframe => String(keyframe.transform ?? '').includes('translateY'))));
+    animation.effect.getKeyframes().some(keyframe => String(keyframe.clipPath ?? '').includes('inset'))));
   expect(travelled).toBe(true);
 });
 

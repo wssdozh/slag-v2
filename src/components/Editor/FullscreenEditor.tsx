@@ -125,7 +125,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     // A wide surface lifts further than a phone screen, where the editor is the
     // whole window and reads as a sheet.
     const travel = window.matchMedia('(max-width: 767px)').matches ? 56 : 18;
-    const originOf = () => document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`);
+    // A card if there is one, otherwise the composer the editor was opened from:
+    // the surface still grows out of something, which is what makes it read as a
+    // resize instead of an unrelated slide.
+    const originOf = () =>
+      document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(item.id)}"]`) ??
+      document.querySelector<HTMLElement>('[data-composer-root]');
 
     if (presencePhase === 'exiting') {
       const target = rootRef.current;
