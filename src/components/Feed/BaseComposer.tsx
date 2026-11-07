@@ -143,7 +143,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             ? `w-full flex flex-col gap-1.5 p-0 bg-transparent border-0 shadow-none relative ${
                 isDraggingOver ? 'rounded-2xl ring-2 ring-blue-500/50 bg-blue-500/[0.04]' : ''
               } ${className}`
-            : `rounded-2xl bg-surface-elevated/80 backdrop-blur-xl border ${
+            : `rounded-2xl bg-surface-elevated border ${
                 isDraggingOver
                   ? 'border-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
                   : 'border-white/[0.12]'
@@ -152,7 +152,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
-          <div className="absolute inset-0.5 z-30 rounded-xl bg-surface/92 backdrop-blur-sm border-2 border-dashed border-blue-500/50 flex items-center justify-center gap-2 pointer-events-none select-none text-xs font-mono text-zinc-300 motion-fade">
+          <div className="absolute inset-0.5 z-30 rounded-xl bg-surface border-2 border-dashed border-blue-500/50 flex items-center justify-center gap-2 pointer-events-none select-none text-xs font-mono text-zinc-300 motion-fade">
             <UploadCloud className="w-4 h-4 text-blue-400 animate-bounce" />
             <span>Отпустите файлы для прикрепления</span>
           </div>

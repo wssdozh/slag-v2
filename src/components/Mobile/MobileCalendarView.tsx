@@ -437,7 +437,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
     <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative">
       {/* 1. Unified Mobile Calendar Header (Single Bar, 44px) */}
       <header
-        className="border-b border-white/[0.06] bg-panel/95 backdrop-blur-md px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
+        className="border-b border-white/[0.06] bg-panel px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
         style={{
           height: embedded ? '2.75rem' : 'calc(2.75rem + max(var(--sat), 0px))',
           paddingTop: embedded ? '0px' : 'max(var(--sat), 0px)',
@@ -1007,7 +1007,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
           onTransitionEnd={onMonthPickerTransitionEnd}
           onClick={() => setIsMonthPickerOpen(false)}
           data-testid="month-picker-sheet"
-          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs motion-fade select-none"
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 motion-fade select-none"
         >
           <div
             onClick={e => e.stopPropagation()}

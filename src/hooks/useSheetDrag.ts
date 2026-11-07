@@ -17,13 +17,6 @@ interface DragSession {
   active: boolean;
 }
 
-interface SheetDragState {
-  isOpen: boolean;
-  offset: number;
-  progress: number;
-  mode: Mode;
-}
-
 const SETTLE_MS = 240;
 
 /** Upwards is beyond the sheet's resting place, so it resists instead of leaving. */
@@ -36,22 +29,42 @@ function resist(delta: number, height: number): number {
 /**
  * Drag-to-dismiss for a bottom sheet. Only the handle takes the gesture, so the
  * sheet's own scroller keeps behaving like a scroller.
+ *
+ * The finger never goes through React: `translate` on the panel and `opacity` on
+ * the scrim are written straight to the two nodes during the drag, so a move
+ * costs one compositor update instead of a re-render of the whole sheet. Both
+ * properties are composited, which is what keeps the drag at panel refresh rate
+ * on a phone. Nothing here animates `background-color`: that repainted the full
+ * viewport every pointermove.
  */
 export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const scrimRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<DragSession | null>(null);
   const settleTimerRef = useRef<number | null>(null);
-  const [state, setState] = useState<SheetDragState>({
-    isOpen,
-    offset: 0,
-    progress: 0,
-    mode: 'idle',
-  });
+  const [mode, setMode] = useState<Mode>('idle');
 
   // Closed from anywhere (tap outside, Cancel, Escape): drop the gesture.
-  if (state.isOpen !== isOpen) {
-    setState({ isOpen, offset: 0, progress: 0, mode: 'idle' });
+  const [openedFor, setOpenedFor] = useState(isOpen);
+  if (openedFor !== isOpen) {
+    setOpenedFor(isOpen);
+    setMode('idle');
   }
+
+  /** Hand both nodes back to their CSS cameras. */
+  const releaseInline = useCallback(() => {
+    const panel = panelRef.current;
+    if (panel) {
+      panel.style.translate = '';
+      panel.style.transition = '';
+    }
+    const scrim = scrimRef.current;
+    if (scrim) scrim.style.opacity = '';
+  }, []);
+
+  useEffect(() => {
+    if (mode !== 'drag') releaseInline();
+  }, [mode, releaseInline]);
 
   useEffect(() => () => {
     if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current);
@@ -85,15 +98,23 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
     if (!session.active) {
       if (Math.abs(raw) < UI_GESTURES.SHEET_DRAG_START_PX) return;
       session.active = true;
+      setMode('drag');
     }
     const offset = resist(raw, session.height);
-    setState({
-      isOpen,
-      offset,
-      progress: session.height > 0 ? Math.min(1, Math.max(0, offset / session.height)) : 0,
-      mode: 'drag',
-    });
-  }, [isOpen]);
+    const panel = panelRef.current;
+    if (panel) {
+      panel.style.transition = 'none';
+      panel.style.translate = `0 ${offset}px`;
+    }
+    // The scrim dims with the sheet, but never below half of its own strength:
+    // `bg-black/70` at full opacity, so opacity 1 - 0.5·progress lands on exactly
+    // the 0.7 → 0.35 alpha ramp the colour animation used to draw.
+    const scrim = scrimRef.current;
+    if (scrim && session.height > 0) {
+      const progress = Math.min(1, Math.max(0, offset / session.height));
+      scrim.style.opacity = String(1 - 0.5 * progress);
+    }
+  }, []);
 
   const onPointerEnd = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const session = sessionRef.current;
@@ -109,27 +130,22 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
       onDismiss();
       return;
     }
-    setState({ isOpen, offset: 0, progress: 0, mode: 'settle' });
+    setMode('settle');
     settleTimerRef.current = window.setTimeout(() => {
-      setState(current => (current.mode === 'settle' ? { ...current, mode: 'idle' } : current));
+      setMode(current => (current === 'settle' ? 'idle' : current));
     }, SETTLE_MS + 20);
-  }, [isOpen, onDismiss]);
+  }, [onDismiss]);
 
   const onPointerCancel = useCallback(() => {
     sessionRef.current = null;
-    setState({ isOpen, offset: 0, progress: 0, mode: 'settle' });
-  }, [isOpen]);
+    setMode('settle');
+  }, []);
 
-  const panelStyle: React.CSSProperties | undefined = state.mode === 'drag' && state.offset !== 0
-    ? { translate: `0 ${state.offset}px`, transition: 'none' }
-    : state.mode === 'settle'
-      ? { transitionDuration: `${SETTLE_MS}ms`, transitionTimingFunction: 'var(--ease-settle)' }
-      : undefined;
-
-  // The scrim dims with the sheet, but never below half of its own strength.
-  const scrimStyle: React.CSSProperties | undefined = state.mode === 'drag'
-    ? { backgroundColor: `rgba(0, 0, 0, ${0.7 - 0.35 * state.progress})` }
+  // Clearing the inline `translate` is what animates the sheet home: the settle
+  // timing is already on the element, so the CSS transition takes the release.
+  const panelStyle: React.CSSProperties | undefined = mode === 'settle'
+    ? { transitionDuration: `${SETTLE_MS}ms`, transitionTimingFunction: 'var(--ease-settle)' }
     : undefined;
 
-  return { panelRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle, scrimStyle };
+  return { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle };
 }

@@ -95,7 +95,7 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
       <nav
         ref={navRef}
         aria-label="Мобильная навигация"
-        className="relative pointer-events-auto h-12 bg-surface/92 backdrop-blur-xl border border-white/[0.08] rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xl shadow-black/80"
+        className="relative pointer-events-auto h-12 bg-surface border border-white/[0.08] rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xl shadow-black/80"
       >
         {/* Animated sliding capsule indicator */}
         {indicatorStyle.ready && (
@@ -147,7 +147,7 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
       {/* Floating Action Button (FAB) matching Linear circular pill */}
       <button
         onClick={handleFabClick}
-        className="pointer-events-auto w-12 h-12 rounded-full bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.12] flex items-center justify-center text-white shadow-2xl shadow-black/80 hover:bg-white/10 motion-press cursor-pointer shrink-0"
+        className="pointer-events-auto w-12 h-12 rounded-full bg-surface-elevated border border-white/[0.12] flex items-center justify-center text-white shadow-2xl shadow-black/80 hover:bg-white/10 motion-press cursor-pointer shrink-0"
         title="Новая запись"
         aria-label="Создать новую запись"
       >

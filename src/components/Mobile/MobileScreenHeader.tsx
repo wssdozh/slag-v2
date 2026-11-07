@@ -30,7 +30,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
     /* Высота = 56px контента + системный inset: раньше inset вычитался из h-14,
        и двухстрочный центр (заголовок + подпись) вылезал на разделитель. */
     <header
-      className={`border-b border-white/[0.06] bg-panel/95 backdrop-blur-md px-3 md:px-4 flex items-center justify-between shrink-0 z-10 ${className}`}
+      className={`border-b border-white/[0.06] bg-panel px-3 md:px-4 flex items-center justify-between shrink-0 z-10 ${className}`}
       style={{ height: 'calc(3.5rem + max(var(--sat), 0px))', paddingTop: 'max(var(--sat), 0px)' }}
     >
       {/* Left Slot: custom, back button, or icon + title */}

@@ -84,7 +84,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       role={role}
       aria-modal="true"
       aria-label={ariaLabelString}
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md motion-fade select-none ${className}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 motion-fade select-none ${className}`}
     >
       <div
         data-motion-state={phase}

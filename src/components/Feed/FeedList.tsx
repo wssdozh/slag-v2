@@ -431,7 +431,7 @@ export const FeedList: React.FC = () => {
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
-          <div className="absolute inset-2 z-30 rounded-2xl bg-canvas/92 backdrop-blur-md border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none motion-fade">
+          <div className="absolute inset-2 z-30 rounded-2xl bg-canvas border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none motion-fade">
             <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
             <span className="text-sm font-medium text-zinc-200">
               Перетащите файлы сюда для создания заметки

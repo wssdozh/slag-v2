@@ -710,7 +710,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       e.stopPropagation();
                       toggleOcr(imageAttachments[0].id);
                     }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 hover:bg-black/90 border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
                     title={expandedOcrIds.has(imageAttachments[0].id) ? 'Скрыть текст' : 'Показать текст с фото'}
                   >
                     <FileText className="w-3.5 h-3.5 text-zinc-300" />
@@ -718,7 +718,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${expandedOcrIds.has(imageAttachments[0].id) ? 'rotate-180' : ''}`} />
                   </button>
                 ) : imageAttachments[0].enrichmentStatus === 'processing' ? (
-                  <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 backdrop-blur-md border border-white/15 text-zinc-300 text-2xs font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
+                  <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 border border-white/15 text-zinc-300 text-2xs font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
                     <span>Анализ...</span>
                   </div>
@@ -730,7 +730,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       e.stopPropagation();
                       handleEnrichAttachment(imageAttachments[0]);
                     }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
+                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 hover:bg-black/90 border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
                     title="Распознать текст на изображении"
                   >
                     <Sparkles className="w-3 h-3 text-zinc-400" />

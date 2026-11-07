@@ -112,7 +112,7 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
           isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
         }`}
       >
-        <div className="w-12 h-12 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-lg motion-press">
+        <div className="w-12 h-12 rounded-full bg-canvas/80 flex items-center justify-center text-white border border-white/20 shadow-lg motion-press">
           {isPlaying ? (
             <Pause className="w-5 h-5 fill-current" />
           ) : (
@@ -126,7 +126,7 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
         <button
           type="button"
           onClick={toggleMute}
-          className="absolute bottom-3 right-5 p-1.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 hover:text-white border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          className="absolute bottom-3 right-5 p-1.5 rounded-full bg-canvas/90 text-white/90 hover:text-white border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
           title={isMuted ? 'Включить звук' : 'Выключить звук'}
         >
           {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
@@ -135,7 +135,7 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
 
       {/* Duration badge at the top if paused and non-compact */}
       {!compact && !isPlaying && duration > 0 && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-mono text-white/90 border border-white/10 pointer-events-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-canvas/90 text-[10px] font-mono text-white/90 border border-white/10 pointer-events-none">
           {Math.floor(duration / 60)}:{(Math.floor(duration % 60) < 10 ? '0' : '') + Math.floor(duration % 60)}
         </div>
       )}

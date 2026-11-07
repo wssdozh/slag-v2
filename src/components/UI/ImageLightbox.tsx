@@ -233,7 +233,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       aria-hidden={!isOpen || undefined}
       onClick={isOpen ? onClose : undefined}
       data-testid="image-lightbox"
-      className="fixed inset-0 z-[130] bg-black/95 backdrop-blur-xl flex flex-col justify-between select-none motion-fade outline-none"
+      className="fixed inset-0 z-[130] bg-black/95 flex flex-col justify-between select-none motion-fade outline-none"
     >
       {/* 3. Upper Toolbar */}
       <div

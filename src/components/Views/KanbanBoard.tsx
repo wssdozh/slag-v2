@@ -222,7 +222,7 @@ export const KanbanBoard: React.FC = () => {
         <div
           onClick={() => setIsKanbanMaterialsOpen(false)}
           aria-hidden={!isKanbanMaterialsOpen}
-          className={`absolute inset-0 bg-black/60 backdrop-blur-xs z-30 transition-opacity duration-200 ${
+          className={`absolute inset-0 bg-black/70 z-30 transition-opacity duration-200 ${
             isKanbanMaterialsOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         />

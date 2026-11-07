@@ -669,7 +669,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="fixed inset-0 z-50 z-[100] bg-surface flex flex-col motion-fade text-fg-primary"
+      className="fixed inset-0 z-50 z-[100] bg-surface flex flex-col text-fg-primary"
     >
       {/* Hidden File Picker Input */}
       <input
@@ -682,7 +682,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
-        <div className="fixed inset-4 z-[120] rounded-3xl bg-surface/95 backdrop-blur-md border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none motion-fade">
+        <div className="fixed inset-4 z-[120] rounded-3xl bg-surface border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none motion-fade">
           <UploadCloud className="w-12 h-12 text-accent animate-bounce" />
           <span className="text-base font-semibold text-white">
             Перетащите медиафайлы сюда
@@ -704,7 +704,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
             toggleMaximizeWindow();
           }
         }}
-        className={`min-h-14 border-b border-white/[0.04] bg-surface/90 backdrop-blur-md shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
+        className={`min-h-14 border-b border-white/[0.04] bg-surface shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
           isZenMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'
         }`}
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
@@ -1863,7 +1863,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
         {/* Bottom Bar Container */}
         <div
-          className="relative z-40 bg-surface/95 backdrop-blur-xl border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
+          className="relative z-40 bg-surface border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
           style={{ paddingBottom: 'max(var(--sab), 0.5rem)' }}
         >
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1953,7 +1953,10 @@ export const FullscreenEditor: React.FC = () => {
   const { isFullscreenEditorOpen, selectedItem } = useApp();
 
   const isOpen = isFullscreenEditorOpen && Boolean(selectedItem);
-  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
+  // The surface unfolds itself through `expandFromRect`/`enterFromEdge`, so it has
+  // no use for the CSS `entering` frame: flipping that phase re-rendered the whole
+  // editor mid-animation and ate the first frames of the unfold.
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen, { skipEntering: true });
 
   const [cachedItem, setCachedItem] = useState(selectedItem);
   if (selectedItem && selectedItem !== cachedItem) {

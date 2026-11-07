@@ -31,7 +31,7 @@ export const MobileActionSheet: React.FC = () => {
 
   const isOpen = mobileActionSheetItem !== null;
   const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
-  const { panelRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle, scrimStyle } =
+  const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle } =
     useSheetDrag({ isOpen, onDismiss: handleClose });
   const [lastItem, setLastItem] = useState(mobileActionSheetItem);
   if (mobileActionSheetItem && mobileActionSheetItem !== lastItem) setLastItem(mobileActionSheetItem);
@@ -43,15 +43,17 @@ export const MobileActionSheet: React.FC = () => {
 
   return (
     <div
-      ref={ref}
+      ref={(node) => {
+        ref.current = node;
+        scrimRef.current = node;
+      }}
       data-testid="action-sheet"
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
       inert={mobileActionSheetItem === null}
       aria-hidden={mobileActionSheetItem === null || undefined}
       onClick={handleClose}
-      style={scrimStyle}
-      className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col justify-end motion-fade select-none"
+      className="fixed inset-0 z-[110] bg-black/80 flex flex-col justify-end motion-fade select-none"
     >
       <div
         ref={panelRef}

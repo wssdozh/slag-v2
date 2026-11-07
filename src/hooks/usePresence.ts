@@ -3,18 +3,30 @@ import type { TransitionEvent } from 'react';
 
 type Phase = 'entering' | 'open' | 'exiting' | 'closed';
 
+interface PresenceOptions {
+  /**
+   * Skip the `entering` phase for a surface that animates its own entrance with
+   * the Web Animations API. `entering` exists to hand CSS a first frame at
+   * opacity 0 and then flip it on the next frame — which costs a full re-render
+   * in the middle of that same animation, and stalls the first frames of a heavy
+   * tree (the editor). A surface that drives its own entrance has no use for it.
+   */
+  skipEntering?: boolean;
+}
+
 /** Keeps the existing DOM during exit. CSS owns the duration and destination. */
-export function usePresence(open: boolean) {
+export function usePresence(open: boolean, { skipEntering = false }: PresenceOptions = {}) {
   const ref = useRef<HTMLDivElement>(null);
+  const initialPhase: Phase = open ? (skipEntering ? 'open' : 'entering') : 'closed';
   const [state, setState] = useState<{ open: boolean; phase: Phase }>({
     open,
-    phase: open ? 'entering' : 'closed',
+    phase: initialPhase,
   });
 
   if (state.open !== open) {
     setState({
       open,
-      phase: open ? (state.phase === 'closed' ? 'entering' : 'open') : 'exiting',
+      phase: open ? (state.phase === 'closed' && !skipEntering ? 'entering' : 'open') : 'exiting',
     });
   }
 

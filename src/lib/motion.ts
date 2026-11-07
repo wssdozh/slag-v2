@@ -38,12 +38,26 @@ export function motionEase(token: MotionEase): string {
 }
 
 /**
+ * A phone viewport. Below this width the surface is the whole window, so a clip
+ * window grown out of a card is neither readable nor cheap: Android WebView
+ * repaints `clip-path` on the main thread, and the main thread is also busy
+ * mounting the surface. Phones get a compositor-only move instead.
+ */
+function isPhoneViewport(): boolean {
+  return window.matchMedia('(max-width: 767px)').matches;
+}
+
+/**
  * Opens a full-bleed surface out of the card that was tapped. The clip window
  * grows from the card's box to the viewport, so no text is ever stretched by a
  * non-uniform scale.
  */
 export function expandFromRect(origin: HTMLElement, target: HTMLElement): void {
   if (prefersReducedMotion()) return;
+  if (isPhoneViewport()) {
+    enterFromEdge(target, 44);
+    return;
+  }
   const from = origin.getBoundingClientRect();
   const to = target.getBoundingClientRect();
   if (from.width < 8 || from.height < 8 || to.width < 8 || to.height < 8) return;
@@ -60,23 +74,25 @@ export function expandFromRect(origin: HTMLElement, target: HTMLElement): void {
       { clipPath: 'inset(0px round 0px)' },
     ],
     {
-      duration: Math.min(280, Math.max(200, distance * 0.35)),
-      easing: motionEase('entrance'),
+      duration: Math.min(200, Math.max(150, distance * 0.2)),
+      easing: 'ease-out',
     },
   );
 }
 
 /**
- * Rise-into-place for a surface with no origin card to unfold from — opened from
- * the composer, from a draft, or from a search hit. CSS owns the fade; this only
- * gives the surface a direction to travel.
+ * Rise-into-place for a surface that arrives without a box to grow from. The
+ * fade lives here rather than in a `motion-fade` class: two independent owners
+ * of the same opacity fight over the first frames, which is what made the
+ * surface look cut off. Only `transform` and `opacity` animate, so the whole
+ * thing stays on the compositor.
  */
 export function enterFromEdge(target: HTMLElement, distance = 18): Animation | undefined {
   if (prefersReducedMotion()) return undefined;
   return target.animate(
     [
-      { transform: `translateY(${distance}px) scale(0.99)` },
-      { transform: 'none' },
+      { transform: `translateY(${distance}px) scale(0.99)`, opacity: 0 },
+      { transform: 'none', opacity: 1 },
     ],
     { duration: motionMs('slow'), easing: motionEase('entrance') },
   );
@@ -100,6 +116,7 @@ export function exitToEdge(target: HTMLElement, distance = 18): Animation | unde
  */
 export function collapseToRect(target: HTMLElement, dest: HTMLElement): Animation | undefined {
   if (prefersReducedMotion()) return undefined;
+  if (isPhoneViewport()) return exitToEdge(target, 44);
   const to = dest.getBoundingClientRect();
   const from = target.getBoundingClientRect();
   if (to.width < 8 || to.height < 8 || from.width < 8 || from.height < 8) return undefined;
@@ -116,8 +133,8 @@ export function collapseToRect(target: HTMLElement, dest: HTMLElement): Animatio
       { clipPath: `inset(${top}px ${right}px ${bottom}px ${left}px round 12px)`, opacity: 0 },
     ],
     {
-      duration: Math.min(220, Math.max(160, distance * 0.25)),
-      easing: motionEase('standard'),
+      duration: Math.min(150, Math.max(100, distance * 0.15)),
+      easing: 'ease-in',
       fill: 'forwards',
     },
   );

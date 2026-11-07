@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.slag_v2" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Painted before the WebView has drawn anything, so it has to be the
+             app's own canvas colour: anything else reads as a flash on launch. -->
+        <item name="android:windowBackground">@color/slag_canvas</item>
+        <item name="android:windowIsTranslucent">false</item>
+    </style>
+</resources>

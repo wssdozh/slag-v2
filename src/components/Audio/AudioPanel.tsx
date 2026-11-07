@@ -436,9 +436,12 @@ export const AudioPanel: React.FC = () => {
                   className="group relative flex-1 flex items-center h-4 cursor-pointer select-none"
                 >
                   <div className="w-full h-1 bg-white/15 rounded-full overflow-hidden group-hover:h-1.5">
+                    {/* Composited fill: `width` here re-laid-out the track on every
+                        `timeupdate` tick for the whole length of the track, forever.
+                        A `scaleX` on the compositor costs one matrix update instead. */}
                     <div
-                      style={{ width: `${progressPercent}%` }}
-                      className="h-full bg-white transition-[width] duration-75"
+                      style={{ transform: `scaleX(${progressPercent / 100})`, transformOrigin: 'left center' }}
+                      className="h-full w-full bg-white transition-transform duration-100 ease-linear"
                     />
                   </div>
                   <div

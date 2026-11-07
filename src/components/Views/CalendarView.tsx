@@ -1726,7 +1726,7 @@ export const CalendarView: React.FC = () => {
           onTransitionEnd={onExpandedDayTransitionEnd}
           inert={!isExpandedDayOpen}
           onClick={() => setExpandedDayDateStr(null)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 motion-fade"
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 motion-fade"
         >
           <div
             onClick={e => e.stopPropagation()}

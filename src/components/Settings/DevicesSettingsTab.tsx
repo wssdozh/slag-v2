@@ -515,7 +515,7 @@ export const DevicesSettingsTab: React.FC<DevicesSettingsTabProps> = ({ addToast
 
       {/* Pairing Modal */}
       {isPairModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
+        <div className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
           <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
               <span className="text-xs font-semibold text-white">Привязка устройства</span>

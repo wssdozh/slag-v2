@@ -109,7 +109,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
           onClick={handleBannerClick}
           onContextMenu={handleContextMenu}
           data-testid="pinned-banner"
-          className="h-11 px-3 sm:px-4 bg-surface/75 hover:bg-surface/95 border-b border-white/[0.06] backdrop-blur-md flex items-center justify-between gap-3 transition-colors cursor-pointer select-none shrink-0 z-20"
+          className="h-11 px-3 sm:px-4 bg-surface hover:bg-surface-hover border-b border-white/[0.06] flex items-center justify-between gap-3 transition-colors cursor-pointer select-none shrink-0 z-20"
           title="Нажмите, чтобы перейти к закрепленному сообщению (ПКМ — контекстное меню)"
         >
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
