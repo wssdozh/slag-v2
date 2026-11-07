@@ -27,6 +27,21 @@ import {
 import { useItemActions, TYPE_LABELS } from '../../hooks/useItemActions';
 import { usePresence } from '../../hooks/usePresence';
 
+/**
+ * A side panel of the menu. The menu itself already outlives its own exit; a
+ * flyout that unmounts the moment the pointer leaves pulls the frame out from
+ * under the cursor, so it keeps the same window as everything else.
+ */
+const Flyout: React.FC<React.HTMLAttributes<HTMLDivElement> & { open: boolean }> = ({ open, children, ...rest }) => {
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(open);
+  if (!isPresent) return null;
+  return (
+    <div ref={ref} data-motion-state={phase} onTransitionEnd={onTransitionEnd} {...rest}>
+      {children}
+    </div>
+  );
+};
+
 export const ContextMenu: React.FC = () => {
   const {
     contextMenu,
@@ -551,8 +566,9 @@ export const ContextMenu: React.FC = () => {
 
       {/* Side Submenu Panel: Quick Type Change */}
       {type === 'item' && item && activeSubmenu === 'type' && triggerRect && (
-        <div
-                      style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        <Flyout
+          open={activeSubmenu === 'type'}
+          style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
           className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
@@ -611,13 +627,14 @@ export const ContextMenu: React.FC = () => {
               {item.type === 'article' && <Check className="w-3.5 h-3.5 text-accent" />}
             </div>
           </button>
-        </div>
+        </Flyout>
       )}
 
       {/* Side Submenu Panel: Explorer / File System */}
       {((type === 'item' && item) || (type === 'folder' && folder)) && activeSubmenu === 'explorer' && triggerRect && (
-        <div
-                      style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        <Flyout
+          open={activeSubmenu === 'explorer'}
+          style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
           className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
@@ -703,13 +720,14 @@ export const ContextMenu: React.FC = () => {
               <span className="whitespace-nowrap">Относительный путь</span>
             </div>
           </button>
-        </div>
+        </Flyout>
       )}
 
       {/* Side Submenu Panel: Additional Utilities */}
       {type === 'item' && item && activeSubmenu === 'more' && triggerRect && (
-        <div
-                      style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        <Flyout
+          open={activeSubmenu === 'more'}
+          style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
           className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
@@ -750,7 +768,7 @@ export const ContextMenu: React.FC = () => {
             <Archive className="w-3.5 h-3.5 text-zinc-400" />
             <span>{item.isArchived ? 'Разархивировать' : 'В архив'}</span>
           </button>
-        </div>
+        </Flyout>
       )}
     </div>
   );

@@ -54,6 +54,12 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   }, [tracks, searchQuery]);
 
   const { ref: drawerRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
+  const {
+    ref: folderMenuRef,
+    phase: folderMenuPhase,
+    isPresent: isFolderMenuPresent,
+    onTransitionEnd: onFolderMenuTransitionEnd,
+  } = usePresence(isFolderSelectOpen);
 
   if (!isPresent) return null;
 
@@ -123,8 +129,14 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
               <Folder className="w-3 h-3 text-zinc-400" />
               <span className="max-w-[100px] truncate">{pinnedFolder}</span>
             </button>
-            {isFolderSelectOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto motion-popover">
+            {isFolderMenuPresent && (
+              <div
+                ref={folderMenuRef}
+                data-motion-state={folderMenuPhase}
+                onTransitionEnd={onFolderMenuTransitionEnd}
+                inert={!isFolderSelectOpen}
+                className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto motion-popover"
+              >
                 {Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)])).map(
                   (folderPath) => (
                     <button

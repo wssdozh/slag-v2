@@ -28,6 +28,7 @@ import { Select } from '../UI/Select';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { TagChip } from '../UI/TagChip';
 import type { SuggestedAction } from '../../types';
+import { prefersReducedMotion } from '../../lib/motion';
 import { DiffModal, type DiffModalItemEntry } from '../Modals/DiffModal';
 
 interface AssistantChatProps {
@@ -63,6 +64,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     initialIndex?: number;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageCountRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const prevLoadingRef = useRef(isChatLoading);
 
@@ -186,8 +188,17 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
   const isSidebar = variant === 'sidebar';
 
+  // A new message earns a smooth scroll; the rest of the time the list is being
+  // rewritten token by token, and restarting an animation on every token is what
+  // made the chat shake while an answer streamed in.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const count = chatMessages.length;
+    const arrived = count !== lastMessageCountRef.current;
+    lastMessageCountRef.current = count;
+    messagesEndRef.current?.scrollIntoView({
+      behavior: arrived && !prefersReducedMotion() ? 'smooth' : 'auto',
+      block: 'end',
+    });
   }, [chatMessages, isChatLoading]);
 
   const handleSend = () => {
