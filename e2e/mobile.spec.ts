@@ -440,9 +440,10 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await textarea.fill('завтра проверить отчет');
     await page.waitForTimeout(250);
 
-    // Verify sleek Linear send button (with rounded-lg, not rounded-full)
+    // Verify sleek Linear send button (rounded-md like the rest of the toolbar, not rounded-full)
     const sendBtn = page.locator('button[title*="Отправить"]').first();
-    await expect(sendBtn).toHaveClass(/rounded-lg/);
+    await expect(sendBtn).toHaveClass(/rounded-md/);
+    await expect(sendBtn).not.toHaveClass(/rounded-full/);
 
     // Capture screenshot of mobile folder filters and streamlined task composer
     await page.screenshot({ path: 'test-results/screenshots/mobile_composer_task_mode.png' });
