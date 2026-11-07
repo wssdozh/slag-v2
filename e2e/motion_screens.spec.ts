@@ -94,4 +94,23 @@ test.describe('screen swaps on a phone', () => {
     await expect(page.locator('header').getByRole('button', { name: 'Папки', exact: true })).toBeVisible();
     expect(await swaps(page)).toEqual([]);
   });
+
+  test('the dock is pinned during a swap instead of being erased by the screen snapshot', async ({ page }) => {
+    // The screen snapshot paints above the live page, so a dock without its own
+    // group disappears for the whole swap and pops back in — the "blink".
+    const pseudos = await page.evaluate(() => new Promise<string[]>(resolve => {
+      const dock = document.querySelector('nav[aria-label="Мобильная навигация"]');
+      const button = dock?.querySelector<HTMLButtonElement>('[data-tab-id="tasks"]');
+      button?.click();
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        resolve(document.getAnimations()
+          .map(animation => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? '')
+          .filter(Boolean));
+      }));
+    }));
+
+    expect(pseudos).toContain('::view-transition-group(mobile-dock)');
+    expect(pseudos.filter(pseudo => pseudo.includes('(root)'))).toEqual([]);
+    expect(pseudos).not.toContain('::view-transition-old(mobile-dock)');
+  });
 });

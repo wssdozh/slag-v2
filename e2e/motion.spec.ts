@@ -269,7 +269,10 @@ test('a browser without view transitions still switches vaults', async ({ page }
   await page.locator('aside button', { hasText: 'main' }).first().click();
   await page.getByRole('button', { name: 'второе' }).click();
   await expect(page.getByTestId('toast').filter({ hasText: 'Хранилище переключено' })).toBeVisible();
-  await expect(page.locator('aside button', { hasText: 'второе' })).toBeVisible();
+  // The switcher now fades instead of vanishing, so the name is briefly in the
+  // sidebar and in the menu that is leaving. The overlay must clear on its own.
+  await expect(page.locator('[data-motion-state="exiting"]')).toHaveCount(0);
+  await expect(page.locator('aside button', { hasText: 'второе' })).toHaveCount(1);
 });
 
 test('the inbox counter pops when its number changes', async ({ page }) => {
@@ -364,4 +367,49 @@ test('a closing dialog keeps its whole exit instead of blinking out', async ({ p
   // before the eye reads it, so the surface would look pulled out from under.
   expect(result.duration).toBeGreaterThanOrEqual(150);
   expect(result.alive).toBe(true);
+});
+
+test('closing the editor collapses it back into the card instead of unmounting', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('button', { hasText: /Заметка|Таска|Статья/ }).first().click();
+  await page.locator('button', { hasText: 'Статья' }).click();
+  const title = 'Статья ' + Date.now();
+  await page.locator('main textarea').fill(title);
+  await page.locator('button[title*="Отправить"]').click();
+
+  const card = page.locator('[data-flip-id]', { hasText: title });
+  await expect(card).toBeVisible();
+  await card.locator('h3').click();
+  const editor = page.getByTestId('fullscreen-editor-modal');
+  await expect(editor).toBeVisible();
+  await page.waitForTimeout(400);
+
+  const exit = await editor.evaluate(element => new Promise<{ aliveMs: number; collapsed: boolean }>(resolve => {
+    // The screen itself has no transition: it only holds the window in which the
+    // child can play the collapse, so a missing hold means an instant unmount.
+    const host = element.closest('.motion-presence-hold');
+    const started = performance.now();
+    let collapsed = false;
+    const tick = () => {
+      collapsed = collapsed || element.getAnimations().some(animation =>
+        animation.playState === 'running' &&
+        animation.effect instanceof KeyframeEffect &&
+        animation.effect.getKeyframes().some(keyframe => String(keyframe.clipPath ?? '').includes('inset')));
+      const alive = host?.isConnected ?? false;
+      if (!alive) {
+        resolve({ aliveMs: Math.round(performance.now() - started), collapsed });
+        return;
+      }
+      if (performance.now() - started > 1200) {
+        resolve({ aliveMs: -1, collapsed });
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  }));
+
+  expect(exit.collapsed).toBe(true);
+  expect(exit.aliveMs).toBeGreaterThanOrEqual(150);
 });
