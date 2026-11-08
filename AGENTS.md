@@ -6,7 +6,7 @@
 
 ## 1. Инварианты
 
-1. `@tauri-apps/*` живёт в `src/lib/*`. В `src/components/` и UI-хуках его нет: UI рендерит и зовёт экшены `AppContext`, системные вызовы — в `src/lib/storage.ts`.
+1. `@tauri-apps/*` живёт в `src/lib/*`. В `src/components/` и UI-хуках его нет: UI рендерит и зовёт экшены `AppContext`, системные вызовы — в `src/lib/storage/`.
 2. Заметки — `.md` с YAML frontmatter. Медиа в `.attachments/`, удаление в `.trash/`. Доменные типы — `src/types/index.ts`.
 3. `?.` на кривых данных, пустой `catch` и `setTimeout(…, 100)` симптом не убирают, а прячут. Чинится источник данных, а не место, где всплыло.
 4. Цвета, границы и шрифты — из `src/styles/theme.css`. Выдуманный hex в компоненте = баг верстки.
@@ -35,23 +35,25 @@
 
 ```text
 src/
-  components/   UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, UI
+  components/   UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
   context/      AppContext — единственный стейт-хаб
-  hooks/        переиспользуемая стейтфул-логика
-  lib/          всё системное: storage, поиск, ИИ, sync, утилиты
+  hooks/        gestures/ (drag, swipe), layout/ (размеры, мобильность), остальное плоско
+  lib/          ai/ (LLM), storage/ (диск и черновики), sync/ (relay), vault/ (модель),
+                time/ (даты и календарь), media/ (вложения и аудио), плоские утилиты
   types/        доменные типы
   mcp/          MCP-сервер, собирается отдельным конфигом
   styles/       theme.css — токены
 src-tauri/      Rust: десктоп и Android
-e2e/            Playwright
+e2e/            Playwright: slag/ по зонам + support/
 relay/          сервер синхронизации
-docs/project-map/  база знаний проекта, 14 документов
+docs/project-map/  база знаний проекта, 15 документов
 ```
 
 Детали не пересказываю, читаю по вопросу:
 
 | Вопрос | Документ |
 |---|---|
+| раскладка модулей и куда класть новое | `docs/project-map/14_Module_Layout.md` |
 | UX, ЛКМ/ПКМ, горячие клавиши | `docs/project-map/01_UI_UX_Interactions_Matrix.md` |
 | модель данных и frontmatter | `docs/project-map/02_Data_Model_Obsidian_Vault.md` |
 | ИИ, теги, триаж | `docs/project-map/03_AI_Engine_Zero_Slop_Gemini.md` |

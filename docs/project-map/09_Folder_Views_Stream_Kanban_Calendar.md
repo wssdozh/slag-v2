@@ -2,7 +2,7 @@
 id: folder_views_stream_kanban_calendar
 title: "Мульти-представления папки: Стрим, Канбан по ТРИЗ и Календарь"
 type: spec
-updated: 2026-10-22
+updated: 2026-11-08
 tags:
   - ui
   - views
@@ -16,6 +16,7 @@ tags:
 
 > Родительский документ: [[00_MOC_Map_of_Content]]  
 > Связанные документы: [[01_UI_UX_Interactions_Matrix]], [[02_Data_Model_Obsidian_Vault]], [[06_E2E_Sync_Architecture]], [[08_AI_Chat_Agentic_RAG]]
+> Код: `src/components/Views/` (`CalendarView` + `CalendarMonthView`, `CalendarDrawer`, `CalendarTaskBlock`, `useCalendarInteractions`), время — `src/lib/time/`.
 
 ---
 

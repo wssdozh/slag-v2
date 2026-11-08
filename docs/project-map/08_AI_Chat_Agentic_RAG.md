@@ -2,7 +2,7 @@
 id: ai_chat_agentic_rag
 title: "ИИ-Чат и Агентный Поиск (Function Calling + Reasoning Control)"
 type: spec
-updated: 2026-10-21
+updated: 2026-11-08
 tags:
   - ai
   - chat
@@ -17,6 +17,7 @@ tags:
 
 > Родительский документ: [[00_MOC_Map_of_Content]]  
 > Связанные документы: [[03_AI_Engine_Zero_Slop_Gemini]], [[05_Search_Orama_Local_First]], [[07_Roadmap_Implementation]]
+> Код: `src/lib/ai/` (`orchestrator`, `tools`, `prompt`, `actionParser`, `toolDefinitions`), фасад — `src/lib/aiService.ts`.
 
 ---
 

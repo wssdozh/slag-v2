@@ -10,7 +10,7 @@ paths: ["**/*"]
 
 ## 1. Этап 1: Изучение (Reconnaissance)
 1. Найти затронутые файлы через `glob` и `grep`.
-2. Проверить типы в `src/types/index.ts`, состояние в `src/context/AppContext.tsx` и методы в `src/lib/storage.ts`.
+2. Проверить типы в `src/types/index.ts`, состояние в `src/context/AppContext.tsx` и методы в `src/lib/storage/`.
 3. Переиспользовать существующие утилиты и компоненты. Не спрашивать пользователя о фактах, доступных в кодовой базе.
 
 ---

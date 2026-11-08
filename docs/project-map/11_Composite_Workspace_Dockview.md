@@ -2,7 +2,7 @@
 id: composite_workspace_dockview
 title: "Композитный интерфейс: Модульная IDE-сетка на Dockview и Popout Windows"
 type: spec
-updated: 2026-10-23
+updated: 2026-11-08
 tags:
   - ui
   - architecture
@@ -18,6 +18,7 @@ tags:
 
 > Родительский документ: [[00_MOC_Map_of_Content]]  
 > Связанные документы: [[01_UI_UX_Interactions_Matrix]], [[07_Roadmap_Implementation]], [[08_AI_Chat_Agentic_RAG]], [[09_Folder_Views_Stream_Kanban_Calendar]]
+> Код: `src/components/Workspace/` (`WorkspaceShell`, `useCrossWindowDnd`, `useDockPanels`, `dockPanelUtils`, `GroupHeaderActions`).
 
 ---
 

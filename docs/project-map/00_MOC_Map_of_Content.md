@@ -2,7 +2,7 @@
 id: moc_slag_v2
 title: "SLAG v2: Map of Content (MOC)"
 type: moc
-updated: 2026-10-21
+updated: 2026-11-08
 tags:
   - moc
   - architecture
@@ -84,6 +84,7 @@ tags:
 11. [[11_Composite_Workspace_Dockview]] — Модульная композитная IDE-сетка на базе `dockview-react`, произвольные сплиты, вкладки, сохранение схем и нативные Popout-окна в Tauri v2.
 12. [[12_Logging_Diagnostics_Engine]] — Архитектура логирования и инспекции (SLAG Logger & HUD), zero-dependency кольцевой буфер, маскировка ключей, фильтры и генератор отчетов.
 13. [[13_AI_Assistant_Interaction_Enhancements]] — Спецификация улучшений взаимодействия: выборочный пакетный перенос (чекбоксы), дополнение заметок (`append_to_note`), откат действий (Undo), фильтрация ленты из чата (`filter_feed`) и составной разбор дат.
+14. [[14_Module_Layout]] — Раскладка модулей: `lib/ai`, `lib/storage`, `lib/sync`, `lib/vault`, `lib/time`, `lib/media`, `hooks/gestures`, `hooks/layout`. Правила размещения нового кода и границы доменов.
 
 ---
 

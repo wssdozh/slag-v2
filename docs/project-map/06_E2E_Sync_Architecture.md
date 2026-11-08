@@ -2,7 +2,7 @@
 id: e2e_sync_architecture
 title: "Архитектура Синхронизации: E2E Relay-сервер и Мобильная Адаптация"
 type: spec
-updated: 2026-10-21
+updated: 2026-11-08
 tags:
   - sync
   - e2e
@@ -15,6 +15,7 @@ tags:
 
 > Родительский документ: [[00_MOC_Map_of_Content]]  
 > Связанные документы: [[02_Data_Model_Obsidian_Vault]], [[07_Roadmap_Implementation]]
+> Код: `src/lib/sync/` (`syncEngine`, `transport`, `devices`, `outbox`, `crypto`), черновики — `src/lib/storage/draftStore.ts`.
 
 ---
 
