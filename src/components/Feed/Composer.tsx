@@ -1581,43 +1581,6 @@ export const Composer: React.FC<ComposerProps> = ({
     </div>
   ) : undefined;
 
-  const propertiesSlot = (
-    <>
-      {/* Task properties have their own wrapping row; folder and tags live in the text as tokens. */}
-      {itemType === 'task' && (
-        <div data-composer-properties="">
-          <ComposerTaskControls
-            effectiveDueDate={effectiveDueDate}
-            effectiveDateLabel={effectiveDateLabel}
-            onDateChange={(newDate) => {
-              setDueDate(newDate);
-              setIsDateDismissed(false);
-            }}
-            onDateClear={() => {
-              setIsDateDismissed(true);
-              setDueDate('');
-            }}
-            effectiveDuration={effectiveDuration}
-            onDurationChange={(mins) => {
-              setDuration(mins);
-              setIsDurationDismissed(mins === undefined);
-            }}
-            effectiveRecurrence={effectiveRecurrence}
-            onRecurrenceChange={(rule) => {
-              setRecurrence(rule);
-              setIsRecurrenceDismissed(!rule);
-            }}
-            effectivePriority={effectivePriority}
-            onPriorityChange={(val) => {
-              setPriority(val);
-              setIsPriorityDismissed(false);
-            }}
-          />
-        </div>
-      )}
-    </>
-  );
-
   const leftControls = (
     <div className="composer-toolbar-group relative">
       {/* Lock Hint Banner when holding mic/video button */}
@@ -1684,7 +1647,36 @@ export const Composer: React.FC<ComposerProps> = ({
         ariaLabel="Сменить тип записи"
       />
 
-
+      {/* Task properties sit with the type selector, under the input */}
+      {itemType === 'task' && (
+        <ComposerTaskControls
+          effectiveDueDate={effectiveDueDate}
+          effectiveDateLabel={effectiveDateLabel}
+          onDateChange={(newDate) => {
+            setDueDate(newDate);
+            setIsDateDismissed(false);
+          }}
+          onDateClear={() => {
+            setIsDateDismissed(true);
+            setDueDate('');
+          }}
+          effectiveDuration={effectiveDuration}
+          onDurationChange={(mins) => {
+            setDuration(mins);
+            setIsDurationDismissed(mins === undefined);
+          }}
+          effectiveRecurrence={effectiveRecurrence}
+          onRecurrenceChange={(rule) => {
+            setRecurrence(rule);
+            setIsRecurrenceDismissed(!rule);
+          }}
+          effectivePriority={effectivePriority}
+          onPriorityChange={(val) => {
+            setPriority(val);
+            setIsPriorityDismissed(false);
+          }}
+        />
+      )}
     </div>
   );
 
@@ -1781,7 +1773,6 @@ export const Composer: React.FC<ComposerProps> = ({
           </div>
         ) : undefined
       }
-      propertiesSlot={propertiesSlot}
       overlaySlot={overlaySlot}
       customControls={customControls}
       leftControls={leftControls}

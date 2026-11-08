@@ -54,14 +54,11 @@ async function geometry(surface: Locator, mobile: boolean) {
         || rect.top < 0 || rect.bottom > innerHeight + 1) errors.push(`outside: ${label}`);
       // Everything is sized from the density token; corner utilities and the
       // send plate are one step smaller than the main controls.
-      const style = getComputedStyle(root);
-      const control = parseFloat(style.getPropertyValue('--slag-ctrl-md')) || 32;
-      const small = parseFloat(style.getPropertyValue('--slag-ctrl-sm')) || 28;
+      const small = parseFloat(getComputedStyle(root).getPropertyValue('--slag-ctrl-sm')) || 28;
       // Corner utilities and the send plate run one step smaller than the row.
-      const isSmall = corner || send;
-      const minHeight = (isSmall ? small : control) - 0.5;
+      const minHeight = small - 0.5;
       // Only square controls owe us a square; labelled ones may be wider or narrower.
-      const minWidth = isSmall || square ? (isSmall ? small : control) - 0.5 : 0;
+      const minWidth = corner || send || square ? small - 0.5 : 0;
       if (mobile && (rect.height < minHeight || rect.width < minWidth)) errors.push(`touch target: ${label} ${Math.round(rect.width)}x${Math.round(rect.height)}`);
       for (const other of controls.slice(i + 1)) {
         if (Math.min(rect.right, other.rect.right) - Math.max(rect.left, other.rect.left) > 1
@@ -74,8 +71,7 @@ async function geometry(surface: Locator, mobile: boolean) {
   }, mobile)).toEqual([]);
 }
 
-// The placeholder has to sit on the expand button's centre, and a one-line row
-// must not be taller than that button.
+// The placeholder has to sit on the expand button's centre.
 async function aligned(surface: Locator) {
   return surface.evaluate((root) => {
     const text = root.querySelector('textarea')!.getBoundingClientRect();
@@ -107,9 +103,11 @@ async function types(page: Page, surface: Locator, mobile: boolean) {
     await geometry(surface, mobile);
     if (type === 'Таска') {
       await expect(surface.locator(taskControls)).toHaveCount(4);
+      // Task properties belong to the toolbar row, under the input, next to the type.
       await expect.poll(() => surface.evaluate((root, selector) => {
         const textarea = root.querySelector('textarea')!.getBoundingClientRect();
-        return Array.from(root.querySelectorAll(selector)).every((el) => el.getBoundingClientRect().bottom <= textarea.top + 1);
+        const controls = Array.from(root.querySelectorAll(selector));
+        return controls.every((el) => el.getBoundingClientRect().top >= textarea.bottom - 1);
       }, taskControls)).toBe(true);
     } else {
       await expect(surface.locator(taskControls)).toHaveCount(0);
@@ -145,7 +143,7 @@ for (const width of [360, 390]) {
   }
 }
 
-test('desktop and modal: all types keep properties above input', async ({ page }) => {
+test('desktop and modal: all types keep properties in the toolbar', async ({ page }) => {
   await open(page, 1440);
   const feed = page.locator('.composer-surface').filter({ has: page.getByRole('button', { name: 'Сменить тип записи', exact: true }) }).first();
   await types(page, feed, false);

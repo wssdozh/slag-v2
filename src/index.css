@@ -334,11 +334,11 @@
 }
 
 /* Composer rules stay local: shared controls elsewhere keep their own density. */
-.composer-context:not(:has([data-expanded="true"], [data-composer-properties], [data-composer-attachments])) {
+.composer-context:not(:has([data-expanded="true"], [data-composer-attachments])) {
   display: none;
 }
 
-.composer-context > :is([data-expanded="true"], [data-composer-properties], [data-composer-attachments]) ~ :is([data-expanded="true"], [data-composer-properties], [data-composer-attachments]) {
+.composer-context > :is([data-expanded="true"], [data-composer-attachments]) ~ :is([data-expanded="true"], [data-composer-attachments]) {
   margin-top: 8px;
 }
 
@@ -353,12 +353,12 @@
 
 .composer-surface .composer-toolbar-control,
 .composer-surface .composer-top-actions button {
-  height: var(--slag-ctrl-md);
+  height: var(--slag-ctrl-sm);
   border-radius: var(--radius-md);
 }
 
 .composer-surface .composer-toolbar-icon {
-  width: var(--slag-ctrl-md);
+  width: var(--slag-ctrl-sm);
   padding-inline: 0;
 }
 
@@ -384,16 +384,14 @@
   font-weight: 400;
 }
 
-/* The corner actions stay one control square, but they must not stretch the text
-   row: a taller row would put more air above the text than below the buttons.
-   The negative margin subtracts the overflow, capped so nothing leaves the frame. */
+/* Corner actions and toolbar controls share one size, so the text row and the
+   button row have the same height and read as one inset. */
 .composer-surface .composer-top-actions button {
   position: relative;
-  width: var(--slag-ctrl-md);
-  height: var(--slag-ctrl-md);
+  width: var(--slag-ctrl-sm);
+  height: var(--slag-ctrl-sm);
   padding-inline: 0;
   justify-content: center;
-  margin-block: max(calc((24px - var(--slag-ctrl-md)) / 2), -8px);
 }
 
 .composer-surface .composer-top-actions button::after {

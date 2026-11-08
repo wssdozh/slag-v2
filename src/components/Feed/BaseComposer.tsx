@@ -32,8 +32,6 @@ export interface BaseComposerProps {
   topSlot?: React.ReactNode;
   /** Верхний правый слот (кнопка раскрытия в полноэкранный редактор) */
   topRightSlot?: React.ReactNode;
-  /** Слот метаданных/чипсов под textarea (активные свойства задачи, теги, папка) */
-  propertiesSlot?: React.ReactNode;
   /** Оверлейный слот в зоне textarea (выпадающий список автокомплита) */
   overlaySlot?: React.ReactNode;
   /** Полное замещение панели управления (например, при активной записи войса/видео) */
@@ -83,7 +81,6 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   rightControls,
   topSlot,
   topRightSlot,
-  propertiesSlot,
   overlaySlot,
   customControls,
   minHeight = 24,
@@ -171,13 +168,10 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         )}
         {/* Both slots collapse to zero height instead of unmounting, so they share
             one gap-less column: a closed slot must not leave a permanent gap. */}
-        {(topSlot || propertiesSlot) && (
+        {topSlot && (
           <div className="composer-context flex min-w-0 flex-col">
-            {/* Верхний слот: Reply, вложенные в черновик файлы/войсы, чипсы */}
+            {/* Верхний слот: Reply и вложенные в черновик файлы/войсы */}
             {topSlot}
-
-            {/* Слот свойств: активные свойства задачи, теги, папка над полем ввода */}
-            {propertiesSlot}
           </div>
         )}
 
