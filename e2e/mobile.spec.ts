@@ -72,6 +72,28 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('button', { hasText: 'Входящие' }).first()).toBeVisible();
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_root_folders.png' });
+
+    // Press feedback: a folder row tints the moment the finger lands, then fades back.
+    const folderRow = page.locator('.divide-y > button').first();
+    const rowBox = await folderRow.boundingBox();
+    if (rowBox) {
+      await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+      await page.mouse.down();
+      // The flash is set on pointer-down and outlives the finger, so a fast tap is
+      // acknowledged even when `:active` never paints a frame.
+      await expect(folderRow).toHaveAttribute('data-tapped', 'true');
+      await expect
+        .poll(() =>
+          folderRow.evaluate(el => {
+            const color = getComputedStyle(el).backgroundColor;
+            const alpha = color.match(/\/\s*([\d.]+)\)$/)?.[1] ?? color.match(/,\s*([\d.]+)\)$/)?.[1];
+            return Number(alpha ?? 0);
+          })
+        )
+        .toBe(0.1);
+      await page.screenshot({ path: 'test-results/screenshots/mobile_folder_press.png' });
+      await page.mouse.up();
+    }
   });
 
   test('2. Hierarchical folder navigation & Telegram-style Composer', async ({ page }) => {

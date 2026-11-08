@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FeedList } from '../Feed/FeedList';
 import { Composer } from '../Feed/Composer';
@@ -54,6 +54,19 @@ export const MobileFoldersView: React.FC = () => {
   } = useApp();
 
   const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
+
+  // A quick tap can end before `:active` ever paints a frame, so the acknowledgement
+  // outlives the finger: the row stays lit for 200ms after it was touched.
+  const flashTimerRef = useRef<number | null>(null);
+  const flashTap = (event: React.PointerEvent<HTMLElement>) => {
+    const row = event.currentTarget;
+    row.dataset.tapped = 'true';
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => {
+      delete row.dataset.tapped;
+      flashTimerRef.current = null;
+    }, 200);
+  };
 
   const isInbox = mobileActiveFolder === DEFAULT_INBOX_FOLDER;
 
@@ -164,7 +177,8 @@ export const MobileFoldersView: React.FC = () => {
           <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden">
             <button
               onClick={() => setMobileActiveFolder(DEFAULT_INBOX_FOLDER)}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
+              onPointerDown={flashTap}
+              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.1] active:duration-0 data-[tapped=true]:bg-white/[0.1] data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-6 h-6 flex items-center justify-center text-zinc-200 shrink-0">
@@ -199,7 +213,8 @@ export const MobileFoldersView: React.FC = () => {
                     <button
                       key={folder.path}
                       onClick={() => setMobileActiveFolder(folder.path)}
-                      className="w-full flex items-center justify-between p-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left cursor-pointer"
+                      onPointerDown={flashTap}
+                      className="w-full flex items-center justify-between p-3 hover:bg-white/[0.04] active:bg-white/[0.1] active:duration-0 data-[tapped=true]:bg-white/[0.1] data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-6 h-6 flex items-center justify-center text-zinc-400 shrink-0">
