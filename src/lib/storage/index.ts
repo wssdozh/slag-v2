@@ -1,4 +1,4 @@
-import { DraftStore } from './storage/draftStore';
+import { DraftStore } from './draftStore';
 import type {
   SlagItem,
   FolderMeta,
@@ -9,12 +9,12 @@ import type {
   WorkspaceState,
   ChatMessage,
   FolderViewSettings,
-} from '../types';
-import { serializeItemToMarkdown, parseMarkdownToItem } from './markdownSerializer';
-import { generateDemoItems } from './demoVault';
-import { getSafeNoteFilename } from './noteFilename';
-export { getSafeNoteFilename } from './noteFilename';
-import { logger } from './logger';
+} from '../../types';
+import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownSerializer';
+import { generateDemoItems } from '../vault/demoVault';
+import { getSafeNoteFilename } from '../vault/noteFilename';
+export { getSafeNoteFilename } from '../vault/noteFilename';
+import { logger } from '../logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
   writeTextFile,
@@ -28,14 +28,14 @@ import {
   writeFile,
 } from '@tauri-apps/plugin-fs';
 
-import { idbSaveAttachment, idbGetAttachment } from './indexedDbStorage';
+import { idbSaveAttachment, idbGetAttachment } from './indexedDb';
 import {
   DEFAULT_INBOX_FOLDER,
   STORAGE_KEYS,
   DEFAULT_WORKSPACE_STATE,
   DEFAULT_FOLDERS,
   DEFAULT_VAULT_META,
-} from '../config';
+} from '../../config';
 
 export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
 

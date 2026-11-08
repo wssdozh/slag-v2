@@ -1,7 +1,7 @@
 import YAML from 'yaml';
-import type { SlagItem, SlagItemType } from '../types';
-import { parseSubtasksFromContent } from './taskUtils';
-import { DEFAULT_INBOX_FOLDER } from '../config';
+import type { SlagItem, SlagItemType } from '../../types';
+import { parseSubtasksFromContent } from '../taskUtils';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).

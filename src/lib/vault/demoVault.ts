@@ -1,5 +1,5 @@
-import type { SlagItem } from '../types';
-import { DEFAULT_INBOX_FOLDER } from '../config';
+import type { SlagItem } from '../../types';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 /**
  * Generates a clean, cohesive set of starter demo items across the default folders.

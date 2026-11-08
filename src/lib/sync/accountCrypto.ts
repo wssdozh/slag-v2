@@ -1,6 +1,6 @@
 import { p256 } from '@noble/curves/nist.js';
 import { validateMnemonic } from './crypto';
-import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../byteCodec';
+import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../media/byteCodec';
 import type { LocalDeviceIdentity } from './accountTypes';
 import { SYNC_CRYPTO_CONSTANTS, SYNC_STORAGE_KEYS } from '../../config';
 

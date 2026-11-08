@@ -6,7 +6,7 @@ import {
   Inbox,
   ChevronRight,
 } from 'lucide-react';
-import { getTodayString, getTomorrowString, getNextWeekString } from '../../lib/dateUtils';
+import { getTodayString, getTomorrowString, getNextWeekString } from '../../lib/time/dateUtils';
 
 export interface CalendarDrawerProps {
   isDrawerOpen: boolean;

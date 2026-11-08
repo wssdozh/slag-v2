@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, Search, Mic, Music, Play, Pause, ExternalLink, Folder } from 'lucide-react';
-import type { AudioTrack, AudioTypeFilter } from '../../lib/audioHelper';
-import { formatAudioDuration } from '../../lib/audioHelper';
+import type { AudioTrack, AudioTypeFilter } from '../../lib/media/audioHelper';
+import { formatAudioDuration } from '../../lib/media/audioHelper';
 import type { FolderMeta } from '../../types';
 import { IconButton } from '../UI/IconButton';
 import { DEFAULT_INBOX_FOLDER } from '../../config';

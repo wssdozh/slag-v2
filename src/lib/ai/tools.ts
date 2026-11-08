@@ -1,8 +1,8 @@
 import type { SlagItem, SuggestedAction, BatchUpdateItem, ItemUpdates } from '../../types';
 import { querySearch, getSearchableAttachmentText } from '../searchService';
-import { serializeItemToMarkdown } from '../markdownSerializer';
+import { serializeItemToMarkdown } from '../vault/markdownSerializer';
 import { storage } from '../storage';
-import { parseTodoistInput } from '../todoistTaskParser';
+import { parseTodoistInput } from '../time/todoistTaskParser';
 import { DEFAULT_INBOX_FOLDER, AI_LIMITS } from '../../config';
 import { cleanSnippetText } from './actionParser';
 import { getAppGuideContent } from './appGuide';

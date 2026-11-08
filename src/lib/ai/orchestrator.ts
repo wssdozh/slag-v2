@@ -7,7 +7,7 @@ import { resolveAiTarget, resolveKieEndpoint } from './aiClient';
 export { resolveKieEndpoint, resolveAiTarget };
 import { storage } from '../storage';
 import { logger } from '../logger';
-import { parseTodoistInput } from '../todoistTaskParser';
+import { parseTodoistInput } from '../time/todoistTaskParser';
 import { DEFAULT_INBOX_FOLDER, AI_LIMITS } from '../../config';
 import { extractActionBlock } from './actionParser';
 export { extractActionBlock, cleanSnippetText } from './actionParser';

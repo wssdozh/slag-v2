@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { SlagItem, SlagItemType, ChatMessage, SuggestedAction, ItemUpdates } from '../types';
-import { applyItemUpdates } from '../lib/itemUpdates';
+import { applyItemUpdates } from '../lib/vault/itemUpdates';
 import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../lib/taskUtils';
 import type { ToastMessage } from '../context/AppContext';
 

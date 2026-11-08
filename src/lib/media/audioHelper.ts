@@ -1,5 +1,5 @@
-import type { SlagItem, InboxMode } from '../types';
-import { DEFAULT_INBOX_FOLDER } from '../config';
+import type { SlagItem, InboxMode } from '../../types';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export interface AudioTrack {
   id: string; // track unique id (itemId + attachmentId)

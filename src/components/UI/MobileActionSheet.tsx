@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { usePresence } from '../../hooks/usePresence';
-import { useSheetDrag } from '../../hooks/useSheetDrag';
+import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';
 import { useApp } from '../../context/AppContext';
 import {
   Maximize2,

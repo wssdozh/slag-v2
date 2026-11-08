@@ -1,6 +1,6 @@
 import React from 'react';
 import type { SlagItem } from '../../types';
-import type { LayoutPositionedTask } from '../../lib/calendarLayout';
+import type { LayoutPositionedTask } from '../../lib/time/calendarLayout';
 import { getPriorityBadge, formatDurationBadge } from './calendarHelpers';
 import { Check, ListTodo } from 'lucide-react';
 

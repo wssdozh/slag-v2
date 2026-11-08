@@ -1,7 +1,7 @@
 import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { BIP39_WORDS } from './bip39Words';
 import type { SyncBundle, EncryptedBundle } from './types';
-import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../byteCodec';
+import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../media/byteCodec';
 import { SYNC_CRYPTO_CONSTANTS } from '../../config';
 
 const VAULT_SALT = new TextEncoder().encode(SYNC_CRYPTO_CONSTANTS.VAULT_SALT);

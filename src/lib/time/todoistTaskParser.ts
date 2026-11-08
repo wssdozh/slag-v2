@@ -1,6 +1,6 @@
 import * as chronoRu from 'chrono-node/ru';
 import * as chronoEn from 'chrono-node/en';
-import type { RecurrenceRule } from '../types';
+import type { RecurrenceRule } from '../../types';
 
 export interface ParsedTodoistTask {
   cleanTitle: string;

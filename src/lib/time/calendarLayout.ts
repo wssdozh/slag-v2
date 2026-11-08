@@ -1,4 +1,4 @@
-import type { SlagItem } from '../types';
+import type { SlagItem } from '../../types';
 import { getTaskTimeSlot, type TaskTimeSlot } from './todoistTaskParser';
 
 export interface LayoutPositionedTask {

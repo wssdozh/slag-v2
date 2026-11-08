@@ -6,7 +6,7 @@ import {
   getTodayIso,
   getTomorrowIso,
   getNextWeekIso,
-} from '../../lib/dateUtils';
+} from '../../lib/time/dateUtils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePresence } from '../../hooks/usePresence';
 

@@ -25,7 +25,7 @@ import {
   type AudioTrack,
   type AudioScopeMode,
   type AudioTypeFilter,
-} from '../../lib/audioHelper';
+} from '../../lib/media/audioHelper';
 import { AudioCoverArt } from './AudioCoverArt';
 import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
 import { storage } from '../../lib/storage';

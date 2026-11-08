@@ -1,4 +1,4 @@
-import type { SlagAttachment, BackupSnapshotMeta } from '../types';
+import type { SlagAttachment, BackupSnapshotMeta } from '../../types';
 
 const DB_NAME = 'slag_v2_blobs';
 const ATTACHMENTS_STORE = 'attachments';

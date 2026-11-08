@@ -3,7 +3,7 @@ import { DEFAULT_FOLDER_VIEW_SETTINGS } from '../../types';
 import { DEFAULT_WORKSPACE_STATE } from '../../config';
 import { STORAGE_KEYS } from '../../config';
 import { logger } from '../logger';
-import type { StorageChangeEvent } from '../storage';
+import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
 

@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
-import { computeAntiOverlapLayout } from '../../lib/calendarLayout';
-import { useDragToScroll } from '../../hooks/useDragToScroll';
+import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
+import { computeAntiOverlapLayout } from '../../lib/time/calendarLayout';
+import { useDragToScroll } from '../../hooks/gestures/useDragToScroll';
 import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
-import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
+import { usePointerDnd, type DragItemPayload } from '../../hooks/gestures/usePointerDnd';
 import { usePresence } from '../../hooks/usePresence';
 import {
   getISODateString,
@@ -13,7 +13,7 @@ import {
   getMonthCalendarDays,
   RUSSIAN_MONTHS,
   RUSSIAN_WEEKDAYS,
-} from '../../lib/dateUtils';
+} from '../../lib/time/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,

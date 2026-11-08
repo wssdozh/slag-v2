@@ -2,11 +2,11 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { querySearch } from '../../lib/searchService';
-import { pluralRu } from '../../lib/dateUtils';
+import { pluralRu } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { useDragToScroll } from '../../hooks/useDragToScroll';
-import { useFlipLayout } from '../../hooks/useFlipLayout';
-import { usePointerDnd, type DragItemPayload } from '../../hooks/usePointerDnd';
+import { useDragToScroll } from '../../hooks/gestures/useDragToScroll';
+import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
+import { usePointerDnd, type DragItemPayload } from '../../hooks/gestures/usePointerDnd';
 import {
   CircleDashed,
   Circle,

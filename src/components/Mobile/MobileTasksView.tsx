@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
-import { formatDueDateLabel } from '../../lib/dateUtils';
+import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { PRIORITY_LABELS } from '../../lib/taskUtils';
 import {
   CheckSquare,
@@ -13,7 +13,7 @@ import {
 import { TaskStatusMark } from '../UI/TaskStatusMark';
 import { MobileCalendarView } from './MobileCalendarView';
 import { MobileScreenHeader } from './MobileScreenHeader';
-import { useSwipeGesture } from '../../hooks/useSwipeGesture';
+import { useSwipeGesture } from '../../hooks/gestures/useSwipeGesture';
 import { EmptyState } from '../UI/EmptyState';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 

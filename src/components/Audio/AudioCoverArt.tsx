@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import type { AudioTrack } from '../../lib/audioHelper';
+import type { AudioTrack } from '../../lib/media/audioHelper';
 
 interface AudioCoverArtProps {
   track: AudioTrack | null;

@@ -1,5 +1,5 @@
 import type { SlagItem } from '../types';
-import { getISODateString } from './dateUtils';
+import { getISODateString } from './time/dateUtils';
 import { parseSubtasksFromContent, setAllCheckboxesInContent } from './taskUtils';
 
 /** keep every local status entry point consistent, without applying transitions to sync imports. */

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { SlagItem } from '../types';
-import { getTodayString } from '../lib/dateUtils';
-import { getRecurringOccurrencesInRange } from '../lib/recurrenceHelper';
+import { getTodayString } from '../lib/time/dateUtils';
+import { getRecurringOccurrencesInRange } from '../lib/time/recurrenceHelper';
 import { DEFAULT_INBOX_FOLDER } from '../config';
 
 export interface CalendarTask extends SlagItem {

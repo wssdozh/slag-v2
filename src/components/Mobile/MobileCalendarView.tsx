@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
-import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
-import { computeAntiOverlapLayout } from '../../lib/calendarLayout';
-import { useSwipeGesture } from '../../hooks/useSwipeGesture';
+import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
+import { computeAntiOverlapLayout } from '../../lib/time/calendarLayout';
+import { useSwipeGesture } from '../../hooks/gestures/useSwipeGesture';
 import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
 import {
   getISODateString,
@@ -14,7 +14,7 @@ import {
   RUSSIAN_MONTHS,
   RUSSIAN_WEEKDAYS,
   pluralRu,
-} from '../../lib/dateUtils';
+} from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { TaskStatusMark } from '../UI/TaskStatusMark';
 import { usePresence } from '../../hooks/usePresence';

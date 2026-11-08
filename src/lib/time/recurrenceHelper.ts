@@ -1,6 +1,6 @@
-import type { RecurrenceRule, SlagItem } from '../types';
+import type { RecurrenceRule, SlagItem } from '../../types';
 import { getISODateString } from './dateUtils';
-import { setAllCheckboxesInContent, parseSubtasksFromContent } from './taskUtils';
+import { setAllCheckboxesInContent, parseSubtasksFromContent } from '../taskUtils';
 
 export { getISODateString };
 

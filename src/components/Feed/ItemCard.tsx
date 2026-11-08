@@ -19,7 +19,7 @@ import {
   Download
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
-import { enrichAttachment, extractFocalContext } from '../../lib/attachmentEnrichment';
+import { enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';

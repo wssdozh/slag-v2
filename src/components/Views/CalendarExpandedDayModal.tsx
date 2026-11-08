@@ -1,6 +1,6 @@
 import React from 'react';
 import type { SlagItem } from '../../types';
-import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
+import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
 import { getPriorityBadge } from './calendarHelpers';
 import {
   Calendar as CalendarIcon,
@@ -9,7 +9,7 @@ import {
   Plus,
   Repeat,
 } from 'lucide-react';
-import { pluralRu } from '../../lib/dateUtils';
+import { pluralRu } from '../../lib/time/dateUtils';
 
 export interface CalendarExpandedDayModalProps {
   isExpandedDayPresent: boolean;

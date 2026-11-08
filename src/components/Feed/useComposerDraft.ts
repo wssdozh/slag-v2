@@ -8,7 +8,7 @@ import type {
   ReplyTarget,
 } from '../../types';
 import { storage } from '../../lib/storage';
-import { extractFolderToken } from '../../lib/todoistTaskParser';
+import { extractFolderToken } from '../../lib/time/todoistTaskParser';
 import { UI_DELAYS } from '../../config';
 
 export interface ComposerDraftState {

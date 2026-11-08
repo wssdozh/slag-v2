@@ -1,7 +1,7 @@
-import type { SlagAttachment, SlagItem, AiSettings } from '../types';
-import { logger } from './logger';
-import { storage } from './storage';
-import { AI_ENDPOINTS, DEFAULT_AI_MODELS, AI_LIMITS } from '../config';
+import type { SlagAttachment, SlagItem, AiSettings } from '../../types';
+import { logger } from '../logger';
+import { storage } from '../storage';
+import { AI_ENDPOINTS, DEFAULT_AI_MODELS, AI_LIMITS } from '../../config';
 
 const enrichLog = logger.scope('AI');
 

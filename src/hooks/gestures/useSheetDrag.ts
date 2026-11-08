@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { UI_GESTURES } from '../config';
+import { UI_GESTURES } from '../../config';
 
 type Mode = 'idle' | 'drag' | 'settle';
 

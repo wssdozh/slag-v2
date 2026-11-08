@@ -4,12 +4,12 @@ import path from 'node:path';
 import os from 'node:os';
 import type { SlagItem, FolderMeta } from '../types';
 import type { McpVaultConfig, VaultStateData, NoteMatch } from './types';
-import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/markdownSerializer';
+import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markdownSerializer';
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/taskUtils';
 
-import { getSafeNoteFilename } from '../lib/noteFilename';
+import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { DEFAULT_INBOX_FOLDER } from '../config';
-export { getSafeNoteFilename } from '../lib/noteFilename';
+export { getSafeNoteFilename } from '../lib/vault/noteFilename';
 
 export function resolveVaultConfig(customPath?: string): McpVaultConfig {
   let targetPath = customPath || process.env.SLAG_VAULT_PATH;

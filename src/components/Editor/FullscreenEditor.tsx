@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemStatus, SlagAttachment } from '../../types';
-import { processFileListToAttachments } from '../../lib/fileDropHelper';
+import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { LinearSignalBars } from '../UI/PriorityBadge';
-import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
+import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/time/recurrenceHelper';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
@@ -21,7 +21,7 @@ import {
 import { Select } from '../UI/Select';
 import { TagChip } from '../UI/TagChip';
 import { DatePickerPopover } from '../UI/DatePickerPopover';
-import { formatDueDateLabel } from '../../lib/dateUtils';
+import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/usePresence';

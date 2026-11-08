@@ -11,7 +11,7 @@ import type {
   ComposerDraft,
 } from '../types';
 import { storage, getSafeNoteFilename } from './storage';
-import { serializeItemToMarkdown, parseMarkdownToItem } from './markdownSerializer';
+import { serializeItemToMarkdown, parseMarkdownToItem } from './vault/markdownSerializer';
 import {
   idbGetAllAttachments,
   idbSaveAttachment,
@@ -19,7 +19,7 @@ import {
   idbGetSnapshots,
   idbGetSnapshotData,
   idbDeleteSnapshot,
-} from './indexedDbStorage';
+} from './storage/indexedDb';
 import { logger } from './logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {

@@ -1,6 +1,6 @@
 import type { AssistantToolDefinition } from './types';
 import { APP_GUIDE_TOPICS } from './appGuide';
-import { ITEM_UPDATES_SCHEMA } from '../itemSchema';
+import { ITEM_UPDATES_SCHEMA } from '../vault/itemSchema';
 
 export function getCanonicalTools(webSearchEnabled: boolean): AssistantToolDefinition[] {
   const canonicalTools: AssistantToolDefinition[] = [

@@ -3,7 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { navigatePage } from './lib/navigation';
 import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
-import { useVisualViewportHeight } from './hooks/useVisualViewportHeight';
+import { useVisualViewportHeight } from './hooks/layout/useVisualViewportHeight';
 import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
 import { SearchModal } from './components/Search/SearchModal';
@@ -17,7 +17,7 @@ import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
 import { Monitor } from 'lucide-react';
-import { enrichAttachment, extractFocalContext } from './lib/attachmentEnrichment';
+import { enrichAttachment, extractFocalContext } from './lib/media/attachmentEnrichment';
 import type { LightboxImage } from './components/UI/ImageLightbox';
 
 const FullscreenEditor = lazy(() =>

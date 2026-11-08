@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
-import { motionEase, motionMs, prefersReducedMotion } from '../lib/motion';
+import { motionEase, motionMs, prefersReducedMotion } from '../../lib/motion';
 
 interface Options {
   selector?: string;

@@ -1,8 +1,8 @@
 import React from 'react';
 import type { SlagItem } from '../../types';
-import type { MonthCalendarCell } from '../../lib/dateUtils';
-import { RUSSIAN_WEEKDAYS } from '../../lib/dateUtils';
-import { getTaskTimeSlot } from '../../lib/todoistTaskParser';
+import type { MonthCalendarCell } from '../../lib/time/dateUtils';
+import { RUSSIAN_WEEKDAYS } from '../../lib/time/dateUtils';
+import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
 import { Plus, Repeat } from 'lucide-react';
 
 export interface CalendarMonthViewProps {

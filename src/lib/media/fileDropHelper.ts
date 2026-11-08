@@ -1,4 +1,4 @@
-import type { SlagAttachment } from '../types';
+import type { SlagAttachment } from '../../types';
 import { downscaleImageDataUrl } from './attachmentEnrichment';
 
 export async function processFileListToAttachments(fileList: FileList | File[]): Promise<SlagAttachment[]> {

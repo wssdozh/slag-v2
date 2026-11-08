@@ -7,10 +7,10 @@ import { VideoRecorder } from '../UI/VideoRecorder';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { useComposerMedia } from '../../hooks/useComposerMedia';
-import { processFileListToAttachments } from '../../lib/fileDropHelper';
+import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { categorizeDraft } from '../../lib/aiService';
-import { enrichItemAttachments, downscaleImageDataUrl } from '../../lib/attachmentEnrichment';
-import { extractFolderToken, parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/todoistTaskParser';
+import { enrichItemAttachments, downscaleImageDataUrl } from '../../lib/media/attachmentEnrichment';
+import { extractFolderToken, parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/time/todoistTaskParser';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
 import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
@@ -22,7 +22,7 @@ import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { TagSuggestionMenu } from './TagSuggestionMenu';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 import { SuggestionMenuHeader } from './SuggestionMenuHeader';
-import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
+import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
 import {
   Paperclip,

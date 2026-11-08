@@ -32,7 +32,7 @@ import { openAppFolder } from '../lib/folderOpener';
 import { listenDesktopEvents, isDesktopApp, isMobilePlatform } from '../lib/windowControls';
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
-import { useIsMobile } from '../hooks/useIsMobile';
+import { useIsMobile } from '../hooks/layout/useIsMobile';
 import { useGlobalHotkeys } from '../hooks/useGlobalHotkeys';
 import { useLayerStack, type AppLayer } from '../hooks/useLayerStack';
 import { useSuggestedActions, type ActionHistoryEntry } from '../hooks/useSuggestedActions';
@@ -49,7 +49,7 @@ import {
 import {
   evaluateRecurringTasks,
   getISODateString,
-} from '../lib/recurrenceHelper';
+} from '../lib/time/recurrenceHelper';
 import {
   parseSubtasksFromContent,
   toggleCheckboxInContent,

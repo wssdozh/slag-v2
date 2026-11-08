@@ -1,6 +1,6 @@
 import React, { useRef, useLayoutEffect } from 'react';
 import { ArrowUp, UploadCloud } from 'lucide-react';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import { useIsMobile } from '../../hooks/layout/useIsMobile';
 
 export interface BaseComposerProps {
   /** Текстовое значение поля ввода */

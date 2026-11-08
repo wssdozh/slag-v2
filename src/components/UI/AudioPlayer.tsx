@@ -1,7 +1,7 @@
 import { formatBytes } from '../../lib/formatBytes';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
-import { formatAudioDuration } from '../../lib/audioHelper';
+import { formatAudioDuration } from '../../lib/media/audioHelper';
 
 
 const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (

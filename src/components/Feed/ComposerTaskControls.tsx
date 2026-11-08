@@ -6,7 +6,7 @@ import { MenuDropdown } from '../UI/MenuDropdown';
 import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { Select } from '../UI/Select';
 import { LinearSignalBars } from '../UI/PriorityBadge';
-import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/recurrenceHelper';
+import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/time/recurrenceHelper';
 
 export interface ComposerTaskControlsProps {
   effectiveDueDate: string;

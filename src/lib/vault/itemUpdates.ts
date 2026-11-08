@@ -1,5 +1,5 @@
-import type { ItemUpdates, SlagItem } from '../types';
-import { parseSubtasksFromContent } from './taskUtils';
+import type { ItemUpdates, SlagItem } from '../../types';
+import { parseSubtasksFromContent } from '../taskUtils';
 
 /**
  * Applies a partial update to an item without touching storage.

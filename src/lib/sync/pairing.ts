@@ -1,6 +1,6 @@
 import type { DeviceSyncMode, PairingSessionData, PairingClaimResult, PairingPollResult } from './types';
 import { accountClient } from './account';
-import { bytesToBase64, base64ToBytes } from '../byteCodec';
+import { bytesToBase64, base64ToBytes } from '../media/byteCodec';
 import { SYNC_INTERVALS } from '../../config';
 
 function pairingHeaders(serverUrl: string, includeJson = true): Record<string, string> {

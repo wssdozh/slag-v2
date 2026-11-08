@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UI_BREAKPOINTS } from '../config';
+import { UI_BREAKPOINTS } from '../../config';
 
 /**
  * Hook to detect mobile screens (< 768px by default).
