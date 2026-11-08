@@ -70,3 +70,6 @@ relay/data/
 # Tooling & temporary
 .dsh/
 *.orig
+
+# Local scratch
+.tmp/
