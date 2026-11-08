@@ -647,6 +647,10 @@ export const Composer: React.FC<ComposerProps> = ({
       reader.onloadend = async () => {
         const id = 'att_' + Date.now() + Math.random().toString(36).slice(2, 6);
         const isImg = type === 'image' || file.type.startsWith('image/');
+        // Android SAF sometimes reports an empty MIME, so fall back to the extension.
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        const isAudio = file.type.startsWith('audio/') || ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext);
+        const isVideo = !isAudio && (file.type.startsWith('video/') || ['mp4', 'mov', 'm4v', 'webm', 'mkv'].includes(ext));
         let finalDataUrl = reader.result as string;
         if (isImg && typeof finalDataUrl === 'string') {
           finalDataUrl = await downscaleImageDataUrl(finalDataUrl, 1440);
@@ -654,7 +658,7 @@ export const Composer: React.FC<ComposerProps> = ({
         const attachment: SlagAttachment = {
           id,
           name: file.name,
-          type: isImg ? 'image' : 'file',
+          type: isImg ? 'image' : isAudio ? 'audio' : isVideo ? 'video' : 'file',
           mimeType: isImg ? 'image/jpeg' : (file.type || 'application/octet-stream'),
           size: file.size,
           relativePath: `.attachments/${id}_${file.name}`,
@@ -1563,23 +1567,23 @@ export const Composer: React.FC<ComposerProps> = ({
     </>
   );
 
-  const customControls = isRecordingAudio ? (
-    <div className="pt-1 w-full motion-fade">
+  // Recording is a composer state, not a layer on top of it: the shell steps
+  // aside and the recorder morphs in from the composer edge.
+  if (isRecordingAudio || isRecordingVideo) {
+    return isRecordingAudio ? (
       <AudioRecorder
         finishTriggerRef={triggerFinishRef}
         onRecorded={handleRecordedAudio}
         onCancel={cancelRecording}
       />
-    </div>
-  ) : isRecordingVideo ? (
-    <div className="pt-1 w-full flex flex-col items-center motion-fade">
+    ) : (
       <VideoRecorder
         finishTriggerRef={triggerFinishRef}
         onRecorded={handleRecordedVideo}
         onCancel={cancelRecording}
       />
-    </div>
-  ) : undefined;
+    );
+  }
 
   const leftControls = (
     <div className="composer-toolbar-group relative">
@@ -1774,7 +1778,6 @@ export const Composer: React.FC<ComposerProps> = ({
         ) : undefined
       }
       overlaySlot={overlaySlot}
-      customControls={customControls}
       leftControls={leftControls}
       rightControls={rightControls}
       sendButton={sendButton}

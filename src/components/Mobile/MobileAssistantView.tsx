@@ -1,17 +1,25 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { AssistantChat } from '../Feed/AssistantChat';
-import { Sparkles, Trash2, Settings } from 'lucide-react';
+import { Trash2, Settings } from 'lucide-react';
 import { MobileScreenHeader } from './MobileScreenHeader';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export const MobileAssistantView: React.FC = () => {
   const {
     clearChatMessages,
-    aiSettings,
     setIsSettingsOpen,
     setActiveMobileTab,
-    chatMessages
+    chatMessages,
+    folders,
+    currentFolder
   } = useApp();
+
+  const activeFolder = folders.find(f => f.path === currentFolder);
+  const contextLabel =
+    currentFolder === DEFAULT_INBOX_FOLDER || !activeFolder
+      ? 'Все хранилище'
+      : activeFolder.name;
 
   return (
     <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
@@ -21,14 +29,9 @@ export const MobileAssistantView: React.FC = () => {
         backLabel="Назад"
         centerSlot={
           <>
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-4 rounded bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-zinc-300 shrink-0">
-                <Sparkles className="w-2.5 h-2.5" />
-              </div>
-              <h1 className="text-sm font-bold text-white tracking-tight">Ассистент</h1>
-            </div>
-            <span className="text-2xs font-mono text-zinc-500 truncate max-w-[160px]">
-              {aiSettings.model}
+            <h1 className="text-sm font-bold text-white tracking-tight">Ассистент</h1>
+            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[200px]">
+              {contextLabel}
             </span>
           </>
         }

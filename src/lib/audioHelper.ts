@@ -4,6 +4,7 @@ import { DEFAULT_INBOX_FOLDER } from '../config';
 export interface AudioTrack {
   id: string; // track unique id (itemId + attachmentId)
   attachmentId: string;
+  relativePath: string;
   name: string;
   url: string;
   duration?: number;
@@ -88,11 +89,12 @@ export function extractAudioTracks(
     );
 
     (item.attachments || []).forEach((att) => {
-      if (att.type !== 'audio' || !att.dataUrl) return;
+      const isAudio = att.type === 'audio' || (att.mimeType || '').startsWith('audio/');
+      if (!isAudio) return;
 
       const isVoice =
         att.name.startsWith('voice_') ||
-        att.mimeType.includes('webm') ||
+        (att.mimeType || '').includes('webm') ||
         (att.name.toLowerCase().includes('voice') && !att.name.endsWith('.mp3'));
 
       if (isVoice && !allowVoice) return;
@@ -103,8 +105,9 @@ export function extractAudioTracks(
       tracks.push({
         id: `${item.id}_${att.id}`,
         attachmentId: att.id,
+        relativePath: att.relativePath,
         name: att.name,
-        url: att.dataUrl,
+        url: att.dataUrl || '',
         duration: att.duration,
         size: att.size,
         waveform: att.waveform,

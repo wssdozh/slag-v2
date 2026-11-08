@@ -1,5 +1,6 @@
 import React, { useRef, useLayoutEffect } from 'react';
 import { ArrowUp, UploadCloud } from 'lucide-react';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export interface BaseComposerProps {
   /** Текстовое значение поля ввода */
@@ -119,11 +120,12 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
     }
   }, [value, highlightRange, effectiveRef]);
 
+  // Desktop keeps Enter-to-send. On a phone the on-screen Enter is the only
+  // newline key, so sending stays on the composer button.
+  const isMobile = useIsMobile();
   const handleKeyDownInternal = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (onKeyDown) {
-      onKeyDown(e);
-      if (e.defaultPrevented) return;
-    }
+    if (onKeyDown) onKeyDown(e);
+    if (isMobile || e.defaultPrevented) return;
 
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -261,7 +263,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                       ? 'bg-accent-strong text-white hover:bg-accent-strong/90 shadow-sm cursor-pointer'
                       : 'bg-surface-active text-fg-dim cursor-not-allowed'
                   }`}
-                  title={submitTitle}
+                  title={isMobile ? submitTitle.replace(' (Enter)', '') : submitTitle}
                 >
                   <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
                 </button>

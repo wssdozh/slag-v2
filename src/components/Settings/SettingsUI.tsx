@@ -39,14 +39,14 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
     {(title || action) && (
       <div className="flex items-center justify-between gap-2 px-1">
         {title && (
-          <span className="text-2xs font-medium uppercase tracking-wide text-fg-dim">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
             {title}
           </span>
         )}
         {action}
       </div>
     )}
-    <div className="rounded-xl bg-surface border border-border-subtle overflow-hidden">
+    <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden">
       {children}
     </div>
   </section>
@@ -54,7 +54,7 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
 
 /** A divider between rows. Inset to the label column when the rows carry icons. */
 export const SettingsDivider: React.FC<{ inset?: boolean }> = ({ inset = false }) => (
-  <div className={`h-px bg-border-subtle ${inset ? 'ml-11' : ''}`} />
+  <div className={`h-px bg-border-subtle ${inset ? 'ml-12' : ''}`} />
 );
 
 interface SettingsRowProps {
@@ -100,33 +100,33 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
       {...(interactive
         ? { type: 'button' as const, onClick, disabled, 'aria-disabled': disabled }
         : {})}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-left ${
+      className={`w-full flex items-center gap-3 p-3.5 text-left ${
         interactive ? 'cursor-pointer hover:bg-surface-hover' : ''
       } ${disabled ? 'opacity-40' : ''} ${className}`}
     >
       {icon && (
         <span
-          className={`w-4 shrink-0 flex items-center justify-center ${
-            danger ? 'text-danger' : 'text-fg-muted'
+          className={`w-5 h-5 shrink-0 flex items-center justify-center ${
+            danger ? 'text-danger' : 'text-zinc-400'
           }`}
         >
           {icon}
         </span>
       )}
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span className={`text-xs font-medium ${danger ? 'text-danger' : 'text-fg-primary'}`}>
+        <span className={`text-sm font-medium ${danger ? 'text-danger' : 'text-zinc-200'}`}>
           {label}
         </span>
         {description && (
-          <span className="text-2xs leading-relaxed text-fg-muted break-words">{description}</span>
+          <span className="text-xs leading-relaxed text-zinc-500 break-words">{description}</span>
         )}
       </span>
       {value !== undefined && (
-        <span className="max-w-[50%] min-w-0 text-right text-2xs text-fg-muted break-words">{value}</span>
+        <span className="max-w-[50%] min-w-0 text-right text-xs text-zinc-500 break-words">{value}</span>
       )}
       {right && <span className="shrink-0">{right}</span>}
-      {chevron && <ChevronRight className="w-3.5 h-3.5 shrink-0 text-fg-dim" />}
-      {external && <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-fg-dim" />}
+      {chevron && <ChevronRight className="w-4 h-4 shrink-0 text-zinc-600" />}
+      {external && <ArrowUpRight className="w-4 h-4 shrink-0 text-zinc-600" />}
     </Element>
   );
 };

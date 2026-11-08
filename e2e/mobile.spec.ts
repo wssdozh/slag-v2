@@ -73,6 +73,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await composerTextarea.fill(Array.from({ length: 20 }, (_, i) => `строка ${i}`).join('\n'));
     await expect(composerTextarea).toHaveCSS('height', '220px');
+    // Resize above invalidates the scroll anchor; the grown composer shrinks the
+    // viewport, so pin the feed to the bottom after the new height lands.
+    await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await expect.poll(() => feed.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThan(3);
     const lastCardSpacer = page.locator('[aria-hidden="true"].h-2');
     await expect(lastCardSpacer).toHaveCount(1);
@@ -154,7 +157,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
     await expect(page.locator('span', { hasText: 'Obsidian' }).first()).toBeVisible();
 
-    // Verify dock customization section exists
+    // Dock lives in the Interface tab now, not on the settings root.
+    await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
     await expect(page.locator('text=Нижняя панель (Dock)')).toBeVisible();
 
     // Verify active rows have checkmark and grip handle
@@ -175,6 +179,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     expect(firstTabLabel).toBe('Таски');
     expect(secondTabLabel).toContain('Папки');
 
+    // Close the settings sheet before the root screenshot.
+    await page.locator('[role="dialog"] button[title="Назад"]').first().click();
+    await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/25_settings_root.png' });
     await page.screenshot({ path: 'test-results/screenshots/mobile_settings.png' });
   });
@@ -487,10 +494,12 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await dock.locator('button[aria-label="Настройки"]').click();
     await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
 
-    // 2. Locate "Плеер" row in dock customization
+    // 2. Open Interface tab and locate "Плеер" row in dock customization
+    await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
     const audioPill = page.locator('[aria-label="Добавить Плеер"]');
     await expect(audioPill).toBeVisible();
     await audioPill.click();
+    await page.locator('[role="dialog"] button[title="Назад"]').first().click();
 
     // 3. Verify audio player tab button appeared in dock
     const audioDockBtn = dock.locator('button[aria-label="Плеер"]');
@@ -499,8 +508,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // 4. Click Audio Player dock tab
     await audioDockBtn.click();
 
-    // Verify MobileAudioView is rendered with header "Плеер"
-    await expect(page.locator('header h1', { hasText: 'Плеер' })).toBeVisible();
+    // The player has no header anymore: the panel starts right under the safe area.
+    await expect(page.locator('header h1', { hasText: 'Плеер' })).toHaveCount(0);
+    await expect(page.locator('main')).toBeVisible();
 
     // Verify player transport or placeholder is visible
     const playerView = page.locator('text=В папке нет аудиозаписей').or(page.locator('button[aria-label="Воспроизведение"]')).first();

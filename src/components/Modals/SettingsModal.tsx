@@ -28,6 +28,7 @@ import { IconButton } from '../UI/IconButton';
 import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSwitch, SettingsSelect, SettingsNumber, SettingsInput } from '../Settings/SettingsUI';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
+import { MobileDockSettings } from '../Settings/MobileDockSettings';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { AiSourceMode, SubscriptionAiTier } from '../../types';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
@@ -756,6 +757,8 @@ export const SettingsModal: React.FC = () => {
                   />
                 </SettingsGroup>
 
+                {isMobile && <MobileDockSettings />}
+
                 {!isMobile && (
                   <>
                     <SettingsGroup title="Предпросмотр">
@@ -806,8 +809,8 @@ export const SettingsModal: React.FC = () => {
                   {[
                     ['Сохранить запись (редактор)', formatShortcut('mod+s')],
                     ['Применить AI Diff', formatShortcut('mod+enter')],
-                    ['Отправить запись (композер)', 'Enter'],
-                    ['Перенос строки', 'Shift + Enter'],
+                    ['Отправить', isMobile ? 'кнопка ↑' : 'Enter'],
+                    ['Перенос строки', isMobile ? 'Enter' : 'Shift + Enter'],
                     ['Закрыть окно / Esc', 'Esc'],
                     ['Контекстное меню', 'ПКМ'],
                   ].map(([label, shortcut], index) => (

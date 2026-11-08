@@ -8,7 +8,6 @@ import { ActiveFilterBadges } from '../Feed/ActiveFilterBadges';
 import {
   Folder,
   FolderPlus,
-  ChevronRight,
   ChevronDown,
   Search,
   Inbox,
@@ -21,6 +20,14 @@ import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
+
+function unsortedLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'неразобранная';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'неразобранные';
+  return 'неразобранных';
+}
 
 export const MobileFoldersView: React.FC = () => {
   const {
@@ -168,11 +175,10 @@ export const MobileFoldersView: React.FC = () => {
 
               <div className="flex items-center gap-2 shrink-0">
                 {unsortedCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/10 text-zinc-200 text-xs font-mono font-medium">
-                    {unsortedCount}
+                  <span className="text-xs font-mono text-zinc-500">
+                    {unsortedCount} {unsortedLabel(unsortedCount)}
                   </span>
                 )}
-                <ChevronRight className="w-4 h-4 text-zinc-600" />
               </div>
             </button>
           </div>
@@ -188,8 +194,6 @@ export const MobileFoldersView: React.FC = () => {
                 .filter(f => f.path !== DEFAULT_INBOX_FOLDER)
                 .map(folder => {
                   const Icon = FOLDER_ICONS[folder.icon || 'Folder'] || Folder;
-                  const folderItemsCount = items.filter(i => i.folder === folder.path || i.folder.startsWith(folder.path + '/')).length;
-                  const subCount = folders.filter(f => f.path.startsWith(folder.path + '/')).length;
 
                   return (
                     <button
@@ -202,13 +206,6 @@ export const MobileFoldersView: React.FC = () => {
                           <Icon className="w-5 h-5" />
                         </div>
                         <div className="text-sm font-medium text-zinc-200 truncate">{folder.name}</div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-mono text-zinc-500">
-                          {subCount > 0 ? `${subCount} п. • ` : ''}{folderItemsCount}
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-zinc-600" />
                       </div>
                     </button>
                   );

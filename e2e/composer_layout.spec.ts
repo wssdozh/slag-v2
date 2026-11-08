@@ -99,7 +99,7 @@ async function types(page: Page, surface: Locator, mobile: boolean) {
     expect(fit.delta).toBeLessThan(2);
     expect(fit.taller).toBe(false);
     await input.fill('Проверка геометрии композера');
-    await expect(surface.getByTitle('Отправить (Enter)', { exact: true })).toBeEnabled();
+    await expect(surface.getByTitle(mobile ? 'Отправить' : 'Отправить (Enter)', { exact: true })).toBeEnabled();
     await geometry(surface, mobile);
     if (type === 'Таска') {
       await expect(surface.locator(taskControls)).toHaveCount(4);

@@ -28,6 +28,7 @@ import {
 } from '../../lib/audioHelper';
 import { AudioCoverArt } from './AudioCoverArt';
 import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
+import { storage } from '../../lib/storage';
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;
 
@@ -52,6 +53,7 @@ export const AudioPanel: React.FC = () => {
   const [volume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
+  const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -92,6 +94,29 @@ export const AudioPanel: React.FC = () => {
     });
   }, [items, effectiveFolder, scopeMode, typeFilters, inboxMode]);
 
+  // Notes restored from markdown carry attachment metadata without bytes. Resolve
+  // only the visible playlist, and keep blob: URLs out of the vault.
+  useEffect(() => {
+    const missing = tracks.filter(t => !t.url);
+    if (missing.length === 0) return;
+    let active = true;
+    void Promise.all(
+      missing.map(async t => [t.id, await storage.getAttachmentUrl(t.attachmentId, t.relativePath, t.mimeType)] as const)
+    ).then(pairs => {
+      if (!active) return;
+      const next: Record<string, string> = {};
+      for (const [id, url] of pairs) {
+        if (url) next[id] = url;
+      }
+      if (Object.keys(next).length > 0) {
+        setResolvedUrls(prev => ({ ...prev, ...next }));
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [tracks]);
+
   // Safe derived track index to avoid out-of-bounds without set-state-in-effect
   const safeTrackIndex = tracks.length === 0 ? 0 : Math.min(currentTrackIndex, tracks.length - 1);
   const currentTrack: AudioTrack | null = tracks[safeTrackIndex] ?? null;
@@ -121,7 +146,7 @@ export const AudioPanel: React.FC = () => {
 
   // Sync audio source when track changes
   const trackId = currentTrack?.id;
-  const trackUrl = currentTrack?.url;
+  const trackUrl = currentTrack ? (currentTrack.url || resolvedUrls[currentTrack.id]) : undefined;
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;

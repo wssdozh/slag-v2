@@ -24,9 +24,11 @@ import {
   remove,
   exists,
   BaseDirectory,
+  readFile,
+  writeFile,
 } from '@tauri-apps/plugin-fs';
 
-import { idbSaveAttachment } from './indexedDbStorage';
+import { idbSaveAttachment, idbGetAttachment } from './indexedDbStorage';
 import {
   DEFAULT_INBOX_FOLDER,
   STORAGE_KEYS,
@@ -73,6 +75,68 @@ export class StorageService {
   private changeListeners: Set<StorageChangeListener> = new Set();
   private instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   private crossWindowDraftChannel: BroadcastChannel | null = null;
+  private persistedAttachmentIds: Set<string> = new Set();
+  private attachmentUrlCache: Map<string, string> = new Map();
+
+  public getVaultAttachmentsPath(vault: VaultMeta = this.currentVault): string {
+    return `${this.getVaultDir(vault)}/.attachments`;
+  }
+
+  private attachmentBasename(att: SlagAttachment): string {
+    const parts = att.relativePath.split(/[\\/]/);
+    return parts[parts.length - 1] || att.id;
+  }
+
+  /**
+   * Playable url for an attachment. Lives only in memory: a blob: URL inside
+   * the item would be dead after restart and would leak into localStorage/sync.
+   */
+  public async getAttachmentUrl(id: string, relativePath: string, mimeType?: string): Promise<string | undefined> {
+    const cached = this.attachmentUrlCache.get(id);
+    if (cached) return cached;
+
+    const stored = this.getAttachment(id) || await idbGetAttachment(id);
+    if (stored?.dataUrl) return stored.dataUrl;
+
+    if (!isTauri()) return undefined;
+    try {
+      const path = `${this.getVaultAttachmentsPath()}/${relativePath.split(/[\\/]/).pop() || id}`;
+      if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) return undefined;
+      const bytes = await readFile(path, { baseDir: BaseDirectory.AppData });
+      const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mimeType || 'application/octet-stream' }));
+      this.attachmentUrlCache.set(id, url);
+      return url;
+    } catch (err) {
+      fsLog.warn(`Failed to read attachment ${id} from disk`, err);
+      return undefined;
+    }
+  }
+
+  /** Persist base64 bytes to .attachments/ once; markdown keeps only metadata. */
+  private async persistAttachmentFiles(item: SlagItem, vault: VaultMeta = this.currentVault): Promise<void> {
+    if (!isTauri()) return;
+    for (const att of item.attachments || []) {
+      if (!att.dataUrl?.startsWith('data:')) continue;
+      if (this.persistedAttachmentIds.has(att.id)) continue;
+
+      try {
+        const dir = this.getVaultAttachmentsPath(vault);
+        await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
+        const path = `${dir}/${this.attachmentBasename(att)}`;
+        if (await exists(path, { baseDir: BaseDirectory.AppData })) {
+          this.persistedAttachmentIds.add(att.id);
+          continue;
+        }
+
+        const response = await fetch(att.dataUrl);
+        const buffer = await response.arrayBuffer();
+        await writeFile(path, new Uint8Array(buffer), { baseDir: BaseDirectory.AppData });
+        this.persistedAttachmentIds.add(att.id);
+      } catch (err) {
+        fsLog.warn(`Failed to persist attachment ${att.id}`, err);
+      }
+    }
+  }
 
   public subscribeChanges(listener: StorageChangeListener): () => void {
     this.changeListeners.add(listener);
@@ -350,6 +414,7 @@ export class StorageService {
       // Write the replacement before removing the previous filename.
       const content = serializeItemToMarkdown(item);
       await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
+      await this.persistAttachmentFiles(item, vault);
 
       if (oldPath !== newPath && !protectedPaths.has(oldPath) && await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
         await remove(oldPath, { baseDir: BaseDirectory.AppData });
