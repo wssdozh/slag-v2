@@ -89,6 +89,14 @@ export class SyncEngine {
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private pushDebounceDeadline = 0;
   private pushDebounceTrailing = false;
+  /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
+  private importBuffer: {
+    items: SlagItem[];
+    folders: FolderMeta[];
+    workspace?: WorkspaceState;
+    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean };
+  } | null = null;
+  private importTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingPushes = new Map<string, PendingPush>();
   private wsSupportsBinary = false;
   private pushDirty = false;
@@ -252,6 +260,58 @@ export class SyncEngine {
 
   public getOutbox(): Outbox {
     return new Outbox(this.currentVaultId);
+  }
+
+  /**
+   * Bundle changes are applied to a working copy and written once per burst.
+   * Writing per bundle made replaying a backlog flicker: a note from an old bundle
+   * appeared, then a newer bundle deleted or replaced it a second later.
+   */
+  private stageImport(
+    items: SlagItem[],
+    folders: FolderMeta[],
+    workspace: WorkspaceState | undefined,
+    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean }
+  ): void {
+    const previous = this.importBuffer?.detail;
+    this.importBuffer = {
+      items,
+      folders,
+      workspace: workspace ?? this.importBuffer?.workspace,
+      detail: {
+        items: detail.items || Boolean(previous?.items),
+        folders: detail.folders || Boolean(previous?.folders),
+        workspace: detail.workspace || Boolean(previous?.workspace),
+        drafts: detail.drafts || Boolean(previous?.drafts),
+      },
+    };
+    if (this.batchUpdating || this.importTimer) return;
+    this.importTimer = setTimeout(() => {
+      this.importTimer = null;
+      void this.flushStagedImport();
+    }, 120);
+  }
+
+  private async flushStagedImport(): Promise<void> {
+    if (this.importTimer) {
+      clearTimeout(this.importTimer);
+      this.importTimer = null;
+    }
+    const buffered = this.importBuffer;
+    if (!buffered) return;
+    this.importBuffer = null;
+    await storage.importSyncedVaultData(buffered);
+    // One render per burst, after the final state is on disk.
+    window.dispatchEvent(
+      new CustomEvent('slag-sync-updated', {
+        detail: {
+          hasItemsChanged: buffered.detail.items,
+          hasFoldersChanged: buffered.detail.folders,
+          hasWorkspaceChanged: buffered.detail.workspace,
+          hasDraftsChanged: buffered.detail.drafts,
+        },
+      })
+    );
   }
 
   private getStateHashKey(vaultId?: string): string {
@@ -501,6 +561,7 @@ export class SyncEngine {
       await this.fetchPendingBundlesHttp();
       if (generation !== this.initGeneration) return;
       this.batchUpdating = false;
+      await this.flushStagedImport();
       if (initial) {
         localStorage.removeItem(`slag_initial_sync_${this.currentVaultId}`);
         this.status.initialSync.state = 'ready';
@@ -697,8 +758,8 @@ export class SyncEngine {
       let hasDraftsChanged = false;
       let workspaceState: WorkspaceState | undefined;
 
-      const currentItems: SlagItem[] = [...storage.getItems()];
-      const currentFolders: FolderMeta[] = [...storage.getFolders()];
+      const currentItems: SlagItem[] = this.importBuffer ? [...this.importBuffer.items] : [...storage.getItems()];
+      const currentFolders: FolderMeta[] = this.importBuffer ? [...this.importBuffer.folders] : [...storage.getFolders()];
       const tombstones = this.loadTombstones();
       let tombstonesDirty = false;
 
@@ -858,11 +919,12 @@ export class SyncEngine {
         localStorage.setItem(this.getTombstonesKey(), JSON.stringify(tombstones));
       }
 
-      if (hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged) {
-        await storage.importSyncedVaultData({
-          items: hasItemsChanged ? currentItems : undefined,
-          folders: hasFoldersChanged ? currentFolders : undefined,
-          workspaceState,
+      if (hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged) {
+        this.stageImport(currentItems, currentFolders, hasWorkspaceChanged ? workspaceState : undefined, {
+          items: hasItemsChanged,
+          folders: hasFoldersChanged,
+          workspace: hasWorkspaceChanged,
+          drafts: hasDraftsChanged,
         });
       }
       if (generation !== this.initGeneration) return;
@@ -875,16 +937,6 @@ export class SyncEngine {
       this.status.lastSyncTime = new Date().toLocaleTimeString();
       this.status.state = this.batchUpdating ? 'syncing' : 'connected';
       this.notify();
-      if (this.batchUpdating) {
-        return;
-      }
-
-      // Dispatch global window event so React UI re-renders cleanly
-      window.dispatchEvent(
-        new CustomEvent('slag-sync-updated', {
-          detail: { hasItemsChanged, hasFoldersChanged, hasWorkspaceChanged, hasDraftsChanged },
-        })
-      );
     } catch (err) {
       if (err instanceof Error && err.message.includes('Local state changed')) {
         // Keep the bundle pending; the caller must not advance past a failed persist.
@@ -1323,6 +1375,9 @@ export class SyncEngine {
     this.pushDebounceTimer = null;
     this.pushDebounceDeadline = 0;
     this.pushDebounceTrailing = false;
+    if (this.importTimer) clearTimeout(this.importTimer);
+    this.importTimer = null;
+    this.importBuffer = null;
     this.appliedBundleIds.clear();
     this.entityHashes.clear();
     this.wsSupportsBinary = false;

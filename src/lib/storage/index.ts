@@ -1301,6 +1301,8 @@ export class StorageService {
         const nextPaths = new Set(data.items.map(notePath));
         for (const item of data.items) {
           const old = previous.find(candidate => candidate.id === item.id);
+          // Unchanged notes are already on disk; rewriting all 39 files per bundle was the sync stall.
+          if (old && JSON.stringify(old) === JSON.stringify(item)) continue;
           const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
           await this.flushItemToDisk(item, old?.folder, oldFilename, vault, true, nextPaths);
         }
