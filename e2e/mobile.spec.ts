@@ -1,4 +1,41 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/** Долгое нажатие: Playwright не умеет touch-hold, а меню на мобилке теперь только на нём. */
+const longPress = async (page: Page, selector: string) => {
+  const target = page.locator(selector).first();
+  await target.scrollIntoViewIfNeeded();
+  await target.evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    const touch = new Touch({
+      identifier: 1,
+      target: el,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + 24,
+    });
+    el.dispatchEvent(
+      new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [touch],
+        targetTouches: [touch],
+        changedTouches: [touch],
+      })
+    );
+  });
+  await page.waitForTimeout(600);
+  await target.evaluate(el => {
+    const touch = new Touch({ identifier: 1, target: el, clientX: 0, clientY: 0 });
+    el.dispatchEvent(
+      new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        touches: [],
+        targetTouches: [],
+        changedTouches: [touch],
+      })
+    );
+  });
+};
 
 test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   test.use({
@@ -205,11 +242,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // Enter "Входящие"
     await page.locator('button', { hasText: 'Входящие' }).first().click();
 
-    // Find any note card and tap its "..." (More) button
-    const firstMoreBtn = page.locator('button[title="Действия"]').first();
-    await firstMoreBtn.scrollIntoViewIfNeeded();
-    await expect(firstMoreBtn).toBeVisible();
-    await firstMoreBtn.click();
+    // Три точки с мобилки убраны: меню открывается долгим нажатием по карточке
+    await expect(page.locator('.feed-card-contain').first()).toBeVisible();
+    await longPress(page, '.feed-card-contain div[id^="item-"]');
 
     // Verify MobileActionSheet opened
     const actionSheet = page.locator('button', { hasText: 'Фокус-редактор' });
@@ -219,6 +254,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('button', { hasText: 'Удалить' })).toBeVisible();
     await expect(page.locator('button', { hasText: 'Разобрать с ИИ' })).toBeVisible();
 
+    // Даём шиту доехать: скриншот посреди motion-sheet выглядит полупрозрачным
+    await page.waitForTimeout(360);
     await page.screenshot({ path: 'test-results/screenshots/mobile_action_sheet.png' });
 
     // Dismiss by tapping "Отмена"
@@ -522,5 +559,121 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // 5. Test Hardware/Browser back from Audio Player returns to Folders
     await page.goBack();
     await expect(page.locator('header h1', { hasText: 'Заметки' })).toBeVisible();
+  });
+});
+
+test.describe('SLAG v2 mobile feed sheet & metadata', () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  const openInboxWithCards = async (page: Page) => {
+    await expect(page.locator('header').first()).toBeVisible({ timeout: 15000 });
+    await page.locator('button', { hasText: 'Входящие' }).first().click();
+
+    const seedBtn = page.locator('button', { hasText: 'Сгенерировать демо-заметки' });
+    if (await seedBtn.count()) {
+      await seedBtn.first().click();
+    }
+    await expect(page.locator('.feed-card-contain').first()).toBeVisible({ timeout: 15000 });
+  };
+
+  const cardOf = (page: Page) =>
+    page.locator('.feed-card-contain').first().locator('div[id^="item-"]').first();
+
+  test('1. Строка метаданных одна, без трёх точек', async ({ page }) => {
+    await openInboxWithCards(page);
+
+    const row = page.locator('[data-testid="item-meta-row"]').first();
+    await expect(row).toBeVisible();
+    expect(await row.evaluate(el => getComputedStyle(el).flexWrap)).toBe('nowrap');
+
+    const rowBox = await row.boundingBox();
+    expect(rowBox).not.toBeNull();
+    expect(rowBox!.height).toBeLessThan(28);
+
+    const tagsRow = page.locator('[data-testid="item-tags-row"]').first();
+    if (await tagsRow.count()) {
+      expect(await tagsRow.evaluate(el => getComputedStyle(el).flexWrap)).toBe('nowrap');
+    }
+
+    await expect(page.locator('[title="Действия"]')).toHaveCount(0);
+
+    await page.screenshot({ path: 'test-results/screenshots/mobile_feed_meta_row.png' });
+  });
+
+  test('2. Тап открывает половинный редактор', async ({ page }) => {
+    await openInboxWithCards(page);
+    await cardOf(page).click();
+
+    const sheet = page.locator('[data-testid="editor-sheet"]');
+    await expect(sheet).toBeVisible();
+    await page.waitForTimeout(320);
+
+    const box = await sheet.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThan(380);
+    expect(box!.height).toBeLessThan(600);
+
+    await page.screenshot({ path: 'test-results/screenshots/mobile_half_sheet.png' });
+  });
+
+  test('3. Ручка вверх разворачивает, вниз сворачивает и закрывает', async ({ page }) => {
+    await openInboxWithCards(page);
+    await cardOf(page).click();
+
+    const sheet = page.locator('[data-testid="editor-sheet"]');
+    const handle = page.locator('[data-sheet-handle]').first();
+    await expect(handle).toBeVisible();
+    await page.waitForTimeout(320);
+
+    const drag = async (deltaY: number) => {
+      const hb = await handle.boundingBox();
+      expect(hb).not.toBeNull();
+      const x = hb!.x + hb!.width / 2;
+      const startY = hb!.y + hb!.height / 2;
+      await page.mouse.move(x, startY);
+      await page.mouse.down();
+      const steps = 10;
+      for (let i = 1; i <= steps; i++) {
+        await page.mouse.move(x, startY + (deltaY * i) / steps);
+      }
+      await page.mouse.up();
+      await page.waitForTimeout(360);
+    };
+
+    await drag(-320);
+    const expanded = await sheet.boundingBox();
+    expect(expanded!.height).toBeGreaterThan(780);
+
+    await drag(320);
+    const collapsed = await sheet.boundingBox();
+    expect(collapsed!.height).toBeLessThan(620);
+
+    await drag(420);
+    await expect(sheet).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('4. Дабл-тап копирует текст', async ({ page }) => {
+    await openInboxWithCards(page);
+
+    // Два клика в одном тике страницы: задержка Playwright между click() уже
+    // вылезает за окно DOUBLE_TAP_MS.
+    await cardOf(page).evaluate(el => {
+      el.click();
+      window.setTimeout(() => el.click(), 60);
+    });
+    await page.waitForTimeout(500);
+
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied.trim().length).toBeGreaterThan(0);
+    await expect(page.locator('[data-testid="editor-sheet"]')).toHaveCount(0);
   });
 });

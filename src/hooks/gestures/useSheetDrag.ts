@@ -6,6 +6,8 @@ type Mode = 'idle' | 'drag' | 'settle';
 interface SheetDragOptions {
   isOpen: boolean;
   onDismiss: () => void;
+  onExpand?: () => void;
+  onCollapse?: () => void;
 }
 
 interface DragSession {
@@ -37,7 +39,7 @@ function resist(delta: number, height: number): number {
  * on a phone. Nothing here animates `background-color`: that repainted the full
  * viewport every pointermove.
  */
-export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
+export function useSheetDrag({ isOpen, onDismiss, onExpand, onCollapse }: SheetDragOptions) {
   const panelRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<DragSession | null>(null);
@@ -100,7 +102,10 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
       session.active = true;
       setMode('drag');
     }
-    const offset = resist(raw, session.height);
+    // Upwards is a real destination only when the sheet can expand: then the
+    // finger owns the panel 1:1, clamped by the room it still has to grow into.
+    const travel = session.height > 0 ? Math.max(0, window.innerHeight - session.height) : 0;
+    const offset = onExpand && raw < 0 ? Math.max(raw, -travel) : resist(raw, session.height);
     const panel = panelRef.current;
     if (panel) {
       panel.style.transition = 'none';
@@ -114,7 +119,7 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
       const progress = Math.min(1, Math.max(0, offset / session.height));
       scrim.style.opacity = String(1 - 0.5 * progress);
     }
-  }, []);
+  }, [onExpand]);
 
   const onPointerEnd = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const session = sessionRef.current;
@@ -125,6 +130,27 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
       UI_GESTURES.SHEET_DISMISS_MAX_PX,
       session.height * UI_GESTURES.SHEET_DISMISS_RATIO,
     );
+    // Upward pulls belong to the expand/collapse axis, never to dismiss: a sheet
+    // that can grow half-way treats "up" as "open more", not as "throw away".
+    if (delta < 0 && onExpand) {
+      if (-delta > threshold || session.velocity < -UI_GESTURES.DISMISS_VELOCITY_PX_MS) {
+        releaseInline();
+        setMode('settle');
+        onExpand();
+      } else {
+        setMode('settle');
+        settleTimerRef.current = window.setTimeout(() => {
+          setMode(current => (current === 'settle' ? 'idle' : current));
+        }, SETTLE_MS + 20);
+      }
+      return;
+    }
+    if (delta > threshold && onCollapse) {
+      releaseInline();
+      setMode('settle');
+      onCollapse();
+      return;
+    }
     if (delta > threshold || session.velocity > UI_GESTURES.DISMISS_VELOCITY_PX_MS) {
       // The sheet's own exit transition picks the panel up from the finger.
       onDismiss();
@@ -134,7 +160,7 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
     settleTimerRef.current = window.setTimeout(() => {
       setMode(current => (current === 'settle' ? 'idle' : current));
     }, SETTLE_MS + 20);
-  }, [onDismiss]);
+  }, [onDismiss, onExpand, onCollapse, releaseInline]);
 
   const onPointerCancel = useCallback(() => {
     sessionRef.current = null;

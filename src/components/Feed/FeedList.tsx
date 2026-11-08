@@ -18,7 +18,7 @@ import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { PinnedBanner } from './PinnedBanner';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
 
-const PAGE_SIZE = 35;
+const WINDOW_CHUNK = 15;
 
 function subscribeToNow() {
   return () => {};
@@ -54,7 +54,8 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
+  // Окно всегда прижато к новым записям: размер — единственная ручка.
+  const [windowSize, setWindowSize] = useState(WINDOW_CHUNK);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   // Fast O(1) item lookup map for reply targets
@@ -101,10 +102,10 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (prevFilterKey !== filterKey) {
     setPrevFilterKey(filterKey);
-    setVisibleCount(PAGE_SIZE);
+    setWindowSize(WINDOW_CHUNK);
   }
 
-  // Permanently expand visibleCount during render when an item is targeted (React pure pattern)
+  // Permanently expand the window during render when an item is targeted (React pure pattern)
   const highlightKey = `${filterKey}:${highlightedItemId || ''}`;
   const [prevHighlightKey, setPrevHighlightKey] = useState(highlightKey);
   if (prevHighlightKey !== highlightKey) {
@@ -112,9 +113,9 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
     if (highlightedItemId) {
       const targetIdx = filteredItems.findIndex(i => i.id === highlightedItemId);
       if (targetIdx !== -1) {
-        const needed = filteredItems.length - targetIdx + 10;
-        if (needed > visibleCount) {
-          setVisibleCount(needed);
+        const start = Math.max(0, filteredItems.length - windowSize);
+        if (targetIdx < start) {
+          setWindowSize(Math.max(windowSize, filteredItems.length - targetIdx + 10));
         }
       }
     }
@@ -129,24 +130,13 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
   const yesterdayMidnight = todayMidnight - 86400000;
   const currentYear = new Date(todayMidnight || 0).getFullYear();
 
-  // If a specific item is targeted via wiki-link or reply, derive expanded window size during render
-  const effectiveVisibleCount = useMemo(() => {
-    if (!highlightedItemId) return visibleCount;
-    const targetIdx = filteredItems.findIndex(i => i.id === highlightedItemId);
-    if (targetIdx !== -1) {
-      const neededCount = filteredItems.length - targetIdx + 10;
-      return Math.max(visibleCount, neededCount);
-    }
-    return visibleCount;
-  }, [highlightedItemId, filteredItems, visibleCount]);
+  // Windowed items: последние `windowSize` записей, новее всегда в кадре
+  const windowedItems = useMemo(
+    () => filteredItems.slice(Math.max(0, filteredItems.length - windowSize)),
+    [filteredItems, windowSize]
+  );
 
-  // Windowed items (only the most recent N items)
-  const windowedItems = useMemo(() => {
-    if (filteredItems.length <= effectiveVisibleCount) return filteredItems;
-    return filteredItems.slice(filteredItems.length - effectiveVisibleCount);
-  }, [filteredItems, effectiveVisibleCount]);
-
-  const hasMoreOlder = filteredItems.length > effectiveVisibleCount;
+  const hasMoreOlder = filteredItems.length > windowSize;
 
   // Cards glide when the list shrinks or reorders; a fresh note lands instead.
   useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'));
@@ -160,7 +150,7 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
     prevScrollTopRef.current = container.scrollTop;
     isPrependRef.current = true;
 
-    setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filteredItems.length));
+    setWindowSize(prev => Math.min(prev + WINDOW_CHUNK, filteredItems.length));
   }, [hasMoreOlder, filteredItems.length]);
 
   const isStuckToBottomRef = useRef(true);
@@ -332,7 +322,19 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
       isStuckToBottomRef.current = distFromBottom <= 40;
     }
     setShowScrollBottom(distFromBottom > 220);
-  }, [highlightedItemId]);
+
+    // ponytail: выгрузка по расстоянию скролла; индексная виртуализация, если карточки станут тяжёлыми
+    // Ушли далеко от верхней кромки окна — верхний чанк можно выгрузить:
+    // окно прижато к новым записям, поэтому уменьшение размера срезает старые.
+    // Под переходом по ссылке окно не трогаем: расширение под цель и выгрузка
+    // дёргали бы друг друга в цикле.
+    if (!highlightedItemId && container.scrollTop > container.clientHeight * 2 && windowSize > WINDOW_CHUNK) {
+      prevScrollHeightRef.current = container.scrollHeight;
+      prevScrollTopRef.current = container.scrollTop;
+      isPrependRef.current = true;
+      setWindowSize(prev => Math.max(WINDOW_CHUNK, prev - WINDOW_CHUNK));
+    }
+  }, [highlightedItemId, windowSize]);
 
   const scrollToBottom = useCallback(() => {
     isStuckToBottomRef.current = true;

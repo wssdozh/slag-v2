@@ -25,6 +25,7 @@ import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/usePresence';
+import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
@@ -61,6 +62,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     openLightbox,
     aiSettings,
     isSearchOpen,
+    isMobile,
   } = useApp();
 
   const handleEditorClose = useCallback(() => {
@@ -111,11 +113,31 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
+  // Phone editor sits as a half sheet (56svh) and grows to the full window when
+  // the handle is pulled up. Reset belongs to render: a new note starts folded.
+  const [isSheetExpanded, setIsSheetExpanded] = useState(false);
+  const [sheetItemId, setSheetItemId] = useState(item.id);
+  if (sheetItemId !== item.id) {
+    setSheetItemId(item.id);
+    setIsSheetExpanded(false);
+  }
+
+  const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle } = useSheetDrag({
+    isOpen: true,
+    onDismiss: handleClose,
+    onExpand: () => setIsSheetExpanded(true),
+    // Свёрнутой шторке некуда сворачиваться: вниз — это закрытие, а не коллапс.
+    onCollapse: isSheetExpanded ? () => setIsSheetExpanded(false) : undefined,
+  });
+
   const rootRef = useRef<HTMLDivElement>(null);
   const hasExpandedRef = useRef(false);
 
   // Unfold out of the card that was tapped and collapse symmetrically on exit.
   useLayoutEffect(() => {
+    // On a phone the surface is a half sheet: it has its own sheet motion, and a
+    // card-to-fullscreen flip would fight the drag gesture.
+    if (isMobile) return;
     // A wide surface lifts further than a phone screen, where the editor is the
     // whole window and reads as a sheet.
     const travel = window.matchMedia('(max-width: 767px)').matches ? 56 : 18;
@@ -143,7 +165,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     // there is no card, and doing nothing looked like the editor just appeared.
     if (origin) expandFromRect(origin, target);
     else enterFromEdge(target, travel);
-  }, [item.id, isSearchOpen, presencePhase]);
+  }, [item.id, isSearchOpen, presencePhase, isMobile]);
 
   // Zen mode & layout controls (persisting user's width preference)
   const [isZenMode, setIsZenMode] = useState(false);
@@ -483,7 +505,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="fixed inset-0 z-50 z-[100] bg-surface flex flex-col text-fg-primary"
+      className="fixed inset-0 z-[100] flex flex-col text-fg-primary"
     >
       {/* Hidden File Picker Input */}
       <input
@@ -507,404 +529,442 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         </div>
       )}
 
-      {/* Top Control Bar */}
-      <EditorToolbar
-        item={item}
-        folder={folder}
-        onFolderChange={setFolder}
-        folderOptions={folderOptions}
-        type={type}
-        onTypeChange={setType}
-        selectedAttachment={selectedAttachment}
-        onSelectAttachment={setSelectedAttachmentId}
-        onRemoveAttachment={removeAttachment}
-        onInsertAttachmentMarkdown={insertAttachmentMarkdown}
-        onOpenLightbox={openLightbox}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onInsertMarkdown={insertMarkdown}
-        onInsertTable={handleInsertTable}
-        onAttachClick={() => fileInputRef.current?.click()}
-        onAiDecompose={handleAiDecomposeInline}
-        isZenMode={isZenMode}
-        onToggleZenMode={() => setIsZenMode(prev => !prev)}
-        isFullWidth={isFullWidth}
-        onToggleFullWidth={() => setIsFullWidth(prev => !prev)}
-        saveStatus={saveStatus}
-        onSave={handleSave}
-        onClose={handleClose}
-      />
-
-      {/* Editor Body */}
-      <div className="flex-1 overflow-y-auto py-6 md:py-8 bg-surface">
+      {/* Phone half sheet: the dim closes on tap and sits behind the panel. */}
+      {isMobile && !isSheetExpanded && (
         <div
-          className={`mx-auto w-full px-4 md:px-6 flex flex-col gap-4 pb-28 ${
-            isFullWidth ? 'max-w-5xl' : 'max-w-3xl'
-          }`}
-        >
-          {/* Title Input with optional task completion toggle */}
-          <div className="flex items-center gap-3">
-            {type === 'task' && (
-              <button
-                type="button"
-                onClick={() => setStatus((prev: SlagItemStatus) => (prev === 'done' ? 'todo' : 'done'))}
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
-                  status === 'done'
-                    ? 'border border-emerald-500 bg-emerald-500/20 text-emerald-400'
-                    : 'border border-zinc-600 hover:border-blue-400 text-transparent hover:text-blue-400'
-                }`}
-                title={status === 'done' ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
-              >
-                <Check className="w-3 h-3 stroke-[3]" />
-              </button>
-            )}
-            {/* textarea вместо input: заголовок переносится, а не обрезается на узком экране.
-                field-sizing:content даёт авто-высоту без JS (Chrome 123+, Android WebView 156). */}
-            <textarea
-              rows={1}
-              value={title}
-              onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
-              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-              placeholder={type === 'task' ? 'Название таски...' : 'Заголовок...'}
-              className={`w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight placeholder-zinc-600 border-none px-0 outline-none resize-none overflow-hidden [field-sizing:content] ${
-                type === 'task' && status === 'done' ? 'text-zinc-500 line-through' : 'text-white'
-              }`}
-            />
-          </div>
+          ref={scrimRef}
+          onClick={handleClose}
+          className="absolute inset-0 bg-black/60"
+        />
+      )}
 
-          {/* Unified Linear Properties & Taxonomy Container */}
+      {/* The editor surface: a half sheet on a phone, the plain window on desktop. */}
+      <div
+        ref={isMobile ? panelRef : undefined}
+        data-testid={isMobile ? 'editor-sheet' : undefined}
+        className={
+          isMobile
+            ? `absolute inset-x-0 bottom-0 flex flex-col overflow-hidden bg-surface border-t border-white/[0.08] shadow-2xl transition-[height] duration-[240ms] ${
+                isSheetExpanded ? 'rounded-t-none' : 'rounded-t-2xl'
+              }`
+            : 'flex flex-1 flex-col bg-surface'
+        }
+        style={isMobile ? { height: isSheetExpanded ? '100%' : '56svh', ...panelStyle } : undefined}
+      >
+        {/* The handle owns the sheet gesture; the scroller under it keeps scrolling. */}
+        {isMobile && (
           <div
-            className={`flex flex-col gap-2.5 pb-1 transition-opacity duration-200 ${
-              isZenMode ? 'opacity-20 hover:opacity-100' : 'opacity-100'
+            data-sheet-handle
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerEnd}
+            onPointerCancel={onPointerCancel}
+            style={{ touchAction: 'none' }}
+            className="flex h-6 shrink-0 items-center justify-center"
+          >
+            <div className="h-1 w-8 rounded-full bg-white/20" />
+          </div>
+        )}
+
+        {/* Top Control Bar */}
+        <EditorToolbar
+          item={item}
+          folder={folder}
+          onFolderChange={setFolder}
+          folderOptions={folderOptions}
+          type={type}
+          onTypeChange={setType}
+          selectedAttachment={selectedAttachment}
+          onSelectAttachment={setSelectedAttachmentId}
+          onRemoveAttachment={removeAttachment}
+          onInsertAttachmentMarkdown={insertAttachmentMarkdown}
+          onOpenLightbox={openLightbox}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onInsertMarkdown={insertMarkdown}
+          onInsertTable={handleInsertTable}
+          onAttachClick={() => fileInputRef.current?.click()}
+          onAiDecompose={handleAiDecomposeInline}
+          isZenMode={isZenMode}
+          onToggleZenMode={() => setIsZenMode(prev => !prev)}
+          isFullWidth={isFullWidth}
+          onToggleFullWidth={() => setIsFullWidth(prev => !prev)}
+          saveStatus={saveStatus}
+          onSave={handleSave}
+          onClose={handleClose}
+        />
+
+        {/* Editor Body */}
+        <div className="flex-1 overflow-y-auto py-6 md:py-8 bg-surface">
+          <div
+            className={`mx-auto w-full px-4 md:px-6 flex flex-col gap-4 pb-28 ${
+              isFullWidth ? 'max-w-5xl' : 'max-w-3xl'
             }`}
           >
-            {/* Task Controls Row */}
-            {type === 'task' && (
-              <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-300">
-                {/* Status Selector */}
-                <div className="flex items-center shrink-0">
-                  <Select
-                    size="sm"
-                    variant="ghost"
-                    direction="down"
-                    value={status}
-                    onChange={(val) => setStatus(val as SlagItemStatus)}
-                    options={[
-                      {
-                        value: 'backlog',
-                        label: 'Бэклог',
-                        icon: <Circle className="w-3.5 h-3.5 text-zinc-500" />,
-                        color: 'text-zinc-500',
-                      },
-                      {
-                        value: 'todo',
-                        label: 'К выполнению',
-                        icon: <Circle className="w-3.5 h-3.5 text-zinc-400" />,
-                        color: 'text-zinc-400',
-                      },
-                      {
-                        value: 'in_progress',
-                        label: 'В работе',
-                        icon: <Clock className="w-3.5 h-3.5 text-blue-400" />,
-                        color: 'text-blue-400',
-                      },
-                      {
-                        value: 'done',
-                        label: 'Выполнено',
-                        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
-                        color: 'text-emerald-400',
-                      },
-                    ]}
-                    className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
-                  />
-                </div>
-
-                {/* Priority Selector */}
-                <div className="flex items-center shrink-0">
-                  <Select
-                    size="sm"
-                    variant="ghost"
-                    direction="down"
-                    value={priority}
-                    onChange={(val) => setPriority(val as 'none' | 'low' | 'medium' | 'high')}
-                    options={[
-                      {
-                        value: 'none',
-                        label: 'Обычный',
-                        icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
-                        color: 'text-zinc-400',
-                      },
-                      {
-                        value: 'low',
-                        label: 'Низкий',
-                        icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
-                        color: 'text-zinc-300',
-                      },
-                      {
-                        value: 'medium',
-                        label: 'Средний',
-                        icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
-                        color: 'text-amber-400',
-                      },
-                      {
-                        value: 'high',
-                        label: 'Высокий',
-                        icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
-                        color: 'text-rose-400',
-                      },
-                    ]}
-                    className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
-                  />
-                </div>
-
-                {/* Due Date Trigger */}
-                <div className="relative shrink-0">
-                  {dueDate ? (
-                    <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs transition-colors shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setIsDatePickerOpen(prev => !prev)}
-                        className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
-                        title="Изменить срок"
-                      >
-                        <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDueDate('')}
-                        className="p-0.5 text-blue-400 hover:text-rose-400 transition-colors cursor-pointer"
-                        title="Снять срок"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsDatePickerOpen(prev => !prev)}
-                      className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                      title="Установить срок таски"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                      <span>Срок</span>
-                    </button>
-                  )}
-
-                  <DatePickerPopover
-                    isOpen={isDatePickerOpen}
-                    value={dueDate}
-                    onChange={(newDate) => {
-                      setDueDate(newDate);
-                      setIsDatePickerOpen(false);
-                    }}
-                    onClear={() => {
-                      setDueDate('');
-                      setIsDatePickerOpen(false);
-                    }}
-                    onClose={() => setIsDatePickerOpen(false)}
-                    direction="down"
-                  />
-                </div>
-
-                {/* Duration Selector */}
-                <div className="relative shrink-0">
-                  {duration !== undefined ? (
-                    <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-white/[0.08] border border-white/[0.12] text-xs text-white transition-colors shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                        className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors cursor-pointer"
-                        title="Изменить длительность"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="font-medium max-w-[70px] truncate">
-                          {duration >= 60
-                            ? `${Math.floor(duration / 60)}ч${duration % 60 ? ` ${duration % 60}м` : ''}`
-                            : `${duration}м`}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDuration(undefined)}
-                        className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                        title="Снять длительность"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                      className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                      title="Установить длительность таски"
-                    >
-                      <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                      <span>Длительность</span>
-                    </button>
-                  )}
-
-                  {isDurationDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
-                      {[15, 30, 45, 60, 90, 120].map(mins => (
-                        <button
-                          key={mins}
-                          type="button"
-                          onClick={() => {
-                            setDuration(mins);
-                            setIsDurationDropdownOpen(false);
-                          }}
-                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                            duration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                          }`}
-                        >
-                          <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Recurrence Selector */}
-                <div className="relative shrink-0">
-                  {recurrence ? (
-                    <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs transition-colors shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                        className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-                        title="Изменить повторение"
-                      >
-                        <Repeat className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span className="font-medium max-w-[85px] truncate">
-                          {formatRecurrenceLabel(recurrence)}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRecurrence(undefined)}
-                        className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                        title="Снять повторение"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                      className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                      title="Повторяющаяся таска"
-                    >
-                      <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                      <span>Повтор</span>
-                    </button>
-                  )}
-
-                  {isRecurrenceDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
-                      {RECURRENCE_PRESETS.map(opt => (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          onClick={() => {
-                            setRecurrence(opt.rule);
-                            setIsRecurrenceDropdownOpen(false);
-                          }}
-                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                        >
-                          <span>{opt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Subtle Divider between Task Controls and Tags */}
-            {type === 'task' && (
-              <div className="h-px bg-white/[0.06] w-full" />
-            )}
-
-            {/* Tags Ribbon Row - Seamless Flat Textarea-Like Area */}
-            <div
-              onClick={() => tagInputRef.current?.focus()}
-              className="flex items-center gap-1.5 flex-wrap min-h-7 py-0.5 cursor-text text-xs"
-            >
-              {tags.map(t => (
-                <TagChip
-                  key={t}
-                  tag={t}
-                  variant="pill"
-                  onRemove={() => setTags(tags.filter(tag => tag !== t))}
-                />
-              ))}
-              <input
-                ref={tagInputRef}
-                type="text"
-                value={newTagInput}
-                onChange={(e) => setNewTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-                onBlur={handleTagBlur}
-                placeholder={tags.length === 0 ? 'добавьте теги...' : ''}
-                className="bg-transparent text-xs font-mono text-zinc-300 placeholder-zinc-600 outline-none min-w-[70px] flex-1 py-0.5"
+            {/* Title Input with optional task completion toggle */}
+            <div className="flex items-center gap-3">
+              {type === 'task' && (
+                <button
+                  type="button"
+                  onClick={() => setStatus((prev: SlagItemStatus) => (prev === 'done' ? 'todo' : 'done'))}
+                  className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
+                    status === 'done'
+                      ? 'border border-emerald-500 bg-emerald-500/20 text-emerald-400'
+                      : 'border border-zinc-600 hover:border-blue-400 text-transparent hover:text-blue-400'
+                  }`}
+                  title={status === 'done' ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
+                >
+                  <Check className="w-3 h-3 stroke-[3]" />
+                </button>
+              )}
+              {/* textarea вместо input: заголовок переносится, а не обрезается на узком экране.
+                  field-sizing:content даёт авто-высоту без JS (Chrome 123+, Android WebView 156). */}
+              <textarea
+                rows={1}
+                value={title}
+                onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                placeholder={type === 'task' ? 'Название таски...' : 'Заголовок...'}
+                className={`w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight placeholder-zinc-600 border-none px-0 outline-none resize-none overflow-hidden [field-sizing:content] ${
+                  type === 'task' && status === 'done' ? 'text-zinc-500 line-through' : 'text-white'
+                }`}
               />
             </div>
 
-            {/* Subtle Divider between Properties/Tags and Content */}
-            <div className="h-px bg-white/[0.06] w-full mt-1" />
-          </div>
+            {/* Unified Linear Properties & Taxonomy Container */}
+            <div
+              className={`flex flex-col gap-2.5 pb-1 transition-opacity duration-200 ${
+                isZenMode ? 'opacity-20 hover:opacity-100' : 'opacity-100'
+              }`}
+            >
+              {/* Task Controls Row */}
+              {type === 'task' && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-300">
+                  {/* Status Selector */}
+                  <div className="flex items-center shrink-0">
+                    <Select
+                      size="sm"
+                      variant="ghost"
+                      direction="down"
+                      value={status}
+                      onChange={(val) => setStatus(val as SlagItemStatus)}
+                      options={[
+                        {
+                          value: 'backlog',
+                          label: 'Бэклог',
+                          icon: <Circle className="w-3.5 h-3.5 text-zinc-500" />,
+                          color: 'text-zinc-500',
+                        },
+                        {
+                          value: 'todo',
+                          label: 'К выполнению',
+                          icon: <Circle className="w-3.5 h-3.5 text-zinc-400" />,
+                          color: 'text-zinc-400',
+                        },
+                        {
+                          value: 'in_progress',
+                          label: 'В работе',
+                          icon: <Clock className="w-3.5 h-3.5 text-blue-400" />,
+                          color: 'text-blue-400',
+                        },
+                        {
+                          value: 'done',
+                          label: 'Выполнено',
+                          icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
+                          color: 'text-emerald-400',
+                        },
+                      ]}
+                      className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
+                    />
+                  </div>
 
-          {/* Media Attachments Section in Fullscreen Editor - Collapsible */}
-          <AttachmentStrip
-            itemId={item.id}
-            attachments={attachments}
-            isCollapsed={isAttachmentsCollapsed}
-            onToggleCollapse={() => setIsAttachmentsCollapsed(prev => !prev)}
-            selectedAttachmentId={selectedAttachmentId}
-            onSelectAttachment={setSelectedAttachmentId}
-            onInsertMarkdown={insertAttachmentMarkdown}
-            onMoveAttachment={moveAttachment}
-            onRemoveAttachment={removeAttachment}
-            onAddClick={() => fileInputRef.current?.click()}
-            onOpenLightbox={openLightbox}
-          />
+                  {/* Priority Selector */}
+                  <div className="flex items-center shrink-0">
+                    <Select
+                      size="sm"
+                      variant="ghost"
+                      direction="down"
+                      value={priority}
+                      onChange={(val) => setPriority(val as 'none' | 'low' | 'medium' | 'high')}
+                      options={[
+                        {
+                          value: 'none',
+                          label: 'Обычный',
+                          icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
+                          color: 'text-zinc-400',
+                        },
+                        {
+                          value: 'low',
+                          label: 'Низкий',
+                          icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
+                          color: 'text-zinc-300',
+                        },
+                        {
+                          value: 'medium',
+                          label: 'Средний',
+                          icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
+                          color: 'text-amber-400',
+                        },
+                        {
+                          value: 'high',
+                          label: 'Высокий',
+                          icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
+                          color: 'text-rose-400',
+                        },
+                      ]}
+                      className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
+                    />
+                  </div>
 
-          {/* Main Markdown Editor with Obsidian-style Live Preview */}
-          <div
-            id="fullscreen-editor-root"
-            onClick={(e) => {
-              const target = e.target as HTMLElement;
-              const img = target.closest('img');
-              if (img) {
-                const src = img.getAttribute('src');
-                const alt = img.getAttribute('alt');
-                const found = attachments.find(a => a.name === alt || a.dataUrl === src);
-                if (found) {
-                  setSelectedAttachmentId(found.id);
-                  return;
-                }
-              }
-              if (selectedAttachmentId) {
-                setSelectedAttachmentId(null);
-              }
-            }}
-            onPaste={handlePaste}
-            className="w-full relative min-h-[420px]"
-          >
-            <AtomicCodeMirrorEditor
-              documentId={item.id}
-              markdownSource={content}
-              onMarkdownChange={setContent}
-              editorHandleRef={editorHandleRef}
-              extensions={editorExtensions}
+                  {/* Due Date Trigger */}
+                  <div className="relative shrink-0">
+                    {dueDate ? (
+                      <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs transition-colors shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsDatePickerOpen(prev => !prev)}
+                          className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                          title="Изменить срок"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                          <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDueDate('')}
+                          className="p-0.5 text-blue-400 hover:text-rose-400 transition-colors cursor-pointer"
+                          title="Снять срок"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsDatePickerOpen(prev => !prev)}
+                        className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                        title="Установить срок таски"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span>Срок</span>
+                      </button>
+                    )}
+
+                    <DatePickerPopover
+                      isOpen={isDatePickerOpen}
+                      value={dueDate}
+                      onChange={(newDate) => {
+                        setDueDate(newDate);
+                        setIsDatePickerOpen(false);
+                      }}
+                      onClear={() => {
+                        setDueDate('');
+                        setIsDatePickerOpen(false);
+                      }}
+                      onClose={() => setIsDatePickerOpen(false)}
+                      direction="down"
+                    />
+                  </div>
+
+                  {/* Duration Selector */}
+                  <div className="relative shrink-0">
+                    {duration !== undefined ? (
+                      <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-white/[0.08] border border-white/[0.12] text-xs text-white transition-colors shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
+                          className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                          title="Изменить длительность"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                          <span className="font-medium max-w-[70px] truncate">
+                            {duration >= 60
+                              ? `${Math.floor(duration / 60)}ч${duration % 60 ? ` ${duration % 60}м` : ''}`
+                              : `${duration}м`}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDuration(undefined)}
+                          className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                          title="Снять длительность"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
+                        className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                        title="Установить длительность таски"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span>Длительность</span>
+                      </button>
+                    )}
+
+                    {isDurationDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
+                        {[15, 30, 45, 60, 90, 120].map(mins => (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => {
+                              setDuration(mins);
+                              setIsDurationDropdownOpen(false);
+                            }}
+                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                              duration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
+                            }`}
+                          >
+                            <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recurrence Selector */}
+                  <div className="relative shrink-0">
+                    {recurrence ? (
+                      <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs transition-colors shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
+                          className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                          title="Изменить повторение"
+                        >
+                          <Repeat className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span className="font-medium max-w-[85px] truncate">
+                            {formatRecurrenceLabel(recurrence)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRecurrence(undefined)}
+                          className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                          title="Снять повторение"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
+                        className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                        title="Повторяющаяся таска"
+                      >
+                        <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <span>Повтор</span>
+                      </button>
+                    )}
+
+                    {isRecurrenceDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
+                        {RECURRENCE_PRESETS.map(opt => (
+                          <button
+                            key={opt.label}
+                            type="button"
+                            onClick={() => {
+                              setRecurrence(opt.rule);
+                              setIsRecurrenceDropdownOpen(false);
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                          >
+                            <span>{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Subtle Divider between Task Controls and Tags */}
+              {type === 'task' && (
+                <div className="h-px bg-white/[0.06] w-full" />
+              )}
+
+              {/* Tags Ribbon Row - Seamless Flat Textarea-Like Area */}
+              <div
+                onClick={() => tagInputRef.current?.focus()}
+                className="flex items-center gap-1.5 flex-wrap min-h-7 py-0.5 cursor-text text-xs"
+              >
+                {tags.map(t => (
+                  <TagChip
+                    key={t}
+                    tag={t}
+                    variant="pill"
+                    onRemove={() => setTags(tags.filter(tag => tag !== t))}
+                  />
+                ))}
+                <input
+                  ref={tagInputRef}
+                  type="text"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  onBlur={handleTagBlur}
+                  placeholder={tags.length === 0 ? 'добавьте теги...' : ''}
+                  className="bg-transparent text-xs font-mono text-zinc-300 placeholder-zinc-600 outline-none min-w-[70px] flex-1 py-0.5"
+                />
+              </div>
+
+              {/* Subtle Divider between Properties/Tags and Content */}
+              <div className="h-px bg-white/[0.06] w-full mt-1" />
+            </div>
+
+            {/* Media Attachments Section in Fullscreen Editor - Collapsible */}
+            <AttachmentStrip
+              itemId={item.id}
+              attachments={attachments}
+              isCollapsed={isAttachmentsCollapsed}
+              onToggleCollapse={() => setIsAttachmentsCollapsed(prev => !prev)}
+              selectedAttachmentId={selectedAttachmentId}
+              onSelectAttachment={setSelectedAttachmentId}
+              onInsertMarkdown={insertAttachmentMarkdown}
+              onMoveAttachment={moveAttachment}
+              onRemoveAttachment={removeAttachment}
+              onAddClick={() => fileInputRef.current?.click()}
+              onOpenLightbox={openLightbox}
             />
-          </div>
 
-          {/* Bottom spacer on mobile so last lines clear the floating bottom bar */}
-          <div className="h-16 md:hidden shrink-0" aria-hidden="true" />
+            {/* Main Markdown Editor with Obsidian-style Live Preview */}
+            <div
+              id="fullscreen-editor-root"
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                const img = target.closest('img');
+                if (img) {
+                  const src = img.getAttribute('src');
+                  const alt = img.getAttribute('alt');
+                  const found = attachments.find(a => a.name === alt || a.dataUrl === src);
+                  if (found) {
+                    setSelectedAttachmentId(found.id);
+                    return;
+                  }
+                }
+                if (selectedAttachmentId) {
+                  setSelectedAttachmentId(null);
+                }
+              }}
+              onPaste={handlePaste}
+              className="w-full relative min-h-[420px]"
+            >
+              <AtomicCodeMirrorEditor
+                documentId={item.id}
+                markdownSource={content}
+                onMarkdownChange={setContent}
+                editorHandleRef={editorHandleRef}
+                extensions={editorExtensions}
+              />
+            </div>
+
+            {/* Bottom spacer on mobile so last lines clear the floating bottom bar */}
+            <div className="h-16 md:hidden shrink-0" aria-hidden="true" />
+          </div>
         </div>
       </div>
 

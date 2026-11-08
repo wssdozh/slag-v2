@@ -1,5 +1,5 @@
 import { formatBytes } from '../../lib/formatBytes';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
@@ -104,6 +104,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
   const [expandedOcrIds, setExpandedOcrIds] = useState<Set<string>>(new Set());
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [visibleTagCount, setVisibleTagCount] = useState(0);
+  const [tagsRowWidth, setTagsRowWidth] = useState(0);
+  const tagsRowRef = useRef<HTMLDivElement | null>(null);
 
   const toggleOcr = (id: string) => {
     setExpandedOcrIds(prev => {
@@ -136,11 +139,87 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
   const longPressTimerRef = useRef<number | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const tapTimerRef = useRef<number | null>(null);
+  const lastTapAtRef = useRef(0);
+  const suppressTapRef = useRef(false);
+
+  // ponytail: замер ряда даёт лишний reflow на карточку; IntersectionObserver на чип, если карточки потяжелеют
+  useLayoutEffect(() => {
+    const row = tagsRowRef.current;
+    if (!row || !item.tags || item.tags.length === 0) return;
+
+    // Невидимые чипы остаются в раскладке, поэтому замер видит все теги сразу
+    // и не зависит от того, сколько показано в прошлом проходе.
+    let usedPx = 0;
+    let count = 0;
+    const limit = row.clientWidth;
+    for (const child of Array.from(row.children) as HTMLElement[]) {
+      if (child.dataset.tagOverflow === '1' || child.offsetWidth === 0) continue;
+      usedPx += child.offsetWidth + 6;
+      if (usedPx <= limit) count += 1;
+    }
+    const next = Math.max(1, count);
+    setVisibleTagCount(prev => (prev === next ? prev : next));
+
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) setTagsRowWidth(Math.round(entry.contentRect.width));
+    });
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [item.tags, tagsRowWidth]);
+
+  const copyItemText = () => {
+    const text = (item.content || '').trim() || item.title;
+    navigator.clipboard
+      .writeText(text)
+      .then(() => addToast('Текст скопирован', 'success'))
+      .catch(() => addToast('Не удалось скопировать', 'error'));
+    try {
+      navigator.vibrate?.(10);
+    } catch {
+      // Ignore: вибрация не критична
+    }
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (!isMobile) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, a, input, textarea, [role="button"], .cursor-pointer')) return;
+    if (suppressTapRef.current) {
+      suppressTapRef.current = false;
+      return;
+    }
+    const now = performance.now();
+    if (now - lastTapAtRef.current < UI_DELAYS.DOUBLE_TAP_MS) {
+      lastTapAtRef.current = 0;
+      if (tapTimerRef.current) {
+        clearTimeout(tapTimerRef.current);
+        tapTimerRef.current = null;
+      }
+      copyItemText();
+      return;
+    }
+    lastTapAtRef.current = now;
+    tapTimerRef.current = window.setTimeout(() => {
+      tapTimerRef.current = null;
+      setSelectedItem(item);
+      setIsFullscreenEditorOpen(true);
+    }, UI_DELAYS.DOUBLE_TAP_MS);
+  };
+
+  useEffect(() => () => {
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+  }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+    }
 
     longPressTimerRef.current = window.setTimeout(() => {
       try {
@@ -149,6 +228,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         // Ignore
       }
       setMobileActionSheetItem(item);
+      suppressTapRef.current = true;
       longPressTimerRef.current = null;
     }, UI_DELAYS.LONG_PRESS_MS);
   };
@@ -163,10 +243,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     if (Math.hypot(dx, dy) > 10 && longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
+      if (tapTimerRef.current) {
+        clearTimeout(tapTimerRef.current);
+        tapTimerRef.current = null;
+      }
     }
 
     // Horizontal swipe left for reply (Telegram style)
     if (dx < 0 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (tapTimerRef.current) {
+        clearTimeout(tapTimerRef.current);
+        tapTimerRef.current = null;
+      }
       setSwipeOffset(Math.max(-70, dx));
     }
   };
@@ -273,7 +361,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           e.stopPropagation();
           navigateToFolder(item.folder, item.id);
         }}
-        className="text-2xs text-zinc-500 hover:text-zinc-200 font-mono transition-colors cursor-pointer hover:underline underline-offset-2 truncate max-w-[140px] text-left leading-none inline-flex items-center"
+        className="text-2xs text-zinc-500 hover:text-zinc-200 font-mono transition-colors cursor-pointer hover:underline underline-offset-2 truncate max-w-[96px] text-left leading-none inline-flex items-center shrink-0"
         title={`Перейти в папку «${item.folder}» и перейти к этой записи`}
       >
         {folderDisplayName}
@@ -298,7 +386,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             item,
           });
         }}
-        className="text-2xs font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer transition-colors hover:underline underline-offset-2"
+        className="text-2xs font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer transition-colors hover:underline underline-offset-2 shrink-0"
         title="Сменить тип записи (клик или ПКМ)"
       >
         Статья
@@ -312,7 +400,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.push(
       <span
         key="priority"
-        className="flex items-center"
+        className="flex items-center shrink-0"
         title={`Приоритет: ${priorityLabel}`}
         aria-label={`Приоритет: ${priorityLabel}`}
       >
@@ -325,7 +413,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.push(
       <span
         key="due"
-        className="flex items-center gap-1 text-2xs text-zinc-500 font-mono"
+        className="flex items-center gap-1 text-2xs text-zinc-500 font-mono shrink-0"
         title={`Срок: ${item.dueDate}`}
       >
         <Calendar className="w-3 h-3 text-zinc-600" />
@@ -340,7 +428,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.push(
       <span
         key="streak"
-        className="flex items-center gap-1 text-2xs font-mono select-none"
+        className="flex items-center gap-1 text-2xs font-mono select-none shrink-0"
         title={isZero ? 'Серия прервана (0)' : `Серия: ${streak}`}
       >
         <Flame
@@ -359,7 +447,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.push(
       <span
         key="pin"
-        className="flex items-center gap-1 text-2xs font-mono text-amber-400/90"
+        className="flex items-center gap-1 text-2xs font-mono text-amber-400/90 shrink-0"
         title="Закрепленная запись"
       >
         <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
@@ -434,6 +522,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       <div
         id={`item-${item.id}`}
         data-flip-id={item.id}
+        onClick={handleCardClick}
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onContextMenu={handleContextMenu}
@@ -471,27 +560,29 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
           </button>
 
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (isMobile) {
-                setMobileActionSheetItem(item);
-              } else {
-                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                openContextMenu({
-                  x: rect.right - 224,
-                  y: rect.bottom + 6,
-                  type: 'item',
-                  item,
-                });
-              }
-            }}
-            className="w-7 h-7 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer flex items-center justify-center shrink-0"
-            title="Действия"
-          >
-            <MoreVertical className="w-3.5 h-3.5 shrink-0" />
-          </button>
+          {!isMobile && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isMobile) {
+                  setMobileActionSheetItem(item);
+                } else {
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  openContextMenu({
+                    x: rect.right - 224,
+                    y: rect.bottom + 6,
+                    type: 'item',
+                    item,
+                  });
+                }
+              }}
+              className="w-7 h-7 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer flex items-center justify-center shrink-0"
+              title="Действия"
+            >
+              <MoreVertical className="w-3.5 h-3.5 shrink-0" />
+            </button>
+          )}
 
           {/* Article Focus Editor Button in top-right corner - kept in place on the far right */}
           {isArticle && (
@@ -866,9 +957,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* Bottom Bar: Metadata & Tags on left + Timestamp on right */}
       {shouldRenderBottomBar && (
-        <div className="flex items-center justify-between gap-2 pt-1 min-h-[16px] w-full select-none">
+        <div
+          data-testid="item-meta-row"
+          className="flex items-center gap-2 pt-1 min-h-[16px] w-full select-none"
+        >
           {hasBottomMeta ? (
-            <div className="flex flex-wrap gap-x-2 gap-y-1 items-center min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap">
               {metaElements.map((el, idx) => (
                 <React.Fragment key={idx}>
                   {idx > 0 && <span className="w-1 h-1 rounded-full bg-zinc-600/80 inline-block shrink-0" />}
@@ -883,13 +977,51 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
               {/* Tags with overflow folding */}
               {item.tags && item.tags.length > 0 && (() => {
+                if (isMobile) {
+                  const shown = Math.max(1, visibleTagCount);
+                  const hidden = item.tags.length - shown;
+                  return (
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div
+                        ref={tagsRowRef}
+                        data-testid="item-tags-row"
+                        className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap"
+                      >
+                        {item.tags.map((tag, idx) => (
+                          <TagChip
+                            key={tag}
+                            tag={tag}
+                            variant="flat"
+                            // Скрытие через visibility: чип остаётся в раскладке и меряется.
+                            className={idx < shown ? '' : 'invisible'}
+                            onClick={() => setActiveTagFilter(tag)}
+                          />
+                        ))}
+                      </div>
+                      {hidden > 0 && (
+                        <span
+                          data-tag-overflow="1"
+                          className="shrink-0 text-2xs font-mono text-zinc-500"
+                        >
+                          +{hidden}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+
                 const maxVisible = 3;
                 const hasOverflow = item.tags.length > maxVisible;
                 const visibleTags = isTagsExpanded || !hasOverflow ? item.tags : item.tags.slice(0, maxVisible);
                 const hiddenCount = item.tags.length - maxVisible;
 
                 return (
-                  <div className="flex flex-wrap gap-1.5 items-center">
+                  <div
+                    data-testid="item-tags-row"
+                    className={`flex items-center gap-1.5 min-w-0 overflow-hidden ${
+                      isTagsExpanded ? 'flex-wrap' : 'flex-nowrap'
+                    }`}
+                  >
                     {visibleTags.map(tag => (
                       <TagChip
                         key={tag}
@@ -905,7 +1037,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                           e.stopPropagation();
                           setIsTagsExpanded(prev => !prev);
                         }}
-                        className="text-2xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer select-none leading-none"
+                        className="text-2xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer select-none leading-none shrink-0"
                         title={isTagsExpanded ? 'Свернуть теги' : `Показать ещё ${hiddenCount} тегов`}
                       >
                         {isTagsExpanded ? 'свернуть' : `+${hiddenCount}`}
