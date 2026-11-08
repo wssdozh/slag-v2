@@ -379,6 +379,29 @@ class TestAccountRelay(RelayTestCase):
         self.assertEqual(status, 403)
         self.assertEqual(revoked_login["error"], "device_revoked")
 
+        # An owner can bring a revoked device back into the account without recreating it.
+        self.assertEqual((await self.http("POST", "/api/devices/device-2/approve", {}, owner_token))[0], 200)
+        _, account = await self.http("GET", "/api/account", token=owner_token)
+        self.assertEqual(account["devices"][1]["status"], "active")
+        self.assertEqual((await self.auth_call("/api/auth/login", identity, device2))[0], 200)
+
+        # Purge drops the record, its sessions and its vault grants; the device re-enters as a new request.
+        self.assertEqual((await self.http("PUT", "/api/vaults/vault-1", {"name": "Shared vault"}, owner_token))[0], 200)
+        self.assertEqual((await self.http("PUT", "/api/vaults/vault-1/grants/device-2",
+                                          {"mode": "read-write", "encryptedKey": "encrypted-vault-key"}, owner_token))[0], 200)
+        self.assertEqual((await self.http("DELETE", "/api/devices/device-2?purge=1", {}, owner_token))[0], 200)
+        _, account = await self.http("GET", "/api/account", token=owner_token)
+        self.assertEqual([device["id"] for device in account["devices"]], ["device-1", "device-3"])
+        self.assertEqual(account["devices"][1]["status"], "pending")
+        _, vaults = await self.http("GET", "/api/vaults", token=owner_token)
+        self.assertEqual([grant["deviceId"] for grant in vaults["vaults"][0]["grants"]], ["device-1"])
+        status, again = await self.auth_call("/api/auth/login", identity, device2)
+        self.assertEqual(status, 202, again)
+        self.assertEqual(again["status"], "pending_device")
+
+        # The current device is not forgettable from its own session.
+        self.assertEqual((await self.http("DELETE", "/api/devices/device-1?purge=1", {}, owner_token))[0], 409)
+
     async def device_completion(self, identity, pending, device_id="device-2", **overrides):
         _, challenge = await self.http("POST", "/api/auth/challenge", {"accountId": identity["accountId"]})
         body = {"continuationSecret": pending["continuationSecret"], "challenge": challenge["challenge"],
@@ -570,7 +593,8 @@ class TestAccountRelay(RelayTestCase):
         self.assertEqual((await self.http("POST", "/api/account/devices/device-2/approve", {}, token))[0], 200)
         self.assertEqual((await self.http("PATCH", "/api/account/devices/device-2", {"name": "new"}, token))[0], 200)
         self.assertEqual((await self.http("DELETE", "/api/account/devices/device-2", {}, token))[0], 200)
-        self.assertEqual((await self.http("POST", "/api/account/devices/device-2/approve", {}, token))[0], 409)
+        # Approve doubles as "bring back": a revoked device returns without a new pairing.
+        self.assertEqual((await self.http("POST", "/api/account/devices/device-2/approve", {}, token))[0], 200)
 
     async def test_rotation_receive_only_and_self_grant_bypass(self):
         _, owner, _, guest = await self.two_devices()

@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Check, Copy, Database, KeyRound, Laptop, Loader2, LogOut, Shield, Smartphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { accountClient, generateMnemonic } from '../../lib/sync/account';
+import type { AccountDevice } from '../../lib/sync/accountTypes';
 import { getOrCreateDeviceIdentity } from '../../lib/sync/accountCrypto';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { acceptSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
 import { getVaultDisplayName } from '../../lib/vaultDisplay';
 import { navigatePage } from '../../lib/navigation';
+import { SettingsDivider, SettingsGroup, SettingsRow } from '../Settings/SettingsUI';
 
 export const AccountCabinet: React.FC = () => {
   const { vaults, createVault, switchVault } = useApp();
@@ -108,12 +110,23 @@ export const AccountCabinet: React.FC = () => {
   };
   const account = state.account;
   const currentId = state.session ? state.session.deviceId : null;
-  const activeDevices = state.devices.filter((device) => device.status === 'active')
-    .sort((a, b) => Number(b.id === currentId) - Number(a.id === currentId));
-  const pendingDevices = state.devices.filter((device) => device.status === 'pending');
+  const activeDevices = state.devices.filter((device) => device.status === 'active');
   const recipients = activeDevices.filter((device) => device.id !== currentId);
+  // One list for every status: current device, then active, then requests, then revoked.
+  const deviceRank = (device: AccountDevice) => device.id === currentId ? 0
+    : device.status === 'active' ? 1
+    : device.status === 'pending' ? 2
+    : 3;
+  const orderedDevices = [...state.devices].sort((a, b) => deviceRank(a) - deviceRank(b)
+    || (b.lastSeenAt ? Date.parse(b.lastSeenAt) : 0) - (a.lastSeenAt ? Date.parse(a.lastSeenAt) : 0));
   const shortId = (id: string) => id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-8)}` : id;
   const rights = (mode: string) => mode === 'receive-only' ? 'только чтение' : 'чтение и изменение';
+  const deviceStatus = (device: AccountDevice) => device.status === 'active' ? 'вход разрешён'
+    : device.status === 'pending' ? 'запрос на вход'
+    : 'доступ отозван';
+  const grantStatus = (status: string) => status === 'pending' ? 'ожидает принятия приглашения'
+    : status === 'accepted' ? 'приглашение принято · загрузка файлов не подтверждена'
+    : 'доступ отозван · устройство снова активно';
   const saveDeviceName = (id: string) => perform(async () => {
     const name = deviceName.trim();
     if (!name || name.length > 64) throw new Error('Название должно содержать от 1 до 64 символов');
@@ -199,38 +212,66 @@ export const AccountCabinet: React.FC = () => {
               <p className="text-xs text-zinc-500">Тариф и лимиты подтверждены сервером. Изменение подписки через оплату пока недоступно.</p>
             </section>
 
-            {pendingDevices.length > 0 && <section aria-label="Запросы новых устройств" className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold text-amber-300">Ожидают разрешения · {pendingDevices.length}</h2>
-              <p className="text-xs text-zinc-400">Разрешайте только знакомые устройства. Доступ к хранилищам выдаётся отдельно.</p>
-              {pendingDevices.map((device) => <div key={device.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.05] py-3">
-                <div>{editingDevice === device.id ? <form className="flex flex-wrap gap-3 items-center" onSubmit={(event) => { event.preventDefault(); if (!busy) void saveDeviceName(device.id); }} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setEditingDevice(null); } }}><input autoFocus aria-label="Название устройства, от 1 до 64 символов" required maxLength={64} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} className="w-48 bg-panel border border-white/[0.12] px-2 py-1 text-sm outline-none ring-0" /><button type="submit" disabled={busy || !deviceName.trim()} className="text-xs disabled:opacity-40">Сохранить</button><button type="button" disabled={busy} onClick={() => setEditingDevice(null)} className="text-xs text-zinc-400">Отмена</button></form> : <div className="flex flex-wrap items-center gap-3"><p className="text-sm">{device.name}</p><button type="button" disabled={busy} onClick={() => { setEditingDevice(device.id); setDeviceName(device.name); }} className="text-xs text-zinc-400">Переименовать</button></div>}<p className="text-xs font-mono text-zinc-500" title={device.id}>{shortId(device.id)} · запрос на вход</p></div>
-                <div className="flex gap-4"><button type="button" disabled={busy} onClick={() => void perform(() => accountClient.approveDevice(device.id), 'Устройство разрешено. Доступ к хранилищам выдаётся отдельно.')} className="text-xs text-zinc-100">Разрешить</button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Отклонить запрос устройства «${device.name}»?`)) void perform(() => accountClient.revokeDevice(device.id), 'Запрос отклонён'); }} className="text-xs text-rose-400">Отклонить</button></div>
-              </div>)}
-            </section>}
-
-            <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Устройства</h2><button type="button" disabled={busy} onClick={() => void perform(() => accountClient.refresh())} className="text-xs text-zinc-400">Обновить</button></div>
-              <p className="text-xs text-zinc-500">Для подключения нового устройства войдите на нём по seed, затем разрешите запрос здесь.</p>
-              <div className="divide-y divide-white/[0.05]">
-                {activeDevices.map((device) => (
-                  <div key={device.id} className="py-3 flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">{device.platform === 'mobile' ? <Smartphone className="w-4 h-4 text-zinc-500 shrink-0" /> : <Laptop className="w-4 h-4 text-zinc-500 shrink-0" />}<div className="min-w-0">
-                      {editingDevice === device.id ? <form className="flex flex-wrap items-center gap-3" onSubmit={(event) => { event.preventDefault(); if (!busy) void saveDeviceName(device.id); }} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setEditingDevice(null); } }}>
-                        <label className="sr-only" htmlFor={`device-name-${device.id}`}>Название устройства, от 1 до 64 символов</label>
-                        <input id={`device-name-${device.id}`} autoFocus required maxLength={64} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} className="min-w-0 w-48 bg-panel border border-white/[0.12] px-2 py-1 text-sm outline-none ring-0" />
-                        <button type="submit" disabled={busy || !deviceName.trim() || deviceName.trim().length > 64} className="text-xs disabled:opacity-40">Сохранить</button><button type="button" disabled={busy} onClick={() => setEditingDevice(null)} className="text-xs text-zinc-400">Отмена</button>
-                      </form> : <div className="text-sm break-words">{device.name}{device.id === currentId && <span className="text-zinc-100 text-xs ml-2 font-medium">вы сейчас здесь</span>}</div>}
-                      <div className="font-mono text-[11px] text-zinc-500" title={device.id}>{shortId(device.id)} · вход разрешён</div>
-                      <p className="text-xs text-zinc-500 mt-1">{device.id === currentId ? `Синхронизация текущего хранилища: ${syncStatus.error || (syncStatus.state === 'connected' ? 'соединение установлено' : syncStatus.state === 'syncing' ? 'обмен данными' : syncStatus.state === 'offline' ? 'нет соединения' : 'не подключена')}` : device.lastSeenAt ? `Последняя активность: ${new Date(device.lastSeenAt).toLocaleString('ru-RU')}` : 'Время последней активности неизвестно'}</p>
-                    </div></div>
-                    <div className="flex gap-4 shrink-0">
-                      <button type="button" disabled={busy} aria-label={`Переименовать устройство ${device.name}`} onClick={() => { setEditingDevice(device.id); setDeviceName(device.name); }} className="text-xs text-zinc-400">Переименовать</button>
-                      {device.id !== currentId && <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Отозвать доступ устройства «${device.name}»? Локальные файлы на нём не удалятся.`)) void perform(() => accountClient.revokeDevice(device.id), 'Устройство отозвано. Локальные файлы сохранены.'); }} className="text-xs text-rose-400">Отозвать</button>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+            <SettingsGroup
+              title="Устройства"
+              action={<span className="flex items-center gap-2">
+                <span className="text-2xs font-mono text-zinc-500">{activeDevices.length} / {account.maxDevices}</span>
+                <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.refresh())} className="px-2 py-0.5 text-2xs text-fg-muted rounded-md hover:bg-surface-hover disabled:opacity-40">Обновить</button>
+              </span>}
+            >
+              {orderedDevices.map((device, index) => (
+                <React.Fragment key={device.id}>
+                  {index > 0 && <SettingsDivider inset />}
+                  <SettingsRow
+                    testId={`device-row-${device.id}`}
+                    icon={device.platform === 'mobile' ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />}
+                    label={editingDevice === device.id ? (
+                      <input
+                        autoFocus
+                        aria-label="Название устройства, от 1 до 64 символов"
+                        required
+                        maxLength={64}
+                        value={deviceName}
+                        onChange={(event) => setDeviceName(event.target.value)}
+                        onBlur={() => { if (deviceName.trim()) void saveDeviceName(device.id); else setEditingDevice(null); }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') { event.preventDefault(); void saveDeviceName(device.id); }
+                          if (event.key === 'Escape') { event.stopPropagation(); setEditingDevice(null); }
+                        }}
+                        className="w-48 bg-transparent border border-white/[0.12] px-1.5 py-0.5 text-sm outline-none ring-0 rounded-md text-fg-primary"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => { setEditingDevice(device.id); setDeviceName(device.name); }}
+                        className="text-left text-sm text-fg-primary hover:text-white disabled:opacity-40"
+                      >
+                        {device.name}
+                      </button>
+                    )}
+                    description={<span className="flex flex-col gap-0.5">
+                      <span className="font-mono text-[11px]" title={device.id}>{shortId(device.id)} · {deviceStatus(device)}</span>
+                      <span>{device.id === currentId
+                        ? `Синхронизация текущего хранилища: ${syncStatus.error || (syncStatus.state === 'connected' ? 'соединение установлено' : syncStatus.state === 'syncing' ? 'обмен данными' : syncStatus.state === 'offline' ? 'нет соединения' : 'не подключена')}`
+                        : device.lastSeenAt ? `Последняя активность: ${new Date(device.lastSeenAt).toLocaleString('ru-RU')}` : 'Время последней активности неизвестно'}</span>
+                    </span>}
+                    right={<span className="flex items-center gap-1">
+                      {device.id === currentId ? <span className="text-2xs text-zinc-400">вы сейчас здесь</span>
+                        : device.status === 'pending' ? <>
+                          <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.approveDevice(device.id), 'Устройство разрешено. Доступ к хранилищам выдаётся отдельно.')} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-40">Разрешить</button>
+                          <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Отклонить запрос устройства «${device.name}»?`)) void perform(() => accountClient.revokeDevice(device.id), 'Запрос отклонён'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отклонить</button>
+                        </>
+                        : device.status === 'revoked' ? <>
+                          <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.approveDevice(device.id), 'Устройство снова активно. Верните ему доступ к хранилищам ниже.')} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-40">Вернуть</button>
+                          <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Удалить запись устройства «${device.name}» навсегда? Локальные файлы на нём и в хранилищах не тронем.`)) void perform(() => accountClient.forgetDevice(device.id), 'Устройство удалено из аккаунта'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Удалить</button>
+                        </>
+                        : <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Отозвать доступ устройства «${device.name}»? Локальные файлы на нём не удалятся.`)) void perform(() => accountClient.revokeDevice(device.id), 'Устройство отозвано. Локальные файлы сохранены.'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отозвать</button>}
+                    </span>}
+                  />
+                </React.Fragment>
+              ))}
+            </SettingsGroup>
 
             {state.invitations.length > 0 && <section className="flex flex-col gap-3"><h2 className="text-sm font-semibold">Приглашения в хранилища</h2>{state.invitations.map((invitation) => {
               const localVault = vaults.find((vault) => (vault.syncId || vault.id) === invitation.vaultId);
@@ -249,19 +290,26 @@ export const AccountCabinet: React.FC = () => {
               {vaults.map((vault) => {
                 const serverVault = state.vaults.find((item) => item.id === (vault.syncId || vault.id));
                 const grants = serverVault ? serverVault.grants : [];
+                // Отозванное устройство живёт в списке выше; здесь показываем только тех, у кого доступ ещё может быть.
+                const visibleGrants = grants.filter((grant) => state.devices.find((item) => item.id === grant.deviceId)?.status !== 'revoked');
                 return <div key={vault.id} className="py-4 border-t border-white/[0.05] flex flex-col gap-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0"><Database className="w-4 h-4 text-zinc-500 shrink-0" /><div><div className="text-sm">{getVaultDisplayName(vault, vaults)}</div><div className="text-xs font-mono text-zinc-500">{shortId(vault.syncId || vault.id)}</div></div></div>
                     <button type="button" disabled={busy} onClick={() => { setSharingVault(sharingVault === vault.id ? null : vault.id); setSelectedDevice(''); setReadOnly(false); }} aria-expanded={sharingVault === vault.id} className="text-xs text-zinc-300">Подключить на другое устройство</button>
                   </div>
-                  {grants.map((grant) => {
+                  {visibleGrants.map((grant) => {
                     const device = state.devices.find((item) => item.id === grant.deviceId);
                     return <div key={grant.deviceId} className="flex flex-wrap items-center justify-between gap-3 text-xs">
-                      <div className="text-zinc-400">{device ? device.name : 'Устройство'} · <span className="font-mono" title={grant.deviceId}>{shortId(grant.deviceId)}</span>{grant.deviceId === currentId && ' · вы сейчас здесь'}<span className="block mt-1 text-zinc-500">{rights(grant.mode)} · {grant.status === 'pending' ? 'ожидает принятия приглашения' : grant.status === 'accepted' ? 'приглашение принято · загрузка файлов не подтверждена' : 'доступ отозван'}</span></div>
-                      {grant.status !== 'revoked' && grant.deviceId !== currentId && <button type="button" disabled={busy} aria-label={`Отозвать доступ ${device ? device.name : shortId(grant.deviceId)} к ${getVaultDisplayName(vault, vaults)}`} onClick={() => { if (window.confirm(`Отозвать доступ к хранилищу «${getVaultDisplayName(vault, vaults)}» у устройства «${device ? device.name : grant.deviceId}»? Локальные файлы на устройстве сохранятся.`)) void perform(() => accountClient.revokeVaultGrant(serverVault!.id, grant.deviceId), 'Доступ отозван. Локальные файлы на устройстве сохранены.'); }} className="text-xs text-rose-400">Отозвать</button>}
+                      <div className="text-zinc-400">{device ? device.name : 'Устройство'} · <span className="font-mono" title={grant.deviceId}>{shortId(grant.deviceId)}</span>{grant.deviceId === currentId && ' · вы сейчас здесь'}<span className="block mt-1 text-zinc-500">{rights(grant.mode)} · {grantStatus(grant.status)}</span></div>
+                      {grant.status === 'revoked'
+                        ? <button type="button" disabled={busy || !device} aria-label={`Вернуть доступ ${device ? device.name : shortId(grant.deviceId)} к ${getVaultDisplayName(vault, vaults)}`} onClick={() => void perform(async () => {
+                          if (!device) throw new Error('Устройство не найдено в аккаунте');
+                          await shareVaultWithDevice(vault, device, grant.mode);
+                        }, 'Доступ снова предложен. Примите приглашение на устройстве.')} className="text-xs text-zinc-300 disabled:opacity-40">Вернуть доступ</button>
+                        : grant.deviceId !== currentId && <button type="button" disabled={busy} aria-label={`Отозвать доступ ${device ? device.name : shortId(grant.deviceId)} к ${getVaultDisplayName(vault, vaults)}`} onClick={() => { if (window.confirm(`Отозвать доступ к хранилищу «${getVaultDisplayName(vault, vaults)}» у устройства «${device ? device.name : grant.deviceId}»? Локальные файлы на устройстве сохранятся.`)) void perform(() => accountClient.revokeVaultGrant(serverVault!.id, grant.deviceId), 'Доступ отозван. Локальные файлы на устройстве сохранены.'); }} className="text-xs text-rose-400">Отозвать</button>}
                     </div>;
                   })}
-                  {grants.length === 0 && <p className="text-xs text-zinc-500">Другим устройствам доступ ещё не выдан.</p>}
+                  {visibleGrants.length === 0 && <p className="text-xs text-zinc-500">Другим устройствам доступ ещё не выдан.</p>}
                   {sharingVault === vault.id && <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); if (busy) return; void perform(async () => {
                     const device = recipients.find((item) => item.id === selectedDevice);
                     if (!device) throw new Error('Выберите разрешённое устройство');

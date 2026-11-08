@@ -69,19 +69,21 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     await guest.getByRole('button', { name: 'Войти', exact: true }).click();
     await expect(guest.getByRole('status')).toContainText('Запрос отправлен', { timeout: 30_000 });
     await host.getByRole('button', { name: 'Обновить', exact: true }).click();
-    await expect(host.getByRole('heading', { name: /Ожидают разрешения/ })).toBeVisible();
+    const pendingRow = host.getByTestId(`device-row-${guestDeviceId}`);
+    await expect(pendingRow).toContainText('запрос на вход');
     await host.screenshot({ path: 'test-results/screenshots/account-device-pending.png', fullPage: true });
     await guest.screenshot({ path: 'test-results/screenshots/account-login-waiting.png', fullPage: true });
     await expect(guest.getByTestId('account-seed-input')).toHaveCount(0);
-    await host.getByRole('button', { name: 'Разрешить', exact: true }).click();
+    await pendingRow.getByRole('button', { name: 'Разрешить', exact: true }).click();
     await expect(host.getByRole('status')).toContainText('Устройство разрешено');
     await expect(guest.getByRole('heading', { name: 'Подписка', exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(guest.getByTestId('account-seed-input')).toHaveCount(0);
 
     await expect(host.getByText('вы сейчас здесь', { exact: true })).toBeVisible();
-    await host.getByRole('button', { name: 'Переименовать устройство Account guest browser', exact: true }).click();
-    await host.getByRole('textbox', { name: 'Название устройства, от 1 до 64 символов' }).fill('Ноутбук для проверки');
-    await host.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    await host.getByTestId(`device-row-${guestDeviceId}`).getByRole('button', { name: 'Account guest browser', exact: true }).click();
+    const renameInput = host.getByRole('textbox', { name: 'Название устройства, от 1 до 64 символов' });
+    await renameInput.fill('Ноутбук для проверки');
+    await renameInput.press('Enter');
     await expect(host.getByRole('status')).toContainText('Название устройства сохранено');
     await host.getByRole('button', { name: 'Подключить на другое устройство', exact: true }).click();
     await host.getByRole('combobox', { name: 'Устройство для хранилища Account integration vault', exact: true }).selectOption(guestDeviceId);
@@ -99,6 +101,21 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     expect(vaults.map((vault: { name: string }) => vault.name)).toEqual(['Account integration vault', 'Account integration vault']);
     await expect(guest.getByText(/Account integration vault · /)).toHaveCount(2);
     await guest.screenshot({ path: 'test-results/screenshots/account-vault-connected.png', fullPage: true });
+
+    // A revoked device stays in the single device list, so the owner can bring it back or drop it.
+    host.on('dialog', (dialog) => void dialog.accept());
+    const guestRow = host.getByTestId(`device-row-${guestDeviceId}`);
+    await guestRow.getByRole('button', { name: 'Отозвать', exact: true }).click();
+    await expect(guestRow).toContainText('доступ отозван');
+    await expect(guestRow.getByRole('button', { name: 'Вернуть', exact: true })).toBeVisible();
+    await host.screenshot({ path: 'test-results/screenshots/account-devices-revoked.png', fullPage: true });
+    await guestRow.getByRole('button', { name: 'Вернуть', exact: true }).click();
+    await expect(host.getByRole('status')).toContainText('Устройство снова активно');
+    await expect(guestRow).toContainText('вход разрешён');
+    await host.getByRole('button', { name: /^Вернуть доступ .*Account integration vault$/ }).click();
+    await expect(host.getByRole('status')).toContainText('Доступ снова предложен');
+    await host.screenshot({ path: 'test-results/screenshots/account-devices-restored.png', fullPage: true });
+
     await guest.getByRole('button', { name: 'Открыть приложение', exact: true }).click();
     const currentVault = await guest.evaluate(() => JSON.parse(localStorage.getItem('slag_current_vault_v2')!));
     const suffix = currentVault.id.replace(/^vault_/, '').replace(/[^a-z0-9]/gi, '').slice(0, 4).toLowerCase();

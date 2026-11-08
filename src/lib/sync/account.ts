@@ -495,6 +495,12 @@ class AccountClient {
     });
   }
 
+  forgetDevice(deviceId: string): Promise<void> {
+    return this.mutate(`/api/devices/${encodeURIComponent(deviceId)}?purge=1`, {
+      method: 'DELETE',
+    });
+  }
+
   registerVault(vaultId: string, name: string): Promise<void> {
     return this.mutate(`/api/vaults/${encodeURIComponent(vaultId)}`, {
       method: 'PUT',

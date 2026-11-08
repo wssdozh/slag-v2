@@ -671,7 +671,7 @@ class RelayDatabase:
             raise ApiError(404, "device_not_found")
         if row["status"] == "active":
             return
-        if row["status"] != "pending":
+        if row["status"] not in ("pending", "revoked"):
             raise ApiError(409, "device_not_pending")
         active = self.conn.execute("SELECT COUNT(*) AS n FROM devices WHERE account_id = ? AND status = 'active'", (account_id,)).fetchone()["n"]
         if active >= PLANS[self.conn.execute("SELECT plan FROM accounts WHERE account_id = ?", (account_id,)).fetchone()["plan"]]["devices"]:
@@ -694,6 +694,14 @@ class RelayDatabase:
             self.conn.execute("UPDATE vault_grants SET status = 'revoked', updated_at = ? WHERE device_id = ?", (time.time(), device_id))
         if not res.rowcount:
             raise ApiError(404, "device_not_found")
+
+    def forget_device(self, account_id: str, device_id: str) -> None:
+        if not self.conn.execute("SELECT 1 FROM devices WHERE id = ? AND account_id = ?", (device_id, account_id)).fetchone():
+            raise ApiError(404, "device_not_found")
+        with self.conn:
+            self.conn.execute("DELETE FROM vault_grants WHERE device_id = ?", (device_id,))
+            self.conn.execute("DELETE FROM auth_sessions WHERE device_id = ?", (device_id,))
+            self.conn.execute("DELETE FROM devices WHERE id = ? AND account_id = ?", (device_id, account_id))
 
     def vault_payload(self, vault_id: str) -> dict:
         vault = self.conn.execute("SELECT * FROM vaults WHERE id = ?", (vault_id,)).fetchone()
@@ -1608,7 +1616,12 @@ class SlagRelayServer:
                 self.db.rename_device(auth["account_id"], device_id, name.strip())
                 return {"status": "ok"}, 200
             if method == "DELETE" and len(parts) == 3:
-                self.db.revoke_device(auth["account_id"], device_id)
+                if query.get("purge") == "1":
+                    if device_id == auth["device_id"]:
+                        raise ApiError(409, "self_forget_not_allowed")
+                    self.db.forget_device(auth["account_id"], device_id)
+                else:
+                    self.db.revoke_device(auth["account_id"], device_id)
                 return {"status": "ok"}, 200
 
         if method == "GET" and path == "/api/vaults":
