@@ -384,6 +384,13 @@
   font-weight: 400;
 }
 
+/* The text starts on the icon line, not on the button box: half the empty space
+   inside a square control is the optical inset the glyphs already have. */
+.composer-surface [data-composer-panel] textarea,
+.composer-surface .composer-mirror {
+  padding-inline: calc((var(--slag-ctrl-sm) - 16px) / 2);
+}
+
 /* Corner actions and toolbar controls share one size, so the text row and the
    button row have the same height and read as one inset. */
 .composer-surface .composer-top-actions button {

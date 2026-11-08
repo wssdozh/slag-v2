@@ -185,7 +185,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               <div
                 ref={mirrorRef}
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden whitespace-pre-wrap break-words px-1 py-0 text-base md:text-sm leading-normal text-fg-primary"
+                className="composer-mirror pointer-events-none absolute inset-0 z-0 select-none overflow-hidden whitespace-pre-wrap break-words py-0 text-base md:text-sm leading-normal text-fg-primary"
               >
                 {value.slice(0, highlightRange.start)}
                 <span className="text-mention">{value.slice(highlightRange.start, highlightRange.end)}</span>
@@ -206,7 +206,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               disabled={disabled}
               className={`min-w-0 flex-1 w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-zinc-500 placeholder:truncate resize-none  ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } relative z-10 leading-normal px-0 py-0 outline-none border-none`}
+              } relative z-10 leading-normal py-0 outline-none border-none`}
               style={{
                 minHeight: `${minHeight}px`,
                 maxHeight: `${maxHeight}px`,
