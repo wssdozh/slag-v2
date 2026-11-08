@@ -13,7 +13,6 @@ import { SettingsDivider, SettingsGroup, SettingsRow } from '../Settings/Setting
 export const AccountCabinet: React.FC = () => {
   const { vaults, createVault, switchVault } = useApp();
   const [state, setState] = useState(accountClient.getState());
-  const [syncStatus, setSyncStatus] = useState(syncEngine.getStatus());
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [seed, setSeed] = useState('');
   const [savedSeed, setSavedSeed] = useState(false);
@@ -31,7 +30,6 @@ export const AccountCabinet: React.FC = () => {
   const config = syncEngine.getConfig();
 
   useEffect(() => accountClient.subscribe(setState), []);
-  useEffect(() => syncEngine.subscribe(setSyncStatus), []);
   // Account polling belongs to AppContext; leaving this page must not stop it.
 
   const perform = async (action: () => Promise<void>, success?: string) => {
@@ -121,12 +119,15 @@ export const AccountCabinet: React.FC = () => {
     || (b.lastSeenAt ? Date.parse(b.lastSeenAt) : 0) - (a.lastSeenAt ? Date.parse(a.lastSeenAt) : 0));
   const shortId = (id: string) => id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-8)}` : id;
   const rights = (mode: string) => mode === 'receive-only' ? 'только чтение' : 'чтение и изменение';
-  const deviceStatus = (device: AccountDevice) => device.status === 'active' ? 'вход разрешён'
-    : device.status === 'pending' ? 'запрос на вход'
-    : 'доступ отозван';
-  const grantStatus = (status: string) => status === 'pending' ? 'ожидает принятия приглашения'
-    : status === 'accepted' ? 'приглашение принято · загрузка файлов не подтверждена'
-    : 'доступ отозван · устройство снова активно';
+  const moment = (iso: string | null | undefined) => iso
+    ? new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : '—';
+  const deviceWord = (device: AccountDevice) => device.id === currentId ? 'это устройство'
+    : device.status === 'active' ? 'активно'
+    : device.status === 'pending' ? 'ожидает'
+    : 'отозвано';
+  const deviceMoment = (device: AccountDevice) => device.id === currentId ? 'сейчас' : moment(device.lastSeenAt);
+  const grantWord = (status: string) => status === 'accepted' ? 'принято' : status === 'pending' ? 'ждёт принятия' : 'отозвано';
   const saveDeviceName = (id: string) => perform(async () => {
     const name = deviceName.trim();
     if (!name || name.length > 64) throw new Error('Название должно содержать от 1 до 64 символов');
@@ -201,16 +202,14 @@ export const AccountCabinet: React.FC = () => {
           </section>
         ) : account && (
           <>
-            <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Подписка</h2><span className="text-xs font-mono text-zinc-500">{account.id}</span></div>
-              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 py-3 border-y border-white/[0.06]">
-                <span className="text-lg font-medium">{account.planLabel}</span>
-                <span className="text-xs text-zinc-500">{account.expiresAt ? `до ${new Date(account.expiresAt).toLocaleDateString('ru-RU')}` : 'бессрочно'}</span>
-                <span className="text-xs text-zinc-400">{activeDevices.length} / {account.maxDevices} устройств</span>
-                <span className="text-xs text-zinc-400">кеш {account.usedCacheMb} / {account.maxCacheMb} мб</span>
-              </div>
-              <p className="text-xs text-zinc-500">Тариф и лимиты подтверждены сервером. Изменение подписки через оплату пока недоступно.</p>
-            </section>
+            <SettingsGroup
+              title="Аккаунт"
+              action={<span className="text-2xs font-mono text-zinc-500" title={account.id}>{shortId(account.id)}</span>}
+            >
+              <SettingsRow label="Тариф" value={`${account.planLabel} · ${account.expiresAt ? `до ${new Date(account.expiresAt).toLocaleDateString('ru-RU')}` : 'бессрочно'}`} />
+              <SettingsDivider />
+              <SettingsRow label="Кеш" value={`${account.usedCacheMb} / ${account.maxCacheMb} мб`} />
+            </SettingsGroup>
 
             <SettingsGroup
               title="Устройства"
@@ -241,21 +240,19 @@ export const AccountCabinet: React.FC = () => {
                         className="w-48 bg-transparent border border-white/[0.12] px-1.5 py-0.5 text-sm outline-none ring-0 rounded-md text-fg-primary"
                       />
                     ) : (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => { setEditingDevice(device.id); setDeviceName(device.name); }}
-                        className="text-left text-sm text-fg-primary hover:text-white disabled:opacity-40"
-                      >
-                        {device.name}
-                      </button>
+                      <span className="flex items-baseline gap-2 min-w-0">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => { setEditingDevice(device.id); setDeviceName(device.name); }}
+                          className="text-left text-sm text-fg-primary hover:text-white disabled:opacity-40 truncate"
+                        >
+                          {device.name}
+                        </button>
+                        <span className="font-mono text-[11px] text-zinc-500 shrink-0" title={device.id}>{shortId(device.id)}</span>
+                      </span>
                     )}
-                    description={<span className="flex flex-col gap-0.5">
-                      <span className="font-mono text-[11px]" title={device.id}>{shortId(device.id)} · {deviceStatus(device)}</span>
-                      <span>{device.id === currentId
-                        ? `Синхронизация текущего хранилища: ${syncStatus.error || (syncStatus.state === 'connected' ? 'соединение установлено' : syncStatus.state === 'syncing' ? 'обмен данными' : syncStatus.state === 'offline' ? 'нет соединения' : 'не подключена')}`
-                        : device.lastSeenAt ? `Последняя активность: ${new Date(device.lastSeenAt).toLocaleString('ru-RU')}` : 'Время последней активности неизвестно'}</span>
-                    </span>}
+                    description={`${deviceWord(device)} · ${deviceMoment(device)}`}
                     right={<span className="flex items-center gap-1">
                       {device.id === currentId ? <span className="text-2xs text-zinc-400">вы сейчас здесь</span>
                         : device.status === 'pending' ? <>
@@ -273,59 +270,75 @@ export const AccountCabinet: React.FC = () => {
               ))}
             </SettingsGroup>
 
-            {state.invitations.length > 0 && <section className="flex flex-col gap-3"><h2 className="text-sm font-semibold">Приглашения в хранилища</h2>{state.invitations.map((invitation) => {
-              const localVault = vaults.find((vault) => (vault.syncId || vault.id) === invitation.vaultId);
-              const inviter = invitation.invitedBy ? state.devices.find((device) => device.id === invitation.invitedBy) : null;
-              return <div key={invitation.vaultId} className="py-3 border-t border-white/[0.05] flex flex-col gap-3">
-                <div><div className="text-sm">{invitation.vaultName}</div><div className="text-xs font-mono text-zinc-500" title={invitation.vaultId}>{shortId(invitation.vaultId)} · {rights(invitation.mode)}</div></div>
-                <p className="text-xs text-zinc-400">Отправитель: {inviter ? `${inviter.name} · ${shortId(inviter.id)}` : invitation.invitedBy ? `идентификатор ${invitation.invitedBy}` : 'не указан сервером'}</p>
-                <p className="text-xs text-zinc-400">{localVault ? `Совпадает syncId: подключим существующее локальное хранилище «${getVaultDisplayName(localVault, vaults)}». Его данные будут синхронизироваться с этим хранилищем, отдельная копия не создаётся.` : 'Локального хранилища с таким syncId нет: создадим отдельное. Совпадение названий не объединяет хранилища; остальные локальные заметки останутся отдельно.'}</p>
-                <div className="flex gap-4"><button type="button" disabled={busy} onClick={() => void perform(() => accountClient.declineVault(invitation.vaultId), 'Приглашение отклонено')} className="text-xs text-zinc-400">Отклонить</button><button type="button" disabled={busy} onClick={() => void acceptInvitation(invitation.vaultId)} className="text-xs text-zinc-100">Подключить</button></div>
-              </div>;
-            })}</section>}
+            {state.invitations.length > 0 && <SettingsGroup title="Приглашения">
+              {state.invitations.map((invitation, index) => {
+                const localVault = vaults.find((vault) => (vault.syncId || vault.id) === invitation.vaultId);
+                const inviter = invitation.invitedBy ? state.devices.find((device) => device.id === invitation.invitedBy) : null;
+                return <React.Fragment key={invitation.vaultId}>
+                  {index > 0 && <SettingsDivider inset />}
+                  <SettingsRow
+                    icon={<Database className="w-4 h-4" />}
+                    label={invitation.vaultName}
+                    description={`${rights(invitation.mode)} · ${inviter ? `от ${inviter.name}` : 'отправитель неизвестен'} · ${localVault ? 'заменит локальное' : 'новое хранилище'}`}
+                    right={<span className="flex items-center gap-1">
+                      <button type="button" disabled={busy} onClick={() => void acceptInvitation(invitation.vaultId)} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-40">Подключить</button>
+                      <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.declineVault(invitation.vaultId), 'Приглашение отклонено')} className="px-2 py-1 text-2xs text-fg-muted rounded-md hover:bg-surface-hover disabled:opacity-40">Отклонить</button>
+                    </span>}
+                  />
+                </React.Fragment>;
+              })}
+            </SettingsGroup>}
 
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold">Хранилища и доступ</h2>
-              <p className="text-xs text-zinc-500">Доступ выдаётся каждому устройству отдельно. Принятое приглашение не означает, что все файлы уже синхронизированы.</p>
-              {vaults.map((vault) => {
+            <SettingsGroup title="Хранилища">
+              {vaults.map((vault, vaultIndex) => {
                 const serverVault = state.vaults.find((item) => item.id === (vault.syncId || vault.id));
                 const grants = serverVault ? serverVault.grants : [];
                 // Отозванное устройство живёт в списке выше; здесь показываем только тех, у кого доступ ещё может быть.
                 const visibleGrants = grants.filter((grant) => state.devices.find((item) => item.id === grant.deviceId)?.status !== 'revoked');
-                return <div key={vault.id} className="py-4 border-t border-white/[0.05] flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0"><Database className="w-4 h-4 text-zinc-500 shrink-0" /><div><div className="text-sm">{getVaultDisplayName(vault, vaults)}</div><div className="text-xs font-mono text-zinc-500">{shortId(vault.syncId || vault.id)}</div></div></div>
-                    <button type="button" disabled={busy} onClick={() => { setSharingVault(sharingVault === vault.id ? null : vault.id); setSelectedDevice(''); setReadOnly(false); }} aria-expanded={sharingVault === vault.id} className="text-xs text-zinc-300">Подключить на другое устройство</button>
-                  </div>
+                const vaultName = getVaultDisplayName(vault, vaults);
+                return <React.Fragment key={vault.id}>
+                  {vaultIndex > 0 && <SettingsDivider />}
+                  <SettingsRow
+                    icon={<Database className="w-4 h-4" />}
+                    label={<span className="flex items-baseline gap-2 min-w-0">
+                      <span className="truncate">{vaultName}</span>
+                      <span className="font-mono text-[11px] text-zinc-500 shrink-0" title={vault.syncId || vault.id}>{shortId(vault.syncId || vault.id)}</span>
+                    </span>}
+                    description={visibleGrants.length > 0 ? `${visibleGrants.length} с доступом` : 'доступ только у этого устройства'}
+                    right={<button type="button" disabled={busy} onClick={() => { setSharingVault(sharingVault === vault.id ? null : vault.id); setSelectedDevice(''); setReadOnly(false); }} aria-expanded={sharingVault === vault.id} className="px-2 py-1 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40">Выдать доступ</button>}
+                  />
                   {visibleGrants.map((grant) => {
                     const device = state.devices.find((item) => item.id === grant.deviceId);
-                    return <div key={grant.deviceId} className="flex flex-wrap items-center justify-between gap-3 text-xs">
-                      <div className="text-zinc-400">{device ? device.name : 'Устройство'} · <span className="font-mono" title={grant.deviceId}>{shortId(grant.deviceId)}</span>{grant.deviceId === currentId && ' · вы сейчас здесь'}<span className="block mt-1 text-zinc-500">{rights(grant.mode)} · {grantStatus(grant.status)}</span></div>
-                      {grant.status === 'revoked'
-                        ? <button type="button" disabled={busy || !device} aria-label={`Вернуть доступ ${device ? device.name : shortId(grant.deviceId)} к ${getVaultDisplayName(vault, vaults)}`} onClick={() => void perform(async () => {
+                    const deviceName = device ? device.name : shortId(grant.deviceId);
+                    return <SettingsRow
+                      key={grant.deviceId}
+                      className="pl-12 py-2"
+                      label={deviceName}
+                      description={`${rights(grant.mode)} · ${grantWord(grant.status)}`}
+                      right={grant.status === 'revoked'
+                        ? <button type="button" disabled={busy || !device} aria-label={`Вернуть доступ ${deviceName} к ${vaultName}`} onClick={() => void perform(async () => {
                           if (!device) throw new Error('Устройство не найдено в аккаунте');
                           await shareVaultWithDevice(vault, device, grant.mode);
-                        }, 'Доступ снова предложен. Примите приглашение на устройстве.')} className="text-xs text-zinc-300 disabled:opacity-40">Вернуть доступ</button>
-                        : grant.deviceId !== currentId && <button type="button" disabled={busy} aria-label={`Отозвать доступ ${device ? device.name : shortId(grant.deviceId)} к ${getVaultDisplayName(vault, vaults)}`} onClick={() => { if (window.confirm(`Отозвать доступ к хранилищу «${getVaultDisplayName(vault, vaults)}» у устройства «${device ? device.name : grant.deviceId}»? Локальные файлы на устройстве сохранятся.`)) void perform(() => accountClient.revokeVaultGrant(serverVault!.id, grant.deviceId), 'Доступ отозван. Локальные файлы на устройстве сохранены.'); }} className="text-xs text-rose-400">Отозвать</button>}
-                    </div>;
+                        }, 'Доступ снова предложен. Примите приглашение на устройстве.')} className="px-2 py-1 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40">Вернуть</button>
+                        : grant.deviceId !== currentId && <button type="button" disabled={busy} aria-label={`Отозвать доступ ${deviceName} к ${vaultName}`} onClick={() => { if (window.confirm(`Отозвать доступ к хранилищу «${vaultName}» у устройства «${deviceName}»? Локальные файлы на устройстве сохранятся.`)) void perform(() => accountClient.revokeVaultGrant(serverVault!.id, grant.deviceId), 'Доступ отозван. Локальные файлы на устройстве сохранены.'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отозвать</button>}
+                    />;
                   })}
-                  {visibleGrants.length === 0 && <p className="text-xs text-zinc-500">Другим устройствам доступ ещё не выдан.</p>}
-                  {sharingVault === vault.id && <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); if (busy) return; void perform(async () => {
+                  {sharingVault === vault.id && <form className="flex flex-wrap items-end gap-3 px-3.5 pb-3.5" onSubmit={(event) => { event.preventDefault(); if (busy) return; void perform(async () => {
                     const device = recipients.find((item) => item.id === selectedDevice);
                     if (!device) throw new Error('Выберите разрешённое устройство');
                     if (grants.some((grant) => grant.deviceId === device.id && grant.status !== 'revoked')) throw new Error('Устройство уже имеет доступ или ожидает приглашения');
                     await shareVaultWithDevice(vault, device, readOnly ? 'receive-only' : 'read-write');
                     setSharingVault(null);
                   }, 'Приглашение отправлено. Подключите хранилище на выбранном устройстве.'); }}>
-                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Устройство<select aria-label={`Устройство для хранилища ${getVaultDisplayName(vault, vaults)}`} value={selectedDevice} onChange={(event) => setSelectedDevice(event.target.value)} required className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0"><option value="">Выберите устройство</option>{recipients.filter((device) => !grants.some((grant) => grant.deviceId === device.id && grant.status !== 'revoked')).map((device) => <option key={device.id} value={device.id}>{device.name} · {shortId(device.id)}</option>)}</select></label>
-                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Права<select aria-label="Права" value={readOnly ? 'receive-only' : 'read-write'} onChange={(event) => setReadOnly(event.target.value === 'receive-only')} className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0"><option value="read-write">Чтение и изменение</option><option value="receive-only">Только чтение</option></select></label>
-                    <button type="submit" disabled={busy || !selectedDevice} className="text-xs py-2 text-zinc-100 disabled:opacity-40">Отправить приглашение</button><button type="button" disabled={busy} onClick={() => setSharingVault(null)} className="text-xs py-2 text-zinc-400">Отмена</button>
-                    {recipients.length === 0 && <p className="w-full text-xs text-zinc-500">Сначала разрешите другое устройство в разделе устройств.</p>}
+                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Устройство<select aria-label={`Устройство для хранилища ${vaultName}`} value={selectedDevice} onChange={(event) => setSelectedDevice(event.target.value)} required className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0 rounded-md"><option value="">Выберите устройство</option>{recipients.filter((device) => !grants.some((grant) => grant.deviceId === device.id && grant.status !== 'revoked')).map((device) => <option key={device.id} value={device.id}>{device.name} · {shortId(device.id)}</option>)}</select></label>
+                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Права<select aria-label="Права" value={readOnly ? 'receive-only' : 'read-write'} onChange={(event) => setReadOnly(event.target.value === 'receive-only')} className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0 rounded-md"><option value="read-write">Чтение и изменение</option><option value="receive-only">Только чтение</option></select></label>
+                    <button type="submit" disabled={busy || !selectedDevice} className="px-2 py-2 text-2xs text-fg-primary disabled:opacity-40">Отправить приглашение</button><button type="button" disabled={busy} onClick={() => setSharingVault(null)} className="px-2 py-2 text-2xs text-fg-muted">Отмена</button>
+                    {recipients.length === 0 && <p className="w-full text-xs text-zinc-500">Сначала разрешите другое устройство.</p>}
                   </form>}
-                </div>;
+                </React.Fragment>;
               })}
-              {vaults.length === 0 && <p className="text-xs text-zinc-500">Создайте локальное хранилище в приложении, затем откройте к нему доступ.</p>}
-            </section>
+              {vaults.length === 0 && <SettingsRow label="Хранилищ пока нет" description="Создайте локальное хранилище в приложении" />}
+            </SettingsGroup>
             <section className="border-t border-white/[0.06] pt-5 flex items-center justify-between gap-4"><div className="flex gap-2 text-xs text-zinc-500"><KeyRound className="w-4 h-4 shrink-0" />Seed аккаунта не хранится в сессии. Выход не удаляет локальные заметки.</div><button type="button" disabled={busy} onClick={() => void perform(() => accountClient.logout(), 'Вы вышли из аккаунта')} className="flex items-center gap-2 text-xs text-zinc-400"><LogOut className="w-4 h-4" />Выйти</button></section>
           </>
         )}

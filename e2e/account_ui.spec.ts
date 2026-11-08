@@ -60,7 +60,7 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     await expect(create).toBeDisabled();
     await host.getByRole('checkbox', { name: /Я сохранил seed/ }).check();
     await create.click();
-    await expect(host.getByRole('heading', { name: 'Подписка', exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(host.getByText('Аккаунт', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(host.getByTestId('account-generated-seed')).toHaveCount(0);
     await host.screenshot({ path: 'test-results/screenshots/account-registered.png', fullPage: true });
 
@@ -70,13 +70,13 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     await expect(guest.getByRole('status')).toContainText('Запрос отправлен', { timeout: 30_000 });
     await host.getByRole('button', { name: 'Обновить', exact: true }).click();
     const pendingRow = host.getByTestId(`device-row-${guestDeviceId}`);
-    await expect(pendingRow).toContainText('запрос на вход');
+    await expect(pendingRow).toContainText('ожидает');
     await host.screenshot({ path: 'test-results/screenshots/account-device-pending.png', fullPage: true });
     await guest.screenshot({ path: 'test-results/screenshots/account-login-waiting.png', fullPage: true });
     await expect(guest.getByTestId('account-seed-input')).toHaveCount(0);
     await pendingRow.getByRole('button', { name: 'Разрешить', exact: true }).click();
     await expect(host.getByRole('status')).toContainText('Устройство разрешено');
-    await expect(guest.getByRole('heading', { name: 'Подписка', exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(guest.getByText('Аккаунт', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(guest.getByTestId('account-seed-input')).toHaveCount(0);
 
     await expect(host.getByText('вы сейчас здесь', { exact: true })).toBeVisible();
@@ -85,17 +85,17 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     await renameInput.fill('Ноутбук для проверки');
     await renameInput.press('Enter');
     await expect(host.getByRole('status')).toContainText('Название устройства сохранено');
-    await host.getByRole('button', { name: 'Подключить на другое устройство', exact: true }).click();
+    await host.getByRole('button', { name: 'Выдать доступ', exact: true }).click();
     await host.getByRole('combobox', { name: 'Устройство для хранилища Account integration vault', exact: true }).selectOption(guestDeviceId);
     await host.getByLabel('Права', { exact: true }).selectOption('receive-only');
     await host.getByRole('button', { name: 'Отправить приглашение', exact: true }).click();
     await expect(host.getByRole('status')).toContainText('Приглашение отправлено', { timeout: 30_000 });
     await guest.getByRole('button', { name: 'Обновить', exact: true }).click();
-    await expect(guest.getByRole('heading', { name: 'Приглашения в хранилища', exact: true })).toBeVisible();
+    await expect(guest.getByText('Приглашения', { exact: true })).toBeVisible();
     await guest.screenshot({ path: 'test-results/screenshots/account-vault-invitation.png', fullPage: true });
     await guest.getByRole('button', { name: 'Подключить', exact: true }).click();
     await expect(guest.getByRole('status')).toContainText('Приглашение принято.', { timeout: 30_000 });
-    await expect(guest.getByRole('heading', { name: 'Приглашения в хранилища', exact: true })).toHaveCount(0);
+    await expect(guest.getByText('Приглашения', { exact: true })).toHaveCount(0);
     const vaults = await guest.evaluate(() => JSON.parse(localStorage.getItem('slag_vaults_v2')!));
     expect(vaults).toHaveLength(2);
     expect(vaults.map((vault: { name: string }) => vault.name)).toEqual(['Account integration vault', 'Account integration vault']);
@@ -106,12 +106,12 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     host.on('dialog', (dialog) => void dialog.accept());
     const guestRow = host.getByTestId(`device-row-${guestDeviceId}`);
     await guestRow.getByRole('button', { name: 'Отозвать', exact: true }).click();
-    await expect(guestRow).toContainText('доступ отозван');
+    await expect(guestRow).toContainText('отозвано');
     await expect(guestRow.getByRole('button', { name: 'Вернуть', exact: true })).toBeVisible();
     await host.screenshot({ path: 'test-results/screenshots/account-devices-revoked.png', fullPage: true });
     await guestRow.getByRole('button', { name: 'Вернуть', exact: true }).click();
     await expect(host.getByRole('status')).toContainText('Устройство снова активно');
-    await expect(guestRow).toContainText('вход разрешён');
+    await expect(guestRow).toContainText('активно');
     await host.getByRole('button', { name: /^Вернуть доступ .*Account integration vault$/ }).click();
     await expect(host.getByRole('status')).toContainText('Доступ снова предложен');
     await host.screenshot({ path: 'test-results/screenshots/account-devices-restored.png', fullPage: true });
