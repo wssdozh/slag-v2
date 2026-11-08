@@ -1,3 +1,4 @@
+import { DraftStore } from './storage/draftStore';
 import type {
   SlagItem,
   FolderMeta,
@@ -9,7 +10,6 @@ import type {
   ChatMessage,
   FolderViewSettings,
 } from '../types';
-import { DEFAULT_FOLDER_VIEW_SETTINGS } from '../types';
 import { serializeItemToMarkdown, parseMarkdownToItem } from './markdownSerializer';
 import { generateDemoItems } from './demoVault';
 import { getSafeNoteFilename } from './noteFilename';
@@ -60,14 +60,13 @@ const TRASH_STORAGE_PREFIX = STORAGE_KEYS.TRASH_PREFIX;
 const DRAFTS_STORAGE_PREFIX = STORAGE_KEYS.DRAFTS_PREFIX;
 const ASSISTANT_STORAGE_PREFIX = STORAGE_KEYS.ASSISTANT_PREFIX;
 const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
-const FULLSCREEN_DRAFTS_PREFIX = STORAGE_KEYS.FULLSCREEN_DRAFTS_PREFIX;
-const FULLSCREEN_WIDTH_KEY = STORAGE_KEYS.FULLSCREEN_WIDTH;
 
 // Initial demo & onboarding items
 export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
 export class StorageService {
   private currentVault: VaultMeta;
+  private draftStore: DraftStore;
   private tauriInitialization: Promise<boolean> | null = null;
   private changeListeners: Set<StorageChangeListener> = new Set();
   private instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -152,6 +151,12 @@ export class StorageService {
 
   constructor() {
     this.currentVault = this.initCurrentVault();
+    this.draftStore = new DraftStore({
+      getVaultId: () => this.currentVault.id,
+      emitChange: (event) => this.emitChange(event),
+      getChannel: () => this.crossWindowDraftChannel,
+      instanceId: this.instanceId,
+    });
     this.initDefaultsIfNeeded();
     this.initCrossWindowDraftSync();
     if (isTauri()) {
@@ -733,10 +738,6 @@ export class StorageService {
     return `${DRAFTS_STORAGE_PREFIX}${this.currentVault.id}`;
   }
 
-  private getAssistantKey(): string {
-    return `${ASSISTANT_STORAGE_PREFIX}${this.currentVault.id}`;
-  }
-
   private getWorkspaceStateKey(): string {
     return `${WORKSPACE_STATE_PREFIX}${this.currentVault.id}`;
   }
@@ -1147,207 +1148,68 @@ export class StorageService {
     };
   }
 
-  // Composer Drafts (per-folder, silent Telegram-style)
   public getAllComposerDrafts(): Record<string, ComposerDraft> {
-    const raw = localStorage.getItem(this.getDraftsKey());
-    if (!raw) return {};
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
-      return {};
-    }
+    return this.draftStore.getAllComposerDrafts();
   }
 
   public getComposerDraft(folderPath: string): ComposerDraft | null {
-    const all = this.getAllComposerDrafts();
-    return all[folderPath] || null;
+    return this.draftStore.getComposerDraft(folderPath);
   }
 
   public saveComposerDraft(folderPath: string, draft: ComposerDraft, origin: 'local' | 'remote' = 'local'): void {
-    try {
-      const all = this.getAllComposerDrafts();
-      all[folderPath] = draft;
-      localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
-      this.emitChange({
-        kind: 'draft',
-        action: 'upsert',
-        id: `composer:${folderPath}`,
-        payload: draft,
-        origin,
-      });
-      if (origin === 'local' && this.crossWindowDraftChannel) {
-        try {
-          this.crossWindowDraftChannel.postMessage({
-            type: 'DRAFT_CHANGED',
-            senderId: this.instanceId,
-            folderPath,
-            draft,
-            action: 'upsert',
-          });
-        } catch {}
-      }
-    } catch (err) {
-      fsLog.warn('Failed to save composer draft to localStorage', { folderPath, err });
-    }
+    return this.draftStore.saveComposerDraft(folderPath, draft, origin);
   }
 
   public deleteComposerDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
-    try {
-      const all = this.getAllComposerDrafts();
-      const had = folderPath in all;
-      if (had) {
-        delete all[folderPath];
-        localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
-      }
-      const draftTombKey = `slag_sync_draft_tomb_${this.currentVault.id}_composer:${folderPath}`;
-      localStorage.setItem(draftTombKey, String(Date.now()));
-      this.emitChange({
-        kind: 'draft',
-        action: 'delete',
-        id: `composer:${folderPath}`,
-        origin,
-      });
-      if (origin === 'local' && this.crossWindowDraftChannel) {
-        try {
-          this.crossWindowDraftChannel.postMessage({
-            type: 'DRAFT_CHANGED',
-            senderId: this.instanceId,
-            folderPath,
-            draft: null,
-            action: 'delete',
-          });
-        } catch {}
-      }
-    } catch (err) {
-      fsLog.warn('Failed to delete composer draft from localStorage', { folderPath, err });
-    }
-  }
-
-  // Fullscreen Editor Drafts (per-item auto-saved in-flight edits)
-  private getFullscreenDraftsKey(): string {
-    return `${FULLSCREEN_DRAFTS_PREFIX}${this.currentVault.id}`;
+    return this.draftStore.deleteComposerDraft(folderPath, origin);
   }
 
   public getFullscreenDraft(itemId: string): FullscreenDraft | null {
-    try {
-      const raw = localStorage.getItem(`${this.getFullscreenDraftsKey()}_${itemId}`);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+    return this.draftStore.getFullscreenDraft(itemId);
   }
 
   public saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin: 'local' | 'remote' = 'local'): void {
-    try {
-      localStorage.setItem(`${this.getFullscreenDraftsKey()}_${itemId}`, JSON.stringify(draft));
-      this.emitChange({
-        kind: 'draft',
-        action: 'upsert',
-        id: `fullscreen:${itemId}`,
-        payload: draft,
-        origin,
-      });
-    } catch (err) {
-      fsLog.warn('Failed to save fullscreen draft to localStorage', { itemId, err });
-    }
+    return this.draftStore.saveFullscreenDraft(itemId, draft, origin);
   }
 
   public clearFullscreenDraft(itemId: string, origin: 'local' | 'remote' = 'local'): void {
-    try {
-      localStorage.removeItem(`${this.getFullscreenDraftsKey()}_${itemId}`);
-      this.emitChange({
-        kind: 'draft',
-        action: 'delete',
-        id: `fullscreen:${itemId}`,
-        origin,
-      });
-    } catch {}
+    return this.draftStore.clearFullscreenDraft(itemId, origin);
   }
 
   public getFullscreenWidth(): boolean {
-    try {
-      return localStorage.getItem(FULLSCREEN_WIDTH_KEY) === 'true';
-    } catch {
-      return false;
-    }
+    return this.draftStore.getFullscreenWidth();
   }
 
   public saveFullscreenWidth(isFullWidth: boolean): void {
-    try {
-      localStorage.setItem(FULLSCREEN_WIDTH_KEY, String(isFullWidth));
-    } catch {}
+    return this.draftStore.saveFullscreenWidth(isFullWidth);
   }
 
-  // Assistant History (Vault-scoped, Obsidian Local-First)
   public getAssistantHistory(): ChatMessage[] {
-    const raw = localStorage.getItem(this.getAssistantKey());
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return this.draftStore.getAssistantHistory();
   }
 
   public saveAssistantHistory(messages: ChatMessage[]): void {
-    try {
-      localStorage.setItem(this.getAssistantKey(), JSON.stringify(messages));
-    } catch (err) {
-      fsLog.error('Failed to save assistant history to localStorage', { count: messages.length, err });
-    }
+    return this.draftStore.saveAssistantHistory(messages);
   }
 
   public clearAssistantHistory(): void {
-    localStorage.removeItem(this.getAssistantKey());
-    fsLog.info('Cleared assistant chat history');
+    return this.draftStore.clearAssistantHistory();
   }
 
-  // Workspace State (per-vault active folder, view modes, and filter settings)
   public getWorkspaceState(): WorkspaceState {
-    const raw = localStorage.getItem(this.getWorkspaceStateKey());
-    if (!raw) return { ...DEFAULT_WORKSPACE_STATE };
-    try {
-      const parsed = JSON.parse(raw);
-      return {
-        ...DEFAULT_WORKSPACE_STATE,
-        ...(parsed && typeof parsed === 'object' ? parsed : {}),
-      };
-    } catch {
-      return { ...DEFAULT_WORKSPACE_STATE };
-    }
+    return this.draftStore.getWorkspaceState();
   }
 
   public saveWorkspaceState(partialState: Partial<WorkspaceState>, origin: 'local' | 'remote' = 'local'): void {
-    try {
-      const current = this.getWorkspaceState();
-      const updated = { ...current, ...partialState };
-      localStorage.setItem(this.getWorkspaceStateKey(), JSON.stringify(updated));
-      this.emitChange({ kind: 'workspace', action: 'upsert', id: 'workspace_state', payload: updated, origin });
-    } catch (err) {
-      fsLog.warn('Failed to save workspace state to localStorage', err);
-    }
+    return this.draftStore.saveWorkspaceState(partialState, origin);
   }
 
   public getFolderViewSettings(folderPath: string): FolderViewSettings {
-    const ws = this.getWorkspaceState();
-    return ws.folderSettings?.[folderPath] || {
-      ...DEFAULT_FOLDER_VIEW_SETTINGS,
-      viewMode: ws.feedViewMode || DEFAULT_FOLDER_VIEW_SETTINGS.viewMode,
-      typeFilter: ws.activeTypeFilter || DEFAULT_FOLDER_VIEW_SETTINGS.typeFilter,
-      sortBy: ws.sortBy || DEFAULT_FOLDER_VIEW_SETTINGS.sortBy,
-      sortOrder: ws.sortOrder || DEFAULT_FOLDER_VIEW_SETTINGS.sortOrder,
-      hideCompletedTasks: ws.hideCompletedTasks ?? DEFAULT_FOLDER_VIEW_SETTINGS.hideCompletedTasks,
-    };
+    return this.draftStore.getFolderViewSettings(folderPath);
   }
 
   public saveFolderViewSettings(folderPath: string, settings: Partial<FolderViewSettings>): void {
-    const ws = this.getWorkspaceState();
-    const currentSettings = ws.folderSettings?.[folderPath] || { ...DEFAULT_FOLDER_VIEW_SETTINGS };
-    const updatedSettings = { ...currentSettings, ...settings };
-    const folderSettings = { ...(ws.folderSettings || {}), [folderPath]: updatedSettings };
-    this.saveWorkspaceState({ folderSettings });
+    return this.draftStore.saveFolderViewSettings(folderPath, settings);
   }
 
   // Export current vault as Markdown files (ZIP or downloadable Blob)
