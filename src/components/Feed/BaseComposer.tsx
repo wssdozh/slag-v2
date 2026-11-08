@@ -43,7 +43,7 @@ export interface BaseComposerProps {
   /** Максимальная высота поля ввода в px (по умолчанию 220) */
   maxHeight?: number;
   /** Вариант отображения: 'card' (со своей рамкой/фоном) или 'flat' (для модалок без матрёшки) */
-  variant?: 'card' | 'flat' | 'embedded';
+  variant?: 'card' | 'flat';
   /** Скрыть поле textarea (например, при активном монохромном режиме войс-записи) */
   hideTextarea?: boolean;
   /** Флаг активного перетаскивания файлов над композером */
@@ -151,9 +151,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={
-          variant === 'embedded'
-            ? `relative flex w-full flex-col gap-2 border-t border-subtle bg-surface p-2 shadow-none ${className}`
-            : isFlat
+          isFlat
             ? `w-full flex flex-col gap-2 p-0 bg-transparent border-0 shadow-none relative ${
                 isDraggingOver ? 'rounded-2xl ring-2 ring-blue-500/50 bg-blue-500/[0.04]' : ''
               } ${className}`

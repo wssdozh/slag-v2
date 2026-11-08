@@ -30,7 +30,7 @@ function getTodayMidnight() {
   return d.getTime();
 }
 
-export const FeedList: React.FC<{ hasEmbeddedComposer?: boolean }> = ({ hasEmbeddedComposer = false }) => {
+export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomComposer = false }) => {
   const {
     filteredItems,
     items,
@@ -187,7 +187,7 @@ export const FeedList: React.FC<{ hasEmbeddedComposer?: boolean }> = ({ hasEmbed
   // The in-flow composer and keyboard resize the scrollport without rendering this list.
   useLayoutEffect(() => {
     const container = containerRef.current;
-    if (!hasEmbeddedComposer || !container) return;
+    if (!hasBottomComposer || !container) return;
     const observer = new ResizeObserver(() => {
       if (isStuckToBottomRef.current && !highlightedItemId) {
         container.scrollTop = container.scrollHeight;
@@ -195,7 +195,7 @@ export const FeedList: React.FC<{ hasEmbeddedComposer?: boolean }> = ({ hasEmbed
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, [hasEmbeddedComposer, highlightedItemId]);
+  }, [hasBottomComposer, highlightedItemId]);
 
   // Dedicated anchoring effect when an item is highlighted / targeted via wiki-link
   useEffect(() => {
@@ -553,7 +553,7 @@ export const FeedList: React.FC<{ hasEmbeddedComposer?: boolean }> = ({ hasEmbed
         )}
 
         {/* Bottom spacer so the last card clears the composer with a clean gap */}
-        <div className={`${hasEmbeddedComposer ? 'h-2' : 'h-[104px]'} shrink-0 pointer-events-none`} aria-hidden="true" />
+        <div className={`${hasBottomComposer ? 'h-2' : 'h-[104px]'} shrink-0 pointer-events-none`} aria-hidden="true" />
         <div ref={bottomAnchorRef} />
       </div>
 
@@ -562,7 +562,7 @@ export const FeedList: React.FC<{ hasEmbeddedComposer?: boolean }> = ({ hasEmbed
           deleted on the first frame of the way back can only blink out. */}
       <div
         aria-hidden={!showScrollBottom}
-        className={`absolute ${hasEmbeddedComposer ? 'bottom-2' : 'bottom-28'} inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
+        className={`absolute ${hasBottomComposer ? 'bottom-2' : 'bottom-28'} inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
           showScrollBottom ? 'opacity-100' : 'opacity-0'
         }`}
       >

@@ -349,16 +349,19 @@ export const MobileFoldersView: React.FC = () => {
           <MobileCalendarView embedded />
         ) : (
           <>
-            <FeedList hasEmbeddedComposer />
+            <FeedList hasBottomComposer />
+            {/* A small floating island: the feed ends above it, so it needs no
+                overlay and no scroll compensation. */}
             <div
-              className="relative z-30 shrink-0 bg-surface"
+              className="relative z-30 flex shrink-0 justify-center"
               style={{
-                paddingBottom: 'var(--sab)',
-                paddingLeft: 'var(--sal)',
-                paddingRight: 'var(--sar)',
+                paddingTop: '8px',
+                paddingBottom: 'calc(var(--sab) + 8px)',
+                paddingLeft: 'calc(var(--sal) + 8px)',
+                paddingRight: 'calc(var(--sar) + 8px)',
               }}
             >
-              <Composer key={currentFolder} variant="embedded" />
+              <Composer key={currentFolder} />
             </div>
           </>
         )}

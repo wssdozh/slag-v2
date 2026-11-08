@@ -56,17 +56,19 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const composer = page.locator('[data-composer-root]');
     const composerBox = await composer.boundingBox();
     expect(composerBox).not.toBeNull();
-    expect(composerBox!.x).toBe(0);
-    expect(composerBox!.width).toBe(390);
+    // Small island: 8px of air on each side, not a flush bar
+    expect(composerBox!.x).toBe(8);
+    expect(composerBox!.width).toBe(390 - 16);
     for (const viewport of [{ width: 360, height: 800 }, { width: 700, height: 390 }]) {
       await page.setViewportSize(viewport);
-      await expect(composer).toHaveCSS('width', `${viewport.width}px`);
+      await expect(composer).toHaveCSS('width', `${viewport.width - 16}px`);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
     await page.setViewportSize({ width: 390, height: 844 });
     const panel = composer.locator(':scope > div').last();
-    await expect(panel).toHaveCSS('border-radius', '0px');
-    await expect(panel).toHaveClass(/shadow-none/);
+    await expect(panel).toHaveCSS('border-radius', '16px');
+    await expect(panel).toHaveClass(/rounded-2xl/);
+    await expect(panel).not.toHaveClass(/shadow-none/);
     const feed = page.locator('.overflow-y-auto').filter({ has: page.locator('[id^="item-"]') }).first();
     await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await composerTextarea.fill(Array.from({ length: 20 }, (_, i) => `строка ${i}`).join('\n'));

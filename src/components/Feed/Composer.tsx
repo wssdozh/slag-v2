@@ -41,7 +41,7 @@ import {
 
 export interface ComposerProps {
   isModal?: boolean;
-  variant?: 'card' | 'flat' | 'embedded';
+  variant?: 'card' | 'flat';
   isActive?: boolean;
   initialType?: SlagItemType;
   initialStatus?: SlagItemStatus;
@@ -1792,7 +1792,7 @@ export const Composer: React.FC<ComposerProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={variant === 'embedded' ? 'w-full' : isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-2xl'}
+      className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-2xl'}
     />
   );
 };
