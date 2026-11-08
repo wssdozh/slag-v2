@@ -5,7 +5,6 @@ import { aiClient } from './ai/aiClient';
 import {
   assistantOrchestrator,
   resolveKieEndpoint,
-  extractActionBlock,
   type SendAssistantChatParams,
   type SendAssistantChatResult,
 } from './ai/orchestrator';
@@ -17,7 +16,6 @@ import {
 
 export {
   resolveKieEndpoint,
-  extractActionBlock,
   type SendAssistantChatParams,
   type SendAssistantChatResult,
 };
