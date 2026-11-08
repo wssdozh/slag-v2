@@ -34,6 +34,7 @@ import { listenDesktopEvents, isDesktopApp, isMobilePlatform } from '../lib/wind
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useGlobalHotkeys } from '../hooks/useGlobalHotkeys';
 import { crossFade, swapScreen, type ScreenSwap } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
@@ -115,7 +116,6 @@ interface AppContextType {
   isChatLoading: boolean;
   sendChatMessage: (text: string) => Promise<void>;
   clearChatMessages: () => void;
-  createNoteFromAction: (action: SuggestedAction, messageId?: string) => SlagItem | void;
   executeSuggestedAction: (action: SuggestedAction, messageId?: string) => SlagItem | void;
   rejectAction: (messageId: string) => void;
 
@@ -1081,90 +1081,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [isMobile, setActiveMobileTab]);
 
   // Global In-App Keyboard Shortcuts (Zero-Overhead native keydown)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. Escape: dismiss top layer in LIFO stack
-      if (e.key === 'Escape') {
-        if (dismissTopLayer()) {
-          e.preventDefault();
-          return;
-        }
-      }
-
-      const mod = e.metaKey || e.ctrlKey;
-
-      // 2. Ctrl/Cmd + F or Ctrl/Cmd + K: Toggle Search (prevent browser find)
-      if (mod && (e.code === 'KeyF' || e.code === 'KeyK' || e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'k')) {
-        e.preventDefault();
-        setIsSearchOpen(prev => !prev);
-        return;
-      }
-
-      // 3. Ctrl/Cmd + J: Toggle Assistant
-      if (mod && (e.code === 'KeyJ' || e.key.toLowerCase() === 'j')) {
-        e.preventDefault();
-        toggleAssistant();
-        return;
-      }
-
-      // 4. Ctrl/Cmd + `: Toggle System Logs & HUD (support tilde and Cyrillic ё)
-      if (mod && (e.code === 'Backquote' || e.key === '`' || e.key === '~' || e.key === 'ё' || e.key === 'Ё')) {
-        e.preventDefault();
-        setIsLogViewerOpen(prev => !prev);
-        return;
-      }
-
-      // 5. Ctrl/Cmd + ,: Open Settings
-      if (mod && (e.key === ',' || e.code === 'Comma')) {
-        e.preventDefault();
-        openSettingsModal();
-        return;
-      }
-
-      // 6. Single-key shortcuts ('C' for task, 'N' for note) outside typing elements
-      if (!mod && !e.altKey && !e.shiftKey) {
-        const target = e.target as HTMLElement | null;
-        const tag = (target?.tagName || '').toLowerCase();
-        const isEditable = target?.isContentEditable || target?.getAttribute('contenteditable') === 'true';
-
-        if (
-          tag !== 'input' &&
-          tag !== 'textarea' &&
-          tag !== 'select' &&
-          !isEditable &&
-          !isFullscreenEditorOpen &&
-          !isComposerModalOpen &&
-          !isSearchOpen &&
-          !isSettingsOpen &&
-          !contextMenu
-        ) {
-          if (e.code === 'KeyC' || e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'с') {
-            e.preventDefault();
-            openComposerModal({ type: 'task' });
-            return;
-          }
-          if (e.code === 'KeyN' || e.key.toLowerCase() === 'n' || e.key.toLowerCase() === 'т') {
-            e.preventDefault();
-            openComposerModal({ type: 'note' });
-            return;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    dismissTopLayer,
+  useGlobalHotkeys({
+    openSearch: () => setIsSearchOpen(prev => !prev),
     toggleAssistant,
-    openComposerModal,
-    openSettingsModal,
-    isFullscreenEditorOpen,
-    isComposerModalOpen,
-    isSearchOpen,
-    isSettingsOpen,
-    contextMenu,
-  ]);
+    toggleLogs: () => setIsLogViewerOpen(prev => !prev),
+    openComposer: openComposerModal,
+    openSettings: openSettingsModal,
+    dismissTopLayer,
+    isOverlayOpen: () => Boolean(isFullscreenEditorOpen || isComposerModalOpen || isSearchOpen || isSettingsOpen || contextMenu),
+  });
 
   // Navigation & Layer Depth Calculation (LIFO Stack)
   const overlayDepth = (
@@ -1793,10 +1718,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('Действие отклонено', 'info');
   }, [addToast]);
 
-  const createNoteFromAction = useCallback((action: SuggestedAction, messageId?: string): SlagItem | void => {
-    return executeSuggestedAction(action, messageId);
-  }, [executeSuggestedAction]);
-
   const sendChatMessage = useCallback(async (userText: string) => {
     if (!userText.trim()) return;
 
@@ -2287,7 +2208,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isChatLoading,
         sendChatMessage,
         clearChatMessages,
-        createNoteFromAction,
         executeSuggestedAction,
         rejectAction,
         lightboxImages,

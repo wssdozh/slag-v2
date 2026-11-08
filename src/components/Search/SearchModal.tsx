@@ -72,6 +72,7 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
       openComposer: (options) => openComposerModal(options),
       openSettings: (tab) => openSettingsModal(tab),
       dismissTopLayer,
+      isOverlayOpen: () => true,
     }),
     [toggleAssistant, isLogViewerOpen, setIsLogViewerOpen, openComposerModal, openSettingsModal, dismissTopLayer, setIsSearchOpen]
   );

@@ -11,6 +11,7 @@ export interface AppCommandContext {
   openComposer: (options?: { type?: 'task' | 'note' | 'article' }) => void;
   openSettings: (tab?: 'ai' | 'vault' | 'ui' | 'shortcuts' | 'logs') => void;
   dismissTopLayer: () => boolean;
+  isOverlayOpen: () => boolean;
   [key: string]: unknown;
 }
 
@@ -233,6 +234,7 @@ export const APP_COMMANDS: AppCommand[] = [
     keywords: ['задача', 'задачи', 'таск', 'task', 'todo', 'дело'],
     shortcut: 'c',
     allowInInput: false,
+    isEnabled: (ctx) => !ctx.isOverlayOpen(),
     run: (ctx) => {
       ctx.openComposer({ type: 'task' });
     },
@@ -245,6 +247,7 @@ export const APP_COMMANDS: AppCommand[] = [
     keywords: ['заметка', 'заметки', 'текст', 'note', 'memo'],
     shortcut: 'n',
     allowInInput: false,
+    isEnabled: (ctx) => !ctx.isOverlayOpen(),
     run: (ctx) => {
       ctx.openComposer({ type: 'note' });
     },

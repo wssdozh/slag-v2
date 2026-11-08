@@ -47,7 +47,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     isChatLoading,
     sendChatMessage,
     clearChatMessages,
-    createNoteFromAction,
+    executeSuggestedAction,
     rejectAction,
     aiSettings,
     saveAiSettings,
@@ -754,7 +754,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                                 return (
                                   <button
                                     disabled={isDisabled}
-                                    onClick={() => createNoteFromAction(finalAction, msg.id)}
+                                    onClick={() => executeSuggestedAction(finalAction, msg.id)}
                                     className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-colors shadow-sm ${
                                       isDisabled
                                         ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/[0.04]'
@@ -985,7 +985,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                 batchUpdateItems: activeItems,
               };
             }
-            createNoteFromAction(finalAction, diffModalData.messageId);
+            executeSuggestedAction(finalAction, diffModalData.messageId);
           }}
         />
       )}
