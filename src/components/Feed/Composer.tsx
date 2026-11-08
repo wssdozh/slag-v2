@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, FolderMeta, ComposerDraft, ReplyTarget } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment } from '../../types';
 import { storage } from '../../lib/storage';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
@@ -17,9 +17,9 @@ import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
 import { ToolbarButton } from '../UI/ToolbarButton';
 import { ComposerTaskControls } from './ComposerTaskControls';
 import { SlashCommandMenu } from './SlashCommandMenu';
-import { SLASH_COMMANDS, type SlashCommand } from '../../types/slashCommands';
+import { type SlashCommand } from '../../types/slashCommands';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
-import { TagSuggestionMenu, type TagMeta } from './TagSuggestionMenu';
+import { TagSuggestionMenu } from './TagSuggestionMenu';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/dateUtils';
@@ -38,6 +38,8 @@ import {
   StickyNote,
   Lock,
 } from 'lucide-react';
+import { useComposerDraft } from './useComposerDraft';
+import { useComposerAutocomplete } from './useComposerAutocomplete';
 
 export interface ComposerProps {
   isModal?: boolean;
@@ -51,19 +53,6 @@ export interface ComposerProps {
   onComplete?: () => void;
   onCancel?: () => void;
 }
-
-/**
- * Drafts written before the reply text was persisted only carried an id and a title.
- * A stub without any text cannot describe what it replies to, and an empty banner is
- * worse than no banner, so it is dropped.
- */
-const reviveReplyTarget = (target: ReplyTarget | null | undefined): ReplyTarget | null => {
-  if (!target) return null;
-  const title = target.title ?? '';
-  const content = target.content ?? '';
-  if (!title && !content) return null;
-  return { ...target, title, content, type: target.type ?? 'note' };
-};
 
 export const Composer: React.FC<ComposerProps> = ({
   isModal = false,
@@ -95,38 +84,104 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const effectiveDefaultFolder = isModal ? DEFAULT_INBOX_FOLDER : (initialFolder || currentFolder);
   const activeFolder = effectiveDefaultFolder;
-  const [initialDraft] = useState(() => storage.getComposerDraft(activeFolder));
 
-  const [content, setContent] = useState(() => initialDraft?.content || '');
-  const [itemType, setItemType] = useState<SlagItemType>(() => initialDraft?.itemType || initialType || 'note');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
-  const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(() => initialDraft?.priority || 'none');
-  const [dueDate, setDueDate] = useState<string>(() => initialDraft?.dueDate || initialDueDate || '');
   const [reminder] = useState<string | undefined>(initialReminder);
-  const [tags, setTags] = useState<string[]>(() => initialDraft?.tags || []);
-  const [targetFolderOverride, setTargetFolderOverride] = useState<{ folder: string; forCurrent: string } | null>(
-    initialDraft?.targetFolder
-      ? { folder: initialDraft.targetFolder, forCurrent: effectiveDefaultFolder }
-      : initialFolder && initialFolder !== effectiveDefaultFolder
-      ? { folder: initialFolder, forCurrent: effectiveDefaultFolder }
-      : null
-  );
-  // The @token in the text is the folder indicator: deleting it drops the
-  // destination, so it is derived rather than mirrored into state.
-  const inlineFolder = useMemo(() => extractFolderToken(content, folders).folder, [content, folders]);
-  const folderTokenRange = useMemo(() => {
-    if (!inlineFolder) return null;
-    const needle = `@${inlineFolder.name}`;
-    const start = content.toLowerCase().indexOf(needle.toLowerCase());
-    return start === -1 ? null : { start, end: start + needle.length };
-  }, [content, inlineFolder]);
-  const targetFolder = inlineFolder?.path
-    ?? (targetFolderOverride?.forCurrent === effectiveDefaultFolder ? targetFolderOverride.folder : null);
-  const setTargetFolder = useCallback((folder: string | null) => {
-    setTargetFolderOverride(folder ? { folder, forCurrent: effectiveDefaultFolder } : null);
-  }, [effectiveDefaultFolder]);
-  const [attachments, setAttachments] = useState<SlagAttachment[]>(() => initialDraft?.attachments || []);
   const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
+
+  // Todoist parser & Ghost-chips state
+  const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
+  const [isDateDismissed, setIsDateDismissed] = useState(false);
+  const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
+  const [isDurationDismissed, setIsDurationDismissed] = useState(false);
+  const [isRecurrenceDismissed, setIsRecurrenceDismissed] = useState(false);
+  const [dismissedTags, setDismissedTags] = useState<Set<string>>(new Set());
+
+  const {
+    content,
+    setContent,
+    itemType,
+    setItemType,
+    priority,
+    setPriority,
+    dueDate,
+    setDueDate,
+    tags,
+    attachments,
+    setAttachments,
+    folderTokenRange,
+    targetFolder,
+    setTargetFolder,
+    duration,
+    setDuration,
+    recurrence,
+    setRecurrence,
+    resetDraftState,
+    notifyUserEdit,
+  } = useComposerDraft({
+    activeFolder,
+    effectiveDefaultFolder,
+    initialType,
+    initialDueDate,
+    initialFolder,
+    replyTarget,
+    setReplyTarget,
+    folders,
+    textareaRef,
+    isModal,
+    isActive,
+    isFullscreenEditorOpen,
+    onResetExtra: () => {
+      clearQueries();
+      setParsedTask(null);
+      setIsDateDismissed(false);
+      setIsPriorityDismissed(false);
+      setDismissedTags(new Set());
+    },
+  });
+
+  const {
+    wikiQuery,
+    wikiSelectedIndex,
+    folderQuery,
+    folderSelectedIndex,
+    slashQuery,
+    setSlashQuery,
+    slashSelectedIndex,
+    setSlashSelectedIndex,
+    tagQuery,
+    tagSelectedIndex,
+    matchingAutocompleteTags,
+    matchingWikiItems,
+    matchingSlashCommands,
+    matchingFolders,
+    lastFolderQuery,
+    lastMatchingFolders,
+    lastSlashQuery,
+    lastTagQuery,
+    lastMatchingTags,
+    lastMatchingWikiItems,
+    insertTag,
+    insertWikiLink,
+    selectFolder,
+    updateAutocompleteQueries,
+    clearQueries,
+    handleAutocompleteKeyDown,
+  } = useComposerAutocomplete({
+    content,
+    setContent,
+    items,
+    folders,
+    currentFolder,
+    DEFAULT_INBOX_FOLDER,
+    textareaRef,
+    addToast,
+    setTargetFolder,
+  });
 
   // Hold-to-record & lock state via custom hook
   const {
@@ -147,32 +202,6 @@ export const Composer: React.FC<ComposerProps> = ({
     cancelRecording,
   } = useComposerMedia({ addToast });
 
-  // WikiLink [[ autocomplete state
-  const [wikiQuery, setWikiQuery] = useState<string | null>(null);
-  const [wikiSelectedIndex, setWikiSelectedIndex] = useState(0);
-
-  // Folder @ autocomplete state
-  const [folderQuery, setFolderQuery] = useState<string | null>(null);
-  const [folderSelectedIndex, setFolderSelectedIndex] = useState(0);
-
-  // Slash command / state
-  const [slashQuery, setSlashQuery] = useState<string | null>(null);
-  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
-
-  // Tag # autocomplete state
-  const [tagQuery, setTagQuery] = useState<string | null>(null);
-  const [tagSelectedIndex, setTagSelectedIndex] = useState(0);
-
-  // Todoist parser & Ghost-chips state
-  const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
-  const [isDateDismissed, setIsDateDismissed] = useState(false);
-  const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
-  const [duration, setDuration] = useState<number | undefined>(() => initialDraft?.duration);
-  const [isDurationDismissed, setIsDurationDismissed] = useState(false);
-  const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(() => initialDraft?.recurrence);
-  const [isRecurrenceDismissed, setIsRecurrenceDismissed] = useState(false);
-  const [dismissedTags, setDismissedTags] = useState<Set<string>>(new Set());
-
   // 150ms debounced Todoist parsing when content changes
   useEffect(() => {
     if (!content.trim()) return;
@@ -186,60 +215,7 @@ export const Composer: React.FC<ComposerProps> = ({
     }, UI_DELAYS.COMPOSER_TODOIST_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [content, itemType]);
-
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
-
-  const draftRef = useRef({ content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence });
-  const isApplyingRemoteDraftRef = useRef(false);
-  const lastAdoptedRemoteDraftUpdatedAtRef = useRef<number>(initialDraft?.updatedAt ?? 0);
-  const lastLocalUserEditTimeRef = useRef<number>(0);
-
-  useEffect(() => {
-    draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence };
-  }, [content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence]);
-
-  const resetDraftState = useCallback(() => {
-    draftRef.current = {
-      content: '',
-      itemType: 'note',
-      priority: 'none',
-      dueDate: '',
-      tags: [],
-      attachments: [],
-      replyTarget: null,
-      targetFolder: null,
-      duration: undefined,
-      recurrence: undefined,
-    };
-    setContent('');
-    setTags([]);
-    setTargetFolderOverride(null);
-    setAttachments([]);
-    setPriority('none');
-    setDueDate('');
-    setDuration(undefined);
-    setIsDurationDismissed(false);
-    setRecurrence(undefined);
-    setIsRecurrenceDismissed(false);
-    setReplyTarget(null);
-    setWikiQuery(null);
-    setFolderQuery(null);
-    setFolderSelectedIndex(0);
-    setSlashQuery(null);
-    setSlashSelectedIndex(0);
-    setTagQuery(null);
-    setTagSelectedIndex(0);
-    setParsedTask(null);
-    setIsDateDismissed(false);
-    setIsPriorityDismissed(false);
-    setDismissedTags(new Set());
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-  }, [setReplyTarget]);
+  }, [content, itemType, setItemType]);
 
   // Focus textarea when replying or when mounted in modal
   useEffect(() => {
@@ -248,278 +224,8 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   }, [replyTarget, isModal]);
 
-  // Initialize replyTarget from draft on initial mount if available
-  useEffect(() => {
-    if (initialDraft?.replyTarget && !replyTarget) {
-      setReplyTarget(reviveReplyTarget(initialDraft.replyTarget));
-    }
-  }, [initialDraft?.replyTarget, replyTarget, setReplyTarget]);
-
-  // Synchronize with stored draft when folder changes, on focus or when returning to tab
-  useEffect(() => {
-    const syncWithStorage = () => {
-      // If user is actively typing right now in focused window, don't overwrite
-      if (
-        typeof document !== 'undefined' &&
-        document.hasFocus() &&
-        textareaRef.current === document.activeElement &&
-        Date.now() - lastLocalUserEditTimeRef.current < 800
-      ) {
-        return;
-      }
-      const currentStored = storage.getComposerDraft(activeFolder);
-      if (currentStored) {
-        if ((currentStored.updatedAt ?? 0) >= lastAdoptedRemoteDraftUpdatedAtRef.current) {
-          isApplyingRemoteDraftRef.current = true;
-          lastAdoptedRemoteDraftUpdatedAtRef.current = currentStored.updatedAt ?? 0;
-          setContent(currentStored.content || '');
-          setItemType(currentStored.itemType || 'note');
-          setPriority(currentStored.priority || 'none');
-          setDueDate(currentStored.dueDate || '');
-          setTags(currentStored.tags || []);
-          setAttachments(currentStored.attachments || []);
-          if (currentStored.replyTarget) setReplyTarget(reviveReplyTarget(currentStored.replyTarget));
-          setTargetFolder(currentStored.targetFolder || null);
-          setDuration(currentStored.duration);
-          setRecurrence(currentStored.recurrence);
-        }
-      } else {
-        // Stored draft was cleared/deleted on remote device
-        if (lastAdoptedRemoteDraftUpdatedAtRef.current > 0) {
-          isApplyingRemoteDraftRef.current = true;
-          lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
-          resetDraftState();
-        }
-      }
-    };
-
-    // Check immediately on folder change or when returning from fullscreen editor
-    if (!isFullscreenEditorOpen) {
-      syncWithStorage();
-    }
-
-    // Check when window gains focus or becomes visible
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        syncWithStorage();
-      }
-    };
-    window.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', syncWithStorage);
-    return () => {
-      window.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', syncWithStorage);
-    };
-  }, [activeFolder, isFullscreenEditorOpen, resetDraftState, setReplyTarget, setTargetFolder]);
-
-  // Flush on logical modal close as well as unmount; exit motion must not delay saving.
-  useEffect(() => {
-    if (!isActive) return;
-    return () => {
-      const d = draftRef.current;
-      if (d.content.trim() || d.attachments.length > 0) {
-        storage.saveComposerDraft(activeFolder, {
-          content: d.content,
-          itemType: d.itemType,
-          priority: d.priority,
-          dueDate: d.dueDate,
-          tags: d.tags,
-          attachments: d.attachments,
-          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title, content: d.replyTarget.content, type: d.replyTarget.type } : null,
-          targetFolder: d.targetFolder,
-          duration: d.duration,
-          recurrence: d.recurrence,
-          updatedAt: Date.now(),
-        });
-      }
-    };
-  }, [activeFolder, isModal, isActive]);
-
-  // Debounced autosave while typing
-  useEffect(() => {
-    if (!isActive) return;
-    const timer = setTimeout(() => {
-      // If we just applied an incoming remote draft, skip echoing it back out
-      if (isApplyingRemoteDraftRef.current) {
-        isApplyingRemoteDraftRef.current = false;
-        return;
-      }
-
-      // If content is typed locally, remove any leftover deletion tombstone
-      const tombKey = `slag_sync_draft_tomb_${storage.getCurrentVault()?.id || 'default_vault'}_composer:${activeFolder}`;
-      try {
-        localStorage.removeItem(tombKey);
-      } catch {}
-
-      if (content.trim() || attachments.length > 0) {
-        storage.saveComposerDraft(activeFolder, {
-          content,
-          itemType,
-          priority,
-          dueDate,
-          tags,
-          attachments,
-          replyTarget: replyTarget ? { id: replyTarget.id, title: replyTarget.title, content: replyTarget.content, type: replyTarget.type } : null,
-          targetFolder,
-          duration,
-          recurrence,
-          updatedAt: Date.now(),
-        });
-      } else if (lastLocalUserEditTimeRef.current > 0) {
-        storage.deleteComposerDraft(activeFolder);
-      }
-    }, UI_DELAYS.COMPOSER_AUTOSAVE_DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive]);
-
-  // Handle beforeunload to avoid lost text on immediate tab close/refresh
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (isApplyingRemoteDraftRef.current) return;
-      const d = draftRef.current;
-      if (d.content.trim() || d.attachments.length > 0) {
-        storage.saveComposerDraft(activeFolder, {
-          content: d.content,
-          itemType: d.itemType,
-          priority: d.priority,
-          dueDate: d.dueDate,
-          tags: d.tags,
-          attachments: d.attachments,
-          replyTarget: d.replyTarget ? { id: d.replyTarget.id, title: d.replyTarget.title, content: d.replyTarget.content, type: d.replyTarget.type } : null,
-          targetFolder: d.targetFolder,
-          duration: d.duration,
-          recurrence: d.recurrence,
-          updatedAt: Date.now(),
-        });
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [activeFolder]);
-
-  // Listen to draft changes (typing on another device, quick composer window, or editor sync)
-  useEffect(() => {
-    const unsubscribe = storage.subscribeChanges((event) => {
-      if (event.kind === 'draft') {
-        const isCurrentFolder = event.id === `composer:${activeFolder}`;
-        // Эхо собственной записи: состояние уже актуально, применять его обратно нельзя —
-        // иначе только что выбранная папка/теги откатываются к предыдущему черновику.
-        if (isCurrentFolder && event.origin === 'local') return;
-        if (isCurrentFolder) {
-          if (event.action === 'upsert' && event.payload) {
-            const incomingDraft = event.payload as ComposerDraft;
-            const incomingTs = incomingDraft.updatedAt ?? 0;
-            const isUserActivelyTyping =
-              typeof document !== 'undefined' &&
-              document.hasFocus() &&
-              textareaRef.current === document.activeElement &&
-              Date.now() - lastLocalUserEditTimeRef.current < 800;
-
-            const isIdentical =
-              draftRef.current.content === (incomingDraft.content || '') &&
-              draftRef.current.itemType === (incomingDraft.itemType || 'note') &&
-              draftRef.current.priority === (incomingDraft.priority || 'none') &&
-              draftRef.current.dueDate === (incomingDraft.dueDate || '') &&
-              JSON.stringify(draftRef.current.tags) === JSON.stringify(incomingDraft.tags || []) &&
-              draftRef.current.attachments.length === (incomingDraft.attachments?.length || 0) &&
-              draftRef.current.targetFolder === (incomingDraft.targetFolder || null) &&
-              draftRef.current.duration === incomingDraft.duration &&
-              JSON.stringify(draftRef.current.recurrence) === JSON.stringify(incomingDraft.recurrence);
-
-            if (isIdentical) return;
-
-            const hasLocalUnsavedChanges = draftRef.current.content.trim().length > 0;
-            const shouldAdopt =
-              !isUserActivelyTyping &&
-              ((!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
-                incomingTs >= lastAdoptedRemoteDraftUpdatedAtRef.current);
-
-            if (shouldAdopt) {
-              isApplyingRemoteDraftRef.current = true;
-              lastAdoptedRemoteDraftUpdatedAtRef.current = incomingTs;
-              setContent(incomingDraft.content || '');
-              setItemType(incomingDraft.itemType || 'note');
-              setPriority(incomingDraft.priority || 'none');
-              setDueDate(incomingDraft.dueDate || '');
-              setTags(incomingDraft.tags || []);
-              setAttachments(incomingDraft.attachments || []);
-              if (incomingDraft.replyTarget) setReplyTarget(incomingDraft.replyTarget as any);
-              setTargetFolder(incomingDraft.targetFolder || null);
-              setDuration(incomingDraft.duration);
-              setRecurrence(incomingDraft.recurrence);
-            }
-          } else if (event.action === 'delete') {
-            isApplyingRemoteDraftRef.current = true;
-            lastAdoptedRemoteDraftUpdatedAtRef.current = 0;
-            resetDraftState();
-          }
-        }
-      }
-    });
-    return unsubscribe;
-  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder]);
-
-  // All unique tags in vault with usage counts, sorted by frequency
-  const allVaultTags = useMemo<TagMeta[]>(() => {
-    const counts = new Map<string, number>();
-    items.forEach(it => {
-      it.tags?.forEach(t => {
-        const clean = t && t.trim();
-        if (clean) counts.set(clean, (counts.get(clean) || 0) + 1);
-      });
-    });
-    return Array.from(counts.entries())
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'ru'));
-  }, [items]);
-
-  // Tags matching current # autocomplete query
-  const matchingAutocompleteTags = useMemo(() => {
-    if (tagQuery === null) return [];
-    const q = tagQuery.toLowerCase().trim();
-    if (!q) return allVaultTags;
-    return allVaultTags.filter(t => t.tag.toLowerCase().includes(q));
-  }, [tagQuery, allVaultTags]);
-
-  // WikiLink items matching current query
-  const matchingWikiItems = wikiQuery !== null
-    ? items
-        .filter(i => (i.title || '').toLowerCase().includes(wikiQuery.toLowerCase()))
-        .slice(0, 5)
-    : [];
-
-  // Slash commands matching current query
-  const matchingSlashCommands = slashQuery !== null
-    ? SLASH_COMMANDS.filter((cmd) => {
-        const q = slashQuery.toLowerCase().trim();
-        if (!q) return true;
-        if (cmd.command.toLowerCase().includes(q)) return true;
-        if (cmd.title.toLowerCase().includes(q)) return true;
-        if (cmd.description.toLowerCase().includes(q)) return true;
-        return cmd.aliases.some((alias) => alias.toLowerCase().includes(q));
-      })
-    : [];
-
-  // Folders matching current @ query
-  const matchingFolders = useMemo(() => {
-    if (folderQuery === null) return [];
-    const sorted = [...folders].sort((a, b) => {
-      if (a.path === currentFolder) return -1;
-      if (b.path === currentFolder) return 1;
-      if (a.path === DEFAULT_INBOX_FOLDER) return -1;
-      if (b.path === DEFAULT_INBOX_FOLDER) return 1;
-      return a.path.localeCompare(b.path, 'ru');
-    });
-    const q = folderQuery.toLowerCase().trim();
-    if (!q) return sorted;
-    return sorted.filter(
-      (f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q)
-    );
-  }, [folderQuery, folders, currentFolder]);
-
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    lastLocalUserEditTimeRef.current = Date.now();
+    notifyUserEdit();
     const text = e.target.value;
     setContent(text);
 
@@ -528,9 +234,7 @@ export const Composer: React.FC<ComposerProps> = ({
       setIsDateDismissed(false);
       setIsPriorityDismissed(false);
       setDismissedTags(new Set());
-      setFolderQuery(null);
-      setSlashQuery(null);
-      setTagQuery(null);
+      clearQueries();
     }
 
     // Smart type inference: typing checklist switches note to task
@@ -541,102 +245,9 @@ export const Composer: React.FC<ComposerProps> = ({
     }
 
     const cursorPos = e.target.selectionStart || text.length;
-    const textBefore = text.slice(0, cursorPos);
-    const wikiMatch = textBefore.match(/\[\[([^\]\n]*)$/);
-    if (wikiMatch) {
-      setWikiQuery(wikiMatch[1]);
-      setWikiSelectedIndex(0);
-      setFolderQuery(null);
-      setSlashQuery(null);
-      setTagQuery(null);
-    } else {
-      setWikiQuery(null);
-      // Folder trigger: beginning of line or preceded by whitespace, followed by @ and folder characters
-      const folderMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
-      if (folderMatch) {
-        setFolderQuery(folderMatch[1]);
-        setFolderSelectedIndex(0);
-        setSlashQuery(null);
-        setTagQuery(null);
-      } else {
-        setFolderQuery(null);
-        // Slash command trigger: beginning of line or preceded by whitespace, followed by non-space chars
-        const slashMatch = textBefore.match(/(?:^|\s)\/([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
-        if (slashMatch) {
-          setSlashQuery(slashMatch[1]);
-          setSlashSelectedIndex(0);
-          setTagQuery(null);
-        } else {
-          setSlashQuery(null);
-          // Tag trigger: beginning of line or preceded by whitespace, followed by # and letters/digits
-          const tagMatch = textBefore.match(/(?:^|\s)#([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
-          if (tagMatch) {
-            setTagQuery(tagMatch[1]);
-            setTagSelectedIndex(0);
-          } else {
-            setTagQuery(null);
-          }
-        }
-      }
-    }
+    updateAutocompleteQueries(text, cursorPos);
   };
 
-  const insertTag = (selectedTag: string) => {
-    const el = textareaRef.current;
-    const cursorPos = el && typeof el.selectionStart === 'number' && el.selectionStart > 0
-      ? el.selectionStart
-      : content.length;
-    const textBefore = content.slice(0, cursorPos);
-    const textAfter = content.slice(cursorPos);
-    const hashIndex = textBefore.lastIndexOf('#');
-    if (hashIndex !== -1) {
-      const newText = textBefore.slice(0, hashIndex) + `#${selectedTag} ` + textAfter;
-      setContent(newText);
-      setTagQuery(null);
-      setTimeout(() => {
-        if (el) {
-          el.focus({ preventScroll: true });
-          const newCursor = hashIndex + selectedTag.length + 2;
-          el.setSelectionRange(newCursor, newCursor);
-        }
-      }, 0);
-    } else {
-      const globalHashIndex = content.lastIndexOf('#');
-      if (globalHashIndex !== -1) {
-        const newText = content.slice(0, globalHashIndex) + `#${selectedTag} `;
-        setContent(newText);
-        setTagQuery(null);
-        setTimeout(() => {
-          if (el) {
-            el.focus({ preventScroll: true });
-            const newCursor = newText.length;
-            el.setSelectionRange(newCursor, newCursor);
-          }
-        }, 0);
-      }
-    }
-  };
-
-  const insertWikiLink = (targetItem: (typeof items)[0]) => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const cursorPos = el.selectionStart || content.length;
-    const textBefore = content.slice(0, cursorPos);
-    const textAfter = content.slice(cursorPos);
-    const match = textBefore.match(/\[\[([^\]\n]*)$/);
-    if (match && match.index !== undefined) {
-      const startIdx = match.index;
-      const cleanTitle = targetItem.title || targetItem.id;
-      const newText = textBefore.slice(0, startIdx) + `[[${cleanTitle}]] ` + textAfter;
-      setContent(newText);
-      setWikiQuery(null);
-      setTimeout(() => {
-        el.focus({ preventScroll: true });
-        const newCursor = startIdx + cleanTitle.length + 5;
-        el.setSelectionRange(newCursor, newCursor);
-      }, 10);
-    }
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
     const files = e.target.files;
@@ -700,47 +311,6 @@ export const Composer: React.FC<ComposerProps> = ({
     } finally {
       setIsGeneratingAiTags(false);
     }
-  };
-
-  const selectFolder = (folder: FolderMeta) => {
-    const el = textareaRef.current;
-    const cursorPos = el && typeof el.selectionStart === 'number' && el.selectionStart > 0
-      ? el.selectionStart
-      : content.length;
-    const textBefore = content.slice(0, cursorPos);
-    const textAfter = content.slice(cursorPos);
-    const atMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
-
-    // The folder stays in the text as an @token, so the draft shows where it
-    // goes without a second row of chips.
-    const inserted = `@${folder.name} `;
-    if (atMatch && atMatch.index !== undefined) {
-      const isStartOfLine = atMatch[0].startsWith('@');
-      const replaceStart = isStartOfLine ? atMatch.index : atMatch.index + 1;
-      setContent(textBefore.slice(0, replaceStart) + inserted + textAfter);
-      const newCursor = replaceStart + inserted.length;
-      setTimeout(() => {
-        if (el) {
-          el.focus({ preventScroll: true });
-          el.setSelectionRange(newCursor, newCursor);
-        }
-      }, 0);
-    } else {
-      const joiner = content && !/\s$/.test(content) ? ' ' : '';
-      const newText = content + joiner + inserted;
-      setContent(newText);
-      const newCursor = newText.length;
-      setTimeout(() => {
-        if (el) {
-          el.focus({ preventScroll: true });
-          el.setSelectionRange(newCursor, newCursor);
-        }
-      }, 0);
-    }
-
-    setTargetFolder(folder.path);
-    setFolderQuery(null);
-    addToast(`Папка «${folder.name}» выбрана`, 'info');
   };
 
   const executeSlashCommand = (cmd: SlashCommand) => {
@@ -886,7 +456,7 @@ export const Composer: React.FC<ComposerProps> = ({
     } catch {
       addToast('Не удалось обработать прикрепленные файлы', 'error');
     }
-  }, [addToast]);
+  }, [addToast, setAttachments]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     if (e.dataTransfer.types.includes('Files')) {
@@ -1217,30 +787,8 @@ export const Composer: React.FC<ComposerProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Folder autocomplete keyboard controls
-    if (folderQuery !== null) {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setFolderQuery(null);
-        return;
-      }
-      if (matchingFolders.length > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setFolderSelectedIndex(prev => (prev < matchingFolders.length - 1 ? prev + 1 : 0));
-          return;
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setFolderSelectedIndex(prev => (prev > 0 ? prev - 1 : matchingFolders.length - 1));
-          return;
-        }
-        if (e.key === 'Enter' || e.key === 'Tab') {
-          e.preventDefault();
-          selectFolder(matchingFolders[folderSelectedIndex]);
-          return;
-        }
-      }
+    if (handleAutocompleteKeyDown(e)) {
+      return;
     }
 
     // Slash commands keyboard controls
@@ -1294,65 +842,6 @@ export const Composer: React.FC<ComposerProps> = ({
         setIsPriorityDismissed(true);
         setPriority('none');
         return;
-      }
-    }
-
-    // Wiki autocomplete keyboard controls
-    if (wikiQuery !== null && matchingWikiItems.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setWikiSelectedIndex(prev => (prev < matchingWikiItems.length - 1 ? prev + 1 : prev));
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setWikiSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
-        return;
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        insertWikiLink(matchingWikiItems[wikiSelectedIndex]);
-        return;
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setWikiQuery(null);
-        return;
-      }
-    }
-
-    // Tag autocomplete keyboard controls
-    if (tagQuery !== null) {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setTagQuery(null);
-        return;
-      }
-      if (matchingAutocompleteTags.length > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setTagSelectedIndex(prev => (prev < matchingAutocompleteTags.length - 1 ? prev + 1 : 0));
-          return;
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setTagSelectedIndex(prev => (prev > 0 ? prev - 1 : matchingAutocompleteTags.length - 1));
-          return;
-        }
-        if (e.key === 'Enter' || e.key === 'Tab') {
-          // If the user already fully typed the exact tag, Enter sends the item while Tab confirms
-          if (
-            e.key === 'Enter' &&
-            tagQuery &&
-            matchingAutocompleteTags[tagSelectedIndex].tag.toLowerCase() === tagQuery.toLowerCase()
-          ) {
-            // Fall through to handleSend
-          } else {
-            e.preventDefault();
-            insertTag(matchingAutocompleteTags[tagSelectedIndex].tag);
-            return;
-          }
-        }
       }
     }
 
@@ -1479,30 +968,6 @@ export const Composer: React.FC<ComposerProps> = ({
       />
     </>
   );
-
-  const [lastFolderQuery, setLastFolderQuery] = useState('');
-  const [lastMatchingFolders, setLastMatchingFolders] = useState<FolderMeta[]>([]);
-  if (folderQuery !== null) {
-    if (folderQuery !== lastFolderQuery) setLastFolderQuery(folderQuery);
-    if (matchingFolders !== lastMatchingFolders) setLastMatchingFolders(matchingFolders);
-  }
-
-  const [lastSlashQuery, setLastSlashQuery] = useState('');
-  if (slashQuery !== null && slashQuery !== lastSlashQuery) {
-    setLastSlashQuery(slashQuery);
-  }
-
-  const [lastTagQuery, setLastTagQuery] = useState('');
-  const [lastMatchingTags, setLastMatchingTags] = useState<TagMeta[]>([]);
-  if (tagQuery !== null) {
-    if (tagQuery !== lastTagQuery) setLastTagQuery(tagQuery);
-    if (matchingAutocompleteTags !== lastMatchingTags) setLastMatchingTags(matchingAutocompleteTags);
-  }
-
-  const [lastMatchingWikiItems, setLastMatchingWikiItems] = useState<SlagItem[]>([]);
-  if (wikiQuery !== null && matchingWikiItems.length > 0) {
-    if (matchingWikiItems !== lastMatchingWikiItems) setLastMatchingWikiItems(matchingWikiItems);
-  }
 
   const overlaySlot = (
     <>
