@@ -4,6 +4,10 @@ import type { SyncOperation } from './types';
 export function createSyncOpFromStorageEvent(event: StorageChangeEvent): SyncOperation | null {
   if (event.origin === 'remote') return null;
 
+  // An unsaved note lives under a throwaway `draft_<timestamp>` id that changes on every open.
+  // Syncing it streams one entity per keystroke and the queue never drains; it is local crash recovery only.
+  if (event.kind === 'draft' && event.id.startsWith('fullscreen:draft_')) return null;
+
   const timestamp = Date.now();
   const opId = `op_${timestamp}_${Math.random().toString(36).slice(2, 7)}`;
 

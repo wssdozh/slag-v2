@@ -88,6 +88,7 @@ export class SyncEngine {
   private currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private pushDebounceDeadline = 0;
+  private pushDebounceTrailing = false;
   private pendingPushes = new Map<string, PendingPush>();
   private wsSupportsBinary = false;
   private pushDirty = false;
@@ -188,8 +189,10 @@ export class SyncEngine {
           syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
           this.getOutbox().enqueue(op);
           // A draft changes on every keystroke; only notes/folders/workspace drive the fast path.
+          const isDraft = op.kind === 'draft';
           this.scheduleDebouncedPush(
-            op.kind === 'draft' ? SYNC_INTERVALS.DRAFT_PUSH_DEBOUNCE_MS : SYNC_INTERVALS.PUSH_DEBOUNCE_MS
+            isDraft ? SYNC_INTERVALS.DRAFT_PUSH_DEBOUNCE_MS : SYNC_INTERVALS.PUSH_DEBOUNCE_MS,
+            isDraft
           );
         }
       });
@@ -227,16 +230,22 @@ export class SyncEngine {
     this.listeners.forEach((fn) => fn(current));
   }
 
-  public scheduleDebouncedPush(delayMs: number = SYNC_INTERVALS.PUSH_DEBOUNCE_MS): void {
+  public scheduleDebouncedPush(delayMs: number = SYNC_INTERVALS.PUSH_DEBOUNCE_MS, trailing = false): void {
     const deadline = Date.now() + delayMs;
-    // A slow draft timer must never hold back a note: keep whichever fires first. Without
-    // this, saving a note right after typing waited for the 1 s draft throttle.
-    if (this.pushDebounceTimer && this.pushDebounceDeadline <= deadline) return;
+    if (this.pushDebounceTimer) {
+      // A note never waits for a slow draft timer: the faster pending push wins.
+      if (!trailing && this.pushDebounceDeadline <= deadline) return;
+      // And a draft never delays a pending note push — that push already carries it.
+      if (trailing && !this.pushDebounceTrailing) return;
+    }
+    // Trailing pushes restart on every keystroke, so only the last state leaves the device.
     if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
     this.pushDebounceDeadline = deadline;
+    this.pushDebounceTrailing = trailing;
     this.pushDebounceTimer = setTimeout(() => {
       this.pushDebounceTimer = null;
       this.pushDebounceDeadline = 0;
+      this.pushDebounceTrailing = false;
       void this.pushLocalChanges();
     }, delayMs);
   }
@@ -1313,6 +1322,7 @@ export class SyncEngine {
     if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
     this.pushDebounceTimer = null;
     this.pushDebounceDeadline = 0;
+    this.pushDebounceTrailing = false;
     this.appliedBundleIds.clear();
     this.entityHashes.clear();
     this.wsSupportsBinary = false;
