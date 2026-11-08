@@ -159,7 +159,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 isDraggingOver
                   ? 'border-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
                   : 'border-white/[0.12]'
-              } p-2 sm:p-2.5 flex flex-col gap-2 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
+              } p-2 flex flex-col gap-2 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
         }
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
@@ -212,7 +212,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               disabled={disabled}
               className={`min-w-0 flex-1 w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-zinc-500 placeholder:truncate resize-none  ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
-              } relative z-10 leading-normal px-1 py-0 outline-none border-none`}
+              } relative z-10 leading-normal px-0 py-0 outline-none border-none`}
               style={{
                 minHeight: `${minHeight}px`,
                 maxHeight: `${maxHeight}px`,

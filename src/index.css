@@ -384,14 +384,16 @@
   font-weight: 400;
 }
 
-/* The corner actions stay one control square so they never inflate the text row;
-   the extra touch area comes from an invisible inset instead of layout height. */
+/* The corner actions stay one control square, but they must not stretch the text
+   row: a taller row would put more air above the text than below the buttons.
+   The negative margin subtracts the overflow, capped so nothing leaves the frame. */
 .composer-surface .composer-top-actions button {
   position: relative;
   width: var(--slag-ctrl-md);
   height: var(--slag-ctrl-md);
   padding-inline: 0;
   justify-content: center;
+  margin-block: max(calc((24px - var(--slag-ctrl-md)) / 2), -8px);
 }
 
 .composer-surface .composer-top-actions button::after {
@@ -410,24 +412,7 @@
   padding: 0;
 }
 
-/* Phones get the tighter frame: the composer is the main surface there and a
-   30% shorter box reads lighter without touching the desktop layout. */
-@media (max-width: 767px) {
-  .composer-surface [data-composer-panel] {
-    padding: 4px;
-    gap: 4px;
-  }
 
-  .composer-surface .composer-top-actions button {
-    width: var(--slag-ctrl-sm);
-    height: var(--slag-ctrl-sm);
-  }
-
-  /* The inset must not outgrow the tighter frame, or it scrolls the panel. */
-  .composer-surface .composer-top-actions button::after {
-    inset: -3px;
-  }
-}
 
 /* SLAG v2 Linear/Obsidian Dark Theme overrides for @atomic-editor/editor */
 .atomic-cm-editor {

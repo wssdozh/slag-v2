@@ -37,6 +37,18 @@ async function geometry(surface: Locator, mobile: boolean) {
       .filter(({ rect }) => rect.width > 0 && rect.height > 0);
     const errors: string[] = [];
     if (root.scrollWidth > root.clientWidth + 1) errors.push('surface overflow');
+    // The frame is one inset on all four sides, on every platform.
+    const panel = root.querySelector<HTMLElement>('[data-composer-panel]');
+    if (panel) {
+      const cs = getComputedStyle(panel);
+      const pads = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft];
+      if (new Set(pads).size > 1) errors.push(`uneven padding: ${pads.join('/')}`);
+      const text = panel.querySelector('textarea');
+      const leftInset = text
+        ? text.getBoundingClientRect().left - panel.getBoundingClientRect().left - parseFloat(cs.borderLeftWidth)
+        : parseFloat(cs.paddingLeft);
+      if (Math.abs(leftInset - parseFloat(cs.paddingLeft)) > 1.5) errors.push(`text inset: ${Math.round(leftInset)}`);
+    }
     for (const [i, { label, rect, corner, send, square }] of controls.entries()) {
       if (rect.left < Math.max(0, bounds.left) - 1 || rect.right > Math.min(innerWidth, bounds.right) + 1
         || rect.top < 0 || rect.bottom > innerHeight + 1) errors.push(`outside: ${label}`);
