@@ -1,8 +1,6 @@
 import { storage } from '../storage';
-export { storage };
 import { logger } from '../logger';
 import { accountClient } from './account';
-export { accountClient };
 import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
 import {

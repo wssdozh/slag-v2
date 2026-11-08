@@ -63,9 +63,6 @@ const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
 const FULLSCREEN_DRAFTS_PREFIX = STORAGE_KEYS.FULLSCREEN_DRAFTS_PREFIX;
 const FULLSCREEN_WIDTH_KEY = STORAGE_KEYS.FULLSCREEN_WIDTH;
 
-// Obsolete dev/manifest demo IDs that should never pollute a clean vault
-export const OBSOLETE_DEMO_IDS = new Set<string>();
-
 // Initial demo & onboarding items
 export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
@@ -309,16 +306,10 @@ export class StorageService {
 
       const loadedItems = await this.scanNotesDir(notesPath);
       if (loadedItems.length > 0) {
-        for (const item of loadedItems) {
-          if (OBSOLETE_DEMO_IDS.has(item.id)) {
-            void this.removeItemFromDisk(item);
-          }
-        }
-        const filteredLoaded = loadedItems.filter(i => !OBSOLETE_DEMO_IDS.has(i.id));
-        localStorage.setItem(this.getItemsKey(), JSON.stringify(filteredLoaded));
-        fsLog.info(`Loaded ${filteredLoaded.length} notes for vault "${this.currentVault.name}" from ${notesPath}`);
+        localStorage.setItem(this.getItemsKey(), JSON.stringify(loadedItems));
+        fsLog.info(`Loaded ${loadedItems.length} notes for vault "${this.currentVault.name}" from ${notesPath}`);
       } else {
-        const current = this.getItems().filter(i => !OBSOLETE_DEMO_IDS.has(i.id));
+        const current = this.getItems();
         for (const item of current) {
           await this.flushItemToDisk(item);
         }
@@ -760,20 +751,6 @@ export class StorageService {
     if (!localStorage.getItem(itemsKey)) {
       const initialItems = this.currentVault.id === 'default_vault' ? generateDemoItems() : [];
       localStorage.setItem(itemsKey, JSON.stringify(initialItems));
-    } else {
-      // Auto-prune obsolete demo items from existing storage
-      try {
-        const raw = localStorage.getItem(itemsKey);
-        if (raw) {
-          const parsed: SlagItem[] = JSON.parse(raw);
-          const filtered = parsed.filter(i => !OBSOLETE_DEMO_IDS.has(i.id));
-          if (filtered.length !== parsed.length) {
-            localStorage.setItem(itemsKey, JSON.stringify(filtered));
-          }
-        }
-      } catch {
-        // ignore
-      }
     }
   }
 
