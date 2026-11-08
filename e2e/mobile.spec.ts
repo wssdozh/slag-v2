@@ -105,7 +105,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const panel = composer.locator(':scope > div').last();
     await expect(panel).toHaveCSS('border-radius', '16px');
     await expect(panel).toHaveClass(/rounded-2xl/);
-    await expect(panel).not.toHaveClass(/shadow-none/);
+    await expect(panel).toHaveCSS('box-shadow', 'none');
     const feed = page.locator('.overflow-y-auto').filter({ has: page.locator('[id^="item-"]') }).first();
     await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await composerTextarea.fill(Array.from({ length: 20 }, (_, i) => `строка ${i}`).join('\n'));
@@ -138,6 +138,65 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Floating dock is visible again
     await expect(page.locator('nav[aria-label="Мобильная навигация"]')).toBeVisible();
+  });
+
+  test('android composer wrappers stay transparent and preserve safe areas', async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto('/');
+      await page.locator('button', { hasText: 'Входящие' }).first().click();
+      await page.evaluate(() => {
+        document.documentElement.style.setProperty('--sab', '24px');
+        document.documentElement.style.setProperty('--sal', '12px');
+        document.documentElement.style.setProperty('--sar', '16px');
+      });
+
+      const composer = page.locator('[data-composer-root]');
+      const panel = composer.locator('[data-composer-panel]');
+      const footer = composer.locator('..');
+      for (const wrapper of [composer, footer]) {
+        await expect(wrapper).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(wrapper).toHaveCSS('border-top-width', '0px');
+        await expect(wrapper).toHaveCSS('backdrop-filter', 'none');
+      }
+      await expect(panel).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(panel).toHaveCSS('border-radius', '16px');
+      await expect(panel).toHaveCSS('box-shadow', 'none');
+      await expect(footer).toHaveCSS('padding-bottom', '32px');
+      await expect(footer).toHaveCSS('padding-left', '20px');
+      await expect(footer).toHaveCSS('padding-right', '24px');
+      await page.screenshot({ path: 'test-results/screenshots/android_composer_outer_surface.png' });
+
+      await page.locator('button[title*="Назад к списку папок"]').click();
+      await page.getByRole('button', { name: 'ИИ', exact: true }).click();
+      const assistantComposer = page.locator('[data-composer-root]');
+      for (const wrapper of [assistantComposer, assistantComposer.locator('..'), assistantComposer.locator('../..')]) {
+        await expect(wrapper).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(wrapper).toHaveCSS('border-top-width', '0px');
+        await expect(wrapper).toHaveCSS('backdrop-filter', 'none');
+      }
+      await expect(assistantComposer.locator('[data-composer-panel]')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(assistantComposer.locator('[data-composer-panel]')).toHaveCSS('box-shadow', 'none');
+
+      await page.getByRole('button', { name: 'Назад', exact: true }).click();
+      await page.getByRole('button', { name: 'Таски', exact: true }).click();
+      await page.getByRole('button', { name: /Добавить (таску|задачу)/ }).click();
+      const modal = page.getByRole('dialog');
+      await expect(modal.locator('[data-composer-panel]')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(modal.locator('[data-composer-panel]')).toHaveClass(/shadow-none/);
+      await expect(modal.locator('.motion-dialog')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await modal.getByRole('button', { name: 'Закрыть', exact: true }).click();
+
+      await expect(modal).not.toBeVisible();
+    } finally {
+      await context.close();
+    }
   });
 
   test('3. Mobile Folder Info Profile with Media Tabs', async ({ page }) => {

@@ -158,7 +158,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 isDraggingOver
                   ? 'border-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
                   : 'border-white/[0.12]'
-              } p-2 flex flex-col gap-2 shadow-2xl shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
+              } p-2 flex flex-col gap-2 md:shadow-2xl md:shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
         }
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
