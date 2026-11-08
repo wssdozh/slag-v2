@@ -1,12 +1,10 @@
 import React, { useCallback, useState, useEffect, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { navigatePage } from './lib/navigation';
-import { WorkspaceShell } from './components/Workspace/WorkspaceShell';
 import { MobileShell } from './components/Mobile/MobileShell';
 import { useVisualViewportHeight } from './hooks/layout/useVisualViewportHeight';
 import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
-import { SearchModal } from './components/Search/SearchModal';
 import { FolderModal } from './components/Modals/FolderModal';
 import { FolderInfoModal } from './components/Modals/FolderInfoModal';
 import { FolderViewModal } from './components/Modals/FolderViewModal';
@@ -20,6 +18,12 @@ import { Monitor } from 'lucide-react';
 import { enrichAttachment, extractFocalContext } from './lib/media/attachmentEnrichment';
 import type { LightboxImage } from './components/UI/ImageLightbox';
 
+const WorkspaceShell = lazy(() =>
+  import('./components/Workspace/WorkspaceShell').then((m) => ({ default: m.WorkspaceShell }))
+);
+const SearchModal = lazy(() =>
+  import('./components/Search/SearchModal').then((m) => ({ default: m.SearchModal }))
+);
 const FullscreenEditor = lazy(() =>
   import('./components/Editor/FullscreenEditor').then((m) => ({ default: m.FullscreenEditor }))
 );
@@ -88,6 +92,20 @@ const AppContent: React.FC = () => {
 
   useVisualViewportHeight();
 
+  // Search sits in its own chunk (Orama index). Warm it after first paint so the
+  // first mod+f does not stutter, without putting it on the startup critical path.
+  useEffect(() => {
+    const prefetch = () => {
+      void import('./components/Search/SearchModal');
+    };
+    if (typeof requestIdleCallback === 'function') {
+      const handle = requestIdleCallback(prefetch, { timeout: 3000 });
+      return () => cancelIdleCallback(handle);
+    }
+    const timer = setTimeout(prefetch, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [currentPage, setCurrentPage] = useState<string | null>(() => {
     return typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('page') : null;
   });
@@ -147,7 +165,9 @@ const AppContent: React.FC = () => {
     return (
       <div className="w-screen app-shell overflow-hidden bg-canvas text-fg-primary select-none relative">
         <InitialSyncBoundary>
-          <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
+          <Suspense fallback={null}>
+            <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
+          </Suspense>
         </InitialSyncBoundary>
         <VaultModal />
         <ToastContainer />
@@ -175,8 +195,12 @@ const AppContent: React.FC = () => {
         </div>
 
         <MobileActionSheet />
-        <FullscreenEditor />
-        <SearchModal />
+        <Suspense fallback={null}>
+          <FullscreenEditor />
+        </Suspense>
+        <Suspense fallback={null}>
+          <SearchModal />
+        </Suspense>
         <SettingsModal />
         <FolderModal />
         <FolderInfoModal />
@@ -202,7 +226,13 @@ const AppContent: React.FC = () => {
   return (
     <div className="w-screen app-shell overflow-hidden bg-canvas text-fg-primary select-none relative">
       <InitialSyncBoundary>
-      {isMobile ? <MobileShell /> : <WorkspaceShell />}
+      {isMobile ? (
+        <MobileShell />
+      ) : (
+        <Suspense fallback={null}>
+          <WorkspaceShell />
+        </Suspense>
+      )}
 
       {/* Global Right-Click Context Menu (Desktop) & Mobile Action Sheet (Touch) */}
       {!isMobile && <ContextMenu />}
@@ -214,8 +244,8 @@ const AppContent: React.FC = () => {
         <SettingsModal />
         <TriageModal />
         <LogModal />
+        <SearchModal />
       </Suspense>
-      <SearchModal />
       <FolderModal />
       <FolderInfoModal />
       <FolderViewModal />

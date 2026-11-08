@@ -1,4 +1,4 @@
-import { create, insert, search, type Orama } from '@orama/orama';
+import type { Orama } from '@orama/orama';
 import type { SlagItem } from '../types';
 import { logger } from './logger';
 import {
@@ -133,6 +133,8 @@ export async function initSearchIndex(items: SlagItem[]): Promise<Orama<any> | n
   isIndexing = true;
   const endTimer = searchLog.time(`Indexing ${items.length} items in Orama`);
   try {
+    // Orama is only needed once search actually runs; keep it out of the startup graph.
+    const { create, insert } = await import('@orama/orama');
     const db = await create({
       schema: {
         id: 'string',
@@ -193,6 +195,7 @@ export async function querySearch(
   // 1. Level A: Try Orama index exact phrase search
   if (dbInstance) {
     try {
+      const { search } = await import('@orama/orama');
       const searchResult = await search(dbInstance, {
         term: trimmed,
         tolerance: SEARCH_LIMITS.TYPO_TOLERANCE,
