@@ -5,6 +5,7 @@ import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/time/recurrenceHelper';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
@@ -123,7 +124,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     setIsSheetExpanded(false);
   }
 
-  const { panelRef, scrimRef, barRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useEditorSheet({
+  const { panelRef, scrimRef, barRef, bodyRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useEditorSheet({
     enabled: isMobile,
     expanded: isSheetExpanded,
     exiting: presencePhase === 'exiting',
@@ -176,61 +177,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
   const selectedAttachment = attachments.find(a => a.id === selectedAttachmentId);
 
-  const folderOptions = React.useMemo(() => {
-    // Collect non-inbox folders
-    const regularFolders = folders.filter(f => f.path !== DEFAULT_INBOX_FOLDER);
-
-    // Hierarchy tree to sort exactly by root and nested paths
-    interface Node {
-      path: string;
-      children: Node[];
-    }
-    const rootMap: Map<string, Node> = new Map();
-
-    regularFolders.forEach(f => {
-      const parts = f.path.split('/');
-      let current = '';
-      let parentNode: Node | null = null;
-
-      parts.forEach((part, idx) => {
-        current = current ? `${current}/${part}` : part;
-        if (idx === 0) {
-          if (!rootMap.has(part)) {
-            rootMap.set(part, { path: current, children: [] });
-          }
-          parentNode = rootMap.get(part)!;
-        } else if (parentNode) {
-          let child = parentNode.children.find(c => c.path === current);
-          if (!child) {
-            child = { path: current, children: [] };
-            parentNode.children.push(child);
-          }
-          parentNode = child;
-        }
-      });
-    });
-
-    const orderedPaths: { path: string; isRoot: boolean }[] = [];
-    const traverse = (node: Node, isRoot: boolean) => {
-      orderedPaths.push({ path: node.path, isRoot });
-      // Sort children alphabetically
-      node.children.sort((a, b) => a.path.localeCompare(b.path, 'ru'));
-      node.children.forEach(c => traverse(c, false));
-    };
-
-    // Sort root nodes alphabetically
-    const roots = Array.from(rootMap.values()).sort((a, b) => a.path.localeCompare(b.path, 'ru'));
-    roots.forEach(r => traverse(r, true));
-
-    return [
-      { value: DEFAULT_INBOX_FOLDER, label: DEFAULT_INBOX_FOLDER },
-      ...orderedPaths.map((it) => ({
-        value: it.path,
-        label: it.path,
-        dividerBefore: it.isRoot,
-      })),
-    ];
-  }, [folders]);
+  const folderOptions = React.useMemo(() => buildFolderOptions(folders), [folders]);
 
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -602,6 +549,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
         {/* Editor Body */}
         <div
+          ref={isMobile ? bodyRef : undefined}
+          data-editor-body
           className="min-h-0 flex-1 overflow-y-auto py-6 md:py-8 bg-surface"
           style={isMobile && !isSheetExpanded ? { maxHeight: 'calc(56% - 68px)' } : undefined}
         >

@@ -728,6 +728,97 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
     await expect(sheet).toHaveCount(0, { timeout: 5000 });
   });
 
+  test('3b. Тело шита тянет вниз и сворачивает его при scrollTop=0', async ({ page }) => {
+    await openInboxWithCards(page);
+    await cardOf(page).click();
+
+    const sheet = page.locator('[data-testid="editor-sheet"]');
+    const handle = page.locator('[data-sheet-handle]').first();
+    await expect(sheet).toBeVisible();
+    await page.waitForTimeout(320);
+
+    // Развернуть шторку ручкой, чтобы проверить именно полноэкранный случай.
+    const hb = await handle.boundingBox();
+    await page.mouse.move(hb!.x + hb!.width / 2, hb!.y + hb!.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) {
+      await page.mouse.move(hb!.x + hb!.width / 2, hb!.y + hb!.height / 2 - (320 * i) / 10);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(360);
+    expect(Math.abs((await sheet.boundingBox())!.y)).toBeLessThan(2);
+
+    // Жест по телу: события touch, потому что обработчик намеренно нативный
+    // (только cancelable touchmove может отобрать скролл у браузера).
+    const pullBody = async (deltaY: number) => {
+      await page.locator('[data-editor-body]').first().evaluate(async (el, dy) => {
+        const at = (y: number) => new Touch({ identifier: 2, target: el, clientX: 120, clientY: y });
+        const fire = (type: string, y: number, touches: Touch[]) => {
+          el.dispatchEvent(
+            new TouchEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              touches,
+              targetTouches: touches,
+              changedTouches: [at(y)],
+            })
+          );
+        };
+        const start = 300;
+        fire('touchstart', start, [at(start)]);
+        const steps = 12;
+        for (let i = 1; i <= steps; i++) {
+          const y = start + (dy * i) / steps;
+          fire('touchmove', y, [at(y)]);
+          await new Promise((resolve) => setTimeout(resolve, 16));
+        }
+        fire('touchend', start + dy, []);
+      }, deltaY);
+      await page.waitForTimeout(420);
+    };
+
+    // Первый рывок: из полного размера — в половину, не в закрытие.
+    await pullBody(340);
+    const collapsed = await sheet.boundingBox();
+    expect(collapsed!.y).toBeGreaterThan(300);
+    await page.screenshot({ path: 'test-results/screenshots/mobile_body_pull_half.png' });
+
+    // Второй: из половины — закрыть.
+    await pullBody(460);
+    await expect(sheet).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('3c. Пикер папок показывает дерево, а не полный путь', async ({ page }) => {
+    await openInboxWithCards(page);
+    await cardOf(page).click();
+
+    const sheet = page.locator('[data-testid="editor-sheet"]');
+    const handle = page.locator('[data-sheet-handle]').first();
+    await expect(sheet).toBeVisible();
+    await page.waitForTimeout(320);
+
+    // В свёрнутой шторке тулбар компактный — разворачиваем, чтобы пикер был в кадре.
+    const hb = await handle.boundingBox();
+    await page.mouse.move(hb!.x + hb!.width / 2, hb!.y + hb!.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) {
+      await page.mouse.move(hb!.x + hb!.width / 2, hb!.y + hb!.height / 2 - (320 * i) / 10);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(360);
+
+    await sheet.locator('[aria-haspopup="listbox"]').first().click();
+    const list = page.locator('[role="listbox"]').first();
+    await expect(list).toBeVisible();
+
+    const labels = await list.locator('[role="option"]').allInnerTexts();
+    expect(labels.length).toBeGreaterThan(0);
+    // Дерево подписывает ветку именем, поэтому слэша в подписях быть не должно.
+    expect(labels.filter((label) => label.includes('/'))).toEqual([]);
+
+    await page.screenshot({ path: 'test-results/screenshots/mobile_folder_tree_picker.png' });
+  });
+
   test('4. Дабл-тап копирует текст', async ({ page }) => {
     await openInboxWithCards(page);
 

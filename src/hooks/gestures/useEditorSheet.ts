@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { prefersReducedMotion } from '../../lib/motion';
 
 interface Options {
@@ -15,6 +15,8 @@ export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, o
   const panelRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  /** Scrollable editor body: pulling it down at scrollTop 0 collapses the sheet. */
+  const bodyRef = useRef<HTMLDivElement>(null);
   const physics = useRef({ y: 0, velocity: 0, target: 0, frame: 0, time: 0, height: 0, initialized: false });
   const drag = useRef<{ start: number; y: number; last: number; time: number; moved: boolean } | null>(null);
   const options = useRef({ expanded, exiting, onExpandedChange, onDismiss, onExited });
@@ -82,47 +84,159 @@ export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, o
     return () => { window.removeEventListener('resize', update); cancelAnimationFrame(state.frame); };
   }, [enabled, expanded, exiting, paint, settle]);
 
-  const onPointerDown = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    if (options.current.exiting || (event.pointerType === 'mouse' && event.button !== 0)) return;
-    cancelAnimationFrame(physics.current.frame);
-    event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { start: event.clientY, y: physics.current.y, last: event.clientY, time: event.timeStamp, moved: false };
-  }, []);
-  const onPointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const session = drag.current;
-    if (!session) return;
-    const delta = event.clientY - session.start;
-    if (!session.moved && Math.abs(delta) < 6) return;
-    session.moved = true;
-    physics.current.velocity = (event.clientY - session.last) / Math.max(1, event.timeStamp - session.time) * 1000;
-    session.last = event.clientY;
-    session.time = event.timeStamp;
-    const y = session.y + delta;
-    physics.current.y = y < 0 ? y * 0.15 : y;
-    paint();
-  }, [paint]);
-  const onPointerEnd = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const session = drag.current;
-    drag.current = null;
-    if (!session) return;
-    const height = panelRef.current?.parentElement?.clientHeight ?? window.innerHeight;
+  const sheetHeight = useCallback(
+    () => panelRef.current?.parentElement?.clientHeight ?? window.innerHeight,
+    []
+  );
+
+  /**
+   * Where the sheet lands when the finger lifts. Fully expanded sheets go to the
+   * half detent before dismissing, so a single pull never skips a stage — but a
+   * pull that carries most of the screen collapses straight through.
+   */
+  const commitDrag = useCallback((velocity: number) => {
+    const height = sheetHeight();
     const half = height * 0.44;
     const state = physics.current;
-    const velocity = event.timeStamp - session.time > 100 ? 0 : state.velocity;
-    const projected = state.y + velocity * 0.18;
     const wasExpanded = options.current.expanded;
-    if (!wasExpanded && projected > half + height * 0.18) {
+    const projected = state.y + velocity * 0.18;
+    if (wasExpanded) {
+      if (projected > height * 0.82) {
+        options.current.onDismiss();
+        return;
+      }
+      const nextExpanded = projected < half * 0.35;
+      options.current.onExpandedChange(nextExpanded);
+      settle(nextExpanded ? 0 : half, velocity);
+      return;
+    }
+    if (projected > half + height * 0.18) {
       options.current.onDismiss();
       return;
     }
-    const nextExpanded = projected < (wasExpanded ? half * 0.35 : half * 0.75);
+    const nextExpanded = projected < half * 0.75;
     options.current.onExpandedChange(nextExpanded);
     settle(nextExpanded ? 0 : half, velocity);
-  }, [settle]);
+  }, [settle, sheetHeight]);
+
+  const beginDrag = useCallback((clientY: number, timeStamp: number) => {
+    cancelAnimationFrame(physics.current.frame);
+    drag.current = { start: clientY, y: physics.current.y, last: clientY, time: timeStamp, moved: false };
+  }, []);
+
+  const moveDrag = useCallback((clientY: number, timeStamp: number) => {
+    const session = drag.current;
+    if (!session) return false;
+    const delta = clientY - session.start;
+    if (!session.moved && Math.abs(delta) < 6) return false;
+    session.moved = true;
+    physics.current.velocity = (clientY - session.last) / Math.max(1, timeStamp - session.time) * 1000;
+    session.last = clientY;
+    session.time = timeStamp;
+    const y = session.y + delta;
+    physics.current.y = y < 0 ? y * 0.15 : y;
+    paint();
+    return true;
+  }, [paint]);
+
+  const endDrag = useCallback((timeStamp: number) => {
+    const session = drag.current;
+    drag.current = null;
+    if (!session) return;
+    const velocity = timeStamp - session.time > 100 ? 0 : physics.current.velocity;
+    if (!session.moved) {
+      settle(options.current.expanded ? 0 : sheetHeight() * 0.44, 0);
+      return;
+    }
+    commitDrag(velocity);
+  }, [commitDrag, settle, sheetHeight]);
+
+  const onPointerDown = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    if (options.current.exiting || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    beginDrag(event.clientY, event.timeStamp);
+  }, [beginDrag]);
+  const onPointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    moveDrag(event.clientY, event.timeStamp);
+  }, [moveDrag]);
+  const onPointerEnd = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    endDrag(event.timeStamp);
+  }, [endDrag]);
   const onPointerCancel = useCallback(() => {
     drag.current = null;
-    const height = panelRef.current?.parentElement?.clientHeight ?? window.innerHeight;
-    settle(options.current.expanded ? 0 : height * 0.44, 0);
-  }, [settle]);
-  return { panelRef, scrimRef, barRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel };
+    settle(options.current.expanded ? 0 : sheetHeight() * 0.44, 0);
+  }, [settle, sheetHeight]);
+
+  /**
+   * Scroll handoff on the body itself: the gesture only becomes a sheet drag once
+   * the list is already at its top edge, otherwise it stays a plain scroll. Native
+   * listeners are required — `touchmove` must be cancelable to stop the browser
+   * from scrolling the container out from under the sheet.
+   */
+  useEffect(() => {
+    if (!enabled) return;
+    const element = bodyRef.current;
+    if (!element) return;
+
+    let startY = 0;
+    let startX = 0;
+    let engaged = false;
+    let axisLocked: 'y' | 'x' | null = null;
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (options.current.exiting || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      startY = touch.clientY;
+      startX = touch.clientX;
+      engaged = false;
+      axisLocked = null;
+      cancelAnimationFrame(physics.current.frame);
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (options.current.exiting || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      const dy = touch.clientY - startY;
+      const dx = touch.clientX - startX;
+
+      if (!axisLocked) {
+        if (Math.abs(dx) > Math.abs(dy) + 4) axisLocked = 'x';
+        else if (Math.abs(dy) > 6) axisLocked = 'y';
+        else return;
+        if (axisLocked === 'x') return;
+        // Downward pull only takes over when the list is already at its top.
+        if (dy > 0 && element.scrollTop > 0) { axisLocked = 'x'; return; }
+      }
+      if (axisLocked === 'x') return;
+
+      if (!engaged) {
+        if (dy <= 0) return;
+        engaged = true;
+        beginDrag(touch.clientY - dy, event.timeStamp);
+      }
+      if (event.cancelable) event.preventDefault();
+      moveDrag(touch.clientY, event.timeStamp);
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      if (axisLocked === 'x') return;
+      if (!engaged) { drag.current = null; return; }
+      engaged = false;
+      axisLocked = null;
+      endDrag(event.timeStamp);
+    };
+
+    element.addEventListener('touchstart', onTouchStart, { passive: true });
+    element.addEventListener('touchmove', onTouchMove, { passive: false });
+    element.addEventListener('touchend', onTouchEnd, { passive: true });
+    element.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    return () => {
+      element.removeEventListener('touchstart', onTouchStart);
+      element.removeEventListener('touchmove', onTouchMove);
+      element.removeEventListener('touchend', onTouchEnd);
+      element.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [enabled, beginDrag, moveDrag, endDrag]);
+
+  return { panelRef, scrimRef, barRef, bodyRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel };
 }
