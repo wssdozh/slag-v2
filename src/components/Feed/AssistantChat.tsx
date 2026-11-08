@@ -27,6 +27,9 @@ import {
 import { Select } from '../UI/Select';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { TagChip } from '../UI/TagChip';
+import { MarkdownRenderer } from '../UI/MarkdownRenderer';
+import { ChatTaskBlock } from './chat/ChatTaskBlock';
+import { splitTaskBlocks } from '../../lib/chatMarkdown';
 import type { SuggestedAction } from '../../types';
 import { prefersReducedMotion } from '../../lib/motion';
 import { DiffModal, type DiffModalItemEntry } from '../Modals/DiffModal';
@@ -231,297 +234,6 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
     });
   };
 
-  // Render rich text with WikiLinks, markdown headers, dividers, code blocks, bold, italic, code, tags, and structured lists
-  const renderRichContent = (content: string) => {
-    const rawLines = content.split('\n');
-    const elements: React.ReactNode[] = [];
-    let inCodeBlock = false;
-    let codeBlockLang = '';
-    let codeBlockLines: string[] = [];
-
-    const parseInline = (text: string, lineKey: string | number) => {
-      // Split text by [Markdown Links](url), [[WikiLinks]] (with tolerance for [[[brackets]]]), `code`, **bold**, *italic*, ~~strikethrough~~, and #tags
-      const tokenRegex = /(\[[^\]]+\]\([^)]+\)|\[{2,}[^\]]+\]+|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|#[\wа-яА-ЯёЁ_-]+)/g;
-      const parts = text.split(tokenRegex);
-
-      return parts.map((part, index) => {
-        const key = `${lineKey}-${index}`;
-
-        // [Markdown Link](url)
-        const mdLinkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-        if (mdLinkMatch) {
-          return (
-            <a
-              key={key}
-              href={mdLinkMatch[2]}
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-400 hover:text-blue-300 hover:underline"
-            >
-              {mdLinkMatch[1]}
-            </a>
-          );
-        }
-
-        // [[WikiLink]] - Clean inline text link without boxes, chips or icons
-        if (part.startsWith('[[') && part.endsWith(']')) {
-          const title = part.replace(/^\[+|\]+$/g, '').trim();
-          return (
-            <span
-              key={key}
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                scrollToItem(title);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  scrollToItem(title);
-                }
-              }}
-              className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
-              title={`Перейти к «${title}»`}
-            >
-              {title}
-            </span>
-          );
-        }
-
-        // **Bold**
-        if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
-          return (
-            <strong key={key} className="font-semibold text-zinc-100">
-              {part.slice(2, -2)}
-            </strong>
-          );
-        }
-
-        // *Italic*
-        if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
-          return (
-            <em key={key} className="italic text-zinc-200">
-              {part.slice(1, -1)}
-            </em>
-          );
-        }
-
-        // ~~Strikethrough~~
-        if (part.startsWith('~~') && part.endsWith('~~') && part.length >= 4) {
-          return (
-            <del key={key} className="line-through text-zinc-500">
-              {part.slice(2, -2)}
-            </del>
-          );
-        }
-
-        // `Code`
-        if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
-          return (
-            <code key={key} className="font-mono text-xs px-1 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/[0.04]">
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-
-        // #Tag
-        if (part.startsWith('#') && part.length > 1 && !part.includes(' ')) {
-          return (
-            <span key={key} className="text-zinc-400 font-mono text-2xs">
-              {part}
-            </span>
-          );
-        }
-
-        return <span key={key}>{part}</span>;
-      });
-    };
-
-    for (let i = 0; i < rawLines.length; i++) {
-      const line = rawLines[i];
-      const trimmed = line.trim();
-
-      // Multi-line Code blocks start/end
-      if (trimmed.startsWith('```')) {
-        if (!inCodeBlock) {
-          inCodeBlock = true;
-          codeBlockLang = trimmed.slice(3).trim();
-          codeBlockLines = [];
-        } else {
-          inCodeBlock = false;
-          if (codeBlockLang === 'task' || codeBlockLang === 'todo') {
-            const firstLine = codeBlockLines[0] || 'Таска';
-            const restLines = codeBlockLines.slice(1);
-            elements.push(
-              <div key={`cb-${i}`} className="my-2 rounded-xl bg-surface border border-white/[0.08] p-3 text-xs flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-zinc-400 font-medium font-mono text-2xs uppercase tracking-wider">
-                  <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Таска</span>
-                </div>
-                <div className="font-semibold text-zinc-100 text-xs">
-                  {firstLine}
-                </div>
-                {restLines.length > 0 && (
-                  <div className="text-zinc-300 flex flex-col gap-1">
-                    {restLines.map((l, lIdx) => {
-                      const trimmedLine = l.trim();
-                      const checkMatch = trimmedLine.match(/^[-*]\s*\[([ xX])\]\s*(.*)$/);
-                      if (checkMatch) {
-                        const isDone = checkMatch[1].toLowerCase() === 'x';
-                        return (
-                          <div key={lIdx} className="flex items-start gap-2 pl-0.5 my-0.5">
-                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 select-none ${
-                              isDone ? 'bg-white/15 border-white/40 text-zinc-200' : 'border-white/20 bg-white/[0.03] text-transparent'
-                            }`}>
-                              {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                            </span>
-                            <span className={`flex-1 min-w-0 ${isDone ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
-                              {parseInline(checkMatch[2], `${i}-${lIdx}`)}
-                            </span>
-                          </div>
-                        );
-                      }
-                      return <div key={lIdx}>{parseInline(l, `${i}-${lIdx}`)}</div>;
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          } else {
-            elements.push(
-              <div key={`cb-${i}`} className="my-2 rounded-lg bg-black/60 border border-white/[0.06] overflow-hidden">
-                {codeBlockLang && (
-                  <div className="px-2.5 py-1 text-2xs font-mono text-zinc-500 bg-white/[0.02] border-b border-white/[0.04]">
-                    {codeBlockLang}
-                  </div>
-                )}
-                <pre className="p-2.5 overflow-x-auto text-xs font-mono text-zinc-300 leading-normal">
-                  <code>{codeBlockLines.join('\n')}</code>
-                </pre>
-              </div>
-            );
-          }
-        }
-        continue;
-      }
-
-      if (inCodeBlock) {
-        codeBlockLines.push(line);
-        continue;
-      }
-
-      // Empty line -> small vertical spacer
-      if (!trimmed) {
-        elements.push(<div key={`sp-${i}`} className="h-1.5" />);
-        continue;
-      }
-
-      // Horizontal Divider: ---, ***, ___
-      if (/^([-*_]){3,}$/.test(trimmed)) {
-        elements.push(<hr key={`hr-${i}`} className="my-2.5 border-t border-white/[0.08]" />);
-        continue;
-      }
-
-      // Blockquote: > text
-      if (/^>\s+/.test(trimmed)) {
-        elements.push(
-          <div key={`quote-${i}`} className="border-l-2 border-zinc-600 pl-2.5 py-0.5 my-1 text-zinc-400 italic">
-            {parseInline(trimmed.replace(/^>\s+/, ''), i)}
-          </div>
-        );
-        continue;
-      }
-
-      // Heading: #, ##, ###
-      if (/^#{1,4}\s+/.test(trimmed)) {
-        const headingMatch = trimmed.match(/^(#{1,4})\s+(.*)$/);
-        if (headingMatch) {
-          const level = headingMatch[1].length;
-          const text = headingMatch[2];
-          elements.push(
-            <div
-              key={`h-${i}`}
-              className={`font-semibold ${
-                level === 1 ? 'text-xs font-bold mt-2 mb-1 text-zinc-100' : 'text-xs mt-1.5 mb-0.5 text-zinc-200'
-              }`}
-            >
-              {parseInline(text, i)}
-            </div>
-          );
-          continue;
-        }
-      }
-
-      // Checkbox task item: - [ ] or - [x] or * [ ] or * [x]
-      const taskCheckMatch = trimmed.match(/^[-*]\s*\[([ xX])\]\s*(.*)$/);
-      if (taskCheckMatch) {
-        const isChecked = taskCheckMatch[1].toLowerCase() === 'x';
-        const taskText = taskCheckMatch[2];
-        elements.push(
-          <div key={`task-item-${i}`} className="flex items-start gap-2 pl-0.5 my-1 leading-relaxed">
-            <span
-              className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 select-none transition-colors ${
-                isChecked
-                  ? 'bg-white/15 border-white/40 text-zinc-200'
-                  : 'border-white/20 bg-white/[0.03] text-transparent'
-              }`}
-            >
-              {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-            </span>
-            <span className={`flex-1 min-w-0 ${isChecked ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
-              {parseInline(taskText, i)}
-            </span>
-          </div>
-        );
-        continue;
-      }
-
-      // List item: - or *
-      if (/^[-*]\s+/.test(trimmed)) {
-        const itemText = trimmed.replace(/^[-*]\s+/, '');
-        elements.push(
-          <div key={`li-${i}`} className="flex items-start gap-2 pl-0.5 my-0.5 leading-relaxed">
-            <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0 mt-1.5 select-none" />
-            <span className="flex-1 min-w-0">{parseInline(itemText, i)}</span>
-          </div>
-        );
-        continue;
-      }
-
-      // Numbered list item: 1. or 2.
-      if (/^\d+\.\s+/.test(trimmed)) {
-        const match = trimmed.match(/^(\d+\.)\s+(.*)$/);
-        if (match) {
-          elements.push(
-            <div key={`ol-${i}`} className="flex items-start gap-1.5 pl-0.5 my-0.5 leading-relaxed">
-              <span className="text-2xs font-mono text-zinc-500 shrink-0 mt-0.5 select-none">{match[1]}</span>
-              <span className="flex-1 min-w-0">{parseInline(match[2], i)}</span>
-            </div>
-          );
-          continue;
-        }
-      }
-
-      // Normal paragraph line
-      elements.push(
-        <div key={`p-${i}`} className="leading-relaxed">
-          {parseInline(line, i)}
-        </div>
-      );
-    }
-
-    if (inCodeBlock && codeBlockLines.length > 0) {
-      elements.push(
-        <div key="cb-unclosed" className="my-2 rounded-lg bg-black/60 border border-white/[0.06] p-2.5 overflow-x-auto text-xs font-mono text-zinc-300">
-          <code>{codeBlockLines.join('\n')}</code>
-        </div>
-      );
-    }
-
-    return elements;
-  };
-
   const isConnected =
     (aiSettings.provider === 'groq' && Boolean(aiSettings.groqApiKey)) ||
     (aiSettings.provider === 'kie' && Boolean(aiSettings.kieApiKey)) ||
@@ -701,7 +413,23 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({ variant = 'center'
                     }`}
                   >
                     <div className="font-sans text-sm flex flex-col gap-1.5 break-words">
-                      {renderRichContent(msg.content)}
+                      {splitTaskBlocks(msg.content).map((segment, segIdx) =>
+                        segment.kind === 'task' ? (
+                          <ChatTaskBlock
+                            key={segIdx}
+                            title={segment.title}
+                            lines={segment.lines}
+                            onWikiLinkClick={scrollToItem}
+                          />
+                        ) : (
+                          <MarkdownRenderer
+                            key={segIdx}
+                            content={segment.text}
+                            onWikiLinkClick={scrollToItem}
+                            className="text-inherit"
+                          />
+                        )
+                      )}
                     </div>
                   </div>
                 )}
