@@ -24,6 +24,10 @@ export function useVisualViewportHeight() {
     const publish = () => {
       frame = 0;
       const height = Math.round(viewport.height);
+      // The WebView shrinks with the keyboard on its own: visual viewport and
+      // window agree, so the shell needs nothing and a write here would re-run
+      // the whole app's layout on every keyboard frame for a value it ignores.
+      if (Math.abs(height - window.innerHeight) <= 1) return;
       if (height === applied) return;
       applied = height;
       root.style.setProperty('--vvh', `${height}px`);
