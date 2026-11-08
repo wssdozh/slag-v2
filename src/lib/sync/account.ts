@@ -470,11 +470,25 @@ class AccountClient {
   }
 
   private async mutate(path: string, init: RequestInit): Promise<void> {
-    await this.run(() => this.request<void>(path, init));
-    await this.refresh();
+    const label = `${(init.method ?? 'GET').toUpperCase()} ${path}`;
+    try {
+      await this.run(() => this.request<void>(path, init));
+      await this.refresh();
+    } catch (error) {
+      accountLog.error(`Account mutation failed: ${label}`, { error: errorMessage(error) });
+      throw error;
+    }
   }
 
   approveDevice(deviceId: string): Promise<void> {
+    accountLog.info('Device request approved', { deviceId });
+    return this.mutate(`/api/devices/${encodeURIComponent(deviceId)}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  restoreDevice(deviceId: string): Promise<void> {
+    accountLog.info('Revoked device restored', { deviceId });
     return this.mutate(`/api/devices/${encodeURIComponent(deviceId)}/approve`, {
       method: 'POST',
     });
@@ -486,16 +500,19 @@ class AccountClient {
     await this.mutate(`/api/devices/${encodeURIComponent(deviceId)}`, {
       method: 'PATCH', body: JSON.stringify({ name: clean }),
     });
+    accountLog.info('Device renamed', { deviceId });
     if (this.session && this.session.deviceId === deviceId) renameStoredDevice(deviceId, clean);
   }
 
   revokeDevice(deviceId: string): Promise<void> {
+    accountLog.warn('Device access revoked', { deviceId });
     return this.mutate(`/api/devices/${encodeURIComponent(deviceId)}`, {
       method: 'DELETE',
     });
   }
 
   forgetDevice(deviceId: string): Promise<void> {
+    accountLog.warn('Device forgotten permanently', { deviceId });
     return this.mutate(`/api/devices/${encodeURIComponent(deviceId)}?purge=1`, {
       method: 'DELETE',
     });
