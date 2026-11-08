@@ -10,6 +10,7 @@ import {
   getTodayString,
   getTomorrowString,
   getMondayOfWeek,
+  getMonthCalendarDays,
   RUSSIAN_MONTHS,
   RUSSIAN_WEEKDAYS,
   pluralRu,
@@ -266,26 +267,10 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
   }, [threeDayStartDate]);
 
   // Month Calendar Days for Picker
-  const monthCalendarDays = useMemo(() => {
-    const firstDay = new Date(pickerYear, pickerMonth, 1);
-    const lastDay = new Date(pickerYear, pickerMonth + 1, 0);
-    const startMonday = getMondayOfWeek(firstDay);
-
-    const cells: { date: Date; isCurrentMonth: boolean; dateStr: string; dayNum: number }[] = [];
-    const current = new Date(startMonday);
-
-    while (current <= lastDay || cells.length % 7 !== 0) {
-      cells.push({
-        date: new Date(current),
-        isCurrentMonth: current.getMonth() === pickerMonth,
-        dateStr: getISODateString(current),
-        dayNum: current.getDate()
-      });
-      current.setDate(current.getDate() + 1);
-    }
-
-    return cells;
-  }, [pickerYear, pickerMonth]);
+  const monthCalendarDays = useMemo(
+    () => getMonthCalendarDays(pickerYear, pickerMonth),
+    [pickerYear, pickerMonth]
+  );
 
   // Month & Year title for Header
   const currentMonthLabel = useMemo(() => {
@@ -1100,7 +1085,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
                           : 'text-zinc-600 hover:bg-white/[0.02]'
                       }`}
                     >
-                      <span className="text-xs">{cell.dayNum}</span>
+                      <span className="text-xs">{cell.date.getDate()}</span>
                       <div className="h-1 flex items-center justify-center">
                         {hasTasks && (
                           <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-black' : 'bg-zinc-400'}`} />
