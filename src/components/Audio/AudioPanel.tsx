@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import {
   extractAudioTracks,
   formatAudioDuration,
@@ -65,10 +66,8 @@ export const AudioPanel: React.FC = () => {
     return setupAudioCollisionGuard();
   }, []);
 
-  // Deduplicated folders list with inbox first
-  const availableFolders = useMemo(() => {
-    return Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)]));
-  }, [folders]);
+  // Same hierarchical folder list as every other picker in the app
+  const folderOptions = useMemo(() => buildFolderOptions(folders), [folders]);
 
   // Extract tracks for current folder and filters
   const tracks = useMemo(() => {
@@ -626,7 +625,7 @@ export const AudioPanel: React.FC = () => {
                 setPinnedFolder(folderPath);
                 setScopeMode('pinned');
               }}
-              options={availableFolders.map((folderPath) => ({ value: folderPath, label: folderPath }))}
+              options={folderOptions}
               aria-label="Выбрать папку аудио"
               title="Выбрать папку (автоматически закрепит)"
               className={`max-w-[150px] sm:max-w-[190px] font-mono ${scopeMode === 'pinned' ? 'font-medium' : ''}`}

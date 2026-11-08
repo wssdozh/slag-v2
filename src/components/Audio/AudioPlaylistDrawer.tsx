@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, Mic, Music, Play, Pause, ExternalLink, Folder } from 'lucide-react';
+import { X, Search, Mic, Music, Play, Pause, ExternalLink } from 'lucide-react';
 import type { AudioTrack, AudioTypeFilter } from '../../lib/media/audioHelper';
 import { formatAudioDuration } from '../../lib/media/audioHelper';
 import type { FolderMeta } from '../../types';
 import { IconButton } from '../UI/IconButton';
 import { Select } from '../UI/Select';
-import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import { usePresence } from '../../hooks/usePresence';
 
 interface AudioPlaylistDrawerProps {
@@ -41,6 +41,8 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   onSelectPinnedFolder,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+
+  const folderOptions = useMemo(() => buildFolderOptions(folders), [folders]);
 
   const filteredTracks = useMemo(() => {
     if (!searchQuery.trim()) return tracks;
@@ -120,13 +122,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
             variant="ghost"
             value={pinnedFolder}
             onChange={onSelectPinnedFolder}
-            options={Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)])).map(
-              (folderPath) => ({
-                value: folderPath,
-                label: folderPath,
-                icon: <Folder className="w-3 h-3 text-zinc-400" aria-hidden="true" />,
-              })
-            )}
+            options={folderOptions}
             aria-label="Закреплённая папка аудио"
             className="max-w-[150px] font-mono"
           />
