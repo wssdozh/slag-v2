@@ -24,6 +24,7 @@ export const STORAGE_KEYS = {
   AI_SETTINGS: 'slag_ai_settings_v2',
   SIDEBAR_WIDTH: 'slag_sidebar_width_v2',
   RIGHT_PANEL_WIDTH: 'slag_right_panel_width_v2',
+  FEED_CONTENT_WIDTH: 'slag_feed_content_width_v1',
   MOBILE_DOCK_TABS: 'slag_mobile_dock_tabs_v2',
   UI_CONFIG: 'slag_ui_config_v2',
   BACKUP_SETTINGS: 'slag_backup_settings_v2',

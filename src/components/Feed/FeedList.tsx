@@ -16,6 +16,7 @@ import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { PinnedBanner } from './PinnedBanner';
+import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
 
 const WINDOW_CHUNK = 15;
@@ -434,6 +435,7 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
 
   return (
     <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
+      <FeedColumnResizer />
       <PinnedBanner />
       <div
         ref={containerRef}

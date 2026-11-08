@@ -215,6 +215,36 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     }
   });
 
+  test('7.1 Reading column handle resizes the feed and clamps at the minimum', async ({ page }) => {
+    const handle = page.getByTestId('feed-width-handle-right');
+    await expect(handle).toBeAttached();
+
+    const readWidth = () =>
+      page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--feed-content-width').trim()
+      );
+    await expect.poll(readWidth).toBe('672px');
+
+    const handleBox = await handle.boundingBox();
+    expect(handleBox).toBeTruthy();
+    if (!handleBox) return;
+
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 200);
+    await page.screenshot({ path: 'test-results/screenshots/feed-column-handle-hover.png' });
+    await page.mouse.down();
+    await page.mouse.move(handleBox.x - 400, handleBox.y + 200, { steps: 8 });
+    await page.mouse.up();
+
+    // However far the hand travels, the reading column stops at its minimum.
+    await expect.poll(readWidth).toBe('420px');
+    const cardMaxWidth = await page
+      .locator('.feed-card-contain')
+      .first()
+      .evaluate(el => getComputedStyle(el).maxWidth);
+    expect(cardMaxWidth).toBe('420px');
+    await page.screenshot({ path: 'test-results/screenshots/feed-column-min-width.png' });
+  });
+
   test('8. Image Lightbox full-screen gallery with Escape dismissal', async ({ page }) => {
     // Open an image in demo item or create one with base64 1x1 image
     const composerTextarea = page.locator('main textarea');

@@ -1251,7 +1251,7 @@ export const Composer: React.FC<ComposerProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-2xl'}
+      className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-[var(--feed-content-width,42rem)]'}
     />
   );
 };

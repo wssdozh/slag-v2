@@ -509,7 +509,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   })();
 
   return (
-    <div className={`relative max-w-2xl w-full mx-auto feed-card-contain ${swipeOffset ? 'overflow-hidden' : ''}`}>
+    <div className={`relative w-full mx-auto feed-card-contain ${swipeOffset ? 'overflow-hidden' : ''}`}>
       {/* Background Reply Swipe Indicator */}
       {swipeOffset < 0 && (
         <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center text-blue-400">
