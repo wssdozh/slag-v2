@@ -1,8 +1,24 @@
 import { storage } from '../storage';
+export { storage };
 import { logger } from '../logger';
 import { accountClient } from './account';
+export { accountClient };
 import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
+import { SyncTransport } from './transport';
+import {
+  addTrustedDeviceToConfig,
+  setDeviceAllowedVaultsInConfig,
+  removeTrustedDeviceFromConfig,
+  renameDeviceInConfig,
+  setDeviceSyncModeInConfig,
+  setDeviceAiLeaseInConfig,
+  touchDeviceLastSeen,
+  normalizeTrustedDevicesFromAccount,
+  computeSubscription,
+  parseStoredConfig,
+  createInitialConfig,
+} from './devices';
 import {
   deriveVaultKey,
   deriveRoomId,
@@ -10,7 +26,6 @@ import {
   encodeBundleFrame,
   decryptBundle,
   generateMnemonic,
-  generateDeviceId,
   computeStateRootHash,
   computeHash,
 } from './crypto';
@@ -59,8 +74,6 @@ export class SyncEngine {
   private config: SyncConfig;
   private status: SyncStatus;
   private listeners = new Set<(status: SyncStatus) => void>();
-  private ws: WebSocket | null = null;
-  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   private activeVaultKey: CryptoKey | null = null;
@@ -79,8 +92,44 @@ export class SyncEngine {
   private wsSupportsBinary = false;
   private pushDirty = false;
   private entityHashes = new Map<string, { sig: string; hash: string }>();
+  private transport: SyncTransport;
 
   constructor() {
+    this.transport = new SyncTransport({
+      onStatus: (state, error) => {
+        this.status.state = state;
+        if (error !== null) {
+          this.status.error = error;
+        } else if (state === 'connected') {
+          this.status.error = null;
+        }
+        this.notify();
+      },
+      onConnectedDevicesCount: (count) => {
+        this.status.connectedDevicesCount = count;
+        this.notify();
+      },
+      onBinarySupport: (supported) => {
+        this.wsSupportsBinary = supported;
+      },
+      onPing: (pingMs) => {
+        this.status.pingMs = pingMs;
+        this.notify();
+      },
+      onServerAck: (bundleId) => {
+        const pending = this.pendingPushes.get(bundleId);
+        if (pending) this.commitPush(pending);
+      },
+      onBundle: async (bundle) => {
+        await this.applyIncomingBundle(bundle);
+      },
+      onCatchUpPull: () => {
+        void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));
+      },
+      onAuthRejected: () => {
+        this.disconnect();
+      },
+    });
     this.currentVaultId =
       (typeof storage !== 'undefined' && storage.getCurrentVault
         ? storage.getCurrentVault()?.id
@@ -119,16 +168,7 @@ export class SyncEngine {
     accountClient.subscribe((accountState) => {
       this.status.isAuthenticated = accountClient.getToken(this.config.serverUrl) !== null;
       if (!this.usesAccountSync()) return;
-      this.config.trustedDevices = accountState.devices
-        .filter((device) => device.status === 'active' && device.id !== this.config.deviceId)
-        .map((device) => ({
-          id: device.id, name: device.name, platform: device.platform,
-          publicKey: device.publicKey, isCurrent: false,
-          pairedAt: device.createdAt || '', lastSeenAt: device.lastSeenAt || '',
-          allowedVaults: accountState.vaults
-            .filter((vault) => vault.grants.some((grant) => grant.deviceId === device.id && grant.status === 'accepted'))
-            .map((vault) => vault.id),
-        }));
+      this.config.trustedDevices = normalizeTrustedDevicesFromAccount(accountState, this.config.deviceId);
       const ownVault = accountState.vaults.find((vault) => vault.id === this.getSyncVaultId());
       const ownGrant = ownVault && ownVault.grants.find((grant) => grant.deviceId === this.config.deviceId);
       if (ownGrant && ownGrant.status === 'accepted') this.config.localSyncMode = ownGrant.mode;
@@ -157,38 +197,12 @@ export class SyncEngine {
   }
 
   private computeSubscription(cfg: SyncConfig): SyncStatus['subscription'] {
-    const accountState = accountClient.getState();
-    const account = accountClient.getToken(cfg.serverUrl) ? accountState.account : null;
-    const activeCount = 1 + cfg.trustedDevices.length;
-    if (account) {
-      return {
-        ...account,
-        expiresFormatted: account.expiresAt ? new Date(account.expiresAt).toLocaleDateString('ru-RU') : 'Бессрочно',
-        activeDevices: accountState.devices.filter((device) => device.status === 'active').length,
-        isExpiringSoon: false,
-      };
-    }
-    if (!this.status.authRequired) {
-      return {
-        plan: 'self-hosted',
-        planLabel: 'Self-hosted релей',
-        expiresAt: null,
-        expiresFormatted: 'Бессрочно',
-        maxDevices: 999,
-        activeDevices: activeCount,
-        maxCacheMb: 999999,
-        usedCacheMb: 0,
-        allowAttachments: true,
-        hasAiLease: true,
-        isExpiringSoon: false,
-      };
-    }
-
-    return {
-      plan: 'free', planLabel: 'SLAG ID · требуется вход', expiresAt: null,
-      expiresFormatted: '—', maxDevices: 0, activeDevices: 0,
-      maxCacheMb: 0, usedCacheMb: 0, allowAttachments: false, hasAiLease: false,
-    };
+    return computeSubscription(
+      cfg,
+      accountClient.getState(),
+      accountClient.getToken(cfg.serverUrl) !== null,
+      this.status.authRequired
+    );
   }
   public getConfig(): SyncConfig {
     return { ...this.config };
@@ -337,66 +351,24 @@ export class SyncEngine {
         raw = localStorage.getItem(SYNC_CONFIG_KEY);
       }
       if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          enabled: parsed.enabled ?? true,
-          serverUrl: parsed.serverUrl || DEFAULT_SERVER_URL,
-          deviceId: accountClient.getToken(parsed.serverUrl || DEFAULT_SERVER_URL)
-            ? accountClient.getSession()!.deviceId
-            : parsed.deviceId || generateDeviceId(),
-          deviceName: parsed.deviceName || 'Это устройство',
-          seedPhrase: parsed.seedPhrase || generateMnemonic(12),
-          autoSync: parsed.autoSync ?? true,
-          subscriptionPlan: parsed.subscriptionPlan || 'smile',
-          bgSyncIntervalMinutes: parsed.bgSyncIntervalMinutes ?? 0,
-          localSyncMode: parsed.localSyncMode || 'read-write',
-          canRunAiLease: parsed.canRunAiLease ?? true,
-          trustedDevices: parsed.trustedDevices || [],
-        };
+        return parseStoredConfig(
+          raw,
+          DEFAULT_SERVER_URL,
+          accountClient.getToken(DEFAULT_SERVER_URL) !== null,
+          accountClient.getSession()?.deviceId
+        );
       }
     } catch {
       // fallback
     }
 
-    let inheritedDeviceId = generateDeviceId();
-    // Имя по умолчанию зависит от платформы: на телефоне «Мой ПК» — дезориентирующая подпись.
-    const defaultDeviceName = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-      ? 'Мой телефон'
-      : 'Мой ПК';
-    let inheritedDeviceName = defaultDeviceName;
-    let inheritedServerUrl = DEFAULT_SERVER_URL;
-    let inheritedPlan: 'free' | 'smile' | 'angry' = 'smile';
-    let inheritedBgSync: 0 | 10 | 30 = 0;
-
     const baseRaw = localStorage.getItem(SYNC_CONFIG_KEY) || localStorage.getItem(`${SYNC_CONFIG_KEY}_default_vault`);
-    if (baseRaw) {
-      try {
-        const base = JSON.parse(baseRaw);
-        if (base.deviceId) inheritedDeviceId = base.deviceId;
-        if (base.deviceName) inheritedDeviceName = base.deviceName;
-        if (base.serverUrl) inheritedServerUrl = base.serverUrl;
-        if (base.subscriptionPlan) inheritedPlan = base.subscriptionPlan;
-        if (typeof base.bgSyncIntervalMinutes === 'number') inheritedBgSync = base.bgSyncIntervalMinutes;
-      } catch {
-        // ignore
-      }
-    }
-
-    const initial: SyncConfig = {
-      enabled: true,
-      serverUrl: inheritedServerUrl,
-      deviceId: accountClient.getToken(inheritedServerUrl)
-        ? accountClient.getSession()!.deviceId
-        : inheritedDeviceId,
-      deviceName: inheritedDeviceName,
-      seedPhrase: generateMnemonic(12),
-      autoSync: true,
-      subscriptionPlan: inheritedPlan,
-      bgSyncIntervalMinutes: inheritedBgSync,
-      localSyncMode: 'read-write',
-      canRunAiLease: true,
-      trustedDevices: [],
-    };
+    const initial = createInitialConfig(
+      DEFAULT_SERVER_URL,
+      baseRaw,
+      accountClient.getToken(DEFAULT_SERVER_URL) !== null,
+      accountClient.getSession()?.deviceId
+    );
     this.saveConfig(initial);
     return initial;
   }
@@ -597,116 +569,26 @@ export class SyncEngine {
     await this.init();
   }
 
-  private reconnectAttempts = 0;
-
-  private connectWebSocket(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.onmessage = null;
-      this.ws.onopen = null;
-      this.ws.onerror = null;
-      this.ws.close();
-      this.ws = null;
-    }
-
-    if (!this.config.enabled || !this.activeRoomId) return;
-
-    try {
-      const baseWsUrl = this.config.serverUrl
-        .replace(/^http:\/\//, 'ws://')
-        .replace(/^https:\/\//, 'wss://')
-        .replace(/\/+$/, '');
-      const authParams = new URLSearchParams({
-        device: this.config.deviceId,
-        vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
-      });
-      const token = accountClient.getToken(this.config.serverUrl);
-      if (token) authParams.set('token', token);
-      const fullWsUrl = `${baseWsUrl}/ws/${this.activeRoomId}?${authParams.toString()}`;
-
-      syncLog.info(`Connecting sync WS for vault ${this.currentVaultId}`);
-      this.ws = new WebSocket(fullWsUrl);
-
-      this.ws.onopen = () => {
-        this.reconnectAttempts = 0;
-        syncLog.info('Sync WebSocket connected');
-        this.status.state = 'connected';
-        this.status.error = null;
-        this.notify();
-      };
-
-      this.ws.onmessage = async (event) => {
-        await this.handleIncomingMessage(event.data);
-      };
-
-      this.ws.onerror = () => {
-        syncLog.warn('Sync WebSocket connection error');
-        this.status.state = 'error';
-        this.status.error = 'Сбой подключения к релею';
-        this.notify();
-      };
-
-      this.ws.onclose = (event) => {
-        this.ws = null;
-        if (event.code === 1008 || event.code === 4401 || event.code === 4403) {
-          this.disconnect();
-          this.status.state = 'error';
-          this.status.error = 'Соединение отклонено сервером. Проверьте вход и доступ к хранилищу';
-          this.notify();
-          return;
-        }
-        const retryMs = Math.min(
-          SYNC_INTERVALS.RECONNECT_BASE_MS * 2 ** Math.min(this.reconnectAttempts++, SYNC_INTERVALS.RECONNECT_MAX_EXPONENT),
-          SYNC_INTERVALS.RECONNECT_MAX_MS
-        );
-        syncLog.info(`Sync WebSocket closed (code ${event.code}${event.reason ? `, reason: ${event.reason.slice(0, 120)}` : ''}), retrying in ${retryMs}ms`);
-        this.status.state = 'offline';
-        this.notify();
-        void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Background pull failed:', error));
-        this.reconnectTimeout = setTimeout(() => {
-          this.reconnectTimeout = null;
-          if (this.config.enabled && this.activeRoomId) this.connectWebSocket();
-        }, retryMs);
-      };
-    } catch (e) {
-      syncLog.error('WebSocket spawn error:', e);
-      this.status.state = 'error';
-      this.notify();
-    }
+  private get ws(): WebSocket | null {
+    return this.transport.getWebSocket();
   }
 
-  private async handleIncomingMessage(data: string): Promise<void> {
-    try {
-      const msg = JSON.parse(data);
-      if (msg.type === 'welcome') {
-        this.status.connectedDevicesCount = msg.connectedDevices || 1;
-        // Relay advertises the binary uplink frame; older relays simply omit it.
-        this.wsSupportsBinary = msg.binary === true;
-        // Catch up on anything missed while the socket was down: connect is the only
-        // moment a full pull is mandatory now that push no longer pulls first.
-        void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));
-        this.notify();
-      } else if (msg.type === 'server_ack' && typeof msg.bundleId === 'string') {
-        const pending = this.pendingPushes.get(msg.bundleId);
-        if (pending) this.commitPush(pending);
-      } else if (msg.type === 'pong') {
-        const now = Date.now();
-        if (msg.ts) {
-          this.status.pingMs = Math.max(1, now - msg.ts * 1000);
-          this.notify();
-        }
-      } else if (msg.type === 'bundle') {
-        await this.applyIncomingBundle(msg.bundle);
-      } else if (msg.type === 'error') {
-        syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
-      }
-    } catch (e) {
-      syncLog.error('Failed to parse incoming message:', e);
-    }
+  private set ws(val: WebSocket | null) {
+    this.transport.setWebSocket(val);
+  }
+
+  private connectWebSocket(): void {
+    this.transport.connect({
+      serverUrl: this.config.serverUrl,
+      deviceId: this.config.deviceId,
+      vaultId: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
+      roomId: this.activeRoomId || '',
+      enabled: this.config.enabled,
+    });
+  }
+
+  public async handleIncomingMessage(data: string): Promise<void> {
+    await this.transport.handleIncomingMessage(data);
   }
 
   private incomingQueue: Promise<void> = Promise.resolve();
@@ -783,10 +665,7 @@ export class SyncEngine {
         };
         this.addTrustedDevice(sender);
       } else {
-        const updatedList = this.config.trustedDevices.map((d) =>
-          d.id === bundle.fromDeviceId ? { ...d, lastSeenAt: 'Только что' } : d
-        );
-        this.saveConfig({ trustedDevices: updatedList });
+        this.saveConfig({ trustedDevices: touchDeviceLastSeen(this.config.trustedDevices, bundle.fromDeviceId) });
       }
       if (sender.syncMode === 'receive-only') {
         syncLog.warn(`Ignored mutation bundle from receive-only device: ${bundle.fromDeviceId}`);
@@ -1013,20 +892,14 @@ export class SyncEngine {
   }
 
   private async sendAck(bundleId: string): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'ack', bundleId }));
-      syncLog.info(`ACK sent for bundle ${bundleId}`);
-      return;
-    }
-    const roomId = this.activeRoomId;
-    if (!roomId) return;
-    const serverUrl = this.config.serverUrl.replace(/\/+$/, '');
-    const response = await fetch(`${serverUrl}/api/rooms/${roomId}/ack?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
-      method: 'POST',
-      headers: this.authHeaders(true),
-      body: JSON.stringify({ deviceId: this.config.deviceId, bundleIds: [bundleId] }),
+    await this.transport.sendAck({
+      bundleId,
+      roomId: this.activeRoomId,
+      serverUrl: this.config.serverUrl,
+      vaultId: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
+      deviceId: this.config.deviceId,
+      authHeaders: (includeJson) => this.authHeaders(includeJson),
     });
-    if (!response.ok) throw new Error(`Sync ACK failed: HTTP ${response.status}`);
   }
 
   public async pushLocalChanges(): Promise<void> {
@@ -1451,18 +1324,7 @@ export class SyncEngine {
     this.batchUpdating = false;
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.onmessage = null;
-      this.ws.onopen = null;
-      this.ws.onerror = null;
-      this.ws.close();
-      this.ws = null;
-    }
+    this.transport.disconnect();
     this.activeVaultKey = null;
     this.activeRoomId = null;
     this.status.currentRoomId = null;
@@ -1471,60 +1333,27 @@ export class SyncEngine {
   }
 
   public addTrustedDevice(device: DeviceProfile): void {
-    const list = this.config.trustedDevices.filter((d) => d.id !== device.id);
-    list.push({
-      ...device,
-      syncMode: device.syncMode || 'read-write',
-      canRunAiLease: device.canRunAiLease ?? false,
-      allowedVaults: device.allowedVaults,
-    });
-    this.saveConfig({ trustedDevices: list });
+    this.saveConfig(addTrustedDeviceToConfig(this.config, device));
   }
 
   public setDeviceAllowedVaults(deviceId: string, allowedVaults: string[]): void {
-    const list = this.config.trustedDevices.map((d) =>
-      d.id === deviceId ? { ...d, allowedVaults } : d
-    );
-    this.saveConfig({ trustedDevices: list });
+    this.saveConfig(setDeviceAllowedVaultsInConfig(this.config, deviceId, allowedVaults));
   }
 
   public removeTrustedDevice(deviceId: string): void {
-    const list = this.config.trustedDevices.filter((d) => d.id !== deviceId);
-    this.saveConfig({ trustedDevices: list });
+    this.saveConfig(removeTrustedDeviceFromConfig(this.config, deviceId));
   }
 
   public renameDevice(deviceId: string, newName: string): void {
-    const clean = newName.trim();
-    if (deviceId === this.config.deviceId) {
-      this.saveConfig({ deviceName: clean || 'Это устройство' });
-      return;
-    }
-    const list = this.config.trustedDevices.map((d) =>
-      d.id === deviceId ? { ...d, name: clean || d.name } : d
-    );
-    this.saveConfig({ trustedDevices: list });
+    this.saveConfig(renameDeviceInConfig(this.config, deviceId, newName));
   }
 
   public setDeviceSyncMode(deviceId: string, mode: DeviceSyncMode): void {
-    if (deviceId === this.config.deviceId) {
-      this.saveConfig({ localSyncMode: mode });
-      return;
-    }
-    const list = this.config.trustedDevices.map((d) =>
-      d.id === deviceId ? { ...d, syncMode: mode } : d
-    );
-    this.saveConfig({ trustedDevices: list });
+    this.saveConfig(setDeviceSyncModeInConfig(this.config, deviceId, mode));
   }
 
   public setDeviceAiLease(deviceId: string, canRun: boolean): void {
-    if (deviceId === this.config.deviceId) {
-      this.saveConfig({ canRunAiLease: canRun });
-      return;
-    }
-    const list = this.config.trustedDevices.map((d) =>
-      d.id === deviceId ? { ...d, canRunAiLease: canRun } : d
-    );
-    this.saveConfig({ trustedDevices: list });
+    this.saveConfig(setDeviceAiLeaseInConfig(this.config, deviceId, canRun));
   }
 
   public async rotateVaultKey(): Promise<string> {
