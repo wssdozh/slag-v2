@@ -25,7 +25,7 @@ import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/usePresence';
-import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';
+import { useEditorSheet } from '../../hooks/gestures/useEditorSheet';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
@@ -49,9 +49,10 @@ const editorExtensions = [
 interface FullscreenEditorContentProps {
   item: SlagItem;
   presencePhase?: string;
+  onExited: () => void;
 }
 
-const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item, presencePhase }) => {
+const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item, presencePhase, onExited }) => {
   const {
     setIsFullscreenEditorOpen,
     saveItem,
@@ -122,12 +123,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     setIsSheetExpanded(false);
   }
 
-  const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useSheetDrag({
-    isOpen: true,
+  const { panelRef, scrimRef, barRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useEditorSheet({
+    enabled: isMobile,
+    expanded: isSheetExpanded,
+    exiting: presencePhase === 'exiting',
+    onExpandedChange: setIsSheetExpanded,
     onDismiss: handleClose,
-    onExpand: () => setIsSheetExpanded(true),
-    // Свёрнутой шторке некуда сворачиваться: вниз — это закрытие, а не коллапс.
-    onCollapse: isSheetExpanded ? () => setIsSheetExpanded(false) : undefined,
+    onExited,
   });
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -530,30 +532,26 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       )}
 
       {/* Phone half sheet: the dim closes on tap and sits behind the panel. */}
-      {isMobile && !isSheetExpanded && (
+      {isMobile && (
         <div
           ref={scrimRef}
           onClick={handleClose}
-          className="motion-fade absolute inset-0 bg-black/60"
+          className="absolute inset-0 bg-black/60"
         />
       )}
 
-      {/* The editor surface: a half sheet on a phone, the plain window on desktop.
-          `motion-sheet` owns the entrance and the exit (opacity + travel of its own
-          height); the height itself is a snap, because the finger already carried
-          the panel to where it lands. */}
+      {/* Full-height surface translated to its detent; text never scales or reflows per frame. */}
       <div
         ref={isMobile ? panelRef : undefined}
         data-testid={isMobile ? 'editor-sheet' : undefined}
         data-motion-state={isMobile ? presencePhase : undefined}
         className={
           isMobile
-            ? `motion-sheet absolute inset-x-0 bottom-0 flex flex-col overflow-hidden bg-surface border-t border-white/[0.08] shadow-2xl ${
+            ? `editor-spring-sheet absolute inset-0 flex flex-col overflow-hidden bg-surface border-t border-subtle ${
                 isSheetExpanded ? 'rounded-t-none' : 'rounded-t-2xl'
               }`
             : 'flex flex-1 flex-col bg-surface'
         }
-        style={isMobile ? { height: isSheetExpanded ? '100%' : '56%' } : undefined}
       >
         {/* The handle owns the sheet gesture. Свёрнутой он с пилюлей, развёрнутой
             остаётся тонкой полосой у кромки — потянуть вниз можно и оттуда. */}
@@ -594,8 +592,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           onAiDecompose={handleAiDecomposeInline}
           isZenMode={isZenMode}
           onToggleZenMode={() => setIsZenMode(prev => !prev)}
-          isFullWidth={isFullWidth}
-          onToggleFullWidth={() => setIsFullWidth(prev => !prev)}
+          isFullWidth={isMobile ? isSheetExpanded : isFullWidth}
+          onToggleFullWidth={() => isMobile ? setIsSheetExpanded(prev => !prev) : setIsFullWidth(prev => !prev)}
           saveStatus={saveStatus}
           onSave={handleSave}
           onClose={handleClose}
@@ -603,7 +601,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         />
 
         {/* Editor Body */}
-        <div className="flex-1 overflow-y-auto py-6 md:py-8 bg-surface">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto py-6 md:py-8 bg-surface"
+          style={isMobile && !isSheetExpanded ? { maxHeight: 'calc(56% - 68px)' } : undefined}
+        >
           <div
             className={`mx-auto w-full px-4 md:px-6 flex flex-col gap-4 pb-28 ${
               isFullWidth ? 'max-w-5xl' : 'max-w-3xl'
@@ -974,10 +975,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
             <div className="h-16 md:hidden shrink-0" aria-hidden="true" />
           </div>
         </div>
-      </div>
 
-      {/* Mobile Telegram-Style Floating Bottom Toolbar */}
+      {/* Chrome shares the sheet's entrance, drag and exit. */}
       <MobileEditorBar
+        ref={barRef}
         isDraft={item.id.startsWith('draft_')}
         activePopover={activeMobilePopover}
         onSetActivePopover={setActiveMobilePopover}
@@ -988,20 +989,20 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         onAiTags={handleAiTagsInline}
         onSave={handleSave}
       />
+      </div>
     </div>
   );
 };
 
 export const FullscreenEditor: React.FC = () => {
-  const { isFullscreenEditorOpen, selectedItem } = useApp();
+  const { isFullscreenEditorOpen, selectedItem, isMobile } = useApp();
 
   const isOpen = isFullscreenEditorOpen && Boolean(selectedItem);
-  // The surface unfolds itself through `expandFromRect`/`enterFromEdge`, so it has
-  // no use for the CSS `entering` frame: flipping that phase re-rendered the whole
-  // editor mid-animation and ate the first frames of the unfold. The phone sheet
-  // takes its entrance from `@starting-style` on `.motion-sheet` for the same
-  // reason — it must not re-render the editor while the panel is sliding.
-  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen, { skipEntering: true });
+  // Mobile lifetime follows the spring, not an unrelated 200ms CSS timeout.
+  const { ref, phase, isPresent, onTransitionEnd, finishExit } = usePresence(isOpen, {
+    skipEntering: true,
+    manualExit: isMobile,
+  });
 
   const [cachedItem, setCachedItem] = useState(selectedItem);
   if (selectedItem && selectedItem !== cachedItem) {
@@ -1023,6 +1024,7 @@ export const FullscreenEditor: React.FC = () => {
         key={effectiveItem.id}
         item={effectiveItem}
         presencePhase={phase}
+        onExited={finishExit}
       />
     </div>
   );

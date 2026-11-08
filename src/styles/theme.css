@@ -109,6 +109,12 @@
   --slag-motion-slow: 200ms;
 }
 
+/* The editor's single moving layer; the spring writes transform outside React. */
+.editor-spring-sheet {
+  will-change: transform;
+  contain: layout style;
+}
+
 /* Mobile settings keep their chrome still; only the new pane settles in. */
 @media (max-width: 767px) {
   .motion-settings-tab { translate: 0 0; }

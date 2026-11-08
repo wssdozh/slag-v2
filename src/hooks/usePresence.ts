@@ -12,10 +12,12 @@ interface PresenceOptions {
    * tree (the editor). A surface that drives its own entrance has no use for it.
    */
   skipEntering?: boolean;
+  /** A gesture spring reports completion instead of a CSS deadline. */
+  manualExit?: boolean;
 }
 
 /** Keeps the existing DOM during exit. CSS owns the duration and destination. */
-export function usePresence(open: boolean, { skipEntering = false }: PresenceOptions = {}) {
+export function usePresence(open: boolean, { skipEntering = false, manualExit = false }: PresenceOptions = {}) {
   const ref = useRef<HTMLDivElement>(null);
   const initialPhase: Phase = open ? (skipEntering ? 'open' : 'entering') : 'closed';
   const [state, setState] = useState<{ open: boolean; phase: Phase }>({
@@ -54,7 +56,7 @@ export function usePresence(open: boolean, { skipEntering = false }: PresenceOpt
       });
       return () => cancelAnimationFrame(frame);
     }
-    if (state.phase !== 'exiting') return;
+    if (state.phase !== 'exiting' || manualExit) return;
 
     const style = getComputedStyle(element);
     const milliseconds = (value: string) => value.trim().endsWith('ms')
@@ -68,7 +70,7 @@ export function usePresence(open: boolean, { skipEntering = false }: PresenceOpt
     exitDeadlineRef.current = performance.now() + windowMs;
     const timer = window.setTimeout(finishExit, windowMs);
     return () => window.clearTimeout(timer);
-  }, [state.phase, finishExit]);
+  }, [state.phase, finishExit, manualExit]);
 
   const onTransitionEnd = useCallback((event: TransitionEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
@@ -84,5 +86,6 @@ export function usePresence(open: boolean, { skipEntering = false }: PresenceOpt
     isPresent: open || state.phase !== 'closed',
     phase: state.phase,
     onTransitionEnd,
+    finishExit,
   };
 }

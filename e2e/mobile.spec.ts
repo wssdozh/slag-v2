@@ -678,8 +678,13 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
 
     const box = await sheet.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.height).toBeGreaterThan(380);
-    expect(box!.height).toBeLessThan(600);
+    const visibleHeight = page.viewportSize()!.height - box!.y;
+    expect(visibleHeight).toBeGreaterThan(380);
+    expect(visibleHeight).toBeLessThan(600);
+    const bar = page.getByTestId('mobile-editor-bar');
+    expect(await bar.evaluate(el => el.closest('[data-testid="editor-sheet"]') !== null)).toBe(true);
+    const barBox = await bar.boundingBox();
+    expect(Math.abs(barBox!.y + barBox!.height - page.viewportSize()!.height)).toBeLessThan(2);
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_half_sheet.png' });
   });
@@ -710,12 +715,14 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
 
     await drag(-320);
     const expanded = await sheet.boundingBox();
-    expect(expanded!.height).toBeGreaterThan(780);
+    expect(Math.abs(expanded!.y)).toBeLessThan(2);
     await page.screenshot({ path: 'test-results/screenshots/mobile_editor_full.png' });
 
     await drag(320);
     const collapsed = await sheet.boundingBox();
-    expect(collapsed!.height).toBeLessThan(620);
+    expect(collapsed!.y).toBeGreaterThan(300);
+    const barBox = await page.getByTestId('mobile-editor-bar').boundingBox();
+    expect(Math.abs(barBox!.y + barBox!.height - page.viewportSize()!.height)).toBeLessThan(2);
 
     await drag(420);
     await expect(sheet).toHaveCount(0, { timeout: 5000 });

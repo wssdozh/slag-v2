@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export interface MobileEditorBarProps {
+  ref?: React.Ref<HTMLDivElement>;
   isDraft: boolean;
   activePopover: 'formatting' | 'lists' | 'ai' | null;
   onSetActivePopover: (popover: 'formatting' | 'lists' | 'ai' | null) => void;
@@ -29,6 +30,7 @@ export interface MobileEditorBarProps {
 }
 
 export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
+  ref,
   isDraft,
   activePopover,
   onSetActivePopover,
@@ -40,7 +42,7 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
   onSave,
 }) => {
   return (
-    <div className="md:hidden fixed bottom-0 inset-x-0 z-30 select-none pointer-events-auto">
+    <div ref={ref} data-testid="mobile-editor-bar" className="md:hidden absolute bottom-0 inset-x-0 z-30 select-none pointer-events-auto">
       {/* Invisible Backdrop to dismiss active popover */}
       {activePopover && (
         <div
@@ -239,7 +241,7 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
 
       {/* Bottom Bar Container */}
       <div
-        className="motion-rise relative z-40 bg-surface border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
+        className="relative z-40 bg-surface border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
         style={{ paddingBottom: 'max(var(--sab), 0.5rem)' }}
       >
         <div className="flex items-center gap-1.5 sm:gap-2">
