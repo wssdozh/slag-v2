@@ -652,6 +652,7 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
     await drag(-320);
     const expanded = await sheet.boundingBox();
     expect(expanded!.height).toBeGreaterThan(780);
+    await page.screenshot({ path: 'test-results/screenshots/mobile_editor_full.png' });
 
     await drag(320);
     const collapsed = await sheet.boundingBox();

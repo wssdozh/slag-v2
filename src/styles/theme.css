@@ -161,6 +161,25 @@
   opacity: 0;
 }
 
+/* A surface that belongs to a bar (a tool shelf, a floating toolbar) rises into
+   place from it. Declared as an animation, not a transition: these elements mount
+   on demand, and `@starting-style` is not guaranteed on older WebViews. */
+@keyframes motion-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.motion-rise {
+  animation: motion-rise var(--slag-motion-base) var(--ease-entrance) both;
+  transform-origin: bottom center;
+}
+
 /* A dialog has to *land*, not only fade. A 2% scale on a dark scrim is a change
    nobody can see; 0.96 plus an 8px drop reads as a surface arriving. */
 .motion-dialog:is([data-motion-state="entering"], [data-motion-state="exiting"]) {

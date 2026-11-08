@@ -13,7 +13,7 @@ import {
   Tag,
   Table,
   Paperclip,
-  Check,
+  ArrowUp,
 } from 'lucide-react';
 
 export interface MobileEditorBarProps {
@@ -51,7 +51,7 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
 
       {/* Floating Popovers */}
       {activePopover === 'formatting' && (
-        <div className="relative z-40 px-3 pb-2">
+        <div className="motion-rise relative z-40 px-3 pb-2">
           <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 motion-popover">
             <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
               <span>Стили текста</span>
@@ -128,7 +128,7 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
       )}
 
       {activePopover === 'lists' && (
-        <div className="relative z-40 px-3 pb-2">
+        <div className="motion-rise relative z-40 px-3 pb-2">
           <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 motion-popover">
             <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
               <span>Списки и блоки</span>
@@ -205,7 +205,7 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
       )}
 
       {activePopover === 'ai' && (
-        <div className="relative z-40 px-3 pb-2">
+        <div className="motion-rise relative z-40 px-3 pb-2">
           <div className="max-w-xs mx-auto rounded-2xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1.5 flex flex-col gap-0.5 motion-popover">
             <div className="px-3 py-1 text-xs text-zinc-400 font-medium border-b border-white/[0.06] mb-0.5 flex items-center justify-between">
               <span>ИИ-Помощник</span>
@@ -239,7 +239,7 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
 
       {/* Bottom Bar Container */}
       <div
-        className="relative z-40 bg-surface border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
+        className="motion-rise relative z-40 bg-surface border-t border-white/[0.08] px-3 py-2 flex items-center justify-between"
         style={{ paddingBottom: 'max(var(--sab), 0.5rem)' }}
       >
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -309,15 +309,15 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
           </button>
         </div>
 
-        {/* Refined Linear Dark Mobile Save Button */}
+        {/* Кнопка отправки: та же форма и цвет, что у композера */}
         <button
           type="button"
           onClick={onSave}
-          className="h-9 px-3.5 rounded-xl bg-white/[0.1] hover:bg-white/[0.16] text-white flex items-center gap-1.5 border border-white/[0.1] shadow-md motion-press cursor-pointer shrink-0 ml-2"
+          aria-label={isDraft ? 'Создать заметку' : 'Сохранить и закрыть'}
+          className="w-9 h-9 rounded-full bg-accent-strong text-white hover:bg-accent-strong/90 flex items-center justify-center motion-press shrink-0 ml-2 shadow-sm cursor-pointer"
           title="Сохранить и закрыть (Ctrl+S)"
         >
-          <Check className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
-          <span className="text-xs font-medium">{isDraft ? 'Создать' : 'Готово'}</span>
+          <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
         </button>
       </div>
     </div>

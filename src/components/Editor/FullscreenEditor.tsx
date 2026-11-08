@@ -555,7 +555,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         }
         style={isMobile ? { height: isSheetExpanded ? '100%' : '56%' } : undefined}
       >
-        {/* The handle owns the sheet gesture; the scroller under it keeps scrolling. */}
+        {/* The handle owns the sheet gesture. Свёрнутой он с пилюлей, развёрнутой
+            остаётся тонкой полосой у кромки — потянуть вниз можно и оттуда. */}
         {isMobile && (
           <div
             data-sheet-handle
@@ -564,9 +565,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
             onPointerUp={onPointerEnd}
             onPointerCancel={onPointerCancel}
             style={{ touchAction: 'none' }}
-            className="flex h-6 shrink-0 items-center justify-center"
+            className={`flex shrink-0 items-center justify-center ${
+              isSheetExpanded ? 'h-3' : 'h-6'
+            }`}
           >
-            <div className="h-1 w-8 rounded-full bg-white/20" />
+            {!isSheetExpanded && <div className="h-1 w-8 rounded-full bg-white/20" />}
           </div>
         )}
 
@@ -596,6 +599,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           saveStatus={saveStatus}
           onSave={handleSave}
           onClose={handleClose}
+          isCompact={isMobile && !isSheetExpanded}
         />
 
         {/* Editor Body */}

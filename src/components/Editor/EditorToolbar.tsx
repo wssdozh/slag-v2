@@ -58,6 +58,8 @@ export interface EditorToolbarProps {
   saveStatus: 'idle' | 'saving' | 'saved';
   onSave: () => void;
   onClose: () => void;
+  /** Sheet mode: the toolbar sits inside the panel, not under the status bar. */
+  isCompact?: boolean;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -85,6 +87,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   saveStatus,
   onSave,
   onClose,
+  isCompact = false,
 }) => {
   const [activeTopDropdown, setActiveTopDropdown] = React.useState<'style' | 'list' | null>(null);
 
@@ -100,10 +103,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           toggleMaximizeWindow();
         }
       }}
-      className={`min-h-14 border-b border-white/[0.04] bg-surface shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
-        isZenMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'
-      }`}
-      style={{ paddingTop: 'max(var(--sat), 0px)' }}
+      className={`border-b border-white/[0.04] bg-surface shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
+        isCompact ? 'min-h-11' : 'min-h-14'
+      } ${isZenMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
+      style={{ paddingTop: isCompact ? 0 : 'max(var(--sat), 0px)' }}
     >
       {/* Invisible Backdrop to dismiss active top dropdown */}
       {activeTopDropdown && (
@@ -113,7 +116,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         />
       )}
 
-      <div className="relative w-full h-full flex items-center justify-between px-4 md:px-6 py-2.5 gap-2 md:gap-3">
+      <div
+        className={`relative w-full h-full flex items-center justify-between px-4 md:px-6 gap-2 md:gap-3 ${
+          isCompact ? 'py-1.5' : 'py-2.5'
+        }`}
+      >
         <div className="flex items-center gap-2 md:gap-2.5 shrink-0 z-10">
           {/* Back Button: pure icon */}
           <button
