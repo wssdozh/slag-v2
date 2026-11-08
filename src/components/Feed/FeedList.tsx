@@ -145,6 +145,8 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
   const loadMoreOlder = useCallback(() => {
     const container = containerRef.current;
     if (!container || !hasMoreOlder) return;
+    // Предыдущая догрузка ещё держит анкор: вторая подряд даёт скачок.
+    if (isPrependRef.current) return;
 
     prevScrollHeightRef.current = container.scrollHeight;
     prevScrollTopRef.current = container.scrollTop;

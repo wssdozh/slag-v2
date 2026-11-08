@@ -989,13 +989,15 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 };
 
 export const FullscreenEditor: React.FC = () => {
-  const { isFullscreenEditorOpen, selectedItem, isMobile } = useApp();
+  const { isFullscreenEditorOpen, selectedItem } = useApp();
 
   const isOpen = isFullscreenEditorOpen && Boolean(selectedItem);
-  // Desktop unfolds itself through `expandFromRect`/`enterFromEdge`, so it has no
-  // use for the CSS `entering` frame. The phone sheet has no unfold: it needs that
-  // frame, otherwise it appears at once and the drag-out has nothing to animate.
-  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen, { skipEntering: !isMobile });
+  // The surface unfolds itself through `expandFromRect`/`enterFromEdge`, so it has
+  // no use for the CSS `entering` frame: flipping that phase re-rendered the whole
+  // editor mid-animation and ate the first frames of the unfold. The phone sheet
+  // takes its entrance from `@starting-style` on `.motion-sheet` for the same
+  // reason — it must not re-render the editor while the panel is sliding.
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen, { skipEntering: true });
 
   const [cachedItem, setCachedItem] = useState(selectedItem);
   if (selectedItem && selectedItem !== cachedItem) {
