@@ -323,16 +323,16 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
     }
     setShowScrollBottom(distFromBottom > 220);
 
-    // ponytail: выгрузка по расстоянию скролла; индексная виртуализация, если карточки станут тяжёлыми
-    // Ушли далеко от верхней кромки окна — верхний чанк можно выгрузить:
-    // окно прижато к новым записям, поэтому уменьшение размера срезает старые.
-    // Под переходом по ссылке окно не трогаем: расширение под цель и выгрузка
-    // дёргали бы друг друга в цикле.
-    if (!highlightedItemId && container.scrollTop > container.clientHeight * 2 && windowSize > WINDOW_CHUNK) {
-      prevScrollHeightRef.current = container.scrollHeight;
-      prevScrollTopRef.current = container.scrollTop;
-      isPrependRef.current = true;
-      setWindowSize(prev => Math.max(WINDOW_CHUNK, prev - WINDOW_CHUNK));
+    // Выгрузка только внизу: там окно прижато к новым, срезание старых не двигает
+    // видимую часть. По дороге вверх окно не трогаем — иначе догрузка и выгрузка
+    // дёргают друг друга на каждом кадре скролла.
+    // ponytail: выгрузка по «прилипанию к низу»; индексная виртуализация, если карточки станут тяжёлыми
+    if (
+      !highlightedItemId &&
+      isStuckToBottomRef.current &&
+      windowSize > WINDOW_CHUNK
+    ) {
+      setWindowSize(WINDOW_CHUNK);
     }
   }, [highlightedItemId, windowSize]);
 

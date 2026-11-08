@@ -152,7 +152,9 @@ export function useSheetDrag({ isOpen, onDismiss, onExpand, onCollapse }: SheetD
       return;
     }
     if (delta > threshold || session.velocity > UI_GESTURES.DISMISS_VELOCITY_PX_MS) {
-      // The sheet's own exit transition picks the panel up from the finger.
+      // The sheet's own exit transition picks the panel up from the finger —
+      // but only once the inline translate stops overriding that transition.
+      releaseInline();
       onDismiss();
       return;
     }

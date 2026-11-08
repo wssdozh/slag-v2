@@ -122,7 +122,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     setIsSheetExpanded(false);
   }
 
-  const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle } = useSheetDrag({
+  const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useSheetDrag({
     isOpen: true,
     onDismiss: handleClose,
     onExpand: () => setIsSheetExpanded(true),
@@ -534,22 +534,26 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         <div
           ref={scrimRef}
           onClick={handleClose}
-          className="absolute inset-0 bg-black/60"
+          className="motion-fade absolute inset-0 bg-black/60"
         />
       )}
 
-      {/* The editor surface: a half sheet on a phone, the plain window on desktop. */}
+      {/* The editor surface: a half sheet on a phone, the plain window on desktop.
+          `motion-sheet` owns the entrance and the exit (opacity + travel of its own
+          height); the height itself is a snap, because the finger already carried
+          the panel to where it lands. */}
       <div
         ref={isMobile ? panelRef : undefined}
         data-testid={isMobile ? 'editor-sheet' : undefined}
+        data-motion-state={isMobile ? presencePhase : undefined}
         className={
           isMobile
-            ? `absolute inset-x-0 bottom-0 flex flex-col overflow-hidden bg-surface border-t border-white/[0.08] shadow-2xl transition-[height] duration-[240ms] ${
+            ? `motion-sheet absolute inset-x-0 bottom-0 flex flex-col overflow-hidden bg-surface border-t border-white/[0.08] shadow-2xl ${
                 isSheetExpanded ? 'rounded-t-none' : 'rounded-t-2xl'
               }`
             : 'flex flex-1 flex-col bg-surface'
         }
-        style={isMobile ? { height: isSheetExpanded ? '100%' : '56%', ...panelStyle } : undefined}
+        style={isMobile ? { height: isSheetExpanded ? '100%' : '56%' } : undefined}
       >
         {/* The handle owns the sheet gesture; the scroller under it keeps scrolling. */}
         {isMobile && (
@@ -985,13 +989,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 };
 
 export const FullscreenEditor: React.FC = () => {
-  const { isFullscreenEditorOpen, selectedItem } = useApp();
+  const { isFullscreenEditorOpen, selectedItem, isMobile } = useApp();
 
   const isOpen = isFullscreenEditorOpen && Boolean(selectedItem);
-  // The surface unfolds itself through `expandFromRect`/`enterFromEdge`, so it has
-  // no use for the CSS `entering` frame: flipping that phase re-rendered the whole
-  // editor mid-animation and ate the first frames of the unfold.
-  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen, { skipEntering: true });
+  // Desktop unfolds itself through `expandFromRect`/`enterFromEdge`, so it has no
+  // use for the CSS `entering` frame. The phone sheet has no unfold: it needs that
+  // frame, otherwise it appears at once and the drag-out has nothing to animate.
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen, { skipEntering: !isMobile });
 
   const [cachedItem, setCachedItem] = useState(selectedItem);
   if (selectedItem && selectedItem !== cachedItem) {
