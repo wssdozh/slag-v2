@@ -4,6 +4,7 @@ import type { AudioTrack, AudioTypeFilter } from '../../lib/media/audioHelper';
 import { formatAudioDuration } from '../../lib/media/audioHelper';
 import type { FolderMeta } from '../../types';
 import { IconButton } from '../UI/IconButton';
+import { Select } from '../UI/Select';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/usePresence';
 
@@ -40,7 +41,6 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   onSelectPinnedFolder,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFolderSelectOpen, setIsFolderSelectOpen] = useState(false);
 
   const filteredTracks = useMemo(() => {
     if (!searchQuery.trim()) return tracks;
@@ -54,12 +54,6 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   }, [tracks, searchQuery]);
 
   const { ref: drawerRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
-  const {
-    ref: folderMenuRef,
-    phase: folderMenuPhase,
-    isPresent: isFolderMenuPresent,
-    onTransitionEnd: onFolderMenuTransitionEnd,
-  } = usePresence(isFolderSelectOpen);
 
   if (!isPresent) return null;
 
@@ -121,43 +115,21 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
 
         {/* Pinned Folder selector (when pinned) */}
         {scopeMode === 'pinned' && (
-          <div className="relative">
-            <button
-              onClick={() => setIsFolderSelectOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] text-xs text-zinc-300 border border-white/[0.06]"
-            >
-              <Folder className="w-3 h-3 text-zinc-400" />
-              <span className="max-w-[100px] truncate">{pinnedFolder}</span>
-            </button>
-            {isFolderMenuPresent && (
-              <div
-                ref={folderMenuRef}
-                data-motion-state={folderMenuPhase}
-                onTransitionEnd={onFolderMenuTransitionEnd}
-                inert={!isFolderSelectOpen}
-                className="absolute right-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-40 max-h-48 overflow-y-auto motion-popover"
-              >
-                {Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)])).map(
-                  (folderPath) => (
-                    <button
-                      key={folderPath}
-                      onClick={() => {
-                        onSelectPinnedFolder(folderPath);
-                        setIsFolderSelectOpen(false);
-                      }}
-                      className={`w-full px-2.5 py-1 text-left text-xs transition-colors cursor-pointer truncate ${
-                        pinnedFolder === folderPath
-                          ? 'text-white font-medium bg-white/[0.06]'
-                          : 'text-zinc-300 hover:bg-white/[0.08]'
-                      }`}
-                    >
-                      {folderPath}
-                    </button>
-                  )
-                )}
-              </div>
+          <Select
+            size="sm"
+            variant="ghost"
+            value={pinnedFolder}
+            onChange={onSelectPinnedFolder}
+            options={Array.from(new Set([DEFAULT_INBOX_FOLDER, ...folders.map((f) => f.path).filter(Boolean)])).map(
+              (folderPath) => ({
+                value: folderPath,
+                label: folderPath,
+                icon: <Folder className="w-3 h-3 text-zinc-400" aria-hidden="true" />,
+              })
             )}
-          </div>
+            aria-label="Закреплённая папка аудио"
+            className="max-w-[150px] font-mono"
+          />
         )}
       </div>
 

@@ -6,6 +6,65 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     await setupSlag(page, testInfo);
   });
 
+  test('audio folder selects preserve pin scope and keyboard selection', async ({ page }) => {
+    await page.evaluate(() => {
+      const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
+      channel.postMessage({
+        type: 'TAB_DRAG_RELEASE',
+        sourceLabel: 'panel-audio-folder-select-e2e',
+        panelId: 'audio',
+        title: 'Аудиоплеер',
+        screenX: window.screenX + 150,
+        screenY: window.screenY + 150,
+      });
+      channel.close();
+    });
+    await page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first().click();
+
+    const folderSelect = page.getByRole('button', { name: 'Выбрать папку аудио', exact: true });
+    const pin = page.getByRole('button', { name: 'Закрепить папку', exact: true });
+    await expect(pin).toHaveAttribute('aria-pressed', 'false');
+    await folderSelect.focus();
+    await page.keyboard.press('Space');
+    await expect(folderSelect).toHaveAttribute('aria-expanded', 'true');
+    const listbox = page.getByRole('listbox');
+    await expect(listbox).toBeVisible();
+    const triggerBounds = await folderSelect.boundingBox();
+    const menuBounds = await listbox.boundingBox();
+    expect(triggerBounds).not.toBeNull();
+    expect(menuBounds).not.toBeNull();
+    expect(menuBounds!.y + menuBounds!.height).toBeLessThanOrEqual(triggerBounds!.y);
+    await folderSelect.dispatchEvent('keydown', { key: 'п' });
+    await folderSelect.dispatchEvent('keydown', { key: 'р' });
+    await expect(listbox.getByRole('option', { name: 'Проекты', exact: true })).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(folderSelect).toHaveText('Проекты');
+    await expect(pin).toHaveAttribute('aria-pressed', 'true');
+
+    await page.locator('aside span', { hasText: 'Личное' }).first().click();
+    await expect(folderSelect).toHaveText('Проекты');
+    await page.getByRole('button', { name: 'Очередь и фильтры', exact: true }).click();
+    const pinnedSelect = page.getByRole('button', { name: 'Закреплённая папка аудио', exact: true });
+    await pinnedSelect.click();
+    await page.getByRole('option', { name: 'Входящие', exact: true }).click();
+    await page.getByRole('button', { name: 'Закрыть список', exact: true }).click();
+    await expect(folderSelect).toHaveText('Входящие');
+    await expect(pin).toHaveAttribute('aria-pressed', 'true');
+    await pin.click();
+    await expect(folderSelect).toHaveText('Личное');
+    await expect(pin).toHaveAttribute('aria-pressed', 'false');
+
+    await folderSelect.click();
+    await page.keyboard.press('Escape');
+    await expect(folderSelect).toHaveAttribute('aria-expanded', 'false');
+    await folderSelect.click();
+    await page.locator('aside').first().click({ position: { x: 8, y: 8 } });
+    await expect(folderSelect).toHaveAttribute('aria-expanded', 'false');
+    await folderSelect.click();
+    await expect(listbox).toHaveCSS('opacity', '1');
+    await page.screenshot({ path: 'test-results/screenshots/audio-folder-select.png', fullPage: false });
+  });
+
   test('48. Full Logging for Workspace Detach, Cross-Window Docking, Folder Navigation, and Log Download / Open Folder', async ({ page }) => {
     test.setTimeout(60000);
     const dockviewContainer = page.locator('.dockview-theme-slag');

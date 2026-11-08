@@ -14,7 +14,6 @@ import {
   ListMusic,
   Pin,
   Folder,
-  ChevronDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -29,6 +28,7 @@ import {
 import { AudioCoverArt } from './AudioCoverArt';
 import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
 import { storage } from '../../lib/storage';
+import { Select } from '../UI/Select';
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;
 
@@ -40,7 +40,6 @@ export const AudioPanel: React.FC = () => {
   const [pinnedFolder, setPinnedFolder] = useState<string>(currentFolder || DEFAULT_INBOX_FOLDER);
   const [typeFilters, setTypeFilters] = useState<AudioTypeFilter[]>(['voice', 'file']);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
-  const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
 
   // Audio Playback State
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
@@ -57,7 +56,6 @@ export const AudioPanel: React.FC = () => {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
-  const folderPickerRef = useRef<HTMLDivElement | null>(null);
 
   // Effective folder based on mode
   const effectiveFolder = scopeMode === 'active' ? currentFolder || DEFAULT_INBOX_FOLDER : pinnedFolder;
@@ -66,18 +64,6 @@ export const AudioPanel: React.FC = () => {
   useEffect(() => {
     return setupAudioCollisionGuard();
   }, []);
-
-  // Close folder picker on outside click
-  useEffect(() => {
-    if (!isFolderPickerOpen) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (folderPickerRef.current && !folderPickerRef.current.contains(e.target as Node)) {
-        setIsFolderPickerOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handleOutsideClick);
-    return () => window.removeEventListener('mousedown', handleOutsideClick);
-  }, [isFolderPickerOpen]);
 
   // Deduplicated folders list with inbox first
   const availableFolders = useMemo(() => {
@@ -334,7 +320,7 @@ export const AudioPanel: React.FC = () => {
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (e.target instanceof HTMLElement && e.target.closest('button, input, textarea, select, a, [role="listbox"]')) return;
 
     if (e.code === 'Space') {
       e.preventDefault();
@@ -607,11 +593,13 @@ export const AudioPanel: React.FC = () => {
 
       {/* 7. Bottom Folder Toggle strictly at the bottom ("прям внизу внизу") */}
       <footer className={`relative z-10 w-full flex items-center justify-center select-none ${isMobile ? 'pt-2 pb-24' : 'py-2.5'}`}>
-        <div className="relative" ref={folderPickerRef}>
+        <div className="relative">
           <div className="group flex items-center gap-1 py-0.5 text-xs select-none transition-colors">
             {/* Pin Icon Toggle */}
             <button
               onClick={toggleScopeMode}
+              aria-label="Закрепить папку"
+              aria-pressed={scopeMode === 'pinned'}
               className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
               title={
                 scopeMode === 'pinned'
@@ -628,49 +616,22 @@ export const AudioPanel: React.FC = () => {
               />
             </button>
 
-            {/* Folder Name & Arrow (Always visible, opens picker and auto-pins on select) */}
-            <button
-              onClick={() => setIsFolderPickerOpen((prev) => !prev)}
-              className="flex items-center gap-1 px-1 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+            {/* Selecting a folder pins it; the separate pin toggle keeps following active folders. */}
+            <Select
+              size="sm"
+              variant="ghost"
+              direction="up"
+              value={effectiveFolder}
+              onChange={(folderPath) => {
+                setPinnedFolder(folderPath);
+                setScopeMode('pinned');
+              }}
+              options={availableFolders.map((folderPath) => ({ value: folderPath, label: folderPath }))}
+              aria-label="Выбрать папку аудио"
               title="Выбрать папку (автоматически закрепит)"
-            >
-              <span
-                className={`max-w-[120px] sm:max-w-[160px] truncate transition-colors ${
-                  scopeMode === 'pinned' ? 'text-zinc-300 group-hover:text-zinc-100 font-medium' : 'text-zinc-500 group-hover:text-zinc-300'
-                }`}
-              >
-                {effectiveFolder}
-              </span>
-              <ChevronDown className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
-            </button>
+              className={`max-w-[150px] sm:max-w-[190px] font-mono ${scopeMode === 'pinned' ? 'font-medium' : ''}`}
+            />
           </div>
-
-          {/* Folder Picker Popover */}
-          {isFolderPickerOpen && (
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 rounded-xl bg-surface-elevated border border-white/[0.12] shadow-2xl py-1.5 z-40 max-h-52 overflow-y-auto motion-popover">
-              <div className="px-3 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04] mb-1">
-                Закрепить папку
-              </div>
-              {availableFolders.map((folderPath) => (
-                <button
-                  key={folderPath}
-                  onClick={() => {
-                    setPinnedFolder(folderPath);
-                    setScopeMode('pinned');
-                    setIsFolderPickerOpen(false);
-                  }}
-                  className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors cursor-pointer ${
-                    scopeMode === 'pinned' && pinnedFolder === folderPath
-                      ? 'text-white font-medium bg-white/[0.04]'
-                      : 'text-zinc-400'
-                  }`}
-                >
-                  <Folder className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{folderPath}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </footer>
     </div>
