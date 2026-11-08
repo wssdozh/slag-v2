@@ -25,6 +25,7 @@ import type {
   FolderViewSettings,
 } from '../types';
 import { storage } from '../lib/storage';
+import { applyItemUpdates } from '../lib/itemUpdates';
 import { applyTaskCompletion } from '../lib/taskCompletion';
 import { backupService } from '../lib/backupService';
 import { sendAssistantChat } from '../lib/aiService';
@@ -35,6 +36,7 @@ import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useGlobalHotkeys } from '../hooks/useGlobalHotkeys';
+import { useLayerStack, type AppLayer } from '../hooks/useLayerStack';
 import { crossFade, swapScreen, type ScreenSwap } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
@@ -282,69 +284,6 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
   allowNewTags: true,
   tagCaseStyle: 'lowercase',
 };
-
-export function applyItemUpdates(target: SlagItem, updates: ItemUpdates): SlagItem {
-  let content = target.content;
-  if (updates.content !== undefined) {
-    content = updates.content;
-  }
-  if (updates.appendContent) {
-    content = content ? `${content}\n\n${updates.appendContent}` : updates.appendContent;
-  }
-
-  let subtasks = target.subtasks;
-  if (updates.subtasks !== undefined && Array.isArray(updates.subtasks) && updates.subtasks.length > 0) {
-    const first = updates.subtasks[0];
-    const newChecklines = typeof first === 'string'
-      ? (updates.subtasks as string[]).map(st => `- [ ] ${st}`)
-      : (updates.subtasks as Array<{ id?: string; title: string; completed?: boolean }>).map(
-          st => `- [${st.completed ? 'x' : ' '}] ${st.title}`
-        );
-    content = content ? `${content}\n\n${newChecklines.join('\n')}` : newChecklines.join('\n');
-    const parsed = parseSubtasksFromContent(content);
-    subtasks = parsed.length > 0 ? parsed : subtasks;
-  }
-
-  let tags = target.tags || [];
-  if (updates.tags !== undefined) {
-    tags = updates.tags;
-  } else {
-    if (updates.addTags && updates.addTags.length > 0) {
-      tags = Array.from(new Set([...tags, ...updates.addTags]));
-    }
-    if (updates.removeTags && updates.removeTags.length > 0) {
-      const removeSet = new Set(updates.removeTags.map(t => t.toLowerCase()));
-      tags = tags.filter(t => !removeSet.has(t.toLowerCase()));
-    }
-  }
-
-  const SPECIAL_KEYS = new Set([
-    'title', 'content', 'appendContent', 'tags', 'addTags', 'removeTags', 'subtasks', 'dueDate', 'reminder', 'customProps'
-  ]);
-
-  const result: SlagItem = {
-    ...target,
-    title: updates.title !== undefined && updates.title.trim() ? updates.title.trim() : target.title,
-    content,
-    tags,
-    subtasks,
-    dueDate: updates.dueDate !== undefined ? (updates.dueDate === null ? undefined : updates.dueDate) : target.dueDate,
-    reminder: updates.reminder !== undefined ? (updates.reminder === null ? undefined : updates.reminder) : target.reminder,
-    customProps: updates.customProps !== undefined
-      ? { ...(target.customProps || {}), ...updates.customProps }
-      : target.customProps,
-    updatedAt: Date.now(),
-  };
-
-  // Dynamically apply any additional scalar properties from updates
-  for (const key of Object.keys(updates) as Array<keyof ItemUpdates>) {
-    if (!SPECIAL_KEYS.has(key) && updates[key] !== undefined) {
-      (result as any)[key] = updates[key];
-    }
-  }
-
-  return result;
-}
 
 export const AppContext = createContext<AppContextType | null>(null);
 
@@ -966,112 +905,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setContextMenu(null);
   }, []);
 
-  // Strict Layered Dismiss Stack (LIFO) for Escape key, Android Hardware Back & Swipes
-  const dismissTopLayer = useCallback((): boolean => {
-    if (activeLightboxIndex !== null) {
-      closeLightbox();
-      return true;
-    }
-    if (mobileActionSheetItem !== null) {
-      setMobileActionSheetItem(null);
-      return true;
-    }
-    if (contextMenu !== null) {
-      closeContextMenu();
-      return true;
-    }
-    if (isLogViewerOpen) {
-      setIsLogViewerOpen(false);
-      return true;
-    }
-    if (isFolderModalOpen) {
-      setIsFolderModalOpen(false);
-      setEditingFolder(null);
-      return true;
-    }
-    if (isFolderViewModalOpen) {
-      setIsFolderViewModalOpen(false);
-      return true;
-    }
-    if (isVaultModalOpen) {
-      setIsVaultModalOpen(false);
-      return true;
-    }
-    if (isFolderInfoModalOpen) {
-      setIsFolderInfoModalOpen(false);
-      setFolderInfoTarget(null);
-      return true;
-    }
-    if (isTriageModalOpen) {
-      setIsTriageModalOpen(false);
-      return true;
-    }
-    if (isComposerModalOpen) {
-      setIsComposerModalOpen(false);
-      setComposerModalOptions(null);
-      return true;
-    }
-    if (isSettingsOpen) {
-      setIsSettingsOpen(false);
-      return true;
-    }
-    if (isSearchOpen) {
-      setIsSearchOpen(false);
-      return true;
-    }
-    if (replyTarget !== null) {
-      setReplyTarget(null);
-      return true;
-    }
-    if (isFullscreenEditorOpen) {
-      setIsFullscreenEditorOpen(false);
-      setSelectedItem(null);
-      return true;
-    }
-    if (isMobile && mobileFolderInfoOpen) {
-      setMobileFolderInfoOpen(false);
-      return true;
-    }
-    if (isMobile && mobileActiveFolder !== null) {
-      if (mobileActiveFolder.includes('/')) {
-        const parent = mobileActiveFolder.substring(0, mobileActiveFolder.lastIndexOf('/'));
-        setMobileActiveFolder(parent);
-      } else {
-        setMobileActiveFolder(null);
-      }
-      return true;
-    }
-    if (isMobile && activeMobileTab !== 'folders') {
-      setActiveMobileTab('folders');
-      return true;
-    }
-    return false;
-  }, [
-    activeLightboxIndex,
-    closeLightbox,
-    mobileActionSheetItem,
-    contextMenu,
-    closeContextMenu,
-    isLogViewerOpen,
-    isFolderModalOpen,
-    isFolderViewModalOpen,
-    isVaultModalOpen,
-    isFolderInfoModalOpen,
-    isTriageModalOpen,
-    isComposerModalOpen,
-    isSettingsOpen,
-    isSearchOpen,
-    replyTarget,
-    isFullscreenEditorOpen,
-    isMobile,
-    mobileFolderInfoOpen,
-    setMobileFolderInfoOpen,
-    mobileActiveFolder,
-    setMobileActiveFolder,
-    activeMobileTab,
-    setActiveMobileTab,
-  ]);
-
+  const layers: AppLayer[] = [
+    { isOpen: activeLightboxIndex !== null, close: closeLightbox },
+    { isOpen: mobileActionSheetItem !== null, close: () => setMobileActionSheetItem(null) },
+    { isOpen: contextMenu !== null, close: closeContextMenu },
+    { isOpen: isLogViewerOpen, close: () => setIsLogViewerOpen(false) },
+    { isOpen: isFolderModalOpen, close: () => { setIsFolderModalOpen(false); setEditingFolder(null); } },
+    { isOpen: isFolderViewModalOpen, close: () => setIsFolderViewModalOpen(false), depth: 0 },
+    { isOpen: isVaultModalOpen, close: () => setIsVaultModalOpen(false) },
+    { isOpen: isFolderInfoModalOpen, close: () => { setIsFolderInfoModalOpen(false); setFolderInfoTarget(null); } },
+    { isOpen: isTriageModalOpen, close: () => setIsTriageModalOpen(false) },
+    { isOpen: isComposerModalOpen, close: () => { setIsComposerModalOpen(false); setComposerModalOptions(null); } },
+    { isOpen: isSettingsOpen, close: () => setIsSettingsOpen(false) },
+    { isOpen: isSearchOpen, close: () => setIsSearchOpen(false) },
+    { isOpen: replyTarget !== null, close: () => setReplyTarget(null) },
+    { isOpen: isFullscreenEditorOpen, close: () => { setIsFullscreenEditorOpen(false); setSelectedItem(null); } },
+    { isOpen: isMobile && mobileFolderInfoOpen, close: () => setMobileFolderInfoOpen(false) },
+    {
+      isOpen: isMobile && mobileActiveFolder !== null,
+      depth: mobileActiveFolder ? mobileActiveFolder.split('/').length : 0,
+      close: () => {
+        if (!mobileActiveFolder) return;
+        if (mobileActiveFolder.includes('/')) {
+          setMobileActiveFolder(mobileActiveFolder.substring(0, mobileActiveFolder.lastIndexOf('/')));
+        } else {
+          setMobileActiveFolder(null);
+        }
+      },
+    },
+    { isOpen: isMobile && activeMobileTab !== 'folders', close: () => setActiveMobileTab('folders') },
+  ];
+  const { dismissTopLayer } = useLayerStack(layers, isMobile);
   const toggleAssistant = useCallback(() => {
     if (isMobile) {
       setActiveMobileTab(prev => (prev === 'assistant' ? 'folders' : 'assistant'));
@@ -1090,115 +954,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dismissTopLayer,
     isOverlayOpen: () => Boolean(isFullscreenEditorOpen || isComposerModalOpen || isSearchOpen || isSettingsOpen || contextMenu),
   });
-
-  // Navigation & Layer Depth Calculation (LIFO Stack)
-  const overlayDepth = (
-    (activeLightboxIndex !== null ? 1 : 0) +
-    (mobileActionSheetItem !== null ? 1 : 0) +
-    (contextMenu !== null ? 1 : 0) +
-    (isLogViewerOpen ? 1 : 0) +
-    (isFolderModalOpen ? 1 : 0) +
-    (isVaultModalOpen ? 1 : 0) +
-    (isFolderInfoModalOpen ? 1 : 0) +
-    (isTriageModalOpen ? 1 : 0) +
-    (isComposerModalOpen ? 1 : 0) +
-    (isSettingsOpen ? 1 : 0) +
-    (isSearchOpen ? 1 : 0) +
-    (replyTarget !== null ? 1 : 0) +
-    (isFullscreenEditorOpen ? 1 : 0) +
-    (isMobile && mobileFolderInfoOpen ? 1 : 0)
-  );
-  const mobileFolderDepth = (isMobile && mobileActiveFolder) ? mobileActiveFolder.split('/').length : 0;
-  const mobileTabDepth = (isMobile && activeMobileTab !== 'folders') ? 1 : 0;
-  const totalLayerDepth = overlayDepth + mobileFolderDepth + mobileTabDepth;
-
-  const historyDepthRef = useRef<number>(0);
-  const isProgrammaticNavRef = useRef<boolean>(false);
-
-  // Initialize base history state on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.history.replaceState({ slagRoot: true, depth: 0 }, '');
-    } catch {
-      // Ignore
-    }
-  }, []);
-
-  // Sync totalLayerDepth with window.history (mobile Android back gesture only)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !isMobile) return;
-
-    const targetDepth = totalLayerDepth;
-    const currentHistDepth = historyDepthRef.current;
-
-    if (targetDepth > currentHistDepth) {
-      const diff = targetDepth - currentHistDepth;
-      for (let i = 0; i < diff; i++) {
-        try {
-          window.history.pushState({ slagLayer: true, depth: currentHistDepth + i + 1 }, '');
-        } catch {
-          // Ignore
-        }
-      }
-      historyDepthRef.current = targetDepth;
-    } else if (targetDepth < currentHistDepth) {
-      const diff = currentHistDepth - targetDepth;
-      historyDepthRef.current = targetDepth;
-      isProgrammaticNavRef.current = true;
-      try {
-        window.history.go(-diff);
-      } catch {
-        // Ignore
-      }
-      const timer = setTimeout(() => {
-        isProgrammaticNavRef.current = false;
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [totalLayerDepth, isMobile]);
-
-  // Handle hardware back / browser back / swipe gestures via popstate
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handlePopState = () => {
-      if (isProgrammaticNavRef.current) {
-        isProgrammaticNavRef.current = false;
-        return;
-      }
-
-      if (historyDepthRef.current > 0) {
-        historyDepthRef.current -= 1;
-      }
-      dismissTopLayer();
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [dismissTopLayer]);
-
-  // Handle Mouse Back button (Mouse button 4 / Back / e.button === 3)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handleMouseBack = (e: MouseEvent) => {
-      if (e.button === 3) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === 'mouseup') {
-          dismissTopLayer();
-        }
-      }
-    };
-
-    window.addEventListener('mouseup', handleMouseBack, true);
-    window.addEventListener('auxclick', handleMouseBack, true);
-    return () => {
-      window.removeEventListener('mouseup', handleMouseBack, true);
-      window.removeEventListener('auxclick', handleMouseBack, true);
-    };
-  }, [dismissTopLayer]);
 
   const scrollToItem = useCallback((idOrTitle: string) => {
     // Strip [[...]] brackets and optional #anchor or .md extension

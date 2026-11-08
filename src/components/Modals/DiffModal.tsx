@@ -6,7 +6,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import type { SlagItem, ItemUpdates } from '../../types';
-import { applyItemUpdates } from '../../context/AppContext';
+import { applyItemUpdates } from '../../lib/itemUpdates';
 import { computeSideBySideDiff, computeMetadataDiff } from '../../lib/diffUtils';
 import { usePresence } from '../../hooks/usePresence';
 
