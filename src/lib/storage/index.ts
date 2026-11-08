@@ -355,32 +355,64 @@ export class StorageService {
     const items: SlagItem[] = [];
     try {
       const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
+      const normalized = dirPath.replace(/\\/g, '/');
+      const notesBase = this.getVaultNotesPath().replace(/\\/g, '/');
+      const folderPart = normalized.startsWith(notesBase + '/')
+        ? normalized.slice(notesBase.length + 1)
+        : (normalized === notesBase ? DEFAULT_INBOX_FOLDER : normalized);
+
+      // Read this directory's notes with bounded parallelism. Read order is restored
+      // below by walking `entries` in readDir order, so a tie on `updatedAt` still
+      // resolves to the first file, exactly like the serial loop did.
+      const noteFiles = entries.filter((entry) => !entry.isDirectory && entry.name.endsWith('.md'));
+      const parsedByName = new Map<string, SlagItem>();
+      const CONCURRENCY = 8;
+      for (let i = 0; i < noteFiles.length; i += CONCURRENCY) {
+        const batch = noteFiles.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(
+          batch.map(async (entry) => {
+            const subPath = `${dirPath}/${entry.name}`;
+            try {
+              const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
+              const fallbackId = entry.name.replace(/\.md$/, '');
+              const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
+              parsed.filename = entry.name;
+              return [entry.name, parsed] as const;
+            } catch (e) {
+              fsLog.warn(`Failed to read note file ${subPath}:`, e);
+              return null;
+            }
+          })
+        );
+        for (const result of results) {
+          if (result) parsedByName.set(result[0], result[1]);
+        }
+      }
+
+      // First occurrence of an id wins, mirroring the previous findIndex() semantics
+      // while staying O(1) per note instead of O(n²) over the directory.
+      const firstIndexById = new Map<string, number>();
       for (const entry of entries) {
         const subPath = `${dirPath}/${entry.name}`;
         if (entry.isDirectory) {
           const nested = await this.scanNotesDir(subPath);
-          items.push(...nested);
-        } else if (entry.name.endsWith('.md')) {
-          try {
-            const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
-            const normalized = dirPath.replace(/\\/g, '/');
-            const notesBase = this.getVaultNotesPath().replace(/\\/g, '/');
-            const folderPart = normalized.startsWith(notesBase + '/')
-              ? normalized.slice(notesBase.length + 1)
-              : (normalized === notesBase ? DEFAULT_INBOX_FOLDER : normalized);
-            const fallbackId = entry.name.replace(/\.md$/, '');
-            const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
-            parsed.filename = entry.name;
-            const existingIdx = items.findIndex(i => i.id === parsed.id);
-            if (existingIdx >= 0) {
-              if ((parsed.updatedAt || 0) > (items[existingIdx].updatedAt || 0)) {
-                items[existingIdx] = parsed;
-              }
-            } else {
-              items.push(parsed);
+          for (const nestedItem of nested) {
+            if (!firstIndexById.has(nestedItem.id)) {
+              firstIndexById.set(nestedItem.id, items.length);
             }
-          } catch (e) {
-            fsLog.warn(`Failed to read note file ${subPath}:`, e);
+            items.push(nestedItem);
+          }
+        } else if (entry.name.endsWith('.md')) {
+          const parsed = parsedByName.get(entry.name);
+          if (!parsed) continue;
+          const existingIdx = firstIndexById.get(parsed.id);
+          if (existingIdx !== undefined) {
+            if ((parsed.updatedAt || 0) > (items[existingIdx].updatedAt || 0)) {
+              items[existingIdx] = parsed;
+            }
+          } else {
+            firstIndexById.set(parsed.id, items.length);
+            items.push(parsed);
           }
         }
       }
