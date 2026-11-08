@@ -113,7 +113,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Phone editor sits as a half sheet (56svh) and grows to the full window when
+  // Phone editor sits as a half sheet (56% of the surface) and grows to the full window when
   // the handle is pulled up. Reset belongs to render: a new note starts folded.
   const [isSheetExpanded, setIsSheetExpanded] = useState(false);
   const [sheetItemId, setSheetItemId] = useState(item.id);
@@ -549,7 +549,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
               }`
             : 'flex flex-1 flex-col bg-surface'
         }
-        style={isMobile ? { height: isSheetExpanded ? '100%' : '56svh', ...panelStyle } : undefined}
+        style={isMobile ? { height: isSheetExpanded ? '100%' : '56%', ...panelStyle } : undefined}
       >
         {/* The handle owns the sheet gesture; the scroller under it keeps scrolling. */}
         {isMobile && (
