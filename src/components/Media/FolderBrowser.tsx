@@ -33,8 +33,8 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
 
   if (openFolder) {
     return (
-      <div className="flex min-h-0 flex-col gap-1" data-testid="folder-browser">
-        <div className="flex items-center gap-2 px-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-1" data-testid="folder-browser">
+        <div className="flex shrink-0 items-center gap-2 px-1">
           <button
             type="button"
             onClick={back}
@@ -47,7 +47,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
           <span className="ml-auto font-mono text-[10px] text-fg-muted">{entries.length}</span>
         </div>
 
-        <div className="max-h-[42vh] overflow-y-auto" data-testid="folder-entries">
+        <div className="min-h-0 flex-1 overflow-y-auto" data-testid="folder-entries">
           {entries.map((entry) => {
             const isSelected = selected.some((pick) => pick.uri.uri === entry.uri.uri);
             return (
@@ -82,14 +82,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
           )}
         </div>
 
-        {error && <p className="px-1 text-[10px] text-rose-400">{error}</p>}
+        {error && <p className="shrink-0 px-1 text-[10px] text-rose-400">{error}</p>}
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-col gap-1" data-testid="folder-browser">
-      <div className="max-h-[38vh] overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col gap-1" data-testid="folder-browser">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {folders.map((folder) => (
           <button
             key={folder.uri.uri}
@@ -117,7 +117,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
         )}
       </div>
 
-      <div className="mt-1 flex items-center gap-2 px-1">
+      <div className="mt-1 flex shrink-0 items-center gap-2 px-1">
         <button
           type="button"
           onClick={() => void addFolder()}
@@ -134,7 +134,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
         </button>
       </div>
 
-      {error && <p className="px-1 text-[10px] text-rose-400">{error}</p>}
+      {error && <p className="shrink-0 px-1 text-[10px] text-rose-400">{error}</p>}
     </div>
   );
 };

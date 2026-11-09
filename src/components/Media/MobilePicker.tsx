@@ -41,7 +41,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-col gap-2" data-testid="mobile-picker">
+    <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="mobile-picker">
       <div className="flex justify-center">
         <ResponsiveSegmented
           value={tab}
@@ -55,11 +55,11 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
       {tab === 'files' ? (
         <FolderBrowser selected={selected} onToggle={onToggle} onSystemPick={attachSystemFiles} />
       ) : tab === 'audio' ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
           <button
             type="button"
             onClick={onRecordVoice}
-            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md bg-surface py-2 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"
+            className="flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-surface py-2 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"
           >
             <Mic className="h-3.5 w-3.5" /> Записать голос
           </button>

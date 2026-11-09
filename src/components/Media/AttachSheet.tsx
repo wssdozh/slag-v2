@@ -122,7 +122,7 @@ export const AttachSheet: React.FC = () => {
         onClick={(event) => event.stopPropagation()}
         data-testid="attach-sheet-panel"
         data-motion-state={phase}
-        className="flex w-full flex-col gap-2 bg-canvas-subtle p-3 motion-sheet sm:mx-auto sm:max-w-[420px] rounded-t-2xl border-t border-white/[0.08] sm:rounded-2xl sm:border"
+        className="flex max-h-[80dvh] w-full min-h-0 flex-col gap-2 bg-canvas-subtle p-3 motion-sheet sm:mx-auto sm:max-w-[420px] rounded-t-2xl border-t border-white/[0.08] sm:rounded-2xl sm:border"
         style={{ paddingBottom: isMobile ? 'max(var(--sab), 0.75rem)' : undefined, ...panelStyle }}
       >
         <div
@@ -152,7 +152,7 @@ export const AttachSheet: React.FC = () => {
           />
         )}
 
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex shrink-0 items-center gap-2 pt-1">
           <Checkbox
             checked={noCompress}
             onChange={setNoCompress}

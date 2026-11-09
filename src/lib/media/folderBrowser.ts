@@ -96,7 +96,8 @@ export async function readEntryBytes(uri: DeviceUri, mimeType: string): Promise<
 /** A square preview for a grid cell; `null` means "no preview", not "broken". */
 export async function readEntryThumbnail(uri: DeviceUri): Promise<string | null> {
   try {
-    return await androidFs.getFileThumbnailAsDataURL(uri, { width: 160, format: 'webp' });
+    // A third of the sheet on a 3× screen is ~400 device pixels wide: 160 was visibly soft.
+    return await androidFs.getFileThumbnailAsDataURL(uri, { width: 320, format: 'webp' });
   } catch (error) {
     pickerLog.warn('Thumbnail failed', error);
     return null;

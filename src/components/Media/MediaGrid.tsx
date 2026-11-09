@@ -89,7 +89,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
   return (
     <div
       data-testid={`media-grid-${kind}`}
-      className="grid max-h-[42vh] auto-rows-min grid-cols-3 content-start gap-1 overflow-y-auto pr-1"
+      className="grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-1 overflow-y-auto pr-1"
       onScroll={(event) => {
         const node = event.currentTarget;
         const nearEnd = node.scrollTop + node.clientHeight >= node.scrollHeight - 120;
