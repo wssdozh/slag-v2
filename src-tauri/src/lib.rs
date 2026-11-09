@@ -171,6 +171,7 @@ fn configure_window_border(window: &tauri::Window) {
 fn configure_window_border(_window: &tauri::Window) {}
 
 mod platform;
+mod media_plugin;
 
 #[cfg(desktop)]
 #[tauri::command]
@@ -423,7 +424,8 @@ pub fn run() {
     builder = builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_notification::init());
+        .plugin(tauri_plugin_notification::init())
+        .plugin(media_plugin::init());
 
     #[cfg(desktop)]
     {

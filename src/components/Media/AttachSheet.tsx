@@ -1,11 +1,15 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, FileUp, Images, Mic } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/usePresence';
 import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
+import { isDeviceGalleryAvailable, pingDeviceGallery } from '../../lib/media/deviceGallery';
+import { logger } from '../../lib/logger';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import type { SlagAttachment } from '../../types';
+
+const mediaLog = logger.scope('MEDIA');
 
 interface SourceTileProps {
   icon: React.ReactNode;
@@ -60,6 +64,14 @@ export const AttachSheet: React.FC = () => {
     setIsRecordingVoice(false);
     closeAttachSheet();
   }, [attachSheet, closeAttachSheet]);
+
+  // Spike: prove the Kotlin side answers before the grid is built on top of it.
+  useEffect(() => {
+    if (!isDeviceGalleryAvailable()) return;
+    void pingDeviceGallery()
+      .then((result) => mediaLog.info(`Gallery bridge answered: sdk ${result.sdk}`))
+      .catch((error: unknown) => mediaLog.error('Gallery bridge failed', error));
+  }, []);
 
   if (!isPresent) return null;
 
