@@ -22,6 +22,8 @@ export interface MobilePickerProps {
   onRecordVoice: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  /** Handed to whichever scroller is on screen, so the sheet can fold from its top edge. */
+  bodyRef?: (node: HTMLDivElement | null) => void;
 }
 
 /**
@@ -36,6 +38,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
   onRecordVoice,
   isFullscreen,
   onToggleFullscreen,
+  bodyRef,
 }) => {
   const [tab, setTab] = useState<PickerTab>('image');
   const cameraRef = useRef<HTMLInputElement | null>(null);
@@ -63,7 +66,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
       </div>
 
       {tab === 'files' ? (
-        <FolderBrowser selected={selected} onToggle={onToggle} onSystemPick={onAttach} />
+        <FolderBrowser selected={selected} onToggle={onToggle} onSystemPick={onAttach} bodyRef={bodyRef} />
       ) : tab === 'audio' ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <button
@@ -78,6 +81,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
             selected={selected}
             onToggle={onToggle}
             onAttachSelected={attachSelected}
+            bodyRef={bodyRef}
           />
         </div>
       ) : (
@@ -88,6 +92,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
           onToggle={onToggle}
           onAttachSelected={attachSelected}
           onCamera={tab === 'image' ? () => cameraRef.current?.click() : undefined}
+          bodyRef={bodyRef}
         />
       )}
 

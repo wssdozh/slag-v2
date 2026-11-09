@@ -137,10 +137,20 @@ test('the picker has two detents: the button and the handle both move it', async
   expect(folded).not.toBeNull();
   expect(folded!.y).toBeGreaterThan(140);
 
+  // The footer rides the counter-translate instead of being resized, so it stays on the edge.
+  const footer = page.locator('[data-testid="attach-footer"]');
+  const pinned = async () => {
+    const fb = await footer.boundingBox();
+    expect(fb).not.toBeNull();
+    return Math.abs(fb!.y + fb!.height - 844);
+  };
+  expect(await pinned()).toBeLessThan(2);
+
   await page.getByRole('button', { name: 'На весь экран' }).click();
   await expect(panel).toHaveAttribute('data-expanded', 'true');
   await page.waitForTimeout(400);
   expect(Math.abs((await panel.boundingBox())!.y)).toBeLessThan(2);
+  expect(await pinned()).toBeLessThan(2);
   await page.screenshot({ path: 'test-results/screenshots/attach-sheet-mobile-full.png' });
 
   // The handle still folds it back, and the panel returns to the same detent.

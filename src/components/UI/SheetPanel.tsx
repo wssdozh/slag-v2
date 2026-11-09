@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { prefersReducedMotion } from '../../lib/motion';
 
 export interface SheetPanelApi {
-  /** Scroll container inside the sheet: pulling it down at its top edge folds the panel. */
-  bodyRef: React.RefObject<HTMLDivElement | null>;
+  /** Callback ref for the scrollable body: it owns the pull-to-fold handoff and the height cap. */
+  setBody: (node: HTMLDivElement | null) => void;
+  /** Callback ref for the chrome bar, which stays glued to the screen edge in every detent. */
+  setBar: (node: HTMLDivElement | null) => void;
 }
 
 export interface SheetPanelProps {
@@ -28,9 +30,10 @@ export interface SheetPanelProps {
  * "half" and "whole screen", a handle that drags it, a scrim that follows it and a scroll
  * handoff that folds it from the top of the body.
  *
- * Geometry: the panel is always the full window and only translates. Its visible part is a
- * wrapper of `100% - var(--sheet-y)`, so the bottom edge stays on the screen edge in every
- * detent and the content never needs a hard-coded `calc`.
+ * The surface only ever *moves*. Sizes change exactly once per detent — the body's max-height —
+ * because resizing the content every pointer frame is what turns a spring into a slideshow of
+ * layouts. The bar is counter-translated by the spring instead, so it stays on the screen edge
+ * while the panel travels.
  */
 export const SheetPanel: React.FC<SheetPanelProps> = ({
   enabled,
@@ -48,7 +51,10 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const bodyNodeRef = useRef<HTMLDivElement | null>(null);
+  const barNodeRef = useRef<HTMLDivElement | null>(null);
+  const [bodyNode, setBody] = useState<HTMLDivElement | null>(null);
+  const [barNode, setBar] = useState<HTMLDivElement | null>(null);
   const physics = useRef({ y: 0, velocity: 0, target: 0, frame: 0, time: 0, height: 0, initialized: false });
   const drag = useRef<{ start: number; y: number; last: number; time: number; moved: boolean } | null>(null);
   const options = useRef({ expanded, exiting, rest, onExpandedChange, onDismiss, onExited });
@@ -56,19 +62,42 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
     options.current = { expanded, exiting, rest, onExpandedChange, onDismiss, onExited };
   });
 
+  // The spring paints outside React, so it reads the bar through a ref that follows the node.
+  useLayoutEffect(() => {
+    bodyNodeRef.current = bodyNode;
+    barNodeRef.current = barNode;
+  }, [bodyNode, barNode]);
+
   const paint = useCallback(() => {
     const state = physics.current;
     const height = state.height;
-    if (panelRef.current) {
-      panelRef.current.style.transform = `translate3d(0, ${state.y}px, 0)`;
-      // The visible wrapper reads this, so one number drives both the slide and the box.
-      panelRef.current.style.setProperty('--sheet-y', `${Math.max(0, Math.min(height, state.y))}px`);
+    if (panelRef.current) panelRef.current.style.transform = `translate3d(0, ${state.y}px, 0)`;
+    if (barNodeRef.current) {
+      // Chrome travels opposite to the panel, so it sits on the screen edge in both detents.
+      barNodeRef.current.style.transform = `translate3d(0, ${-Math.min(state.y, height * options.current.rest)}px, 0)`;
     }
     if (scrimRef.current) {
       const exposed = Math.max(1, height * (1 - options.current.rest));
       scrimRef.current.style.opacity = String(Math.max(0, Math.min(1, (height - state.y) / exposed)));
     }
   }, []);
+
+  /** One measurement per detent: the body fills what the chrome leaves, and never the bar. */
+  const applyBodyCap = useCallback(() => {
+    const panel = panelRef.current;
+    const body = bodyNodeRef.current;
+    if (!panel || !body) return;
+    const panelBox = panel.getBoundingClientRect();
+    const visible = panelBox.height * (options.current.expanded ? 1 : 1 - options.current.rest);
+    const top = body.getBoundingClientRect().top - panelBox.top;
+    const bar = barNodeRef.current?.offsetHeight ?? 0;
+    body.style.maxHeight = `${Math.max(96, visible - top - bar)}px`;
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    applyBodyCap();
+  }, [applyBodyCap, enabled, expanded, bodyNode]);
 
   const settle = useCallback((target: number, velocity?: number) => {
     const state = physics.current;
@@ -212,12 +241,11 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
    * Scroll handoff on the body itself: the gesture only becomes a sheet drag once the list is
    * already at its top edge, otherwise it stays a plain scroll. Native listeners are required —
    * `touchmove` must be cancelable to stop the browser from scrolling the container out from
-   * under the sheet.
+   * under the sheet. Bound per node, because a tab switch swaps the scroller.
    */
   useEffect(() => {
-    if (!enabled) return;
-    const element = bodyRef.current;
-    if (!element) return;
+    if (!enabled || !bodyNode) return;
+    const element = bodyNode;
 
     let startY = 0;
     let startX = 0;
@@ -277,12 +305,12 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
       element.removeEventListener('touchend', onTouchEnd);
       element.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [enabled, beginDrag, moveDrag, endDrag]);
+  }, [enabled, bodyNode, beginDrag, moveDrag, endDrag]);
 
   if (!enabled) {
     return (
       <div data-testid={testId} className={[panelClassName, contentClassName].filter(Boolean).join(' ')}>
-        {children({ bodyRef })}
+        {children({ setBody, setBar })}
       </div>
     );
   }
@@ -298,10 +326,7 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
         data-expanded={expanded || undefined}
         className={`sheet-spring absolute inset-0 flex flex-col overflow-hidden ${panelClassName ?? ''}`}
       >
-        <div
-          className={`relative flex min-h-0 flex-col ${contentClassName ?? ''}`}
-          style={{ height: 'calc(100% - var(--sheet-y, 0px))' }}
-        >
+        <div className={`flex min-h-0 flex-1 flex-col ${contentClassName ?? ''}`}>
           {/* The handle owns the gesture. Folded it has a pill, unfolded it stays a thin strip
               at the edge: pulling down must work from either detent. */}
           <div
@@ -316,9 +341,12 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
             {!expanded && <div className="h-1 w-8 shrink-0 rounded-full bg-white/20" />}
           </div>
 
-          {children({ bodyRef })}
+          {children({ setBody, setBar })}
         </div>
       </div>
     </>
   );
 };
+
+
+

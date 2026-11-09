@@ -522,7 +522,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
             : 'flex min-h-0 flex-1 flex-col bg-surface'
         }
       >
-        {({ bodyRef }) => (
+        {({ setBody, setBar }) => (
           <>
         {/* Top Control Bar */}
         <EditorToolbar
@@ -557,7 +557,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
         {/* Editor Body */}
         <div
-          ref={bodyRef}
+          ref={setBody}
           data-editor-body
           className="min-h-0 flex-1 overflow-y-auto py-6 md:py-8 bg-surface"
         >
@@ -934,6 +934,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
       {/* Chrome shares the sheet's entrance, drag and exit. */}
       <MobileEditorBar
+        ref={setBar}
         isDraft={item.id.startsWith('draft_')}
         activePopover={activeMobilePopover}
         onSetActivePopover={setActiveMobilePopover}

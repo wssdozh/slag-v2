@@ -15,6 +15,8 @@ export interface FolderBrowserProps {
   onToggle: (pick: DevicePick) => void;
   /** The system dialog has no grid to select from, so its files attach immediately. */
   onSystemPick: (entries: FolderEntry[]) => void;
+  /** The sheet's scroll handoff needs the live scroller, and which one depends on the view. */
+  bodyRef?: (node: HTMLDivElement | null) => void;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface FolderBrowserProps {
  * tap away because Android refuses to grant some directories at all (the root of Download, for
  * one), and a picker that cannot open a folder is worse than a system dialog.
  */
-export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle, onSystemPick }) => {
+export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle, onSystemPick, bodyRef }) => {
   const { folders, openFolder, entries, isLoading, error, addFolder, open, back, browseSystem } =
     useFolderBrowser(true);
 
@@ -47,7 +49,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
           <span className="ml-auto font-mono text-[10px] text-fg-muted">{entries.length}</span>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto" data-testid="folder-entries">
+        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto" data-testid="folder-entries">
           {entries.map((entry) => {
             const isSelected = selected.some((pick) => pick.uri.uri === entry.uri.uri);
             return (
@@ -89,7 +91,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1" data-testid="folder-browser">
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto">
         {folders.map((folder) => (
           <button
             key={folder.uri.uri}

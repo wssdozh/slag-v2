@@ -46,6 +46,8 @@ export interface MediaGridProps {
   onAttachSelected: () => void;
   /** The camera cell lives in the photo grid: one less place to hunt for it. */
   onCamera?: () => void;
+  /** The sheet's scroll handoff needs the live scroller. */
+  bodyRef?: (node: HTMLDivElement | null) => void;
 }
 
 const EMPTY_LABEL: Record<DeviceMediaKind, string> = {
@@ -64,7 +66,7 @@ const GRANT_LABEL: Record<DeviceMediaKind, string> = {
  * A paged grid of whatever the device media database holds for one kind. Selecting is the only
  * thing it does: the button that turns a selection into attachments lives in the sheet footer.
  */
-export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, onAttachSelected, onCamera }) => {
+export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, onAttachSelected, onCamera, bodyRef }) => {
   const { access, items, hasMore, isLoading, loadMore, request } = useDeviceGallery(kind, true);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -93,6 +95,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
   return (
     <>
       <div
+        ref={bodyRef}
         data-testid={`media-grid-${kind}`}
         className="grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-1 overflow-y-auto pr-1 [overflow-anchor:none]"
         onScroll={(event) => {

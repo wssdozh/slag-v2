@@ -29,7 +29,11 @@ export const AttachSheet: React.FC = () => {
 
   const isOpen = attachSheet !== null;
   // On a phone the sheet leaves with its spring; on desktop a plain CSS fade is the exit.
-  const { ref, phase, isPresent, onTransitionEnd, finishExit } = usePresence(isOpen, { manualExit: isMobile });
+  const { ref, phase, isPresent, onTransitionEnd, finishExit } = usePresence(isOpen, {
+    manualExit: isMobile,
+    // The spring draws the entrance too; the extra `entering` frame is a stutter on the phone.
+    skipEntering: isMobile,
+  });
 
   const [selected, setSelected] = useState<DevicePick[]>([]);
   const [noCompress, setNoCompress] = useState(false);
@@ -134,10 +138,11 @@ export const AttachSheet: React.FC = () => {
           isMobile && isPickerFullscreen ? 'pt-[max(var(--sat),0.75rem)]' : ''
         }`}
       >
-        {() => (
+        {({ setBody, setBar }) => (
           <>
             {isMobile ? (
               <MobilePicker
+                bodyRef={setBody}
                 selected={selected}
                 onToggle={togglePick}
                 onAttach={(picks) => void attachPicked(picks)}
@@ -153,7 +158,16 @@ export const AttachSheet: React.FC = () => {
               />
             )}
 
-            <div className="flex shrink-0 items-center gap-2 pt-1">
+            <div
+              ref={isMobile ? setBar : undefined}
+              data-testid="attach-footer"
+              className={
+                isMobile
+                  // The bar rides the panel's counter-translate, so it stays on the screen edge.
+                  ? 'absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center gap-2 border-t border-white/[0.08] bg-canvas-subtle px-3 pb-[max(var(--sab),0.75rem)] pt-2'
+                  : 'flex shrink-0 items-center gap-2 pt-1'
+              }
+            >
               <Checkbox
                 checked={noCompress}
                 onChange={setNoCompress}
