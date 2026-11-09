@@ -1,5 +1,10 @@
 import type { SlagAttachment } from '../../types';
-import { downscaleImageDataUrl } from './attachmentEnrichment';
+import {
+  encodeImage,
+  STORED_IMAGE_MAX_DIM,
+  STORED_IMAGE_QUALITY,
+  UNCOMPRESSIBLE_IMAGE_TYPES,
+} from './imageCodec';
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif', 'bmp', 'svg'];
 const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'];
@@ -20,9 +25,19 @@ export function attachmentType(file: File): SlagAttachment['type'] {
   return 'file';
 }
 
+/** `shot.png` → `shot.webp`; the stored file must say what it actually contains. */
+function withExtension(name: string, extension: string): string {
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  return `${stem}.${extension}`;
+}
+
 /**
  * The one place bytes become an attachment: picked files and gallery rows both land here, so the
- * naming, the image downscale and the disk path stay identical for every source.
+ * naming, the image squeeze and the disk path stay identical for every source.
+ *
+ * Compression is images-only by nature: a webview can decode and re-encode a bitmap, but it has
+ * no video or audio encoder, so those types are copied byte for byte.
  */
 export async function attachmentFromDataUrl(source: {
   name: string;
@@ -31,6 +46,8 @@ export async function attachmentFromDataUrl(source: {
   dataUrl: string;
   /** Callers that already know better than the MIME (a File does, a gallery row does not). */
   type?: SlagAttachment['type'];
+  /** The "не сжимать" toggle: store the original bytes, untouched. */
+  compress?: boolean;
 }): Promise<SlagAttachment> {
   const id = 'att_' + Date.now() + Math.random().toString(36).slice(2, 6);
   const type: SlagAttachment['type'] = source.type
@@ -42,21 +59,40 @@ export async function attachmentFromDataUrl(source: {
           ? 'video'
           : 'file');
 
-  // Optimize image memory: downscale massive photos to 1440px max dimension
-  const dataUrl = type === 'image' ? await downscaleImageDataUrl(source.dataUrl, 1440) : source.dataUrl;
+  let name = source.name;
+  let mimeType = source.mimeType || 'application/octet-stream';
+  let size = source.size;
+  let dataUrl = source.dataUrl;
+
+  if ((source.compress ?? true) && type === 'image' && !UNCOMPRESSIBLE_IMAGE_TYPES.has(mimeType)) {
+    const encoded = await encodeImage(dataUrl, {
+      maxDim: STORED_IMAGE_MAX_DIM,
+      quality: STORED_IMAGE_QUALITY,
+      format: 'image/webp',
+    });
+    if (encoded) {
+      dataUrl = encoded.dataUrl;
+      mimeType = encoded.mimeType;
+      size = encoded.byteLength;
+      name = withExtension(name, 'webp');
+    }
+  }
 
   return {
     id,
-    name: source.name,
+    name,
     type,
-    mimeType: source.mimeType || 'application/octet-stream',
-    size: source.size,
-    relativePath: `.attachments/${id}_${source.name}`,
+    mimeType,
+    size,
+    relativePath: `.attachments/${id}_${name}`,
     dataUrl,
   };
 }
 
-export async function processFileListToAttachments(fileList: FileList | File[]): Promise<SlagAttachment[]> {
+export async function processFileListToAttachments(
+  fileList: FileList | File[],
+  compress = true,
+): Promise<SlagAttachment[]> {
   const files = Array.from(fileList);
   const attachments: SlagAttachment[] = [];
 
@@ -74,6 +110,7 @@ export async function processFileListToAttachments(fileList: FileList | File[]):
       size: file.size,
       dataUrl,
       type: attachmentType(file),
+      compress,
     }));
   }
 

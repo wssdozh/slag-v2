@@ -171,6 +171,7 @@ fn configure_window_border(window: &tauri::Window) {
 fn configure_window_border(_window: &tauri::Window) {}
 
 mod platform;
+#[cfg(target_os = "android")]
 mod media_plugin;
 
 #[cfg(desktop)]
@@ -367,14 +368,12 @@ pub fn run() {
         ]);
     }
 
-    #[cfg(mobile)]
+    #[cfg(target_os = "android")]
     {
         builder = builder.invoke_handler(tauri::generate_handler![
-            media_plugin::gallery_ping,
             media_plugin::gallery_access,
             media_plugin::gallery_request_access,
-            media_plugin::gallery_list,
-            media_plugin::gallery_read
+            media_plugin::gallery_list
         ]);
     }
 
@@ -436,7 +435,13 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(media_plugin::init());
+        .plugin(tauri_plugin_android_fs::init());
+
+    // MediaStore listing only exists on Android; the module is compiled there and nowhere else.
+    #[cfg(target_os = "android")]
+    {
+        builder = builder.plugin(media_plugin::init());
+    }
 
     #[cfg(desktop)]
     {

@@ -3,6 +3,13 @@ import { test, expect } from '@playwright/test';
 const attachButton = (page: Parameters<Parameters<typeof test>[1]>[0]['page']) =>
   page.locator('button[aria-label="Прикрепить файл"]').first();
 
+/** A 1×1 PNG: enough for the canvas path, small enough to inline. */
+const PNG_BYTES = Buffer.from(
+  '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001' +
+  '0d0a2db40000000049454e44ae426082',
+  'hex',
+);
+
 test('the paperclip opens one sheet with every source, and the pick lands in the tray', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -23,17 +30,35 @@ test('the paperclip opens one sheet with every source, and the pick lands in the
   await page.locator('[data-testid="attach-input-media"]').setInputFiles({
     name: 'shot.png',
     mimeType: 'image/png',
-    buffer: Buffer.from(
-      '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001' +
-      '0d0a2db40000000049454e44ae426082',
-      'hex',
-    ),
+    buffer: PNG_BYTES,
   });
 
   await expect(sheet).toHaveCount(0);
-  // Images land in the tray as thumbnails, so the name lives in the alt text.
-  await expect(page.locator('[data-composer-attachments] img[alt="shot.png"]')).toBeVisible({ timeout: 5000 });
+  // Images are stored as webp, so the name says what the bytes actually are.
+  await expect(page.locator('[data-composer-attachments] img[alt="shot.webp"]')).toBeVisible({ timeout: 5000 });
   await page.screenshot({ path: 'test-results/screenshots/attach-sheet-picked.png' });
+});
+
+test('"не сжимать" keeps the original bytes and the original name', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const button = attachButton(page);
+  await expect(button).toBeVisible({ timeout: 20000 });
+  await button.click();
+
+  const toggle = page.locator('[data-testid="attach-sheet-panel"] [role="checkbox"]').first();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+  await page.locator('[data-testid="attach-input-media"]').setInputFiles({
+    name: 'shot.png',
+    mimeType: 'image/png',
+    buffer: PNG_BYTES,
+  });
+
+  await expect(page.locator('[data-composer-attachments] img[alt="shot.png"]')).toBeVisible({ timeout: 5000 });
 });
 
 test('Esc closes the sheet, not the surface it was opened from', async ({ page }) => {
@@ -53,7 +78,7 @@ test('Esc closes the sheet, not the surface it was opened from', async ({ page }
   await expect(page.locator('main textarea').first()).toBeVisible();
 });
 
-test('on a phone the sheet is a bottom panel with a handle', async ({ page }) => {
+test('on a phone the sheet is a tabbed bottom panel with a handle', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
@@ -67,9 +92,15 @@ test('on a phone the sheet is a bottom panel with a handle', async ({ page }) =>
   await expect(button).toBeVisible({ timeout: 20000 });
   await button.click();
 
+  const sheet = page.locator('[data-testid="attach-sheet"]');
   const panel = page.locator('[data-testid="attach-sheet-panel"]');
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText('Камера');
+
+  // Four tabs, no header repeating them in smaller type.
+  for (const label of ['Фото', 'Видео', 'Аудио', 'Файлы']) {
+    await expect(sheet.getByRole('button', { name: label, exact: true })).toBeVisible();
+  }
+  await expect(panel.getByRole('checkbox')).toBeVisible();
 
   const box = await panel.boundingBox();
   expect(box).not.toBeNull();
@@ -77,4 +108,9 @@ test('on a phone the sheet is a bottom panel with a handle', async ({ page }) =>
   await expect(panel.locator('[data-sheet-handle]')).toBeVisible();
   await page.waitForTimeout(250);
   await page.screenshot({ path: 'test-results/screenshots/attach-sheet-mobile.png' });
+
+  // The files tab explains itself instead of showing an empty list.
+  await sheet.getByRole('button', { name: 'Файлы', exact: true }).click();
+  await expect(sheet).toContainText('Папок пока нет');
+  await page.screenshot({ path: 'test-results/screenshots/attach-sheet-mobile-files.png' });
 });

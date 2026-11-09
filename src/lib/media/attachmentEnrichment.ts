@@ -2,6 +2,7 @@ import type { SlagAttachment, SlagItem, AiSettings } from '../../types';
 import { logger } from '../logger';
 import { storage } from '../storage';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, AI_LIMITS } from '../../config';
+import { downscaleImageDataUrl } from './imageCodec';
 
 const enrichLog = logger.scope('AI');
 
@@ -154,46 +155,6 @@ async function transcribeAudioGemini(
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
   return { extractedText: text, summary: text.slice(0, 100) };
-}
-
-/**
- * Downscales an image data URL to a maximum dimension to stay within token/payload budgets.
- */
-export async function downscaleImageDataUrl(dataUrl: string, maxDim: number = AI_LIMITS.IMAGE_DOWNSCALE_MAX_DIM): Promise<string> {
-  if (typeof window === 'undefined' || !dataUrl.startsWith('data:image')) return dataUrl;
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width <= maxDim && height <= maxDim && dataUrl.length < AI_LIMITS.IMAGE_MAX_PAYLOAD_BYTES) {
-        resolve(dataUrl);
-        return;
-      }
-      if (width > height) {
-        if (width > maxDim) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        }
-      } else {
-        if (height > maxDim) {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', AI_LIMITS.IMAGE_JPEG_QUALITY));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
 }
 
 /**

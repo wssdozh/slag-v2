@@ -1,101 +1,107 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Camera, FileUp, Images, Mic } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/usePresence';
 import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';
-import { attachmentFromDataUrl, MAX_ATTACHMENT_BYTES, processFileListToAttachments } from '../../lib/media/fileDropHelper';
-import { isDeviceGalleryAvailable, readDeviceMedia } from '../../lib/media/deviceGallery';
+import {
+  attachmentFromDataUrl,
+  MAX_ATTACHMENT_BYTES,
+  processFileListToAttachments,
+} from '../../lib/media/fileDropHelper';
+import { readEntryBytes } from '../../lib/media/folderBrowser';
+import { formatBytes } from '../../lib/formatBytes';
 import { logger } from '../../lib/logger';
 import { AudioRecorder } from '../UI/AudioRecorder';
-import { DeviceGalleryGrid } from './DeviceGalleryGrid';
-import type { DeviceMediaItem, SlagAttachment } from '../../types';
+import { Checkbox } from '../UI/Checkbox';
+import { DesktopSources } from './DesktopSources';
+import { MobilePicker } from './MobilePicker';
+import type { DevicePick, SlagAttachment } from '../../types';
 
 const mediaLog = logger.scope('MEDIA');
 
-interface SourceTileProps {
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-  onClick: () => void;
-}
-
-const SourceTile: React.FC<SourceTileProps> = ({ icon, label, hint, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="flex flex-col items-start gap-1 rounded-xl border border-white/[0.06] bg-surface px-3 py-2.5 text-left hover:bg-surface-hover active:bg-surface-hover transition-colors cursor-pointer"
-  >
-    <span className="text-fg-secondary">{icon}</span>
-    <span className="text-xs font-medium text-fg-primary leading-tight">{label}</span>
-    <span className="text-[10px] text-fg-muted leading-tight">{hint}</span>
-  </button>
-);
-
 /**
- * One place that attaches things: the device gallery, an arbitrary file, a voice note, a photo
- * from the camera. It owns the hidden file inputs and the gallery screen; the surface only ever
- * receives ready attachments.
+ * One place that attaches things. On the phone it is the picker itself — tabs over the media
+ * database and the folders already granted — while the desktop keeps the system dialog, which is
+ * the better one there. The surface above only ever receives ready attachments.
  */
 export const AttachSheet: React.FC = () => {
   const { attachSheet, closeAttachSheet, isMobile, addToast } = useApp();
 
   const isOpen = attachSheet !== null;
   const { ref, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
-  const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle } =
-    useSheetDrag({ isOpen, onDismiss: closeAttachSheet });
 
-  const [view, setView] = useState<'sources' | 'gallery'>('sources');
+  const [selected, setSelected] = useState<DevicePick[]>([]);
+  const [noCompress, setNoCompress] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
-  const mediaInputRef = useRef<HTMLInputElement | null>(null);
-  const filesInputRef = useRef<HTMLInputElement | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
-  const addFiles = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    try {
-      const attachments = await processFileListToAttachments(files);
-      if (attachments.length > 0) attachSheet?.onAdd(attachments);
-    } catch {
-      addToast('Не удалось прочитать файл', 'error');
-    }
+  /** Closing always drops the selection: a half-picked folder must not resurface next time. */
+  const dismiss = useCallback(() => {
+    setSelected([]);
     closeAttachSheet();
-  }, [attachSheet, closeAttachSheet, addToast]);
+  }, [closeAttachSheet]);
 
-  const addRecorded = useCallback((attachment: SlagAttachment) => {
-    attachSheet?.onAdd([attachment]);
-    setIsRecordingVoice(false);
+  const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle } =
+    useSheetDrag({ isOpen, onDismiss: dismiss });
+
+  const handOver = useCallback((attachments: SlagAttachment[]) => {
+    if (attachments.length > 0) attachSheet?.onAdd(attachments);
+    setSelected([]);
     closeAttachSheet();
   }, [attachSheet, closeAttachSheet]);
 
-  const addFromGallery = useCallback(async (picked: DeviceMediaItem[]) => {
-    setIsAttaching(true);
+  const addFiles = useCallback(async (files: FileList) => {
     try {
-      const attachments: SlagAttachment[] = [];
-      for (const item of picked) {
-        if (item.size > MAX_ATTACHMENT_BYTES) {
-          addToast(`«${item.name}» больше 25 МБ — пропустил`, 'error');
+      handOver(await processFileListToAttachments(files, !noCompress));
+    } catch (error) {
+      mediaLog.error('File conversion failed', error);
+      addToast('Не удалось прочитать файл', 'error');
+    }
+  }, [addToast, handOver, noCompress]);
+
+  const attachPicked = useCallback(async (picks: DevicePick[]) => {
+    if (picks.length === 0) return;
+    setIsAttaching(true);
+    const ready: SlagAttachment[] = [];
+    try {
+      for (const pick of picks) {
+        if (pick.size > MAX_ATTACHMENT_BYTES) {
+          addToast(`«${pick.name}» больше 25 МБ — пропустил`, 'error');
           continue;
         }
-        const file = await readDeviceMedia(item.id);
-        attachments.push(await attachmentFromDataUrl({
-          name: item.name,
-          mimeType: file.mimeType,
-          size: file.size,
-          dataUrl: file.dataUrl,
+        const dataUrl = await readEntryBytes(pick.uri, pick.mimeType);
+        ready.push(await attachmentFromDataUrl({
+          name: pick.name,
+          mimeType: pick.mimeType,
+          size: pick.size,
+          dataUrl,
+          compress: !noCompress,
         }));
       }
-      if (attachments.length > 0) attachSheet?.onAdd(attachments);
-      closeAttachSheet();
+      handOver(ready);
     } catch (error) {
-      mediaLog.error('Gallery read failed', error);
-      addToast('Не удалось прочитать фото', 'error');
+      mediaLog.error('Picked file read failed', error);
+      addToast('Не удалось прочитать файл', 'error');
     } finally {
       setIsAttaching(false);
     }
-  }, [attachSheet, closeAttachSheet, addToast]);
+  }, [addToast, handOver, noCompress]);
+
+  const togglePick = useCallback((pick: DevicePick) => {
+    setSelected((prev) => (
+      prev.some((current) => current.uri.uri === pick.uri.uri)
+        ? prev.filter((current) => current.uri.uri !== pick.uri.uri)
+        : [...prev, pick]
+    ));
+  }, []);
+
+  const addRecorded = useCallback((attachment: SlagAttachment) => {
+    setIsRecordingVoice(false);
+    handOver([attachment]);
+  }, [handOver]);
 
   if (!isPresent) return null;
+
+  const selectedBytes = selected.reduce((total, pick) => total + pick.size, 0);
 
   return (
     <div
@@ -108,15 +114,15 @@ export const AttachSheet: React.FC = () => {
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
       aria-hidden={!isOpen || undefined}
-      onClick={closeAttachSheet}
-      className="fixed inset-0 z-[115] bg-black/85 flex flex-col justify-end motion-fade motion-scrim-hold select-none"
+      onClick={dismiss}
+      className="fixed inset-0 z-[115] flex select-none flex-col justify-end bg-black/85 motion-fade motion-scrim-hold"
     >
       <div
         ref={panelRef}
         onClick={(event) => event.stopPropagation()}
         data-testid="attach-sheet-panel"
         data-motion-state={phase}
-        className="w-full sm:max-w-[420px] sm:mx-auto bg-canvas-subtle border-t sm:border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-3 flex flex-col gap-2 motion-sheet"
+        className="flex w-full flex-col gap-2 bg-canvas-subtle p-3 motion-sheet sm:mx-auto sm:max-w-[420px] rounded-t-2xl border-t border-white/[0.08] sm:rounded-2xl sm:border"
         style={{ paddingBottom: isMobile ? 'max(var(--sab), 0.75rem)' : undefined, ...panelStyle }}
       >
         <div
@@ -126,83 +132,54 @@ export const AttachSheet: React.FC = () => {
           onPointerUp={onPointerEnd}
           onPointerCancel={onPointerCancel}
           style={{ touchAction: 'none' }}
-          className="flex flex-col gap-2 shrink-0"
+          className="flex shrink-0 flex-col gap-2"
         >
-          <div className="w-8 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1" />
-          {view === 'sources' && (
-            <div className="px-1 pb-1">
-              <p className="text-xs font-medium text-fg-primary">Прикрепить</p>
-              <p className="text-[10px] text-fg-muted">Файл ляжет в .attachments заметки</p>
-            </div>
-          )}
+          <div className="mx-auto mb-1 h-1 w-8 shrink-0 rounded-full bg-white/20" />
         </div>
 
-        {view === 'gallery' ? (
-          <DeviceGalleryGrid
-            onBack={() => setView('sources')}
-            onAttach={(picked) => void addFromGallery(picked)}
-            isAttaching={isAttaching}
+        {isMobile ? (
+          <MobilePicker
+            selected={selected}
+            onToggle={togglePick}
+            onAttach={(picks) => void attachPicked(picks)}
+            onCameraFiles={(files) => void addFiles(files)}
+            onRecordVoice={() => setIsRecordingVoice(true)}
           />
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <SourceTile
-              icon={<Images className="w-4 h-4" />}
-              label="Фото и видео"
-              hint={isDeviceGalleryAvailable() ? 'из этой галереи' : 'из галереи'}
-              onClick={() => {
-                if (isDeviceGalleryAvailable()) setView('gallery');
-                else mediaInputRef.current?.click();
-              }}
-            />
-            <SourceTile
-              icon={<FileUp className="w-4 h-4" />}
-              label="Файл"
-              hint="любой документ"
-              onClick={() => filesInputRef.current?.click()}
-            />
-            <SourceTile
-              icon={<Mic className="w-4 h-4" />}
-              label="Голос"
-              hint="записать сейчас"
-              onClick={() => setIsRecordingVoice(true)}
-            />
-            {isMobile && (
-              <SourceTile
-                icon={<Camera className="w-4 h-4" />}
-                label="Камера"
-                hint="снять фото"
-                onClick={() => cameraInputRef.current?.click()}
-              />
-            )}
-          </div>
+          <DesktopSources
+            onPickFiles={(files) => void addFiles(files)}
+            onRecordVoice={() => setIsRecordingVoice(true)}
+          />
         )}
 
-        <input
-          ref={mediaInputRef}
-          type="file"
-          multiple
-          accept="image/*,video/*"
-          data-testid="attach-input-media"
-          className="hidden"
-          onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }}
-        />
-        <input
-          ref={filesInputRef}
-          type="file"
-          multiple
-          data-testid="attach-input-files"
-          className="hidden"
-          onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }}
-        />
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          data-testid="attach-input-camera"
-          className="hidden"
-          onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }}
-        />
+        <div className="flex items-center gap-2 pt-1">
+          <Checkbox
+            checked={noCompress}
+            onChange={setNoCompress}
+            label="не сжимать"
+            className="text-fg-secondary"
+          />
+
+          {isMobile && (
+            <>
+              <span className="ml-auto shrink-0 font-mono text-[10px] text-fg-muted">
+                {selected.length > 0 ? `${selected.length} · ${formatBytes(selectedBytes)}` : ''}
+              </span>
+              <button
+                type="button"
+                disabled={selected.length === 0 || isAttaching}
+                onClick={() => void attachPicked(selected)}
+                className={`shrink-0 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                  selected.length === 0 || isAttaching
+                    ? 'cursor-not-allowed bg-surface text-fg-dim'
+                    : 'cursor-pointer bg-accent-strong text-white hover:bg-accent-strong/90'
+                }`}
+              >
+                {isAttaching ? 'Прикрепляю…' : 'Прикрепить'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {isRecordingVoice && (

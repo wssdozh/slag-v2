@@ -362,16 +362,17 @@ export interface ConfirmOptions {
 }
 
 /** A row of the device gallery, as MediaStore reports it. */
-export type DeviceMediaKind = 'image' | 'video';
+export type DeviceMediaKind = 'image' | 'video' | 'audio';
 
 export interface DeviceMediaItem {
   id: string;
+  /** `content://` handle: the plugin turns it into a thumbnail and, later, into bytes. */
+  uri: DeviceUri;
   kind: DeviceMediaKind;
   name: string;
   mimeType: string;
   size: number;
   dateAdded: number;
-  thumb?: string;
 }
 
 export interface DeviceMediaPage {
@@ -379,9 +380,41 @@ export interface DeviceMediaPage {
   hasMore: boolean;
 }
 
+export type GalleryPermission = 'granted' | 'denied' | 'prompt';
+
 export interface GalleryAccess {
-  images: 'granted' | 'denied' | 'prompt' | string;
-  video: 'granted' | 'denied' | 'prompt' | string;
+  images: GalleryPermission;
+  video: GalleryPermission;
+  audio: GalleryPermission;
+}
+
+/** The shape `tauri-plugin-android-fs` addresses content URIs with. */
+export interface DeviceUri {
+  uri: string;
+  documentTopTreeUri: string | null;
+}
+
+/** A folder the person handed over once; the grant survives restarts. */
+export interface DeviceFolder {
+  uri: DeviceUri;
+  name: string;
+}
+
+export interface FolderEntry {
+  uri: DeviceUri;
+  name: string;
+  isDir: boolean;
+  size: number;
+  mimeType: string;
+  modified: number;
+}
+
+/** What any tab of the picker hands to the attachment pipeline: just enough to read and name it. */
+export interface DevicePick {
+  uri: DeviceUri;
+  name: string;
+  mimeType: string;
+  size: number;
 }
 
 

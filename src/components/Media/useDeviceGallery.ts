@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getGalleryAccess, listDeviceMedia, requestGalleryAccess } from '../../lib/media/deviceGallery';
-import type { DeviceMediaItem, DeviceMediaKind } from '../../types';
+import type { DeviceMediaItem, DeviceMediaKind, GalleryAccess, GalleryPermission } from '../../types';
 
 const PAGE_SIZE = 60;
+
+/** MediaStore reports `images`, the UI talks about a `image` tab. One mapping, one place. */
+const ACCESS_KEY: Record<DeviceMediaKind, keyof GalleryAccess> = {
+  image: 'images',
+  video: 'video',
+  audio: 'audio',
+};
 
 /**
  * Rows of the device gallery, paged. Permission is part of the state: a grid that silently shows
  * nothing is worse than one that says the photo library is closed.
  */
 export function useDeviceGallery(kind: DeviceMediaKind, isOpen: boolean) {
-  const [access, setAccess] = useState<string>('unknown');
+  const [access, setAccess] = useState<GalleryPermission>('prompt');
   const [items, setItems] = useState<DeviceMediaItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +45,7 @@ export function useDeviceGallery(kind: DeviceMediaKind, isOpen: boolean) {
     void (async () => {
       const state = await getGalleryAccess().catch(() => null);
       if (!alive) return;
-      const next = state?.images ?? 'denied';
+      const next = state?.[ACCESS_KEY[kind]] ?? 'denied';
       setAccess(next);
       if (next !== 'granted') return;
       const page = await listDeviceMedia(kind, 0, PAGE_SIZE).catch(() => null);
@@ -52,10 +59,10 @@ export function useDeviceGallery(kind: DeviceMediaKind, isOpen: boolean) {
 
   const request = useCallback(async () => {
     const state = await requestGalleryAccess().catch(() => null);
-    const next = state?.images ?? 'denied';
+    const next = state?.[ACCESS_KEY[kind]] ?? 'denied';
     setAccess(next);
     if (next === 'granted') await appendPage(true);
-  }, [appendPage]);
+  }, [appendPage, kind]);
 
   return {
     access,

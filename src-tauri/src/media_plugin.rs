@@ -2,12 +2,15 @@ use serde_json::{json, Value};
 use tauri::plugin::{Builder, PluginHandle, TauriPlugin};
 use tauri::{Manager, State};
 
-/// A handle to the Kotlin side, so the picker can ask MediaStore for rows and thumbnails.
+/// A handle to the Kotlin side, so the picker can ask MediaStore for rows.
 pub struct GalleryBridge(pub PluginHandle<tauri::Wry>);
 
 /// App-local plugin: the commands themselves live in `MediaGalleryPlugin.kt`. Routing them
 /// through app commands instead of `plugin:slag-media|…` keeps the webview off the plugin ACL,
 /// which an app-local plugin has no way to declare.
+///
+/// Only MediaStore *listing* lives here. Thumbnails and bytes go through `android-fs`, which
+/// takes the same `content://` URI a row carries.
 pub fn init() -> TauriPlugin<tauri::Wry> {
     Builder::new("slag-media")
         .setup(|app, api| {
@@ -34,11 +37,6 @@ async fn call(bridge: &GalleryBridge, command: &str, payload: Value) -> Result<V
 }
 
 #[tauri::command]
-pub async fn gallery_ping(bridge: State<'_, GalleryBridge>) -> Result<Value, String> {
-    call(&bridge, "ping", json!({})).await
-}
-
-#[tauri::command]
 pub async fn gallery_access(bridge: State<'_, GalleryBridge>) -> Result<Value, String> {
     call(&bridge, "accessState", json!({})).await
 }
@@ -56,9 +54,4 @@ pub async fn gallery_list(
     limit: u32,
 ) -> Result<Value, String> {
     call(&bridge, "listMedia", json!({ "kind": kind, "offset": offset, "limit": limit })).await
-}
-
-#[tauri::command]
-pub async fn gallery_read(bridge: State<'_, GalleryBridge>, id: String) -> Result<Value, String> {
-    call(&bridge, "readMedia", json!({ "id": id })).await
 }
