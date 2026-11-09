@@ -101,7 +101,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         ? { type: 'button' as const, onClick, disabled, 'aria-disabled': disabled }
         : {})}
       className={`w-full flex items-center gap-3 p-3.5 text-left ${
-        interactive ? 'cursor-pointer hover:bg-surface-hover' : ''
+        interactive ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-white/[0.1] active:duration-0' : ''
       } ${disabled ? 'opacity-40' : ''} ${className}`}
     >
       {icon && (
