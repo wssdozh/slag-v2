@@ -16,7 +16,7 @@ test.describe('Folder picker list', () => {
       '╰── Поиск работы',
       'Род',
       '├── доч1',
-      '│   ╰── внук',
+      '│' + '\u00A0'.repeat(3) + '╰── внук',
       '╰── доч2',
     ]);
   });
@@ -31,7 +31,7 @@ test.describe('Folder picker list', () => {
   test('inbox is always first and no label repeats a slash', () => {
     const options = buildFolderOptions(foldersOf('А', 'А/Б', 'В/Г/Д'));
 
-    expect(options[0]).toEqual({ value: 'Входящие', label: 'Входящие' });
+    expect(options[0]).toEqual({ value: 'Входящие', label: 'Входящие', triggerLabel: 'Входящие' });
     expect(options.filter((option) => option.label.includes('/'))).toEqual([]);
   });
 

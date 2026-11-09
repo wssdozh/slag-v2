@@ -6,6 +6,8 @@ import { usePresence } from '../../hooks/usePresence';
 export interface SelectOption {
   value: string;
   label: string;
+  /** Shown on the closed trigger when the list label is a tree branch, e.g. "Род / доч". */
+  triggerLabel?: string;
   icon?: React.ReactNode;
   color?: string;
   disabled?: boolean;
@@ -322,7 +324,7 @@ export const Select: React.FC<SelectProps> = ({
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
           {showLabel && (
             <span className={selectedOption?.color || (selectedOption ? 'text-zinc-200' : 'text-zinc-500')}>
-              {selectedOption ? selectedOption.label : placeholder}
+              {selectedOption ? (selectedOption.triggerLabel ?? selectedOption.label) : placeholder}
             </span>
           )}
         </span>

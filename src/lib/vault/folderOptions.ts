@@ -4,6 +4,8 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 export interface FolderSelectOption {
   value: string;
   label: string;
+  /** Full parent chain for the closed trigger: "Род / доч". */
+  triggerLabel: string;
   /** True for a root folder; renders a separator above it. */
   dividerBefore?: boolean;
 }
@@ -55,14 +57,22 @@ export function buildFolderOptions(folders: FolderMeta[]): FolderSelectOption[] 
   const sorted = (nodes: Node[]) => [...nodes].sort((a, b) => a.path.localeCompare(b.path, 'ru'));
 
   const options: FolderSelectOption[] = [];
+  // Indentation uses non-breaking spaces: a plain run of spaces collapses to one in the picker,
+  // which made a nested folder look like a root.
+  const GAP = '\u00A0\u00A0\u00A0';
   const walk = (node: Node, prefix: string, isLast: boolean, depth: number) => {
     const label = depth === 0
       ? lastSegment(node.path)
       : `${prefix}${isLast ? '╰── ' : '├── '}${lastSegment(node.path)}`;
-    options.push({ value: node.path, label, dividerBefore: depth === 0 });
+    options.push({
+      value: node.path,
+      label,
+      triggerLabel: node.path.split('/').join(' / '),
+      dividerBefore: depth === 0,
+    });
 
     // A root carries no vertical bar above it, so its children start flush left.
-    const childPrefix = depth === 0 ? '' : `${prefix}${isLast ? '    ' : '│   '}`;
+    const childPrefix = depth === 0 ? '' : `${prefix}${isLast ? `${GAP} ` : `│${GAP}`}`;
     const children = sorted(node.children);
     children.forEach((child, index) => walk(child, childPrefix, index === children.length - 1, depth + 1));
   };
@@ -71,5 +81,5 @@ export function buildFolderOptions(folders: FolderMeta[]): FolderSelectOption[] 
     walk(root, '', index === roots.length - 1, 0);
   });
 
-  return [{ value: DEFAULT_INBOX_FOLDER, label: DEFAULT_INBOX_FOLDER }, ...options];
+  return [{ value: DEFAULT_INBOX_FOLDER, label: DEFAULT_INBOX_FOLDER, triggerLabel: DEFAULT_INBOX_FOLDER }, ...options];
 }
