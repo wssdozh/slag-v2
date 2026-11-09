@@ -7,7 +7,6 @@ import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { TaskStatusMark } from '../UI/TaskStatusMark';
 import {
   Maximize2,
-  MoreVertical,
   Calendar,
   ChevronDown,
   FileText,
@@ -541,7 +540,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         } p-2.5 sm:p-3 rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
-            : 'bg-surface/80 hover:bg-surface-hover border border-white/[0.05]'
+            : 'bg-surface hover:bg-surface-hover'
         }`}
       >
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
@@ -560,29 +559,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
           </button>
 
-          {!isMobile && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (isMobile) {
-                  setMobileActionSheetItem(item);
-                } else {
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  openContextMenu({
-                    x: rect.right - 224,
-                    y: rect.bottom + 6,
-                    type: 'item',
-                    item,
-                  });
-                }
-              }}
-              className="w-7 h-7 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer flex items-center justify-center shrink-0"
-              title="Действия"
-            >
-              <MoreVertical className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          )}
+          {/* Действия с карточкой живут на ПКМ: кнопка в углу дублировала меню и шумела. */}
 
           {/* Article Focus Editor Button in top-right corner - kept in place on the far right */}
           {isArticle && (

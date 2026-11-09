@@ -154,11 +154,11 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             ? `w-full flex flex-col gap-2 p-0 bg-transparent border-0 shadow-none relative ${
                 isDraggingOver ? 'rounded-2xl ring-2 ring-blue-500/50 bg-blue-500/[0.04]' : ''
               } ${className}`
-            : `rounded-2xl bg-surface-elevated border ${
+            : `rounded-2xl bg-surface-elevated ${
                 isDraggingOver
-                  ? 'border-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
-                  : 'border-white/[0.12]'
-              } p-2 flex flex-col gap-2 md:shadow-2xl md:shadow-black/50 focus-within:border-white/20 transition-colors w-full relative ${className}`
+                  ? 'ring-2 ring-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
+                  : 'focus-within:ring-1 focus-within:ring-white/10'
+              } p-2 flex flex-col gap-2 md:shadow-2xl md:shadow-black/50 transition-shadow w-full relative ${className}`
         }
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
