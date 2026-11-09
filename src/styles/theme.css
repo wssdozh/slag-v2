@@ -269,10 +269,15 @@
               opacity var(--slag-motion-base) var(--ease-standard);
   overflow: hidden;
   opacity: 0;
+  /* Collapsed text is still in the DOM, and a grid item reports its max-content width: inside
+     a `w-fit` card that made a picture card as wide as its hidden OCR text. Zero width while
+     closed means the card measures only what is on screen. */
+  width: 0;
 }
 .motion-accordion[data-expanded="true"] {
   grid-template-rows: 1fr;
   opacity: 1;
+  width: 100%;
 }
 .motion-accordion-inner {
   min-height: 0;

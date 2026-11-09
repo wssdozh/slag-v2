@@ -69,6 +69,30 @@ const NOTES = [
     })),
   },
   {
+    // A picture with recognised text: the panel is closed, so the card must stay a bubble.
+    // Its text used to live in the DOM and pull the card out to the whole column.
+    id: 'thumb_ocr',
+    type: 'note',
+    title: 'ocr',
+    content: '',
+    folder: 'Входящие',
+    tags: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    attachments: [
+      {
+        id: 'thumb_ocr_file',
+        name: 'poster-ocr.svg',
+        type: 'image',
+        mimeType: 'image/svg+xml',
+        size: 1024,
+        relativePath: '.attachments/poster-ocr.svg',
+        dataUrl: svg(400, 600, 'постер с текстом'),
+        extractedText: 'Lipsticks. Nails. Blades. ARASAKA — предупреждение о военном кибероружии, очень длинная строка распознанного текста, которая раньше распирала карточку.',
+      },
+    ],
+  },
+  {
     // A note whose bytes never arrived: an id that moved, an upload that got lost. The card
     // has to say so instead of showing the browser's broken-image icon.
     id: 'thumb_missing',
@@ -223,6 +247,22 @@ test.describe('feed thumbnails', () => {
     // Bytes that never arrived are a fact the card states, not a broken icon.
     await expect(page.locator('#item-thumb_missing [data-testid="media-missing"]')).toBeVisible();
     await expect(page.locator('#item-thumb_missing img')).toHaveCount(0);
+
+    // A recognised text panel is collapsed by default and must not stretch the card behind it:
+    // the picture keeps hugging its own width until the panel is opened on purpose.
+    const ocrCard = page.locator('#item-thumb_ocr');
+    const collapsed = await boxOf(page, '#item-thumb_ocr');
+    expect(collapsed.width).toBeLessThan(column.width - 100);
+    expect((await boxOf(page, '#item-thumb_ocr img')).width).toBeGreaterThan(200);
+
+    await ocrCard.getByTitle('Показать текст с фото').click();
+    await expect(ocrCard).toContainText('Lipsticks. Nails. Blades.');
+    const opened = await boxOf(page, '#item-thumb_ocr');
+    expect(opened.width).toBeGreaterThan(column.width - 40);
+
+    await ocrCard.getByTitle('Скрыть текст').click();
+    const closedAgain = await boxOf(page, '#item-thumb_ocr');
+    expect(closedAgain.width).toBeLessThan(column.width - 100);
 
     await page.locator('#item-thumb_album').scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-album-phone.png', fullPage: false });
