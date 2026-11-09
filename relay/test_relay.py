@@ -11,10 +11,12 @@ import socket
 import sqlite3
 import struct
 import tempfile
+import threading
 import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -22,6 +24,56 @@ from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
 from server import RelayDatabase, SlagRelayServer
 from unittest.mock import patch
+
+
+DEFAULT_KIE_RESPONSE = {
+    "id": "resp_test",
+    "object": "response",
+    "status": "completed",
+    "model": "deepseek-v4.1-flash",
+    "output": [{"type": "message", "role": "assistant",
+                "content": [{"type": "output_text", "text": '{"tags": ["react"]}'}]}],
+    "usage": {"input_tokens": 21, "output_tokens": 7, "total_tokens": 28},
+    "credits_consumed": 0.01,
+}
+
+
+class FakeKieUpstream:
+    """Stand-in for api.kie.ai/openai/v1/responses; records what the gateway sent."""
+
+    def __init__(self, response: dict | None = None, status: int = 200):
+        self.requests: list[dict] = []
+        self.response = DEFAULT_KIE_RESPONSE if response is None else response
+        self.status = status
+        upstream = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get("content-length", 0) or 0)
+                raw = self.rfile.read(length)
+                upstream.requests.append({
+                    "path": self.path,
+                    "authorization": self.headers.get("authorization"),
+                    "body": json.loads(raw.decode("utf-8")) if raw else {},
+                })
+                payload = json.dumps(upstream.response).encode("utf-8")
+                self.send_response(upstream.status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *args):
+                pass
+
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
+
+    def close(self) -> None:
+        self.httpd.shutdown()
+        self.httpd.server_close()
 
 
 def make_client_ws_frame(payload: bytes, opcode: int = 0x1) -> bytes:
@@ -59,7 +111,8 @@ class RelayTestCase(unittest.IsolatedAsyncioTestCase):
             self.port = sock.getsockname()[1]
         self.host = "127.0.0.1"
         self.base = f"http://{self.host}:{self.port}"
-        self.server = SlagRelayServer(self.host, self.port, self.db_path, require_account_auth=self.auth_required)
+        self.server = SlagRelayServer(self.host, self.port, self.db_path, require_account_auth=self.auth_required,
+                                      admin_token=getattr(self, "admin_token", None))
         self.server_task = asyncio.create_task(self.server.run())
         await asyncio.sleep(0.05)
 
@@ -113,6 +166,8 @@ class RelayTestCase(unittest.IsolatedAsyncioTestCase):
 
 
 class TestLegacyRelay(RelayTestCase):
+    admin_token = "test-admin-token"
+
     async def test_auth_environment_validation(self):
         for value in ("1", " true ", "yes", "on", "0", "false", "no", "off"):
             with patch.dict(os.environ, {"SLAG_REQUIRE_ACCOUNT_AUTH": value}):
@@ -141,9 +196,94 @@ class TestLegacyRelay(RelayTestCase):
 
         self.assertEqual((await self.http("POST", "/api/ai/chat", {}))[0], 401)
         self.assertEqual((await self.http("POST", "/api/ai/chat", {}, "free_user"))[0], 403)
-        status, answer = await self.http("POST", "/api/ai/chat", {"messages": []}, "legacy-room-token")
+        with patch.dict(os.environ, {"KIE_API_KEY": ""}):
+            status, answer = await self.http("POST", "/api/ai/chat", {"model": "deepseek-v4-1-flash"}, "legacy-room-token")
+        self.assertEqual(status, 503)
+        self.assertEqual(answer["error"], "upstream_not_configured")
+
+    async def test_ai_gateway_proxies_deepseek_responses(self):
+        upstream = FakeKieUpstream()
+        try:
+            payload = {
+                "model": "deepseek-v4.1-flash",
+                "instructions": "Отвечай строго JSON.",
+                "input": [{"type": "message", "role": "user",
+                           "content": [{"type": "input_text", "text": "Разбери заметку про react"}]}],
+                "reasoning": {"effort": "none"},
+            }
+            with patch.dict(os.environ, {"KIE_API_KEY": "master-test-key", "KIE_BASE_URL": upstream.url}):
+                status, answer = await self.http("POST", "/api/ai/chat", payload, "legacy-room-token")
+        finally:
+            upstream.close()
+
         self.assertEqual(status, 200)
-        self.assertIn("choices", answer)
+        self.assertEqual(answer["output"][0]["content"][0]["text"], '{"tags": ["react"]}')
+        self.assertEqual(len(upstream.requests), 1)
+        sent = upstream.requests[0]
+        self.assertEqual(sent["path"], "/openai/v1/responses")
+        self.assertEqual(sent["authorization"], "Bearer master-test-key")
+        self.assertEqual(sent["body"]["model"], "deepseek-v4-1-flash")
+        self.assertFalse(sent["body"]["stream"])
+        self.assertEqual(sent["body"]["instructions"], "Отвечай строго JSON.")
+        self.assertEqual(sent["body"]["input"][0]["content"][0]["text"], "Разбери заметку про react")
+
+        rows = self.server.db.conn.execute(
+            "SELECT model, prompt_tokens, completion_tokens FROM ai_usage_logs").fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["model"], "deepseek-v4.1-flash")
+        self.assertEqual(rows[0]["prompt_tokens"], 21)
+        self.assertEqual(rows[0]["completion_tokens"], 7)
+
+    async def test_ai_gateway_rejects_non_allowlisted_model(self):
+        upstream = FakeKieUpstream()
+        try:
+            with patch.dict(os.environ, {"KIE_API_KEY": "master-test-key", "KIE_BASE_URL": upstream.url}):
+                status, body = await self.http("POST", "/api/ai/chat",
+                                               {"model": "gpt-6-luna", "input": []}, "legacy-room-token")
+        finally:
+            upstream.close()
+        self.assertEqual(status, 400)
+        self.assertEqual(body["error"], "model_not_allowed")
+        self.assertEqual(upstream.requests, [])
+
+    async def test_ai_gateway_maps_kie_error_codes(self):
+        upstream = FakeKieUpstream(response={"code": 402, "msg": "insufficient credits", "data": None})
+        try:
+            with patch.dict(os.environ, {"KIE_API_KEY": "master-test-key", "KIE_BASE_URL": upstream.url}):
+                status, body = await self.http("POST", "/api/ai/chat",
+                                               {"model": "deepseek-v4-1-flash", "input": []}, "legacy-room-token")
+        finally:
+            upstream.close()
+        self.assertEqual(status, 402)
+        self.assertEqual(body["code"], 402)
+        self.assertEqual(self.server.db.conn.execute("SELECT COUNT(*) AS c FROM ai_usage_logs").fetchone()["c"], 0)
+
+    async def test_ai_gateway_rejects_non_json_upstream(self):
+        upstream = FakeKieUpstream(response={"unexpected": "shape"})
+        try:
+            with patch.dict(os.environ, {"KIE_API_KEY": "master-test-key", "KIE_BASE_URL": upstream.url}):
+                status, body = await self.http("POST", "/api/ai/chat",
+                                               {"model": "deepseek-v4-1-flash", "input": []}, "legacy-room-token")
+        finally:
+            upstream.close()
+        # Старый шлюз отдавал 200 с этим телом, и клиент молча падал в эвристику.
+        self.assertEqual(status, 502)
+        self.assertEqual(body["error"], "upstream_invalid_response")
+
+    async def test_admin_ai_ping_hits_real_upstream(self):
+        upstream = FakeKieUpstream()
+        try:
+            with patch.dict(os.environ, {"KIE_API_KEY": "master-test-key", "KIE_BASE_URL": upstream.url}):
+                status, body = await self.http("POST", "/api/admin/ai/ping", {}, self.admin_token)
+                stats_status, stats = await self.http("GET", "/api/admin/ai/stats", None, self.admin_token)
+        finally:
+            upstream.close()
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "ok")
+        self.assertGreaterEqual(body["latencyMs"], 0)
+        self.assertEqual(stats_status, 200)
+        self.assertEqual(stats["gatewayStatus"], "operational")
+        self.assertEqual(upstream.requests[0]["body"]["model"], "deepseek-v4-1-flash")
 
     async def test_anonymous_http_room(self):
         bundle = {"bundleId": "legacy-http-1", "fromDeviceId": "dev-1", "sequence": 1, "changes": []}
@@ -688,13 +828,29 @@ class TestAccountRelay(RelayTestCase):
 
     async def test_ai_requires_account_plan_not_room_token(self):
         identity, token, _ = await self.register()
-        self.assertEqual((await self.http("POST", "/api/ai/chat", {}, "room_smile_valid_token"))[0], 401)
-        self.assertEqual((await self.http("POST", "/api/ai/chat", {}, token))[0], 403)
+        self.assertEqual((await self.http("POST", "/api/ai/chat", {"model": "deepseek-v4-1-flash", "input": []},
+                                          "room_smile_valid_token"))[0], 401)
+        self.assertEqual((await self.http("POST", "/api/ai/chat", {"model": "deepseek-v4-1-flash", "input": []},
+                                          token))[0], 403)
         self.server.db.conn.execute("UPDATE accounts SET plan = 'smile' WHERE account_id = ?", (identity["accountId"],))
         self.server.db.conn.commit()
-        status, answer = await self.http("POST", "/api/ai/chat", {"messages": []}, token)
+
+        upstream = FakeKieUpstream()
+        try:
+            with patch.dict(os.environ, {"KIE_API_KEY": "master-test-key", "KIE_BASE_URL": upstream.url}):
+                status, answer = await self.http("POST", "/api/ai/chat", {
+                    "model": "deepseek-v4-1-flash",
+                    "input": [{"type": "message", "role": "user",
+                               "content": [{"type": "input_text", "text": "Разбери заметку"}]}],
+                }, token)
+        finally:
+            upstream.close()
+
         self.assertEqual(status, 200)
-        self.assertIn("choices", answer)
+        self.assertIn("output", answer)
+        self.assertEqual(len(upstream.requests), 1)
+        row = self.server.db.conn.execute("SELECT account_id FROM ai_usage_logs").fetchone()
+        self.assertEqual(row["account_id"], identity["accountId"])
         _, account = await self.http("GET", "/api/account", token=token)
         self.assertTrue(account["account"]["hasAiLease"])
         self.assertEqual(account["account"]["maxCacheMb"], 10240)

@@ -75,6 +75,35 @@ before release:
 5. verify `/health` reports `authRequired=true`; anonymous pair creation and room access must return 401, while account login, approved-device access and authenticated websocket sync pass.
 6. invalidate disposable http-era sessions and rotate test credentials; never reuse tokens exposed during http testing.
 
+## ai gateway — 2026-11-09
+
+the subscription AI path is served by the relay at `POST /api/ai/chat`, which proxies
+`{KIE_BASE_URL}/openai/v1/responses` with the master key. KIE does **not** serve chat models on
+`/v1/chat/completions` (every model there answers `422 model not supported`), so the Responses
+protocol is the only working route.
+
+required env (systemd drop-in, `chmod 600`):
+
+| variable | default | meaning |
+| --- | --- | --- |
+| `KIE_API_KEY` | — | master key. absent → `503 upstream_not_configured`, never a fake answer |
+| `KIE_BASE_URL` | `https://api.kie.ai` | upstream base |
+| `SLAG_AI_MODEL` | `deepseek-v4-1-flash` | the only model the gateway allows; everything else → `400` |
+| `SLAG_AI_DAILY_LIMIT` | `500` | per-account requests per 24 h → `429` |
+| `SLAG_AI_TIMEOUT_SECONDS` | `60` | upstream timeout; the call runs in `asyncio.to_thread` |
+
+gate behaviour: no token → `401`, free plan → `403 subscription_required`, non-allowlisted model →
+`400 model_not_allowed`, KIE error body (`HTTP 200` + `{"code":...}`) → mapped `429`/`402`/`502`,
+short/odd bodies → `502 upstream_invalid_response`. successful calls write `ai_usage_logs`
+(tokens + latency, never content) and show up in `/api/admin/ai/stats` and `/api/admin/ai/logs`.
+`POST /api/admin/ai/ping` performs a real one-word upstream call.
+
+acceptance probe (creates a disposable account, sets `plan=smile`, blocks it at the end):
+
+```sh
+SLAG_ADMIN_TOKEN=<admin token> python relay/ai_smoke.py --server http://152.53.199.71:8320
+```
+
 check live state without printing environment secrets:
 
 ```sh

@@ -138,7 +138,7 @@ export class AssistantOrchestrator {
               apiKey,
               endpointUrl,
               model,
-              reasoningEffort: settings.reasoningEffort,
+              reasoningEffort: target.reasoningEffort ?? settings.reasoningEffort,
               webSearchEnabled: settings.webSearchEnabled,
               turnHistory,
               isLastAllowedRound,

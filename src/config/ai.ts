@@ -5,9 +5,11 @@ export const AI_ENDPOINTS = {
 } as const;
 
 export const DEFAULT_AI_MODELS = {
+  // KIE serves chat models through the OpenAI Responses protocol; the subscription
+  // gateway pins every tier to the one model we actually pay for.
   SUBSCRIPTION_TIERS: {
-    fast: 'gemini-2.0-flash',
-    smart: 'claude-haiku-5-5',
+    fast: 'deepseek-v4-1-flash',
+    smart: 'deepseek-v4-1-flash',
     deep: 'deepseek-v4-1-flash',
   },
   GROQ_DEFAULT: 'openai/gpt-oss-120b',
@@ -15,6 +17,12 @@ export const DEFAULT_AI_MODELS = {
   GEMINI_DEFAULT: 'gemini-2.0-flash',
   WHISPER_DEFAULT: 'whisper-large-v3-turbo',
   GROQ_VISION_CANDIDATES: ['qwen/qwen3.8-27b', 'qwen-3.8-27b'] as const,
+} as const;
+
+export const SUBSCRIPTION_TIER_EFFORT = {
+  fast: 'none',
+  smart: 'low',
+  deep: 'high',
 } as const;
 
 export const AI_LIMITS = {

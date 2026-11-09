@@ -6,7 +6,7 @@ import { logger } from '../logger';
 import { OpenAiChatAdapter } from './adapters/openAiAdapter';
 import { OpenAiResponsesAdapter } from './adapters/openAiResponsesAdapter';
 import { AnthropicMessagesAdapter } from './adapters/anthropicAdapter';
-import { AI_ENDPOINTS, DEFAULT_AI_MODELS } from '../../config';
+import { AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT } from '../../config';
 
 const aiLog = logger.scope('AI');
 
@@ -17,6 +17,7 @@ export interface AiResolvedTarget {
   endpointUrl: string;
   adapter: LlmProtocolAdapter;
   isSubscriptionMode: boolean;
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
 }
 
 export interface PromptRequest {
@@ -70,8 +71,10 @@ export function resolveAiTarget(settings: AiSettings): AiResolvedTarget | null {
       apiKey,
       model,
       endpointUrl: `${cleanServer}/api/ai/chat`,
-      adapter: new OpenAiChatAdapter(),
+      // KIE serves chat models over the Responses protocol; the relay proxies it verbatim.
+      adapter: new OpenAiResponsesAdapter(),
       isSubscriptionMode: true,
+      reasoningEffort: SUBSCRIPTION_TIER_EFFORT[tier as keyof typeof SUBSCRIPTION_TIER_EFFORT] || 'low',
     };
   }
 
@@ -185,7 +188,7 @@ export async function completePrompt(
       apiKey: target.apiKey,
       endpointUrl: target.endpointUrl,
       model: target.model,
-      reasoningEffort: settings.reasoningEffort || 'low',
+      reasoningEffort: target.reasoningEffort ?? settings.reasoningEffort ?? 'low',
       webSearchEnabled: false,
       turnHistory: [],
       isLastAllowedRound: true,
@@ -200,7 +203,8 @@ export async function completePrompt(
 
     return { text, target };
   } catch (err) {
-    aiLog.warn(`AI call failed [${target.providerName}] (${Math.round(performance.now() - start)}ms), falling back`, err);
+    const reason = err instanceof Error ? err.message : String(err);
+    aiLog.warn(`AI call failed [${target.providerName}] (${Math.round(performance.now() - start)}ms): ${reason}`);
     return null;
   }
 }

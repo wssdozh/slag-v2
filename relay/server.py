@@ -568,6 +568,23 @@ class RelayDatabase:
                 (f"aud_{secrets.token_hex(6)}", action, target_type, target_id, details, time.time())
             )
 
+    def record_ai_usage(self, account_id: str, model: str, prompt_tokens: int, completion_tokens: int,
+                        latency_ms: float) -> None:
+        """Stores token and latency counters only — never the prompt or the reply text."""
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO ai_usage_logs VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (f"ai_{secrets.token_hex(6)}", account_id, model,
+                 max(0, int(prompt_tokens)), max(0, int(completion_tokens)), float(latency_ms), time.time())
+            )
+
+    def count_ai_requests_since(self, account_id: str, since_ts: float) -> int:
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM ai_usage_logs WHERE account_id = ? AND created_at >= ?",
+            (account_id, since_ts)
+        ).fetchone()
+        return int(row["c"])
+
     def account_payload(self, account_id: str) -> dict:
         account = self.conn.execute("SELECT * FROM accounts WHERE account_id = ?", (account_id,)).fetchone()
         if not account:
@@ -847,8 +864,9 @@ class SlagRelayServer:
 
     def _json_response(self, data: dict, status: int = 200) -> bytes:
         labels = {200: "OK", 201: "Created", 202: "Accepted", 204: "No Content", 400: "Bad Request",
-                  401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict",
-                  413: "Payload Too Large", 429: "Too Many Requests", 502: "Bad Gateway"}
+                  401: "Unauthorized", 402: "Payment Required", 403: "Forbidden", 404: "Not Found",
+                  409: "Conflict", 413: "Payload Too Large", 429: "Too Many Requests",
+                  502: "Bad Gateway", 503: "Service Unavailable", 504: "Gateway Timeout"}
         return self._http_response(status, labels.get(status, "Error"), "application/json", json.dumps(data).encode("utf-8"))
 
     async def _send_response(self, writer: asyncio.StreamWriter, resp_bytes: bytes) -> None:
@@ -866,6 +884,57 @@ class SlagRelayServer:
         if value.lower().startswith("bearer "):
             return value[7:].strip()
         return value if allow_raw else ""
+
+    @staticmethod
+    def _normalize_ai_model(model: str) -> str:
+        return str(model or "").strip().lower().replace(".", "-")
+
+    @staticmethod
+    def _ai_model() -> str:
+        return os.environ.get("SLAG_AI_MODEL", "").strip() or "deepseek-v4-1-flash"
+
+    @staticmethod
+    def _kie_base_url() -> str:
+        return (os.environ.get("KIE_BASE_URL", "").strip() or "https://api.kie.ai").rstrip("/")
+
+    @staticmethod
+    def _ai_timeout_seconds() -> float:
+        try:
+            return max(5.0, min(180.0, float(os.environ.get("SLAG_AI_TIMEOUT_SECONDS", "60"))))
+        except ValueError:
+            return 60.0
+
+    @staticmethod
+    def _ai_daily_limit() -> int:
+        try:
+            return max(0, int(os.environ.get("SLAG_AI_DAILY_LIMIT", "500")))
+        except ValueError:
+            return 500
+
+    @staticmethod
+    def _call_ai_upstream(url: str, api_key: str, payload: dict, timeout: float) -> Tuple[object, bytes]:
+        """Blocking upstream call, always run through `asyncio.to_thread`.
+
+        Returns ("timeout" | "network" | int_http_status, raw_body). Never raises.
+        """
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "Authorization": api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}",
+                     "User-Agent": "SLAG-Relay-Gateway/0.2.0"},
+            method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status, resp.read()
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read()
+        except urllib.error.URLError as exc:
+            reason = exc.reason
+            return ("timeout" if isinstance(reason, TimeoutError) else "network"), b""
+        except TimeoutError:
+            return "timeout", b""
+        except Exception:
+            return "network", b""
 
     def _auth(self, headers: dict) -> dict:
         auth = self.db.authenticate(self._bearer(headers))
@@ -1195,7 +1264,7 @@ class SlagRelayServer:
             master_key = os.environ.get("KIE_API_KEY", "").strip()
             return {
                 "status": "ok",
-                "gatewayStatus": "operational" if master_key else "mock_gateway",
+                "gatewayStatus": "operational" if master_key else "unconfigured",
                 "totalRequests": stats_row["total_reqs"],
                 "totalPromptTokens": stats_row["total_prompt"],
                 "totalCompletionTokens": stats_row["total_comp"],
@@ -1222,16 +1291,41 @@ class SlagRelayServer:
 
         if method == "POST" and path == "/api/admin/ai/ping":
             self._admin_auth(headers)
-            t0 = time.time()
-            model = body.get("model", "deepseek-v4-1-flash")
-            # Minimal internal latency check
-            latency_ms = round((time.time() - t0 + 0.045) * 1000, 1)
-            with self.db.conn:
-                self.db.conn.execute(
-                    "INSERT INTO ai_usage_logs VALUES (?, 'admin', ?, 12, 10, ?, ?)",
-                    (f"ai_{secrets.token_hex(6)}", model, latency_ms, time.time())
-                )
-            return {"status": "ok", "latencyMs": latency_ms, "model": model}, 200
+            master_api_key = os.environ.get("KIE_API_KEY", "").strip()
+            if not master_api_key:
+                return {"error": "upstream_not_configured"}, 503
+            model = self._ai_model()
+            probe = {
+                "model": model,
+                "stream": False,
+                "input": [{"type": "message", "role": "user",
+                           "content": [{"type": "input_text", "text": "ping"}]}],
+                "reasoning": {"effort": "none"},
+            }
+            started = time.time()
+            outcome, raw = await asyncio.to_thread(
+                SlagRelayServer._call_ai_upstream,
+                f"{self._kie_base_url()}/openai/v1/responses",
+                master_api_key, probe, self._ai_timeout_seconds())
+            latency_ms = round((time.time() - started) * 1000, 1)
+            if outcome == "timeout":
+                return {"error": "upstream_timeout", "latencyMs": latency_ms}, 504
+            if outcome != 200:
+                return {"error": "upstream_unavailable", "upstreamStatus": outcome, "latencyMs": latency_ms}, 502
+            try:
+                data = json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return {"error": "upstream_invalid_response", "latencyMs": latency_ms}, 502
+            if (not isinstance(data, dict) or data.get("error")
+                    or (data.get("code") is not None and data.get("code") != 200)
+                    or not isinstance(data.get("output"), list)):
+                return {"error": "upstream_error", "latencyMs": latency_ms}, 502
+            usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+            self.db.record_ai_usage(
+                "admin", str(data.get("model") or model),
+                int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0), latency_ms)
+            return {"status": "ok", "latencyMs": latency_ms, "model": str(data.get("model") or model),
+                    "creditsConsumed": data.get("credits_consumed")}, 200
 
         if method == "GET" and path == "/api/admin/audit":
             self._admin_auth(headers)
@@ -1818,37 +1912,75 @@ class SlagRelayServer:
                     return {"error": "unauthorized"}, 401
                 if auth["plan"] == "free":
                     return {"error": "subscription_required"}, 403
-            elif auth_token.startswith("free_") or auth_token == "free":
-                return {"error": "subscription_required"}, 403
+                account_id = auth["account_id"]
+            else:
+                if auth_token.startswith("free_") or auth_token == "free":
+                    return {"error": "subscription_required"}, 403
+                account_id = "self-hosted"
 
             master_api_key = os.environ.get("KIE_API_KEY", "").strip()
             if not master_api_key:
-                acc_id = auth["account_id"] if self.require_account_auth and auth else "demo"
-                model_name = body.get("model", "deepseek-v4-1-flash")
-                with self.db.conn:
-                    self.db.conn.execute(
-                        "INSERT INTO ai_usage_logs VALUES (?, ?, ?, 15, 12, 45.0, ?)",
-                        (f"ai_{secrets.token_hex(6)}", acc_id, model_name, time.time())
-                    )
-                return {"id": f"chatcmpl-{secrets.token_hex(8)}", "object": "chat.completion", "created": int(time.time()),
-                        "model": model_name,
-                        "choices": [{"index": 0, "message": {"role": "assistant", "content": "Запрос обработан через защищённый релей-шлюз SLAG (без логов в памяти)."}, "finish_reason": "stop"}],
-                        "usage": {"prompt_tokens": 15, "completion_tokens": 12, "total_tokens": 27}}, 200
+                return {"error": "upstream_not_configured"}, 503
 
-            upstream_url = os.environ.get("KIE_BASE_URL", "https://api.kie.ai").rstrip("/") + "/v1/chat/completions"
-            req = urllib.request.Request(upstream_url, data=json.dumps(body).encode("utf-8"),
-                                         headers={"Content-Type": "application/json",
-                                                  "Authorization": master_api_key if master_api_key.startswith("Bearer ") else f"Bearer {master_api_key}",
-                                                  "User-Agent": "SLAG-Relay-Gateway/0.2.0"}, method="POST")
+            allowed_model = self._ai_model()
+            requested_model = str(body.get("model") or "").strip()
+            if not requested_model or self._normalize_ai_model(requested_model) != self._normalize_ai_model(allowed_model):
+                return {"error": "model_not_allowed", "allowed": allowed_model}, 400
+
+            daily_limit = self._ai_daily_limit()
+            if daily_limit > 0 and self.db.count_ai_requests_since(account_id, time.time() - 86400) >= daily_limit:
+                return {"error": "ai_daily_limit", "limit": daily_limit}, 429
+
+            # KIE chat models speak the OpenAI Responses protocol, not /v1/chat/completions.
+            upstream_payload = {**body, "model": allowed_model, "stream": False}
+            started = time.time()
+            outcome, raw = await asyncio.to_thread(
+                SlagRelayServer._call_ai_upstream,
+                f"{self._kie_base_url()}/openai/v1/responses",
+                master_api_key, upstream_payload, self._ai_timeout_seconds())
+            latency_ms = (time.time() - started) * 1000
+
+            if outcome == "timeout":
+                return {"error": "upstream_timeout"}, 504
+            if outcome == "network" or not isinstance(outcome, int):
+                return {"error": "upstream_gateway_failed"}, 502
+            if not 200 <= outcome < 300:
+                logger.warning("AI upstream HTTP %s", outcome)
+                return {"error": "upstream_gateway_failed", "upstreamStatus": outcome}, 502
+
             try:
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    await self._send_response(writer, self._http_response(resp.status, "OK", "application/json", resp.read()))
-            except urllib.error.HTTPError as exc:
-                await self._send_response(writer, self._http_response(exc.code, "Upstream Error", "application/json", exc.read()))
-            except Exception as exc:
-                logger.warning("Upstream AI gateway exception: %s", type(exc).__name__)
-                await self._send_response(writer, self._json_response({"error": "upstream_gateway_failed"}, 502))
-            return None
+                data = json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return {"error": "upstream_invalid_response"}, 502
+            if not isinstance(data, dict):
+                return {"error": "upstream_invalid_response"}, 502
+
+            error_obj = data.get("error")
+            if error_obj:
+                message = error_obj.get("message") if isinstance(error_obj, dict) else error_obj
+                logger.warning("AI upstream error: %s", str(message)[:200])
+                return {"error": "upstream_error", "detail": str(message)[:200]}, 502
+
+            upstream_code = data.get("code")
+            if upstream_code is not None and upstream_code != 200:
+                message = str(data.get("msg") or "upstream_error")[:200]
+                logger.warning("AI upstream code %s: %s", upstream_code, message)
+                status = 429 if upstream_code == 429 else 402 if upstream_code == 402 else 502
+                return {"error": message, "code": upstream_code}, status
+
+            usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+            # Anything without a Responses-shaped payload is not a real answer —
+            # returning it as 200 is exactly how the old stub poisoned the client.
+            if not isinstance(data.get("output"), list):
+                return {"error": "upstream_invalid_response"}, 502
+            self.db.record_ai_usage(
+                account_id,
+                str(data.get("model") or allowed_model),
+                int(usage.get("input_tokens") or 0),
+                int(usage.get("output_tokens") or 0),
+                latency_ms,
+            )
+            return data, 200
 
         if method in ("GET", "HEAD") and not path.startswith("/api/") and path != "/health":
             static_dir = os.environ.get("SLAG_STATIC_DIR") or str(Path(__file__).resolve().parent / "dist")
