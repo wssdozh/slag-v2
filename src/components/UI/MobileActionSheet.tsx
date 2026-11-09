@@ -12,9 +12,6 @@ import {
   CornerUpLeft,
   Pin,
   Sparkles,
-  CopyPlus,
-  Archive,
-  Link2,
 } from 'lucide-react';
 import { useItemActions } from '../../hooks/useItemActions';
 
@@ -191,35 +188,11 @@ export const MobileActionSheet: React.FC = () => {
         {/* Secondary Utilities List (Clean hairline divide, no card-in-card podlozhki) */}
         <div className="flex flex-col rounded-xl overflow-hidden divide-y divide-white/[0.06] border border-white/[0.06] bg-surface">
           <button
-            onClick={actions.handleDuplicate}
-            className="w-full h-11 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-surface-hover active:bg-surface-hover transition-colors cursor-pointer text-left"
-          >
-            <CopyPlus className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span>Дублировать</span>
-          </button>
-
-          <button
-            onClick={actions.handleCopyFullLink}
-            className="w-full h-11 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-surface-hover active:bg-surface-hover transition-colors cursor-pointer text-left"
-          >
-            <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span>Скопировать фулл ссылку</span>
-          </button>
-
-          <button
             onClick={actions.handleCopyLink}
             className="w-full h-11 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-surface-hover active:bg-surface-hover transition-colors cursor-pointer text-left"
           >
             <Copy className="w-4 h-4 text-zinc-400 shrink-0" />
             <span>Копировать [[линк]]</span>
-          </button>
-
-          <button
-            onClick={actions.handleToggleArchive}
-            className="w-full h-11 px-3.5 flex items-center gap-3 text-xs text-zinc-300 hover:text-white hover:bg-surface-hover active:bg-surface-hover transition-colors cursor-pointer text-left"
-          >
-            <Archive className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span>{item.isArchived ? 'Разархивировать' : 'В архив'}</span>
           </button>
 
           <button
@@ -230,14 +203,6 @@ export const MobileActionSheet: React.FC = () => {
             <span className="font-medium">Удалить</span>
           </button>
         </div>
-
-        {/* Cancel Button */}
-        <button
-          onClick={handleClose}
-          className="w-full h-10 rounded-xl bg-surface-elevated hover:bg-surface-hover active:bg-surface-hover text-zinc-300 hover:text-white font-medium text-xs flex items-center justify-center transition-colors cursor-pointer"
-        >
-          Отмена
-        </button>
       </div>
     </div>
   );

@@ -18,8 +18,6 @@ import {
   Pin,
   ChevronRight,
   Sparkles,
-  CopyPlus,
-  Archive,
   Info,
   MoreVertical,
   Check,
@@ -153,19 +151,9 @@ export const ContextMenu: React.FC = () => {
         actions.handleOpenInExplorer();
         return;
       }
-      if (mod && e.shiftKey && (e.code === 'KeyL' || e.key.toLowerCase() === 'l' || e.key.toLowerCase() === 'д')) {
-        e.preventDefault();
-        actions.handleCopyFullLink();
-        return;
-      }
       if (mod && (e.code === 'KeyE' || e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'у')) {
         e.preventDefault();
         actions.handleOpenFocus();
-        return;
-      }
-      if (mod && (e.code === 'KeyD' || e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'в')) {
-        e.preventDefault();
-        actions.handleDuplicate();
         return;
       }
       if (mod && (e.code === 'KeyL' || e.key.toLowerCase() === 'l' || e.key.toLowerCase() === 'д')) {
@@ -667,26 +655,6 @@ export const ContextMenu: React.FC = () => {
           <button
             onClick={async () => {
               if (type === 'item') {
-                actions.handleCopyFullLink();
-              } else if (folder) {
-                const fullLink = `slag://folder/${folder.path}`;
-                navigator.clipboard.writeText(fullLink);
-                addToast(`Скопирована ссылка: ${fullLink}`, 'success');
-                closeContextMenu();
-              }
-            }}
-            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Link2 className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="whitespace-nowrap">Скопировать фулл ссылку</span>
-            </div>
-            <span className="text-[10px] text-zinc-500 font-mono">slag://</span>
-          </button>
-
-          <button
-            onClick={async () => {
-              if (type === 'item') {
                 actions.handleCopyFullPath();
               } else if (folder) {
                 const fullPath = await storage.getFolderAbsolutePath(folder.path);
@@ -748,25 +716,6 @@ export const ContextMenu: React.FC = () => {
               <span>Копировать [[линк]]</span>
             </div>
             <span className="text-[10px] text-zinc-500 font-mono">⌘L</span>
-          </button>
-
-          <button
-            onClick={actions.handleDuplicate}
-            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <CopyPlus className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Дублировать</span>
-            </div>
-            <span className="text-[10px] text-zinc-500 font-mono">⌘D</span>
-          </button>
-
-          <button
-            onClick={actions.handleToggleArchive}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
-          >
-            <Archive className="w-3.5 h-3.5 text-zinc-400" />
-            <span>{item.isArchived ? 'Разархивировать' : 'В архив'}</span>
           </button>
         </Flyout>
       )}

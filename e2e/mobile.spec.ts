@@ -339,8 +339,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.waitForTimeout(360);
     await page.screenshot({ path: 'test-results/screenshots/mobile_action_sheet.png' });
 
-    // Dismiss by tapping "Отмена"
-    await page.locator('button', { hasText: 'Отмена' }).click();
+    // The sheet has no cancel button any more: tapping the backdrop dismisses it.
+    await expect(page.locator('button', { hasText: 'Отмена' })).toHaveCount(0);
+    await page.getByTestId('action-sheet').click({ position: { x: 10, y: 10 } });
     await expect(actionSheet).not.toBeVisible();
   });
 

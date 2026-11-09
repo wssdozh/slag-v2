@@ -55,10 +55,12 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     await expect(moreBtn).toBeVisible();
     await moreBtn.hover();
 
-    const moreSubmenu = contextMenu.locator('button', { hasText: 'Дублировать' }).locator('..');
+    const moreSubmenu = contextMenu.locator('button', { hasText: 'Копировать [[линк]]' }).locator('..');
     await expect(moreSubmenu).toBeVisible();
     await expect(moreSubmenu.locator('button', { hasText: 'Копировать [[линк]]' })).toBeVisible();
-    await expect(moreSubmenu.locator('button', { hasText: 'Дублировать' })).toBeVisible();
+    // Duplicate, archive and full link were removed from the menu for good.
+    await expect(moreSubmenu.locator('button', { hasText: 'Дублировать' })).toHaveCount(0);
+    await expect(moreSubmenu.locator('button', { hasText: 'В архив' })).toHaveCount(0);
 
     const moreBox = await moreSubmenu.boundingBox();
     if (mainBox && moreBox) {
@@ -99,7 +101,7 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     const explorerSubmenu = contextMenu.locator('button', { hasText: 'Открыть в проводнике' }).locator('..');
     await expect(explorerSubmenu).toBeVisible();
     await expect(explorerSubmenu.locator('button', { hasText: 'Открыть в проводнике' })).toBeVisible();
-    await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toBeVisible();
+    await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toHaveCount(0);
     await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать полный путь' })).toBeVisible();
     await expect(explorerSubmenu.locator('button', { hasText: 'Относительный путь' })).toBeVisible();
 
@@ -109,17 +111,8 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
       fullPage: false,
     });
 
-    // Click "Скопировать фулл ссылку"
-    await explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' }).click();
-    const toast = page.locator('text=Скопирована ссылка: slag://note/');
-    await expect(toast).toBeVisible();
-
-    // Capture screenshot verifying toast position at top-center
-    await page.screenshot({
-      path: 'test-results/screenshots/toast_top_center.png',
-      fullPage: false,
-    });
-
+    // "Скопировать фулл ссылку" is gone: the explorer flyout keeps paths only.
+    await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toHaveCount(0);
     // 8. Verify Folder Context Menu has Explorer flyout submenu
     const careerFolderNode = page.locator('aside span', { hasText: 'Карьера' }).first();
     await careerFolderNode.click({ button: 'right' });
@@ -132,7 +125,7 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
 
     const folderExplorerSubmenu = folderContextMenu.locator('button', { hasText: 'Открыть в проводнике' }).locator('..');
     await expect(folderExplorerSubmenu).toBeVisible();
-    await expect(folderExplorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toBeVisible();
+    await expect(folderExplorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toHaveCount(0);
     await expect(folderExplorerSubmenu.locator('button', { hasText: 'Скопировать полный путь' })).toBeVisible();
     await expect(folderExplorerSubmenu.locator('button', { hasText: 'Относительный путь' })).toBeVisible();
 

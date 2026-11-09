@@ -56,7 +56,7 @@ test.describe('Backup & Restore System Verification', () => {
     await page.keyboard.press('Escape');
     await expect(settingsModal).not.toBeVisible();
 
-    // 8. Delete the note from the feed via context menu
+    // 8. Delete the note from the feed via context menu (confirm is accepted by the dialog handler above)
     await noteCard.click({ button: 'right' });
     const deleteMenuItem = page.locator('button', { hasText: 'Удалить' }).first();
     await expect(deleteMenuItem).toBeVisible();

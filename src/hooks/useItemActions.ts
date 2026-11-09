@@ -189,6 +189,8 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
 
   const handleDelete = () => {
     if (!item) return;
+    // The menu can be reached with one keystroke; deleting without asking is a data-loss trap.
+    if (!window.confirm(`Удалить «${item.title || 'без названия'}»? Запись уйдёт в корзину.`)) return;
     deleteItem(item.id);
     onDone?.();
   };
