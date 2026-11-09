@@ -4,7 +4,7 @@ import { Select } from '../UI/Select';
 import { ResponsiveSegmented, type SegmentedOption } from '../UI/ResponsiveSegmented';
 import {
   ArrowLeft,
-  Save,
+  ArrowUp,
   Trash2,
   StickyNote,
   FileText,
@@ -555,14 +555,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             <Eye className="w-4 h-4" />
           </button>
 
-          {/* Linear Dark Save Button (no kbd badge) */}
+          {/* Send, the same plate the composer sends with: it is the one commit action here. */}
           <button
             onClick={onSave}
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-zinc-100 text-xs font-medium border border-white/[0.08] hover:border-white/[0.16] shadow-sm cursor-pointer motion-press"
+            className="hidden md:flex w-ctrl-sm h-ctrl-sm items-center justify-center rounded-full bg-accent-strong text-white hover:bg-accent-strong/90 shadow-sm cursor-pointer motion-press"
             title="Сохранить изменения (Ctrl+S / ⌘S)"
+            aria-label={item.id.startsWith('draft_') ? 'Создать' : 'Готово'}
           >
-            <Save className="w-4 h-4 text-zinc-300" />
-            <span>{item.id.startsWith('draft_') ? 'Создать' : 'Готово'}</span>
+            <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
           </button>
         </div>
       </div>
