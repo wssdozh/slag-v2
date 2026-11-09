@@ -104,6 +104,15 @@ export async function readEntryObjectUrl(uri: DeviceUri, mimeType: string): Prom
 }
 
 /**
+ * The same entry as a URL a `<video>` can stream: the plugin's own protocol serves the content
+ * URI with range requests, so seeking works and a 200 MB clip never lands in the webview heap.
+ * The caller owns nothing — there is no blob to revoke.
+ */
+export function entryStreamSrc(uri: DeviceUri): string {
+  return androidFs.convertFileSrc(uri);
+}
+
+/**
  * A preview for a grid cell, or a bigger one when the cell is opened full screen.
  * `null` means "no preview", not "broken".
  */

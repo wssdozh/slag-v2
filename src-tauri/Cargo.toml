@@ -27,7 +27,9 @@ tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
 # Android content:// file access (SAF trees, pickers, thumbnails). Pinned: its major tracks
 # tauri's major, and a minor drift silently changes the ACL against capabilities/default.json.
-tauri-plugin-android-fs = "=30.2.0"
+# `protocol-content` serves a content:// URI over `android-fs-content://` with range requests,
+# which is the only way a video plays without loading the whole file into the webview.
+tauri-plugin-android-fs = { version = "=30.2.0", features = ["protocol-content"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 

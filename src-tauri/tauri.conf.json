@@ -52,6 +52,11 @@
   "plugins": {
     "fs": {
       "requireLiteralLeadingDot": false
+    },
+    "android-fs": {
+      "contentProtocol": {
+        "enable": true
+      }
     }
   },
   "bundle": {
