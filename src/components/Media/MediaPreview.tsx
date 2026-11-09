@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X } from 'lucide-react';
-import { readEntryObjectUrl, readEntryThumbnail } from '../../lib/media/folderBrowser';
+import { ArrowLeft, Check } from 'lucide-react';
+import { entryStreamSrc, readEntryObjectUrl, readEntryThumbnail } from '../../lib/media/folderBrowser';
 import { enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePhotoPager } from '../../hooks/gestures/usePhotoPager';
+import { SendButton } from '../UI/SendButton';
+import { ViewerVideo } from './ViewerVideo';
 import type { DeviceMediaItem, DevicePick } from '../../types';
 
 /** Full bytes for the photo on screen; above this the stored thumbnail is all we show. */
 const FULL_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
+/** Idle before the chrome leaves, the way a phone gallery behaves. */
+const CHROME_IDLE_MS = 2500;
 
 interface PreviewImageProps {
   item: DeviceMediaItem;
@@ -65,7 +69,7 @@ export interface MediaPreviewProps {
 }
 
 /**
- * One photo, full screen, swipe to the next. Selection lives here rather than in the grid, the
+ * One file, full screen, swipe to the next. Selection lives here rather than in the grid, the
  * way every gallery on a phone does it: open, look, tick, swipe on.
  *
  * Portalled to the body on purpose: the sheet owns a `translate`, and a translated ancestor is
@@ -101,6 +105,7 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
     index,
     onIndexChange,
     onDismiss: close,
+    hideChromeAfter: CHROME_IDLE_MS,
   });
 
   useEffect(() => {
@@ -124,6 +129,8 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
 
   if (!item) return null;
 
+  const chrome = isChromeVisible ? 'opacity-100' : 'pointer-events-none opacity-0';
+
   return createPortal(
     <div
       ref={(node) => {
@@ -135,37 +142,43 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
       style={{ touchAction: 'none' }}
       {...handlers}
     >
+      {/* The bars are gradients over the frame: the slide area keeps clear of them so a photo is
+          neither cropped by the title nor covered by the attach plate. */}
       <div
-        className={`absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/80 to-transparent px-3 pb-6 pt-[max(var(--sat),0.75rem)] transition-opacity duration-150 ${
-          isChromeVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
+        className={`absolute inset-x-0 top-0 z-10 flex items-center gap-1 bg-gradient-to-b from-black/80 to-transparent px-2 pb-8 pt-[max(var(--sat),0.5rem)] transition-opacity duration-150 ${chrome}`}
       >
         <button
           type="button"
           onClick={close}
-          aria-label="Закрыть"
-          className="cursor-pointer rounded-full p-2 text-fg-secondary transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Назад"
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/10 hover:text-white"
         >
-          <X className="h-4 w-4" />
+          <ArrowLeft className="h-5 w-5" />
         </button>
-        <span className="min-w-0 truncate text-xs text-fg-secondary">{item.name}</span>
-        <span className="ml-auto shrink-0 font-mono text-[10px] text-fg-muted">{index + 1} / {items.length}</span>
+        <div className="min-w-0 flex-1 text-center">
+          <p className="truncate text-[13px] font-medium leading-tight text-white">{item.name}</p>
+          <p className="font-mono text-[10px] leading-tight text-white/50">{index + 1} из {items.length}</p>
+        </div>
         <button
           type="button"
           onClick={() => onToggle(item)}
           aria-label={isSelected ? 'Убрать из выбранных' : 'Выбрать'}
           aria-pressed={isSelected}
-          className={`flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors ${
+          className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors ${
             isSelected
               ? 'border-accent-strong bg-accent-strong text-white'
-              : 'border-white/40 text-white/70 hover:border-white/70'
+              : 'border-white/40 text-white/80 hover:border-white/70 hover:text-white'
           }`}
         >
-          <Check className="h-3.5 w-3.5" />
+          <Check className="h-4 w-4" />
         </button>
       </div>
 
-      <div ref={stageRef} className="flex min-h-0 flex-1 items-center justify-center will-change-transform">
+      <div
+        ref={stageRef}
+        className="flex min-h-0 flex-1 items-center justify-center will-change-transform"
+        style={{ paddingTop: 'calc(var(--sat) + 64px)', paddingBottom: 'calc(var(--sab) + 72px)' }}
+      >
         <div ref={trackRef} className="flex h-full w-full will-change-transform">
           {items.map((entry, slideIndex) => (
             <div
@@ -175,11 +188,29 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
             >
               {Math.abs(slideIndex - index) <= 1 && (
                 <div
-                  ref={slideIndex === index ? imageRef : undefined}
+                  ref={slideIndex === index && entry.kind === 'image' ? imageRef : undefined}
                   className="flex h-full w-full items-center justify-center transition-transform duration-150"
-                  style={slideIndex === index ? { transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)` } : undefined}
+                  style={slideIndex === index && entry.kind === 'image'
+                    ? { transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)` }
+                    : undefined}
                 >
-                  <PreviewImage item={entry} isActive={slideIndex === index} />
+                  {entry.kind === 'video' ? (
+                    <ViewerVideo
+                      src={entryStreamSrc(entry.uri)}
+                      isActive={slideIndex === index}
+                      chromeVisible={isChromeVisible}
+                    />
+                  ) : entry.kind === 'audio' ? (
+                    <audio
+                      controls
+                      preload="metadata"
+                      src={entryStreamSrc(entry.uri)}
+                      className="w-full max-w-sm px-4"
+                      data-testid="viewer-audio"
+                    />
+                  ) : (
+                    <PreviewImage item={entry} isActive={slideIndex === index} />
+                  )}
                 </div>
               )}
             </div>
@@ -188,25 +219,18 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
       </div>
 
       <div
-        className={`absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 bg-gradient-to-t from-black/80 to-transparent px-3 pt-8 pb-[max(var(--sab),0.75rem)] transition-opacity duration-150 ${
-          isChromeVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
+        className={`absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 bg-gradient-to-t from-black/80 to-transparent px-3 pt-10 pb-[max(var(--sab),0.75rem)] transition-opacity duration-150 ${chrome}`}
       >
-        <span className="text-[11px] text-fg-muted">
+        <span className="text-[11px] text-white/60">
           {selected.length > 0 ? `${selected.length} выбрано` : 'ничего не выбрано'}
         </span>
-        <button
-          type="button"
-          onClick={onAttach}
+        <SendButton
+          size="lg"
+          onClick={() => onAttach()}
           disabled={selected.length === 0}
-          className={`ml-auto shrink-0 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-            selected.length === 0
-              ? 'cursor-not-allowed bg-surface text-fg-dim'
-              : 'cursor-pointer bg-accent-strong text-white hover:bg-accent-strong/90'
-          }`}
-        >
-          Прикрепить
-        </button>
+          label="Прикрепить"
+          className="ml-auto"
+        />
       </div>
     </div>,
     document.body,

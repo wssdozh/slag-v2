@@ -65,6 +65,10 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
   const [isChromeVisible, setIsChromeVisible] = useState(true);
   /** The pager is placed by hand, so the layout effect must not snap over a running settle. */
   const placedRef = useRef(-1);
+  /** A drag is followed by a click on the same node; a backdrop-close must not read it as a tap. */
+  const swallowClickRef = useRef(false);
+  /** Whether the chrome was up when this press started: a tap reveals, it does not dim again. */
+  const chromeShownAtPressRef = useRef(false);
 
   // A new slide starts unzoomed; the reset belongs to render, not to an effect.
   const [zoomIndex, setZoomIndex] = useState(index);
@@ -86,8 +90,10 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
 
   useLayoutEffect(() => {
     if (placedRef.current === index) return;
+    // Coming from a drag the track is already there; a jump from a key or a button still slides.
+    const isFirstPlacement = placedRef.current < 0;
     placedRef.current = index;
-    placeTrack(index);
+    placeTrack(index, 0, !isFirstPlacement);
   }, [index, placeTrack]);
 
   const showChrome = useCallback(() => setIsChromeVisible(true), []);
@@ -122,8 +128,10 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     // Controls own their own drags: a slider under the finger is not a swipe.
-    if ((event.target as HTMLElement).closest('button, input, a, textarea')) return;
+    if ((event.target as HTMLElement).closest('button, input, a, textarea, audio')) return;
+    chromeShownAtPressRef.current = isChromeVisible;
     showChrome();
+    swallowClickRef.current = false;
     const drag = dragRef.current;
     if (!drag) {
       dragRef.current = {
@@ -152,7 +160,7 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
       current.startDistance = distanceOf(current.pointers);
       current.startZoom = zoom;
     }
-  }, [pan.x, pan.y, showChrome, zoom]);
+  }, [isChromeVisible, pan.x, pan.y, showChrome, zoom]);
 
   const onPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
@@ -207,6 +215,7 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
   const onPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag) return;
+    if (drag.moved) swallowClickRef.current = true;
     drag.pointers.delete(event.pointerId);
 
     if (drag.mode === 'pinch') {
@@ -251,8 +260,9 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
       return;
     }
 
-    // A press without movement is a tap: it hides or shows the chrome.
-    if (!drag.moved) setIsChromeVisible((visible) => !visible);
+    // A press without movement is a tap. Pressing already revealed the chrome, so a tap only
+    // ever puts it away — a hidden viewer must not dim itself on the very tap that woke it.
+    if (!drag.moved && chromeShownAtPressRef.current) setIsChromeVisible(false);
     dragRef.current = null;
   }, [clampPan, commitZoom, count, index, onDismiss, onIndexChange, placeTrack, zoom]);
 
@@ -267,6 +277,17 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
     }
   }, [index, placeTrack]);
 
+  /**
+   * A click that follows a drag is the tail of the gesture, not a tap on the backdrop. Shells
+   * that close themselves on a click put this in capture, the way the viewer root does.
+   */
+  const onClickCapture = useCallback((event: React.MouseEvent) => {
+    if (!swallowClickRef.current) return;
+    swallowClickRef.current = false;
+    event.stopPropagation();
+    event.preventDefault();
+  }, []);
+
   return {
     rootRef,
     stageRef,
@@ -277,6 +298,6 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
     commitZoom,
     isChromeVisible,
     showChrome,
-    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel },
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onClickCapture },
   };
 }
