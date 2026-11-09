@@ -147,3 +147,8 @@ export PATH="$HOME/.cargo/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HO
 | `npm run android:run` | Запустить установленное приложение `com.slag.notes` на устройстве. |
 | `npm run android:log` | Читать консольные логи в реальном времени (`RustStdoutStderr`, `SLAG`, `chromium`). |
 | `adb exec-out screencap -p > <path>.png` | Снять скриншот экрана мобильного устройства для визуальной инспекции. |
+
+### Иконки android
+`python scripts/build-android-icons.py --scale 0.56` пересобирает `src-tauri/icons/android/**` из `src-tauri/icons/icon.png`. `--scale` — доля adaptive-канвы (108dp) под шар. Лончеры читают канву по-разному: одни показывают все 108dp плиткой, другие режут до центральных 72dp и шар выглядит в 1.5 раза крупнее. Honor UniHome показывает всю канву (проверено по фото собственной иконки), поэтому масштаб равен доле плитки у референса — 0.56. `--preview <path> [--before <старая foreground.png>]` отрисует, как это выглядит под скруглением и кругом.
+
+`src-tauri/gen/**` в gitignore, и tauri кладёт туда mipmap только при инициализации проекта, а не на каждой сборке. Скрипт сам копирует результат в `gen/android/app/src/main/res/`, если проект уже сгенерирован; без этого правка иконок остаётся только в git.
