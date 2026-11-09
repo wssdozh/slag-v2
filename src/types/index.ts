@@ -361,5 +361,29 @@ export interface ConfirmOptions {
   isDestructive?: boolean;
 }
 
+/** A row of the device gallery, as MediaStore reports it. */
+export type DeviceMediaKind = 'image' | 'video';
+
+export interface DeviceMediaItem {
+  id: string;
+  kind: DeviceMediaKind;
+  name: string;
+  mimeType: string;
+  size: number;
+  dateAdded: number;
+  thumb?: string;
+}
+
+export interface DeviceMediaPage {
+  items: DeviceMediaItem[];
+  hasMore: boolean;
+}
+
+export interface GalleryAccess {
+  images: 'granted' | 'denied' | 'prompt' | string;
+  video: 'granted' | 'denied' | 'prompt' | string;
+}
+
+
 
 

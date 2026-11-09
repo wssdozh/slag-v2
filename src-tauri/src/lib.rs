@@ -369,7 +369,13 @@ pub fn run() {
 
     #[cfg(mobile)]
     {
-        builder = builder.invoke_handler(tauri::generate_handler![media_plugin::gallery_ping]);
+        builder = builder.invoke_handler(tauri::generate_handler![
+            media_plugin::gallery_ping,
+            media_plugin::gallery_access,
+            media_plugin::gallery_request_access,
+            media_plugin::gallery_list,
+            media_plugin::gallery_read
+        ]);
     }
 
     #[cfg(desktop)]

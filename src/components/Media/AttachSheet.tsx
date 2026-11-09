@@ -1,13 +1,14 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Camera, FileUp, Images, Mic } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/usePresence';
 import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';
-import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
-import { isDeviceGalleryAvailable, pingDeviceGallery } from '../../lib/media/deviceGallery';
+import { attachmentFromDataUrl, MAX_ATTACHMENT_BYTES, processFileListToAttachments } from '../../lib/media/fileDropHelper';
+import { isDeviceGalleryAvailable, readDeviceMedia } from '../../lib/media/deviceGallery';
 import { logger } from '../../lib/logger';
 import { AudioRecorder } from '../UI/AudioRecorder';
-import type { SlagAttachment } from '../../types';
+import { DeviceGalleryGrid } from './DeviceGalleryGrid';
+import type { DeviceMediaItem, SlagAttachment } from '../../types';
 
 const mediaLog = logger.scope('MEDIA');
 
@@ -31,9 +32,9 @@ const SourceTile: React.FC<SourceTileProps> = ({ icon, label, hint, onClick }) =
 );
 
 /**
- * One place that attaches things: photos and videos, an arbitrary file, a voice note, a photo
- * from the camera. It owns the hidden file inputs, the platform file chooser is behind them,
- * and the surface only receives ready attachments.
+ * One place that attaches things: the device gallery, an arbitrary file, a voice note, a photo
+ * from the camera. It owns the hidden file inputs and the gallery screen; the surface only ever
+ * receives ready attachments.
  */
 export const AttachSheet: React.FC = () => {
   const { attachSheet, closeAttachSheet, isMobile, addToast } = useApp();
@@ -43,7 +44,9 @@ export const AttachSheet: React.FC = () => {
   const { panelRef, scrimRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel, panelStyle } =
     useSheetDrag({ isOpen, onDismiss: closeAttachSheet });
 
+  const [view, setView] = useState<'sources' | 'gallery'>('sources');
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
   const filesInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -65,13 +68,32 @@ export const AttachSheet: React.FC = () => {
     closeAttachSheet();
   }, [attachSheet, closeAttachSheet]);
 
-  // Spike: prove the Kotlin side answers before the grid is built on top of it.
-  useEffect(() => {
-    if (!isDeviceGalleryAvailable()) return;
-    void pingDeviceGallery()
-      .then((result) => mediaLog.info(`Gallery bridge answered: sdk ${result.sdk}`))
-      .catch((error: unknown) => mediaLog.error('Gallery bridge failed', error));
-  }, []);
+  const addFromGallery = useCallback(async (picked: DeviceMediaItem[]) => {
+    setIsAttaching(true);
+    try {
+      const attachments: SlagAttachment[] = [];
+      for (const item of picked) {
+        if (item.size > MAX_ATTACHMENT_BYTES) {
+          addToast(`«${item.name}» больше 25 МБ — пропустил`, 'error');
+          continue;
+        }
+        const file = await readDeviceMedia(item.id);
+        attachments.push(await attachmentFromDataUrl({
+          name: item.name,
+          mimeType: file.mimeType,
+          size: file.size,
+          dataUrl: file.dataUrl,
+        }));
+      }
+      if (attachments.length > 0) attachSheet?.onAdd(attachments);
+      closeAttachSheet();
+    } catch (error) {
+      mediaLog.error('Gallery read failed', error);
+      addToast('Не удалось прочитать фото', 'error');
+    } finally {
+      setIsAttaching(false);
+    }
+  }, [attachSheet, closeAttachSheet, addToast]);
 
   if (!isPresent) return null;
 
@@ -107,40 +129,53 @@ export const AttachSheet: React.FC = () => {
           className="flex flex-col gap-2 shrink-0"
         >
           <div className="w-8 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1" />
-          <div className="px-1 pb-1">
-            <p className="text-xs font-medium text-fg-primary">Прикрепить</p>
-            <p className="text-[10px] text-fg-muted">Файл ляжет в .attachments заметки</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <SourceTile
-            icon={<Images className="w-4 h-4" />}
-            label="Фото и видео"
-            hint="из галереи"
-            onClick={() => mediaInputRef.current?.click()}
-          />
-          <SourceTile
-            icon={<FileUp className="w-4 h-4" />}
-            label="Файл"
-            hint="любой документ"
-            onClick={() => filesInputRef.current?.click()}
-          />
-          <SourceTile
-            icon={<Mic className="w-4 h-4" />}
-            label="Голос"
-            hint="записать сейчас"
-            onClick={() => setIsRecordingVoice(true)}
-          />
-          {isMobile && (
-            <SourceTile
-              icon={<Camera className="w-4 h-4" />}
-              label="Камера"
-              hint="снять фото"
-              onClick={() => cameraInputRef.current?.click()}
-            />
+          {view === 'sources' && (
+            <div className="px-1 pb-1">
+              <p className="text-xs font-medium text-fg-primary">Прикрепить</p>
+              <p className="text-[10px] text-fg-muted">Файл ляжет в .attachments заметки</p>
+            </div>
           )}
         </div>
+
+        {view === 'gallery' ? (
+          <DeviceGalleryGrid
+            onBack={() => setView('sources')}
+            onAttach={(picked) => void addFromGallery(picked)}
+            isAttaching={isAttaching}
+          />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <SourceTile
+              icon={<Images className="w-4 h-4" />}
+              label="Фото и видео"
+              hint={isDeviceGalleryAvailable() ? 'из этой галереи' : 'из галереи'}
+              onClick={() => {
+                if (isDeviceGalleryAvailable()) setView('gallery');
+                else mediaInputRef.current?.click();
+              }}
+            />
+            <SourceTile
+              icon={<FileUp className="w-4 h-4" />}
+              label="Файл"
+              hint="любой документ"
+              onClick={() => filesInputRef.current?.click()}
+            />
+            <SourceTile
+              icon={<Mic className="w-4 h-4" />}
+              label="Голос"
+              hint="записать сейчас"
+              onClick={() => setIsRecordingVoice(true)}
+            />
+            {isMobile && (
+              <SourceTile
+                icon={<Camera className="w-4 h-4" />}
+                label="Камера"
+                hint="снять фото"
+                onClick={() => cameraInputRef.current?.click()}
+              />
+            )}
+          </div>
+        )}
 
         <input
           ref={mediaInputRef}

@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{json, Value};
 use tauri::plugin::{Builder, PluginHandle, TauriPlugin};
 use tauri::{Manager, State};
 
@@ -6,7 +6,7 @@ use tauri::{Manager, State};
 pub struct GalleryBridge(pub PluginHandle<tauri::Wry>);
 
 /// App-local plugin: the commands themselves live in `MediaGalleryPlugin.kt`. Routing them
-/// through an app command instead of `plugin:slag-media|…` keeps the webview off the plugin ACL,
+/// through app commands instead of `plugin:slag-media|…` keeps the webview off the plugin ACL,
 /// which an app-local plugin has no way to declare.
 pub fn init() -> TauriPlugin<tauri::Wry> {
     Builder::new("slag-media")
@@ -25,11 +25,40 @@ pub fn init() -> TauriPlugin<tauri::Wry> {
         .build()
 }
 
-#[tauri::command]
-pub async fn gallery_ping(bridge: State<'_, GalleryBridge>) -> Result<Value, String> {
+async fn call(bridge: &GalleryBridge, command: &str, payload: Value) -> Result<Value, String> {
     bridge
         .0
-        .run_mobile_plugin_async::<Value>("ping", ())
+        .run_mobile_plugin_async::<Value>(command, payload)
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn gallery_ping(bridge: State<'_, GalleryBridge>) -> Result<Value, String> {
+    call(&bridge, "ping", json!({})).await
+}
+
+#[tauri::command]
+pub async fn gallery_access(bridge: State<'_, GalleryBridge>) -> Result<Value, String> {
+    call(&bridge, "accessState", json!({})).await
+}
+
+#[tauri::command]
+pub async fn gallery_request_access(bridge: State<'_, GalleryBridge>) -> Result<Value, String> {
+    call(&bridge, "requestAccess", json!({})).await
+}
+
+#[tauri::command]
+pub async fn gallery_list(
+    bridge: State<'_, GalleryBridge>,
+    kind: String,
+    offset: u32,
+    limit: u32,
+) -> Result<Value, String> {
+    call(&bridge, "listMedia", json!({ "kind": kind, "offset": offset, "limit": limit })).await
+}
+
+#[tauri::command]
+pub async fn gallery_read(bridge: State<'_, GalleryBridge>, id: String) -> Result<Value, String> {
+    call(&bridge, "readMedia", json!({ "id": id })).await
 }
