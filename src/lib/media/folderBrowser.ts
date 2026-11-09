@@ -94,6 +94,16 @@ export async function readEntryBytes(uri: DeviceUri, mimeType: string): Promise<
 }
 
 /**
+ * The original entry as an object URL. A photo on a phone is megabytes: as a data URL that is a
+ * base64 string twice as big to hold and copy, which is what made the full-screen viewer stall.
+ * The caller owns the URL and must revoke it.
+ */
+export async function readEntryObjectUrl(uri: DeviceUri, mimeType: string): Promise<string> {
+  const bytes = await androidFs.readFile(uri);
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+}
+
+/**
  * A preview for a grid cell, or a bigger one when the cell is opened full screen.
  * `null` means "no preview", not "broken".
  */

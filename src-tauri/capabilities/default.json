@@ -32,6 +32,7 @@
     "android-fs:allow-get-metadata",
     "android-fs:allow-get-file-thumbnail-as-data-url",
     "android-fs:allow-read-dir",
+    "android-fs:allow-read-file",
     "android-fs:allow-read-file-as-data-url",
     "android-fs:allow-show-open-dir-picker",
     "android-fs:allow-show-open-file-picker",

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
-import { readEntryBytes, readEntryThumbnail } from '../../lib/media/folderBrowser';
+import { readEntryObjectUrl, readEntryThumbnail } from '../../lib/media/folderBrowser';
 import { enterFromEdge, exitToEdge, motionEase, motionMs } from '../../lib/motion';
 import type { DeviceMediaItem, DevicePick } from '../../types';
 
@@ -26,6 +26,7 @@ interface PreviewImageProps {
  */
 const PreviewImage: React.FC<PreviewImageProps> = ({ item, isActive }) => {
   const [src, setSrc] = useState<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -38,12 +39,21 @@ const PreviewImage: React.FC<PreviewImageProps> = ({ item, isActive }) => {
   useEffect(() => {
     if (!isActive || item.size > FULL_IMAGE_MAX_BYTES) return;
     let alive = true;
-    void readEntryBytes(item.uri, item.mimeType)
-      .then((value) => { if (alive) setSrc(value); })
+    void readEntryObjectUrl(item.uri, item.mimeType)
+      .then((url) => {
+        objectUrlRef.current = url;
+        if (alive) setSrc(url);
+        else URL.revokeObjectURL(url);
+      })
       // The thumbnail is already on screen: a failed read degrades, it does not break.
       .catch(() => undefined);
     return () => { alive = false; };
   }, [isActive, item.mimeType, item.size, item.uri]);
+
+  // The browser frees the bytes only when the URL is gone, and the viewer is opened over and over.
+  useEffect(() => () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+  }, []);
 
   if (!src) return <span className="text-[10px] text-fg-muted">открываю</span>;
   return <img src={src} alt="" draggable={false} className="h-full w-full select-none object-contain" />;
