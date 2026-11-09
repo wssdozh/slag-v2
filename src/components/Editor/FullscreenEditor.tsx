@@ -128,9 +128,15 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   // Desktop has the same two detents as the phone sheet, with a different first one: the note
   // opens inside the pane it was clicked in, and only the second detent takes the whole window.
   const [isEditorExpanded, setIsEditorExpanded] = useState(false);
+  // Only the detent switch animates: while docked, a sash drag must move the surface with the
+  // pane, not trail it by a fifth of a second.
+  const [isDetentMoving, setIsDetentMoving] = useState(false);
   const paneRect = useEditorPaneRect(item.id, !isMobile);
   const isDocked = !isMobile && !isEditorExpanded && paneRect !== null;
-  const toggleEditorExpanded = useCallback(() => setIsEditorExpanded(prev => !prev), []);
+  const toggleEditorExpanded = useCallback(() => {
+    setIsDetentMoving(true);
+    setIsEditorExpanded(prev => !prev);
+  }, []);
 
   const { panelRef, scrimRef, barRef, bodyRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useEditorSheet({
     enabled: isMobile,
@@ -224,7 +230,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           return;
         }
         // Развёрнутый редактор сначала возвращается в свою панель, закрывается вторым нажатием.
+        // capture-фаза: событие не должно дойти до глобального стека слоёв, иначе Esc закроет
+        // редактор целиком вместо того, чтобы свернуть его в панель.
         if (!isMobile && isEditorExpanded && paneRect) {
+          e.stopPropagation();
           setIsEditorExpanded(false);
           return;
         }
@@ -467,14 +476,22 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={isDocked && paneRect ? { left: paneRect.left, top: paneRect.top, width: paneRect.width, height: paneRect.height } : undefined}
-      className={
-        isDocked
-          // Flush with the pane, no card chrome: a border and a shadow on top of the pane is
-          // what makes a docked editor read as an overlay again. The surface tone stays.
-          ? 'pointer-events-auto fixed z-[100] flex flex-col bg-surface text-fg-primary'
-          : 'pointer-events-auto fixed inset-0 z-[100] flex flex-col text-fg-primary'
+      // Both detents are an explicit box, so left/top/width/height can interpolate between them
+      // instead of snapping. Flush with the pane: no card chrome, or a docked editor reads as an
+      // overlay again.
+      style={
+        isMobile
+          ? undefined
+          : isDocked && paneRect
+            ? { left: paneRect.left, top: paneRect.top, width: paneRect.width, height: paneRect.height }
+            : { left: 0, top: 0, width: '100vw', height: '100vh' }
       }
+      onTransitionEnd={(event) => {
+        if (event.propertyName === 'width') setIsDetentMoving(false);
+      }}
+      className={`pointer-events-auto fixed inset-0 z-[100] flex flex-col bg-surface text-fg-primary ${
+        isDetentMoving ? 'transition-[left,top,width,height] duration-200 ease-out motion-reduce:transition-none' : ''
+      }`}
     >
       {/* Hidden File Picker Input */}
       <input
@@ -517,7 +534,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
             ? `editor-spring-sheet absolute inset-0 flex flex-col overflow-hidden bg-surface border-t border-subtle ${
                 isSheetExpanded ? 'rounded-t-none' : 'rounded-t-2xl'
               }`
-            : 'flex flex-1 flex-col bg-surface'
+            : 'flex min-h-0 flex-1 flex-col bg-surface'
         }
       >
         {/* The handle owns the sheet gesture. Свёрнутой он с пилюлей, развёрнутой

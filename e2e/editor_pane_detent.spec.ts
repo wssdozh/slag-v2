@@ -27,6 +27,8 @@ test('desktop editor docks into its pane, then expands to the window', async ({ 
   await expect(typeTrigger).toHaveAttribute('title', 'Таска');
 
   await page.locator('header button[title="Развернуть на всё окно"]').first().click();
+  // The detent interpolates its box; measure after it settles.
+  await page.waitForTimeout(400);
   const expanded = await editor.boundingBox();
   expect(expanded!.width).toBeCloseTo(1440, 0);
   await page.waitForTimeout(500);
@@ -34,6 +36,7 @@ test('desktop editor docks into its pane, then expands to the window', async ({ 
 
   // Esc walks back one detent at a time: window → pane → closed.
   await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
   const back = await editor.boundingBox();
   expect(back!.width).toBeCloseTo(docked!.width, 0);
   await page.keyboard.press('Escape');
