@@ -1,6 +1,7 @@
 package com.slag.notes
 
 import android.Manifest
+import android.app.Activity
 import android.content.ContentUris
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
