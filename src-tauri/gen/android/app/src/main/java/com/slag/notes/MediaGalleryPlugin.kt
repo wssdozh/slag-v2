@@ -109,20 +109,22 @@ class MediaGalleryPlugin(private val activity: Activity) : Plugin(activity) {
     val sortOrder = "${MediaStore.MediaColumns.DATE_ADDED} DESC LIMIT ${args.limit} OFFSET ${args.offset}"
 
     val items = JSArray()
-    contentResolver.query(collection, projection, null, null, sortOrder)?.use { cursor ->
+    val cursor: android.database.Cursor? = contentResolver.query(collection, projection, null, null, sortOrder)
+    if (cursor != null) {
       while (cursor.moveToNext()) {
-        val id = cursor.getLong(0)
+        val id: Long = cursor.getLong(0)
         val uri = ContentUris.withAppendedId(collection, id)
         val item = JSObject()
         item.put("id", id.toString())
         item.put("kind", args.kind)
         item.put("name", cursor.getString(1) ?: "")
         item.put("mimeType", cursor.getString(2) ?: "application/octet-stream")
-        item.put("size", cursor.getLong(3))
-        item.put("dateAdded", cursor.getLong(4) * 1000L)
+        item.put("size", cursor.getLong(3).toDouble())
+        item.put("dateAdded", cursor.getLong(4).toDouble() * 1000.0)
         thumbnail(uri)?.let { item.put("thumb", it) }
         items.put(item)
       }
+      cursor.close()
     }
 
     val result = JSObject()
@@ -137,8 +139,8 @@ class MediaGalleryPlugin(private val activity: Activity) : Plugin(activity) {
     val collections = listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
     for (collection in collections) {
       val uri = ContentUris.withAppendedId(collection, args.id.toLongOrNull() ?: -1L)
-      val bytes = try {
-        contentResolver.openInputStream(uri)?.use { it.readBytes() }
+      val bytes: ByteArray? = try {
+        contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
       } catch (error: Exception) {
         null
       }
@@ -146,7 +148,7 @@ class MediaGalleryPlugin(private val activity: Activity) : Plugin(activity) {
       val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
       val result = JSObject()
       result.put("mimeType", mimeType)
-      result.put("size", bytes.size)
+      result.put("size", bytes.size.toDouble())
       result.put("dataUrl", "data:$mimeType;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
       invoke.resolve(result)
       return
