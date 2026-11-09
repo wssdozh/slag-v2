@@ -50,4 +50,52 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
     await expect(settingsModal.locator('input[placeholder*="gsk_"]')).toBeVisible();
     await expect(settingsModal.locator('text=Groq Cloud API')).toBeVisible();
   });
+
+  test('subscription mode still exposes the Groq key for images and audio', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+
+    // Force a paid plan so the modal renders the subscription branch.
+    await page.evaluate(async () => {
+      const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
+      const pick = (modulePath: string) =>
+        loaded.find((name) => name.split('?')[0].endsWith(modulePath)) || modulePath;
+
+      const { accountClient } = await import(pick('/src/lib/sync/account.ts'));
+      const client = accountClient as unknown as {
+        session: unknown;
+        state: Record<string, unknown>;
+        getState: () => Record<string, unknown>;
+      };
+      client.session = {
+        token: 'test-token',
+        accountId: 'acc_test',
+        deviceId: 'device-test',
+        serverUrl: 'http://152.53.199.71:8320',
+      };
+      client.state = {
+        ...client.getState(),
+        account: {
+          plan: 'smile', planLabel: 'Smile', expiresAt: null, maxDevices: 5, activeDevices: 1,
+          maxCacheMb: 10240, usedCacheMb: 0, allowAttachments: true, hasAiLease: true, isExpiringSoon: false,
+        },
+      };
+
+      const { syncEngine } = await import(pick('/src/lib/sync/syncEngine.ts'));
+      (syncEngine as unknown as { saveConfig: (config: Record<string, unknown>) => void }).saveConfig({});
+    });
+
+    await page.locator('[data-testid="sidebar-settings-btn"]').click();
+    const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
+    await expect(settingsModal).toBeVisible({ timeout: 5000 });
+    await settingsModal.locator('button', { hasText: 'ИИ & Провайдеры' }).click();
+
+    await expect(settingsModal.locator('text=Groq · картинки и аудио')).toBeVisible();
+    await expect(settingsModal.locator('text=OCR картинок и транскрипция аудио')).toBeVisible();
+    await expect(settingsModal.locator('input[placeholder*="gsk_"]')).toBeVisible();
+
+    await page.screenshot({
+      path: 'test-results/screenshots/ai_settings_groq_media.png',
+      fullPage: false,
+    });
+  });
 });
