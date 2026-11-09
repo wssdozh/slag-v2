@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
-import { readEntryThumbnail } from '../../lib/media/folderBrowser';
+import { readEntryBytes, readEntryThumbnail } from '../../lib/media/folderBrowser';
 import { enterFromEdge, exitToEdge, motionEase, motionMs } from '../../lib/motion';
-import type { DeviceMediaItem, DevicePick, DeviceUri } from '../../types';
+import type { DeviceMediaItem, DevicePick } from '../../types';
 
 const MAX_ZOOM = 4;
+/** Full bytes for the photo on screen; above this the stored thumbnail is all we show. */
+const FULL_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
 const SWIPE_COMMIT = 0.25;
 /** ms of coasting the release velocity buys, same constant the sheet's spring uses. */
 const PROJECT_MS = 180;
@@ -13,23 +15,38 @@ const DISMISS_PX = 120;
 const FLICK_PX_MS = 0.35;
 
 interface PreviewImageProps {
-  uri: DeviceUri;
+  item: DeviceMediaItem;
+  isActive: boolean;
 }
 
-/** The big version of a grid cell: a wide thumbnail, not the original, so it opens instantly. */
-const PreviewImage: React.FC<PreviewImageProps> = ({ uri }) => {
+/**
+ * A grid cell's preview is a stored thumbnail, which on a phone is about 600px — sharp in a tile,
+ * mush full screen. The photo on screen upgrades to its real bytes; its neighbours stay cheap,
+ * so a swipe never holds three full-size bitmaps at once.
+ */
+const PreviewImage: React.FC<PreviewImageProps> = ({ item, isActive }) => {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    void readEntryThumbnail(uri, 1400).then((value) => {
+    void readEntryThumbnail(item.uri, 800).then((value) => {
       if (alive) setSrc(value);
     });
     return () => { alive = false; };
-  }, [uri]);
+  }, [item.uri]);
+
+  useEffect(() => {
+    if (!isActive || item.size > FULL_IMAGE_MAX_BYTES) return;
+    let alive = true;
+    void readEntryBytes(item.uri, item.mimeType)
+      .then((value) => { if (alive) setSrc(value); })
+      // The thumbnail is already on screen: a failed read degrades, it does not break.
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [isActive, item.mimeType, item.size, item.uri]);
 
   if (!src) return <span className="text-[10px] text-fg-muted">открываю</span>;
-  return <img src={src} alt="" draggable={false} className="max-h-full max-w-full select-none object-contain" />;
+  return <img src={src} alt="" draggable={false} className="h-full w-full select-none object-contain" />;
 };
 
 type DragMode = 'idle' | 'x' | 'y' | 'pinch' | 'pan';
@@ -370,7 +387,7 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
                   className="flex h-full w-full items-center justify-center transition-transform duration-150"
                   style={slideIndex === index ? { transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)` } : undefined}
                 >
-                  <PreviewImage uri={entry.uri} />
+                  <PreviewImage item={entry} isActive={slideIndex === index} />
                 </div>
               )}
             </div>

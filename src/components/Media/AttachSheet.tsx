@@ -125,7 +125,10 @@ export const AttachSheet: React.FC = () => {
         rest={0.22}
         testId="attach-sheet-panel"
         scrimClassName="bg-black/85"
-        panelClassName="w-full bg-canvas-subtle border-t border-white/[0.08] rounded-t-2xl sm:mx-auto sm:max-w-[420px] sm:rounded-2xl sm:border"
+        panelClassName={`w-full bg-canvas-subtle border-t border-white/[0.08] rounded-t-2xl sm:mx-auto sm:max-w-[420px] sm:rounded-2xl sm:border ${
+          // On a phone the spring owns the panel's transform; on desktop the sheet keeps sliding in.
+          isMobile ? '' : 'motion-sheet'
+        }`}
         contentClassName={`flex min-h-0 flex-col gap-2 p-3 pb-[max(var(--sab),0.75rem)] ${
           // Unfolded the sheet reaches the top edge, where the status bar sits.
           isMobile && isPickerFullscreen ? 'pt-[max(var(--sat),0.75rem)]' : ''
