@@ -13,8 +13,8 @@ import {
   Tag,
   Table,
   Paperclip,
-  ArrowUp,
 } from 'lucide-react';
+import { SendButton } from '../UI/SendButton';
 
 export interface MobileEditorBarProps {
   ref?: React.Ref<HTMLDivElement>;
@@ -311,16 +311,13 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
           </button>
         </div>
 
-        {/* Кнопка отправки: та же форма и цвет, что у композера */}
-        <button
-          type="button"
+        {/* Кнопка отправки: та же плашка, что у композера */}
+        <SendButton
           onClick={onSave}
-          aria-label={isDraft ? 'Создать заметку' : 'Сохранить и закрыть'}
-          className="w-9 h-9 rounded-full bg-accent-strong text-white hover:bg-accent-strong/90 flex items-center justify-center motion-press shrink-0 ml-2 shadow-sm cursor-pointer"
+          label={isDraft ? 'Создать заметку' : 'Сохранить и закрыть'}
           title="Сохранить и закрыть (Ctrl+S)"
-        >
-          <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
-        </button>
+          className="ml-2"
+        />
       </div>
     </div>
   );

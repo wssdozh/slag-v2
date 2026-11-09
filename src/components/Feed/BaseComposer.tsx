@@ -1,5 +1,6 @@
 import React, { useRef, useLayoutEffect } from 'react';
-import { ArrowUp, UploadCloud } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
+import { SendButton } from '../UI/SendButton';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
 
 export interface BaseComposerProps {
@@ -239,8 +240,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               {sendButton !== undefined ? (
                 sendButton
               ) : (
-                <button
-                  type="button"
+                <SendButton
                   // Tapping must not move focus out of the textarea: on Android that
                   // closes the keyboard, and the refocus below opens it again — two
                   // animations the user reads as the composer shaking.
@@ -258,15 +258,9 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                     }
                   }}
                   disabled={isSubmitDisabled}
-                  className={`composer-toolbar-control composer-send flex items-center justify-center motion-press shrink-0 ${
-                    !isSubmitDisabled
-                      ? 'bg-accent-strong text-white hover:bg-accent-strong/90 shadow-sm cursor-pointer'
-                      : 'bg-surface-active text-fg-dim cursor-not-allowed'
-                  }`}
-                  title={isMobile ? submitTitle.replace(' (Enter)', '') : submitTitle}
-                >
-                  <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
-                </button>
+                  label={isMobile ? submitTitle.replace(' (Enter)', '') : submitTitle}
+                  className="composer-toolbar-control composer-send"
+                />
               )}
             </div>
           </div>

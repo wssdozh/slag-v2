@@ -11,6 +11,7 @@ import { formatBytes } from '../../lib/formatBytes';
 import { logger } from '../../lib/logger';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { Checkbox } from '../UI/Checkbox';
+import { SendButton } from '../UI/SendButton';
 import { SheetPanel } from '../UI/SheetPanel';
 import { DesktopSources } from './DesktopSources';
 import { MobilePicker } from './MobilePicker';
@@ -180,18 +181,12 @@ export const AttachSheet: React.FC = () => {
                   <span className="ml-auto shrink-0 font-mono text-[10px] text-fg-muted">
                     {selected.length > 0 ? `${selected.length} · ${formatBytes(selectedBytes)}` : ''}
                   </span>
-                  <button
-                    type="button"
-                    disabled={selected.length === 0 || isAttaching}
+                  <SendButton
+                    size="lg"
                     onClick={() => void attachPicked(selected)}
-                    className={`shrink-0 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-                      selected.length === 0 || isAttaching
-                        ? 'cursor-not-allowed bg-surface text-fg-dim'
-                        : 'cursor-pointer bg-accent-strong text-white hover:bg-accent-strong/90'
-                    }`}
-                  >
-                    {isAttaching ? 'Прикрепляю…' : 'Прикрепить'}
-                  </button>
+                    disabled={selected.length === 0 || isAttaching}
+                    label={isAttaching ? 'Прикрепляю…' : 'Прикрепить'}
+                  />
                 </>
               )}
             </div>
