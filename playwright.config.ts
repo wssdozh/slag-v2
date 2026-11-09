@@ -6,7 +6,10 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: 1,
+  // Files run in parallel across workers; tests inside one file stay serial
+  // (fullyParallel is off), so stateful specs keep their order. Override with
+  // PLAYWRIGHT_WORKERS=1 when chasing a flake.
+  workers: Number(process.env.PLAYWRIGHT_WORKERS ?? 6),
   reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:5173',
