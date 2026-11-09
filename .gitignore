@@ -73,3 +73,7 @@ relay/data/
 
 # Local scratch
 .tmp/
+
+# Search benchmark artifacts (corpora are huge, they are generated)
+bench/.data/
+bench/out/
