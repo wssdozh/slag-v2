@@ -6,8 +6,10 @@ import { usePresence } from '../../hooks/usePresence';
 export interface SelectOption {
   value: string;
   label: string;
-  /** Shown on the closed trigger when the list label is a tree branch, e.g. "Род / доч". */
+  /** Shown on the closed trigger when the list label is a tree branch, e.g. "… / Род / доч". */
   triggerLabel?: string;
+  /** Monospace the label: tree branch glyphs only line up in a fixed-width font. */
+  mono?: boolean;
   icon?: React.ReactNode;
   color?: string;
   disabled?: boolean;
@@ -280,7 +282,7 @@ export const Select: React.FC<SelectProps> = ({
                   >
                     <div className="flex items-center gap-2 truncate">
                       {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                      <span className={`truncate ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>
+                      <span className={`truncate ${opt.mono ? 'font-mono whitespace-pre' : ''} ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>
                         {opt.label}
                       </span>
                     </div>

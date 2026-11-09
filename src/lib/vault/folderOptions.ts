@@ -4,8 +4,9 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 export interface FolderSelectOption {
   value: string;
   label: string;
-  /** Full parent chain for the closed trigger: "Род / доч". */
+  /** Tail of the path for the closed trigger: "… / медиа / Идеи". */
   triggerLabel: string;
+  mono: boolean;
   /** True for a root folder; renders a separator above it. */
   dividerBefore?: boolean;
 }
@@ -16,6 +17,12 @@ interface Node {
 }
 
 const lastSegment = (path: string) => path.slice(path.lastIndexOf('/') + 1);
+
+/** The trigger only fits the tail, so a deep path shows as "… / медиа / Идеи". */
+const segmentsOf = (path: string) => {
+  const parts = path.split('/');
+  return parts.length > 2 ? `… / ${parts.slice(-2).join(' / ')}` : parts.join(' / ');
+};
 
 /**
  * The single folder list for every folder picker. The `value` is always the full
@@ -67,7 +74,9 @@ export function buildFolderOptions(folders: FolderMeta[]): FolderSelectOption[] 
     options.push({
       value: node.path,
       label,
-      triggerLabel: node.path.split('/').join(' / '),
+      // The trigger has no room for the whole path; keep the tail so the current folder stays visible.
+      triggerLabel: segmentsOf(node.path),
+      mono: true,
       dividerBefore: depth === 0,
     });
 
@@ -81,5 +90,5 @@ export function buildFolderOptions(folders: FolderMeta[]): FolderSelectOption[] 
     walk(root, '', index === roots.length - 1, 0);
   });
 
-  return [{ value: DEFAULT_INBOX_FOLDER, label: DEFAULT_INBOX_FOLDER, triggerLabel: DEFAULT_INBOX_FOLDER }, ...options];
+  return [{ value: DEFAULT_INBOX_FOLDER, label: DEFAULT_INBOX_FOLDER, triggerLabel: DEFAULT_INBOX_FOLDER, mono: true }, ...options];
 }

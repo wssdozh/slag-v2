@@ -143,7 +143,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             value={folder}
             onChange={onFolderChange}
             options={folderOptions}
-            className="max-w-[150px] md:max-w-[220px] h-7 text-xs font-mono"
+            className="max-w-[220px] md:max-w-[280px] h-7 text-xs font-mono"
           />
 
           {/* Vertical Divider */}
