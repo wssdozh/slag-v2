@@ -90,11 +90,13 @@ export const FeedList: React.FC = () => {
   const handleImageClick = useCallback((img: SlagAttachment) => {
     const folderImages: LightboxImage[] = filteredItems.flatMap(it =>
       (it.attachments || [])
-        .filter(att => att.type === 'image')
+        // Photos and clips in one deck: the viewer pages through the folder the way it opened.
+        .filter(att => att.type === 'image' || att.type === 'video')
         .map(att => ({
           id: att.id,
           name: att.name,
           url: attachmentSrcs[att.id] ?? att.dataUrl ?? '',
+          kind: att.type === 'video' ? ('video' as const) : ('image' as const),
           extractedText: att.extractedText,
           summary: att.summary,
           enrichmentStatus: att.enrichmentStatus,

@@ -331,12 +331,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       onImageClick(img, item);
       return;
     }
+    // One deck for the whole note: a photo and a clip page next to each other, as they do
+    // in every messenger. `kind` is what the viewer reads to pick a slide.
     const itemImages: LightboxImage[] = (item.attachments || [])
-      .filter(att => att.type === 'image')
+      .filter(att => att.type === 'image' || att.type === 'video')
       .map(att => ({
         id: att.id,
         name: att.name,
         url: attachmentSrcs[att.id] ?? att.dataUrl ?? '',
+        kind: att.type === 'video' ? 'video' : 'image',
         extractedText: att.extractedText,
         summary: att.summary,
         enrichmentStatus: att.enrichmentStatus,
@@ -737,8 +740,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* Video Circle Notes (Telegram style) */}
       {videoAttachments.map(att => (
-        <div key={att.id} className="pt-1 flex">
+        <div key={att.id} className="flex items-center gap-1 pt-1">
           <VideoCirclePlayer src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''} />
+          {/* The circle plays in place; this is the way out of the card and into the viewer. */}
+          <button
+            type="button"
+            onClick={() => handleImageClick(att)}
+            aria-label="Открыть видео"
+            title="Открыть видео"
+            className="cursor-pointer rounded-md p-1.5 text-fg-dim transition-colors hover:bg-surface-hover hover:text-fg-primary"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       ))}
 

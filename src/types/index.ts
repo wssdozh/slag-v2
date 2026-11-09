@@ -156,11 +156,15 @@ export interface LightboxImage {
   id?: string;
   name: string;
   url: string;
+  /** Photos and clips share one deck; the slide decides what to render. Default is a photo. */
+  kind?: 'image' | 'video';
   extractedText?: string;
   summary?: string;
   enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
   enrichmentError?: string;
   itemId?: string;
+  /** The note the file came from: the viewer's menu acts on it, not on the bytes. */
+  sourceItem?: SlagItem;
 }
 
 export interface ItemUpdates {
