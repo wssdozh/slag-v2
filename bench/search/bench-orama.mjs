@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadCorpus, snapshot, summarise } from './common.mjs';
-import { searchFallback } from './fallback.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const arg = (name, def) => {
@@ -15,7 +14,6 @@ const queriesPath = resolve(arg('queries', `${__dirname}/../.data/queries-10000.
 const outPath = resolve(arg('out', `${__dirname}/../out/orama.json`));
 const limitPerTemplate = Number(arg('limit-per-template', 0));
 const language = arg('language', 'english');
-const noFallback = process.argv.includes('--no-fallback');
 
 const { create, insertMultiple, search } = await import('@orama/orama');
 
@@ -62,7 +60,9 @@ for (const q of queries) {
   const start = performance.now();
   let hits = [];
   try {
-    const phrase = await search(db, { term: q.text, tolerance: 1, limit: 15 });
+    // Same policy as src/lib/searchService.ts: tolerance on single tokens only.
+    const tolerance = q.tokens.length > 1 ? 0 : 1;
+    const phrase = await search(db, { term: q.text, tolerance, limit: 15 });
     hits = phrase.hits;
     if (hits.length === 0 && q.tokens.length > 1) {
       const ids = new Set();
@@ -75,16 +75,8 @@ for (const q of queries) {
   } catch (err) {
     console.error('orama query failed:', q.text, err.message);
   }
-  if (hits.length === 0) {
-    fellThrough++;
-    if (!noFallback) {
-      // The app pays this on top of Orama when the index returns nothing.
-      const fb = searchFallback(docs, q.text);
-      hits = fb.map((d) => ({ document: d }));
-    }
-  } else {
-    oramaHits++;
-  }
+  if (hits.length === 0) fellThrough++;
+  else oramaHits++;
 
   const ms = performance.now() - start;
   totalMs += ms;
@@ -106,9 +98,9 @@ for (const [template, data] of Object.entries(perTemplate)) {
 }
 
 const result = {
-  engine: `orama-${language}${noFallback ? '-clean' : ''}`,
+  engine: `orama-${language}`,
   language,
-  mode: noFallback ? 'engine-only' : 'app-path',
+  mode: 'engine-only',
   docs: docs.length,
   buildMs,
   mem: { load: loaded, built },

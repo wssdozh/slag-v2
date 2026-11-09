@@ -424,14 +424,12 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
 export const SearchModal: React.FC = () => {
   const { isSearchOpen, items } = useApp();
 
-  // Lazy index: initialize / re-index Orama only when the search modal is opened,
-  // preventing constant indexing churn during rapid note writing or background operations.
+  // Lazy index: sync on open. The sync is incremental, so this stays cheap even
+  // after every keystroke that changed a note — and it must start before the query
+  // effect fires, otherwise the first search of a just-saved note sees a stale index.
   useEffect(() => {
     if (!isSearchOpen) return;
-    const timer = setTimeout(() => {
-      initSearchIndex(items);
-    }, 200);
-    return () => clearTimeout(timer);
+    void initSearchIndex(items);
   }, [items, isSearchOpen]);
 
   const presence = usePresence(isSearchOpen);
