@@ -12,12 +12,12 @@ test.describe('Folder picker list', () => {
 
     expect(options.map((option) => option.label)).toEqual([
       'Входящие',
-      'Карьера',
-      '╰── Поиск работы',
       'Род',
       '├── доч1',
       '│' + '\u00A0'.repeat(3) + '╰── внук',
       '╰── доч2',
+      'Карьера',
+      '╰── Поиск работы',
     ]);
   });
 
@@ -39,6 +39,6 @@ test.describe('Folder picker list', () => {
     const options = buildFolderOptions(foldersOf('Род', 'Род/доч1', 'Карьера'));
     const withDivider = options.filter((option) => option.dividerBefore).map((option) => option.label);
 
-    expect(withDivider).toEqual(['Карьера', 'Род']);
+    expect(withDivider).toEqual(['Род', 'Карьера']);
   });
 });

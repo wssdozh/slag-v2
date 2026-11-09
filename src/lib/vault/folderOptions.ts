@@ -61,8 +61,6 @@ export function buildFolderOptions(folders: FolderMeta[]): FolderSelectOption[] 
     });
   });
 
-  const sorted = (nodes: Node[]) => [...nodes].sort((a, b) => a.path.localeCompare(b.path, 'ru'));
-
   const options: FolderSelectOption[] = [];
   // Indentation uses non-breaking spaces: a plain run of spaces collapses to one in the picker,
   // which made a nested folder look like a root.
@@ -82,11 +80,12 @@ export function buildFolderOptions(folders: FolderMeta[]): FolderSelectOption[] 
 
     // A root carries no vertical bar above it, so its children start flush left.
     const childPrefix = depth === 0 ? '' : `${prefix}${isLast ? `${GAP} ` : `│${GAP}`}`;
-    const children = sorted(node.children);
+    const children = node.children;
     children.forEach((child, index) => walk(child, childPrefix, index === children.length - 1, depth + 1));
   };
 
-  sorted(Array.from(rootMap.values())).forEach((root, index, roots) => {
+  // Same order the app shows folders in: the vault array order, not an alphabetical resort.
+  Array.from(rootMap.values()).forEach((root, index, roots) => {
     walk(root, '', index === roots.length - 1, 0);
   });
 

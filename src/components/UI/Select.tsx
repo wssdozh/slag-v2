@@ -78,6 +78,12 @@ export const Select: React.FC<SelectProps> = ({
       )
     : options;
 
+  // Open on the current choice: highlight is set in handleToggle, scroll is here.
+  useEffect(() => {
+    if (!isOpen || !isPresent) return;
+    listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' });
+  }, [isOpen, isPresent, listRef]);
+
   // Calculate fixed viewport coordinates for portal
   const updatePosition = useCallback(() => {
     if (!containerRef.current) return;
