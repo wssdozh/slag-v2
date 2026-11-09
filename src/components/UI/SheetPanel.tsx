@@ -1,34 +1,73 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { prefersReducedMotion } from '../../lib/motion';
 
-interface Options {
+export interface SheetPanelApi {
+  /** Scroll container inside the sheet: pulling it down at its top edge folds the panel. */
+  bodyRef: React.RefObject<HTMLDivElement | null>;
+}
+
+export interface SheetPanelProps {
+  /** Off on desktop: the same markup becomes a plain panel and the spring never runs. */
   enabled: boolean;
   expanded: boolean;
   exiting: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onDismiss: () => void;
   onExited: () => void;
+  /** Share of the viewport still covered at rest: 0.22 for the picker, 0.44 for the editor. */
+  rest?: number;
+  testId?: string;
+  scrimClassName?: string;
+  panelClassName?: string;
+  contentClassName?: string;
+  children: (api: SheetPanelApi) => React.ReactNode;
 }
 
-/** One interruptible spring owns the surface; pointer frames never render React. */
-export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, onDismiss, onExited }: Options) {
+/**
+ * The app's one two-detent bottom sheet: a spring that moves a full-height surface between
+ * "half" and "whole screen", a handle that drags it, a scrim that follows it and a scroll
+ * handoff that folds it from the top of the body.
+ *
+ * Geometry: the panel is always the full window and only translates. Its visible part is a
+ * wrapper of `100% - var(--sheet-y)`, so the bottom edge stays on the screen edge in every
+ * detent and the content never needs a hard-coded `calc`.
+ */
+export const SheetPanel: React.FC<SheetPanelProps> = ({
+  enabled,
+  expanded,
+  exiting,
+  onExpandedChange,
+  onDismiss,
+  onExited,
+  rest = 0.44,
+  testId,
+  scrimClassName,
+  panelClassName,
+  contentClassName,
+  children,
+}) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
-  const barRef = useRef<HTMLDivElement>(null);
-  /** Scrollable editor body: pulling it down at scrollTop 0 collapses the sheet. */
   const bodyRef = useRef<HTMLDivElement>(null);
   const physics = useRef({ y: 0, velocity: 0, target: 0, frame: 0, time: 0, height: 0, initialized: false });
   const drag = useRef<{ start: number; y: number; last: number; time: number; moved: boolean } | null>(null);
-  const options = useRef({ expanded, exiting, onExpandedChange, onDismiss, onExited });
-  useLayoutEffect(() => { options.current = { expanded, exiting, onExpandedChange, onDismiss, onExited }; });
+  const options = useRef({ expanded, exiting, rest, onExpandedChange, onDismiss, onExited });
+  useLayoutEffect(() => {
+    options.current = { expanded, exiting, rest, onExpandedChange, onDismiss, onExited };
+  });
 
   const paint = useCallback(() => {
     const state = physics.current;
     const height = state.height;
-    if (panelRef.current) panelRef.current.style.transform = `translate3d(0, ${state.y}px, 0)`;
-    // Chrome is attached to the same surface, but stays at the visible bottom.
-    if (barRef.current) barRef.current.style.transform = `translate3d(0, ${-Math.min(state.y, height * 0.44)}px, 0)`;
-    if (scrimRef.current) scrimRef.current.style.opacity = String(Math.max(0, Math.min(1, (height - state.y) / (height * 0.56))));
+    if (panelRef.current) {
+      panelRef.current.style.transform = `translate3d(0, ${state.y}px, 0)`;
+      // The visible wrapper reads this, so one number drives both the slide and the box.
+      panelRef.current.style.setProperty('--sheet-y', `${Math.max(0, Math.min(height, state.y))}px`);
+    }
+    if (scrimRef.current) {
+      const exposed = Math.max(1, height * (1 - options.current.rest));
+      scrimRef.current.style.opacity = String(Math.max(0, Math.min(1, (height - state.y) / exposed)));
+    }
   }, []);
 
   const settle = useCallback((target: number, velocity?: number) => {
@@ -73,30 +112,32 @@ export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, o
       state.height = height;
       if (!state.initialized) {
         state.initialized = true;
-        state.y = prefersReducedMotion() ? height * 0.44 : height;
+        state.y = prefersReducedMotion() ? height * options.current.rest : height;
         paint();
       }
-      settle(exiting ? height + 16 : expanded ? 0 : height * 0.44);
+      settle(exiting ? height + 16 : expanded ? 0 : height * options.current.rest);
     };
     update();
     const state = physics.current;
     window.addEventListener('resize', update);
-    return () => { window.removeEventListener('resize', update); cancelAnimationFrame(state.frame); };
+    return () => {
+      window.removeEventListener('resize', update);
+      cancelAnimationFrame(state.frame);
+    };
   }, [enabled, expanded, exiting, paint, settle]);
 
   const sheetHeight = useCallback(
     () => panelRef.current?.parentElement?.clientHeight ?? window.innerHeight,
-    []
+    [],
   );
 
   /**
-   * Where the sheet lands when the finger lifts. Fully expanded sheets go to the
-   * half detent before dismissing, so a single pull never skips a stage — but a
-   * pull that carries most of the screen collapses straight through.
+   * Where the sheet lands when the finger lifts. A folded sheet grows to half before it reads as
+   * dismiss; a whole one folds back before it may leave, so a single pull never skips a stage.
    */
   const commitDrag = useCallback((velocity: number) => {
     const height = sheetHeight();
-    const half = height * 0.44;
+    const half = height * options.current.rest;
     const state = physics.current;
     const wasExpanded = options.current.expanded;
     const projected = state.y + velocity * 0.18;
@@ -130,7 +171,7 @@ export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, o
     const delta = clientY - session.start;
     if (!session.moved && Math.abs(delta) < 6) return false;
     session.moved = true;
-    physics.current.velocity = (clientY - session.last) / Math.max(1, timeStamp - session.time) * 1000;
+    physics.current.velocity = ((clientY - session.last) / Math.max(1, timeStamp - session.time)) * 1000;
     session.last = clientY;
     session.time = timeStamp;
     const y = session.y + delta;
@@ -145,7 +186,7 @@ export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, o
     if (!session) return;
     const velocity = timeStamp - session.time > 100 ? 0 : physics.current.velocity;
     if (!session.moved) {
-      settle(options.current.expanded ? 0 : sheetHeight() * 0.44, 0);
+      settle(options.current.expanded ? 0 : sheetHeight() * options.current.rest, 0);
       return;
     }
     commitDrag(velocity);
@@ -164,14 +205,14 @@ export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, o
   }, [endDrag]);
   const onPointerCancel = useCallback(() => {
     drag.current = null;
-    settle(options.current.expanded ? 0 : sheetHeight() * 0.44, 0);
+    settle(options.current.expanded ? 0 : sheetHeight() * options.current.rest, 0);
   }, [settle, sheetHeight]);
 
   /**
-   * Scroll handoff on the body itself: the gesture only becomes a sheet drag once
-   * the list is already at its top edge, otherwise it stays a plain scroll. Native
-   * listeners are required — `touchmove` must be cancelable to stop the browser
-   * from scrolling the container out from under the sheet.
+   * Scroll handoff on the body itself: the gesture only becomes a sheet drag once the list is
+   * already at its top edge, otherwise it stays a plain scroll. Native listeners are required —
+   * `touchmove` must be cancelable to stop the browser from scrolling the container out from
+   * under the sheet.
    */
   useEffect(() => {
     if (!enabled) return;
@@ -238,5 +279,46 @@ export function useEditorSheet({ enabled, expanded, exiting, onExpandedChange, o
     };
   }, [enabled, beginDrag, moveDrag, endDrag]);
 
-  return { panelRef, scrimRef, barRef, bodyRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel };
-}
+  if (!enabled) {
+    return (
+      <div data-testid={testId} className={[panelClassName, contentClassName].filter(Boolean).join(' ')}>
+        {children({ bodyRef })}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div ref={scrimRef} onClick={onDismiss} className={`absolute inset-0 ${scrimClassName ?? ''}`} />
+
+      <div
+        ref={panelRef}
+        data-testid={testId}
+        data-motion-state={exiting ? 'exiting' : undefined}
+        data-expanded={expanded || undefined}
+        className={`sheet-spring absolute inset-0 flex flex-col overflow-hidden ${panelClassName ?? ''}`}
+      >
+        <div
+          className={`relative flex min-h-0 flex-col ${contentClassName ?? ''}`}
+          style={{ height: 'calc(100% - var(--sheet-y, 0px))' }}
+        >
+          {/* The handle owns the gesture. Folded it has a pill, unfolded it stays a thin strip
+              at the edge: pulling down must work from either detent. */}
+          <div
+            data-sheet-handle
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerEnd}
+            onPointerCancel={onPointerCancel}
+            style={{ touchAction: 'none' }}
+            className={`flex shrink-0 cursor-grab items-center justify-center ${expanded ? 'h-3' : 'h-6'}`}
+          >
+            {!expanded && <div className="h-1 w-8 shrink-0 rounded-full bg-white/20" />}
+          </div>
+
+          {children({ bodyRef })}
+        </div>
+      </div>
+    </>
+  );
+};

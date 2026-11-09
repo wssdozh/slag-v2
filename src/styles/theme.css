@@ -109,8 +109,9 @@
   --slag-motion-slow: 200ms;
 }
 
-/* The editor's single moving layer; the spring writes transform outside React. */
-.editor-spring-sheet {
+/* The sheet's single moving layer; the spring writes transform outside React. Layout is
+   contained so the per-detent box change never reaches the rest of the app. */
+.sheet-spring {
   will-change: transform;
   contain: layout style;
 }

@@ -114,3 +114,45 @@ test('on a phone the sheet is a tabbed bottom panel with a handle', async ({ pag
   await expect(sheet).toContainText('Папок пока нет');
   await page.screenshot({ path: 'test-results/screenshots/attach-sheet-mobile-files.png' });
 });
+
+test('the picker has two detents: the button and the handle both move it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const inbox = page.locator('button', { hasText: 'Входящие' }).first();
+  await expect(inbox).toBeVisible({ timeout: 20000 });
+  await inbox.click();
+  await expect(page.locator('.feed-card-contain').first()).toBeVisible({ timeout: 15000 });
+
+  await attachButton(page).click();
+
+  const panel = page.locator('[data-testid="attach-sheet-panel"]');
+  const handle = panel.locator('[data-sheet-handle]');
+  await expect(panel).toBeVisible();
+  await expect(handle).toBeVisible();
+  await page.waitForTimeout(400);
+
+  // Folded: the sheet starts a fifth of the screen down.
+  const folded = await panel.boundingBox();
+  expect(folded).not.toBeNull();
+  expect(folded!.y).toBeGreaterThan(140);
+
+  await page.getByRole('button', { name: 'На весь экран' }).click();
+  await expect(panel).toHaveAttribute('data-expanded', 'true');
+  await page.waitForTimeout(400);
+  expect(Math.abs((await panel.boundingBox())!.y)).toBeLessThan(2);
+  await page.screenshot({ path: 'test-results/screenshots/attach-sheet-mobile-full.png' });
+
+  // The handle still folds it back, and the panel returns to the same detent.
+  const box = await handle.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width / 2;
+  const startY = box!.y + box!.height / 2;
+  await page.mouse.move(x, startY);
+  await page.mouse.down();
+  for (let step = 1; step <= 10; step++) await page.mouse.move(x, startY + (200 * step) / 10);
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  await expect(panel).not.toHaveAttribute('data-expanded', 'true');
+  expect(Math.abs((await panel.boundingBox())!.y - folded!.y)).toBeLessThan(4);
+});

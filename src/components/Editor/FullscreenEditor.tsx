@@ -20,13 +20,13 @@ import {
   Repeat,
 } from 'lucide-react';
 import { Select } from '../UI/Select';
+import { SheetPanel } from '../UI/SheetPanel';
 import { TagChip } from '../UI/TagChip';
 import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/usePresence';
-import { useEditorSheet } from '../../hooks/gestures/useEditorSheet';
 import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
@@ -146,15 +146,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     setIsDetentMoving(true);
     setIsEditorExpanded(prev => !prev);
   }, []);
-
-  const { panelRef, scrimRef, barRef, bodyRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useEditorSheet({
-    enabled: isMobile,
-    expanded: isSheetExpanded,
-    exiting: presencePhase === 'exiting',
-    onExpandedChange: setIsSheetExpanded,
-    onDismiss: handleClose,
-    onExited,
-  });
 
   const rootRef = useRef<HTMLDivElement>(null);
   const hasExpandedRef = useRef(false);
@@ -513,46 +504,26 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         </div>
       )}
 
-      {/* Phone half sheet: the dim closes on tap and sits behind the panel. */}
-      {isMobile && (
-        <div
-          ref={scrimRef}
-          onClick={handleClose}
-          className="absolute inset-0 bg-black/60"
-        />
-      )}
-
-      {/* Full-height surface translated to its detent; text never scales or reflows per frame. */}
-      <div
-        ref={isMobile ? panelRef : undefined}
-        data-testid={isMobile ? 'editor-sheet' : undefined}
-        data-motion-state={isMobile ? presencePhase : undefined}
-        className={
+      {/* On a phone the surface is a two-detent sheet: the dim closes on tap, the handle and
+          the body pull it between half and the whole window. On desktop the same markup is a
+          plain pane. */}
+      <SheetPanel
+        enabled={isMobile}
+        expanded={isSheetExpanded}
+        exiting={presencePhase === 'exiting'}
+        onExpandedChange={setIsSheetExpanded}
+        onDismiss={handleClose}
+        onExited={onExited}
+        testId={isMobile ? 'editor-sheet' : undefined}
+        scrimClassName="bg-black/60"
+        panelClassName={
           isMobile
-            ? `editor-spring-sheet absolute inset-0 flex flex-col overflow-hidden bg-surface border-t border-subtle ${
-                isSheetExpanded ? 'rounded-t-none' : 'rounded-t-2xl'
-              }`
+            ? `bg-surface border-t border-subtle ${isSheetExpanded ? 'rounded-t-none' : 'rounded-t-2xl'}`
             : 'flex min-h-0 flex-1 flex-col bg-surface'
         }
       >
-        {/* The handle owns the sheet gesture. Свёрнутой он с пилюлей, развёрнутой
-            остаётся тонкой полосой у кромки — потянуть вниз можно и оттуда. */}
-        {isMobile && (
-          <div
-            data-sheet-handle
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerEnd}
-            onPointerCancel={onPointerCancel}
-            style={{ touchAction: 'none' }}
-            className={`flex shrink-0 items-center justify-center ${
-              isSheetExpanded ? 'h-3' : 'h-6'
-            }`}
-          >
-            {!isSheetExpanded && <div className="h-1 w-8 rounded-full bg-white/20" />}
-          </div>
-        )}
-
+        {({ bodyRef }) => (
+          <>
         {/* Top Control Bar */}
         <EditorToolbar
           item={item}
@@ -586,10 +557,9 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
         {/* Editor Body */}
         <div
-          ref={isMobile ? bodyRef : undefined}
+          ref={bodyRef}
           data-editor-body
           className="min-h-0 flex-1 overflow-y-auto py-6 md:py-8 bg-surface"
-          style={isMobile && !isSheetExpanded ? { maxHeight: 'calc(56% - 68px)' } : undefined}
         >
           <div
             className={`mx-auto w-full px-4 md:px-6 flex flex-col gap-4 pb-28 ${
@@ -964,7 +934,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
       {/* Chrome shares the sheet's entrance, drag and exit. */}
       <MobileEditorBar
-        ref={barRef}
         isDraft={item.id.startsWith('draft_')}
         activePopover={activeMobilePopover}
         onSetActivePopover={setActiveMobilePopover}
@@ -975,7 +944,9 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         onAiTags={handleAiTagsInline}
         onSave={handleSave}
       />
-      </div>
+          </>
+        )}
+      </SheetPanel>
     </div>
   );
 };

@@ -6,8 +6,6 @@ type Mode = 'idle' | 'drag' | 'settle';
 interface SheetDragOptions {
   isOpen: boolean;
   onDismiss: () => void;
-  onExpand?: () => void;
-  onCollapse?: () => void;
 }
 
 interface DragSession {
@@ -29,8 +27,10 @@ function resist(delta: number, height: number): number {
 }
 
 /**
- * Drag-to-dismiss for a bottom sheet. Only the handle takes the gesture, so the
- * sheet's own scroller keeps behaving like a scroller.
+ * Drag-to-dismiss for a one-detent sheet — a content-sized panel with nothing to expand into.
+ * Two-detent sheets (the editor, the attach picker) live in `SheetPanel`.
+ *
+ * Only the handle takes the gesture, so the sheet's own scroller keeps behaving like a scroller.
  *
  * The finger never goes through React: `translate` on the panel and `opacity` on
  * the scrim are written straight to the two nodes during the drag, so a move
@@ -39,7 +39,7 @@ function resist(delta: number, height: number): number {
  * on a phone. Nothing here animates `background-color`: that repainted the full
  * viewport every pointermove.
  */
-export function useSheetDrag({ isOpen, onDismiss, onExpand, onCollapse }: SheetDragOptions) {
+export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
   const panelRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<DragSession | null>(null);
@@ -102,10 +102,8 @@ export function useSheetDrag({ isOpen, onDismiss, onExpand, onCollapse }: SheetD
       session.active = true;
       setMode('drag');
     }
-    // Upwards is a real destination only when the sheet can expand: then the
-    // finger owns the panel 1:1, clamped by the room it still has to grow into.
-    const travel = session.height > 0 ? Math.max(0, window.innerHeight - session.height) : 0;
-    const offset = onExpand && raw < 0 ? Math.max(raw, -travel) : resist(raw, session.height);
+    // A pull upwards is past the sheet's resting place, so it resists instead of leaving.
+    const offset = resist(raw, session.height);
     const panel = panelRef.current;
     if (panel) {
       panel.style.transition = 'none';
@@ -119,7 +117,7 @@ export function useSheetDrag({ isOpen, onDismiss, onExpand, onCollapse }: SheetD
       const progress = Math.min(1, Math.max(0, offset / session.height));
       scrim.style.opacity = String(1 - 0.5 * progress);
     }
-  }, [onExpand]);
+  }, []);
 
   const onPointerEnd = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const session = sessionRef.current;
@@ -130,27 +128,6 @@ export function useSheetDrag({ isOpen, onDismiss, onExpand, onCollapse }: SheetD
       UI_GESTURES.SHEET_DISMISS_MAX_PX,
       session.height * UI_GESTURES.SHEET_DISMISS_RATIO,
     );
-    // Upward pulls belong to the expand/collapse axis, never to dismiss: a sheet
-    // that can grow half-way treats "up" as "open more", not as "throw away".
-    if (delta < 0 && onExpand) {
-      if (-delta > threshold || session.velocity < -UI_GESTURES.DISMISS_VELOCITY_PX_MS) {
-        releaseInline();
-        setMode('settle');
-        onExpand();
-      } else {
-        setMode('settle');
-        settleTimerRef.current = window.setTimeout(() => {
-          setMode(current => (current === 'settle' ? 'idle' : current));
-        }, SETTLE_MS + 20);
-      }
-      return;
-    }
-    if (delta > threshold && onCollapse) {
-      releaseInline();
-      setMode('settle');
-      onCollapse();
-      return;
-    }
     if (delta > threshold || session.velocity > UI_GESTURES.DISMISS_VELOCITY_PX_MS) {
       // The sheet's own exit transition picks the panel up from the finger —
       // but only once the inline translate stops overriding that transition.
@@ -162,7 +139,7 @@ export function useSheetDrag({ isOpen, onDismiss, onExpand, onCollapse }: SheetD
     settleTimerRef.current = window.setTimeout(() => {
       setMode(current => (current === 'settle' ? 'idle' : current));
     }, SETTLE_MS + 20);
-  }, [onDismiss, onExpand, onCollapse, releaseInline]);
+  }, [onDismiss, releaseInline]);
 
   const onPointerCancel = useCallback(() => {
     sessionRef.current = null;
