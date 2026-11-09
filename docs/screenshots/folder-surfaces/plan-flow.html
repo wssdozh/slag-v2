@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 1500px; background: #0a0a0b; color: #e4e4e7;
+         font-family: Inter, -apple-system, "Segoe UI", sans-serif; padding: 34px 36px 38px; }
+  h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.015em; }
+  .sub { font: 15px/1.4 ui-monospace, monospace; color: #8a8a94; margin: 8px 0 30px; }
+  .flow { display: flex; align-items: center; gap: 16px; }
+  .flow + .flow { margin-top: 26px; }
+  .node { border: 1px solid #2f2f36; border-radius: 12px; padding: 14px 18px; background: #101013; }
+  .node .k { display: block; font: 12px/1 ui-monospace, monospace; color: #71717a; margin-bottom: 7px;
+             text-transform: uppercase; letter-spacing: 0.07em; }
+  .node .v { font: 16.5px/1.35 ui-monospace, monospace; color: #e4e4e7; }
+  .node.acc { border-color: #86efac; }
+  .node.acc .v { color: #bbf7d0; }
+  .arr { font: 26px/1 ui-monospace, monospace; color: #52525b; }
+  .rows { display: flex; flex-direction: column; gap: 26px; }
+  .legend { width: 560px; font: 15px/1.65 ui-monospace, monospace; color: #a8a8b2; }
+  .legend b { color: #e4e4e7; }
+  .row { display: flex; gap: 40px; align-items: flex-start; }
+  .col { flex: 1; }
+</style></head>
+<body>
+  <h1>куда текут данные</h1>
+  <div class="sub">источники → один хук / одни экшены → поверхности</div>
+
+  <div class="row">
+    <div class="col rows">
+
+      <div class="flow">
+        <div class="node"><span class="k">источник</span><span class="v">items — все записи</span></div>
+        <span class="arr">──▶</span>
+        <div class="node acc"><span class="k">хук</span><span class="v">useFolderStats(path)</span></div>
+        <span class="arr">──▶</span>
+        <div class="node"><span class="k">потребители</span><span class="v">панель · модалка · мобильный профиль</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="node"><span class="k">источник</span><span class="v">folders — мета</span></div>
+        <span class="arr">──▶</span>
+        <div class="node acc"><span class="k">экшены</span><span class="v">saveFolder · renameFolder · deleteFolder</span></div>
+        <span class="arr">──▶</span>
+        <div class="node"><span class="k">поверхность</span><span class="v">инлайн-правка профиля (+ шторка на телефоне)</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="node"><span class="k">создание</span><span class="v">FolderModal: родитель, пустое имя</span></div>
+        <span class="arr">──▶</span>
+        <div class="node"><span class="k">редактирование</span><span class="v">профиль папки — везде и всегда</span></div>
+      </div>
+
+    </div>
+
+    <div class="legend">
+      <b>почему так</b><br><br>
+      панель, модалка и мобильный экран — это уже три копии одной шапки, одного описания и одних чисел. вынос по третьему повтору.<br><br>
+      «режим редактирования» — четвёртая копия тех же полей, но со своим способом сохранения и своим багом в переименовании.<br><br>
+      одна модель + три контейнера = правка в одном файле вместо четырёх.
+    </div>
+  </div>
+</body></html>

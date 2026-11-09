@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 1500px; background: #0a0a0b; color: #e4e4e7;
+         font-family: Inter, -apple-system, "Segoe UI", sans-serif; padding: 34px 36px 38px; }
+  h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.015em; }
+  .sub { font: 15px/1.4 ui-monospace, monospace; color: #8a8a94; margin: 8px 0 30px; }
+  .row { display: flex; gap: 34px; align-items: flex-start; }
+
+  .anat { width: 820px; border: 1px solid #43434d; border-radius: 16px; background: #101013; overflow: hidden; }
+  .anat .bar { height: 46px; border-bottom: 1px solid #26262c; display: flex; align-items: center;
+               gap: 10px; padding: 0 16px; font: 17px/1 ui-monospace, monospace; color: #e4e4e7; }
+  .anat .bar .sp { margin-left: auto; color: #8a8a94; }
+  .anat .body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .slot { border: 1px dashed #4a4a55; border-radius: 12px; padding: 15px 16px 14px; position: relative; }
+  .slot .n { position: absolute; top: -11px; left: 13px; background: #0a0a0b; padding: 0 7px;
+             font: 700 13px/1 ui-monospace, monospace; color: #fafafa; }
+  .slot .t { font: 14px/1.5 ui-monospace, monospace; color: #86efac; margin-bottom: 11px; }
+  .metrics { display: grid; grid-template-columns: repeat(6, 1fr); }
+  .metrics div { text-align: center; border-left: 1px solid #26262c; padding: 6px 0; }
+  .metrics div:first-child { border-left: 0; }
+  .metrics b { display: block; font: 650 26px/1.15 ui-monospace, monospace; color: #fafafa; }
+  .metrics span { font: 12px/1.5 ui-monospace, monospace; color: #8a8a94; }
+  .line { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 34px; height: 34px; border-radius: 9px; border: 1px solid #2f2f36; background: #17171b; }
+  .ta { border: 1px solid #2f2f36; border-radius: 9px; background: #0a0a0c; padding: 12px 13px;
+        font: 15px/1.55 ui-monospace, monospace; color: #b8b8c0; }
+  .chips { display: flex; gap: 16px; font: 14px/1 ui-monospace, monospace; color: #8a8a94;
+           border-bottom: 1px solid #26262c; padding-bottom: 9px; }
+  .chips .on { color: #fafafa; box-shadow: 0 1px 0 #fafafa; }
+  .hint { font: 13px/1.4 ui-monospace, monospace; color: #c4b5fd; }
+
+  .col { width: 610px; display: flex; flex-direction: column; gap: 18px; }
+  .cont { border: 1px solid #2a2a31; border-radius: 12px; padding: 16px 18px; background: #101013; }
+  .cont .h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px; }
+  .cont .name { font: 650 18px/1.25 Inter, sans-serif; color: #fafafa; }
+  .cont .meta { font: 12.5px/1 ui-monospace, monospace; color: #6b6b75; }
+  .cont p { font: 14.5px/1.55 ui-monospace, monospace; color: #a8a8b2; }
+  .cont .good { color: #86efac; }
+  .cont .bad { color: #fca5a5; }
+  .note { font: 14.5px/1.6 ui-monospace, monospace; color: #a8a8b2; }
+  .note b { color: #e4e4e7; }
+  .note .ok { color: #86efac; }
+  .note .no { color: #fca5a5; }
+</style></head>
+<body>
+  <h1>стало: один профиль папки, три контейнера</h1>
+  <div class="sub">шапка / описание / метрики / табы — одна разметка, разные обёртки</div>
+
+  <div class="row">
+    <div class="anat">
+      <div class="bar"><span>▣</span><span>Входящие</span><span>·</span><span>19 записей</span><span class="sp">⋯ &nbsp; ✕</span></div>
+      <div class="body">
+
+        <div class="slot">
+          <span class="n">1</span>
+          <div class="t">шапка</div>
+          <div class="line">
+            <div class="avatar"></div>
+            <div style="font:600 17px/1 Inter,sans-serif;color:#fafafa">Входящие</div>
+            <div style="font:13px/1 ui-monospace,monospace;color:#8a8a94;margin-left:auto">иконка → пикер · имя → инлайн</div>
+          </div>
+        </div>
+
+        <div class="slot">
+          <span class="n">2</span>
+          <div class="t">описание для ИИ · тап → textarea · blur = сохранить</div>
+          <div class="ta">Все новые неотсортированные заметки, идеи, быстрые мысли и задачи для дальнейшего распределения.</div>
+        </div>
+
+        <div class="slot">
+          <span class="n">3</span>
+          <div class="t">метрики · одна строка, одни подписи везде</div>
+          <div class="metrics">
+            <div><b>25</b><span>заметки</span></div>
+            <div><b>6</b><span>таски</span></div>
+            <div><b>8</b><span>статьи</span></div>
+            <div><b>0</b><span>медиа</span></div>
+            <div><b>0</b><span>аудио</span></div>
+            <div><b>18</b><span>ссылки</span></div>
+          </div>
+        </div>
+
+        <div class="slot">
+          <span class="n">4</span>
+          <div class="t">табы · как есть</div>
+          <div class="chips"><span class="on">Медиа</span><span>Аудио</span><span>Файлы</span><span>Ссылки 18</span><span>Теги 97</span></div>
+        </div>
+
+        <div class="hint">меню «⋯»: переименовать · переместить · удалить (с подтверждением)</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="cont">
+        <div class="h"><span class="name">1 · док-панель «Инфо папки»</span><span class="meta">260–540 px</span></div>
+        <p>те же 4 слота в колонку. без строки действий. <span class="good">панель остаётся</span></p>
+      </div>
+      <div class="cont">
+        <div class="h"><span class="name">2 · модалка по клику названия</span><span class="meta">max-w-xl</span></div>
+        <p>4 слота + строка действий (Сортировка / Создать запись). <span class="bad">тоггл «Изменить / Инфо» выпиливается</span></p>
+      </div>
+      <div class="cont">
+        <div class="h"><span class="name">3 · мобильный экран профиля</span><span class="meta">390 px</span></div>
+        <p>4 слота крупно, метрики 3×2, действия липкие снизу. правка инлайн + шторка для иконки, «переместить», «удалить»</p>
+      </div>
+      <div class="cont" style="border-color:#43434d">
+        <div class="h"><span class="name">FolderModal</span><span class="meta">было: второй редактор</span></div>
+        <p><span class="bad">переименование и описание убираем</span> → только «создать папку»: имя, родитель, иконка, описание</p>
+      </div>
+
+      <div class="note">
+        <b>в данных</b><br>
+        <span class="ok">✔</span> один <b>useFolderStats(folder)</b> от <code>items</code> по пути папки: фильтры ленты и режим входящих на счётчики не влияют.<br>
+        <span class="ok">✔</span> подписи — одна константа.<br>
+        <span class="ok">✔</span> переименование — только <b>renameFolder</b> (миграция заметок + диск).<br>
+        <span class="no">✗</span> удаляются: режим правки, правка в FolderModal, дубль «Изменить» на телефоне.
+      </div>
+    </div>
+  </div>
+</body></html>

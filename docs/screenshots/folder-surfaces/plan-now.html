@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 1500px; background: #0a0a0b; color: #e4e4e7;
+         font-family: Inter, -apple-system, "Segoe UI", sans-serif; padding: 34px 36px 38px; }
+  h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.015em; }
+  .sub { font: 15px/1.4 ui-monospace, monospace; color: #8a8a94; margin: 8px 0 30px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px 34px; }
+  .card { display: flex; flex-direction: column; gap: 12px; }
+  .cap { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .num { font: 700 15px/1 ui-monospace, monospace; color: #0a0a0b; background: #d4d4d8;
+         border-radius: 5px; padding: 3px 8px; }
+  .cap .t { font-size: 19px; font-weight: 650; color: #fafafa; }
+  .cap .f { font: 13px/1 ui-monospace, monospace; color: #6b6b75; }
+  .wf { border: 1px solid #2f2f36; border-radius: 12px; background: #101013; overflow: hidden; }
+  .wf .bar { height: 40px; border-bottom: 1px solid #26262c; display: flex; align-items: center;
+             gap: 9px; padding: 0 13px; font: 14px/1 ui-monospace, monospace; color: #b8b8c0; }
+  .wf .bar .sp { margin-left: auto; }
+  .wf .body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .lbl { font: 13px/1.3 ui-monospace, monospace; color: #8a8a94; }
+  .ln { height: 8px; border-radius: 4px; background: #2a2a31; }
+  .ln.s { width: 62%; }
+  .rowm { display: flex; justify-content: space-between; font: 15px/1 ui-monospace, monospace;
+          color: #c8c8d0; padding: 6px 0; border-bottom: 1px solid #22222a; }
+  .rowm b { font-weight: 500; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { border: 1px solid #26262c; border-radius: 8px; padding: 11px 0; text-align: center;
+          font: 11px/1.5 ui-monospace, monospace; color: #8a8a94; }
+  .tile b { display: block; font-size: 20px; color: #e4e4e7; }
+  .icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .icons i { display: block; height: 30px; border: 1px solid #26262c; border-radius: 6px; }
+  .input { height: 34px; border: 1px solid #2f2f36; border-radius: 8px; background: #0a0a0c;
+           display: flex; align-items: center; padding: 0 11px; font: 13px/1 ui-monospace, monospace; color: #a8a8b2; }
+  .ta { border: 1px solid #2f2f36; border-radius: 8px; background: #0a0a0c; padding: 9px 11px;
+        font: 13px/1.55 ui-monospace, monospace; color: #a8a8b2; }
+  .chips { display: flex; gap: 14px; font: 13px/1 ui-monospace, monospace; color: #8a8a94;
+           border-bottom: 1px solid #26262c; padding-bottom: 8px; }
+  .chips .on { color: #fafafa; box-shadow: 0 1px 0 #fafafa; }
+  .btns { display: flex; gap: 8px; }
+  .btn { flex: 1; height: 30px; border: 1px solid #2f2f36; border-radius: 8px;
+         display: flex; align-items: center; justify-content: center;
+         font: 12.5px/1 ui-monospace, monospace; color: #b8b8c0; }
+  .foot { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
+          border-top: 1px solid #26262c; font: 13px/1 ui-monospace, monospace; color: #a8a8b2; }
+  .bad { border-radius: 8px; border: 1px solid #3a1f22; background: #1a0f11; color: #fca5a5;
+         font: 14.5px/1.45 ui-monospace, monospace; padding: 11px 13px; }
+  .bad b { color: #fecaca; font-weight: 700; }
+  .phone { width: 360px; margin: 0 auto; border: 1px solid #2f2f36; border-radius: 18px;
+           background: #101013; overflow: hidden; }
+  .phone .bar { padding: 0 16px; font-size: 13px; }
+  .avatar { width: 56px; height: 56px; border-radius: 50%; border: 1px solid #2f2f36; background: #17171b; }
+  .p3 { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #26262c; border-radius: 9px; }
+  .p3 div { text-align: center; padding: 9px 0; font: 10.5px/1.5 ui-monospace, monospace; color: #8a8a94;
+            border-left: 1px solid #26262c; }
+  .p3 div:first-child { border-left: 0; }
+  .p3 b { display: block; font-size: 17px; color: #e4e4e7; }
+  .cent { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+</style></head>
+<body>
+  <h1>сейчас: четыре места, две правды о данных</h1>
+  <div class="sub">док-панель · модалка-просмотр · модалка-правка · мобильный профиль</div>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="cap"><span class="num">1</span><span class="t">док-панель «Инфо папки»</span><span class="f">FolderInfoPanel</span></div>
+      <div class="wf">
+        <div class="bar"><span>▣</span><span>Входящие</span></div>
+        <div class="body">
+          <div style="display:flex;justify-content:space-between"><span class="lbl">✦ Описание для ИИ</span><span class="lbl">Изменить</span></div>
+          <div class="ln"></div><div class="ln s"></div>
+          <div class="rowm"><span>Заметки</span><b>25</b></div>
+          <div class="rowm"><span>Таски</span><b>6</b></div>
+          <div class="rowm"><span>Статьи</span><b>8</b></div>
+          <div class="rowm"><span>Фото / Медиа</span><b>0</b></div>
+          <div class="rowm"><span>Голосовые</span><b>0</b></div>
+          <div class="rowm"><span>Ссылки</span><b>18</b></div>
+          <div class="chips"><span class="on">Медиа</span><span>Аудио</span><span>Файлы</span><span>Ссылки</span><span>Теги</span></div>
+        </div>
+      </div>
+      <div class="bad">✗ считает <b>filteredItems</b> — на «Входящих» это <b>вся база</b>, а не 19 записей папки</div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span class="num">2</span><span class="t">модалка, просмотр</span><span class="f">FolderInfoModal</span></div>
+      <div class="wf">
+        <div class="bar"><span>▣</span><span>Входящие</span><span class="sp">✎ Изменить · ✕</span></div>
+        <div class="body">
+          <div class="lbl">19 записей • Входящие</div>
+          <div class="ta">✦ Описание для ИИ — карточка внутри карточки</div>
+          <div class="tiles">
+            <div class="tile"><b>1</b>Заметки</div><div class="tile"><b>0</b>Таски</div><div class="tile"><b>0</b>Статьи</div>
+            <div class="tile"><b>0</b>Медиа</div><div class="tile"><b>0</b>Аудио</div><div class="tile"><b>0</b>Ссылки</div>
+          </div>
+          <div class="btns"><div class="btn">↕ ИИ-Сортировка</div><div class="btn">+ Создать запись</div></div>
+          <div class="chips"><span class="on">Медиа</span><span>Аудио</span><span>Файлы</span><span>Ссылки</span><span>Теги</span></div>
+        </div>
+      </div>
+      <div class="bad">✗ считает <b>items</b> по папке → ни одно число не совпало с панелью. подписи «Медиа» / «Аудио» ≠ «Фото / Медиа» / «Голосовые»</div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span class="num">3</span><span class="t">модалка, режим правки</span><span class="f">FolderInfoModal → edit</span></div>
+      <div class="wf">
+        <div class="bar"><span>✎</span><span>Редактирование папки</span><span class="sp">Инфо · ✕</span></div>
+        <div class="body">
+          <div class="lbl">Название папки</div>
+          <div class="input">Входящие</div>
+          <div class="lbl">Иконка папки</div>
+          <div class="icons"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="lbl">Описание для ИИ-сортировки</div>
+          <div class="ta">Все новые неотсортированные заметки…</div>
+        </div>
+        <div class="foot"><span style="color:#f87171">🗑 Удалить папку</span><span>Отмена&nbsp;&nbsp; Сохранить</span></div>
+      </div>
+      <div class="bad">✗ тоггл «Изменить / Инфо» внутри модалки: свой заголовок, свой футер, свой способ сохранения</div>
+    </div>
+
+    <div class="card">
+      <div class="cap"><span class="num">4</span><span class="t">мобильный профиль</span><span class="f">MobileFolderInfoView</span></div>
+      <div class="phone">
+        <div class="bar"><span>←</span><span>Назад</span><span class="sp">✎</span></div>
+        <div class="body">
+          <div class="cent">
+            <div class="avatar"></div>
+            <div style="font-size:17px;font-weight:650;color:#fafafa">Проекты</div>
+            <div class="lbl">4 записи • Проекты</div>
+            <div class="btns" style="width:100%"><div class="btn">+ Запись</div><div class="btn">✎ Изменить</div></div>
+          </div>
+          <div class="p3"><div><b>2</b>заметки</div><div><b>2</b>таски</div><div><b>0</b>статьи</div></div>
+          <div class="chips"><span class="on">Фото</span><span>Аудио</span><span>Файлы</span><span>Ссылки</span></div>
+        </div>
+      </div>
+      <div class="bad">✗ 3 метрики из 6, описание только на чтение, «Изменить» уводит в форму №3 (на телефоне — в форму «Настройки папки»)</div>
+    </div>
+
+  </div>
+</body></html>

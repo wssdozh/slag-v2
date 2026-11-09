@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1560px; background: #0a0a0b; color: #e4e4e7;
+    font-family: Inter, -apple-system, "Segoe UI", sans-serif; padding: 26px 28px 30px;
+  }
+  h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { font: 11.5px/1.4 ui-monospace, monospace; color: #71717a; margin: 4px 0 20px; }
+  h2 { font: 600 12px/1 ui-monospace, monospace; color: #a1a1aa; text-transform: uppercase;
+       letter-spacing: 0.08em; margin-bottom: 10px; }
+  h2 .dot { color: #f87171; }
+  section + section { margin-top: 26px; padding-top: 22px; border-top: 1px solid #1f1f23; }
+  .row { display: flex; gap: 16px; align-items: flex-start; }
+
+  /* wireframe box */
+  .wf { width: 350px; border: 1px solid #2a2a30; border-radius: 10px; background: #101013; overflow: hidden; }
+  .wf .bar { height: 26px; border-bottom: 1px solid #232329; display: flex; align-items: center;
+             gap: 6px; padding: 0 8px; font: 10px/1 ui-monospace, monospace; color: #8a8a94; }
+  .wf .bar .sp { margin-left: auto; }
+  .wf .body { padding: 9px; display: flex; flex-direction: column; gap: 7px; }
+  .ln { height: 5px; border-radius: 3px; background: #27272d; }
+  .ln.w80 { width: 80%; } .ln.w60 { width: 60%; } .ln.w40 { width: 40%; }
+  .lbl { font: 9.5px/1 ui-monospace, monospace; color: #71717a; }
+  .rowm { display: flex; align-items: center; justify-content: space-between;
+          font: 10px/1 ui-monospace, monospace; color: #a1a1aa; padding: 3px 0; border-bottom: 1px dotted #232329; }
+  .rowm:last-child { border-bottom: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .tile { border: 1px solid #232329; border-radius: 6px; padding: 6px 0; text-align: center;
+          font: 9px/1.4 ui-monospace, monospace; color: #71717a; }
+  .tile b { display: block; font-size: 12px; color: #d4d4d8; }
+  .icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .icons i { display: block; height: 22px; border: 1px solid #232329; border-radius: 5px; }
+  .input { height: 24px; border: 1px solid #2a2a30; border-radius: 6px; background: #0a0a0c;
+           display: flex; align-items: center; padding: 0 7px; font: 9.5px/1 ui-monospace, monospace; color: #a1a1aa; }
+  .ta { height: 44px; border: 1px solid #2a2a30; border-radius: 6px; background: #0a0a0c; padding: 6px 7px;
+        font: 9.5px/1.5 ui-monospace, monospace; color: #8a8a94; }
+  .chips { display: flex; gap: 8px; font: 9.5px/1 ui-monospace, monospace; color: #71717a;
+           border-bottom: 1px solid #232329; padding-bottom: 5px; }
+  .chips .on { color: #fafafa; border-bottom: 1px solid #fafafa; padding-bottom: 5px; margin-bottom: -6px; }
+  .btns { display: flex; gap: 6px; }
+  .btn { flex: 1; height: 20px; border: 1px solid #2a2a30; border-radius: 6px;
+         display: flex; align-items: center; justify-content: center;
+         font: 9px/1 ui-monospace, monospace; color: #a1a1aa; }
+  .btn.pri { background: #e4e4e7; color: #0a0a0b; border-color: #e4e4e7; }
+  .foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 9px;
+          border-top: 1px solid #232329; font: 9.5px/1 ui-monospace, monospace; color: #8a8a94; }
+  .tag { margin-top: 7px; font: 10px/1.45 ui-monospace, monospace; color: #f87171; display: flex; gap: 5px; }
+  .tag.ok { color: #86efac; }
+  .tag .x { font-weight: 700; }
+
+  .phone { width: 240px; border-radius: 14px; border: 1px solid #2a2a30; background: #101013; overflow: hidden; }
+  .phone .body { gap: 6px; }
+  .prof { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0 2px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #2a2a30; background: #16161a; }
+  .p3 { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #232329; border-radius: 7px; }
+  .p3 div { text-align: center; padding: 5px 0; font: 8px/1.5 ui-monospace, monospace; color: #71717a; }
+  .p3 b { display: block; font-size: 11px; color: #d4d4d8; }
+
+  /* decided anatomy */
+  .anat { width: 560px; border: 1px solid #3f3f46; border-radius: 12px; background: #101013; overflow: hidden; }
+  .anat .bar { height: 30px; border-bottom: 1px solid #232329; display: flex; align-items: center; gap: 7px;
+               padding: 0 10px; font: 10px/1 ui-monospace, monospace; color: #d4d4d8; }
+  .anat .bar .sp { margin-left: auto; color: #71717a; }
+  .anat .body { padding: 12px; display: flex; flex-direction: column; gap: 11px; }
+  .slot { border: 1px dashed #3f3f46; border-radius: 8px; padding: 9px 10px; position: relative; }
+  .slot .n { position: absolute; top: -8px; left: 8px; background: #0a0a0b; padding: 0 5px;
+             font: 700 9.5px/1 ui-monospace, monospace; color: #fafafa; }
+  .slot .t { font: 10px/1.5 ui-monospace, monospace; color: #86efac; margin-bottom: 6px; }
+  .metrics { display: grid; grid-template-columns: repeat(6, 1fr); }
+  .metrics div { text-align: center; border-left: 1px solid #232329; padding: 4px 0; }
+  .metrics div:first-child { border-left: 0; }
+  .metrics b { display: block; font: 600 15px/1.1 ui-monospace, monospace; color: #fafafa; }
+  .metrics span { font: 8.5px/1.4 ui-monospace, monospace; color: #71717a; }
+  .containers { width: 560px; display: flex; flex-direction: column; gap: 10px; }
+  .cont { border: 1px solid #232329; border-radius: 9px; padding: 10px 12px; background: #101013; }
+  .cont .h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+  .cont .name { font: 600 12px/1.2 Inter, sans-serif; color: #fafafa; }
+  .cont .meta { font: 10px/1 ui-monospace, monospace; color: #52525b; }
+  .cont p { font: 10.5px/1.5 ui-monospace, monospace; color: #a1a1aa; }
+  .cont .bad { color: #f87171; }
+  .cont .good { color: #86efac; }
+
+  /* flow */
+  .flow { display: flex; align-items: center; gap: 10px; font: 10.5px/1.35 ui-monospace, monospace; }
+  .node { border: 1px solid #2a2a30; border-radius: 8px; padding: 8px 11px; background: #101013; color: #d4d4d8; }
+  .node .k { color: #71717a; font-size: 9.5px; display: block; margin-bottom: 3px; }
+  .arr { color: #52525b; }
+  .flowcol { display: flex; flex-direction: column; gap: 12px; }
+  .legend { font: 10.5px/1.5 ui-monospace, monospace; color: #71717a; width: 330px; }
+  .legend b { color: #e4e4e7; }
+  .legend .ok { color: #86efac; }
+  .legend .no { color: #f87171; }
+</style>
+</head>
+<body>
+
+  <h1>инфо о папке: из трёх поверхностей и двух редакторов → одна модель</h1>
+  <div class="sub">схема, не финал. числа демо; слева «сейчас», справа «стало»</div>
+
+  <section>
+    <h2><span class="dot">●</span> сейчас: 4 места, 2 правды о данных</h2>
+    <div class="row">
+
+      <div>
+        <div class="wf">
+          <div class="bar"><span>▣</span><span>Инфо папки</span><span class="sp">◫</span></div>
+          <div class="body">
+            <div class="lbl">✦ Описание для ИИ ......... Изменить</div>
+            <div class="ln"></div><div class="ln w80"></div>
+            <div class="rowm"><span>Заметки</span><span>25</span></div>
+            <div class="rowm"><span>Таски</span><span>6</span></div>
+            <div class="rowm"><span>Статьи</span><span>8</span></div>
+            <div class="rowm"><span>Фото / Медиа</span><span>0</span></div>
+            <div class="rowm"><span>Голосовые</span><span>0</span></div>
+            <div class="rowm"><span>Ссылки</span><span>18</span></div>
+            <div class="chips"><span class="on">Медиа</span><span>Аудио</span><span>Файлы</span><span>Ссылки</span><span>Теги</span></div>
+            <div class="lbl" style="text-align:center;padding:10px 0">Нет фото в этой папке</div>
+          </div>
+        </div>
+        <div class="tag"><span class="x">✗</span><span>считает <b>filteredItems</b> — на «Входящих» это вся база</span></div>
+      </div>
+
+      <div>
+        <div class="wf">
+          <div class="bar"><span>▣</span><span>Входящие</span><span class="sp">✎ Изменить · ✕</span></div>
+          <div class="body">
+            <div class="lbl" style="padding-bottom:2px">19 записей • Входящие</div>
+            <div class="ta" style="height:38px">✦ Описание для ИИ — карточка в карточке</div>
+            <div class="tiles">
+              <div class="tile"><b>1</b>Заметки</div><div class="tile"><b>0</b>Таски</div><div class="tile"><b>0</b>Статьи</div>
+              <div class="tile"><b>0</b>Медиа</div><div class="tile"><b>0</b>Аудио</div><div class="tile"><b>0</b>Ссылки</div>
+            </div>
+            <div class="btns"><div class="btn">↕ ИИ-Сортировка</div><div class="btn">+ Создать запись</div></div>
+            <div class="chips"><span class="on">Медиа</span><span>Аудио</span><span>Файлы</span><span>Ссылки</span><span>Теги</span></div>
+          </div>
+        </div>
+        <div class="tag"><span class="x">✗</span><span>считает <b>items</b> по папке → другие числа, другие подписи</span></div>
+      </div>
+
+      <div>
+        <div class="wf">
+          <div class="bar"><span>✎</span><span>Редактирование папки</span><span class="sp">Инфо · ✕</span></div>
+          <div class="body">
+            <div class="lbl">Название папки</div>
+            <div class="input">Входящие</div>
+            <div class="lbl">Иконка папки</div>
+            <div class="icons"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="lbl">Описание для ИИ-сортировки</div>
+            <div class="ta">Все новые неотсортированные заметки...</div>
+          </div>
+          <div class="foot"><span style="color:#f87171">🗑 Удалить</span><span>Отмена &nbsp; Сохранить</span></div>
+        </div>
+        <div class="tag"><span class="x">✗</span><span>режим-тоггл внутри модалки: свой заголовок, свой футер</span></div>
+      </div>
+
+      <div>
+        <div class="phone">
+          <div class="bar"><span>←</span><span>Назад</span><span class="sp">✎</span></div>
+          <div class="body">
+            <div class="prof">
+              <div class="avatar"></div>
+              <div class="lbl" style="color:#e4e4e7;font-size:11px;font-weight:600">Проекты</div>
+              <div class="lbl">4 записи • Проекты</div>
+              <div class="btns" style="width:100%"><div class="btn">+ Запись</div><div class="btn">✎ Изменить</div></div>
+            </div>
+            <div class="p3"><div><b>2</b>заметки</div><div><b>2</b>таски</div><div><b>0</b>статьи</div></div>
+            <div class="chips"><span class="on">Фото</span><span>Аудио</span><span>Файлы</span></div>
+          </div>
+        </div>
+        <div class="tag"><span class="x">✗</span><span>3 метрики из 6, «Изменить» уводит в форму №3</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2><span style="color:#86efac">●</span> стало: один <b>профиль папки</b>, три контейнера</h2>
+    <div class="row">
+      <div class="anat">
+        <div class="bar"><span>▣</span><span>Входящие</span><span>·</span><span>19 записей</span><span class="sp">⋯ ✕</span></div>
+        <div class="body">
+          <div class="slot">
+            <span class="n">1</span>
+            <div class="t">шапка: иконка · имя · счётчик · меню</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="avatar" style="width:24px;height:24px;border-radius:6px"></div>
+              <div class="lbl" style="color:#fafafa;font-size:11px">Входящие</div>
+              <div class="lbl" style="margin-left:auto">тап по иконке → пикер · тап по имени → инлайн</div>
+            </div>
+          </div>
+
+          <div class="slot">
+            <span class="n">2</span>
+            <div class="t">описание для ИИ — текст, тап → textarea, blur = сохранить</div>
+            <div class="ta" style="height:46px">Все новые неотсортированные заметки, идеи, быстрые мысли и задачи для дальнейшего распределения.</div>
+          </div>
+
+          <div class="slot">
+            <span class="n">3</span>
+            <div class="t">одна строка чисел, одни подписи во всех контейнерах</div>
+            <div class="metrics">
+              <div><b>25</b><span>заметки</span></div>
+              <div><b>6</b><span>таски</span></div>
+              <div><b>8</b><span>статьи</span></div>
+              <div><b>0</b><span>медиа</span></div>
+              <div><b>0</b><span>аудио</span></div>
+              <div><b>18</b><span>ссылки</span></div>
+            </div>
+          </div>
+
+          <div class="slot">
+            <span class="n">4</span>
+            <div class="t">табы медиа/аудио/файлы/ссылки/теги — как есть</div>
+            <div class="chips"><span class="on">Медиа</span><span>Аудио</span><span>Файлы</span><span>Ссылки 18</span><span>Теги 97</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="containers">
+        <div class="cont">
+          <div class="h"><span class="name">1. док-панель «Инфо папки»</span><span class="meta">260–540 px</span></div>
+          <p>те же 4 слота, вертикально. без строки действий и без медиа-экшенов. <span class="good">панель остаётся</span></p>
+        </div>
+        <div class="cont">
+          <div class="h"><span class="name">2. модалка по клику названия</span><span class="meta">max-w-xl</span></div>
+          <p>4 слота + строка действий (Сортировка / Создать запись). метрики — одна строка, не плитки. <span class="bad">тоггл «Изменить/Инфо» выпиливается</span></p>
+        </div>
+        <div class="cont">
+          <div class="h"><span class="name">3. мобильный экран профиля</span><span class="meta">390 px</span></div>
+          <p>4 слота крупно, метрики — 6 чисел в 3×2, действия липкие снизу. правка — инлайн + шторка для иконки и «переместить/удалить»</p>
+        </div>
+        <div class="cont" style="border-color:#3f3f46">
+          <div class="h"><span class="name">FolderModal</span><span class="meta">было: 2-й редактор</span></div>
+          <p><span class="bad">переименование и описание убираем</span> → остаётся только «Создать папку»: имя, родитель, иконка, описание. один вход, одно поведение.</p>
+        </div>
+      </div>
+
+      <div class="legend">
+        <b>что меняется в данных</b><br><br>
+        <span class="ok">✔</span> один <b>useFolderStats(folder)</b> от <code>items</code> строго по пути папки. фильтры ленты, тег-фильтр и режим входящих на счётчики не влияют.<br><br>
+        <span class="ok">✔</span> подписи метрик — один список в константе: заметки / таски / статьи / медиа / аудио / ссылки.<br><br>
+        <span class="ok">✔</span> переименование — только <b>renameFolder</b> (миграция заметок + диск). либо его вообще нет в UI.<br><br>
+        <span class="no">✗</span> удаляется: режим правки в модалке, правка из FolderModal, дубль «Изменить» на телефоне.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span style="color:#86efac">●</span> куда текут данные</h2>
+    <div class="row">
+      <div class="flowcol">
+        <div class="flow">
+          <div class="node"><span class="k">источник</span>items (все записи)</div>
+          <span class="arr">──▶</span>
+          <div class="node" style="border-color:#86efac"><span class="k">хук</span>useFolderStats(path)</div>
+          <span class="arr">──▶</span>
+          <div class="node"><span class="k">потребители</span>панель · модалка · мобильный профиль</div>
+        </div>
+        <div class="flow">
+          <div class="node"><span class="k">источник</span>folders (мета)</div>
+          <span class="arr">──▶</span>
+          <div class="node" style="border-color:#86efac"><span class="k">действия</span>saveFolder / renameFolder / deleteFolder</div>
+          <span class="arr">──▶</span>
+          <div class="node"><span class="k">поверхность</span>инлайн-правка профиля (+ шторка на телефоне)</div>
+        </div>
+        <div class="flow">
+          <div class="node"><span class="k">создание</span>FolderModal (родитель, пустое имя)</div>
+          <span class="arr">──▶</span>
+          <div class="node"><span class="k">редактирование</span>профиль папки — везде</div>
+        </div>
+      </div>
+      <div class="legend">
+        <b>почему так, а не наоборот</b><br><br>
+        вынос по третьему повтору: панель, модалка и мобильный экран — это уже три копии одной шапки, одного описания и одних чисел.<br><br>
+        а «режим редактирования» — четвёртая копия тех же полей, но с другим поведением сохранения.<br><br>
+        одна модель + три контейнера = правки в одном файле, а не в четырёх.
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>

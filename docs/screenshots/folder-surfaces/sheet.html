@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1940px;
+    background: #0a0a0b;
+    color: #e4e4e7;
+    font-family: Inter, -apple-system, "Segoe UI", sans-serif;
+    padding: 26px 30px 30px;
+  }
+  h1 { font-size: 19px; letter-spacing: -0.01em; font-weight: 600; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: #71717a; margin-bottom: 20px; font-family: ui-monospace, "JetBrains Mono", monospace; }
+  .row { display: flex; gap: 18px; align-items: flex-start; }
+  .row + .row { margin-top: 24px; }
+  .cell { display: flex; flex-direction: column; gap: 8px; }
+  .cap { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .num {
+    font-family: ui-monospace, monospace; font-size: 11px; color: #0a0a0b;
+    background: #d4d4d8; border-radius: 4px; padding: 1px 5px; font-weight: 700;
+  }
+  .title { font-size: 13px; font-weight: 600; color: #fafafa; }
+  .file { font-family: ui-monospace, monospace; font-size: 10.5px; color: #52525b; }
+  .note { font-size: 11.5px; color: #a1a1aa; line-height: 1.5; }
+  img { display: block; border-radius: 10px; border: 1px solid rgba(255,255,255,0.10); }
+  .w610 { width: 610px; }
+  .w610 img { width: 610px; }
+  .w390 { width: 390px; }
+  .w390 img { width: 390px; }
+  .text { font-size: 12px; color: #a1a1aa; line-height: 1.55; padding-top: 2px; }
+  .text b { color: #fafafa; font-weight: 600; }
+  .text code { font-family: ui-monospace, monospace; font-size: 11px; color: #d4d4d8; }
+  .text .lead { color: #e4e4e7; font-weight: 600; display: block; margin-bottom: 6px; font-size: 12.5px; }
+  ul { padding-left: 16px; display: flex; flex-direction: column; gap: 5px; }
+</style>
+</head>
+<body>
+  <h1>инфо о папке: все поверхности разом</h1>
+  <div class="sub">SLAG v2 · демо-хранилище · desktop 1280×800 / mobile 390×844 · папка «Входящие» и «Проекты»</div>
+
+  <div class="row">
+    <div class="cell w610">
+      <div class="cap"><span class="num">1</span><span class="title">правая панель «Инфо папки»</span><span class="file">FolderInfoPanel</span></div>
+      <img src="01-desktop-panel.png">
+      <div class="note">заметки 4 / таски 6 / статьи 2 — это <b>вся база</b>: считает от <code>filteredItems</code> (+ режим входящих «все»), а не от папки. подписи «Фото / Медиа», «Голосовые».</div>
+    </div>
+    <div class="cell w610">
+      <div class="cap"><span class="num">2</span><span class="title">модалка «Входящие», просмотр</span><span class="file">FolderInfoModal</span></div>
+      <img src="02-desktop-info-modal.png">
+      <div class="note">та же папка: 1 запись, заметки 1, таски 0 — считает от <code>items</code> строго по папке. ни одно число не совпало с панелью. подписи «Медиа» / «Аудио».</div>
+    </div>
+    <div class="cell w610">
+      <div class="cap"><span class="num">3</span><span class="title">модалка, «Редактирование папки»</span><span class="file">FolderInfoModal → edit</span></div>
+      <img src="03-desktop-info-modal-edit.png">
+      <div class="note">в шапке кнопка «Инфо» — назад. заголовок подменяется названием «Редактирование папки», для входящих удаление скрыто, в футере «Отмена / Сохранить».</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="cell w610">
+      <div class="cap"><span class="num">4</span><span class="title">второй редактор — «Настройки папки»</span><span class="file">FolderModal</span></div>
+      <img src="04-desktop-folder-modal.png">
+      <div class="note">те же поля, другой заголовок. удаление без подтверждения, переименование идёт через <code>saveFolder</code>, а не <code>renameFolder</code>.</div>
+    </div>
+    <div class="cell w610">
+      <div class="cap"><span class="num">5</span><span class="title">путь к нему — ПКМ по папке</span><span class="file">ContextMenu</span></div>
+      <img src="04a-desktop-context-menu.png">
+      <div class="note">«Информация и медиа» → модалка №2, «Иконка и описание» → модалка №4. два входа в одно и то же, с разным поведением.</div>
+    </div>
+    <div class="cell" style="width:620px">
+      <div class="text">
+        <span class="lead">как в это попадают</span>
+        <ul>
+          <li>шапка ленты: клик по названию папки → модалка №2</li>
+          <li>правая док-панель «Инфо» → панель №1 (по дефолту табом к ассистенту)</li>
+          <li>ПКМ по папке в сайдбаре → №2 или №4, в зависимости от пункта</li>
+          <li>телефон: тап по названию в шапке → профиль №7, из него «Изменить» → форма №8</li>
+        </ul>
+        <div style="margin-top:10px">итого: <b>3 инфо-поверхности</b> и <b>2 редактора</b> одной папки, каждый со своим набором полей и своими числами.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="cell w390">
+      <div class="cap"><span class="num">6</span><span class="title">телефон: список папок</span><span class="file">MobileFoldersView</span></div>
+      <img src="05a-mobile-folders-list.png">
+    </div>
+    <div class="cell w390">
+      <div class="cap"><span class="num">7</span><span class="title">телефон: профиль папки</span><span class="file">MobileFolderInfoView</span></div>
+      <img src="05-mobile-folder-info.png">
+      <div class="note">3 метрики вместо 6, описание только на чтение, удаления нет.</div>
+    </div>
+    <div class="cell w390">
+      <div class="cap"><span class="num">8</span><span class="title">телефон: правка</span><span class="file">FolderModal</span></div>
+      <img src="06-mobile-folder-edit.png">
+    </div>
+    <div class="cell" style="width:620px">
+      <div class="text">
+        <span class="lead">почему телефон и правка — боль</span>
+        <ul>
+          <li>правка — десктопная центрированная модалка <code>max-w-md</code>, а не шторка снизу;</li>
+          <li>грид иконок <b>8 в ряд</b>, 16 иконок, тап-таргет ≈30px вместо 44;</li>
+          <li><b>автофокус</b> на поле имени: клавиатура выезжает сразу и накрывает форму;</li>
+          <li>перенести папку в другую нельзя — селект родителя есть только при создании;</li>
+          <li>удаление — мелкая строчка в футере, без подтверждения;</li>
+          <li>в профиле №7 та же папка показывает 3 метрики, а в форме №8 правится то, чего в профиле не видно.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
