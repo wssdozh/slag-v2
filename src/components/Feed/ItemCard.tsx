@@ -15,7 +15,8 @@ import {
   Sparkles,
   Loader2,
   Flame,
-  Download
+  Download,
+  ImageOff
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
@@ -352,6 +353,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
   // exception is the open OCR panel: prose needs a column, not a 200px strip.
   const isPictureBubble = shape === 'image' && expandedOcrIds.size === 0;
+
+  // A note can point at a file that is not on disk (an id that moved, an upload that never
+  // landed). The card says so quietly instead of drawing the browser's broken-image icon.
+  const heroSrc = attachmentSrcs[imageAttachments[0]?.id ?? ''] ?? imageAttachments[0]?.dataUrl;
+  const albumSrc = (image: SlagAttachment) => attachmentSrcs[image.id] ?? image.dataUrl;
 
   // A pile of pictures fills one canvas: the first frame is the biggest, the rest catch up in
   // rows. Six is the ceiling — the sixth slot counts what did not fit.
@@ -830,25 +836,29 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       }
                     : undefined
                 }
-                onClick={() => handleImageClick(imageAttachments[0])}
+                onClick={heroSrc ? () => handleImageClick(imageAttachments[0]) : undefined}
               >
-                <img
-                  src={attachmentSrcs[imageAttachments[0].id] ?? imageAttachments[0].dataUrl}
-                  alt={imageAttachments[0].name}
-                  loading="lazy"
-                  decoding="async"
-                  className={
-                    firstImageRatio
-                      ? 'block h-full w-full object-contain'
-                      : 'block h-auto w-auto max-h-[20rem] max-w-full object-contain'
-                  }
-                  onLoad={(event) => {
-                    const picture = event.currentTarget;
-                    if (picture.naturalWidth && picture.naturalHeight) {
-                      setFirstImageRatio(picture.naturalWidth / picture.naturalHeight);
+                {heroSrc ? (
+                  <img
+                    src={heroSrc}
+                    alt={imageAttachments[0].name}
+                    loading="lazy"
+                    decoding="async"
+                    className={
+                      firstImageRatio
+                        ? 'block h-full w-full object-contain'
+                        : 'block h-auto w-auto max-h-[20rem] max-w-full object-contain'
                     }
-                  }}
-                />
+                    onLoad={(event) => {
+                      const picture = event.currentTarget;
+                      if (picture.naturalWidth && picture.naturalHeight) {
+                        setFirstImageRatio(picture.naturalWidth / picture.naturalHeight);
+                      }
+                    }}
+                  />
+                ) : (
+                  <MissingMedia name={imageAttachments[0].name} />
+                )}
 
                 {/* Text action badge anchored in the bottom-right corner of the image */}
                 {imageAttachments[0].extractedText ? (
@@ -909,20 +919,24 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     <button
                       key={tile.hidden > 0 ? 'more' : tile.image.id}
                       type="button"
-                      onClick={() => handleImageClick(tile.image)}
+                      onClick={tile.hidden > 0 || albumSrc(tile.image) ? () => handleImageClick(tile.image) : undefined}
                       title={tile.hidden > 0 ? `Ещё ${tile.hidden}` : tile.image.name}
                       className={`relative min-w-0 flex-1 overflow-hidden cursor-pointer transition-opacity hover:opacity-90 ${
                         perRow === 1 ? 'aspect-[3/2]' : 'aspect-square'
                       } ${tile.hidden > 0 ? 'bg-white/[0.06]' : ''}`}
                     >
                       {tile.hidden === 0 && (
-                        <img
-                          src={attachmentSrcs[tile.image.id] ?? tile.image.dataUrl}
-                          alt={tile.image.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="absolute inset-0 h-full w-full object-cover"
-                        />
+                        albumSrc(tile.image) ? (
+                          <img
+                            src={albumSrc(tile.image)}
+                            alt={tile.image.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : (
+                          <MissingMedia name={tile.image.name} />
+                        )
                       )}
                       {tile.hidden > 0 ? (
                         <span className="absolute inset-0 flex items-center justify-center text-sm font-mono text-zinc-200">
@@ -1119,6 +1133,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     </div>
   );
 };
+
+/** A media slot with no bytes behind it. Says so once, instead of a broken-image icon. */
+const MissingMedia: React.FC<{ name: string }> = ({ name }) => (
+  <span
+    data-testid="media-missing"
+    title={`Файл не найден: ${name}`}
+    className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/[0.04] text-fg-dim"
+  >
+    <ImageOff className="h-4 w-4" />
+    <span className="font-mono text-[10px]">нет файла</span>
+  </span>
+);
 
 export const ItemCard = React.memo(ItemCardComponent);
 

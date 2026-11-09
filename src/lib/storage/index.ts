@@ -74,6 +74,8 @@ export class StorageService {
   private crossWindowDraftChannel: BroadcastChannel | null = null;
   private persistedAttachmentIds: Set<string> = new Set();
   private attachmentUrlCache: Map<string, string> = new Map();
+  /** One listing of `.attachments/`, used only when an attachment's own path misses. */
+  private attachmentNameIndex: string[] | null = null;
   /**
    * Attachment bytes for the current session, keyed by id. The note itself only keeps metadata:
    * a data URL in `localStorage` is one photo against a five-megabyte quota.
@@ -90,6 +92,30 @@ export class StorageService {
   }
 
   /**
+   * File name inside `.attachments/`. The id in front of it is bookkeeping; when it does not
+   * match a note (a re-saved attachment gets a fresh id) the picture is still in there by name.
+   * ponytail: trailing-name match, so two different pictures sharing a name can swap. Upgrade:
+   * write `relativePath` from the id at persist time and never regenerate an id after that.
+   */
+  private async attachmentPathFor(id: string, relativePath: string): Promise<string | undefined> {
+    const basename = relativePath.split(/[\\/]/).pop() || id;
+    const dir = this.getVaultAttachmentsPath();
+    if (await exists(`${dir}/${basename}`, { baseDir: BaseDirectory.AppData })) return `${dir}/${basename}`;
+
+    try {
+      if (!this.attachmentNameIndex) {
+        const entries = await readDir(dir, { baseDir: BaseDirectory.AppData });
+        this.attachmentNameIndex = entries.filter((entry) => entry.isFile).map((entry) => entry.name);
+      }
+      const name = basename.replace(/^att_[a-z0-9]+_/i, '');
+      const match = this.attachmentNameIndex.find((file) => file === name || file.endsWith(`_${name}`));
+      return match ? `${dir}/${match}` : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * Playable url for an attachment. Lives only in memory: a blob: URL inside
    * the item would be dead after restart and would leak into localStorage/sync.
    */
@@ -102,8 +128,8 @@ export class StorageService {
 
     if (!isTauri()) return undefined;
     try {
-      const path = `${this.getVaultAttachmentsPath()}/${relativePath.split(/[\\/]/).pop() || id}`;
-      if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) return undefined;
+      const path = await this.attachmentPathFor(id, relativePath);
+      if (!path) return undefined;
       const bytes = await readFile(path, { baseDir: BaseDirectory.AppData });
       const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mimeType || 'application/octet-stream' }));
       this.attachmentUrlCache.set(id, url);
