@@ -367,6 +367,11 @@ pub fn run() {
         ]);
     }
 
+    #[cfg(mobile)]
+    {
+        builder = builder.invoke_handler(tauri::generate_handler![media_plugin::gallery_ping]);
+    }
+
     #[cfg(desktop)]
     {
         builder = builder

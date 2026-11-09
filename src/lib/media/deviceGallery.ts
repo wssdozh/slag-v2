@@ -14,5 +14,5 @@ export interface GalleryPing {
 export const isDeviceGalleryAvailable = (): boolean => isMobilePlatform();
 
 export async function pingDeviceGallery(): Promise<GalleryPing> {
-  return invoke<GalleryPing>('plugin:slag-media|ping');
+  return invoke<GalleryPing>('gallery_ping');
 }
