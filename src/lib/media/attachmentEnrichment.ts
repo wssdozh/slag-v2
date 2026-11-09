@@ -8,6 +8,12 @@ import { accountClient } from '../sync/account';
 
 const enrichLog = logger.scope('AI');
 
+/** One deadline for every provider call: a stalled socket must end as an error with a retry
+ *  button, not as a spinner that never stops. */
+const ENRICH_TIMEOUT_MS = 60_000;
+const enrichFetch = (input: string, init: RequestInit = {}) =>
+  fetch(input, { ...init, signal: init.signal ?? AbortSignal.timeout(ENRICH_TIMEOUT_MS) });
+
 interface RelayMediaTarget {
   serverUrl: string;
   token: string;
@@ -37,7 +43,7 @@ async function callRelayMedia(
   kind: 'vision' | 'audio',
   payload: Record<string, unknown>
 ): Promise<{ extractedText: string; summary: string }> {
-  const res = await fetch(`${target.serverUrl}/api/ai/${kind}`, {
+  const res = await enrichFetch(`${target.serverUrl}/api/ai/${kind}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.token}` },
     body: JSON.stringify(payload),
@@ -142,7 +148,7 @@ async function transcribeAudioGroq(
     formData.append('prompt', focalContext);
   }
 
-  const res = await fetch(getGroqApiUrl('/audio/transcriptions'), {
+  const res = await enrichFetch(getGroqApiUrl('/audio/transcriptions'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -181,7 +187,7 @@ async function transcribeAudioGemini(
   const base64Data = (attachment.dataUrl || '').split(',')[1] || '';
   const prompt = `Контекст: "${focalContext}". Сделай точную дословную расшифровку аудиозаписи. Без лишних вступительных слов. Выведи строго расшифрованный текст.`;
 
-  const res = await fetch(
+  const res = await enrichFetch(
     `${AI_ENDPOINTS.DEFAULT_GEMINI_BASE_URL}/models/${DEFAULT_AI_MODELS.GEMINI_DEFAULT}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
@@ -235,7 +241,7 @@ async function analyzeImageGroq(
   let lastError = '';
   for (const model of candidateModels) {
     try {
-      const res = await fetch(getGroqApiUrl('/chat/completions'), {
+      const res = await enrichFetch(getGroqApiUrl('/chat/completions'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -301,7 +307,7 @@ async function analyzeImageGemini(
   const prompt = `Контекст: "${focalContext}". Извлеки весь читаемый текст на изображении (OCR) и дай краткое описание сути в 1-2 предложениях.
 Ответ верни СТРОГО в формате JSON: {"extractedText": "найденный текст", "summary": "краткое описание"}`;
 
-  const res = await fetch(
+  const res = await enrichFetch(
     `${AI_ENDPOINTS.DEFAULT_GEMINI_BASE_URL}/models/${DEFAULT_AI_MODELS.GEMINI_DEFAULT}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
@@ -387,7 +393,7 @@ ${sample.slice(0, AI_LIMITS.FILE_SAMPLE_SLICE_CHARS)}
 Ответ верни СТРОГО в JSON:
 {"summary": "суть файла", "extractedText": "ключевые строки/ошибки/тезисы"}`;
 
-  const res = await fetch(getGroqApiUrl('/chat/completions'), {
+  const res = await enrichFetch(getGroqApiUrl('/chat/completions'), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -425,13 +431,34 @@ ${sample.slice(0, AI_LIMITS.FILE_SAMPLE_SLICE_CHARS)}
 }
 
 /**
+ * The note keeps attachment metadata; the bytes live in IndexedDB or `.attachments/`. Every
+ * vision/whisper call needs a `data:` URL, so bring them back before asking anybody to look.
+ */
+async function withBytes(attachment: SlagAttachment): Promise<SlagAttachment> {
+  if (attachment.dataUrl) return attachment;
+  const url = await storage.getAttachmentUrl(attachment.id, attachment.relativePath, attachment.mimeType);
+  if (!url) return attachment;
+  if (url.startsWith('data:')) return { ...attachment, dataUrl: url };
+
+  const blob = await (await fetch(url)).blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+  return { ...attachment, dataUrl };
+}
+
+/**
  * Single Entrypoint: Enriches any attachment using context-aware dispatching.
  */
 export async function enrichAttachment(
-  attachment: SlagAttachment,
+  attachmentInput: SlagAttachment,
   focalContext: string,
   settings: AiSettings
 ): Promise<SlagAttachment> {
+  const attachment = await withBytes(attachmentInput);
   const groqKey = settings.groqApiKey || '';
   const relay = resolveRelayMedia(settings);
   if (!groqKey && !relay && !settings.geminiApiKey) {

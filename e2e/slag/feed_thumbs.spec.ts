@@ -69,6 +69,28 @@ const NOTES = [
     })),
   },
   {
+    // A note whose bytes never arrived: an id that moved, an upload that got lost. The card
+    // has to say so instead of showing the browser's broken-image icon.
+    id: 'thumb_missing',
+    type: 'note',
+    title: 'missing',
+    content: '',
+    folder: 'Входящие',
+    tags: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    attachments: [
+      {
+        id: 'thumb_missing_file',
+        name: 'gone.webp',
+        type: 'image',
+        mimeType: 'image/webp',
+        size: 1024,
+        relativePath: '.attachments/att_gone_gone.webp',
+      },
+    ],
+  },
+  {
     // A clip is media too: the circle and its way out do not need a column-wide card.
     id: 'thumb_clip',
     type: 'note',
@@ -198,6 +220,10 @@ test.describe('feed thumbnails', () => {
     const withText = await boxOf(page, '#item-thumb_with_text');
     expect(withText.width).toBeGreaterThan(column.width - 12);
 
+    // Bytes that never arrived are a fact the card states, not a broken icon.
+    await expect(page.locator('#item-thumb_missing [data-testid="media-missing"]')).toBeVisible();
+    await expect(page.locator('#item-thumb_missing img')).toHaveCount(0);
+
     await page.locator('#item-thumb_album').scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-album-phone.png', fullPage: false });
 
@@ -224,5 +250,61 @@ test.describe('feed thumbnails', () => {
 
     await page.locator('#item-thumb_poster').scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-desktop.png', fullPage: false });
+  });
+
+  test('a job that was running when the app closed is not a job any more', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const result = await page.evaluate(async () => {
+      const { parseMarkdownToItem, serializeItemToMarkdown } = await import('/src/lib/vault/markdownSerializer.ts');
+      const raw = [
+        '---',
+        'id: item_stale',
+        'type: note',
+        'title: stale',
+        'attachments:',
+        '  - id: att_stale',
+        '    name: photo.webp',
+        '    type: image',
+        '    mimeType: image/webp',
+        '    relativePath: .attachments/att_stale_photo.webp',
+        '    enrichmentStatus: processing',
+        '---',
+        '',
+        'body',
+        '',
+      ].join('\n');
+
+      const parsed = parseMarkdownToItem(raw, 'item_stale');
+      const written = serializeItemToMarkdown({
+        id: 'item_write',
+        type: 'note',
+        title: 'write',
+        content: '',
+        folder: 'Входящие',
+        tags: [],
+        createdAt: 1,
+        updatedAt: 1,
+        attachments: [{
+          id: 'att_write',
+          name: 'photo.webp',
+          type: 'image' as const,
+          mimeType: 'image/webp',
+          size: 10,
+          relativePath: '.attachments/att_write_photo.webp',
+          enrichmentStatus: 'processing' as const,
+        }],
+      });
+
+      return {
+        read: parsed.attachments?.[0]?.enrichmentStatus,
+        writesProcessing: written.includes('enrichmentStatus: processing'),
+      };
+    });
+
+    // Read: a spinner nobody is turning becomes "no text yet, try again".
+    expect(result.read).toBe('idle');
+    // Write: the next save does not poison the note with a promise that cannot outlive the app.
+    expect(result.writesProcessing).toBe(false);
   });
 });

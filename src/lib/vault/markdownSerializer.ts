@@ -1,5 +1,5 @@
 import YAML from 'yaml';
-import type { SlagItem, SlagItemType } from '../../types';
+import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
 import { parseSubtasksFromContent } from '../taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
@@ -63,7 +63,11 @@ export function serializeItemToMarkdown(item: SlagItem): string {
       ...(att.waveform ? { waveform: att.waveform } : {}),
       ...(att.extractedText ? { extractedText: att.extractedText } : {}),
       ...(att.summary ? { summary: att.summary } : {}),
-      ...(att.enrichmentStatus ? { enrichmentStatus: att.enrichmentStatus } : {}),
+      // `processing` is a live promise, not a fact: a note saved mid-run must not come back
+      // from disk claiming a job that nobody is running any more.
+      ...(att.enrichmentStatus && att.enrichmentStatus !== 'processing'
+        ? { enrichmentStatus: att.enrichmentStatus }
+        : {}),
     }));
   }
 
@@ -125,7 +129,12 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
     content: body.trim(),
     folder: frontmatter.folder || fallbackFolder,
     tags: allTags,
-    attachments: Array.isArray(frontmatter.attachments) ? frontmatter.attachments : [],
+    attachments: Array.isArray(frontmatter.attachments)
+      // Anything written by an older build that did persist a running job: nobody is running
+      // it, so the spinner would spin forever. Only `ready` and `error` survive a reload.
+      ? frontmatter.attachments.map((att: SlagAttachment) =>
+        att.enrichmentStatus === 'processing' ? { ...att, enrichmentStatus: 'idle' as const } : att)
+      : [],
     createdAt: Number(frontmatter.created) || Date.now(),
     updatedAt: Number(frontmatter.updated) || Date.now(),
     isPinned: Boolean(frontmatter.pinned),
