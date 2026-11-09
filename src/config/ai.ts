@@ -16,7 +16,9 @@ export const DEFAULT_AI_MODELS = {
   KIE_DEFAULT: 'deepseek-v4-1-flash',
   GEMINI_DEFAULT: 'gemini-2.0-flash',
   WHISPER_DEFAULT: 'whisper-large-v3-turbo',
-  GROQ_VISION_CANDIDATES: ['qwen/qwen3.8-27b', 'qwen-3.8-27b'] as const,
+  // The one image model this Groq organisation actually serves. `qwen-3.8-27b` without the
+  // vendor prefix used to sit here as a "fallback" and answered 404 on every picture.
+  GROQ_VISION_CANDIDATES: ['qwen/qwen3.8-27b'] as const,
 } as const;
 
 export const SUBSCRIPTION_TIER_EFFORT = {

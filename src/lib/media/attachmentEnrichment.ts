@@ -553,15 +553,17 @@ export async function enrichItemAttachments(
   };
   onUpdated(inFlightItem);
 
-  // Run enrichments in parallel
-  const enrichedAttachments = await Promise.all(
-    inFlightAttachments.map(async (att) => {
-      if (att.enrichmentStatus === 'processing') {
-        return await enrichAttachment(att, focalContext, settings);
-      }
-      return att;
-    })
-  );
+  // One at a time. Five photos enriched in parallel are five vision requests inside one second,
+  // and the provider meters tokens per minute: the burst comes back as 429 and the whole note
+  // ends up with an error instead of text.
+  const enrichedAttachments: SlagAttachment[] = [];
+  for (const att of inFlightAttachments) {
+    enrichedAttachments.push(
+      att.enrichmentStatus === 'processing'
+        ? await enrichAttachment(att, focalContext, settings)
+        : att
+    );
+  }
 
   const finalItem: SlagItem = {
     ...item,
