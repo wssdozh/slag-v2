@@ -12,7 +12,12 @@
 | **Web Fast Check** | `npm run build`<br>`npm run lint` | Проверка TypeScript-типов, синтаксиса и сборки Vite. | ~2 сек | Нет |
 | **E2E Testing** | `npx playwright test` | Прогон Playwright-тестов в headless Chromium (чистый View). | ~15–30 сек | Нет (Vite запускается тестом) |
 | **Desktop Live (HMR)** | `npm run dev:desktop`<br>*(запускать через `tauri dev`, не обычный `cargo build`)* | **Основной режим разработки**: живое обновление UI в нативном окне без перезапуска. | ~1 сек | Требует `localhost:5173` |
-| **Standalone Release** | `npm run build:desktop`<br>*(или `cargo build --release`)* | **Автономный бинарник**: файлы вшиты внутрь бинарника, работает оффлайн без Node.js. | ~1–3 мин | **Не использует порты** (0 сетевых зависимостей) |
+| **Desktop Fast Rebuild** | `npm run build`<br>`npm run build:desktop:fast` | **«Пересобери и перезапусти»**: тот же автономный бинарник с вшитым `dist/`, но без LTO и с параллельным кодогеном. Для правок фронта, когда нужен нативный вид, а не HMR. | ~30 сек (`target/fast/slag-v2.exe`) | **Не использует порты** |
+| **Standalone Release** | `npm run build:desktop`<br>*(или `cargo build --release`)* | **Автономный бинарник**: файлы вшиты внутрь бинарника, работает оффлайн без Node.js. Профиль вылизан под Android: `lto = "thin"` + один codegen unit, поэтому любая правка фронта тянет полную реоптимизацию. | 3–8 мин | **Не использует порты** (0 сетевых зависимостей) |
+
+> Перед любой пересборкой **закрыть запущенный `slag-v2.exe`**: Windows держит файл, и
+> `cargo` упадёт на `failed to remove file … Access is denied` уже после компиляции —
+> время на компиляцию потрачено, бинарник старый.
 
 ---
 

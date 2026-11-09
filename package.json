@@ -10,6 +10,7 @@
     "build:mcp": "vite build --config vite.mcp.config.ts",
     "mcp": "node dist/mcp/index.js",
     "build:desktop": "tauri build",
+    "build:desktop:fast": "cargo build --profile fast --manifest-path src-tauri/Cargo.toml",
     "build:android": "tauri android build --debug --apk --target aarch64",
     "build:android:release": "tauri android build --apk --target aarch64",
     "android:install": "adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk",

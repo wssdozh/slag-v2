@@ -49,3 +49,13 @@ lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
 opt-level = 3
+
+# `release` optimises for the shipped binary, which costs minutes on every frontend
+# change: one codegen unit plus LTO re-optimises the whole graph even if one line moved.
+# This profile is for "rebuild and look at it": no LTO, parallel codegen units, same
+# features and the same embedded `dist/`, just linked faster.
+[profile.fast]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
