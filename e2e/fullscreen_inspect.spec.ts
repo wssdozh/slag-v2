@@ -13,7 +13,8 @@ test('Capture Fullscreen Editor Teletype Top Utilities and Object Context', asyn
   await expect(editorModal).toBeVisible();
 
   // 1. Task Mode with title, tags, and content
-  await page.locator('header button:has-text("Таска")').click();
+  await page.locator('header button[aria-label="Сменить тип записи"]').click();
+  await page.getByRole('button', { name: 'Таска', exact: true }).last().click();
   await page.waitForTimeout(200);
 
   // Type title
@@ -52,9 +53,10 @@ test('Capture Fullscreen Editor Teletype Top Utilities and Object Context', asyn
   await page.waitForTimeout(200);
   await page.screenshot({ path: 'test-results/screenshots/teletype_aa_dropdown.png' });
 
-  // Close dropdown by clicking in editor
+  // Close the dropdown through its own backdrop: the backdrop swallows the click, so aiming
+  // at the editor body would only be retried forever.
   console.log('Closing dropdown');
-  await cmContent.click();
+  await page.locator('header div.fixed.inset-0.z-40').click();
   await page.waitForTimeout(200);
 
   // 3. Attach an image to test Selected Object Context at the top

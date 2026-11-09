@@ -1,10 +1,13 @@
 import React from 'react';
 import type { SlagAttachment, SlagItem, SlagItemType } from '../../types';
 import { Select } from '../UI/Select';
+import { ResponsiveSegmented, type SegmentedOption } from '../UI/ResponsiveSegmented';
 import {
   ArrowLeft,
   Save,
   Trash2,
+  StickyNote,
+  FileText,
   Bold,
   Italic,
   Heading1,
@@ -21,12 +24,20 @@ import {
   Table,
   Maximize2,
   Minimize2,
+  Maximize,
+  Minimize,
   Eye,
   ChevronDown,
   Strikethrough,
   X,
 } from 'lucide-react';
 import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/windowControls';
+
+const ITEM_TYPE_OPTIONS: SegmentedOption<SlagItemType>[] = [
+  { value: 'note', label: 'Заметка', icon: <StickyNote className="w-4 h-4" />, showLabelInTrigger: true, title: 'Заметка', ariaLabel: 'Заметка' },
+  { value: 'task', label: 'Таска', icon: <CheckSquare className="w-4 h-4" />, showLabelInTrigger: true, title: 'Таска', ariaLabel: 'Таска' },
+  { value: 'article', label: 'Статья', icon: <FileText className="w-4 h-4" />, showLabelInTrigger: true, title: 'Статья', ariaLabel: 'Статья' },
+];
 
 export interface EditorToolbarProps {
   item: SlagItem;
@@ -53,13 +64,17 @@ export interface EditorToolbarProps {
   onAiDecompose: () => void;
   isZenMode: boolean;
   onToggleZenMode: () => void;
-  isFullWidth: boolean;
-  onToggleFullWidth: () => void;
+  isFullWidth?: boolean;
+  /** Phone only: the sheet detent. Desktop has no width toggle. */
+  onToggleFullWidth?: () => void;
   saveStatus: 'idle' | 'saving' | 'saved';
   onSave: () => void;
   onClose: () => void;
   /** Sheet mode: the toolbar sits inside the panel, not under the status bar. */
   isCompact?: boolean;
+  /** Desktop detents: the note sits in its pane until expanded to the whole window. */
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -88,6 +103,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onSave,
   onClose,
   isCompact = false,
+  isExpanded = false,
+  onToggleExpanded,
 }) => {
   const [activeTopDropdown, setActiveTopDropdown] = React.useState<'style' | 'list' | null>(null);
 
@@ -149,25 +166,24 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           {/* Vertical Divider */}
           <div className="h-4 w-px bg-white/[0.08] shrink-0 hidden sm:block" />
 
-          {/* Item Type Switcher: flat radio buttons without container podlozhka */}
-          <div className="hidden sm:flex items-center gap-0.5">
-            {(['note', 'task', 'article'] as SlagItemType[]).map(t => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => onTypeChange(t)}
-                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
-                  type === t ? 'bg-white/10 text-white font-medium' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
-                }`}
-              >
-                {t === 'note' ? 'Заметка' : t === 'task' ? 'Таска' : 'Статья'}
-              </button>
-            ))}
+          {/* Item Type: droplist, the same control the composer uses */}
+          <div className="hidden shrink-0 sm:block">
+            <ResponsiveSegmented<SlagItemType>
+              value={type}
+              onChange={onTypeChange}
+              options={ITEM_TYPE_OPTIONS}
+              compact
+              size="sm"
+              ariaLabel="Сменить тип записи"
+            />
           </div>
         </div>
 
-        {/* Teletype Center Utilities: Context-Aware for Selected Object (Text, Image, Audio, File) - Centered & Scaled */}
-        <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-50">
+        {/* Teletype Center Utilities: Context-Aware for Selected Object (Text, Image, Audio, File).
+            In flow, not absolutely centred: a docked editor is as narrow as its pane, and a floating
+            cluster would sit on top of the right-hand actions. */}
+        {/* Above the dropdown backdrop (z-40), or the trigger cannot close its own panel. */}
+        <div className="relative z-50 hidden md:flex min-w-0 flex-1 items-center justify-start gap-1 overflow-x-auto scrollbar-none">
           {selectedAttachment ? (
             /* Selected Object (Media / File) Action Bar */
             <div className="flex items-center gap-1.5 text-xs text-zinc-300">
@@ -493,19 +509,37 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </span>
           )}
 
-          {/* Reading measure / width toggle: Focus (768px) vs Wide (1024px) */}
-          <button
-            type="button"
-            onClick={onToggleFullWidth}
-            className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-              isFullWidth
-                ? 'text-white bg-white/10 border border-white/10'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
-            }`}
-            title={isFullWidth ? 'Стандартная ширина фокуса (768px)' : 'Широкая область (1024px)'}
-          >
-            {isFullWidth ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
+          {/* Pane / window detent. Only desktop has a pane to return to. */}
+          {onToggleExpanded && (
+            <button
+              type="button"
+              onClick={onToggleExpanded}
+              className={`hidden md:flex p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                isExpanded
+                  ? 'text-white bg-white/10 border border-white/10'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title={isExpanded ? 'Вернуть в панель (Esc)' : 'Развернуть на всё окно'}
+            >
+              {isExpanded ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </button>
+          )}
+
+          {/* Reading measure / width toggle. Desktop dropped it; the phone keeps it as the sheet detent. */}
+          {onToggleFullWidth && (
+            <button
+              type="button"
+              onClick={onToggleFullWidth}
+              className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                isFullWidth
+                  ? 'text-white bg-white/10 border border-white/10'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title={isFullWidth ? 'Свернуть лист' : 'Развернуть лист'}
+            >
+              {isFullWidth ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          )}
 
           {/* Zen Mode Toggle */}
           <button

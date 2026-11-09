@@ -1426,12 +1426,11 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // Take screenshot of enhanced context menu
     await page.screenshot({ path: 'test-results/screenshots/context-menu-enhanced.png' });
 
-    // Open "Дополнительно" submenu to access Duplicate
+    // "Дополнительно" keeps only the wiki link; duplicate and archive are gone.
     await contextMenu.locator('button', { hasText: 'Дополнительно' }).click();
-    const dupBtn = contextMenu.locator('button', { hasText: 'Дублировать' });
-    await expect(dupBtn).toBeVisible();
-    await dupBtn.click();
-    await expect(page.locator('text=Запись продублирована')).toBeVisible();
+    await expect(contextMenu.locator('button', { hasText: 'Дублировать' })).toHaveCount(0);
+    await expect(contextMenu.locator('button', { hasText: 'В архив' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
 
     // Test "Разобрать с ИИ" (Real triage: folder & tags)
     const secondCard = page.locator('[id^="item-"]').first();
@@ -1463,7 +1462,8 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await page.screenshot({ path: 'test-results/screenshots/editor-desktop-sticky.png' });
 
     // Switch to task mode to verify clean monochrome task metadata without lines
-    await page.locator('header button', { hasText: 'Таска' }).click();
+    await page.locator('header button[aria-label="Сменить тип записи"]').click();
+    await page.getByRole('button', { name: 'Таска', exact: true }).last().click();
     await page.waitForTimeout(100);
     await page.screenshot({ path: 'screenshots/editor-task-clean.png' });
 

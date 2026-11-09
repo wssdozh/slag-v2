@@ -27,6 +27,7 @@ import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/usePresence';
 import { useEditorSheet } from '../../hooks/gestures/useEditorSheet';
+import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
@@ -124,6 +125,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     setIsSheetExpanded(false);
   }
 
+  // Desktop has the same two detents as the phone sheet, with a different first one: the note
+  // opens inside the pane it was clicked in, and only the second detent takes the whole window.
+  const [isEditorExpanded, setIsEditorExpanded] = useState(false);
+  const paneRect = useEditorPaneRect(item.id, !isMobile);
+  const isDocked = !isMobile && !isEditorExpanded && paneRect !== null;
+  const toggleEditorExpanded = useCallback(() => setIsEditorExpanded(prev => !prev), []);
+
   const { panelRef, scrimRef, barRef, bodyRef, onPointerDown, onPointerMove, onPointerEnd, onPointerCancel } = useEditorSheet({
     enabled: isMobile,
     expanded: isSheetExpanded,
@@ -215,6 +223,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           setActiveMobilePopover(null);
           return;
         }
+        // Развёрнутый редактор сначала возвращается в свою панель, закрывается вторым нажатием.
+        if (!isMobile && isEditorExpanded && paneRect) {
+          setIsEditorExpanded(false);
+          return;
+        }
         handleClose();
       } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.code === 'KeyS')) {
         e.preventDefault();
@@ -229,7 +242,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [handleClose, handleSave, activeMobilePopover, setIsFullWidth]);
+  }, [handleClose, handleSave, activeMobilePopover, setIsFullWidth, isMobile, isEditorExpanded, paneRect]);
 
   const tagInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -454,7 +467,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       onDragEnter={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="fixed inset-0 z-[100] flex flex-col text-fg-primary"
+      style={isDocked && paneRect ? { left: paneRect.left, top: paneRect.top, width: paneRect.width, height: paneRect.height } : undefined}
+      className={
+        isDocked
+          ? 'pointer-events-auto fixed z-[100] flex flex-col overflow-hidden rounded-xl border border-subtle bg-surface text-fg-primary shadow-2xl shadow-black/60'
+          : 'pointer-events-auto fixed inset-0 z-[100] flex flex-col text-fg-primary'
+      }
     >
       {/* Hidden File Picker Input */}
       <input
@@ -540,11 +558,13 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           isZenMode={isZenMode}
           onToggleZenMode={() => setIsZenMode(prev => !prev)}
           isFullWidth={isMobile ? isSheetExpanded : isFullWidth}
-          onToggleFullWidth={() => isMobile ? setIsSheetExpanded(prev => !prev) : setIsFullWidth(prev => !prev)}
+          onToggleFullWidth={isMobile ? () => setIsSheetExpanded(prev => !prev) : undefined}
           saveStatus={saveStatus}
           onSave={handleSave}
           onClose={handleClose}
           isCompact={isMobile && !isSheetExpanded}
+          isExpanded={isEditorExpanded}
+          onToggleExpanded={isMobile ? undefined : toggleEditorExpanded}
         />
 
         {/* Editor Body */}
@@ -967,7 +987,7 @@ export const FullscreenEditor: React.FC = () => {
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
-      className="fixed inset-0 z-[100] motion-presence-hold"
+      className="fixed inset-0 z-[100] motion-presence-hold pointer-events-none"
     >
       <FullscreenEditorContent
         key={effectiveItem.id}
