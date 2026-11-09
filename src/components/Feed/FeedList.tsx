@@ -14,7 +14,7 @@ import { Inbox, UploadCloud, Sparkles, ChevronDown, Pin } from 'lucide-react';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
-import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
+import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { PinnedBanner } from './PinnedBanner';
 import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import { FeedColumnResizer } from './FeedColumnResizer';
@@ -401,7 +401,7 @@ export const FeedList: React.FC = () => {
             });
             addToast(`Заметка создана с ${attachments.length} ${attachments.length === 1 ? 'файлом' : 'файлами'}`, 'success');
 
-            if (aiSettings.groqApiKey) {
+            if (canEnrichAttachments(aiSettings)) {
               enrichItemAttachments(created, updateItem, aiSettings).catch(() => {});
             }
           }

@@ -917,9 +917,15 @@ class SlagRelayServer:
 
         Returns ("timeout" | "network" | int_http_status, raw_body). Never raises.
         """
+        return SlagRelayServer._post_raw(url, api_key, json.dumps(payload).encode("utf-8"),
+                                         "application/json", timeout)
+
+    @staticmethod
+    def _post_raw(url: str, api_key: str, body: bytes, content_type: str,
+                  timeout: float) -> Tuple[object, bytes]:
         req = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json",
+            url, data=body,
+            headers={"Content-Type": content_type,
                      "Authorization": api_key if api_key.startswith("Bearer ") else f"Bearer {api_key}",
                      "User-Agent": "SLAG-Relay-Gateway/0.2.0"},
             method="POST")
@@ -935,6 +941,79 @@ class SlagRelayServer:
             return "timeout", b""
         except Exception:
             return "network", b""
+
+    @staticmethod
+    def _groq_base_url() -> str:
+        return (os.environ.get("GROQ_BASE_URL", "").strip() or "https://api.groq.com/openai/v1").rstrip("/")
+
+    @staticmethod
+    def _groq_vision_model() -> str:
+        return os.environ.get("SLAG_VISION_MODEL", "").strip() or "qwen/qwen3.8-27b"
+
+    @staticmethod
+    def _groq_whisper_model() -> str:
+        return os.environ.get("SLAG_WHISPER_MODEL", "").strip() or "whisper-large-v3-turbo"
+
+    @staticmethod
+    def _call_groq_vision(api_key: str, data_url: str, prompt: str, timeout: float) -> Tuple[object, bytes, str]:
+        model = SlagRelayServer._groq_vision_model()
+        instruction = prompt.strip() or (
+            'Извлеки весь читаемый текст с изображения (OCR) и дай краткое описание сути. '
+            'Ответ строго JSON: {"extractedText": "...", "summary": "..."}')
+        payload = {
+            "model": model,
+            "temperature": 0.1,
+            "max_tokens": 900,
+            "response_format": {"type": "json_object"},
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": instruction},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }],
+        }
+        outcome, raw = SlagRelayServer._post_raw(
+            f"{SlagRelayServer._groq_base_url()}/chat/completions",
+            api_key, json.dumps(payload).encode("utf-8"), "application/json", timeout)
+        return outcome, raw, model
+
+    @staticmethod
+    def _call_groq_audio(api_key: str, data_url: str, prompt: str, file_name: str,
+                         timeout: float) -> Tuple[object, bytes, str]:
+        model = SlagRelayServer._groq_whisper_model()
+        try:
+            header, encoded = data_url.split(",", 1)
+            mime = header[5:].split(";")[0] or "audio/webm"
+            audio = base64.b64decode(encoded)
+        except (ValueError, TypeError):
+            return "bad_data", b"", model
+        if len(audio) > 12 * 1024 * 1024:
+            return "too_large", b"", model
+
+        boundary = "----slag" + secrets.token_hex(8)
+        safe_name = (file_name or "audio.webm").replace('"', "").replace("\r", "").replace("\n", "")[:120]
+        chunks: list[bytes] = []
+
+        def field(name: str, value: str) -> None:
+            chunks.append(
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode("utf-8"))
+
+        chunks.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{safe_name}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n".encode("utf-8") + audio + b"\r\n")
+        field("model", model)
+        field("response_format", "json")
+        field("temperature", "0")
+        if prompt.strip():
+            field("prompt", prompt.strip()[:900])
+        chunks.append(f"--{boundary}--\r\n".encode("utf-8"))
+
+        outcome, raw = SlagRelayServer._post_raw(
+            f"{SlagRelayServer._groq_base_url()}/audio/transcriptions",
+            api_key, b"".join(chunks), f"multipart/form-data; boundary={boundary}", timeout)
+        return outcome, raw, model
+
 
     def _auth(self, headers: dict) -> dict:
         auth = self.db.authenticate(self._bearer(headers))
@@ -1981,6 +2060,102 @@ class SlagRelayServer:
                 latency_ms,
             )
             return data, 200
+
+        if method == "POST" and path in ("/api/ai/vision", "/api/ai/audio"):
+            auth_token = self._bearer(headers, allow_raw=not self.require_account_auth)
+            if not auth_token:
+                return {"error": "unauthorized"}, 401
+            if self.require_account_auth:
+                auth = self.db.authenticate(auth_token)
+                if not auth:
+                    return {"error": "unauthorized"}, 401
+                if auth["plan"] == "free":
+                    return {"error": "subscription_required"}, 403
+                account_id = auth["account_id"]
+            else:
+                if auth_token.startswith("free_") or auth_token == "free":
+                    return {"error": "subscription_required"}, 403
+                account_id = "self-hosted"
+
+            groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+            if not groq_key:
+                return {"error": "upstream_not_configured"}, 503
+
+            daily_limit = self._ai_daily_limit()
+            if daily_limit > 0 and self.db.count_ai_requests_since(account_id, time.time() - 86400) >= daily_limit:
+                return {"error": "ai_daily_limit", "limit": daily_limit}, 429
+
+            data_url = str(body.get("dataUrl") or "")
+            if not data_url.startswith("data:") or "," not in data_url:
+                return {"error": "invalid_data_url"}, 400
+            prompt = str(body.get("prompt") or "")[:1200]
+            is_vision = path.endswith("/vision")
+
+            started = time.time()
+            if is_vision:
+                outcome, raw, model_used = await asyncio.to_thread(
+                    SlagRelayServer._call_groq_vision, groq_key, data_url, prompt, self._ai_timeout_seconds())
+            else:
+                outcome, raw, model_used = await asyncio.to_thread(
+                    SlagRelayServer._call_groq_audio, groq_key, data_url, prompt,
+                    str(body.get("fileName") or "audio.webm"), self._ai_timeout_seconds())
+            latency_ms = (time.time() - started) * 1000
+
+            if outcome == "timeout":
+                return {"error": "upstream_timeout"}, 504
+            if outcome == "too_large":
+                return {"error": "payload_too_large"}, 413
+            if outcome == "bad_data":
+                return {"error": "invalid_data_url"}, 400
+            if outcome == "network" or not isinstance(outcome, int):
+                return {"error": "upstream_gateway_failed"}, 502
+            if not 200 <= outcome < 300:
+                detail = ""
+                try:
+                    err_payload = json.loads(raw.decode("utf-8"))
+                    err_obj = err_payload.get("error") if isinstance(err_payload, dict) else None
+                    detail = str(err_obj.get("message") if isinstance(err_obj, dict) else err_obj or "")[:200]
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    detail = ""
+                # Groq rejects bad media with 400/413/422 — surface that as a client error.
+                mapped = 429 if outcome == 429 else 400 if outcome in (400, 413, 422) else 502
+                logger.warning("Media upstream HTTP %s: %s", outcome, detail)
+                return {"error": "upstream_rejected" if mapped == 400 else "upstream_gateway_failed",
+                        "upstreamStatus": outcome, "detail": detail}, mapped
+
+            try:
+                data = json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return {"error": "upstream_invalid_response"}, 502
+            if not isinstance(data, dict):
+                return {"error": "upstream_invalid_response"}, 502
+            if data.get("error"):
+                message = data["error"].get("message") if isinstance(data["error"], dict) else data["error"]
+                logger.warning("Media upstream error: %s", str(message)[:200])
+                return {"error": "upstream_error", "detail": str(message)[:200]}, 502
+
+            usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+            if is_vision:
+                content = str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
+                parsed = None
+                try:
+                    start, end = content.find("{"), content.rfind("}")
+                    if start != -1 and end > start:
+                        parsed = json.loads(content[start:end + 1])
+                except json.JSONDecodeError:
+                    parsed = None
+                extracted = str((parsed or {}).get("extractedText") or "").strip()
+                summary = str((parsed or {}).get("summary") or content).strip()[:240]
+            else:
+                extracted = str(data.get("text") or "").strip()
+                summary = extracted.split("\n")[0][:240]
+
+            self.db.record_ai_usage(
+                account_id, model_used,
+                int(usage.get("prompt_tokens") or 0), int(usage.get("completion_tokens") or 0),
+                latency_ms)
+            return {"extractedText": extracted, "summary": summary, "model": model_used,
+                    "latencyMs": round(latency_ms)}, 200
 
         if method in ("GET", "HEAD") and not path.startswith("/api/") and path != "/health":
             static_dir = os.environ.get("SLAG_STATIC_DIR") or str(Path(__file__).resolve().parent / "dist")

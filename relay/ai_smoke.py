@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import io
 import json
 import os
 import sys
@@ -22,6 +23,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import wave
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -190,6 +192,26 @@ class Probe:
 
         status, answer = self.call("POST", "/api/ai/chat", {**CHAT_PAYLOAD, "model": "deepseek-v4.1-flash"}, token)
         self.record("dotted model alias is accepted", status == 200, f"http {status}")
+
+        png = ("data:image/png;base64,"
+               "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEsSURBVHhe7ZDBCQMxDARTTkpMiekqwY+DMB9LtnQW0S7MZ8HWMo/n6/3pzINFNySARTckgEU3JIBFNySARTckgEU3JIBFJp7wbRbpAiLCPyNJE5AR3oggRUBmeGuXUAF3hrdXCRNwItywQoiAk+EWLxLAwkuFcJOHLQGVwm1WJICFlYrhRgsSwMJKxXCjhSUBlcOtMySAhYXK4dYZEsDCQuVw6wy3gOrh3hluAYPK4dYZEsDCQuVw6wwJYGGhcrh1xpKAQdVw54y/EsCNFiSAhYdK4TYrEsDCS4Vwk4dtAYOT4RYvEsBilRPhhhXCBAzuDG+vEirgIjO8tUuKgEFGeCOCNAEXEeGfkaQL+MUbvs/gVgEVkQAW3ZAAFt2QABbdkAAW3ZAAFt1oL+ALYH4ca/2ry7YAAAAASUVORK5CYII=")
+        status, vision = self.call("POST", "/api/ai/vision",
+                                   {"dataUrl": png, "prompt": "Опиши картинку. JSON: {extractedText, summary}"}, token)
+        self.record("vision goes through the relay", status == 200 and "extractedText" in vision,
+                    f"http {status}, model={vision.get('model')}")
+
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(8000)
+            wav.writeframes(b"\x00\x00" * 8000)
+        wav_url = "data:audio/wav;base64," + base64.b64encode(wav_buffer.getvalue()).decode()
+        status, audio = self.call("POST", "/api/ai/audio",
+                                  {"dataUrl": wav_url, "fileName": "silence.wav", "prompt": "тишина"}, token)
+        self.record("audio transcription goes through the relay",
+                    status == 200 and "extractedText" in audio,
+                    f"http {status}, model={audio.get('model')}, chars={len(audio.get('extractedText') or '')}")
 
         timings: list[int] = []
 

@@ -91,12 +91,27 @@ required env (systemd drop-in, `chmod 600`):
 | `SLAG_AI_MODEL` | `deepseek-v4-1-flash` | the only model the gateway allows; everything else → `400` |
 | `SLAG_AI_DAILY_LIMIT` | `500` | per-account requests per 24 h → `429` |
 | `SLAG_AI_TIMEOUT_SECONDS` | `60` | upstream timeout; the call runs in `asyncio.to_thread` |
+| `GROQ_API_KEY` | — | media key. absent → `503` on both media endpoints |
+| `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Groq base |
+| `SLAG_VISION_MODEL` | `qwen/qwen3.8-27b` | image OCR/description |
+| `SLAG_WHISPER_MODEL` | `whisper-large-v3-turbo` | audio transcription |
 
 gate behaviour: no token → `401`, free plan → `403 subscription_required`, non-allowlisted model →
 `400 model_not_allowed`, KIE error body (`HTTP 200` + `{"code":...}`) → mapped `429`/`402`/`502`,
 short/odd bodies → `502 upstream_invalid_response`. successful calls write `ai_usage_logs`
 (tokens + latency, never content) and show up in `/api/admin/ai/stats` and `/api/admin/ai/logs`.
 `POST /api/admin/ai/ping` performs a real one-word upstream call.
+
+media (subscription covers images and audio, no client key needed):
+
+- `POST /api/ai/vision` — `{dataUrl, prompt}` → Groq chat-completions with the image, returns
+  `{extractedText, summary}`.
+- `POST /api/ai/audio` — `{dataUrl, fileName, prompt}` → base64 decoded and posted as multipart to
+  Groq Whisper, returns `{extractedText, summary}`. Bodies over 12 MB after decoding → `413`.
+- bad media is Groq's `400/413/422` and is surfaced as `400 upstream_rejected` with the message.
+
+note: unlike the e2e-encrypted sync path, the relay operator can see attachments that pass through
+these two endpoints. that is the deliberate trade-off of moving media off the client.
 
 acceptance probe (creates a disposable account, sets `plan=smile`, blocks it at the end):
 

@@ -3,8 +3,65 @@ import { logger } from '../logger';
 import { storage } from '../storage';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, AI_LIMITS } from '../../config';
 import { downscaleImageDataUrl } from './imageCodec';
+import { syncEngine } from '../sync/syncEngine';
+import { accountClient } from '../sync/account';
 
 const enrichLog = logger.scope('AI');
+
+interface RelayMediaTarget {
+  serverUrl: string;
+  token: string;
+}
+
+/**
+ * Subscription mode routes images and audio through the relay: the Groq key lives
+ * on the server, the client never needs one. BYOK mode keeps talking to Groq directly.
+ */
+export function resolveRelayMedia(settings: AiSettings): RelayMediaTarget | null {
+  const isSubscription = settings.sourceMode === 'subscription' || !settings.sourceMode;
+  if (!isSubscription) return null;
+  const status = syncEngine.getStatus();
+  if (!status.subscription?.hasAiLease) return null;
+  const serverUrl = syncEngine.getConfig().serverUrl.replace(/\/+$/, '');
+  if (!serverUrl) return null;
+  const token = accountClient.getToken() || status.currentRoomId || 'slag-relay-room';
+  return { serverUrl, token };
+}
+
+export function canEnrichAttachments(settings: AiSettings): boolean {
+  return Boolean(settings.groqApiKey) || Boolean(settings.geminiApiKey) || resolveRelayMedia(settings) !== null;
+}
+
+async function callRelayMedia(
+  target: RelayMediaTarget,
+  kind: 'vision' | 'audio',
+  payload: Record<string, unknown>
+): Promise<{ extractedText: string; summary: string }> {
+  const res = await fetch(`${target.serverUrl}/api/ai/${kind}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Relay ${kind} failed (${res.status}): ${errText.slice(0, 150)}`);
+  }
+  const data = await res.json();
+  return {
+    extractedText: String(data.extractedText || '').trim(),
+    summary: String(data.summary || '').trim(),
+  };
+}
+
+export function buildImageInstruction(focalContext: string): string {
+  return `Ты — модуль анализа изображений и OCR.
+Задачи:
+1. Извлечь весь читаемый текст на изображении (OCR), если он есть (чеки, код, скриншоты, надписи, ценники).
+2. Сформулировать краткую выжимку в 1-2 предложения с учетом контекста заметки: "${focalContext}".
+Если текста на картинке нет, extractedText оставь пустым.
+Ответ верни СТРОГО в формате JSON без разметки:
+{"extractedText": "весь найденный текст или пусто", "summary": "краткое описание"}`;
+}
 
 /**
  * Extracts a compact, high-value focal context snapshot (under 50 tokens).
@@ -171,13 +228,7 @@ async function analyzeImageGroq(
 
   const optimizedDataUrl = await downscaleImageDataUrl(attachment.dataUrl);
 
-  const systemInstruction = `Ты — модуль анализа изображений и OCR.
-Задачи:
-1. Извлечь весь читаемый текст на изображении (OCR), если он есть (чеки, код, скриншоты, надписи, ценники).
-2. Сформулировать краткую выжимку в 1-2 предложения с учетом контекста заметки: "${focalContext}".
-Если текста на картинке нет, extractedText оставь пустым.
-Ответ верни СТРОГО в формате JSON без разметки:
-{"extractedText": "весь найденный текст или пусто", "summary": "краткое описание"}`;
+  const systemInstruction = buildImageInstruction(focalContext);
 
   const candidateModels = DEFAULT_AI_MODELS.GROQ_VISION_CANDIDATES;
 
@@ -382,7 +433,8 @@ export async function enrichAttachment(
   settings: AiSettings
 ): Promise<SlagAttachment> {
   const groqKey = settings.groqApiKey || '';
-  if (!groqKey) {
+  const relay = resolveRelayMedia(settings);
+  if (!groqKey && !relay && !settings.geminiApiKey) {
     return {
       ...attachment,
       enrichmentStatus: 'idle',
@@ -392,46 +444,53 @@ export async function enrichAttachment(
   const startMs = performance.now();
   enrichLog.info(`Enriching attachment "${attachment.name}" (${attachment.type})`, {
     context: focalContext.slice(0, 60),
+    route: relay ? 'relay' : groqKey ? 'byok-groq' : 'byok-gemini',
   });
 
   try {
-    let result: { extractedText: string; summary: string };
+    const executors: Array<() => Promise<{ extractedText: string; summary: string }>> = [];
 
-    if (attachment.type === 'audio' || attachment.type === 'video') {
-      if (groqKey) {
-        try {
-          result = await transcribeAudioGroq(attachment, focalContext, groqKey);
-        } catch (groqErr) {
-          if (settings.geminiApiKey) {
-            result = await transcribeAudioGemini(attachment, focalContext, settings.geminiApiKey);
-          } else {
-            throw groqErr;
-          }
-        }
-      } else if (settings.geminiApiKey) {
-        result = await transcribeAudioGemini(attachment, focalContext, settings.geminiApiKey);
-      } else {
-        throw new Error('API ключ Groq не указан в настройках');
+    if (attachment.type === 'image') {
+      if (relay) {
+        executors.push(async () => {
+          const dataUrl = await downscaleImageDataUrl(attachment.dataUrl || '');
+          return callRelayMedia(relay, 'vision', { dataUrl, prompt: buildImageInstruction(focalContext) });
+        });
       }
-    } else if (attachment.type === 'image') {
-      if (groqKey) {
-        try {
-          result = await analyzeImageGroq(attachment, focalContext, groqKey);
-        } catch (groqErr) {
-          if (settings.geminiApiKey) {
-            result = await analyzeImageGemini(attachment, focalContext, settings.geminiApiKey);
-          } else {
-            throw groqErr;
-          }
-        }
-      } else if (settings.geminiApiKey) {
-        result = await analyzeImageGemini(attachment, focalContext, settings.geminiApiKey);
-      } else {
-        throw new Error('API ключ Groq не указан в настройках');
+      if (groqKey) executors.push(() => analyzeImageGroq(attachment, focalContext, groqKey));
+      if (settings.geminiApiKey) executors.push(() => analyzeImageGemini(attachment, focalContext, settings.geminiApiKey!));
+    } else if (attachment.type === 'audio' || attachment.type === 'video') {
+      if (relay) {
+        executors.push(() => callRelayMedia(relay, 'audio', {
+          dataUrl: attachment.dataUrl || '',
+          prompt: focalContext,
+          fileName: attachment.name,
+        }));
       }
-    } else {
-      result = await analyzeFileGroq(attachment, focalContext, groqKey);
+      if (groqKey) executors.push(() => transcribeAudioGroq(attachment, focalContext, groqKey));
+      if (settings.geminiApiKey) executors.push(() => transcribeAudioGemini(attachment, focalContext, settings.geminiApiKey!));
+    } else if (groqKey) {
+      executors.push(() => analyzeFileGroq(attachment, focalContext, groqKey));
     }
+
+    if (executors.length === 0) {
+      throw new Error('Нет доступного канала разбора вложения');
+    }
+
+    let result: { extractedText: string; summary: string } | null = null;
+    let lastError: unknown = null;
+    for (const executor of executors) {
+      try {
+        result = await executor();
+        break;
+      } catch (err) {
+        lastError = err;
+        enrichLog.warn(`Attachment channel failed for "${attachment.name}", trying next`, {
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    if (!result) throw lastError ?? new Error('Разбор вложения не удался');
 
     const duration = Math.round(performance.now() - startMs);
     enrichLog.info(`Enriched "${attachment.name}" in ${duration}ms`, {
@@ -470,7 +529,7 @@ export async function enrichItemAttachments(
   settings: AiSettings
 ): Promise<void> {
   if (!item.attachments || item.attachments.length === 0) return;
-  if (!settings.groqApiKey) return;
+  if (!settings.groqApiKey && !resolveRelayMedia(settings) && !settings.geminiApiKey) return;
 
   const needsEnrichment = item.attachments.some(
     (a) => !a.extractedText && !a.summary && a.enrichmentStatus !== 'processing'

@@ -15,6 +15,16 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
     // 1. Open app (cold vite transform can exceed the default goto timeout on first load)
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
+    // The app boots as "self-hosted" until the relay /health check reports authRequired,
+    // so wait for the authoritative free plan before opening settings.
+    await page.waitForFunction(async () => {
+      const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
+      const pick = (modulePath: string) =>
+        loaded.find((name) => name.split('?')[0].endsWith(modulePath)) || modulePath;
+      const { syncEngine } = await import(pick('/src/lib/sync/syncEngine.ts'));
+      return (syncEngine.getStatus() as any).subscription?.plan === 'free';
+    }, undefined, { timeout: 20_000 });
+
     // 2. Open Settings modal
     const settingsBtn = page.locator('[data-testid="sidebar-settings-btn"]');
     await expect(settingsBtn).toBeVisible({ timeout: 10000 });
@@ -89,12 +99,11 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
     await settingsModal.locator('button', { hasText: 'ИИ & Провайдеры' }).click();
 
-    await expect(settingsModal.locator('text=Groq · картинки и аудио')).toBeVisible();
-    await expect(settingsModal.locator('text=OCR картинок и транскрипция аудио')).toBeVisible();
-    await expect(settingsModal.locator('input[placeholder*="gsk_"]')).toBeVisible();
+    await expect(settingsModal.locator('text=Картинки и аудио тоже идут через подписку')).toBeVisible();
+    await expect(settingsModal.locator('input[placeholder*="gsk_"]')).toHaveCount(0);
 
     await page.screenshot({
-      path: 'test-results/screenshots/ai_settings_groq_media.png',
+      path: 'test-results/screenshots/ai_settings_subscription_media.png',
       fullPage: false,
     });
   });

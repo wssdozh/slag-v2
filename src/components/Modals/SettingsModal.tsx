@@ -355,6 +355,9 @@ export const SettingsModal: React.FC = () => {
                           { value: 'deep', label: 'Deep — логика' },
                         ]}
                       />
+                      <p className="px-3 pb-2 text-2xs leading-relaxed text-fg-muted">
+                        Картинки и аудио тоже идут через подписку — отдельный ключ Groq не нужен.
+                      </p>
                     </SettingsGroup>
                   ) : (
                     /* Mode B: BYOK (Bring Your Own Key) Settings */
@@ -474,34 +477,6 @@ export const SettingsModal: React.FC = () => {
                         </SettingsGroup>
                       )}
                     </>
-                  )}
-
-                  {/* Медиа-конвейер: картинки и аудио всегда разбирает Groq,
-                      независимо от того, кто обрабатывает текст. */}
-                  {(sourceMode === 'subscription' || provider !== 'groq') && (
-                    <SettingsGroup
-                      title="Groq · картинки и аудио"
-                      action={
-                        <a
-                          href="https://console.groq.com/keys"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-2xs text-fg-muted hover:text-fg-primary flex items-center gap-1 transition-colors"
-                        >
-                          <span>Получить ключ</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      }
-                    >
-                      <p className="px-3 pb-2 text-2xs leading-relaxed text-fg-muted">
-                        OCR картинок и транскрипция аудио идут через Groq даже при подписке на текст.
-                      </p>
-                      <SecretKeyField
-                        value={groqApiKey}
-                        onChange={setGroqApiKey}
-                        placeholder="API Key · gsk_..."
-                      />
-                    </SettingsGroup>
                   )}
 
                   {/* Section 3: Автоматизация и интеллектуальные сервисы */}

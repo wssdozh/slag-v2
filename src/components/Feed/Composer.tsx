@@ -10,7 +10,7 @@ import { useComposerMedia } from '../../hooks/useComposerMedia';
 import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { categorizeDraft } from '../../lib/aiService';
-import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
+import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { extractFolderToken, parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/time/todoistTaskParser';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
@@ -624,7 +624,7 @@ export const Composer: React.FC<ComposerProps> = ({
       subtasks: subtasks.length > 0 ? subtasks : undefined,
     });
 
-    if (attachmentsToSend.length > 0 && aiSettings.groqApiKey) {
+    if (attachmentsToSend.length > 0 && canEnrichAttachments(aiSettings)) {
       enrichItemAttachments(saved, updateItem, aiSettings).catch(() => {});
     }
 

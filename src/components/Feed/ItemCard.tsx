@@ -18,7 +18,7 @@ import {
   Download
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
-import { enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
+import { canEnrichAttachments, enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
@@ -128,8 +128,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   };
 
   const handleEnrichAttachment = React.useCallback(async (targetAtt: SlagAttachment) => {
-    if (!aiSettings.groqApiKey) {
-      addToast('Укажите ключ Groq в настройках ИИ для распознавания', 'info');
+    if (!canEnrichAttachments(aiSettings)) {
+      addToast('Подписка неактивна, а свой ключ Groq не указан — распознавание недоступно', 'info');
       return;
     }
     const focalContext = extractFocalContext(item);

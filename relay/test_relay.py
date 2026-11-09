@@ -51,10 +51,16 @@ class FakeKieUpstream:
             def do_POST(self):
                 length = int(self.headers.get("content-length", 0) or 0)
                 raw = self.rfile.read(length)
+                try:
+                    parsed = json.loads(raw.decode("utf-8")) if raw else {}
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    parsed = None
                 upstream.requests.append({
                     "path": self.path,
                     "authorization": self.headers.get("authorization"),
-                    "body": json.loads(raw.decode("utf-8")) if raw else {},
+                    "content_type": self.headers.get("content-type"),
+                    "raw": raw.decode("latin-1"),
+                    "body": parsed,
                 })
                 payload = json.dumps(upstream.response).encode("utf-8")
                 self.send_response(upstream.status)
@@ -284,6 +290,67 @@ class TestLegacyRelay(RelayTestCase):
         self.assertEqual(stats_status, 200)
         self.assertEqual(stats["gatewayStatus"], "operational")
         self.assertEqual(upstream.requests[0]["body"]["model"], "deepseek-v4-1-flash")
+
+    async def test_ai_vision_and_audio_go_through_groq(self):
+        vision = FakeKieUpstream(response={
+            "choices": [{"message": {"role": "assistant",
+                                     "content": '{"extractedText": "чек на 300", "summary": "чек из магазина"}'}}],
+            "usage": {"prompt_tokens": 40, "completion_tokens": 12},
+        })
+        audio = FakeKieUpstream(response={"text": "созвон с Петей про смету"})
+        data_url = "data:image/png;base64," + base64.b64encode(b"fake-image-bytes").decode()
+        audio_url = "data:audio/webm;base64," + base64.b64encode(b"fake-audio-bytes").decode()
+        try:
+            with patch.dict(os.environ, {"GROQ_API_KEY": "groq-test-key",
+                                         "GROQ_BASE_URL": vision.url}):
+                status, answer = await self.http("POST", "/api/ai/vision",
+                                                 {"dataUrl": data_url, "prompt": "опиши чек"}, "legacy-room-token")
+            self.assertEqual(status, 200)
+            self.assertEqual(answer["extractedText"], "чек на 300")
+            self.assertEqual(answer["summary"], "чек из магазина")
+            sent = vision.requests[0]
+            self.assertEqual(sent["path"], "/chat/completions")
+            self.assertEqual(sent["authorization"], "Bearer groq-test-key")
+            self.assertEqual(sent["body"]["model"], "qwen/qwen3.8-27b")
+            self.assertEqual(sent["body"]["messages"][0]["content"][1]["image_url"]["url"], data_url)
+
+            with patch.dict(os.environ, {"GROQ_API_KEY": "groq-test-key",
+                                         "GROQ_BASE_URL": audio.url}):
+                status, answer = await self.http("POST", "/api/ai/audio",
+                                                 {"dataUrl": audio_url, "fileName": "voice.webm",
+                                                  "prompt": "контекст"}, "legacy-room-token")
+            self.assertEqual(status, 200)
+            self.assertEqual(answer["extractedText"], "созвон с Петей про смету")
+            sent = audio.requests[0]
+            self.assertEqual(sent["path"], "/audio/transcriptions")
+            self.assertTrue(str(sent["content_type"]).startswith("multipart/form-data; boundary="))
+            self.assertIn('name="model"', sent["raw"])
+            self.assertIn("whisper-large-v3-turbo", sent["raw"])
+            self.assertIn('filename="voice.webm"', sent["raw"])
+
+            rows = self.server.db.conn.execute("SELECT model FROM ai_usage_logs").fetchall()
+            self.assertEqual(len(rows), 2)
+        finally:
+            vision.close()
+            audio.close()
+
+    async def test_ai_media_requires_groq_key_and_valid_data_url(self):
+        with patch.dict(os.environ, {"GROQ_API_KEY": ""}):
+            status, body = await self.http("POST", "/api/ai/vision", {"dataUrl": "data:image/png;base64,AA"},
+                                           "legacy-room-token")
+        self.assertEqual(status, 503)
+        self.assertEqual(body["error"], "upstream_not_configured")
+
+        upstream = FakeKieUpstream()
+        try:
+            with patch.dict(os.environ, {"GROQ_API_KEY": "groq-test-key", "GROQ_BASE_URL": upstream.url}):
+                status, body = await self.http("POST", "/api/ai/audio", {"dataUrl": "not-a-data-url"},
+                                               "legacy-room-token")
+        finally:
+            upstream.close()
+        self.assertEqual(status, 400)
+        self.assertEqual(body["error"], "invalid_data_url")
+        self.assertEqual(upstream.requests, [])
 
     async def test_anonymous_http_room(self):
         bundle = {"bundleId": "legacy-http-1", "fromDeviceId": "dev-1", "sequence": 1, "changes": []}
