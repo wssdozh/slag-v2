@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Lock, Music, RefreshCw } from 'lucide-react';
 import { readEntryThumbnail } from '../../lib/media/folderBrowser';
+import { MediaPreview } from './MediaPreview';
 import { useDeviceGallery } from './useDeviceGallery';
 import type { DeviceMediaItem, DeviceMediaKind, DevicePick, DeviceUri } from '../../types';
 
@@ -41,6 +42,8 @@ export interface MediaGridProps {
   kind: DeviceMediaKind;
   selected: DevicePick[];
   onToggle: (pick: DevicePick) => void;
+  /** Attaching from the full-screen preview, where the sheet footer is not on screen. */
+  onAttachSelected: () => void;
   /** The camera cell lives in the photo grid: one less place to hunt for it. */
   onCamera?: () => void;
 }
@@ -61,8 +64,9 @@ const GRANT_LABEL: Record<DeviceMediaKind, string> = {
  * A paged grid of whatever the device media database holds for one kind. Selecting is the only
  * thing it does: the button that turns a selection into attachments lives in the sheet footer.
  */
-export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, onCamera }) => {
+export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, onAttachSelected, onCamera }) => {
   const { access, items, hasMore, isLoading, loadMore, request } = useDeviceGallery(kind, true);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   if (access !== 'granted') {
     return (
@@ -87,66 +91,80 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
   const orderOf = (uri: string) => selected.findIndex((pick) => pick.uri.uri === uri);
 
   return (
-    <div
-      data-testid={`media-grid-${kind}`}
-      className="grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-1 overflow-y-auto pr-1"
-      onScroll={(event) => {
-        const node = event.currentTarget;
-        const nearEnd = node.scrollTop + node.clientHeight >= node.scrollHeight - 120;
-        if (nearEnd && hasMore && !isLoading) loadMore();
-      }}
-    >
-      {onCamera && (
-        <button
-          type="button"
-          onClick={onCamera}
-          aria-label="Снять фото"
-          className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-white/15 bg-surface text-fg-muted transition-colors hover:text-fg-primary"
-        >
-          <Camera className="h-4 w-4" />
-          <span className="text-[9px]">снять</span>
-        </button>
-      )}
-
-      {items.map((item: DeviceMediaItem) => {
-        const order = orderOf(item.uri.uri);
-        return (
+    <>
+      <div
+        data-testid={`media-grid-${kind}`}
+        className="grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-1 overflow-y-auto pr-1"
+        onScroll={(event) => {
+          const node = event.currentTarget;
+          const nearEnd = node.scrollTop + node.clientHeight >= node.scrollHeight - 120;
+          if (nearEnd && hasMore && !isLoading) loadMore();
+        }}
+      >
+        {onCamera && (
           <button
-            key={item.id}
             type="button"
-            onClick={() => onToggle(item)}
-            aria-label={item.name}
-            className="relative aspect-square min-w-0 cursor-pointer overflow-hidden rounded-md bg-black/40"
+            onClick={onCamera}
+            aria-label="Снять фото"
+            className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-white/15 bg-surface text-fg-muted transition-colors hover:text-fg-primary"
           >
-            {kind === 'audio' ? (
-              <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-surface px-1 text-fg-muted">
-                <Music className="h-4 w-4 shrink-0" />
-                <span className="w-full truncate text-center text-[9px] leading-tight">{item.name}</span>
-              </span>
-            ) : (
-              <Thumb uri={item.uri} />
-            )}
-            <span
-              className={`absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[9px] ${
-                order >= 0
-                  ? 'bg-accent-strong text-white'
-                  : 'border border-white/40 bg-black/50 text-transparent'
-              }`}
-            >
-              {order >= 0 ? order + 1 : <Check className="h-2.5 w-2.5 opacity-0" />}
-            </span>
+            <Camera className="h-4 w-4" />
+            <span className="text-[9px]">снять</span>
           </button>
-        );
-      })}
+        )}
 
-      {isLoading && items.length === 0 && (
-        <span className="col-span-3 flex items-center justify-center gap-2 py-6 text-[10px] text-fg-muted">
-          <RefreshCw className="w-3 h-3 motion-safe:animate-spin" /> читаю галерею
-        </span>
+        {items.map((item: DeviceMediaItem, itemIndex: number) => {
+          const order = orderOf(item.uri.uri);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setPreviewIndex(itemIndex)}
+              aria-label={item.name}
+              className="relative aspect-square min-w-0 cursor-pointer overflow-hidden rounded-md bg-black/40"
+            >
+              {kind === 'audio' ? (
+                <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-surface px-1 text-fg-muted">
+                  <Music className="h-4 w-4 shrink-0" />
+                  <span className="w-full truncate text-center text-[9px] leading-tight">{item.name}</span>
+                </span>
+              ) : (
+                <Thumb uri={item.uri} />
+              )}
+              <span
+                className={`absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[9px] ${
+                  order >= 0
+                    ? 'bg-accent-strong text-white'
+                    : 'border border-white/40 bg-black/50 text-transparent'
+                }`}
+              >
+                {order >= 0 ? order + 1 : <Check className="h-2.5 w-2.5 opacity-0" />}
+              </span>
+            </button>
+          );
+        })}
+
+        {isLoading && items.length === 0 && (
+          <span className="col-span-3 flex items-center justify-center gap-2 py-6 text-[10px] text-fg-muted">
+            <RefreshCw className="w-3 h-3 motion-safe:animate-spin" /> читаю галерею
+          </span>
+        )}
+        {!isLoading && items.length === 0 && (
+          <span className="col-span-3 py-6 text-center text-[10px] text-fg-muted">{EMPTY_LABEL[kind]}</span>
+        )}
+      </div>
+
+      {previewIndex !== null && (
+        <MediaPreview
+          items={items}
+          index={previewIndex}
+          selected={selected}
+          onToggle={onToggle}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          onAttach={onAttachSelected}
+        />
       )}
-      {!isLoading && items.length === 0 && (
-        <span className="col-span-3 py-6 text-center text-[10px] text-fg-muted">{EMPTY_LABEL[kind]}</span>
-      )}
-    </div>
+    </>
   );
 };

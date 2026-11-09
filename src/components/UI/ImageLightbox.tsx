@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { LightboxImage } from '../../types';
 import { usePresence } from '../../hooks/usePresence';
+import { useSwipeGesture } from '../../hooks/gestures/useSwipeGesture';
 
 export type { LightboxImage };
 
@@ -90,8 +91,13 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
     }
   }, [isOpen, currentIndex, images.length, onNavigate]);
 
-  const currentImage = activeImages[activeIndex];
-  const hasText = Boolean(currentImage?.extractedText || currentImage?.summary);
+  // A phone navigates with a swipe; a zoomed photo keeps the gesture for panning.
+  const { onTouchStart, onTouchEnd } = useSwipeGesture({
+    onSwipeLeft: () => { if (scale === 1) handleNext(); },
+    onSwipeRight: () => { if (scale === 1) handlePrev(); },
+  });
+
+  const currentImage = activeImages[activeIndex];  const hasText = Boolean(currentImage?.extractedText || currentImage?.summary);
 
   const handleCopyText = useCallback(async () => {
     if (!isOpen || !currentImage) return;
@@ -238,7 +244,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       {/* 3. Upper Toolbar */}
       <div
         onClick={e => e.stopPropagation()}
-        className="h-14 px-6 flex items-center justify-between border-b border-white/[0.06] bg-black/40 backdrop-blur-md z-10 shrink-0"
+        className="h-14 px-3 sm:px-6 flex items-center justify-between border-b border-white/[0.06] bg-black/40 backdrop-blur-md z-10 shrink-0"
       >
         {/* Left: File name + Counter */}
         <div className="flex items-center gap-3 min-w-0 max-w-[55%]">
@@ -271,49 +277,51 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             <span className="hidden sm:inline">Текст</span>
           </button>
 
-          <div className="w-px h-4 bg-white/[0.08]" />
+          <div className="w-px h-4 bg-white/[0.08] hidden sm:block" />
 
-          <button
-            type="button"
-            onClick={zoomOut}
-            disabled={scale <= 0.5}
-            title="Уменьшить (Zoom -)"
-            aria-label="Уменьшить"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none disabled:opacity-25 disabled:pointer-events-none"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
+          <div className="hidden items-center gap-1.5 sm:flex">
+            <button
+              type="button"
+              onClick={zoomOut}
+              disabled={scale <= 0.5}
+              title="Уменьшить (Zoom -)"
+              aria-label="Уменьшить"
+              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none disabled:opacity-25 disabled:pointer-events-none"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
 
-          <span
-            onClick={resetZoom}
-            title="Кликните для сброса (100%)"
-            className="w-12 text-center text-zinc-400 font-mono text-xs cursor-pointer hover:text-zinc-200 transition-colors py-1"
-          >
-            {Math.round(scale * 100)}%
-          </span>
+            <span
+              onClick={resetZoom}
+              title="Кликните для сброса (100%)"
+              className="w-12 text-center text-zinc-400 font-mono text-xs cursor-pointer hover:text-zinc-200 transition-colors py-1"
+            >
+              {Math.round(scale * 100)}%
+            </span>
 
-          <button
-            type="button"
-            onClick={zoomIn}
-            disabled={scale >= 3}
-            title="Увеличить (Zoom +)"
-            aria-label="Увеличить"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none disabled:opacity-25 disabled:pointer-events-none"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
+            <button
+              type="button"
+              onClick={zoomIn}
+              disabled={scale >= 3}
+              title="Увеличить (Zoom +)"
+              aria-label="Увеличить"
+              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none disabled:opacity-25 disabled:pointer-events-none"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
 
-          <button
-            type="button"
-            onClick={resetZoom}
-            title="Сбросить масштаб (RotateCcw)"
-            aria-label="Сбросить"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
+            <button
+              type="button"
+              onClick={resetZoom}
+              title="Сбросить масштаб (RotateCcw)"
+              aria-label="Сбросить"
+              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press outline-none"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
 
-          <div className="w-px h-4 bg-white/[0.08] mx-0.5 sm:mx-1.5" />
+            <div className="w-px h-4 bg-white/[0.08] mx-0.5 sm:mx-1.5" />
+          </div>
 
           <button
             type="button"
@@ -328,7 +336,11 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       </div>
 
       {/* 4. Central Area */}
-      <div className="relative flex-1 flex items-stretch overflow-hidden w-full h-full min-h-0">
+      <div
+        className="relative flex-1 flex items-stretch overflow-hidden w-full h-full min-h-0"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Left: Image Canvas */}
         <div className="relative flex-1 flex items-center justify-center overflow-hidden h-full min-w-0">
           {/* Previous Button (ChevronLeft) */}
@@ -341,7 +353,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               title="Предыдущее (←)"
               aria-label="Предыдущее изображение"
-              className="absolute left-6 z-20 p-2.5 rounded-full bg-black/40 hover:bg-white/10 motion-press text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md shadow-xl outline-none"
+              className="absolute left-6 z-20 hidden sm:flex items-center justify-center p-2.5 rounded-full bg-black/40 hover:bg-white/10 motion-press text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md shadow-xl outline-none"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -350,7 +362,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           {/* Current Image */}
           <div
             onClick={e => e.stopPropagation()}
-            className="relative max-w-full max-h-full flex items-center justify-center p-4"
+            className="relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-4"
           >
             <img
               src={currentImage.url}
@@ -365,7 +377,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
                 transition: isDragging ? 'none' : 'transform var(--slag-motion-base) var(--ease-press)'
               }}
-              className={`max-h-[80vh] ${isTextPanelOpen ? 'max-w-[calc(85vw-360px)]' : 'max-w-[85vw]'} object-contain select-none rounded-md shadow-2xl transition-transform duration-200 ${
+              className={`max-h-full sm:max-h-[80vh] ${isTextPanelOpen ? 'sm:max-w-[calc(85vw-360px)]' : 'sm:max-w-[85vw]'} max-w-full object-contain select-none rounded-md shadow-2xl transition-transform duration-200 ${
                 scale > 1
                   ? isDragging
                     ? 'cursor-grabbing'
@@ -385,7 +397,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               title="Следующее (→)"
               aria-label="Следующее изображение"
-              className="absolute right-6 z-20 p-2.5 rounded-full bg-black/40 hover:bg-white/10 motion-press text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md shadow-xl outline-none"
+              className="absolute right-6 z-20 hidden sm:flex items-center justify-center p-2.5 rounded-full bg-black/40 hover:bg-white/10 motion-press text-zinc-400 hover:text-white border border-white/[0.08] backdrop-blur-md shadow-xl outline-none"
             >
               <ChevronRight className="w-5 h-5" />
             </button>

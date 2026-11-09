@@ -93,11 +93,14 @@ export async function readEntryBytes(uri: DeviceUri, mimeType: string): Promise<
   return androidFs.readFileAsDataURL(uri, { mimeType });
 }
 
-/** A square preview for a grid cell; `null` means "no preview", not "broken". */
-export async function readEntryThumbnail(uri: DeviceUri): Promise<string | null> {
+/**
+ * A preview for a grid cell, or a bigger one when the cell is opened full screen.
+ * `null` means "no preview", not "broken".
+ */
+export async function readEntryThumbnail(uri: DeviceUri, width = 400): Promise<string | null> {
   try {
-    // A third of the sheet on a 3× screen is ~400 device pixels wide: 160 was visibly soft.
-    return await androidFs.getFileThumbnailAsDataURL(uri, { width: 320, format: 'webp' });
+    // A third of the sheet on a 3× screen is ~400 device pixels wide.
+    return await androidFs.getFileThumbnailAsDataURL(uri, { width, format: 'webp' });
   } catch (error) {
     pickerLog.warn('Thumbnail failed', error);
     return null;

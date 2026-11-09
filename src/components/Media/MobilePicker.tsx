@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Mic } from 'lucide-react';
+import { Maximize2, Mic, Minimize2 } from 'lucide-react';
 import { ResponsiveSegmented, type SegmentedOption } from '../UI/ResponsiveSegmented';
 import { FolderBrowser } from './FolderBrowser';
 import { MediaGrid } from './MediaGrid';
-import type { DevicePick, FolderEntry } from '../../types';
+import type { DevicePick } from '../../types';
 
 type PickerTab = 'image' | 'video' | 'audio' | 'files';
 
@@ -20,11 +20,13 @@ export interface MobilePickerProps {
   onAttach: (picks: DevicePick[]) => void;
   onCameraFiles: (files: FileList) => void;
   onRecordVoice: () => void;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
 }
 
 /**
- * The picker itself: four tabs over one selection. No title — the tab strip already says where
- * you are, and a header would only repeat it in a smaller font.
+ * The picker itself: four tabs over one selection, and a second state that fills the screen the
+ * way the focus editor does. No title — the tab strip already says where you are.
  */
 export const MobilePicker: React.FC<MobilePickerProps> = ({
   selected,
@@ -32,17 +34,17 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
   onAttach,
   onCameraFiles,
   onRecordVoice,
+  isFullscreen,
+  onToggleFullscreen,
 }) => {
   const [tab, setTab] = useState<PickerTab>('image');
   const cameraRef = useRef<HTMLInputElement | null>(null);
 
-  const attachSystemFiles = (entries: FolderEntry[]) => {
-    onAttach(entries);
-  };
+  const attachSelected = () => onAttach(selected);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="mobile-picker">
-      <div className="flex justify-center">
+      <div className="relative flex shrink-0 justify-center">
         <ResponsiveSegmented
           value={tab}
           onChange={setTab}
@@ -50,10 +52,18 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
           ariaLabel="Тип вложения"
           className="max-w-full overflow-x-auto scrollbar-none"
         />
+        <button
+          type="button"
+          onClick={onToggleFullscreen}
+          aria-label={isFullscreen ? 'Свернуть' : 'На весь экран'}
+          className="absolute right-0 top-0 cursor-pointer rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
+        >
+          {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </button>
       </div>
 
       {tab === 'files' ? (
-        <FolderBrowser selected={selected} onToggle={onToggle} onSystemPick={attachSystemFiles} />
+        <FolderBrowser selected={selected} onToggle={onToggle} onSystemPick={onAttach} />
       ) : tab === 'audio' ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <button
@@ -63,7 +73,12 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
           >
             <Mic className="h-3.5 w-3.5" /> Записать голос
           </button>
-          <MediaGrid kind="audio" selected={selected} onToggle={onToggle} />
+          <MediaGrid
+            kind="audio"
+            selected={selected}
+            onToggle={onToggle}
+            onAttachSelected={attachSelected}
+          />
         </div>
       ) : (
         <MediaGrid
@@ -71,6 +86,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
           kind={tab}
           selected={selected}
           onToggle={onToggle}
+          onAttachSelected={attachSelected}
           onCamera={tab === 'image' ? () => cameraRef.current?.click() : undefined}
         />
       )}

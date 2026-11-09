@@ -31,12 +31,14 @@ export const AttachSheet: React.FC = () => {
 
   const [selected, setSelected] = useState<DevicePick[]>([]);
   const [noCompress, setNoCompress] = useState(false);
+  const [isPickerFullscreen, setIsPickerFullscreen] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
 
   /** Closing always drops the selection: a half-picked folder must not resurface next time. */
   const dismiss = useCallback(() => {
     setSelected([]);
+    setIsPickerFullscreen(false);
     closeAttachSheet();
   }, [closeAttachSheet]);
 
@@ -46,6 +48,7 @@ export const AttachSheet: React.FC = () => {
   const handOver = useCallback((attachments: SlagAttachment[]) => {
     if (attachments.length > 0) attachSheet?.onAdd(attachments);
     setSelected([]);
+    setIsPickerFullscreen(false);
     closeAttachSheet();
   }, [attachSheet, closeAttachSheet]);
 
@@ -122,20 +125,29 @@ export const AttachSheet: React.FC = () => {
         onClick={(event) => event.stopPropagation()}
         data-testid="attach-sheet-panel"
         data-motion-state={phase}
-        className="flex max-h-[80dvh] w-full min-h-0 flex-col gap-2 bg-canvas-subtle p-3 motion-sheet sm:mx-auto sm:max-w-[420px] rounded-t-2xl border-t border-white/[0.08] sm:rounded-2xl sm:border"
-        style={{ paddingBottom: isMobile ? 'max(var(--sab), 0.75rem)' : undefined, ...panelStyle }}
+        className={`flex w-full min-h-0 flex-col gap-2 bg-canvas-subtle p-3 motion-sheet transition-[height] duration-200 ease-out sm:mx-auto sm:max-w-[420px] border-t border-white/[0.08] sm:border ${
+          isPickerFullscreen ? 'rounded-none sm:rounded-none' : 'rounded-t-2xl sm:rounded-2xl'
+        }`}
+        style={{
+          paddingBottom: isMobile ? 'max(var(--sab), 0.75rem)' : undefined,
+          height: isMobile ? (isPickerFullscreen ? '100dvh' : '78dvh') : undefined,
+          transitionTimingFunction: 'var(--ease-settle)',
+          ...panelStyle,
+        }}
       >
-        <div
-          data-sheet-handle
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerEnd}
-          onPointerCancel={onPointerCancel}
-          style={{ touchAction: 'none' }}
-          className="flex shrink-0 flex-col gap-2"
-        >
-          <div className="mx-auto mb-1 h-1 w-8 shrink-0 rounded-full bg-white/20" />
-        </div>
+        {!(isMobile && isPickerFullscreen) && (
+          <div
+            data-sheet-handle
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerEnd}
+            onPointerCancel={onPointerCancel}
+            style={{ touchAction: 'none' }}
+            className="flex shrink-0 flex-col gap-2"
+          >
+            <div className="mx-auto mb-1 h-1 w-8 shrink-0 rounded-full bg-white/20" />
+          </div>
+        )}
 
         {isMobile ? (
           <MobilePicker
@@ -144,6 +156,8 @@ export const AttachSheet: React.FC = () => {
             onAttach={(picks) => void attachPicked(picks)}
             onCameraFiles={(files) => void addFiles(files)}
             onRecordVoice={() => setIsRecordingVoice(true)}
+            isFullscreen={isPickerFullscreen}
+            onToggleFullscreen={() => setIsPickerFullscreen((prev) => !prev)}
           />
         ) : (
           <DesktopSources
