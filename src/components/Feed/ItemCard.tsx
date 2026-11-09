@@ -33,6 +33,31 @@ const CARD_TRANSITION =
 const THUMB_MAX_HEIGHT = 320;
 const THUMB_MAX_WIDTH = 416;
 
+type CardShape = 'voice' | 'file' | 'video' | 'image' | 'mixed';
+
+/**
+ * A card that is nothing but its attachment becomes a bubble; one kind of picture does it even
+ * as a pile. Text, chips, tasks and mixed attachments keep the full row: they need the width.
+ */
+const cardShape = (
+  item: SlagItem,
+  counts: { audio: number; video: number; image: number; file: number },
+): CardShape => {
+  const bare =
+    item.type === 'note' &&
+    !item.content.trim() &&
+    (!item.subtasks || item.subtasks.length === 0) &&
+    (!item.tags || item.tags.length === 0) &&
+    !item.replyToId &&
+    !item.isPinned &&
+    (!item.priority || item.priority === 'none');
+  if (!bare) return 'mixed';
+  if (counts.image > 0) return counts.audio + counts.video + counts.file > 0 ? 'mixed' : 'image';
+  if (counts.audio > 0) return counts.audio + counts.video + counts.file > 1 ? 'mixed' : 'voice';
+  if (counts.video > 0) return counts.video + counts.file > 1 ? 'mixed' : 'video';
+  return counts.file === 1 ? 'file' : 'mixed';
+};
+
 /** A pile of pictures fills one canvas: the first frame gets a row of its own. */
 const albumRowSizes = (count: number): number[] => {
   if (count === 2) return [2];
@@ -315,48 +340,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const completedSubtasksCount = item.subtasks?.filter(s => s.completed).length || 0;
   const totalSubtasksCount = item.subtasks?.length || 0;
 
-  // A bare note is nothing but its media: no text, no chips, no shared bottom row.
-  const isBareNote =
-    !item.content.trim() &&
-    !isTask &&
-    !isArticle &&
-    (!item.subtasks || item.subtasks.length === 0) &&
-    (!item.tags || item.tags.length === 0) &&
-    !item.replyToId &&
-    !item.isPinned &&
-    (!item.priority || item.priority === 'none');
-
-  const isPureVoice =
-    isBareNote &&
-    audioAttachments.length === 1 &&
-    videoAttachments.length === 0 &&
-    imageAttachments.length === 0 &&
-    fileAttachments.length === 0;
-
-  const isPureFile =
-    isBareNote &&
-    fileAttachments.length === 1 &&
-    audioAttachments.length === 0 &&
-    videoAttachments.length === 0 &&
-    imageAttachments.length === 0;
-
-  const isPureImage =
-    isBareNote &&
-    imageAttachments.length > 0 &&
-    audioAttachments.length === 0 &&
-    videoAttachments.length === 0 &&
-    fileAttachments.length === 0;
-
-  const isPureVideo =
-    isBareNote &&
-    videoAttachments.length === 1 &&
-    audioAttachments.length === 0 &&
-    imageAttachments.length === 0 &&
-    fileAttachments.length === 0;
+  const shape = cardShape(item, {
+    audio: audioAttachments.length,
+    video: videoAttachments.length,
+    image: imageAttachments.length,
+    file: fileAttachments.length,
+  });
+  const isVoiceBubble = shape === 'voice';
+  const isFileBubble = shape === 'file';
 
   // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
   // exception is the open OCR panel: prose needs a column, not a 200px strip.
-  const isPictureBubble = isPureImage && expandedOcrIds.size === 0;
+  const isPictureBubble = shape === 'image' && expandedOcrIds.size === 0;
 
   // A pile of pictures fills one canvas: the first frame is the biggest, the rest catch up in
   // rows. Six is the ceiling — the sixth slot counts what did not fit.
@@ -510,7 +505,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const hasBottomMeta =
     metaElements.length > 0 || Boolean(item.tags && item.tags.length > 0);
 
-  const shouldRenderBottomBar = (!isPureVoice && !isPureFile) || hasBottomMeta;
+  const shouldRenderBottomBar = (shape !== 'voice' && shape !== 'file') || hasBottomMeta;
 
   const handleOpenArticle = () => {
     setSelectedItem(item);
@@ -589,9 +584,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           ...style,
         }}
         className={`group relative flex flex-col ${
-          isPureVoice || isPureFile
+          isVoiceBubble || isFileBubble
             ? 'gap-0 max-w-sm sm:max-w-md'
-            : isPictureBubble || isPureVideo
+            : isPictureBubble || shape === 'video'
               ? 'gap-0 w-fit max-w-full'
               : 'gap-1.5 w-full'
         } p-2.5 sm:p-3 rounded-xl cursor-default select-none ${
@@ -603,7 +598,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
         <div
           className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 ${
-            isPureVoice || isPureFile || isPictureBubble || isPureVideo
+            isVoiceBubble || isFileBubble || isPictureBubble || shape === 'video'
               ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
               : 'flex items-center'
           } gap-1 sm:gap-0 sm:group-hover:gap-1 z-20 pointer-events-auto`}
@@ -804,13 +799,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* Audio Notes Player */}
       {audioAttachments.map(att => (
-        <div key={att.id} className={isPureVoice ? 'w-full' : 'pt-0.5 w-full'}>
+        <div key={att.id} className={isVoiceBubble ? 'w-full' : 'pt-0.5 w-full'}>
           <AudioPlayer
             src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
             duration={att.duration}
             size={att.size}
             waveform={att.waveform}
-            timeContext={isPureVoice ? formattedTime : undefined}
+            timeContext={isVoiceBubble ? formattedTime : undefined}
             transcript={att.extractedText}
             summary={att.summary}
             enrichmentStatus={att.enrichmentStatus}
@@ -821,9 +816,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* Pictures: one keeps its own shape, a pile fills one canvas */}
       {imageAttachments.length > 0 && (
-        <div className={`pt-1 ${isPictureBubble ? 'w-fit max-w-full' : 'w-full'}`}>
+        <div className={`pt-1 flex flex-col gap-1.5 ${isPictureBubble ? 'w-fit max-w-full' : 'w-full items-start'}`}>
           {imageAttachments.length === 1 ? (
-            <div className="flex flex-col items-start max-w-full">
+            <>
               <div
                 className="relative min-w-[9rem] min-h-[4.5rem] rounded-lg overflow-hidden group/img flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
                 style={
@@ -905,7 +900,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 </div>
               </div>
             )}
-            </div>
+            </>
           ) : (
             <div className="flex w-[20rem] max-w-full flex-col gap-0.5 overflow-hidden rounded-lg" data-testid="media-album">
               {albumRows.map((perRow, rowIndex) => (
@@ -949,14 +944,14 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* File Attachments */}
       {fileAttachments.length > 0 && (
-        <div className={`flex flex-col gap-1.5 ${isPureFile ? 'w-full' : 'pt-1 w-full'}`}>
+        <div className={`flex flex-col gap-1.5 ${isFileBubble ? 'w-full' : 'pt-1 w-full'}`}>
           {fileAttachments.map(file => (
             <a
               key={file.id}
               href={attachmentSrcs[file.id] ?? file.dataUrl}
               download={file.name}
               className={
-                isPureFile
+                isFileBubble
                   ? 'flex items-center gap-2.5 sm:gap-3 w-full select-none group/file cursor-pointer'
                   : 'flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-colors group/file select-none cursor-pointer w-full'
               }
@@ -987,7 +982,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
                 {/* Right Action: Timestamp + Download for pure file, or Download icon */}
                 <div className="flex items-center gap-2 shrink-0 ml-1">
-                  {isPureFile && (
+                  {isFileBubble && (
                     <span className="text-2xs font-mono text-zinc-500 select-none leading-none">
                       {formattedTime}
                     </span>
@@ -1100,7 +1095,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <div />
           )}
 
-          {!isPureVoice && (
+          {!isVoiceBubble && (
             <span className="text-2xs font-mono text-zinc-500 select-none ml-auto shrink-0 leading-none">
               {formattedTime}
             </span>
