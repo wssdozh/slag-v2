@@ -73,6 +73,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     setSelectedItem(null);
   }, [setIsFullscreenEditorOpen, setSelectedItem]);
 
+  // Where the surface folds back to. A draft is saved under a new id, so the card is only known
+  // after the save; without this the exit has no target and slides off to the screen edge.
+  const exitTargetIdRef = useRef<string | null>(null);
+
   const {
     title,
     setTitle,
@@ -106,6 +110,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     saveItem,
     updateItem,
     onClose: handleEditorClose,
+    // A fresh note becomes a different id on save; the exit folds into its card, not the composer.
+    onSaved: (saved) => {
+      exitTargetIdRef.current = saved.id;
+    },
     addToast,
   });
 
@@ -168,7 +176,10 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     if (presencePhase === 'exiting') {
       const target = rootRef.current;
       if (!target || isSearchOpen) return;
-      const origin = originOf();
+      const savedId = exitTargetIdRef.current;
+      const origin =
+        (savedId && document.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(savedId)}"]`)) ||
+        originOf();
       if (origin) collapseToRect(target, origin);
       else exitToEdge(target, travel);
       return;

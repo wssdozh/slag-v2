@@ -217,6 +217,18 @@ export const useComposerDraft = ({
     };
   }, [activeFolder, isFullscreenEditorOpen, resetDraftState, setReplyTarget, setTargetFolder, textareaRef]);
 
+  // Saving from the fullscreen editor consumes the draft: the editor closes with nothing stored,
+  // so the field must not keep a copy that would become a duplicate note on the next Enter.
+  const wasEditorOpenRef = useRef(isFullscreenEditorOpen);
+  useEffect(() => {
+    if (wasEditorOpenRef.current && !isFullscreenEditorOpen) {
+      if (!storage.getComposerDraft(activeFolder) && draftRef.current.content.trim()) {
+        resetDraftState();
+      }
+    }
+    wasEditorOpenRef.current = isFullscreenEditorOpen;
+  }, [isFullscreenEditorOpen, activeFolder, resetDraftState]);
+
   // Flush on logical modal close as well as unmount; exit motion must not delay saving.
   useEffect(() => {
     if (!isActive) return;

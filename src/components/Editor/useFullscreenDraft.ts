@@ -6,9 +6,11 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export interface UseFullscreenDraftOptions {
   item: SlagItem;
-  saveItem: (item: SlagItem) => void;
+  saveItem: (item: SlagItem) => SlagItem;
   updateItem: (item: SlagItem) => void;
   onClose: () => void;
+  /** The exit animation lands on this item's card, so the surface folds into what was saved. */
+  onSaved?: (saved: SlagItem) => void;
   addToast?: (message: string, type?: 'info' | 'success' | 'error') => void;
 }
 
@@ -51,6 +53,7 @@ export function useFullscreenDraft({
   saveItem,
   updateItem,
   onClose,
+  onSaved,
   addToast,
 }: UseFullscreenDraftOptions): UseFullscreenDraftReturn {
   const initialDraft = storage.getFullscreenDraft(item.id);
@@ -80,6 +83,8 @@ export function useFullscreenDraft({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstMountRef = useRef(true);
+  // A saved draft must not come back as a composer draft when the editor unmounts.
+  const didSaveRef = useRef(false);
 
   // Function to persist changes for existing item to disk and sync
   const flushAutosave = useCallback(() => {
@@ -181,20 +186,28 @@ export function useFullscreenDraft({
     storage.clearFullscreenDraft(item.id);
   }, [item.id, item.replyToId, folder, content, type, priority, dueDate, tags, attachments, duration, recurrence]);
 
-  // Flush on unmount if pending or sync back to composer draft
+  // Flush on unmount if pending or sync back to composer draft. The latest closures live in refs:
+  // as a dependency-driven cleanup this ran on every keystroke and wrote the composer draft
+  // behind the editor.
+  const itemIdRef = useRef(item.id);
+  const flushRef = useRef(flushAutosave);
+  const syncRef = useRef(syncDraftBackToComposer);
+  useEffect(() => {
+    itemIdRef.current = item.id;
+    flushRef.current = flushAutosave;
+    syncRef.current = syncDraftBackToComposer;
+  });
   useEffect(() => {
     return () => {
-      if (item.id.startsWith('draft_')) {
-        if (autosaveTimerRef.current) {
-          clearTimeout(autosaveTimerRef.current);
-          autosaveTimerRef.current = null;
-        }
-        syncDraftBackToComposer();
-      } else if (autosaveTimerRef.current) {
-        flushAutosave();
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
       }
+      if (didSaveRef.current) return;
+      if (itemIdRef.current.startsWith('draft_')) syncRef.current();
+      else flushRef.current();
     };
-  }, [item.id, syncDraftBackToComposer, flushAutosave]);
+  }, []);
 
   // Persist width preference
   useEffect(() => {
@@ -228,18 +241,28 @@ export function useFullscreenDraft({
       updatedAt: Date.now(),
     };
 
+    didSaveRef.current = true;
     if (isNewDraft) {
       storage.clearFullscreenDraft(item.id);
-      saveItem(updated);
+      // The composer the draft came from must not keep a copy of what just became a note. Only
+      // when it is that same text: a note opened from a hotkey may sit next to an unrelated draft.
+      const composerDraft = storage.getComposerDraft(folder) ?? storage.getComposerDraft(DEFAULT_INBOX_FOLDER);
+      if (composerDraft?.content.trim() === content.trim()) {
+        storage.deleteComposerDraft(folder);
+        storage.deleteComposerDraft(DEFAULT_INBOX_FOLDER);
+      }
+      const saved = saveItem(updated);
+      onSaved?.(saved);
       addToast?.('Запись создана и сохранена', 'success');
     } else {
       storage.clearFullscreenDraft(item.id);
       updateItem(updated);
+      onSaved?.(updated);
       addToast?.('Изменения сохранены', 'success');
     }
     setSaveStatus('saved');
     onClose();
-  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, readTime, saveItem, updateItem, addToast, onClose]);
+  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, readTime, saveItem, updateItem, onSaved, addToast, onClose]);
 
   const handleClose = useCallback(() => {
     if (!item.id.startsWith('draft_')) {
