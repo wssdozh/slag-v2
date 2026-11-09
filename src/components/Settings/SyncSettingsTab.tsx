@@ -9,7 +9,7 @@ import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSw
 
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
-  const { addToast } = useApp();
+  const { addToast, confirmAction } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
@@ -71,8 +71,8 @@ export const SyncSettingsTab: React.FC = () => {
 
       <SettingsGroup title="Безопасность">
         <SettingsRow label="Смена ключа хранилища" description="Все устройства потребуют нового приглашения." danger right={
-          <button type="button" disabled={locked} onClick={() => {
-            if (!window.confirm('Сменить ключ хранилища? Доступ остальных устройств будет остановлен.')) return;
+          <button type="button" disabled={locked} onClick={async () => {
+            if (!await confirmAction({ title: 'Сменить ключ хранилища?', description: 'Остальные устройства потеряют доступ и потребуют нового приглашения. Ключ нельзя вернуть назад.', confirmLabel: 'Сменить ключ', isDestructive: true })) return;
             void syncEngine.rotateVaultKey().then(() => addToast('Ключ хранилища изменён', 'success')).catch((error: unknown) => addToast(`Не удалось сменить ключ: ${error instanceof Error ? error.message : String(error)}`, 'error'));
           }} className="px-2 py-1.5 text-2xs text-danger rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">Сменить ключ</button>
         } />

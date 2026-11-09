@@ -57,6 +57,7 @@ export const SettingsModal: React.FC = () => {
     backupSettings,
     createManualBackup,
     restoreSnapshot,
+    confirmAction,
     deleteSnapshot,
     downloadSnapshot,
     downloadVaultZip,
@@ -193,9 +194,13 @@ export const SettingsModal: React.FC = () => {
   };
 
   const handleRestoreSnapshot = async (id: string) => {
-    if (!window.confirm('Восстановить хранилище из этого снимка? Текущие несохраненные данные будут заменены.')) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: 'Восстановить из снимка?',
+      description: 'Текущее содержимое хранилища заменится данными снимка. Несохранённые изменения пропадут.',
+      confirmLabel: 'Восстановить',
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     setIsRestoring(true);
     try {
       await restoreSnapshot(id);
@@ -225,7 +230,13 @@ export const SettingsModal: React.FC = () => {
     if (!file) return;
 
     if (file.name.endsWith('.zip')) {
-      if (!window.confirm(`Восстановить хранилище из архива "${file.name}"? Текущие данные будут заменены.`)) {
+      const confirmed = await confirmAction({
+        title: `Восстановить из «${file.name}»?`,
+        description: 'Текущее содержимое хранилища заменится данными архива.',
+        confirmLabel: 'Восстановить',
+        isDestructive: true,
+      });
+      if (!confirmed) {
         e.target.value = '';
         return;
       }

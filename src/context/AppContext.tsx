@@ -22,6 +22,7 @@ import type {
   SortField,
   SortOrder,
   FolderViewSettings,
+  ConfirmOptions,
 } from '../types';
 import { storage } from '../lib/storage';
 import { applyTaskCompletion } from '../lib/taskCompletion';
@@ -213,6 +214,11 @@ interface AppContextType {
   undoLastAction: () => boolean;
   removeToast: (id: string) => void;
   refreshData: () => void;
+
+  // The app's own question for irreversible actions, instead of window.confirm
+  confirmAction: (options: ConfirmOptions) => Promise<boolean>;
+  confirmRequest: ConfirmOptions | null;
+  resolveConfirm: (confirmed: boolean) => void;
 
   // Backup operations & state
   backupSnapshots: BackupSnapshotMeta[];
@@ -590,6 +596,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // One pending question at a time. The resolver lives in a ref so a re-render cannot drop it.
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmOptions | null>(null);
+  const confirmResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+
+  const resolveConfirm = useCallback((confirmed: boolean) => {
+    const resolve = confirmResolverRef.current;
+    confirmResolverRef.current = null;
+    setConfirmRequest(null);
+    resolve?.(confirmed);
+  }, []);
+
+  const confirmAction = useCallback((options: ConfirmOptions) => {
+    // A second question replaces the first: answering the stale one would answer the wrong thing.
+    confirmResolverRef.current?.(false);
+    return new Promise<boolean>((resolve) => {
+      confirmResolverRef.current = resolve;
+      setConfirmRequest(options);
+    });
+  }, []);
+
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
     try {
       const saved = localStorage.getItem(AI_SETTINGS_KEY);
@@ -899,6 +925,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const layers: AppLayer[] = [
+    // Topmost: it can be asked above any dialog, and Esc must answer it, not close what is behind.
+    { isOpen: confirmRequest !== null, close: () => resolveConfirm(false) },
     { isOpen: activeLightboxIndex !== null, close: closeLightbox },
     { isOpen: mobileActionSheetItem !== null, close: () => setMobileActionSheetItem(null) },
     { isOpen: contextMenu !== null, close: closeContextMenu },
@@ -1123,7 +1151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Единственный источник уведомления об удалении: слой модели, а не каждый вызывающий.
     addToast('Запись в корзине', 'info', {
       kind: 'restore',
-      label: 'восстановить',
+      label: 'Вернуть',
       onClick: () => {
         storage.restoreFromTrash(id);
         refreshData();
@@ -1822,6 +1850,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         undoLastAction,
         removeToast,
         refreshData,
+        confirmAction,
+        confirmRequest,
+        resolveConfirm,
         backupSnapshots,
         backupSettings,
         refreshBackupSnapshots,

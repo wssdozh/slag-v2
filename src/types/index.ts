@@ -352,4 +352,14 @@ export interface BackupSettings {
   lastBackupAt?: number;
 }
 
+/** One irreversible question asked in the app's own dialog, never by the system one. */
+export interface ConfirmOptions {
+  title: string;
+  description?: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  isDestructive?: boolean;
+}
+
+
 

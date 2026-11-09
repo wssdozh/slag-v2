@@ -11,7 +11,7 @@ import { navigatePage } from '../../lib/navigation';
 import { SettingsDivider, SettingsGroup, SettingsRow } from '../Settings/SettingsUI';
 
 export const AccountCabinet: React.FC = () => {
-  const { vaults, createVault, switchVault } = useApp();
+  const { vaults, createVault, switchVault, confirmAction } = useApp();
   const [state, setState] = useState(accountClient.getState());
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [seed, setSeed] = useState('');
@@ -257,13 +257,13 @@ export const AccountCabinet: React.FC = () => {
                       {device.id === currentId ? <span className="text-2xs text-zinc-400">вы сейчас здесь</span>
                         : device.status === 'pending' ? <>
                           <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.approveDevice(device.id), 'Устройство разрешено. Доступ к хранилищам выдаётся отдельно.')} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-40">Разрешить</button>
-                          <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Отклонить запрос устройства «${device.name}»?`)) void perform(() => accountClient.revokeDevice(device.id), 'Запрос отклонён'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отклонить</button>
+                          <button type="button" disabled={busy} onClick={async () => { if (await confirmAction({ title: `Отклонить запрос устройства «${device.name}»?`, description: 'Устройство не получит доступ к аккаунту. Запросить снова можно с самого устройства.', confirmLabel: 'Отклонить', isDestructive: true })) void perform(() => accountClient.revokeDevice(device.id), 'Запрос отклонён'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отклонить</button>
                         </>
                         : device.status === 'revoked' ? <>
                           <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.restoreDevice(device.id), 'Устройство снова активно. Верните ему доступ к хранилищам ниже.')} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-40">Вернуть</button>
-                          <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Удалить запись устройства «${device.name}» навсегда? Локальные файлы на нём и в хранилищах не тронем.`)) void perform(() => accountClient.forgetDevice(device.id), 'Устройство удалено из аккаунта'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Удалить</button>
+                          <button type="button" disabled={busy} onClick={async () => { if (await confirmAction({ title: `Удалить запись устройства «${device.name}»?`, description: 'Устройство исчезнет из аккаунта навсегда. Локальные файлы на нём и в хранилищах не тронем.', confirmLabel: 'Удалить навсегда', isDestructive: true })) void perform(() => accountClient.forgetDevice(device.id), 'Устройство удалено из аккаунта'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Удалить</button>
                         </>
-                        : <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Отозвать доступ устройства «${device.name}»? Локальные файлы на нём не удалятся.`)) void perform(() => accountClient.revokeDevice(device.id), 'Устройство отозвано. Локальные файлы сохранены.'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отозвать</button>}
+                        : <button type="button" disabled={busy} onClick={async () => { if (await confirmAction({ title: `Отозвать доступ устройства «${device.name}»?`, description: 'Синхронизация с ним остановится. Локальные файлы на устройстве не удалятся, вернуть доступ можно кнопкой «Вернуть».', confirmLabel: 'Отозвать', isDestructive: true })) void perform(() => accountClient.revokeDevice(device.id), 'Устройство отозвано. Локальные файлы сохранены.'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отозвать</button>}
                     </span>}
                   />
                 </React.Fragment>
@@ -320,7 +320,7 @@ export const AccountCabinet: React.FC = () => {
                           if (!device) throw new Error('Устройство не найдено в аккаунте');
                           await shareVaultWithDevice(vault, device, grant.mode);
                         }, 'Доступ снова предложен. Примите приглашение на устройстве.')} className="px-2 py-1 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40">Вернуть</button>
-                        : grant.deviceId !== currentId && <button type="button" disabled={busy} aria-label={`Отозвать доступ ${deviceName} к ${vaultName}`} onClick={() => { if (window.confirm(`Отозвать доступ к хранилищу «${vaultName}» у устройства «${deviceName}»? Локальные файлы на устройстве сохранятся.`)) void perform(() => accountClient.revokeVaultGrant(serverVault!.id, grant.deviceId), 'Доступ отозван. Локальные файлы на устройстве сохранены.'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отозвать</button>}
+                        : grant.deviceId !== currentId && <button type="button" disabled={busy} aria-label={`Отозвать доступ ${deviceName} к ${vaultName}`} onClick={async () => { if (await confirmAction({ title: `Отозвать доступ к «${vaultName}»?`, description: `Устройство «${deviceName}» перестанет получать это хранилище. Локальные файлы на нём сохранятся.`, confirmLabel: 'Отозвать', isDestructive: true })) void perform(() => accountClient.revokeVaultGrant(serverVault!.id, grant.deviceId), 'Доступ отозван. Локальные файлы на устройстве сохранены.'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отозвать</button>}
                     />;
                   })}
                   {sharingVault === vault.id && <form className="flex flex-wrap items-end gap-3 px-3.5 pb-3.5" onSubmit={(event) => { event.preventDefault(); if (busy) return; void perform(async () => {

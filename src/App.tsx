@@ -5,6 +5,7 @@ import { MobileShell } from './components/Mobile/MobileShell';
 import { useVisualViewportHeight } from './hooks/layout/useVisualViewportHeight';
 import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { MobileActionSheet } from './components/UI/MobileActionSheet';
+import { ConfirmDialog } from './components/Modals/ConfirmDialog';
 import { FolderModal } from './components/Modals/FolderModal';
 import { FolderInfoModal } from './components/Modals/FolderInfoModal';
 import { FolderViewModal } from './components/Modals/FolderViewModal';
@@ -219,6 +220,7 @@ const AppContent: React.FC = () => {
           onNavigate={navigateLightbox}
           onRetryEnrich={handleRetryEnrich}
         />
+        <ConfirmDialog />
       </div>
     );
   }
@@ -261,6 +263,8 @@ const AppContent: React.FC = () => {
         onNavigate={navigateLightbox}
         onRetryEnrich={handleRetryEnrich}
       />
+      {/* Last in the tree: it asks above whatever dialog is open, so it must paint above them. */}
+      <ConfirmDialog />
     </div>
   );
 };

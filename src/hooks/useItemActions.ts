@@ -189,8 +189,8 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
 
   const handleDelete = () => {
     if (!item) return;
-    // The menu can be reached with one keystroke; deleting without asking is a data-loss trap.
-    if (!window.confirm(`Удалить «${item.title || 'без названия'}»? Запись уйдёт в корзину.`)) return;
+    // Deleting is reversible: the note lands in .trash and the model layer offers it back in
+    // the toast, so the question before the click was just a second click.
     deleteItem(item.id);
     onDone?.();
   };
