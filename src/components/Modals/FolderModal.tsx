@@ -1,99 +1,73 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
-import { Folder, Trash2 } from 'lucide-react';
-import { Select } from '../UI/Select';
+import { Folder } from 'lucide-react';
+import { Select, type SelectOption } from '../UI/Select';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { buildFolderOptions } from '../../lib/vault/folderOptions';
+import { folderPathUnder, sanitizeFolderName } from '../../lib/vault/folderPaths';
 
-const FolderModalDialog: React.FC<{
-  editingFolder: FolderMeta | null;
+interface FolderModalDialogProps {
+  parentPath: string | null;
   presence: ReturnType<typeof usePresence>;
-}> = ({ editingFolder, presence }) => {
-  const {
-    isFolderModalOpen,
-    closeFolderModal,
-    saveFolder,
-    deleteFolder,
-    folders
-  } = useApp();
+}
 
-  const isEditing = Boolean(editingFolder && editingFolder.name);
+/**
+ * Creating a folder is the only thing this dialog does now. Renaming, icons,
+ * description, moving and deleting belong to the folder profile, where the same
+ * fields are visible next to the folder's records.
+ */
+const FolderModalDialog: React.FC<FolderModalDialogProps> = ({ parentPath, presence }) => {
+  const { isFolderModalOpen, closeFolderModal, saveFolder, folders } = useApp();
 
-  const [name, setName] = useState(() => editingFolder?.name || '');
-  const [parentFolder, setParentFolder] = useState<string>(() => {
-    if (editingFolder) {
-      const parts = editingFolder.path.split('/');
-      if (parts.length > 1) {
-        return parts.slice(0, -1).join('/');
-      }
-    }
-    return '';
-  });
-  const [description, setDescription] = useState(() => editingFolder?.description || '');
-  const [selectedIcon, setSelectedIcon] = useState<string>(() => editingFolder?.icon || 'Folder');
+  const [name, setName] = useState('');
+  const [parent, setParent] = useState<string>(parentPath || '');
+  const [description, setDescription] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState<string>('Folder');
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const parentOptions = useMemo<SelectOption[]>(() => {
+    const targets = folders.filter(folder => folder.path !== DEFAULT_INBOX_FOLDER);
+    return [
+      { value: '', label: 'Корневой уровень (без родителя)', triggerLabel: 'Корень хранилища', mono: true },
+      ...buildFolderOptions(targets)
+        .filter(option => option.value !== DEFAULT_INBOX_FOLDER)
+        .map(option => ({
+          value: option.value,
+          label: option.label,
+          triggerLabel: option.triggerLabel,
+          mono: true as const,
+        })),
+    ];
+  }, [folders]);
 
-    const cleanName = name.trim().replace(/[\\/:*?"<>|]/g, '-');
-    const finalPath = parentFolder ? `${parentFolder}/${cleanName}` : cleanName;
+  const handleSave = (event: React.FormEvent) => {
+    event.preventDefault();
+    const cleanName = sanitizeFolderName(name);
+    if (!cleanName) return;
 
     const folderMeta: FolderMeta = {
-      path: finalPath,
+      path: folderPathUnder(parent, cleanName),
       name: cleanName,
       description: description.trim(),
       icon: selectedIcon,
     };
-
     saveFolder(folderMeta);
   };
-
-  const eligibleParentFolders = folders.filter(f => f.path !== DEFAULT_INBOX_FOLDER && f.path !== editingFolder?.path);
 
   const CurrentIconComp = FOLDER_ICONS[selectedIcon] || Folder;
 
   const footer = (
-    <div className="flex items-center justify-between">
-      {isEditing && editingFolder?.path !== DEFAULT_INBOX_FOLDER ? (
-        <button
-          type="button"
-          onClick={() => {
-            deleteFolder(editingFolder!.path);
-            closeFolderModal();
-          }}
-          className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>Удалить папку</span>
-        </button>
-      ) : (
-        <div />
-      )}
-
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={closeFolderModal}
-        >
-          Отмена
-        </Button>
-        <Button
-          type="submit"
-          form="folder-modal-form"
-          variant="primary"
-          size="sm"
-          disabled={!name.trim()}
-        >
-          Сохранить
-        </Button>
-      </div>
+    <div className="flex items-center justify-end gap-2">
+      <Button type="button" variant="ghost" size="sm" onClick={closeFolderModal}>
+        Отмена
+      </Button>
+      <Button type="submit" form="folder-create-form" variant="primary" size="sm" disabled={!name.trim()}>
+        Создать
+      </Button>
     </div>
   );
 
@@ -102,38 +76,36 @@ const FolderModalDialog: React.FC<{
       presence={presence}
       isOpen={isFolderModalOpen}
       onClose={closeFolderModal}
-      title={isEditing ? 'Настройки папки' : 'Создать новую папку'}
+      title={parentPath ? 'Новая подпапка' : 'Создать новую папку'}
       icon={<CurrentIconComp className="w-4 h-4" />}
       maxWidth="max-w-md"
       footer={footer}
     >
-      {/* Form Body */}
-      <form id="folder-modal-form" onSubmit={handleSave} className="p-5 flex flex-col gap-4">
+      <form id="folder-create-form" onSubmit={handleSave} className="p-5 flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-zinc-400">Название папки</label>
+          <label className="text-xs font-medium text-fg-secondary">Название папки</label>
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={event => setName(event.target.value)}
             placeholder="Например: Проекты, Финансы, Идеи..."
             autoFocus
-            className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600"
+            className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-fg-primary placeholder-fg-dim outline-none ring-0 focus:border-white/20"
           />
         </div>
 
-        {/* Folder Icon Selector Grid */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-zinc-400">Иконка папки</label>
+          <label className="text-xs font-medium text-fg-secondary">Иконка папки</label>
           <div className="grid grid-cols-8 gap-1.5 p-2 rounded-lg bg-black/30 border border-white/[0.06]">
             {Object.entries(FOLDER_ICONS).map(([key, IconComponent]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setSelectedIcon(key)}
-                className={`p-1.5 rounded-md flex items-center justify-center motion-surface cursor-pointer ${
+                className={`p-1.5 rounded-md flex items-center justify-center motion-surface outline-none ring-0 cursor-pointer ${
                   selectedIcon === key
-                    ? 'bg-white text-black font-medium'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                    ? 'bg-white text-black'
+                    : 'text-fg-secondary hover:text-fg-primary hover:bg-white/[0.06]'
                 }`}
                 title={key}
               >
@@ -143,30 +115,24 @@ const FolderModalDialog: React.FC<{
           </div>
         </div>
 
-        {!isEditing && (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-zinc-400">Родительская папка (опционально)</label>
-            <Select
-              value={parentFolder}
-              onChange={setParentFolder}
-              options={[
-                { value: '', label: 'Корневой уровень (без родителя)' },
-                ...eligibleParentFolders.map(f => ({ value: f.path, label: f.path })),
-              ]}
-            />
-          </div>
-        )}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-fg-secondary">Родительская папка (опционально)</label>
+          <Select
+            value={parent}
+            onChange={setParent}
+            options={parentOptions}
+            aria-label="Родительская папка"
+          />
+        </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-zinc-400">
-            Описание для ИИ-сортировки
-          </label>
+          <label className="text-xs font-medium text-fg-secondary">Описание для ИИ-сортировки</label>
           <textarea
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={event => setDescription(event.target.value)}
             placeholder="Опишите темы и содержание папки, чтобы ИИ сортировал сюда входящие заметки..."
             rows={2}
-            className="w-full bg-black/40 border border-white/[0.08] rounded-lg p-2.5 text-xs text-white placeholder-zinc-600 resize-none leading-relaxed"
+            className="w-full bg-black/40 border border-white/[0.08] rounded-lg p-2.5 text-xs text-fg-primary placeholder-fg-dim resize-none leading-relaxed outline-none ring-0 focus:border-white/20"
           />
         </div>
       </form>
@@ -175,18 +141,25 @@ const FolderModalDialog: React.FC<{
 };
 
 export const FolderModal: React.FC = () => {
-  const { isFolderModalOpen, editingFolder } = useApp();
+  const { isFolderModalOpen, folderModalParent } = useApp();
 
   const presence = usePresence(isFolderModalOpen);
-  const [snapshot, setSnapshot] = useState({ open: isFolderModalOpen, session: 0, folder: editingFolder });
-  if (snapshot.open !== isFolderModalOpen || (isFolderModalOpen && snapshot.folder !== editingFolder)) {
-    setSnapshot({
-      open: isFolderModalOpen,
-      session: snapshot.session + (isFolderModalOpen && !snapshot.open ? 1 : 0),
-      folder: isFolderModalOpen ? editingFolder : snapshot.folder,
-    });
+  const [session, setSession] = useState(0);
+  const [snapshot, setSnapshot] = useState<{ open: boolean; parent: string | null }>({
+    open: isFolderModalOpen,
+    parent: folderModalParent,
+  });
+  if (snapshot.open !== isFolderModalOpen) {
+    setSnapshot({ open: isFolderModalOpen, parent: folderModalParent });
+    if (isFolderModalOpen) setSession(previous => previous + 1);
   }
   if (!presence.isPresent) return null;
 
-  return <FolderModalDialog key={`${snapshot.session}:${snapshot.folder?.path || 'new-folder'}`} editingFolder={snapshot.folder} presence={presence} />;
+  return (
+    <FolderModalDialog
+      key={`${session}:${snapshot.parent || 'root'}`}
+      parentPath={snapshot.parent}
+      presence={presence}
+    />
+  );
 };

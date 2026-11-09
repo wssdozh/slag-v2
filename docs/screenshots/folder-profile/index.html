@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 920px; background: #0a0a0b; color: #e4e4e7;
+         font-family: Inter, -apple-system, "Segoe UI", sans-serif; padding: 26px 28px 30px; }
+  h1 { font-size: 21px; font-weight: 650; letter-spacing: -0.015em; }
+  .sub { font: 12.5px/1.4 ui-monospace, monospace; color: #8a8a94; margin: 6px 0 20px; max-width: 860px; }
+  .row { display: flex; gap: 22px; align-items: flex-start; }
+  .row + .row { margin-top: 20px; }
+  .cell { display: flex; flex-direction: column; gap: 8px; }
+  .cap { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .num { font: 700 12px/1 ui-monospace, monospace; color: #0a0a0b; background: #d4d4d8;
+         border-radius: 5px; padding: 3px 7px; }
+  .t { font-size: 14.5px; font-weight: 620; color: #fafafa; }
+  .f { font: 11.5px/1 ui-monospace, monospace; color: #6b6b75; }
+  img { display: block; border-radius: 10px; border: 1px solid rgba(255,255,255,0.10); }
+  .w560 img { width: 560px; }
+  .w300 img { width: 300px; }
+  .w260 img { width: 260px; }
+  .note { font: 11.5px/1.5 ui-monospace, monospace; color: #8a8a94; }
+</style></head>
+<body>
+  <h1>один профиль папки — три контейнера</h1>
+  <div class="sub">те же цифры, тот же блок «имя + описание», правка по месту. режима «Изменить / Инфо» больше нет.</div>
+
+  <div class="row">
+    <div class="cell w560">
+      <div class="cap"><span class="num">1</span><span class="t">модалка по клику названия</span><span class="f">FolderInfoModal</span></div>
+      <img src="modal.png">
+      <div class="note">иконка + имя + «4 записи» + описание — один блок; шесть счётчиков одной строкой; «⋯» — переименовать / переместить / удалить.</div>
+    </div>
+    <div class="cell w260">
+      <div class="cap"><span class="num">2</span><span class="t">док-панель «Инфо папки»</span><span class="f">FolderInfoPanel</span></div>
+      <img src="dock.png">
+      <div class="note">тот же компонент в узкой колонке, счётчики строками. числа совпадают с модалкой до цифры.</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="cell w300">
+      <div class="cap"><span class="num">3</span><span class="t">телефон</span><span class="f">MobileFolderInfoView</span></div>
+      <img src="mobile.png">
+      <div class="note">6 счётчиков 3×2, правка тапом, без формы и шторки.</div>
+    </div>
+  </div>
+</body></html>

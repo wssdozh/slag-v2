@@ -114,7 +114,7 @@ interface AppContextType {
   toggleAssistant: () => void;
   isLogViewerOpen: boolean;
   isFolderModalOpen: boolean;
-  editingFolder: FolderMeta | null;
+  folderModalParent: string | null;
   isTriageModalOpen: boolean;
   aiSettings: AiSettings;
   toasts: ToastMessage[];
@@ -166,7 +166,6 @@ interface AppContextType {
   openSettingsModal: (tab?: SettingsTabId) => void;
   setIsLogViewerOpen: (open: boolean) => void;
   openCreateFolderModal: (parentPath?: string) => void;
-  openEditFolderModal: (folder: FolderMeta) => void;
   closeFolderModal: () => void;
   isFolderInfoModalOpen: boolean;
   folderInfoTarget: string | null;
@@ -204,6 +203,7 @@ interface AppContextType {
   completeTaskForever: (itemId: string) => void;
   moveItem: (itemId: string, targetFolder: string) => void;
   saveFolder: (folder: FolderMeta) => void;
+  updateFolderDescription: (path: string, description: string) => void;
   deleteFolder: (path: string) => void;
   switchVault: (vaultId: string) => void;
   createVault: (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => void;
@@ -448,7 +448,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isLogViewerOpen, setIsLogViewerOpen] = useState<boolean>(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
-  const [editingFolder, setEditingFolder] = useState<FolderMeta | null>(null);
+  const [folderModalParent, setFolderModalParent] = useState<string | null>(null);
   const [isFolderInfoModalOpen, setIsFolderInfoModalOpen] = useState<boolean>(false);
   const [folderInfoTarget, setFolderInfoTarget] = useState<string | null>(null);
 
@@ -949,7 +949,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { isOpen: mobileActionSheetItem !== null, close: () => setMobileActionSheetItem(null) },
     { isOpen: contextMenu !== null, close: closeContextMenu },
     { isOpen: isLogViewerOpen, close: () => setIsLogViewerOpen(false) },
-    { isOpen: isFolderModalOpen, close: () => { setIsFolderModalOpen(false); setEditingFolder(null); } },
+    { isOpen: isFolderModalOpen, close: () => { setIsFolderModalOpen(false); setFolderModalParent(null); } },
     { isOpen: isFolderViewModalOpen, close: () => setIsFolderViewModalOpen(false), depth: 0 },
     { isOpen: isVaultModalOpen, close: () => setIsVaultModalOpen(false) },
     { isOpen: isFolderInfoModalOpen, close: () => { setIsFolderInfoModalOpen(false); setFolderInfoTarget(null); } },
@@ -1372,16 +1372,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     storage.saveFolder(folder);
     refreshData();
     setIsFolderModalOpen(false);
-    setEditingFolder(null);
+    setFolderModalParent(null);
     addToast(`Папка «${folder.name}» сохранена`, 'success');
   };
 
+  const updateFolderDescription = useCallback((path: string, description: string) => {
+    storage.updateFolderDescription(path, description);
+    refreshData();
+    addToast('Описание папки обновлено', 'success');
+  }, [refreshData, addToast]);
+
   const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
     storage.renameFolder(oldPath, updatedFolder);
+    const remap = (value: string | null): string | null =>
+      value && (value === oldPath || value.startsWith(oldPath + '/'))
+        ? updatedFolder.path + value.slice(oldPath.length)
+        : value;
     if (currentFolder === oldPath || currentFolder.startsWith(oldPath + '/')) {
       const newCurrent = updatedFolder.path + currentFolder.slice(oldPath.length);
       setCurrentFolder(newCurrent);
     }
+    // The profile modal and the phone screen point at the old path; follow the move.
+    setFolderInfoTarget(previous => remap(previous));
+    setMobileActiveFolderState(previous => remap(previous));
+    mobileFolderRef.current = remap(mobileFolderRef.current);
     refreshData();
     addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
   }, [currentFolder, refreshData, addToast]);
@@ -1482,18 +1496,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [refreshData, addToast]);
 
   const openCreateFolderModal = (parentPath?: string) => {
-    setEditingFolder(parentPath ? { path: `${parentPath}/`, name: '', description: '', icon: 'Folder' } : null);
-    setIsFolderModalOpen(true);
-  };
-
-  const openEditFolderModal = (folder: FolderMeta) => {
-    setEditingFolder(folder);
+    setFolderModalParent(parentPath ?? null);
     setIsFolderModalOpen(true);
   };
 
   const closeFolderModal = () => {
     setIsFolderModalOpen(false);
-    setEditingFolder(null);
+    setFolderModalParent(null);
   };
 
   const openFolderViewModal = useCallback(() => {
@@ -1773,7 +1782,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSearchOpen,
         isSettingsOpen,
         isFolderModalOpen,
-        editingFolder,
+        folderModalParent,
         isFolderInfoModalOpen,
         folderInfoTarget,
         openFolderInfoModal,
@@ -1823,7 +1832,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLogViewerOpen,
         setIsLogViewerOpen,
         openCreateFolderModal,
-        openEditFolderModal,
         closeFolderModal,
         setIsTriageModalOpen,
         isComposerModalOpen,
@@ -1852,6 +1860,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         completeTaskForever,
         moveItem,
         saveFolder,
+        updateFolderDescription,
         deleteFolder,
         switchVault,
         createVault,

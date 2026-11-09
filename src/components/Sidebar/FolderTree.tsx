@@ -160,6 +160,8 @@ export const FolderTree: React.FC = () => {
     return (
       <div key={node.fullPath} className="flex flex-col select-none">
         <div
+          data-testid="folder-tree-row"
+          data-folder-path={node.fullPath}
           onClick={() => {
             setCurrentFolder(node.fullPath);
             if (hasChildren && !isExpanded) {

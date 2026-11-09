@@ -8,7 +8,6 @@ import {
   Copy,
   FolderPlus,
   FolderOpen,
-  Edit2,
   Search,
   CheckSquare,
   FileText,
@@ -45,7 +44,6 @@ export const ContextMenu: React.FC = () => {
     contextMenu,
     closeContextMenu,
     openCreateFolderModal,
-    openEditFolderModal,
     openFolderInfoModal,
     openFolderInExplorer,
     deleteFolder,
@@ -438,17 +436,6 @@ export const ContextMenu: React.FC = () => {
             >
               <FolderPlus className="w-3.5 h-3.5 text-zinc-400" />
               <span>Создать подпапку</span>
-            </button>
-
-            <button
-              onClick={() => {
-                openEditFolderModal(folder);
-                closeContextMenu();
-              }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Иконка и описание</span>
             </button>
 
             <div className="my-0.5 border-t border-white/[0.06]" />
