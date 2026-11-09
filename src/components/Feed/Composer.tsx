@@ -7,6 +7,7 @@ import { VideoRecorder } from '../UI/VideoRecorder';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { useComposerMedia } from '../../hooks/useComposerMedia';
+import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { categorizeDraft } from '../../lib/aiService';
 import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
@@ -142,6 +143,9 @@ export const Composer: React.FC<ComposerProps> = ({
       setDismissedTags(new Set());
     },
   });
+
+  // The draft keeps attachment metadata; the bytes are resolved on demand.
+  const attachmentSrcs = useAttachmentSrcs(attachments);
 
   const {
     wikiQuery,
@@ -858,7 +862,7 @@ export const Composer: React.FC<ComposerProps> = ({
               {att.type === 'audio' ? (
                 <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.05] border border-white/[0.08] relative group">
                   <AudioPlayer
-                    src={att.dataUrl || ''}
+                    src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
                     duration={att.duration}
                     size={att.size}
                     waveform={att.waveform}
@@ -875,7 +879,7 @@ export const Composer: React.FC<ComposerProps> = ({
                 </div>
               ) : att.type === 'video' ? (
                 <div className="relative group p-0.5">
-                  <VideoCirclePlayer src={att.dataUrl || ''} compact={true} />
+                  <VideoCirclePlayer src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''} compact={true} />
                   <button
                     type="button"
                     onClick={() => removeAttachment(att.id)}
@@ -887,7 +891,7 @@ export const Composer: React.FC<ComposerProps> = ({
                 </div>
               ) : att.type === 'image' ? (
                 <div className="relative group rounded-lg overflow-hidden border border-white/[0.08] bg-black/40">
-                  <img src={att.dataUrl} alt={att.name} className="w-11 h-11 object-cover" />
+                  <img src={attachmentSrcs[att.id] ?? att.dataUrl} alt={att.name} className="w-11 h-11 object-cover" />
                   <button
                     type="button"
                     onClick={() => removeAttachment(att.id)}

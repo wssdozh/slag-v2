@@ -61,6 +61,38 @@ test('"не сжимать" keeps the original bytes and the original name', asy
   await expect(page.locator('[data-composer-attachments] img[alt="shot.png"]')).toBeVisible({ timeout: 5000 });
 });
 
+test('an attached image survives a reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const button = attachButton(page);
+  await expect(button).toBeVisible({ timeout: 20000 });
+  await button.click();
+
+  await page.locator('[data-testid="attach-input-media"]').setInputFiles({
+    name: 'shot.png',
+    mimeType: 'image/png',
+    buffer: PNG_BYTES,
+  });
+  await expect(page.locator('[data-composer-attachments] img[alt="shot.webp"]')).toBeVisible({ timeout: 5000 });
+
+  // Send it, so the note is stored the way a saved note stores things: metadata in the index,
+  // bytes in IndexedDB.
+  await page.locator('main textarea').first().fill('заметка с картинкой');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('img[alt="shot.webp"]').first()).toBeVisible({ timeout: 10000 });
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const image = page.locator('img[alt="shot.webp"]').first();
+  await expect(image).toBeVisible({ timeout: 20000 });
+  // A src is not enough: a broken image also has one. It has to have decoded into pixels.
+  await expect.poll(
+    () => image.evaluate((el: HTMLImageElement) => el.naturalWidth),
+    { timeout: 15000 },
+  ).toBeGreaterThan(0);
+  await page.screenshot({ path: 'test-results/screenshots/attach-survives-reload.png' });
+});
+
 test('Esc closes the sheet, not the surface it was opened from', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });

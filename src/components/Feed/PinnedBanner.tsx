@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Pin, CheckSquare, FileText, StickyNote } from 'lucide-react';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/usePresence';
+import { useAttachmentSrc } from '../../hooks/useAttachmentSrc';
 
 export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' }) => {
   const {
@@ -44,15 +45,15 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
   }
   const effectivePinnedItems = pinnedItems.length > 0 ? pinnedItems : cachedPinnedItems;
 
-  if (!isPresent || effectivePinnedItems.length === 0) return null;
-
-  const safeIndex = pinIndex % effectivePinnedItems.length;
+  const safeIndex = effectivePinnedItems.length > 0 ? pinIndex % effectivePinnedItems.length : 0;
   const currentPinnedItem = effectivePinnedItems[safeIndex];
 
   // First image attachment for thumbnail preview
-  const firstImage = currentPinnedItem.attachments?.find(
-    a => a.type === 'image' && a.dataUrl
-  );
+  const firstImage = currentPinnedItem?.attachments?.find(a => a.type === 'image');
+  // The note carries metadata only, so the thumbnail's bytes are resolved on demand.
+  const firstImageSrc = useAttachmentSrc(firstImage);
+
+  if (!isPresent || effectivePinnedItems.length === 0) return null;
 
   // Formatted preview text: strip markdown headers, bold, links
   const previewText = (() => {
@@ -148,7 +149,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
             {/* Thumbnail or Type Icon Box */}
             {firstImage ? (
               <img
-                src={firstImage.dataUrl}
+                src={firstImageSrc}
                 alt="Превью"
                 className="w-7 h-7 rounded-md object-cover shrink-0 border border-white/[0.08]"
               />

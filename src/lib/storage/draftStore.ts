@@ -3,6 +3,7 @@ import { DEFAULT_FOLDER_VIEW_SETTINGS } from '../../types';
 import { DEFAULT_WORKSPACE_STATE } from '../../config';
 import { STORAGE_KEYS } from '../../config';
 import { logger } from '../logger';
+import { stripAttachmentList } from './attachmentData';
 import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
@@ -65,7 +66,7 @@ export class DraftStore {
   public saveComposerDraft(folderPath: string, draft: ComposerDraft, origin: 'local' | 'remote' = 'local'): void {
     try {
       const all = this.getAllComposerDrafts();
-      all[folderPath] = draft;
+      all[folderPath] = { ...draft, attachments: stripAttachmentList(draft.attachments || []) };
       localStorage.setItem(this.getDraftsKey(), JSON.stringify(all));
       this.deps.emitChange({
         kind: 'draft',

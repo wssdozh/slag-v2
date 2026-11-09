@@ -2,6 +2,7 @@ import React from 'react';
 import type { LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
+import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import {
   ChevronRight,
   ChevronDown,
@@ -39,6 +40,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
   onAddClick,
   onOpenLightbox,
 }) => {
+  const srcs = useAttachmentSrcs(attachments);
   if (attachments.length === 0) return null;
 
   return (
@@ -102,7 +104,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                       </span>
                     </div>
                     <AudioPlayer
-                      src={att.dataUrl || ''}
+                      src={srcs[att.id] ?? att.dataUrl ?? ''}
                       duration={att.duration}
                       waveform={att.waveform}
                       size={att.size}
@@ -112,7 +114,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                   </div>
                 ) : att.type === 'video' ? (
                   <div className="flex items-center gap-3">
-                    <VideoCirclePlayer src={att.dataUrl || ''} compact={true} />
+                    <VideoCirclePlayer src={srcs[att.id] ?? att.dataUrl ?? ''} compact={true} />
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <span className="text-xs font-mono text-zinc-300 font-medium truncate">
                         {att.name}
@@ -126,11 +128,12 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                   <div className="flex items-center gap-3">
                     <div
                       onClick={() => {
-                        if (att.dataUrl) {
+                        const url = srcs[att.id] ?? att.dataUrl;
+                        if (url) {
                           onOpenLightbox([{
                             id: att.id,
                             name: att.name,
-                            url: att.dataUrl,
+                            url,
                             extractedText: att.extractedText,
                             summary: att.summary,
                             enrichmentStatus: att.enrichmentStatus,
@@ -141,7 +144,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                       }}
                       className="w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"
                     >
-                      <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+                      <img src={srcs[att.id] ?? att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <span className="text-xs font-mono text-zinc-300 font-medium truncate">

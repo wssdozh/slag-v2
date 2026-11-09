@@ -29,6 +29,7 @@ import {
 } from '@tauri-apps/plugin-fs';
 
 import { idbSaveAttachment, idbGetAttachment } from './indexedDb';
+import { stripAttachmentData } from './attachmentData';
 import {
   DEFAULT_INBOX_FOLDER,
   STORAGE_KEYS,
@@ -73,6 +74,11 @@ export class StorageService {
   private crossWindowDraftChannel: BroadcastChannel | null = null;
   private persistedAttachmentIds: Set<string> = new Set();
   private attachmentUrlCache: Map<string, string> = new Map();
+  /**
+   * Attachment bytes for the current session, keyed by id. The note itself only keeps metadata:
+   * a data URL in `localStorage` is one photo against a five-megabyte quota.
+   */
+  private attachmentDataUrlCache: Map<string, string> = new Map();
 
   public getVaultAttachmentsPath(vault: VaultMeta = this.currentVault): string {
     return `${this.getVaultDir(vault)}/.attachments`;
@@ -91,7 +97,7 @@ export class StorageService {
     const cached = this.attachmentUrlCache.get(id);
     if (cached) return cached;
 
-    const stored = this.getAttachment(id) || await idbGetAttachment(id);
+    const stored = await idbGetAttachment(id);
     if (stored?.dataUrl) return stored.dataUrl;
 
     if (!isTauri()) return undefined;
@@ -132,6 +138,46 @@ export class StorageService {
         fsLog.warn(`Failed to persist attachment ${att.id}`, err);
       }
     }
+  }
+
+  /** A note keeps attachment ids; the bytes belong in IndexedDB, once per attachment. */
+  private persistNewAttachments(items: SlagItem[]): void {
+    for (const item of items) {
+      for (const att of item.attachments || []) {
+        if (att.dataUrl && !this.attachmentDataUrlCache.has(att.id)) this.saveAttachment(att);
+      }
+    }
+  }
+
+  /**
+   * The index is a cache, never the source of truth: a note that does not fit here still has to
+   * reach the disk. So a quota miss is a warning, not an exception.
+   */
+  private cacheItems(key: string, items: SlagItem[]): void {
+    try {
+      localStorage.setItem(key, JSON.stringify(stripAttachmentData(items)));
+    } catch (err) {
+      fsLog.warn('Storage index write failed, notes keep landing on disk', {
+        key,
+        itemCount: items.length,
+        error: err,
+      });
+    }
+  }
+
+  /** Put back the bytes of the session's own attachments, so the UI sees them as it always has. */
+  private hydrateAttachmentData(items: SlagItem[]): SlagItem[] {
+    if (this.attachmentDataUrlCache.size === 0) return items;
+    return items.map((item) => (
+      item.attachments?.some((att) => !att.dataUrl)
+        ? {
+          ...item,
+          attachments: item.attachments.map((att) => (
+            att.dataUrl ? att : { ...att, dataUrl: this.attachmentDataUrlCache.get(att.id) }
+          )),
+        }
+        : item
+    ));
   }
 
   public subscribeChanges(listener: StorageChangeListener): () => void {
@@ -311,7 +357,7 @@ export class StorageService {
 
       const loadedItems = await this.scanNotesDir(notesPath);
       if (loadedItems.length > 0) {
-        localStorage.setItem(this.getItemsKey(), JSON.stringify(loadedItems));
+        this.cacheItems(this.getItemsKey(), loadedItems);
         fsLog.info(`Loaded ${loadedItems.length} notes for vault "${this.currentVault.name}" from ${notesPath}`);
       } else {
         const current = this.getItems();
@@ -346,9 +392,44 @@ export class StorageService {
     if (!isTauri()) return Promise.resolve(false);
     if (!this.tauriInitialization) {
       this.tauriInitialization = this.migrateLegacyNotesToVaults()
-        .then(() => this.syncCurrentVaultFs());
+        .then(() => this.syncCurrentVaultFs())
+        .then((ready) => this.compactLocalStorage().then(() => ready));
     }
     return this.tauriInitialization;
+  }
+
+  /**
+   * One-off pass over what older builds left in localStorage: attachment bytes and note bodies
+   * with data URLs inside. The bytes move to IndexedDB (where `getAttachmentUrl` looks first),
+   * the keys are dropped, and the note index is rewritten as metadata only. This is what frees
+   * the quota that used to reject every save with an attachment in it.
+   */
+  private async compactLocalStorage(): Promise<void> {
+    try {
+      const staleKeys: string[] = [];
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(ATTACHMENTS_STORAGE_PREFIX)) staleKeys.push(key);
+      }
+      for (const key of staleKeys) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            await idbSaveAttachment(JSON.parse(raw) as SlagAttachment);
+          } catch {
+            // Unreadable leftovers are exactly what we came here to delete.
+          }
+        }
+        localStorage.removeItem(key);
+      }
+      this.cacheItems(this.getItemsKey(), this.getItems());
+      this.cacheItems(this.getTrashKey(), this.getTrashItems());
+      if (staleKeys.length > 0) {
+        fsLog.info(`Dropped ${staleKeys.length} attachment entries from localStorage (bytes live in IndexedDB)`);
+      }
+    } catch (err) {
+      fsLog.warn('localStorage compaction failed', err);
+    }
   }
 
   private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {
@@ -683,7 +764,7 @@ export class StorageService {
     const demoItems = generateDemoItems();
     const existing = this.getItems();
     const updated = [...existing, ...demoItems];
-    localStorage.setItem(this.getItemsKey(), JSON.stringify(updated));
+    this.cacheItems(this.getItemsKey(), updated);
     if (isTauri()) {
       for (const item of demoItems) {
         void this.flushItemToDisk(item);
@@ -783,7 +864,7 @@ export class StorageService {
     const itemsKey = this.getItemsKey();
     if (!localStorage.getItem(itemsKey)) {
       const initialItems = this.currentVault.id === 'default_vault' ? generateDemoItems() : [];
-      localStorage.setItem(itemsKey, JSON.stringify(initialItems));
+      this.cacheItems(itemsKey, initialItems);
     }
   }
 
@@ -847,7 +928,7 @@ export class StorageService {
       }
       return it;
     });
-    localStorage.setItem(this.getItemsKey(), JSON.stringify(items));
+    this.cacheItems(this.getItemsKey(), items);
 
     fsLog.info(`Renamed folder "${oldPath}" to "${updatedFolder.path}"`);
     if (isTauri()) {
@@ -892,7 +973,7 @@ export class StorageService {
       }
       return it;
     });
-    localStorage.setItem(this.getItemsKey(), JSON.stringify(updatedItems));
+    this.cacheItems(this.getItemsKey(), updatedItems);
 
     // Clean up drafts for deleted folder and any subfolders
     const drafts = this.getAllComposerDrafts();
@@ -925,7 +1006,7 @@ export class StorageService {
     let list: SlagItem[] = [];
     if (raw) {
       try {
-        list = JSON.parse(raw);
+        list = this.hydrateAttachmentData(JSON.parse(raw));
       } catch {
         list = [];
       }
@@ -959,15 +1040,8 @@ export class StorageService {
       fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     }
 
-    try {
-      localStorage.setItem(this.getItemsKey(), JSON.stringify(items));
-    } catch (err) {
-      fsLog.error('Failed to save items to localStorage (storage quota exceeded)', {
-        itemCount: items.length,
-        error: err,
-      });
-      throw err;
-    }
+    this.persistNewAttachments([updatedItem]);
+    this.cacheItems(this.getItemsKey(), items);
 
     if (isTauri()) {
       const oldFilename = oldItem?.filename || (oldItem ? getSafeNoteFilename(oldItem.title, oldItem.id) : undefined);
@@ -992,12 +1066,8 @@ export class StorageService {
         updated.unshift(item);
       }
     }
-    try {
-      localStorage.setItem(this.getItemsKey(), JSON.stringify(updated));
-    } catch (err) {
-      fsLog.error('Failed to bulk save items to localStorage', { error: err });
-      throw err;
-    }
+    this.persistNewAttachments([...saveMap.values()]);
+    this.cacheItems(this.getItemsKey(), updated);
 
     if (isTauri()) {
       for (const it of saveMap.values()) {
@@ -1020,7 +1090,7 @@ export class StorageService {
     const raw = localStorage.getItem(this.getTrashKey());
     if (!raw) return [];
     try {
-      return JSON.parse(raw);
+      return this.hydrateAttachmentData(JSON.parse(raw));
     } catch {
       return [];
     }
@@ -1033,12 +1103,12 @@ export class StorageService {
 
     // Remove from active items
     const remaining = items.filter(i => i.id !== id);
-    localStorage.setItem(this.getItemsKey(), JSON.stringify(remaining));
+    this.cacheItems(this.getItemsKey(), remaining);
 
     // Save to .trash
     const trash = this.getTrashItems();
     trash.unshift({ ...item, updatedAt: Date.now() });
-    localStorage.setItem(this.getTrashKey(), JSON.stringify(trash));
+    this.cacheItems(this.getTrashKey(), trash);
     fsLog.info(`Moved "${item.title || item.id}" to .trash`);
 
     if (isTauri()) {
@@ -1054,7 +1124,7 @@ export class StorageService {
 
     // Remove from trash
     const remainingTrash = trash.filter(i => i.id !== id);
-    localStorage.setItem(this.getTrashKey(), JSON.stringify(remainingTrash));
+    this.cacheItems(this.getTrashKey(), remainingTrash);
 
     // Restore to active items
     this.saveItem(item, origin);
@@ -1101,27 +1171,11 @@ export class StorageService {
 
   // Attachments
   public saveAttachment(attachment: SlagAttachment): void {
-    const key = `${ATTACHMENTS_STORAGE_PREFIX}${attachment.id}`;
-    idbSaveAttachment(attachment);
-    try {
-      localStorage.setItem(key, JSON.stringify(attachment));
-      fsLog.info(`Saved attachment "${attachment.name}" (${attachment.type}, ${Math.round(attachment.size / 1024)} KB)`);
-    } catch (err) {
-      fsLog.warn(`localStorage quota exceeded for attachment "${attachment.name}", persisted in IndexedDB`, {
-        attachmentId: attachment.id,
-        sizeBytes: attachment.size,
-        error: err,
-      });
-    }
-  }
-
-  public getAttachment(id: string): SlagAttachment | null {
-    try {
-      const raw = localStorage.getItem(`${ATTACHMENTS_STORAGE_PREFIX}${id}`);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+    // Bytes go to IndexedDB; the note keeps only the id. `localStorage` would count every photo
+    // against the same five megabytes the whole note index lives in.
+    if (attachment.dataUrl) this.attachmentDataUrlCache.set(attachment.id, attachment.dataUrl);
+    void idbSaveAttachment(attachment);
+    fsLog.info(`Saved attachment "${attachment.name}" (${attachment.type}, ${Math.round(attachment.size / 1024)} KB)`);
   }
 
   // Tag taxonomy index
@@ -1359,7 +1413,7 @@ export class StorageService {
         localStorage.setItem(this.getFoldersKey(), JSON.stringify(data.folders));
       }
       if (Array.isArray(data.items)) {
-        localStorage.setItem(this.getItemsKey(), JSON.stringify(data.items));
+        this.cacheItems(this.getItemsKey(), data.items);
       }
       if (Array.isArray(data.assistantHistory)) {
         this.saveAssistantHistory(data.assistantHistory);

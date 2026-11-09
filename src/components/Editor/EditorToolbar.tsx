@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/windowControls';
+import { storage } from '../../lib/storage';
 
 const ITEM_TYPE_OPTIONS: SegmentedOption<SlagItemType>[] = [
   { value: 'note', label: 'Заметка', icon: <StickyNote className="w-4 h-4" />, showLabelInTrigger: true, title: 'Заметка', ariaLabel: 'Заметка' },
@@ -202,14 +203,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (selectedAttachment.dataUrl) {
-                      onOpenLightbox([{
-                        id: selectedAttachment.id,
-                        name: selectedAttachment.name,
-                        url: selectedAttachment.dataUrl,
-                        itemId: item.id,
-                      }], 0);
-                    }
+                    void storage
+                      .getAttachmentUrl(selectedAttachment.id, selectedAttachment.relativePath, selectedAttachment.mimeType)
+                      .then((url) => {
+                        if (!url) return;
+                        onOpenLightbox([{
+                          id: selectedAttachment.id,
+                          name: selectedAttachment.name,
+                          url,
+                          itemId: item.id,
+                        }], 0);
+                      });
                   }}
                   className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
                   title="Открыть изображение (Lightbox)"

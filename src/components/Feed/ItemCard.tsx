@@ -20,6 +20,7 @@ import {
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
+import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
 
@@ -291,6 +292,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const videoAttachments = item.attachments.filter(a => a.type === 'video');
   const imageAttachments = item.attachments.filter(a => a.type === 'image');
   const fileAttachments = item.attachments.filter(a => a.type === 'file');
+  // Bytes are not in the note any more: they are resolved from IndexedDB or `.attachments/`.
+  const attachmentSrcs = useAttachmentSrcs(item.attachments);
 
   const completedSubtasksCount = item.subtasks?.filter(s => s.completed).length || 0;
   const totalSubtasksCount = item.subtasks?.length || 0;
@@ -329,11 +332,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       return;
     }
     const itemImages: LightboxImage[] = (item.attachments || [])
-      .filter(att => att.type === 'image' && att.dataUrl)
+      .filter(att => att.type === 'image')
       .map(att => ({
         id: att.id,
         name: att.name,
-        url: att.dataUrl!,
+        url: attachmentSrcs[att.id] ?? att.dataUrl ?? '',
         extractedText: att.extractedText,
         summary: att.summary,
         enrichmentStatus: att.enrichmentStatus,
@@ -735,7 +738,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {/* Video Circle Notes (Telegram style) */}
       {videoAttachments.map(att => (
         <div key={att.id} className="pt-1 flex">
-          <VideoCirclePlayer src={att.dataUrl || ''} />
+          <VideoCirclePlayer src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''} />
         </div>
       ))}
 
@@ -743,7 +746,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {audioAttachments.map(att => (
         <div key={att.id} className={isPureVoice ? 'w-full' : 'pt-0.5 w-full'}>
           <AudioPlayer
-            src={att.dataUrl || ''}
+            src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
             duration={att.duration}
             size={att.size}
             waveform={att.waveform}
@@ -766,7 +769,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 onClick={() => handleImageClick(imageAttachments[0])}
               >
                 <img
-                  src={imageAttachments[0].dataUrl}
+                  src={attachmentSrcs[imageAttachments[0].id] ?? imageAttachments[0].dataUrl}
                   alt={imageAttachments[0].name}
                   loading="lazy"
                   decoding="async"
@@ -841,7 +844,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     onClick={() => handleImageClick(img)}
                   >
                     <img
-                      src={img.dataUrl}
+                      src={attachmentSrcs[img.id] ?? img.dataUrl}
                       alt={img.name}
                       loading="lazy"
                       decoding="async"
@@ -885,7 +888,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           {fileAttachments.map(file => (
             <a
               key={file.id}
-              href={file.dataUrl}
+              href={attachmentSrcs[file.id] ?? file.dataUrl}
               download={file.name}
               className={
                 isPureFile

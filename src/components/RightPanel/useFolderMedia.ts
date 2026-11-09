@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SlagItem } from '../../types';
 import type { LightboxImage } from '../UI/ImageLightbox';
+import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 
 export interface FolderMediaData {
   allImages: LightboxImage[];
@@ -30,6 +31,10 @@ export interface FolderMediaData {
 }
 
 export function useFolderMedia(items: SlagItem[]): FolderMediaData {
+  // Bytes live outside the note now, so the panel resolves them once for the whole folder.
+  const attachments = useMemo(() => items.flatMap(i => i.attachments || []), [items]);
+  const srcs = useAttachmentSrcs(attachments);
+
   return useMemo(() => {
     const allImages: LightboxImage[] = [];
     const allAudio: FolderMediaData['allAudio'] = [];
@@ -49,33 +54,33 @@ export function useFolderMedia(items: SlagItem[]): FolderMediaData {
       (item.tags || []).forEach(t => folderTags.add(t));
 
       (item.attachments || []).forEach(att => {
-        if (att.type === 'image' && att.dataUrl) {
+        if (att.type === 'image') {
           allImages.push({
             id: att.id,
             name: att.name,
-            url: att.dataUrl,
+            url: srcs[att.id] ?? att.dataUrl ?? '',
             extractedText: att.extractedText,
             summary: att.summary,
             enrichmentStatus: att.enrichmentStatus,
             enrichmentError: att.enrichmentError,
             itemId: item.id,
           });
-        } else if (att.type === 'audio' && att.dataUrl) {
+        } else if (att.type === 'audio') {
           allAudio.push({
             id: att.id,
             name: att.name,
-            url: att.dataUrl,
+            url: srcs[att.id] ?? att.dataUrl ?? '',
             extractedText: att.extractedText,
             summary: att.summary,
             enrichmentStatus: att.enrichmentStatus,
             enrichmentError: att.enrichmentError,
             itemId: item.id,
           });
-        } else if (att.type === 'file' && att.dataUrl) {
+        } else if (att.type === 'file') {
           allFiles.push({
             id: att.id,
             name: att.name,
-            url: att.dataUrl,
+            url: srcs[att.id] ?? att.dataUrl ?? '',
             size: att.size,
             summary: att.summary,
             extractedText: att.extractedText,
@@ -107,5 +112,5 @@ export function useFolderMedia(items: SlagItem[]): FolderMediaData {
       tasksCount,
       articlesCount,
     };
-  }, [items]);
+  }, [items, srcs]);
 }

@@ -16,6 +16,7 @@ import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { PinnedBanner } from './PinnedBanner';
+import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
 import { noteGapPx } from '../../lib/time/dateUtils';
@@ -78,15 +79,22 @@ export const FeedList: React.FC = () => {
     return { countMap, firstReplyMap };
   }, [items]);
 
+  // The note keeps attachment metadata; the bytes are resolved once for the whole feed.
+  const feedAttachments = useMemo(
+    () => filteredItems.flatMap(it => it.attachments || []),
+    [filteredItems],
+  );
+  const attachmentSrcs = useAttachmentSrcs(feedAttachments);
+
   // Stable handler for image lightbox in feed
   const handleImageClick = useCallback((img: SlagAttachment) => {
     const folderImages: LightboxImage[] = filteredItems.flatMap(it =>
       (it.attachments || [])
-        .filter(att => att.type === 'image' && att.dataUrl)
+        .filter(att => att.type === 'image')
         .map(att => ({
           id: att.id,
           name: att.name,
-          url: att.dataUrl!,
+          url: attachmentSrcs[att.id] ?? att.dataUrl ?? '',
           extractedText: att.extractedText,
           summary: att.summary,
           enrichmentStatus: att.enrichmentStatus,
@@ -96,7 +104,7 @@ export const FeedList: React.FC = () => {
     );
     const clickedIdx = folderImages.findIndex(i => i.id === img.id);
     openLightbox(folderImages, clickedIdx >= 0 ? clickedIdx : 0);
-  }, [filteredItems, openLightbox]);
+  }, [attachmentSrcs, filteredItems, openLightbox]);
 
   // Sync state during render on folder or filter change (React pure pattern)
   const filterKey = `${currentFolder}:${activeTypeFilter}:${activeTagFilter || ''}`;
