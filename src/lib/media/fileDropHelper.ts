@@ -1,6 +1,22 @@
 import type { SlagAttachment } from '../../types';
 import { downscaleImageDataUrl } from './attachmentEnrichment';
 
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif', 'bmp', 'svg'];
+const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'];
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm', 'mkv'];
+
+/**
+ * What kind of attachment a picked file is. Android's file picker (SAF) sometimes reports an
+ * empty MIME, so the extension has to answer when the type does not.
+ */
+export function attachmentType(file: File): SlagAttachment['type'] {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  if (file.type.startsWith('image/') || IMAGE_EXTENSIONS.includes(ext)) return 'image';
+  if (file.type.startsWith('audio/') || AUDIO_EXTENSIONS.includes(ext)) return 'audio';
+  if (file.type.startsWith('video/') || VIDEO_EXTENSIONS.includes(ext)) return 'video';
+  return 'file';
+}
+
 export async function processFileListToAttachments(fileList: FileList | File[]): Promise<SlagAttachment[]> {
   const files = Array.from(fileList);
   const attachments: SlagAttachment[] = [];
@@ -14,10 +30,7 @@ export async function processFileListToAttachments(fileList: FileList | File[]):
     });
 
     const id = 'att_' + Date.now() + Math.random().toString(36).slice(2, 6);
-    let type: SlagAttachment['type'] = 'file';
-    if (file.type.startsWith('image/')) type = 'image';
-    else if (file.type.startsWith('audio/')) type = 'audio';
-    else if (file.type.startsWith('video/')) type = 'video';
+    const type = attachmentType(file);
 
     // Optimize image memory: downscale massive photos to 1440px max dimension
     const dataUrl = type === 'image'

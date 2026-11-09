@@ -9,7 +9,7 @@ import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { useComposerMedia } from '../../hooks/useComposerMedia';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { categorizeDraft } from '../../lib/aiService';
-import { enrichItemAttachments, downscaleImageDataUrl } from '../../lib/media/attachmentEnrichment';
+import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { extractFolderToken, parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/time/todoistTaskParser';
 import { parseSubtasksFromContent } from '../../lib/taskUtils';
 import { BaseComposer } from './BaseComposer';
@@ -80,14 +80,13 @@ export const Composer: React.FC<ComposerProps> = ({
     addToast,
     isMobile,
     isFullscreenEditorOpen,
+    openAttachSheet,
   } = useApp();
 
   const effectiveDefaultFolder = isModal ? DEFAULT_INBOX_FOLDER : (initialFolder || currentFolder);
   const activeFolder = effectiveDefaultFolder;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
   const [reminder] = useState<string | undefined>(initialReminder);
@@ -248,39 +247,6 @@ export const Composer: React.FC<ComposerProps> = ({
     updateAutocompleteQueries(text, cursorPos);
   };
 
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const id = 'att_' + Date.now() + Math.random().toString(36).slice(2, 6);
-        const isImg = type === 'image' || file.type.startsWith('image/');
-        // Android SAF sometimes reports an empty MIME, so fall back to the extension.
-        const ext = file.name.split('.').pop()?.toLowerCase() || '';
-        const isAudio = file.type.startsWith('audio/') || ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'].includes(ext);
-        const isVideo = !isAudio && (file.type.startsWith('video/') || ['mp4', 'mov', 'm4v', 'webm', 'mkv'].includes(ext));
-        let finalDataUrl = reader.result as string;
-        if (isImg && typeof finalDataUrl === 'string') {
-          finalDataUrl = await downscaleImageDataUrl(finalDataUrl, 1440);
-        }
-        const attachment: SlagAttachment = {
-          id,
-          name: file.name,
-          type: isImg ? 'image' : isAudio ? 'audio' : isVideo ? 'video' : 'file',
-          mimeType: isImg ? 'image/jpeg' : (file.type || 'application/octet-stream'),
-          size: file.size,
-          relativePath: `.attachments/${id}_${file.name}`,
-          dataUrl: finalDataUrl,
-        };
-        setAttachments(prev => [...prev, attachment]);
-      };
-      reader.readAsDataURL(file);
-    });
-    e.target.value = '';
-  };
 
   const handleSmartAiTags = async () => {
     if (!content.trim() && attachments.length === 0) {
@@ -951,21 +917,6 @@ export const Composer: React.FC<ComposerProps> = ({
       )}
 
       {/* Hidden File / Image inputs */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(e) => handleFileUpload(e, 'file')}
-      />
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => handleFileUpload(e, 'image')}
-      />
     </>
   );
 
@@ -1152,7 +1103,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const rightControls = (
     <ToolbarButton
       size="md"
-      onClick={() => fileInputRef.current?.click()}
+      onClick={() => openAttachSheet((attachments) => setAttachments(prev => [...prev, ...attachments]))}
       className="composer-toolbar-control composer-toolbar-icon"
       title="Прикрепить файл"
       aria-label="Прикрепить файл"

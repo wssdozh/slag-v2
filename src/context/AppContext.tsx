@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type {
   ReplyTarget,
   SlagItem,
+  SlagAttachment,
   FolderMeta,
   VaultMeta,
   AiSettings,
@@ -70,6 +71,11 @@ export interface ToastMessage {
     label: string;
     onClick: () => void;
   };
+}
+
+/** A surface asking for attachments: it passes only the place they should land. */
+export interface AttachSheetRequest {
+  onAdd: (attachments: SlagAttachment[]) => void;
 }
 
 export interface ContextMenuTarget {
@@ -219,6 +225,11 @@ interface AppContextType {
   confirmAction: (options: ConfirmOptions) => Promise<boolean>;
   confirmRequest: ConfirmOptions | null;
   resolveConfirm: (confirmed: boolean) => void;
+
+  // Attaching media: one sheet, the surface only says where the result lands
+  attachSheet: AttachSheetRequest | null;
+  openAttachSheet: (onAdd: (attachments: SlagAttachment[]) => void) => void;
+  closeAttachSheet: () => void;
 
   // Backup operations & state
   backupSnapshots: BackupSnapshotMeta[];
@@ -616,6 +627,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
+  const [attachSheet, setAttachSheet] = useState<AttachSheetRequest | null>(null);
+  const openAttachSheet = useCallback((onAdd: (attachments: SlagAttachment[]) => void) => {
+    setAttachSheet({ onAdd });
+  }, []);
+  const closeAttachSheet = useCallback(() => setAttachSheet(null), []);
+
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
     try {
       const saved = localStorage.getItem(AI_SETTINGS_KEY);
@@ -927,6 +944,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const layers: AppLayer[] = [
     // Topmost: it can be asked above any dialog, and Esc must answer it, not close what is behind.
     { isOpen: confirmRequest !== null, close: () => resolveConfirm(false) },
+    { isOpen: attachSheet !== null, close: closeAttachSheet },
     { isOpen: activeLightboxIndex !== null, close: closeLightbox },
     { isOpen: mobileActionSheetItem !== null, close: () => setMobileActionSheetItem(null) },
     { isOpen: contextMenu !== null, close: closeContextMenu },
@@ -1853,6 +1871,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         confirmAction,
         confirmRequest,
         resolveConfirm,
+        attachSheet,
+        openAttachSheet,
+        closeAttachSheet,
         backupSnapshots,
         backupSettings,
         refreshBackupSnapshots,

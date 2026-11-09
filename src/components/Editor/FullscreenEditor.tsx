@@ -66,6 +66,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     aiSettings,
     isSearchOpen,
     isMobile,
+    openAttachSheet,
   } = useApp();
 
   const handleEditorClose = useCallback(() => {
@@ -205,7 +206,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   const folderOptions = React.useMemo(() => buildFolderOptions(folders), [folders]);
 
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const getEditorView = useCallback((): EditorView | null => activeEditorView, []);
 
@@ -450,19 +450,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     }
   };
 
-  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      try {
-        const processed = await processFileListToAttachments(e.target.files);
-        if (processed.length > 0) {
-          handleAttachmentsAdded(processed);
-        }
-      } catch {
-        addToast('Ошибка при чтении файлов', 'error');
-      }
-      e.target.value = '';
-    }
-  };
+  const handleAttachClick = useCallback(() => {
+    openAttachSheet((attachments) => {
+      if (attachments.length > 0) handleAttachmentsAdded(attachments);
+    });
+  }, [openAttachSheet, handleAttachmentsAdded]);
 
   const moveAttachment = (index: number, direction: 'up' | 'down') => {
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
@@ -508,15 +500,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         isDetentMoving ? 'transition-[left,top,width,height] duration-200 ease-out motion-reduce:transition-none' : ''
       }`}
     >
-      {/* Hidden File Picker Input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={handleFileInputChange}
-      />
-
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
         <div className="fixed inset-4 z-[120] rounded-3xl bg-surface border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none motion-fade">
@@ -587,7 +570,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           onRedo={handleRedo}
           onInsertMarkdown={insertMarkdown}
           onInsertTable={handleInsertTable}
-          onAttachClick={() => fileInputRef.current?.click()}
+          onAttachClick={handleAttachClick}
           onAiDecompose={handleAiDecomposeInline}
           isZenMode={isZenMode}
           onToggleZenMode={() => setIsZenMode(prev => !prev)}
@@ -939,7 +922,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
               onInsertMarkdown={insertAttachmentMarkdown}
               onMoveAttachment={moveAttachment}
               onRemoveAttachment={removeAttachment}
-              onAddClick={() => fileInputRef.current?.click()}
+              onAddClick={handleAttachClick}
               onOpenLightbox={openLightbox}
             />
 
@@ -987,7 +970,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         onSetActivePopover={setActiveMobilePopover}
         onInsertMarkdown={insertMarkdown}
         onInsertTable={handleInsertTable}
-        onAttachClick={() => fileInputRef.current?.click()}
+        onAttachClick={handleAttachClick}
         onAiDecompose={handleAiDecomposeInline}
         onAiTags={handleAiTagsInline}
         onSave={handleSave}
