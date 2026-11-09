@@ -19,7 +19,6 @@ export const MobileActionSheet: React.FC = () => {
   const {
     mobileActionSheetItem,
     setMobileActionSheetItem,
-    navigateToFolder,
   } = useApp();
 
   const handleClose = useCallback(() => {
@@ -71,29 +70,6 @@ export const MobileActionSheet: React.FC = () => {
           className="flex flex-col gap-2 shrink-0"
         >
           <div className="w-8 h-1 bg-white/20 rounded-full mx-auto shrink-0 mb-1" />
-
-          {/* Item Title Header */}
-          <div className="px-3 py-2 flex items-center justify-between rounded-xl border border-white/[0.06] bg-surface">
-            <div className="flex items-center gap-2 min-w-0">
-              {item.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-              {item.type === 'article' && <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-              {item.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-              <span className="text-xs font-semibold text-zinc-200 truncate">
-                {item.title || item.content.slice(0, 40) || 'Без названия'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                handleClose();
-                navigateToFolder(item.folder, item.id);
-              }}
-              className="text-[10px] font-mono text-zinc-500 hover:text-zinc-200 hover:underline transition-colors cursor-pointer shrink-0 ml-2"
-              title={`Перейти в папку «${item.folder}» и перейти к этой записи`}
-            >
-              {item.folder}
-            </button>
-          </div>
         </div>
 
         {/* Quick Type Switcher (Segmented Control) */}
