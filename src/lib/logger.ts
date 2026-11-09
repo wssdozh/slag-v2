@@ -86,6 +86,16 @@ const LEVEL_COLORS: Record<LogLevel, string> = {
   error: '#f87171',
 };
 
+/** A week of dailies answers "what broke yesterday" and costs nothing on a phone. */
+const LOG_RETENTION_DAYS = 7;
+
+/** Local day, not UTC: a file named after a UTC day would flip at 03:00 in Moscow. */
+function localDay(date = new Date()): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 class LoggerEngine {
   private buffer: LogEntry[] = [];
   private maxEntries = 250;
@@ -95,6 +105,7 @@ class LoggerEngine {
   private diskLogQueue: string[] = [];
   private isDiskFlushing = false;
   private diskDirEnsured = false;
+  private diskPruned = false;
   private diskFlushTimeout: number | null = null;
 
   constructor() {
@@ -239,26 +250,16 @@ class LoggerEngine {
     const textToAppend = batch.join('');
 
     try {
-      const { mkdir, writeTextFile, exists, stat, rename, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+      const { mkdir, writeTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
       if (!this.diskDirEnsured) {
         await mkdir('logs', { baseDir: BaseDirectory.AppData, recursive: true });
         this.diskDirEnsured = true;
       }
 
-      const logPath = 'logs/slag.log';
-      // Rotate if > 5MB
-      try {
-        if (await exists(logPath, { baseDir: BaseDirectory.AppData })) {
-          const fileInfo = await stat(logPath, { baseDir: BaseDirectory.AppData });
-          if (fileInfo.size > 5 * 1024 * 1024) {
-            await rename(logPath, 'logs/slag.old.log', {
-              oldPathBaseDir: BaseDirectory.AppData,
-              newPathBaseDir: BaseDirectory.AppData,
-            });
-          }
-        }
-      } catch {
-        // ignore rotation errors
+      const logPath = `logs/slag-${localDay()}.log`;
+      if (!this.diskPruned) {
+        this.diskPruned = true;
+        void this.pruneOldLogs();
       }
 
       await writeTextFile(logPath, textToAppend, {
@@ -274,6 +275,27 @@ class LoggerEngine {
       if (this.diskLogQueue.length > 0) {
         this.scheduleDiskFlush(1000);
       }
+    }
+  }
+
+  /**
+   * One file per day, so the folder is the history: drop anything older than the retention.
+   * The old single-file scheme (`slag.log`, `slag.old.log`) has no date and is stale by definition.
+   * Exported logs (`slag_logs_*.log`) are somebody's artefact, not ours to delete.
+   */
+  private async pruneOldLogs(): Promise<void> {
+    try {
+      const { readDir, remove, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+      const cutoff = Date.now() - LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      const entries = await readDir('logs', { baseDir: BaseDirectory.AppData });
+      for (const entry of entries) {
+        const match = entry.name.match(/^slag(?:-(\d{4}-\d{2}-\d{2}))?(?:\.old)?\.log$/);
+        if (!match) continue;
+        const expired = !match[1] || new Date(`${match[1]}T00:00:00`).getTime() < cutoff;
+        if (expired) await remove(`logs/${entry.name}`, { baseDir: BaseDirectory.AppData });
+      }
+    } catch (err) {
+      console.warn('Failed to prune old logs:', err);
     }
   }
 
