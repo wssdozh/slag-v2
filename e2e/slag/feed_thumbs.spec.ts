@@ -58,7 +58,7 @@ const NOTES = [
     tags: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    attachments: Array.from({ length: 6 }, (_, index) => ({
+    attachments: Array.from({ length: 8 }, (_, index) => ({
       id: `thumb_album_${index}`,
       name: `album-${index + 1}.svg`,
       type: 'image',
@@ -165,20 +165,18 @@ test.describe('feed thumbnails', () => {
     const clip = await boxOf(page, '#item-thumb_clip');
     expect(clip.width).toBeLessThan(column.width * 0.8);
 
-    // Five pictures are one hero and a rail, not five equal crops across the column.
-    const rail = page.locator('#item-thumb_album [data-testid="media-rail"]');
-    await expect(rail).toBeVisible();
-    await expect(rail).toContainText('+2');
-    await expect(rail.locator('button')).toHaveCount(4);
-    const albumHero = await boxOf(page, '#item-thumb_album img');
-    expect(albumHero.height).toBeLessThanOrEqual(352);
-
+    // Eight pictures fill one canvas: five frames and a counter, not eight crops across the column.
+    const album = page.locator('#item-thumb_album [data-testid="media-album"]');
+    await expect(album).toBeVisible();
+    await expect(album.locator('button')).toHaveCount(6);
+    await expect(album).toContainText('+3');
+    const albumBox = await album.boundingBox();
+    expect(albumBox?.width).toBeLessThanOrEqual(321);
     // The counter is a door, not a decoration: it opens the deck on the first hidden frame.
-    await rail.getByTitle('Ещё 2').click();
+    await album.getByTitle('Ещё 3').click();
     const lightbox = page.getByTestId('image-lightbox');
     await expect(lightbox).toBeVisible();
-    // The folder keeps one deck for every picture in it, so the counter is checked by name.
-    await expect(lightbox.getByText(/album-5\.svg/).first()).toBeVisible();
+    await expect(lightbox.getByText(/album-6\.svg/).first()).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(lightbox).not.toBeVisible();
 

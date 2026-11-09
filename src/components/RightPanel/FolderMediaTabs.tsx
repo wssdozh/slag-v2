@@ -192,7 +192,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                     isMobile ? 'rounded-xl' : 'rounded'
                   }`}
                 >
-                  <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                  <img src={img.url} alt={img.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>

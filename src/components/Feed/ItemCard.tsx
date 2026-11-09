@@ -33,8 +33,14 @@ const CARD_TRANSITION =
 const THUMB_MAX_HEIGHT = 320;
 const THUMB_MAX_WIDTH = 416;
 
-/** Slots in the rail under the hero picture, counting the "+N" one. */
-const RAIL_SLOTS = 4;
+/** A pile of pictures fills one canvas: the first frame gets a row of its own. */
+const albumRowSizes = (count: number): number[] => {
+  if (count === 2) return [2];
+  if (count === 3) return [1, 2];
+  if (count === 4) return [2, 2];
+  if (count === 5) return [2, 3];
+  return [3, 3];
+};
 
 export interface ItemCardProps {
   item: SlagItem;
@@ -352,11 +358,16 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   // exception is the open OCR panel: prose needs a column, not a 200px strip.
   const isPictureBubble = isPureImage && expandedOcrIds.size === 0;
 
-  // The rest of the pictures wait in a rail: three slots fit, the fourth counts the leftovers.
-  const railImages = imageAttachments.slice(1);
-  const railVisible =
-    railImages.length > RAIL_SLOTS ? railImages.slice(0, RAIL_SLOTS - 1) : railImages;
-  const railHidden = railImages.length - railVisible.length;
+  // A pile of pictures fills one canvas: the first frame is the biggest, the rest catch up in
+  // rows. Six is the ceiling — the sixth slot counts what did not fit.
+  const albumShown = imageAttachments.length > 6 ? 5 : imageAttachments.length;
+  const albumHidden = imageAttachments.length - albumShown;
+  const albumRows = albumRowSizes(imageAttachments.length);
+  const albumTiles = imageAttachments.slice(0, albumShown).map((image) => ({ image, hidden: 0 }));
+  if (albumHidden > 0) albumTiles.push({ image: imageAttachments[albumShown], hidden: albumHidden });
+  const albumRowStarts = albumRows.map((_, rowIndex) =>
+    albumRows.slice(0, rowIndex).reduce((sum, perRow) => sum + perRow, 0),
+  );
 
   const handleImageClick = (img: SlagAttachment) => {
     if (onImageClick) {
@@ -808,10 +819,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         </div>
       ))}
 
-      {/* Pictures: the first one gets the room, the rest wait in a rail under it */}
+      {/* Pictures: one keeps its own shape, a pile fills one canvas */}
       {imageAttachments.length > 0 && (
-        <div className={`pt-1 flex flex-col gap-1.5 ${isPictureBubble ? 'w-fit max-w-full' : 'w-full'}`}>
-          <div className="flex flex-col items-start max-w-full">
+        <div className={`pt-1 ${isPictureBubble ? 'w-fit max-w-full' : 'w-full'}`}>
+          {imageAttachments.length === 1 ? (
+            <div className="flex flex-col items-start max-w-full">
               <div
                 className="relative min-w-[9rem] min-h-[4.5rem] rounded-lg overflow-hidden group/img flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
                 style={
@@ -833,7 +845,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   className={
                     firstImageRatio
                       ? 'block h-full w-full object-contain'
-                      : 'block h-auto w-auto max-h-[22rem] max-w-full object-contain'
+                      : 'block h-auto w-auto max-h-[20rem] max-w-full object-contain'
                   }
                   onLoad={(event) => {
                     const picture = event.currentTarget;
@@ -893,41 +905,43 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 </div>
               </div>
             )}
-          </div>
-
-          {railVisible.length > 0 && (
-            <div className="flex items-center gap-1.5" data-testid="media-rail">
-              {railVisible.map(img => (
-                <button
-                  key={img.id}
-                  type="button"
-                  onClick={() => handleImageClick(img)}
-                  title={img.name}
-                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md cursor-pointer transition-opacity hover:opacity-90"
-                >
-                  <img
-                    src={attachmentSrcs[img.id] ?? img.dataUrl}
-                    alt={img.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                  {img.extractedText && (
-                    <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent-strong" />
-                  )}
-                </button>
+            </div>
+          ) : (
+            <div className="flex w-[20rem] max-w-full flex-col gap-0.5 overflow-hidden rounded-lg" data-testid="media-album">
+              {albumRows.map((perRow, rowIndex) => (
+                <div key={rowIndex} className="flex gap-0.5">
+                  {albumTiles.slice(albumRowStarts[rowIndex], albumRowStarts[rowIndex] + perRow).map(tile => (
+                    <button
+                      key={tile.hidden > 0 ? 'more' : tile.image.id}
+                      type="button"
+                      onClick={() => handleImageClick(tile.image)}
+                      title={tile.hidden > 0 ? `Ещё ${tile.hidden}` : tile.image.name}
+                      className={`relative min-w-0 flex-1 overflow-hidden cursor-pointer transition-opacity hover:opacity-90 ${
+                        perRow === 1 ? 'aspect-[3/2]' : 'aspect-square'
+                      } ${tile.hidden > 0 ? 'bg-white/[0.06]' : ''}`}
+                    >
+                      {tile.hidden === 0 && (
+                        <img
+                          src={attachmentSrcs[tile.image.id] ?? tile.image.dataUrl}
+                          alt={tile.image.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      )}
+                      {tile.hidden > 0 ? (
+                        <span className="absolute inset-0 flex items-center justify-center text-sm font-mono text-zinc-200">
+                          +{tile.hidden}
+                        </span>
+                      ) : (
+                        tile.image.extractedText && (
+                          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-accent-strong" />
+                        )
+                      )}
+                    </button>
+                  ))}
+                </div>
               ))}
-
-              {railHidden > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleImageClick(railImages[railVisible.length])}
-                  title={`Ещё ${railHidden}`}
-                  className="h-16 w-16 shrink-0 rounded-md bg-white/[0.06] ring-1 ring-white/10 text-xs font-mono text-zinc-200 hover:bg-white/[0.1] hover:text-white cursor-pointer transition-colors"
-                >
-                  +{railHidden}
-                </button>
-              )}
             </div>
           )}
         </div>
