@@ -470,7 +470,9 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       style={isDocked && paneRect ? { left: paneRect.left, top: paneRect.top, width: paneRect.width, height: paneRect.height } : undefined}
       className={
         isDocked
-          ? 'pointer-events-auto fixed z-[100] flex flex-col overflow-hidden rounded-xl border border-subtle bg-surface text-fg-primary shadow-2xl shadow-black/60'
+          // Flush with the pane, no card chrome: a border and a lit surface on top of the
+          // pane is what makes a docked editor read as an overlay again.
+          ? 'pointer-events-auto fixed z-[100] flex flex-col bg-canvas text-fg-primary'
           : 'pointer-events-auto fixed inset-0 z-[100] flex flex-col text-fg-primary'
       }
     >
@@ -571,7 +573,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         <div
           ref={isMobile ? bodyRef : undefined}
           data-editor-body
-          className="min-h-0 flex-1 overflow-y-auto py-6 md:py-8 bg-surface"
+          className={`min-h-0 flex-1 overflow-y-auto py-6 md:py-8 ${isDocked ? 'bg-canvas' : 'bg-surface'}`}
           style={isMobile && !isSheetExpanded ? { maxHeight: 'calc(56% - 68px)' } : undefined}
         >
           <div
