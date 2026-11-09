@@ -112,3 +112,14 @@ export function pluralRu(count: number, forms: [string, string, string]): string
   if (tail === 1) return forms[0];
   return forms[2];
 }
+
+/**
+ * Дыхание между соседними заметками: записи одного часа стоят плотно, разрыв в часы — шире.
+ *
+ * Ступени, а не непрерывная шкала: отступ растёт от разницы во времени, и любая формула с
+ * минутами превращает список в дрожащую вёрстку, которую дёргает любой пересохранённый элемент.
+ * Границу дня отдельно не считаем — её задаёт групповой gap с пузырём даты.
+ */
+export function noteGapPx(previousMs: number, nextMs: number): number {
+  return Math.abs(nextMs - previousMs) < 60 * 60 * 1000 ? 6 : 12;
+}

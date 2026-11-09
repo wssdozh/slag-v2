@@ -35,6 +35,8 @@ export interface ItemCardProps {
   firstReplyId?: string | null;
   replyParent?: SlagItem | null;
   onImageClick?: (img: SlagAttachment, currentItem: SlagItem) => void;
+  /** Layout offset from the list (the gap between two notes), merged into the card box. */
+  style?: React.CSSProperties;
 }
 
 const formatDueDate = (rawDate?: string): string => {
@@ -80,6 +82,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   firstReplyId = null,
   replyParent = null,
   onImageClick,
+  style,
 }) => {
   const {
     toggleTaskComplete,
@@ -534,6 +537,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           // One declaration for the card: a separate `transition-colors` class would
           // be overridden here, which is why the hover colour used to snap.
           transition: swipeOffset ? 'none' : CARD_TRANSITION,
+          ...style,
         }}
         className={`group relative flex flex-col ${
           isPureVoice || isPureFile ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'

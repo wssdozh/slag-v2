@@ -18,6 +18,7 @@ import { enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { PinnedBanner } from './PinnedBanner';
 import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
+import { noteGapPx } from '../../lib/time/dateUtils';
 
 const WINDOW_CHUNK = 15;
 
@@ -31,7 +32,7 @@ function getTodayMidnight() {
   return d.getTime();
 }
 
-export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomComposer = false }) => {
+export const FeedList: React.FC = () => {
   const {
     filteredItems,
     items,
@@ -57,27 +58,6 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
   // Окно всегда прижато к новым записям: размер — единственная ручка.
   const [windowSize, setWindowSize] = useState(WINDOW_CHUNK);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
-  // Композер висит над лентой, и его высота не константа: с вложениями и контролами таски он
-  // вырастает, и магические 104px оставляли последнюю карточку под ним. Меряем сам элемент.
-  const [composerInset, setComposerInset] = useState(0);
-
-  useLayoutEffect(() => {
-    // The composer is a sibling of the list inside the same pane, not a child of this component.
-    const pane = containerRef.current?.closest('main');
-    const wrapper = pane?.querySelector<HTMLElement>('[data-composer-root]')?.parentElement;
-    if (!wrapper) return;
-    const measure = () => {
-      const list = containerRef.current;
-      if (!list) return;
-      // Distance from the list's bottom edge to the composer's top: its height plus the gutter,
-      // whichever way the wrapper nests.
-      setComposerInset(Math.max(0, Math.round(list.getBoundingClientRect().bottom - wrapper.getBoundingClientRect().top)));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(wrapper);
-    return () => observer.disconnect();
-  }, []);
 
   // Fast O(1) item lookup map for reply targets
   const itemMap = useMemo(() => new Map(items.map(i => [i.id, i])), [items]);
@@ -197,10 +177,10 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
     }
   });
 
-  // The in-flow composer and keyboard resize the scrollport without rendering this list.
+  // The keyboard and a growing composer resize the scrollport without rendering this list.
   useLayoutEffect(() => {
     const container = containerRef.current;
-    if (!hasBottomComposer || !container) return;
+    if (!container) return;
     const observer = new ResizeObserver(() => {
       if (isStuckToBottomRef.current && !highlightedItemId) {
         container.scrollTop = container.scrollHeight;
@@ -208,7 +188,7 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, [hasBottomComposer, highlightedItemId]);
+  }, [highlightedItemId]);
 
   // Dedicated anchoring effect when an item is highlighted / targeted via wiki-link
   useEffect(() => {
@@ -422,12 +402,13 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
     }
   };
 
-  // Group items by calendar date using pure timestamp calculations
+  // Group items by calendar date using pure timestamp calculations. Inside a group the gap comes
+  // from the time between two neighbours, so the list breathes instead of stepping evenly.
   const grouped = useMemo(() => {
-    const groups: { dateLabel: string; items: SlagItem[] }[] = [];
-    let currentGroup: { dateLabel: string; items: SlagItem[] } | null = null;
+    const groups: { dateLabel: string; items: { item: SlagItem; gap: number }[] }[] = [];
+    let currentGroup: { dateLabel: string; items: { item: SlagItem; gap: number }[] } | null = null;
 
-    windowedItems.forEach(item => {
+    windowedItems.forEach((item, index) => {
       let label = '';
       if (item.createdAt >= todayMidnight) {
         label = 'Сегодня';
@@ -442,11 +423,12 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
         });
       }
 
+      const gap = index === 0 ? 0 : noteGapPx(windowedItems[index - 1].createdAt, item.createdAt);
       if (!currentGroup || currentGroup.dateLabel !== label) {
-        currentGroup = { dateLabel: label, items: [item] };
+        currentGroup = { dateLabel: label, items: [{ item, gap: 0 }] };
         groups.push(currentGroup);
       } else {
-        currentGroup.items.push(item);
+        currentGroup.items.push({ item, gap });
       }
     });
 
@@ -468,8 +450,9 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
         onDrop={handleDrop}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 flex flex-col gap-6 relative scrollbar-thin"
         // Padding, not a spacer element: the column has a flex gap, so a spacer would add it too
-        // and the anchor would stop a gap short of the composer.
-        style={{ paddingBottom: hasBottomComposer ? 8 : (composerInset || 104) + 4 }}
+        // and the anchor would stop a gap short of the composer. The dock height is published by
+        // whoever owns the composer, so a keyboard frame costs no render here.
+        style={{ paddingBottom: 'calc(var(--composer-inset, 104px) + 4px)' }}
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
@@ -562,12 +545,13 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
                   </span>
                 </div>
 
-                {/* List of cards */}
-                <div className="flex flex-col gap-1.5">
-                  {group.items.map(item => (
+                {/* List of cards: the step between two notes is their own gap, not the column's */}
+                <div className="flex flex-col">
+                  {group.items.map(({ item, gap }) => (
                     <ItemCard
                       key={item.id}
                       item={item}
+                      style={gap > 0 ? { marginTop: gap } : undefined}
                       isHighlighted={highlightedItemId === item.id}
                       repliesCount={replyMetaMap.countMap.get(item.id) || 0}
                       firstReplyId={replyMetaMap.firstReplyMap.get(item.id) || null}
@@ -588,8 +572,8 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
           deleted on the first frame of the way back can only blink out. */}
       <div
         aria-hidden={!showScrollBottom}
-        style={hasBottomComposer ? undefined : { bottom: (composerInset || 104) + 8 }}
-        className={`absolute ${hasBottomComposer ? 'bottom-2' : ''} inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
+        style={{ bottom: 'calc(var(--composer-inset, 104px) + 8px)' }}
+        className={`absolute inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
           showScrollBottom ? 'opacity-100' : 'opacity-0'
         }`}
       >

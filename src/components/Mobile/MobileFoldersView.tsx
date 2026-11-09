@@ -20,6 +20,7 @@ import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
+import { useComposerInset } from '../../hooks/layout/useComposerInset';
 
 function unsortedLabel(count: number): string {
   const mod10 = count % 10;
@@ -54,6 +55,8 @@ export const MobileFoldersView: React.FC = () => {
   } = useApp();
 
   const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
+  // Лента уезжает под островок композера: панель публикует его высоту, список её читает.
+  const [attachComposerDock, composerInset] = useComposerInset();
 
   // A quick tap can end before `:active` ever paints a frame, so the acknowledgement
   // outlives the finger: the row stays lit for 200ms after it was touched.
@@ -354,26 +357,33 @@ export const MobileFoldersView: React.FC = () => {
       )}
 
       {/* Main Content Area: Reacting to feedViewMode */}
-      <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
+      <div
+        className="flex-1 min-h-0 relative flex flex-col overflow-hidden"
+        style={{ '--composer-inset': composerInset ? `${composerInset}px` : undefined } as React.CSSProperties}
+      >
         {feedViewMode === 'kanban' ? (
           <KanbanBoard />
         ) : feedViewMode === 'calendar' ? (
           <MobileCalendarView embedded />
         ) : (
           <>
-            <FeedList hasBottomComposer />
-            {/* A small floating island: the feed ends above it, so it needs no
-                overlay and no scroll compensation. */}
+            <FeedList />
+            {/* Островок: лента уезжает под него, поэтому край карточки — это его скругление,
+                а не прямоугольная кромка скролла. Градиент сверху съедает резкую границу. */}
             <div
-              className="relative z-30 flex shrink-0 justify-center"
+              ref={attachComposerDock}
+              data-testid="composer-dock"
+              className="absolute inset-x-0 bottom-0 z-30 flex flex-col items-center pointer-events-none"
               style={{
-                paddingTop: '8px',
                 paddingBottom: 'calc(var(--sab) + 8px)',
-                paddingLeft: 'calc(var(--sal) + 8px)',
-                paddingRight: 'calc(var(--sar) + 8px)',
+                paddingLeft: 'calc(var(--sal) + 12px)',
+                paddingRight: 'calc(var(--sar) + 12px)',
               }}
             >
-              <Composer key={currentFolder} />
+              <div className="h-6 w-full bg-gradient-to-t from-canvas to-transparent" aria-hidden="true" />
+              <div className="pointer-events-auto w-full">
+                <Composer key={currentFolder} />
+              </div>
             </div>
           </>
         )}

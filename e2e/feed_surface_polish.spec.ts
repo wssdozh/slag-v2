@@ -88,4 +88,64 @@ test.describe('Feed surfaces: tone instead of borders, one motion per action', (
     expect(anchored.composerTop - anchored.lastBottom).toBeGreaterThanOrEqual(0);
     expect(anchored.composerTop - anchored.lastBottom).toBeLessThanOrEqual(6);
   });
+
+  test('6. the gap between neighbouring notes follows the time between them', async ({ page }) => {
+    const cards = await page.evaluate(() => {
+      const stored = (window as any).storage.getItems() as { id: string; createdAt: number }[];
+      const byId = new Map(stored.map(item => [item.id, item]));
+      return Array.from(document.querySelectorAll('[data-flip-id]')).flatMap((el) => {
+        const item = byId.get((el as HTMLElement).dataset.flipId || '');
+        if (!item) return [];
+        return [{
+          created: item.createdAt,
+          gap: parseFloat(getComputedStyle(el).marginTop) || 0,
+        }];
+      });
+    });
+
+    const spaced = cards.filter((_, index) => index > 0 && cards[index].gap > 0);
+    expect(spaced.length).toBeGreaterThan(0);
+    for (let i = 1; i < cards.length; i += 1) {
+      if (cards[i].gap === 0) continue; // first card of a day: the bubble and the group gap own it
+      const expected = Math.abs(cards[i].created - cards[i - 1].created) < 3600_000 ? 6 : 12;
+      expect(cards[i].gap).toBe(expected);
+    }
+    await page.screenshot({ path: 'test-results/screenshots/notes-gap-buckets.png' });
+  });
+});
+
+test.describe('Mobile: composer island over the feed', () => {
+  test('island is a hair wider than the notes and the feed scrolls under it', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('header').first()).toBeVisible({ timeout: 15000 });
+    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    await expect(page.locator('.feed-card-contain').first()).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(400);
+
+    const geometry = await page.evaluate(() => {
+      const card = document.querySelector('[data-flip-id]') as HTMLElement;
+      const composer = document.querySelector('[data-composer-panel]') as HTMLElement;
+      const list = document.querySelector('[data-testid="feed-list-container"]') as HTMLElement;
+      const cardBox = card.getBoundingClientRect();
+      const composerBox = composer.getBoundingClientRect();
+      const listBox = list.getBoundingClientRect();
+      return {
+        cardLeft: Math.round(cardBox.left),
+        cardRight: Math.round(cardBox.right),
+        composerLeft: Math.round(composerBox.left),
+        composerRight: Math.round(composerBox.right),
+        composerTop: Math.round(composerBox.top),
+        listBottom: Math.round(listBox.bottom),
+      };
+    });
+
+    expect(geometry.cardLeft).toBe(16);
+    expect(geometry.composerLeft).toBe(12);
+    expect(geometry.cardRight).toBe(374);
+    expect(geometry.composerRight).toBe(378);
+    // The list runs under the island instead of ending above it.
+    expect(geometry.listBottom).toBeGreaterThan(geometry.composerTop);
+    await page.screenshot({ path: 'test-results/screenshots/mobile-composer-island.png' });
+  });
 });

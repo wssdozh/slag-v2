@@ -14,6 +14,7 @@ import { AssistantChat } from '../Feed/AssistantChat';
 import { KanbanBoard } from '../Views/KanbanBoard';
 import { CalendarView } from '../Views/CalendarView';
 import { FolderInfoPanel } from '../RightPanel/FolderInfoPanel';
+import { useComposerInset } from '../../hooks/layout/useComposerInset';
 import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
@@ -29,6 +30,8 @@ const WorkspaceContentPanel: React.FC<{
 }> = ({ panelProps, defaultMode, syncWithGlobal = false }) => {
   const { feedViewMode, setFeedViewMode, currentFolder } = useApp();
   const [localMode, setLocalMode] = useState<FeedViewMode>(() => defaultMode || feedViewMode);
+  // The feed scrolls under the composer, so the panel publishes the dock height for the list.
+  const [attachComposerDock, composerInset] = useComposerInset();
 
   const activeMode = syncWithGlobal ? feedViewMode : localMode;
 
@@ -58,9 +61,16 @@ const WorkspaceContentPanel: React.FC<{
       ) : activeMode === 'calendar' ? (
         <CalendarView />
       ) : (
-        <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
+        <div
+          className="flex-1 min-h-0 relative flex flex-col overflow-hidden"
+          style={{ '--composer-inset': composerInset ? `${composerInset}px` : undefined } as React.CSSProperties}
+        >
           <FeedList />
-          <div className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 px-2 sm:pl-4 sm:pr-[22px] flex justify-center">
+          <div
+            ref={attachComposerDock}
+            data-testid="composer-dock"
+            className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 px-2 sm:pl-4 sm:pr-[22px] flex justify-center"
+          >
             <div className="pointer-events-auto max-w-2xl w-full">
               <Composer key={currentFolder} />
             </div>

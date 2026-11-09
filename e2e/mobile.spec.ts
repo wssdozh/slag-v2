@@ -115,12 +115,12 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const composer = page.locator('[data-composer-root]');
     const composerBox = await composer.boundingBox();
     expect(composerBox).not.toBeNull();
-    // Small island: 8px of air on each side, not a flush bar
-    expect(composerBox!.x).toBe(8);
-    expect(composerBox!.width).toBe(390 - 16);
+    // Small island: a hair wider than the cards, which sit at 16px.
+    expect(composerBox!.x).toBe(12);
+    expect(composerBox!.width).toBe(390 - 24);
     for (const viewport of [{ width: 360, height: 800 }, { width: 700, height: 390 }]) {
       await page.setViewportSize(viewport);
-      await expect(composer).toHaveCSS('width', `${viewport.width - 16}px`);
+      await expect(composer).toHaveCSS('width', `${viewport.width - 24}px`);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
     await page.setViewportSize({ width: 390, height: 844 });
@@ -136,8 +136,14 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     // viewport, so pin the feed to the bottom after the new height lands.
     await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await expect.poll(() => feed.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThan(3);
-    const lastCardSpacer = page.locator('[aria-hidden="true"].h-2');
-    await expect(lastCardSpacer).toHaveCount(1);
+    // The feed scrolls under the island: its clearance comes from the dock height, published as
+    // a custom property by the panel instead of a spacer element.
+    const dockInset = await page.locator('[data-testid="composer-dock"]').evaluate(
+      el => getComputedStyle(el.parentElement as HTMLElement).getPropertyValue('--composer-inset').trim(),
+    );
+    expect(parseInt(dockInset, 10)).toBeGreaterThan(0);
+    const feedPadding = await feed.evaluate(el => parseFloat(getComputedStyle(el).paddingBottom));
+    expect(feedPadding).toBeGreaterThan(parseInt(dockInset, 10));
 
     // Type a note in mobile composer and send
     const testNoteText = 'Мобильная мысль с телефона ' + Date.now();
@@ -181,7 +187,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
       const composer = page.locator('[data-composer-root]');
       const panel = composer.locator('[data-composer-panel]');
-      const footer = composer.locator('..');
+      const footer = page.locator('[data-testid="composer-dock"]');
       for (const wrapper of [composer, footer]) {
         await expect(wrapper).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         await expect(wrapper).toHaveCSS('border-top-width', '0px');
@@ -190,9 +196,10 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
       await expect(panel).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(panel).toHaveCSS('border-radius', '16px');
       await expect(panel).toHaveCSS('box-shadow', 'none');
+      // Safe areas plus the island's own 12px of air.
       await expect(footer).toHaveCSS('padding-bottom', '32px');
-      await expect(footer).toHaveCSS('padding-left', '20px');
-      await expect(footer).toHaveCSS('padding-right', '24px');
+      await expect(footer).toHaveCSS('padding-left', '24px');
+      await expect(footer).toHaveCSS('padding-right', '28px');
       await page.screenshot({ path: 'test-results/screenshots/android_composer_outer_surface.png' });
 
       await page.locator('button[title*="Назад к списку папок"]').click();
