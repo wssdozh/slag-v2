@@ -489,7 +489,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       onTransitionEnd={(event) => {
         if (event.propertyName === 'width') setIsDetentMoving(false);
       }}
-      className={`pointer-events-auto fixed inset-0 z-[100] flex flex-col bg-surface text-fg-primary ${
+      // The phone surface is the sheet itself (56% tall over a dimmed backdrop), so only the
+      // desktop root paints: an opaque root would black out the scrim and the app behind it.
+      className={`pointer-events-auto fixed inset-0 z-[100] flex flex-col text-fg-primary ${
+        isMobile ? '' : 'bg-surface'
+      } ${
         isDetentMoving ? 'transition-[left,top,width,height] duration-200 ease-out motion-reduce:transition-none' : ''
       }`}
     >
