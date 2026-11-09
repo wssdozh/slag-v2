@@ -17,7 +17,7 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
-import app.tauri.plugin.PermissionState
+import app.tauri.PermissionState
 import app.tauri.plugin.Plugin
 import java.io.ByteArrayOutputStream
 
@@ -44,8 +44,8 @@ class ReadMediaArgs {
     Permission(strings = [Manifest.permission.READ_MEDIA_VIDEO], alias = "mediaVideo"),
   ]
 )
-class MediaGalleryPlugin(private val activity: Activity) : Plugin(activity) {
-  private val contentResolver get() = activity.contentResolver
+class MediaGalleryPlugin(host: Activity) : Plugin(host) {
+  private val resolver = host.contentResolver
 
   @Command
   fun ping(invoke: Invoke) {
@@ -109,7 +109,7 @@ class MediaGalleryPlugin(private val activity: Activity) : Plugin(activity) {
     val sortOrder = "${MediaStore.MediaColumns.DATE_ADDED} DESC LIMIT ${args.limit} OFFSET ${args.offset}"
 
     val items = JSArray()
-    val cursor: android.database.Cursor? = contentResolver.query(collection, projection, null, null, sortOrder)
+    val cursor: android.database.Cursor? = resolver.query(collection, projection, null, null, sortOrder)
     if (cursor != null) {
       while (cursor.moveToNext()) {
         val id: Long = cursor.getLong(0)
@@ -140,12 +140,12 @@ class MediaGalleryPlugin(private val activity: Activity) : Plugin(activity) {
     for (collection in collections) {
       val uri = ContentUris.withAppendedId(collection, args.id.toLongOrNull() ?: -1L)
       val bytes: ByteArray? = try {
-        contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
+        resolver.openInputStream(uri)?.use { input -> input.readBytes() }
       } catch (error: Exception) {
         null
       }
       if (bytes == null) continue
-      val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+      val mimeType = resolver.getType(uri) ?: "application/octet-stream"
       val result = JSObject()
       result.put("mimeType", mimeType)
       result.put("size", bytes.size.toDouble())
@@ -160,7 +160,7 @@ class MediaGalleryPlugin(private val activity: Activity) : Plugin(activity) {
   private fun thumbnail(uri: Uri): String? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
     return try {
-      val bitmap = contentResolver.loadThumbnail(uri, Size(160, 160), null)
+      val bitmap = resolver.loadThumbnail(uri, Size(160, 160), null)
       val stream = ByteArrayOutputStream()
       bitmap.compress(Bitmap.CompressFormat.JPEG, 70, stream)
       bitmap.recycle()
