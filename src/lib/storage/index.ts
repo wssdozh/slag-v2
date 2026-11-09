@@ -12,7 +12,7 @@ import type {
 } from '../../types';
 import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownSerializer';
 import { generateDemoItems } from '../vault/demoVault';
-import { getSafeNoteFilename } from '../vault/noteFilename';
+import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 export { getSafeNoteFilename } from '../vault/noteFilename';
 import { logger } from '../logger';
 import { isTauri } from '@tauri-apps/api/core';
@@ -529,6 +529,50 @@ export class StorageService {
     return items;
   }
 
+  /**
+   * One note, one file. The name comes from the title, two notes can share a title, and the
+   * second write used to land on the first one's path and swallow it. The id suffix keeps them
+   * apart; it is derived from the id, so a note keeps its name between saves.
+   */
+  private claimNoteFilename(item: SlagItem, folder: string): string {
+    const base = item.filename || getSafeNoteFilename(item.title, item.id);
+    const taken = new Set<string>();
+    for (const other of this.getItems()) {
+      if (other.id === item.id) continue;
+      const name = other.filename || getSafeNoteFilename(other.title, other.id);
+      taken.add(`${other.folder || DEFAULT_INBOX_FOLDER}/${name}`);
+    }
+    if (!taken.has(`${folder}/${base}`)) return base;
+
+    let candidate = withIdSuffix(base, item.id);
+    for (let n = 2; taken.has(`${folder}/${candidate}`); n += 1) {
+      candidate = withIdSuffix(`${base.replace(/\.md$/, '')}-${n}`, item.id);
+    }
+    return candidate;
+  }
+
+  /** Two notes deleted under one title must not share one copy in `.trash/`. */
+  private async freeTrashFilename(filename: string, id: string): Promise<string> {
+    const trashBase = this.getVaultTrashPath();
+    if (!(await exists(`${trashBase}/${filename}`, { baseDir: BaseDirectory.AppData }))) return filename;
+    let candidate = withIdSuffix(filename, id);
+    for (let n = 2; await exists(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData }); n += 1) {
+      candidate = withIdSuffix(`${filename.replace(/\.md$/, '')}-${n}`, id);
+    }
+    return candidate;
+  }
+
+  /** A file on disk is this note's only if its frontmatter says so. */
+  private async fileBelongsTo(path: string, id: string): Promise<boolean> {
+    try {
+      if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) return false;
+      const text = await readTextFile(path, { baseDir: BaseDirectory.AppData });
+      return text.includes(`id: ${id}\n`) || text.includes(`id: ${id}\r`) || text.endsWith(`id: ${id}`);
+    } catch {
+      return false;
+    }
+  }
+
   private async flushItemToDisk(item: SlagItem, oldFolder?: string, oldFilename?: string, vault: VaultMeta = this.currentVault, strict = false, protectedPaths = new Set<string>()): Promise<void> {
     if (!isTauri()) return;
     try {
@@ -537,7 +581,8 @@ export class StorageService {
       const targetDir = `${notesBase}/${folder}`;
       await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
 
-      const newFilename = item.filename || getSafeNoteFilename(item.title, item.id);
+      const newFilename = this.claimNoteFilename(item, folder);
+      item.filename = newFilename;
       const newPath = `${targetDir}/${newFilename}`;
 
       const prevFolder = oldFolder || folder;
@@ -551,7 +596,9 @@ export class StorageService {
       await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
       await this.persistAttachmentFiles(item, vault);
 
-      if (oldPath !== newPath && !protectedPaths.has(oldPath) && await exists(oldPath, { baseDir: BaseDirectory.AppData })) {
+      // The old path may be somebody else's file when two notes shared a title, so a rename
+      // only deletes a file that is really this note.
+      if (oldPath !== newPath && !protectedPaths.has(oldPath) && await this.fileBelongsTo(oldPath, item.id)) {
         await remove(oldPath, { baseDir: BaseDirectory.AppData });
       }
       if (legacyOldPath !== newPath && !protectedPaths.has(legacyOldPath) && await exists(legacyOldPath, { baseDir: BaseDirectory.AppData })) {
@@ -584,7 +631,7 @@ export class StorageService {
       if (pathToRemove) {
         await mkdir(trashBase, { baseDir: BaseDirectory.AppData, recursive: true });
         const content = await readTextFile(pathToRemove, { baseDir: BaseDirectory.AppData });
-        await writeTextFile(`${trashBase}/${filename}`, content, { baseDir: BaseDirectory.AppData });
+        await writeTextFile(`${trashBase}/${await this.freeTrashFilename(filename, item.id)}`, content, { baseDir: BaseDirectory.AppData });
         await remove(pathToRemove, { baseDir: BaseDirectory.AppData });
       }
     } catch (err) {
@@ -598,12 +645,12 @@ export class StorageService {
     try {
       const trashBase = this.getVaultTrashPath();
       const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-      const trashPath = `${trashBase}/${filename}`;
-      const legacyTrashPath = `${trashBase}/${item.id}.md`;
-      if (await exists(trashPath, { baseDir: BaseDirectory.AppData })) {
-        await remove(trashPath, { baseDir: BaseDirectory.AppData });
-      } else if (await exists(legacyTrashPath, { baseDir: BaseDirectory.AppData })) {
-        await remove(legacyTrashPath, { baseDir: BaseDirectory.AppData });
+      // A copy may sit under the plain name, under the id-suffixed one, or under the old id name.
+      for (const candidate of [filename, withIdSuffix(filename, item.id), `${item.id}.md`]) {
+        if (await exists(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData })) {
+          await remove(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData });
+          break;
+        }
       }
       await this.flushItemToDisk(item);
     } catch (err) {
@@ -1368,9 +1415,7 @@ export class StorageService {
           const folder = item.folder || DEFAULT_INBOX_FOLDER;
           let noteRelPath = `${this.getVaultNotesPath(vault)}/${folder}/${filename}`;
           if (usedPaths.has(noteRelPath) && usedPaths.get(noteRelPath) !== item.id) {
-            const shortId = item.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(-8) || 'dup';
-            const base = filename.replace(/\.md$/, '');
-            filename = `${base} (${shortId}).md`;
+            filename = withIdSuffix(filename, item.id);
             item.filename = filename;
             noteRelPath = `${this.getVaultNotesPath(vault)}/${folder}/${filename}`;
           }
