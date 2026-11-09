@@ -56,9 +56,10 @@ export interface PhotoPagerOptions {
 export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChromeAfter = 0 }: PhotoPagerOptions) {
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
+  /** The track node itself; a callback ref reports the moment it appears. */
+  const trackNodeRef = useRef<HTMLDivElement | null>(null);
 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -80,13 +81,28 @@ export function usePhotoPager({ count, index, onIndexChange, onDismiss, hideChro
 
   /** Write the pager offset straight to the node: a swipe must not wait for a re-render. */
   const placeTrack = useCallback((next: number, offset = 0, animate = false) => {
-    const track = trackRef.current;
+    const track = trackNodeRef.current;
     if (!track) return;
     track.style.transition = animate
       ? `transform ${motionMs('base')}ms ${motionEase('settle')}`
       : 'none';
     track.style.transform = `translate3d(calc(${-next * 100}% + ${offset}px), 0, 0)`;
   }, []);
+
+  // The viewer unmounts its tree when it closes, so the track is a new node every time it opens.
+  // A fresh node carries no transform and would show the first slide; it is placed on attach, and
+  // the effect below then jumps it to the requested slide without animating in from nowhere.
+  const latestIndexRef = useRef(index);
+  useLayoutEffect(() => {
+    latestIndexRef.current = index;
+  }, [index]);
+
+  const trackRef = useCallback((node: HTMLDivElement | null) => {
+    trackNodeRef.current = node;
+    if (!node) return;
+    placeTrack(latestIndexRef.current);
+    placedRef.current = -1;
+  }, [placeTrack]);
 
   useLayoutEffect(() => {
     if (placedRef.current === index) return;

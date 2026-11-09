@@ -177,8 +177,22 @@ test.describe('feed thumbnails', () => {
     const lightbox = page.getByTestId('image-lightbox');
     await expect(lightbox).toBeVisible();
     await expect(lightbox.getByText(/album-6\.svg/).first()).toBeVisible();
+    // The deck opens on the frame that was clicked, not on the first one of the pile — and the
+    // frame is really on screen, not merely marked active.
+    await expect(lightbox.locator('[aria-hidden="false"] img')).toHaveAttribute('alt', 'album-6.svg');
+    await expect(lightbox.locator('[aria-hidden="false"] img')).toBeInViewport();
     await page.keyboard.press('Escape');
     await expect(lightbox).not.toBeVisible();
+
+    // The same frame twice in a row: a fresh viewer still lands on it, it does not fall back
+    // to the first slide because the pager remembers where it was.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await album.getByTitle('album-4.svg').click();
+      await expect(lightbox.locator('[aria-hidden="false"] img')).toHaveAttribute('alt', 'album-4.svg');
+      await expect(lightbox.locator('[aria-hidden="false"] img')).toBeInViewport();
+      await page.keyboard.press('Escape');
+      await expect(lightbox).not.toBeVisible();
+    }
 
     // A note with text keeps the full column.
     const withText = await boxOf(page, '#item-thumb_with_text');
