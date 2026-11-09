@@ -67,6 +67,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
         </div>
       ) : (
         <MediaGrid
+          key={tab}
           kind={tab}
           selected={selected}
           onToggle={onToggle}

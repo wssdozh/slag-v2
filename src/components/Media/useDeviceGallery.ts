@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getGalleryAccess, listDeviceMedia, requestGalleryAccess } from '../../lib/media/deviceGallery';
 import type { DeviceMediaItem, DeviceMediaKind, GalleryAccess, GalleryPermission } from '../../types';
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 30;
 
 /** MediaStore reports `images`, the UI talks about a `image` tab. One mapping, one place. */
 const ACCESS_KEY: Record<DeviceMediaKind, keyof GalleryAccess> = {
@@ -21,8 +21,11 @@ export function useDeviceGallery(kind: DeviceMediaKind, isOpen: boolean) {
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const offsetRef = useRef(0);
+  const inFlightRef = useRef(false);
 
   const appendPage = useCallback(async (reset: boolean) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setIsLoading(true);
     try {
       const offset = reset ? 0 : offsetRef.current;
@@ -33,6 +36,7 @@ export function useDeviceGallery(kind: DeviceMediaKind, isOpen: boolean) {
     } catch {
       setHasMore(false);
     } finally {
+      inFlightRef.current = false;
       setIsLoading(false);
     }
   }, [kind]);

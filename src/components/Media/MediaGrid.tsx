@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Lock, Music, RefreshCw } from 'lucide-react';
 import { readEntryThumbnail } from '../../lib/media/folderBrowser';
 import { useDeviceGallery } from './useDeviceGallery';
@@ -8,20 +8,33 @@ interface ThumbProps {
   uri: DeviceUri;
 }
 
-/** One thumbnail per cell, fetched lazily: the listing never carries image bytes. */
+/**
+ * One thumbnail per cell, asked for only when the cell is about to be seen. A phone gallery has
+ * hundreds of rows; decoding all of them on mount is what turns a scroll into a freeze.
+ */
 const Thumb: React.FC<ThumbProps> = ({ uri }) => {
+  const holderRef = useRef<HTMLSpanElement | null>(null);
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    let alive = true;
-    void readEntryThumbnail(uri).then((value) => {
-      if (alive) setSrc(value);
-    });
-    return () => { alive = false; };
+    const node = holderRef.current;
+    if (!node) return;
+    let requested = false;
+    const observer = new IntersectionObserver((entries) => {
+      if (requested || !entries.some((entry) => entry.isIntersecting)) return;
+      requested = true;
+      observer.disconnect();
+      void readEntryThumbnail(uri).then((value) => setSrc(value));
+    }, { rootMargin: '160px' });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [uri]);
 
-  if (!src) return <span className="block h-full w-full bg-surface" />;
-  return <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />;
+  return (
+    <span ref={holderRef} className="absolute inset-0 bg-surface">
+      {src && <img src={src} alt="" className="h-full w-full object-cover" />}
+    </span>
+  );
 };
 
 export interface MediaGridProps {
@@ -76,7 +89,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
   return (
     <div
       data-testid={`media-grid-${kind}`}
-      className="grid max-h-[42vh] grid-cols-3 gap-1 overflow-y-auto pr-1"
+      className="grid max-h-[42vh] auto-rows-min grid-cols-3 content-start gap-1 overflow-y-auto pr-1"
       onScroll={(event) => {
         const node = event.currentTarget;
         const nearEnd = node.scrollTop + node.clientHeight >= node.scrollHeight - 120;
@@ -103,10 +116,10 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
             type="button"
             onClick={() => onToggle(item)}
             aria-label={item.name}
-            className="relative aspect-square cursor-pointer overflow-hidden rounded-md bg-black/40"
+            className="relative aspect-square min-w-0 cursor-pointer overflow-hidden rounded-md bg-black/40"
           >
             {kind === 'audio' ? (
-              <span className="flex h-full w-full flex-col items-center justify-center gap-1 bg-surface px-1 text-fg-muted">
+              <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-surface px-1 text-fg-muted">
                 <Music className="h-4 w-4 shrink-0" />
                 <span className="w-full truncate text-center text-[9px] leading-tight">{item.name}</span>
               </span>
@@ -114,7 +127,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
               <Thumb uri={item.uri} />
             )}
             <span
-              className={`absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[9px] ${
+              className={`absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[9px] ${
                 order >= 0
                   ? 'bg-accent-strong text-white'
                   : 'border border-white/40 bg-black/50 text-transparent'
