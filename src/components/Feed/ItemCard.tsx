@@ -29,6 +29,10 @@ const CARD_TRANSITION =
   'background-color var(--slag-motion-base) var(--ease-standard), ' +
   'border-color var(--slag-motion-base) var(--ease-standard)';
 
+/** One picture never eats the column: 320 tall, and never wider than 416 even as a panorama. */
+const THUMB_MAX_HEIGHT = 320;
+const THUMB_MAX_WIDTH = 416;
+
 export interface ItemCardProps {
   item: SlagItem;
   isHighlighted?: boolean;
@@ -285,6 +289,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     minute: '2-digit',
   });
 
+  // A picture sizes itself from its own proportions: height has a ceiling, width follows the
+  // ratio. Without the loaded ratio the browser inflates the box to the unclamped width.
+  const [firstImageRatio, setFirstImageRatio] = useState<number | null>(null);
+
   const isTask = item.type === 'task';
   const isArticle = item.type === 'article';
 
@@ -298,11 +306,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const completedSubtasksCount = item.subtasks?.filter(s => s.completed).length || 0;
   const totalSubtasksCount = item.subtasks?.length || 0;
 
-  const isPureVoice =
-    audioAttachments.length === 1 &&
-    videoAttachments.length === 0 &&
-    imageAttachments.length === 0 &&
-    fileAttachments.length === 0 &&
+  // A bare note is nothing but its media: no text, no chips, no shared bottom row.
+  const isBareNote =
     !item.content.trim() &&
     !isTask &&
     !isArticle &&
@@ -312,19 +317,37 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     !item.isPinned &&
     (!item.priority || item.priority === 'none');
 
+  const isPureVoice =
+    isBareNote &&
+    audioAttachments.length === 1 &&
+    videoAttachments.length === 0 &&
+    imageAttachments.length === 0 &&
+    fileAttachments.length === 0;
+
   const isPureFile =
+    isBareNote &&
     fileAttachments.length === 1 &&
     audioAttachments.length === 0 &&
     videoAttachments.length === 0 &&
+    imageAttachments.length === 0;
+
+  const isPureImage =
+    isBareNote &&
+    imageAttachments.length === 1 &&
+    audioAttachments.length === 0 &&
+    videoAttachments.length === 0 &&
+    fileAttachments.length === 0;
+
+  const isPureVideo =
+    isBareNote &&
+    videoAttachments.length === 1 &&
+    audioAttachments.length === 0 &&
     imageAttachments.length === 0 &&
-    !item.content.trim() &&
-    !isTask &&
-    !isArticle &&
-    (!item.subtasks || item.subtasks.length === 0) &&
-    (!item.tags || item.tags.length === 0) &&
-    !item.replyToId &&
-    !item.isPinned &&
-    (!item.priority || item.priority === 'none');
+    fileAttachments.length === 0;
+
+  // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
+  // exception is the open OCR panel: prose needs a column, not a 200px strip.
+  const isPictureBubble = isPureImage && expandedOcrIds.size === 0;
 
   const handleImageClick = (img: SlagAttachment) => {
     if (onImageClick) {
@@ -546,7 +569,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           ...style,
         }}
         className={`group relative flex flex-col ${
-          isPureVoice || isPureFile ? 'gap-0 max-w-sm sm:max-w-md' : 'gap-1.5 w-full'
+          isPureVoice || isPureFile
+            ? 'gap-0 max-w-sm sm:max-w-md'
+            : isPictureBubble || isPureVideo
+              ? 'gap-0 w-fit max-w-full'
+              : 'gap-1.5 w-full'
         } p-2.5 sm:p-3 rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
@@ -556,7 +583,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
         <div
           className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 ${
-            isPureVoice || isPureFile
+            isPureVoice || isPureFile || isPictureBubble || isPureVideo
               ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
               : 'flex items-center'
           } gap-1 sm:gap-0 sm:group-hover:gap-1 z-20 pointer-events-auto`}
@@ -774,11 +801,20 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* Image Attachments Gallery (Obsidian/Linear Lightbox) */}
       {imageAttachments.length > 0 && (
-        <div className="pt-1 w-full flex flex-col gap-1">
+        <div className={`pt-1 flex flex-col gap-1 ${imageAttachments.length > 1 ? 'w-full' : 'w-fit max-w-full'}`}>
           {imageAttachments.length === 1 ? (
             <div className="flex flex-col items-start max-w-full">
               <div
-                className="relative rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 min-w-[140px] min-h-[72px] max-h-[420px] max-w-full group/img flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
+                className="relative min-w-[9rem] min-h-[4.5rem] rounded-lg overflow-hidden group/img flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
+                style={
+                  firstImageRatio
+                    ? {
+                        width: Math.min(THUMB_MAX_WIDTH, THUMB_MAX_HEIGHT * firstImageRatio),
+                        aspectRatio: String(firstImageRatio),
+                        maxWidth: '100%',
+                      }
+                    : undefined
+                }
                 onClick={() => handleImageClick(imageAttachments[0])}
               >
                 <img
@@ -786,7 +822,17 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   alt={imageAttachments[0].name}
                   loading="lazy"
                   decoding="async"
-                  className="w-auto h-auto max-h-[420px] max-w-full object-contain rounded-lg"
+                  className={
+                    firstImageRatio
+                      ? 'block h-full w-full object-contain'
+                      : 'block h-auto w-auto max-h-[22rem] max-w-full object-contain'
+                  }
+                  onLoad={(event) => {
+                    const picture = event.currentTarget;
+                    if (picture.naturalWidth && picture.naturalHeight) {
+                      setFirstImageRatio(picture.naturalWidth / picture.naturalHeight);
+                    }
+                  }}
                 />
 
                 {/* Text action badge anchored in the bottom-right corner of the image */}
