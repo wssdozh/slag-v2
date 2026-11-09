@@ -49,6 +49,26 @@ const NOTES = [
     ],
   })),
   {
+    // Five pictures: one hero and a rail. The fourth slot counts what did not fit.
+    id: 'thumb_album',
+    type: 'note',
+    title: 'album',
+    content: '',
+    folder: 'Входящие',
+    tags: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    attachments: Array.from({ length: 6 }, (_, index) => ({
+      id: `thumb_album_${index}`,
+      name: `album-${index + 1}.svg`,
+      type: 'image',
+      mimeType: 'image/svg+xml',
+      size: 512,
+      relativePath: `.attachments/album-${index + 1}.svg`,
+      dataUrl: svg(800, 800, `кадр ${index + 1}`),
+    })),
+  },
+  {
     // A clip is media too: the circle and its way out do not need a column-wide card.
     id: 'thumb_clip',
     type: 'note',
@@ -145,9 +165,29 @@ test.describe('feed thumbnails', () => {
     const clip = await boxOf(page, '#item-thumb_clip');
     expect(clip.width).toBeLessThan(column.width * 0.8);
 
+    // Five pictures are one hero and a rail, not five equal crops across the column.
+    const rail = page.locator('#item-thumb_album [data-testid="media-rail"]');
+    await expect(rail).toBeVisible();
+    await expect(rail).toContainText('+2');
+    await expect(rail.locator('button')).toHaveCount(4);
+    const albumHero = await boxOf(page, '#item-thumb_album img');
+    expect(albumHero.height).toBeLessThanOrEqual(352);
+
+    // The counter is a door, not a decoration: it opens the deck on the first hidden frame.
+    await rail.getByTitle('Ещё 2').click();
+    const lightbox = page.getByTestId('image-lightbox');
+    await expect(lightbox).toBeVisible();
+    // The folder keeps one deck for every picture in it, so the counter is checked by name.
+    await expect(lightbox.getByText(/album-5\.svg/).first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(lightbox).not.toBeVisible();
+
     // A note with text keeps the full column.
     const withText = await boxOf(page, '#item-thumb_with_text');
     expect(withText.width).toBeGreaterThan(column.width - 12);
+
+    await page.locator('#item-thumb_album').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-album-phone.png', fullPage: false });
 
     await page.locator('#item-thumb_poster').scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-phone.png', fullPage: false });

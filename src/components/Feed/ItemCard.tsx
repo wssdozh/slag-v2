@@ -33,6 +33,9 @@ const CARD_TRANSITION =
 const THUMB_MAX_HEIGHT = 320;
 const THUMB_MAX_WIDTH = 416;
 
+/** Slots in the rail under the hero picture, counting the "+N" one. */
+const RAIL_SLOTS = 4;
+
 export interface ItemCardProps {
   item: SlagItem;
   isHighlighted?: boolean;
@@ -333,7 +336,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
   const isPureImage =
     isBareNote &&
-    imageAttachments.length === 1 &&
+    imageAttachments.length > 0 &&
     audioAttachments.length === 0 &&
     videoAttachments.length === 0 &&
     fileAttachments.length === 0;
@@ -348,6 +351,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
   // exception is the open OCR panel: prose needs a column, not a 200px strip.
   const isPictureBubble = isPureImage && expandedOcrIds.size === 0;
+
+  // The rest of the pictures wait in a rail: three slots fit, the fourth counts the leftovers.
+  const railImages = imageAttachments.slice(1);
+  const railVisible =
+    railImages.length > RAIL_SLOTS ? railImages.slice(0, RAIL_SLOTS - 1) : railImages;
+  const railHidden = railImages.length - railVisible.length;
 
   const handleImageClick = (img: SlagAttachment) => {
     if (onImageClick) {
@@ -799,11 +808,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         </div>
       ))}
 
-      {/* Image Attachments Gallery (Obsidian/Linear Lightbox) */}
+      {/* Pictures: the first one gets the room, the rest wait in a rail under it */}
       {imageAttachments.length > 0 && (
-        <div className={`pt-1 flex flex-col gap-1 ${imageAttachments.length > 1 ? 'w-full' : 'w-fit max-w-full'}`}>
-          {imageAttachments.length === 1 ? (
-            <div className="flex flex-col items-start max-w-full">
+        <div className={`pt-1 flex flex-col gap-1.5 ${isPictureBubble ? 'w-fit max-w-full' : 'w-full'}`}>
+          <div className="flex flex-col items-start max-w-full">
               <div
                 className="relative min-w-[9rem] min-h-[4.5rem] rounded-lg overflow-hidden group/img flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
                 style={
@@ -873,69 +881,53 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 )}
               </div>
 
-              {/* Extracted text accordion directly under the image */}
-              {imageAttachments[0].extractedText && (
-                <div
-                  className="motion-accordion w-full"
-                  data-expanded={expandedOcrIds.has(imageAttachments[0].id)}
-                  aria-hidden={!expandedOcrIds.has(imageAttachments[0].id)}
+            {/* Extracted text accordion directly under the hero picture */}
+            {imageAttachments[0].extractedText && (
+              <div
+                className="motion-accordion w-full"
+                data-expanded={expandedOcrIds.has(imageAttachments[0].id)}
+                aria-hidden={!expandedOcrIds.has(imageAttachments[0].id)}
+              >
+                <div className="motion-accordion-inner w-full mt-1.5 pt-1.5 border-t border-white/[0.08] text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+                  {imageAttachments[0].extractedText}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {railVisible.length > 0 && (
+            <div className="flex items-center gap-1.5" data-testid="media-rail">
+              {railVisible.map(img => (
+                <button
+                  key={img.id}
+                  type="button"
+                  onClick={() => handleImageClick(img)}
+                  title={img.name}
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md cursor-pointer transition-opacity hover:opacity-90"
                 >
-                  <div className="motion-accordion-inner w-full mt-1.5 pt-1.5 border-t border-white/[0.08] text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
-                    {imageAttachments[0].extractedText}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div
-              className={`grid ${
-                imageAttachments.length === 2 || imageAttachments.length === 4
-                  ? 'grid-cols-2'
-                  : imageAttachments.length === 3
-                  ? 'grid-cols-3'
-                  : 'grid-cols-2 sm:grid-cols-3'
-              } gap-1.5 w-full`}
-            >
-              {imageAttachments.map(img => (
-                <div key={img.id} className="flex flex-col">
-                  <div
-                    className="rounded-lg overflow-hidden border border-white/[0.08] bg-black/30 aspect-[4/3] flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
-                    onClick={() => handleImageClick(img)}
-                  >
-                    <img
-                      src={attachmentSrcs[img.id] ?? img.dataUrl}
-                      alt={img.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <img
+                    src={attachmentSrcs[img.id] ?? img.dataUrl}
+                    alt={img.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
                   {img.extractedText && (
-                    <div className="w-full mt-1">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleOcr(img.id);
-                        }}
-                        className="text-2xs text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-0.5 cursor-pointer select-none font-mono"
-                      >
-                        <span>{expandedOcrIds.has(img.id) ? 'Скрыть текст' : 'Текст'}</span>
-                        <ChevronDown className={`w-2.5 h-2.5 transition-transform ${expandedOcrIds.has(img.id) ? 'rotate-180' : ''}`} />
-                      </button>
-                      <div
-                        className="motion-accordion w-full"
-                        data-expanded={expandedOcrIds.has(img.id)}
-                        aria-hidden={!expandedOcrIds.has(img.id)}
-                      >
-                        <div className="motion-accordion-inner mt-0.5 pt-0.5 pl-2 border-l border-white/10 text-2xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
-                          {img.extractedText}
-                        </div>
-                      </div>
-                    </div>
+                    <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent-strong" />
                   )}
-                </div>
+                </button>
               ))}
+
+              {railHidden > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleImageClick(railImages[railVisible.length])}
+                  title={`Ещё ${railHidden}`}
+                  className="h-16 w-16 shrink-0 rounded-md bg-white/[0.06] ring-1 ring-white/10 text-xs font-mono text-zinc-200 hover:bg-white/[0.1] hover:text-white cursor-pointer transition-colors"
+                >
+                  +{railHidden}
+                </button>
+              )}
             </div>
           )}
         </div>
