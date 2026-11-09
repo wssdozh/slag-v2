@@ -54,4 +54,38 @@ test.describe('Feed surfaces: tone instead of borders, one motion per action', (
     await page.getByText('Удалить', { exact: true }).click();
     await expect(page.locator(`[data-flip-id="${cardId}"]`)).toHaveCount(0, { timeout: 5000 });
   });
+
+  test('5. the jump-to-bottom pill sits above the composer and the anchor lands flush', async ({ page }) => {
+    const geometry = () => page.evaluate(() => {
+      const list = document.querySelector('[data-testid="feed-list-container"]') as HTMLElement;
+      const cards = Array.from(document.querySelectorAll('[data-flip-id]')) as HTMLElement[];
+      const composer = (document.querySelector('[data-composer-root]') as HTMLElement).parentElement!;
+      const pill = document.querySelector('button[aria-label="Прокрутить к последним заметкам"]') as HTMLElement;
+      return {
+        dist: Math.round(list.scrollHeight - list.scrollTop - list.clientHeight),
+        lastBottom: Math.round(cards[cards.length - 1].getBoundingClientRect().bottom),
+        composerTop: Math.round(composer.getBoundingClientRect().top),
+        pillBottom: Math.round(pill.getBoundingClientRect().bottom),
+      };
+    });
+
+    await page.evaluate(() => {
+      const list = document.querySelector('[data-testid="feed-list-container"]') as HTMLElement;
+      list.scrollTop = list.scrollHeight - list.clientHeight - 300;
+    });
+    await page.waitForTimeout(300);
+
+    const floating = await geometry();
+    expect(floating.pillBottom).toBeLessThanOrEqual(floating.composerTop);
+    await page.screenshot({ path: 'test-results/screenshots/feed-scroll-pill-over-composer.png' });
+
+    await page.locator('button[aria-label="Прокрутить к последним заметкам"]').click();
+    await page.waitForTimeout(1200);
+
+    const anchored = await geometry();
+    expect(anchored.dist).toBe(0);
+    // Lands on the composer, not a gap above it and not underneath it.
+    expect(anchored.composerTop - anchored.lastBottom).toBeGreaterThanOrEqual(0);
+    expect(anchored.composerTop - anchored.lastBottom).toBeLessThanOrEqual(6);
+  });
 });

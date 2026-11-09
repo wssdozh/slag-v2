@@ -51,13 +51,33 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   // Окно всегда прижато к новым записям: размер — единственная ручка.
   const [windowSize, setWindowSize] = useState(WINDOW_CHUNK);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  // Композер висит над лентой, и его высота не константа: с вложениями и контролами таски он
+  // вырастает, и магические 104px оставляли последнюю карточку под ним. Меряем сам элемент.
+  const [composerInset, setComposerInset] = useState(0);
+
+  useLayoutEffect(() => {
+    // The composer is a sibling of the list inside the same pane, not a child of this component.
+    const pane = containerRef.current?.closest('main');
+    const wrapper = pane?.querySelector<HTMLElement>('[data-composer-root]')?.parentElement;
+    if (!wrapper) return;
+    const measure = () => {
+      const list = containerRef.current;
+      if (!list) return;
+      // Distance from the list's bottom edge to the composer's top: its height plus the gutter,
+      // whichever way the wrapper nests.
+      setComposerInset(Math.max(0, Math.round(list.getBoundingClientRect().bottom - wrapper.getBoundingClientRect().top)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, []);
 
   // Fast O(1) item lookup map for reply targets
   const itemMap = useMemo(() => new Map(items.map(i => [i.id, i])), [items]);
@@ -447,6 +467,9 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 flex flex-col gap-6 relative scrollbar-thin"
+        // Padding, not a spacer element: the column has a flex gap, so a spacer would add it too
+        // and the anchor would stop a gap short of the composer.
+        style={{ paddingBottom: hasBottomComposer ? 8 : (composerInset || 104) + 4 }}
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
@@ -558,9 +581,6 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
           </>
         )}
 
-        {/* Bottom spacer so the last card clears the composer with a clean gap */}
-        <div className={`${hasBottomComposer ? 'h-2' : 'h-[104px]'} shrink-0 pointer-events-none`} aria-hidden="true" />
-        <div ref={bottomAnchorRef} />
       </div>
 
       {/* Floating scroll to bottom button: centered comfortably above the composer island */}
@@ -568,7 +588,8 @@ export const FeedList: React.FC<{ hasBottomComposer?: boolean }> = ({ hasBottomC
           deleted on the first frame of the way back can only blink out. */}
       <div
         aria-hidden={!showScrollBottom}
-        className={`absolute ${hasBottomComposer ? 'bottom-2' : 'bottom-28'} inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
+        style={hasBottomComposer ? undefined : { bottom: (composerInset || 104) + 8 }}
+        className={`absolute ${hasBottomComposer ? 'bottom-2' : ''} inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
           showScrollBottom ? 'opacity-100' : 'opacity-0'
         }`}
       >
