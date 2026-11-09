@@ -4,20 +4,11 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import { accountClient } from '../../lib/sync/account';
 import { navigatePage } from '../../lib/navigation';
 import { acceptSharedVault } from '../../lib/sync/vaultSharing';
-import {
-  Sparkles,
-  Database,
-  Terminal,
-  Shield,
-  RotateCcw,
-  Sliders,
-  Keyboard,
-  Laptop,
-  Settings as SettingsIcon
-} from 'lucide-react';
+import { Database, Shield, Settings as SettingsIcon } from 'lucide-react';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { SettingsGroup, SettingsRow, SettingsDivider } from '../Settings/SettingsUI';
+import { SETTINGS_TABS } from '../../config/settingsTabs';
 
 export const MobileSettingsView: React.FC = () => {
   const {
@@ -27,7 +18,6 @@ export const MobileSettingsView: React.FC = () => {
     openSettingsModal,
     createVault,
     switchVault,
-    setIsLogViewerOpen,
     addToast
   } = useApp();
 
@@ -42,6 +32,10 @@ export const MobileSettingsView: React.FC = () => {
 
   const isLocked = syncStatus.authRequired && !accountClient.isAuthenticated();
   const account = accountState.account;
+  const planLabel = account?.planLabel || syncStatus.subscription.planLabel;
+  const usedCacheMb = account?.usedCacheMb ?? syncStatus.subscription.usedCacheMb;
+  const maxCacheMb = account?.maxCacheMb ?? syncStatus.subscription.maxCacheMb;
+  const cacheLabel = maxCacheMb >= 1024 ? `${Math.round(maxCacheMb / 1024)} ГБ` : `${maxCacheMb} МБ`;
 
   const handleAcceptInvitation = async (vaultId: string) => {
     const invitation = accountState.invitations.find((item) => item.vaultId === vaultId);
@@ -83,7 +77,19 @@ export const MobileSettingsView: React.FC = () => {
 
       {/* Main Settings List (Matching iOS/Telegram grouped style) */}
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">
-        <SettingsGroup title="Хранилище">
+        {/* Аккаунт первым: в настройки заходят проверить его, а не папки. */}
+        <SettingsGroup title="Аккаунт">
+          <SettingsRow
+            icon={<Shield className="w-4 h-4" />}
+            label={isLocked ? 'SLAG ID' : 'Личный кабинет'}
+            description={isLocked ? 'Войти · синхронизация и облачный ИИ' : `Тариф ${planLabel} · кеш ${usedCacheMb} МБ из ${cacheLabel}`}
+            testId={isLocked ? 'mobile-settings-login-btn' : 'mobile-settings-account-btn'}
+            onClick={() => navigatePage('account')}
+            chevron
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="Текущее хранилище">
           <SettingsRow icon={<Database className="w-4 h-4" />} label={vault.name || 'SLAG Vault'} description={`${folders.length} ${folders.length === 1 ? 'папка' : folders.length < 5 ? 'папки' : 'папок'} · ${items.length} ${items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}`} value="Obsidian" onClick={() => setIsVaultSwitcherOpen(true)} chevron />
         </SettingsGroup>
         <VaultSwitcherMenu isOpen={isVaultSwitcherOpen} onClose={() => setIsVaultSwitcherOpen(false)} variant="sheet" />
@@ -103,30 +109,17 @@ export const MobileSettingsView: React.FC = () => {
             ))}
           </SettingsGroup>
         )}
-        {isLocked && (
-          <SettingsGroup title="Аккаунт">
-            <SettingsRow icon={<Shield className="w-4 h-4" />} label="SLAG ID" description="Войти · синхронизация и облачный ИИ" testId="mobile-settings-login-btn" onClick={() => navigatePage('account')} chevron />
-          </SettingsGroup>
-        )}
-        {!isLocked && account && (
-          <SettingsGroup title="Аккаунт"><SettingsRow icon={<Shield className="w-4 h-4" />} label={account.planLabel || 'SLAG ID'} description="Аккаунт подключен" onClick={() => navigatePage('account')} chevron /></SettingsGroup>
-        )}
-        <SettingsGroup title="Параметры">
-          <SettingsRow icon={<Sparkles className="w-4 h-4" />} label="ИИ & Провайдеры" onClick={() => openSettingsModal('ai')} chevron />
-          <SettingsDivider inset />
-          <SettingsRow icon={<Database className="w-4 h-4" />} label="Хранилище & Бэкап" onClick={() => openSettingsModal('vault')} chevron />
-          <SettingsDivider inset />
-          <SettingsRow icon={<Laptop className="w-4 h-4" />} label="Устройства & Доступ" onClick={() => openSettingsModal('devices')} chevron />
-          <SettingsDivider inset />
-          <SettingsRow icon={<RotateCcw className="w-4 h-4" />} label="Синхронизация & Сервер" onClick={() => openSettingsModal('sync')} chevron />
-          <SettingsDivider inset />
-          <SettingsRow icon={<Sliders className="w-4 h-4" />} label="Интерфейс, масштаб и плотность" onClick={() => openSettingsModal('ui')} chevron />
-          <SettingsDivider inset />
-          <SettingsRow icon={<Keyboard className="w-4 h-4" />} label="Горячие клавиши" onClick={() => openSettingsModal('shortcuts')} chevron />
-        </SettingsGroup>
 
-        <SettingsGroup title="Отладка & Диагностика">
-          <SettingsRow icon={<Terminal className="w-4 h-4" />} label="Логи & Dev HUD" onClick={() => setIsLogViewerOpen(true)} chevron />
+        <SettingsGroup title="Настройки">
+          {SETTINGS_TABS.filter((tab) => tab.id !== 'account').map((tab, index) => {
+            const TabIcon = tab.icon;
+            return (
+              <React.Fragment key={tab.id}>
+                {index > 0 && <SettingsDivider inset />}
+                <SettingsRow icon={<TabIcon className="w-4 h-4" />} label={tab.label} testId={`mobile-settings-${tab.id}`} onClick={() => openSettingsModal(tab.id)} chevron />
+              </React.Fragment>
+            );
+          })}
         </SettingsGroup>
 
         {/* Version info footer */}

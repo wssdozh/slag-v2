@@ -244,7 +244,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await expect(page.getByRole('dialog', { name: 'Настройки', exact: true })).toBeHidden();
 
     // Open UI Scale & Density Settings
-    await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
+    await page.locator('button', { hasText: 'Интерфейс & Панели' }).click();
     await expect(page.locator('h3', { hasText: 'Настройки' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/28_settings_ui_modal.png' });
     await page.locator('button[title="Назад"]').click();
@@ -257,8 +257,8 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await page.locator('button[title="Назад"]').click();
     await expect(page.getByRole('dialog', { name: 'Настройки', exact: true })).toBeHidden();
 
-    // Open Log Modal / Dev HUD
-    await page.locator('button', { hasText: 'Логи & Dev HUD' }).click();
+    // Open Logs tab of the settings dialog
+    await page.locator('button', { hasText: 'Логи & Диагностика' }).click();
     await page.waitForTimeout(300);
     await page.screenshot({ path: 'test-results/screenshots/audit/30_log_viewer_modal.png' });
   });

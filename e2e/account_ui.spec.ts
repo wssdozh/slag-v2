@@ -144,10 +144,8 @@ test('hosted sync is locked without an account while local empty vault remains u
     await openCabinet(page, origin, accountHarness.relayUrl);
     await page.getByRole('button', { name: 'Открыть приложение', exact: true }).click();
     await page.getByTestId('sidebar-settings-btn').click();
-    await page.getByTestId('settings-tab-sync').click();
-    await expect(page.getByRole('heading', { name: 'Для синхронизации нужен SLAG ID' })).toBeVisible();
-    await expect(page.getByTestId('btn-open-pair-modal')).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Сменить ключ', exact: true })).toBeDisabled();
+    await page.getByTestId('settings-tab-account').click();
+    await expect(page.getByText('Требуется вход в аккаунт SLAG ID.')).toBeVisible();
     await expect(page.getByTestId('sync-open-account')).toBeEnabled();
     await page.screenshot({ path: 'test-results/screenshots/account-hosted-locked.png', fullPage: true });
     await page.getByTestId('sync-open-account').click();

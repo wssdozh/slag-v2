@@ -1,37 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Laptop,
-  RefreshCw,
-  PlugZap,
-  UserRound,
-} from 'lucide-react';
+import { RefreshCw, PlugZap } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { navigatePage } from '../../lib/navigation';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
 import { IconButton } from '../UI/IconButton';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
+/** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
-  const { setSettingsTab, addToast } = useApp();
+  const { addToast } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
-  const [accountState, setAccountState] = useState(accountClient.getState());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isTestingServer, setIsTestingServer] = useState(false);
 
-  const hosted = status.authRequired || accountClient.isAuthenticated();
   const locked = status.authRequired && !accountClient.isAuthenticated();
-  const account = accountState.account;
-  const sub = status.subscription;
 
   useEffect(() => syncEngine.subscribe((next) => {
     setStatus(next);
     setConfig(syncEngine.getConfig());
   }), []);
-
-  useEffect(() => accountClient.subscribe(setAccountState), []);
 
   useEffect(() => {
     void accountClient.detectServer(config.serverUrl);
@@ -54,33 +43,8 @@ export const SyncSettingsTab: React.FC = () => {
     }
   };
 
-  const activeDevices = account
-    ? accountState.devices.filter((device) => device.status === 'active').length
-    : 1 + config.trustedDevices.length;
-  const planLabel = account?.planLabel || sub.planLabel;
-  const maxDevices = account?.maxDevices ?? sub.maxDevices;
-  const usedCacheMb = account?.usedCacheMb ?? sub.usedCacheMb;
-  const maxCacheMb = account?.maxCacheMb ?? sub.maxCacheMb;
-  const limitsKnown = Boolean(account) || maxDevices > 0;
-
   return (
     <div className="flex flex-col gap-3">
-      {locked && (
-        <SettingsGroup title="SLAG ID">
-          <SettingsRow label="Синхронизация недоступна" description="Требуется вход в аккаунт SLAG ID." right={
-            <button type="button" data-testid="sync-open-account" onClick={() => navigatePage('account')} className="px-3 py-1.5 text-xs text-fg-primary rounded-md hover:bg-surface-hover cursor-pointer">Войти</button>
-          } />
-        </SettingsGroup>
-      )}
-
-      <SettingsGroup title="Аккаунт">
-        <SettingsRow label="Тариф" value={planLabel} />
-        <SettingsDivider />
-        <SettingsRow label="Срок действия" value={hosted ? (account ? (account.expiresAt ? <span className="font-mono">{new Date(account.expiresAt).toLocaleDateString('ru-RU')}</span> : 'Бессрочно') : 'Требуется вход') : 'Свой сервер'} />
-        <SettingsDivider />
-        <SettingsRow label="Кеш" value={limitsKnown ? <span className="font-mono">{usedCacheMb} МБ / {maxCacheMb >= 1024 ? `${Math.round(maxCacheMb / 1024)} ГБ` : `${maxCacheMb} МБ`}</span> : 'Не синхронизирован'} />
-      </SettingsGroup>
-
       <SettingsGroup title="Синхронизация" action={<span className="text-2xs font-mono text-fg-dim">E2EE</span>}>
         <SettingsRow label="Статус" description={
           <span role="status" className="flex flex-col gap-0.5 break-words">
@@ -103,11 +67,6 @@ export const SyncSettingsTab: React.FC = () => {
           { value: '10', label: '10 мин', testId: 'sync-interval-10' },
           { value: '30', label: '30 мин (эко)', testId: 'sync-interval-30' },
         ]} />
-      </SettingsGroup>
-
-      <SettingsGroup>
-        {hosted && !locked && <><SettingsRow icon={<UserRound className="w-4 h-4" />} label="Личный кабинет" onClick={() => navigatePage('account')} external /><SettingsDivider inset /></>}
-        <SettingsRow icon={<Laptop className="w-4 h-4" />} label="Подключённые устройства" value={<span className="font-mono">{limitsKnown ? `${activeDevices} из ${maxDevices}` : activeDevices}</span>} testId="sync-to-devices-btn" onClick={() => setSettingsTab('devices')} chevron />
       </SettingsGroup>
 
       <SettingsGroup title="Безопасность">

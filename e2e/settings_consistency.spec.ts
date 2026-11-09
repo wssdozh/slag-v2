@@ -15,10 +15,14 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     const dialog = page.getByRole('dialog', { name: 'Настройки', exact: true });
     // Desktop modal has no accessible name; use the tab container as a stable scope.
     const scope = viewport.width < 768 ? dialog : page.locator('.fixed.z-50').filter({ has: page.locator('[data-tab="ai"]') });
-    for (const tab of ['ai', 'vault', 'ui', 'shortcuts', 'sync', 'devices', 'logs']) {
+    for (const tab of ['account', 'ai', 'vault', 'ui', 'shortcuts', 'sync', 'devices', 'logs']) {
       await scope.locator(`[data-tab="${tab}"]`).click();
       if (tab === 'ai') await expect(scope.getByRole('button', { name: 'Сохранить', exact: true })).toBeVisible();
       else await expect(scope.getByRole('button', { name: 'Сохранить', exact: true })).toHaveCount(0);
+      if (tab === 'account') {
+        await expect(scope.getByText('Тариф', { exact: true })).toBeVisible();
+        await expect(scope.getByTestId('sync-to-devices-btn')).toHaveJSProperty('tagName', 'BUTTON');
+      }
       if (tab === 'ui') await expect(scope.getByText('Заголовок заметки или ключевая задача')).toHaveCount(viewport.width < 768 ? 0 : 1);
       if (tab === 'vault') {
         const toggle = scope.getByRole('switch', { name: 'Автобэкап раз в сутки' });
@@ -37,7 +41,6 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
         await expect(scope.getByRole('status')).toBeVisible();
         await expect(scope.getByRole('textbox', { name: 'Адрес сервера синхронизации' })).toHaveCSS('font-size', '12px');
         await expect(scope.getByRole('button', { name: 'Проверить', exact: true })).toHaveText('');
-        await expect(scope.getByTestId('sync-to-devices-btn')).toHaveJSProperty('tagName', 'BUTTON');
         await page.route('**/health', route => route.fulfill({ status: 503 }));
         await scope.getByRole('button', { name: 'Проверить', exact: true }).click();
         await expect(page.getByTestId('toast').filter({ hasText: 'Не удалось проверить сервер: HTTP 503' })).toBeVisible();

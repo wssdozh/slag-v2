@@ -9,23 +9,19 @@ import type { AiProvider } from '../../types';
 import {
   Settings,
   X,
-  Sparkles,
   Download,
   ExternalLink,
-  Database,
-  Sliders,
-  Keyboard,
-  Terminal,
-  ArrowLeft,
   Archive,
+  History,
+  Plus,
   Trash2,
-  RefreshCw,
-  Laptop
+  ArrowLeft
 } from 'lucide-react';
 import { LogViewer } from '../Logs/LogViewer';
 import { BaseModal } from './BaseModal';
 import { IconButton } from '../UI/IconButton';
 import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSwitch, SettingsSelect, SettingsNumber, SettingsInput } from '../Settings/SettingsUI';
+import { AccountSettingsTab } from '../Settings/AccountSettingsTab';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
 import { MobileDockSettings } from '../Settings/MobileDockSettings';
@@ -33,6 +29,7 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import type { AiSourceMode, SubscriptionAiTier } from '../../types';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
 import { FONT_SCALE_OPTIONS, FONT_FAMILY_OPTIONS } from '../../config/typography';
+import { SETTINGS_TABS, settingsTabLabel } from '../../config/settingsTabs';
 
 const DENSITY_OPTIONS = [
   { value: 'compact' as const, label: 'Компактный' },
@@ -279,111 +276,35 @@ export const SettingsModal: React.FC = () => {
         ref={tabsRef}
         className="flex md:flex-col overflow-x-auto md:overflow-visible md:w-48 border-b md:border-b-0 md:border-r border-border-subtle bg-panel p-2 gap-1 select-none shrink-0 scrollbar-none"
       >
-        <button
-          type="button"
-          data-tab="ai"
-          onClick={() => setActiveTab('ai')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
-            activeTab === 'ai'
-              ? 'bg-surface-active text-fg-primary font-medium'
-              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-          <span>ИИ & Провайдеры</span>
-        </button>
-
-        <button
-          type="button"
-          data-tab="vault"
-          onClick={() => setActiveTab('vault')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
-            activeTab === 'vault'
-              ? 'bg-surface-active text-fg-primary font-medium'
-              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-          }`}
-        >
-          <Database className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-          <span>Хранилище & Бэкап</span>
-        </button>
-
-        <button
-          type="button"
-          data-tab="devices"
-          onClick={() => setActiveTab('devices')}
-          data-testid="settings-tab-devices"
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
-            activeTab === 'devices'
-              ? 'bg-surface-active text-fg-primary font-medium'
-              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-          }`}
-        >
-          <Laptop className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-          <span>Устройства</span>
-        </button>
-
-        <button
-          type="button"
-          data-tab="sync"
-          onClick={() => setActiveTab('sync')}
-          data-testid="settings-tab-sync"
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
-            activeTab === 'sync'
-              ? 'bg-surface-active text-fg-primary font-medium'
-              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-          }`}
-        >
-          <RefreshCw className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-          <span>Синхронизация</span>
-        </button>
-
-        <button
-          type="button"
-          data-tab="ui"
-          onClick={() => setActiveTab('ui')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
-            activeTab === 'ui'
-              ? 'bg-surface-active text-fg-primary font-medium'
-              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-          }`}
-        >
-          <Sliders className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-          <span>Интерфейс & Панели</span>
-        </button>
-
-        <button
-          type="button"
-          data-tab="shortcuts"
-          onClick={() => setActiveTab('shortcuts')}
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
-            activeTab === 'shortcuts'
-              ? 'bg-surface-active text-fg-primary font-medium'
-              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-          }`}
-        >
-          <Keyboard className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-          <span>Горячие клавиши</span>
-        </button>
-
-        <button
-          type="button"
-          data-tab="logs"
-          onClick={() => setActiveTab('logs')}
-          data-testid="settings-tab-logs"
-          className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
-            activeTab === 'logs'
-              ? 'bg-surface-active text-fg-primary font-medium'
-              : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-          }`}
-        >
-          <Terminal className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-          <span>Логи & Диагностика</span>
-        </button>
+        {SETTINGS_TABS.map((tab) => {
+          const TabIcon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              data-tab={tab.id}
+              data-testid={`settings-tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+              className={`shrink-0 flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-xl text-xs transition-colors text-left whitespace-nowrap cursor-pointer motion-press ${
+                activeTab === tab.id
+                  ? 'bg-surface-active text-fg-primary font-medium'
+                  : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
+              }`}
+            >
+              <TabIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
           {/* Right Tab Content */}
           <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-panel">
             <div key={activeTab} className="flex-1 overflow-y-auto p-4 pb-8 sm:pb-4 motion-fade motion-settings-tab">
+              {activeTab === 'account' && (
+                <AccountSettingsTab />
+              )}
+
               {activeTab === 'ai' && (
                 <div className="flex flex-col gap-3">
                   {/* Top Switcher: Подписка vs Свой ключ */}
@@ -614,7 +535,7 @@ export const SettingsModal: React.FC = () => {
                   <SettingsRow
                     label="Последний снимок"
                     description={backupSettings.lastBackupAt ? <span className="font-mono">{new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU')}</span> : 'Ещё не создан'}
-                    right={<IconButton size="lg" data-testid="btn-create-snapshot" aria-label="Создать снимок" title="Создать снимок" aria-busy={isCreatingSnapshot} disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()}><Archive className={`w-4 h-4 ${isCreatingSnapshot ? 'motion-safe:animate-pulse' : ''}`} /></IconButton>}
+                    right={<IconButton size="lg" data-testid="btn-create-snapshot" aria-label="Создать снимок" title="Создать снимок" aria-busy={isCreatingSnapshot} disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()}><Plus className={`w-4 h-4 ${isCreatingSnapshot ? 'motion-safe:animate-pulse' : ''}`} /></IconButton>}
                   />
                 </SettingsGroup>
 
@@ -624,7 +545,7 @@ export const SettingsModal: React.FC = () => {
                       Точек восстановления пока нет. Создайте первый снимок или дождитесь автобэкапа.
                     </div>
                   ) : (
-                    <div className="flex flex-col divide-y divide-border-subtle max-h-56 overflow-y-auto">
+                    <div className="flex flex-col divide-y divide-border-subtle">
                       {backupSnapshots.map((snap) => {
                         const dateStr = new Date(snap.createdAt).toLocaleString('ru-RU', {
                           day: 'numeric',
@@ -634,55 +555,42 @@ export const SettingsModal: React.FC = () => {
                         });
                         const sizeKb = Math.round(snap.sizeBytes / 1024);
                         return (
-                          <div
+                          <SettingsRow
                             key={snap.id}
-                            data-testid={`snapshot-item-${snap.id}`}
-                            className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 sm:px-4 sm:py-3 hover:bg-surface-hover"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <Archive className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-                              <div className="flex flex-col min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-fg-primary truncate">{dateStr}</span>
-                                  <span className="text-2xs font-mono text-fg-muted">
-                                    {snap.trigger === 'auto' ? 'Авто' : 'Ручной'}
-                                  </span>
-                                </div>
-                                <div className="text-2xs font-mono text-fg-dim">
-                                  {snap.notesCount} зам. · {snap.attachmentsCount} мед. · {sizeKb} КБ
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                data-testid={`btn-restore-snapshot-${snap.id}`}
-                                onClick={() => handleRestoreSnapshot(snap.id)}
-                                disabled={isRestoring}
-                                className="px-2 py-1 rounded text-xs font-medium text-fg-secondary hover:text-fg-primary hover:bg-surface-hover transition-colors disabled:opacity-50 cursor-pointer"
-                                title="Восстановить хранилище из этого снимка"
-                              >
-                                Восстановить
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => downloadSnapshot(snap.id)}
-                                className="p-1.5 rounded text-fg-muted hover:text-fg-primary hover:bg-surface-hover transition-colors cursor-pointer"
-                                title="Скачать ZIP архива"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteSnapshot(snap.id)}
-                                className="p-1.5 rounded text-fg-dim hover:text-danger hover:bg-surface-hover transition-colors cursor-pointer"
-                                title="Удалить снимок"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
+                            testId={`snapshot-item-${snap.id}`}
+                            icon={<Archive className="w-3.5 h-3.5" />}
+                            label={
+                              <span className="flex items-baseline gap-2">
+                                <span className="truncate">{dateStr}</span>
+                                <span className="shrink-0 font-mono text-2xs text-fg-muted">
+                                  {snap.trigger === 'auto' ? 'Авто' : 'Ручной'}
+                                </span>
+                              </span>
+                            }
+                            description={<span className="font-mono">{snap.notesCount} зам. · {snap.attachmentsCount} мед. · {sizeKb} КБ</span>}
+                            right={
+                              <span className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  data-testid={`btn-restore-snapshot-${snap.id}`}
+                                  onClick={() => handleRestoreSnapshot(snap.id)}
+                                  disabled={isRestoring}
+                                  className="px-1.5 py-1 rounded-md font-medium text-fg-secondary hover:text-fg-primary hover:bg-surface-hover transition-colors disabled:opacity-50 cursor-pointer"
+                                  title="Восстановить хранилище из этого снимка"
+                                  aria-label={`Восстановить хранилище из снимка ${dateStr}`}
+                                >
+                                  <History className="w-4 h-4 sm:hidden" />
+                                  <span className="hidden text-xs sm:inline">Восстановить</span>
+                                </button>
+                                <IconButton size="lg" aria-label="Скачать ZIP архива" title="Скачать ZIP архива" onClick={() => downloadSnapshot(snap.id)}>
+                                  <Download className="w-4 h-4" />
+                                </IconButton>
+                                <IconButton size="lg" variant="danger" aria-label="Удалить снимок" title="Удалить снимок" onClick={() => deleteSnapshot(snap.id)}>
+                                  <Trash2 className="w-4 h-4" />
+                                </IconButton>
+                              </span>
+                            }
+                          />
                         );
                       })}
                     </div>
@@ -882,15 +790,7 @@ export const SettingsModal: React.FC = () => {
             <h3 className="text-sm font-semibold text-fg-primary">
               Настройки
               <span className="text-fg-dim font-normal ml-2">
-                / {
-                  activeTab === 'ai' ? 'ИИ & Провайдеры' :
-                  activeTab === 'vault' ? 'Хранилище & Бэкап' :
-                  activeTab === 'devices' ? 'Устройства' :
-                  activeTab === 'sync' ? 'Синхронизация' :
-                  activeTab === 'ui' ? 'Интерфейс & Панели' :
-                  activeTab === 'shortcuts' ? 'Горячие клавиши' :
-                  'Логи & Диагностика'
-                }
+                / {settingsTabLabel(activeTab)}
               </span>
             </h3>
           </div>

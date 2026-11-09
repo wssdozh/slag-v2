@@ -47,10 +47,14 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
 
-    // 4. Verify Unified Single Card (Subscription + Sync Status + Manual Sync button)
+    // 4. Verify the account card (plan, expiry, cache) lives in the "Аккаунт" tab
+    await settingsModal.getByTestId('settings-tab-account').click();
     await expect(settingsModal.getByText('Self-hosted', { exact: false }).first()).toBeVisible();
     await expect(settingsModal.getByText('Свой сервер', { exact: true })).toBeVisible();
     await expect(settingsModal.getByText('Кеш', { exact: true })).toBeVisible();
+
+    // 5. Back to sync: status row and manual sync button
+    await settingsModal.getByTestId('settings-tab-sync').click();
     await expect(settingsModal.getByRole('button', { name: 'Синхронизировать', exact: true })).toBeVisible();
 
     // Screenshot of Unified Header Card & Clean Sync Tab

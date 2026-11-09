@@ -276,7 +276,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('span', { hasText: 'Obsidian' }).first()).toBeVisible();
 
     // Dock lives in the Interface tab now, not on the settings root.
-    await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
+    await page.locator('button', { hasText: 'Интерфейс & Панели' }).click();
     await expect(page.locator('text=Нижняя панель (Dock)')).toBeVisible();
 
     // Verify active rows have checkmark and grip handle
@@ -438,8 +438,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
     await settingsTab.click();
 
-    // Click "Интерфейс, масштаб и плотность"
-    await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
+    // Click "Интерфейс & Панели"
+    await page.locator('button', { hasText: 'Интерфейс & Панели' }).click();
 
     // Verify UI settings panel opened
     await expect(page.getByTestId('font-scale-select')).toBeVisible();
@@ -614,7 +614,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
 
     // 2. Open Interface tab and locate "Плеер" row in dock customization
-    await page.locator('button', { hasText: 'Интерфейс, масштаб и плотность' }).click();
+    await page.locator('button', { hasText: 'Интерфейс & Панели' }).click();
     const audioPill = page.locator('[aria-label="Добавить Плеер"]');
     await expect(audioPill).toBeVisible();
     await audioPill.click();

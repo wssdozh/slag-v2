@@ -46,8 +46,7 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
 
     const syncTabBtn = settingsModal.locator('button[data-testid="settings-tab-sync"]');
     await syncTabBtn.click();
-    await expect(settingsModal.getByText('Self-hosted', { exact: false }).first()).toBeVisible({ timeout: 10000 });
-    await expect(settingsModal.locator('button', { hasText: 'Синхронизировать' })).toBeVisible();
+    await expect(settingsModal.getByRole('button', { name: 'Синхронизировать', exact: true })).toBeVisible();
 
     // 3. Test Sync Mode Toggle (Read-Write vs Receive-Only) on the current device
     const devicesTabBtn = settingsModal.locator('button[data-tab="devices"]');
