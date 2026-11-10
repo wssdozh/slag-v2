@@ -170,7 +170,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
             {searchQuery ? 'Ничего не найдено' : 'В списке нет треков'}
           </div>
         ) : (
-          filteredTracks.map((track, idx) => {
+          filteredTracks.map((track) => {
             const isCurrent = track.id === currentTrackId;
 
             return (
@@ -183,32 +183,32 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
                     : 'text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100'
                 }`}
               >
-                {/* Left: Index / Play Icon & Track Info */}
+                {/* Left: cover art & Track Info */}
                 <div className="flex items-center gap-3 min-w-0 pr-2">
-                  <div className="w-5 h-5 shrink-0 flex items-center justify-center text-zinc-500">
-                    {isCurrent ? (
-                      isPlaying ? (
-                        <Pause className="w-3.5 h-3.5 text-white fill-current" />
-                      ) : (
-                        <Play className="w-3.5 h-3.5 text-white fill-current ml-0.5" />
-                      )
+                  {/* The cover takes the number's place; hovering turns it into a play button. */}
+                  <div
+                    className={`relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-white/[0.06] ${
+                      isCurrent ? 'ring-1 ring-white/30' : ''
+                    }`}
+                  >
+                    {track.coverUrl ? (
+                      <img src={track.coverUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-[10px] font-mono group-hover:hidden">
-                        {idx + 1}
+                      <span className="flex h-full w-full items-center justify-center text-zinc-500">
+                        {track.isVoice ? (
+                          <Mic className="h-3.5 w-3.5" />
+                        ) : (
+                          <Music className="h-3.5 w-3.5" />
+                        )}
                       </span>
                     )}
-                    {!isCurrent && (
-                      <Play className="w-3 h-3 text-zinc-400 fill-current ml-0.5 hidden group-hover:block" />
-                    )}
-                  </div>
-
-                  {/* Icon */}
-                  <div className="shrink-0 w-6 h-6 rounded bg-white/[0.04] flex items-center justify-center text-zinc-400">
-                    {track.isVoice ? (
-                      <Mic className="w-3 h-3" />
-                    ) : (
-                      <Music className="w-3 h-3" />
-                    )}
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      {isCurrent && isPlaying ? (
+                        <Pause className="h-3.5 w-3.5 fill-current" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5 fill-current" />
+                      )}
+                    </span>
                   </div>
 
                   {/* Title & Note details */}

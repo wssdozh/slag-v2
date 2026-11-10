@@ -400,6 +400,8 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
       await expect(queue.getByRole('button', { name: label })).toBeVisible();
     }
     await expect(queue.getByRole('button', { name: 'Закрыть список' })).toBeVisible();
+    // The somewhere-to-look is the cover of the note the track came from.
+    await expect(queue.locator('img').first()).toBeVisible();
     await expect(page.locator('text=Очередь воспроизведения')).toHaveCount(0);
     // The field is a button until it is needed.
     await expect(queue.locator('input[type="text"]')).toHaveCount(0);
@@ -416,6 +418,17 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await expect(voiceTrackRow).toBeVisible();
     await voiceTrackRow.click();
     await expect(queue).toHaveCount(0);
+
+    // The mp3 carries a cover: make it current, reopen, and the row shows the art, not a number.
+    await queueBtn.click();
+    await expect(queue).toBeVisible();
+    await queue.locator('text=Never_Enough_The_Cure.mp3').click();
+    await expect(queue).toHaveCount(0);
+    await queueBtn.click();
+    await expect(queue).toBeVisible();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: 'test-results/screenshots/audio-queue-covers.png' });
+    await queue.getByRole('button', { name: 'Закрыть список' }).click();
 
     // Verify bottom bar utilities (speed, repeat, shuffle)
     const shuffleBtn = page.locator('button[aria-label="Перемешать"]');
