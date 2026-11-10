@@ -1,7 +1,6 @@
 import type { DockviewApi, IDockviewPanel } from 'dockview-react';
 import { logger } from '../../lib/logger';
 import { isDesktopApp, openDetachedWindow } from '../../lib/windowControls';
-import { crossFade } from '../../lib/motion';
 import {
   Layers,
   Kanban,
@@ -167,16 +166,34 @@ export const syncAllGroupConstraints = (api: DockviewApi, foldOnly = false) => {
     if (!foldOnly) applyGroupConstraints(api);
   };
 
-  // The snapshot layer cross-fades the old grid into the new one; `data-motion-swap` in theme.css
-  // owns the frames and the reduced-motion opt-out is inside `crossFade`.
+  // No view-transition snapshot here: folding a column is two moves, and a full-window snapshot of a
+  // live audio orb costs more than the layout change itself.
   isApplyingLayout = true;
-  crossFade(() => {
-    try {
-      apply();
-    } finally {
-      isApplyingLayout = false;
-    }
-  });
+  try {
+    apply();
+  } finally {
+    isApplyingLayout = false;
+  }
+};
+
+/**
+ * A layout saved in a narrower window keeps its pixel sizes, and restoring it into a wider one
+ * leaves a blank strip on the right (black on WebKit). Rescale the saved numbers to the container
+ * before handing them to dockview.
+ */
+export const scaleLayoutToWidth = (root: unknown, width: number): void => {
+  if (!root || typeof root !== 'object' || width <= 0) return;
+  const top = (root as { data?: { size?: number }[] }).data;
+  const total = Array.isArray(top) ? top.reduce((sum, node) => sum + (node.size ?? 0), 0) : 0;
+  if (total <= 0 || Math.abs(total - width) < 2) return;
+  const factor = width / total;
+  const scale = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    const entry = node as { size?: number; data?: unknown };
+    if (typeof entry.size === 'number') entry.size = Math.round(entry.size * factor);
+    if (Array.isArray(entry.data)) entry.data.forEach(scale);
+  };
+  scale(root);
 };
 
 let isDetaching = false;

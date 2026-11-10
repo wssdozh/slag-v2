@@ -115,3 +115,32 @@ test('a folded layout is never saved, so a reload brings the columns back', asyn
   await page.waitForTimeout(3000);
   expect((await groups(page)).length).toBeGreaterThanOrEqual(4);
 });
+
+test('a layout saved in a narrow window is stretched to the current one', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await setupSlag(page, testInfo);
+  await page.waitForTimeout(2500);
+
+  const key = 'slag_workspace_layout_v2';
+  const shrinkSizes = (storageKey: string) => {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return false;
+    const layout = JSON.parse(raw);
+    const walk = (node: { size?: number; data?: unknown[] }) => {
+      if (!node || typeof node !== 'object') return;
+      if (typeof node.size === 'number') node.size = Math.round(node.size * 0.6);
+      if (Array.isArray(node.data)) (node.data as { size?: number; data?: unknown[] }[]).forEach(walk);
+    };
+    walk(layout?.grid?.root);
+    localStorage.setItem(storageKey, JSON.stringify(layout));
+    return true;
+  };
+  expect(await page.evaluate(shrinkSizes, key)).toBe(true);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000);
+  const restored = await groups(page);
+  // 0.6 of 1600 is 960: without the rescale the grid stops at 960 and leaves a blank strip.
+  expect(restored.reduce((sum, group) => sum + group.width, 0)).toBeGreaterThan(1500);
+});

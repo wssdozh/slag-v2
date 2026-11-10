@@ -14,6 +14,7 @@ import {
   getPanelComponent,
   syncAllGroupConstraints,
   isDockLayoutFolded,
+  scaleLayoutToWidth,
   detachPanel,
 } from './dockPanelUtils';
 import { GroupHeaderActions } from './GroupHeaderActions';
@@ -121,6 +122,9 @@ export function useDockPanels({
                 }
               }
             }
+            // The saved pixel sizes belong to the window they were saved in; rescale them or the
+            // grid stops short of the right edge.
+            scaleLayoutToWidth(parsed?.grid?.root, api.width);
             api.fromJSON(parsed);
             syncAllGroupConstraints(api);
             restored = true;
