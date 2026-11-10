@@ -1,0 +1,1616 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>orb lab — три варианта</title>
+<!--
+  Лаборатория для настройки liquid orb без пересборки.
+
+  Открыть: http://127.0.0.1:5173/demo/orb-lab.html (если vite dev поднят)
+  или просто двойным кликом по файлу — импортов нет, работает из file://.
+
+  Панели:
+    как сейчас — дословная копия src/components/Audio/liquidOrb.ts (тёмный шов, тёмный rim);
+    a          — стоячие волны + растворяющиеся стыки;
+    b          — одно поле (smooth max) + цветовые зоны по весам;
+    c          — эквалайзер: радиус на каждом угле из 48 полос спектра.
+
+  Числовой масштаб тот же, что в проде: vUv = aPosition в клип-спейсе, радиусы 0.62/0.46/0.30.
+  Поэтому значения из слайдеров переносятся в liquidOrb.ts один в один.
+
+  Контракт юниформ: сеттер ставит всё, что пережило оптимизатор;
+  отсутствующие в шейдере имена просто пропускаются, так что шейдер можно править как угодно.
+
+    uTime, uVolume, uBass, uMid, uHigh, uFlux
+    uRadiusBack, uRadiusMid, uRadiusFront
+    uDeform, uSpeed, uLobes, uBreath, uEdge, uNoise
+    uReveal            (a, c)
+    uBlend, uMerge     (b)
+    uGain, uSpin       (c)
+    uSpectrum          (c, sampler2D: 48x1, 40 Гц — 14 кГц)
+    uAudioMix
+
+  Ctrl+Enter в редакторе перекомпилирует выбранную панель. Ошибка компиляции
+  показывается под редактором, старая программа продолжает рисоваться.
+-->
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #101012;
+    --panel: #17181a;
+    --line: rgba(255, 255, 255, 0.08);
+    --fg: #f4f4f5;
+    --fg-2: #9a9aa2;
+    --fg-3: #6a6a72;
+    --accent: #4f9bff;
+    --mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .hint {
+    margin: 0 0 20px;
+    color: var(--fg-3);
+    font-size: 12px;
+  }
+  .hint code {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-2);
+  }
+
+  .stage {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    max-width: 1240px;
+  }
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    padding: 10px;
+  }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .panel-head b { font-size: 12px; font-weight: 600; }
+  .panel-head span {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-3);
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    background: #000;
+  }
+  .fallback {
+    display: none;
+    aspect-ratio: 1;
+    place-items: center;
+    padding: 12px;
+    border-radius: 10px;
+    background: #000;
+    color: var(--fg-3);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .meters {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    max-width: 1240px;
+    margin: 14px 0 18px;
+  }
+  .meter span {
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-3);
+  }
+  .meter i {
+    display: block;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+  .meter b {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 28px;
+    max-width: 980px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .group h2 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 96px 1fr 42px;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+  }
+  .row > span { color: var(--fg-2); font-size: 12px; }
+  .row output {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-3);
+    text-align: right;
+  }
+  input[type="range"] {
+    width: 100%;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--accent);
+    background: transparent;
+  }
+  input[type="range"]:focus { outline: none; }
+
+  .seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  button {
+    font: inherit;
+    font-size: 12px;
+    color: var(--fg-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  button:hover { border-color: rgba(255, 255, 255, 0.18); color: var(--fg); }
+  button[aria-pressed="true"] {
+    color: var(--fg);
+    border-color: rgba(79, 155, 255, 0.55);
+    background: rgba(79, 155, 255, 0.12);
+  }
+  .quiet { color: var(--fg-3); font-size: 11px; margin: 6px 0 0; }
+
+  .editor {
+    max-width: 980px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  textarea {
+    display: block;
+    width: 100%;
+    height: 300px;
+    margin: 0 0 8px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #0c0d0f;
+    color: #cfd6e4;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    tab-size: 2;
+    resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: rgba(79, 155, 255, 0.4); }
+  #log {
+    margin: 0;
+    min-height: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-3);
+    white-space: pre-wrap;
+  }
+  #log.err { color: #ff8f8f; }
+  #log.ok { color: #8fe0a8; }
+</style>
+</head>
+<body>
+
+<h1>orb lab</h1>
+<p class="hint">
+  один clock и одни фичи на все три панели. правка glsl — <code>ctrl+enter</code>, страница не перезагружается.
+  состояние (слайдеры и шейдеры) лежит в <code>localStorage</code>.
+</p>
+
+<div class="stage">
+  <div class="panel">
+    <div class="panel-head"><b>как сейчас</b><span id="fps">—</span></div>
+    <canvas id="canvas-current"></canvas>
+    <div class="fallback" id="fallback-current">webgl недоступен</div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><b>a · волны</b></div>
+    <canvas id="canvas-a"></canvas>
+    <div class="fallback" id="fallback-a">webgl недоступен</div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><b>b · поле</b></div>
+    <canvas id="canvas-b"></canvas>
+    <div class="fallback" id="fallback-b">webgl недоступен</div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><b>c · эквалайзер</b></div>
+    <canvas id="canvas-c"></canvas>
+    <div class="fallback" id="fallback-c">webgl недоступен</div>
+  </div>
+</div>
+
+<div class="meters">
+  <div class="meter"><span>volume</span><i><b id="m-volume"></b></i></div>
+  <div class="meter"><span>bass</span><i><b id="m-bass"></b></i></div>
+  <div class="meter"><span>mid</span><i><b id="m-mid"></b></i></div>
+  <div class="meter"><span>high</span><i><b id="m-high"></b></i></div>
+  <div class="meter"><span>flux</span><i><b id="m-flux"></b></i></div>
+</div>
+
+<div class="controls">
+  <div class="group">
+    <h2>аудио</h2>
+    <div class="seg" id="modes">
+      <button type="button" data-mode="silence" aria-pressed="true">тишина</button>
+      <button type="button" data-mode="synth" aria-pressed="false">синтетика</button>
+      <button type="button" data-mode="mic" aria-pressed="false">микрофон</button>
+      <button type="button" data-mode="file" aria-pressed="false">файл</button>
+    </div>
+    <input type="file" id="file" accept="audio/*" hidden />
+    <p class="quiet">«тишина» отдаёт нули — смотреть чистую механику без звука.</p>
+    <div id="params-audio"></div>
+  </div>
+  <div class="group">
+    <h2>форма и слои</h2>
+    <div id="params-shape"></div>
+  </div>
+  <div class="group">
+    <h2>a · мягкие стыки</h2>
+    <div id="params-a"></div>
+  </div>
+  <div class="group">
+    <h2>b · поле и зоны</h2>
+    <div id="params-b"></div>
+  </div>
+  <div class="group">
+    <h2>c · эквалайзер</h2>
+    <div id="params-c"></div>
+  </div>
+</div>
+
+<div class="editor">
+  <div class="editor-head">
+    <div class="seg" id="editors">
+      <button type="button" data-editor="current" aria-pressed="true">как сейчас</button>
+      <button type="button" data-editor="a" aria-pressed="false">a</button>
+      <button type="button" data-editor="b" aria-pressed="false">b</button>
+      <button type="button" data-editor="c" aria-pressed="false">c</button>
+    </div>
+    <div class="seg">
+      <button type="button" id="compile">применить (ctrl+enter)</button>
+      <button type="button" id="copy-params">скопировать параметры</button>
+      <button type="button" id="reset">сброс</button>
+    </div>
+  </div>
+  <textarea id="glsl" spellcheck="false" autocomplete="off"></textarea>
+  <pre id="log"></pre>
+</div>
+
+<script>
+"use strict";
+
+const STORAGE_KEY = "slag.orbLab.v2";
+
+const VERTEX_SRC = `
+attribute vec2 aPosition;
+varying vec2 vUv;
+void main() {
+  vUv = aPosition;
+  gl_Position = vec4(aPosition, 0.0, 1.0);
+}
+`;
+
+/* ---------------------------------------------------------------------------
+   как сейчас: дословная копия FRAGMENT_SOURCE из src/components/Audio/liquidOrb.ts,
+   только базовые радиусы вынесены в юниформы, чтобы слайдеры слоёв работали на
+   всех панелях. при дефолтах 0.62/0.46/0.30 картинка совпадает с продом.
+   --------------------------------------------------------------------------- */
+const SHADER_CURRENT = `
+precision highp float;
+
+uniform float uTime, uVolume, uBass, uMid, uHigh, uFlux;
+uniform float uRadiusBack, uRadiusMid, uRadiusFront;
+varying vec2 vUv;
+
+vec3 orb(vec2 p, vec2 center, float base, float soft,
+         float amp1, float phase1, float freq1,
+         float amp2, float phase2, float freq2) {
+    vec2 d = p - center;
+    float r = length(d);
+    float ang = atan(d.y, d.x);
+    float radius = base + amp1 * cos(ang * freq1 + phase1) + amp2 * sin(ang * freq2 + phase2);
+    return vec3(1.0 - smoothstep(radius - soft, radius + soft, r), radius, r);
+}
+
+void main() {
+    vec2 p = vUv;
+    float t = uTime;
+
+    vec2 centerBack = vec2(0.010 * sin(t * 0.17), 0.008 * cos(t * 0.13))
+                    + vec2(uVolume * 0.006, 0.0);
+    vec2 centerMid = vec2(-0.008 * sin(t * 0.23 + 1.3), 0.010 * cos(t * 0.19 + 0.7));
+    vec2 centerFront = vec2(0.006 * sin(t * 0.31 + 2.7) + uFlux * 0.020,
+                            0.006 * cos(t * 0.27 + 1.9));
+
+    float breath = sin(t * 1.1) * 0.012;
+
+    vec3 back = orb(p, centerBack,
+        uRadiusBack + breath + uVolume * 0.07, 0.055,
+        0.060 + uVolume * 0.045, t * 0.23, 2.0,
+        0.045 + uBass * 0.035, t * 0.17 + 0.8, 3.0);
+
+    vec3 mid = orb(p, centerMid,
+        uRadiusMid + uBass * 0.06 + uVolume * 0.02, 0.045,
+        0.055 + uMid * 0.070, t * 0.47 + 0.5, 2.0,
+        0.050 + uBass * 0.070, t * 0.53 - 0.3, 3.0);
+
+    vec3 front = orb(p, centerFront,
+        uRadiusFront + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, 0.040,
+        0.035 + uHigh * 0.030, t * 0.90, 4.0,
+        0.030 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
+
+    vec3 seamMid = orb(p, centerMid,
+        uRadiusMid + uBass * 0.06 + uVolume * 0.02 + 0.020, 0.024,
+        0.055 + uMid * 0.070, t * 0.47 + 0.5, 2.0,
+        0.050 + uBass * 0.070, t * 0.53 - 0.3, 3.0);
+
+    vec3 seamFront = orb(p, centerFront,
+        uRadiusFront + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03 + 0.018, 0.022,
+        0.035 + uHigh * 0.030, t * 0.90, 4.0,
+        0.030 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
+
+    float backNd = clamp(back.z / back.y, 0.0, 1.0);
+    vec3 colBack = mix(vec3(0.20, 0.58, 0.98), vec3(0.03, 0.20, 0.55), smoothstep(0.0, 1.0, backNd));
+
+    float midNd = clamp(mid.z / mid.y, 0.0, 1.0);
+    vec3 colMid = mix(vec3(0.75, 0.98, 1.0), vec3(0.08, 0.50, 0.92), smoothstep(0.0, 1.0, midNd));
+
+    float frontNd = clamp(front.z / front.y, 0.0, 1.0);
+    vec3 colFront = mix(vec3(1.0), vec3(0.45, 0.88, 1.0), smoothstep(0.0, 1.0, frontNd));
+
+    colMid += vec3(0.40, 0.90, 1.0)
+            * smoothstep(mid.y - 0.10, mid.y - 0.01, mid.z)
+            * (0.06 + uHigh * 0.20);
+
+    float aBack = back.x;
+    float aMid = mid.x;
+    float aFront = front.x;
+
+    vec3 color = colBack * aBack;
+    float alpha = aBack;
+    color *= 1.0 - seamMid.x * 0.30;
+
+    color = colMid * aMid + color * (1.0 - aMid);
+    alpha = aMid + alpha * (1.0 - aMid);
+    color *= 1.0 - seamFront.x * 0.30;
+
+    color = colFront * aFront + color * (1.0 - aFront);
+    alpha = aFront + alpha * (1.0 - aFront);
+
+    if (alpha <= 0.004) {
+        discard;
+    }
+
+    gl_FragColor = vec4(color, alpha);
+}
+`;
+
+/* ---------------------------------------------------------------------------
+   вариант a. стоячие волны: лепестки не вращаются, у них дышит амплитуда.
+   стыки растворяются: широкий edge, никаких seam-масок, rim отдаёт альфу
+   вниз (reveal), а не темнеет.
+   --------------------------------------------------------------------------- */
+const SHADER_A = `
+precision highp float;
+
+uniform float uTime, uVolume, uBass, uMid, uHigh, uFlux;
+uniform float uRadiusBack, uRadiusMid, uRadiusFront;
+uniform float uDeform, uSpeed, uLobes, uBreath, uEdge, uReveal, uCrest, uNoise, uAudioMix;
+varying vec2 vUv;
+
+float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    return valueNoise(p) * 0.6 + valueNoise(p * 2.13 + 17.0) * 0.3 + valueNoise(p * 4.37 + 41.0) * 0.1;
+}
+
+float waveShape(float ang, float lobes, float phase, float speed, float lag) {
+    float a = cos(ang * lobes + phase) * sin(uTime * speed + lag);
+    float b = sin(ang * (lobes + 1.0) + phase * 1.7) * sin(uTime * speed * 1.7 + lag + 1.3);
+    return a + 0.55 * b;
+}
+
+vec3 layer(vec2 p, vec2 center, float base, float lobes, float phase, float speed, float lag,
+           float noiseSeed, float audioRadius, float audioDeform) {
+    vec2 d = p - center;
+    float r = length(d);
+    float ang = atan(d.y, d.x);
+    float amp = uDeform + audioDeform * uAudioMix;
+    // Шум в uv, а не по углу: именно поэтому силуэт не рассыпается на ровные
+    // лепестки, а мнётся как угодно — гармоника задаёт только общий ритм.
+    float n = fbm(p * 2.6 + vec2(noiseSeed, noiseSeed * 1.7) + vec2(0.0, uTime * 0.18)) - 0.5;
+    float radius = base * (1.0 + amp * waveShape(ang, lobes, phase, speed, lag)
+                               + uBreath * sin(uTime * 0.9 + lag))
+                 + n * uNoise * 2.0
+                 + audioRadius * uAudioMix;
+    float nd = clamp(r / max(radius, 1e-3), 0.0, 1.4);
+    float cover = 1.0 - smoothstep(radius - uEdge, radius + uEdge, r);
+    float rim = smoothstep(0.60, 1.0, nd);
+    return vec3(cover, nd, rim);
+}
+
+void main() {
+    vec2 p = vUv;
+    float t = uTime;
+
+    vec2 centerBack = vec2(0.010 * sin(t * 0.17), 0.008 * cos(t * 0.13))
+                    + vec2(uVolume * 0.006 * uAudioMix, 0.0);
+    vec2 centerMid = vec2(-0.008 * sin(t * 0.23 + 1.3), 0.010 * cos(t * 0.19 + 0.7));
+    vec2 centerFront = vec2(0.006 * sin(t * 0.31 + 2.7) + uFlux * 0.020 * uAudioMix,
+                            0.006 * cos(t * 0.27 + 1.9));
+
+    vec3 back  = layer(p, centerBack, uRadiusBack, uLobes, 0.0, uSpeed, 0.0,
+                       0.0, uVolume * 0.07, uVolume * 0.16);
+    vec3 mid   = layer(p, centerMid, uRadiusMid, uLobes + 1.0, 0.55, uSpeed * 0.82, -1.1,
+                       13.7, uBass * 0.06 + uVolume * 0.02, uBass * 0.18);
+    vec3 front = layer(p, centerFront, uRadiusFront, uLobes, 1.10, uSpeed * 1.16, -2.2,
+                       31.3, uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, uHigh * 0.14 + uMid * 0.10);
+
+    vec3 colBack = mix(vec3(0.22, 0.60, 1.0), vec3(0.04, 0.22, 0.62),
+                       smoothstep(0.0, 1.0, back.y) * 0.75);
+    vec3 colMid = mix(vec3(0.62, 0.96, 1.0), vec3(0.10, 0.52, 0.95),
+                      smoothstep(0.0, 1.0, mid.y) * 0.75);
+    vec3 colFront = mix(vec3(1.0), vec3(0.70, 0.95, 1.0),
+                        smoothstep(0.0, 1.0, front.y) * 0.70);
+
+    colMid += vec3(0.40, 0.90, 1.0) * mid.z * (0.05 + uHigh * 0.25 * uAudioMix) * uReveal;
+    colFront += vec3(0.75, 0.97, 1.0) * front.z * 0.10 * uReveal;
+
+    // Гребень: светлое кольцо у кромки каждого слоя. Не обводка, а свет на
+    // краю волны, поэтому мягкий и широкий — именно он показывает, что слоёв три.
+    colBack += vec3(0.42, 0.78, 1.0) * pow(back.z, 1.3) * uCrest * 0.55;
+    colMid += vec3(0.55, 0.90, 1.0) * pow(mid.z, 1.3) * uCrest * 0.75;
+    colFront += vec3(0.85, 0.98, 1.0) * pow(front.z, 1.3) * uCrest * 0.9;
+
+    float aBack = back.x * (1.0 - back.z * uReveal * 0.35);
+    float aMid = mid.x * (1.0 - mid.z * uReveal * 0.55);
+    float aFront = front.x * (1.0 - front.z * uReveal * 0.65);
+
+    vec3 color = colBack * aBack;
+    float alpha = aBack;
+
+    color = colMid * aMid + color * (1.0 - aMid);
+    alpha = aMid + alpha * (1.0 - aMid);
+
+    color = colFront * aFront + color * (1.0 - aFront);
+    alpha = aFront + alpha * (1.0 - aFront);
+
+    if (alpha <= 0.004) {
+        discard;
+    }
+
+    gl_FragColor = vec4(color, alpha);
+}
+`;
+
+/* ---------------------------------------------------------------------------
+   вариант b. один силуэт (smooth max трёх полей), внутри — не окклюзия,
+   а нормированные веса: зоны переходят друг в друга на ширине uBlend.
+   --------------------------------------------------------------------------- */
+const SHADER_B = `
+precision highp float;
+
+uniform float uTime, uVolume, uBass, uMid, uHigh, uFlux;
+uniform float uRadiusBack, uRadiusMid, uRadiusFront;
+uniform float uDeform, uSpeed, uLobes, uBreath, uEdge, uBlend, uMerge, uCrest, uNoise, uAudioMix;
+varying vec2 vUv;
+
+float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    return valueNoise(p) * 0.6 + valueNoise(p * 2.13 + 17.0) * 0.3 + valueNoise(p * 4.37 + 41.0) * 0.1;
+}
+
+float waveShape(float ang, float lobes, float phase, float speed, float lag) {
+    float a = cos(ang * lobes + phase) * sin(uTime * speed + lag);
+    float b = sin(ang * (lobes + 1.0) + phase * 1.7) * sin(uTime * speed * 1.7 + lag + 1.3);
+    return a + 0.55 * b;
+}
+
+vec3 fieldLayer(vec2 p, vec2 center, float base, float lobes, float phase, float speed, float lag,
+                float noiseSeed, float audioRadius, float audioDeform) {
+    vec2 d = p - center;
+    float r = length(d);
+    float ang = atan(d.y, d.x);
+    float amp = uDeform + audioDeform * uAudioMix;
+    float n = fbm(p * 2.6 + vec2(noiseSeed, noiseSeed * 1.7) + vec2(0.0, uTime * 0.18)) - 0.5;
+    float radius = base * (1.0 + amp * waveShape(ang, lobes, phase, speed, lag)
+                               + uBreath * sin(uTime * 0.9 + lag))
+                 + n * uNoise * 2.0
+                 + audioRadius * uAudioMix;
+    float nd = clamp(r / max(radius, 1e-3), 0.0, 1.4);
+    return vec3(radius - r, nd, smoothstep(0.60, 1.0, nd));
+}
+
+float smoothMax3(float a, float b, float c, float k) {
+    float ka = clamp(k * a, -30.0, 30.0);
+    float kb = clamp(k * b, -30.0, 30.0);
+    float kc = clamp(k * c, -30.0, 30.0);
+    return log(exp(ka) + exp(kb) + exp(kc)) / k;
+}
+
+void main() {
+    vec2 p = vUv;
+    float t = uTime;
+
+    vec2 centerBack = vec2(0.010 * sin(t * 0.17), 0.008 * cos(t * 0.13))
+                    + vec2(uVolume * 0.006 * uAudioMix, 0.0);
+    vec2 centerMid = vec2(-0.008 * sin(t * 0.23 + 1.3), 0.010 * cos(t * 0.19 + 0.7));
+    vec2 centerFront = vec2(0.006 * sin(t * 0.31 + 2.7) + uFlux * 0.020 * uAudioMix,
+                            0.006 * cos(t * 0.27 + 1.9));
+
+    vec3 fb = fieldLayer(p, centerBack, uRadiusBack, uLobes, 0.0, uSpeed, 0.0,
+                         0.0, uVolume * 0.07, uVolume * 0.16);
+    vec3 fm = fieldLayer(p, centerMid, uRadiusMid, uLobes + 1.0, 0.55, uSpeed * 0.82, -1.1,
+                         13.7, uBass * 0.06 + uVolume * 0.02, uBass * 0.18);
+    vec3 ff = fieldLayer(p, centerFront, uRadiusFront, uLobes, 1.10, uSpeed * 1.16, -2.2,
+                         31.3, uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, uHigh * 0.14 + uMid * 0.10);
+
+    float outer = smoothMax3(fb.x, fm.x, ff.x, uMerge);
+    float alpha = smoothstep(-uEdge, uEdge, outer);
+
+    // Зоны не смешиваются поровну (в центре все три поля >0, и среднее дало бы
+    // серую кашу): верхний слой просто перекрывает нижний, но с мягкой рамкой
+    // шириной uBlend, поэтому граница — не линия, а перелив.
+    float aMid = smoothstep(-uBlend, uBlend, fm.x);
+    float aFront = smoothstep(-uBlend, uBlend, ff.x);
+
+    vec3 colBack = mix(vec3(0.22, 0.60, 1.0), vec3(0.03, 0.18, 0.56),
+                       smoothstep(0.0, 1.0, fb.y) * 0.75);
+    vec3 colMid = mix(vec3(0.62, 0.96, 1.0), vec3(0.09, 0.48, 0.92),
+                      smoothstep(0.0, 1.0, fm.y) * 0.75);
+    vec3 colFront = mix(vec3(1.0), vec3(0.68, 0.94, 1.0),
+                        smoothstep(0.0, 1.0, ff.y) * 0.70);
+
+    colMid += vec3(0.40, 0.90, 1.0) * fm.z * (0.05 + uHigh * 0.25 * uAudioMix);
+
+    // У b гребень только на внутренних стыках: внешняя кромка — это уже одна
+    // общая поверхность, у неё нет «края верхнего слоя».
+    colMid += vec3(0.55, 0.90, 1.0) * pow(fm.z, 1.3) * uCrest * 0.75;
+    colFront += vec3(0.85, 0.98, 1.0) * pow(ff.z, 1.3) * uCrest * 0.9;
+
+    vec3 color = mix(colBack, colMid, aMid);
+    color = mix(color, colFront, aFront);
+
+    if (alpha <= 0.004) {
+        discard;
+    }
+
+    gl_FragColor = vec4(color * alpha, alpha);
+}
+`;
+
+/* ---------------------------------------------------------------------------
+   вариант c. эквалайзер: радиус в каждом угле берётся из спектра (текстура
+   uSpectrum, 48 полос 40 Гц — 14 кГц), а не из гармоники. Три слоя читают
+   одни и те же полосы со своим сдвигом и фазой, поэтому их кромки идут в
+   разных местах и переплетаются, а не лежат бубликами.
+   --------------------------------------------------------------------------- */
+const SHADER_C = `
+precision highp float;
+
+uniform float uTime, uVolume, uBass, uMid, uHigh, uFlux;
+uniform float uRadiusBack, uRadiusMid, uRadiusFront;
+uniform float uDeform, uSpeed, uLobes, uBreath, uEdge, uReveal, uCrest, uNoise, uGain, uSpin, uAudioMix;
+uniform sampler2D uSpectrum;
+varying vec2 vUv;
+
+const float PI = 3.1415926536;
+const float TAU = 6.2831853072;
+
+float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    return valueNoise(p) * 0.6 + valueNoise(p * 2.13 + 17.0) * 0.3 + valueNoise(p * 4.37 + 41.0) * 0.1;
+}
+
+// Спектр не периодичен по кругу, поэтому угол переводится в 0..1 через
+// зеркало: на стыке 0 и 1 значение одно и то же, шва нет.
+float bandAt(float angle, float shift) {
+    float u = fract((angle + PI) / TAU + uTime * uSpin + shift);
+    float mirrored = u < 0.5 ? u * 2.0 : (1.0 - u) * 2.0;
+    return texture2D(uSpectrum, vec2(mirrored, 0.5)).r;
+}
+
+vec3 eqLayer(vec2 p, vec2 center, float base, float shift, float phase, float lag,
+             float noiseSeed, float audioRadius, float audioDeform) {
+    vec2 d = p - center;
+    float r = length(d);
+    float ang = atan(d.y, d.x);
+    float band = bandAt(ang, shift);
+    float n = fbm(p * 2.6 + vec2(noiseSeed, noiseSeed * 1.7) + vec2(0.0, uTime * 0.18)) - 0.5;
+    float radius = base
+                 + uGain * band
+                 + base * (uDeform * 0.5 * cos(ang * uLobes + phase) * sin(uTime * uSpeed + lag)
+                           + uBreath * sin(uTime * 0.7 + lag))
+                 + n * uNoise * 2.0
+                 + audioRadius * uAudioMix;
+    float nd = clamp(r / max(radius, 1e-3), 0.0, 1.4);
+    float cover = 1.0 - smoothstep(radius - uEdge, radius + uEdge, r);
+    return vec3(cover, nd, smoothstep(0.60, 1.0, nd));
+}
+
+void main() {
+    vec2 p = vUv;
+    float t = uTime;
+
+    vec2 centerBack = vec2(0.010 * sin(t * 0.17), 0.008 * cos(t * 0.13));
+    vec2 centerMid = vec2(-0.008 * sin(t * 0.23 + 1.3), 0.010 * cos(t * 0.19 + 0.7));
+    vec2 centerFront = vec2(0.006 * sin(t * 0.31 + 2.7), 0.006 * cos(t * 0.27 + 1.9));
+
+    vec3 back  = eqLayer(p, centerBack, uRadiusBack, 0.00, 0.0, 0.0, 0.0,
+                         uVolume * 0.05, uVolume * 0.10);
+    vec3 mid   = eqLayer(p, centerMid, uRadiusMid, 0.33, 0.6, -0.9, 13.7,
+                         uBass * 0.05, uBass * 0.12);
+    vec3 front = eqLayer(p, centerFront, uRadiusFront, 0.66, 1.2, -1.8, 31.3,
+                         uMid * 0.04 + uFlux * 0.03, uHigh * 0.10);
+
+    vec3 colBack = mix(vec3(0.22, 0.60, 1.0), vec3(0.04, 0.22, 0.62),
+                       smoothstep(0.0, 1.0, back.y) * 0.75);
+    vec3 colMid = mix(vec3(0.62, 0.96, 1.0), vec3(0.10, 0.52, 0.95),
+                      smoothstep(0.0, 1.0, mid.y) * 0.75);
+    vec3 colFront = mix(vec3(1.0), vec3(0.70, 0.95, 1.0),
+                        smoothstep(0.0, 1.0, front.y) * 0.70);
+
+    colMid += vec3(0.40, 0.90, 1.0) * mid.z * (0.05 + uHigh * 0.25 * uAudioMix) * uReveal;
+    colFront += vec3(0.75, 0.97, 1.0) * front.z * 0.10 * uReveal;
+
+    colBack += vec3(0.42, 0.78, 1.0) * pow(back.z, 1.3) * uCrest * 0.55;
+    colMid += vec3(0.55, 0.90, 1.0) * pow(mid.z, 1.3) * uCrest * 0.75;
+    colFront += vec3(0.85, 0.98, 1.0) * pow(front.z, 1.3) * uCrest * 0.9;
+
+    float aBack = back.x * (1.0 - back.z * uReveal * 0.35);
+    float aMid = mid.x * (1.0 - mid.z * uReveal * 0.55);
+    float aFront = front.x * (1.0 - front.z * uReveal * 0.65);
+
+    vec3 color = colBack * aBack;
+    float alpha = aBack;
+
+    color = colMid * aMid + color * (1.0 - aMid);
+    alpha = aMid + alpha * (1.0 - aMid);
+
+    color = colFront * aFront + color * (1.0 - aFront);
+    alpha = aFront + alpha * (1.0 - aFront);
+
+    if (alpha <= 0.004) {
+        discard;
+    }
+
+    gl_FragColor = vec4(color, alpha);
+}
+`;
+
+const DEFAULT_SHADERS = {
+  current: SHADER_CURRENT,
+  a: SHADER_A,
+  b: SHADER_B,
+  c: SHADER_C,
+};
+
+const DEFAULT_PARAMS = {
+  radiusBack: 0.62,
+  radiusMid: 0.46,
+  radiusFront: 0.3,
+  deform: 0.12,
+  speed: 0.55,
+  lobes: 5,
+  breath: 0.02,
+  edge: 0.055,
+  reveal: 0.35,
+  crest: 0.15,
+  blend: 0.165,
+  merge: 25,
+  noise: 0.1,
+  gain: 0.2,
+  spin: 0.04,
+  audioMix: 1,
+};
+
+const PARAM_SPECS = [
+  { group: "audio", key: "audioMix", label: "audio mix", min: 0, max: 1, step: 0.01 },
+  { group: "shape", key: "radiusBack", label: "радиус back", min: 0.3, max: 0.78, step: 0.005 },
+  { group: "shape", key: "radiusMid", label: "радиус mid", min: 0.2, max: 0.66, step: 0.005 },
+  { group: "shape", key: "radiusFront", label: "радиус front", min: 0.12, max: 0.56, step: 0.005 },
+  { group: "shape", key: "deform", label: "деформация", min: 0, max: 0.3, step: 0.005 },
+  { group: "shape", key: "speed", label: "скорость", min: 0.05, max: 2, step: 0.01 },
+  { group: "shape", key: "lobes", label: "лепестки", min: 2, max: 5, step: 1 },
+  { group: "shape", key: "breath", label: "дыхание", min: 0, max: 0.06, step: 0.002 },
+  { group: "shape", key: "edge", label: "мягкость края", min: 0.02, max: 0.2, step: 0.005 },
+  { group: "shape", key: "crest", label: "гребень", min: 0, max: 1.5, step: 0.01 },
+  { group: "shape", key: "noise", label: "шум формы", min: 0, max: 0.2, step: 0.005 },
+  { group: "a", key: "reveal", label: "reveal rim", min: 0, max: 1, step: 0.01 },
+  { group: "b", key: "blend", label: "ширина зон", min: 0.02, max: 0.3, step: 0.005 },
+  { group: "b", key: "merge", label: "слипание", min: 4, max: 30, step: 1 },
+  { group: "c", key: "gain", label: "полосы", min: 0, max: 0.35, step: 0.005 },
+  { group: "c", key: "spin", label: "дрейф", min: -0.2, max: 0.2, step: 0.005 },
+];
+
+const GROUP_HOSTS = {
+  audio: document.getElementById("params-audio"),
+  shape: document.getElementById("params-shape"),
+  a: document.getElementById("params-a"),
+  b: document.getElementById("params-b"),
+  c: document.getElementById("params-c"),
+};
+
+const state = {
+  params: { ...DEFAULT_PARAMS },
+  shaders: { ...DEFAULT_SHADERS },
+  mode: "silence",
+  editor: "current",
+};
+
+const canvases = {
+  current: document.getElementById("canvas-current"),
+  a: document.getElementById("canvas-a"),
+  b: document.getElementById("canvas-b"),
+  c: document.getElementById("canvas-c"),
+};
+
+const logEl = document.getElementById("log");
+const textarea = document.getElementById("glsl");
+
+function setLog(message, kind) {
+  logEl.textContent = message;
+  logEl.className = kind || "";
+}
+
+/* ------------------------------ persistence ------------------------------ */
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      params: state.params,
+      shaders: state.shaders,
+      mode: state.mode,
+    }));
+  } catch {
+    /* приватный режим или запрещённое хранилище: живём без сохранения */
+  }
+}
+
+function restore() {
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+  } catch {
+    stored = null;
+  }
+  if (!stored || typeof stored !== "object") return;
+
+  if (stored.params && typeof stored.params === "object") {
+    for (const key of Object.keys(DEFAULT_PARAMS)) {
+      const value = Number(stored.params[key]);
+      if (Number.isFinite(value)) state.params[key] = value;
+    }
+  }
+  if (stored.shaders && typeof stored.shaders === "object") {
+    for (const key of Object.keys(DEFAULT_SHADERS)) {
+      if (typeof stored.shaders[key] === "string" && stored.shaders[key].length > 40) {
+        state.shaders[key] = stored.shaders[key];
+      }
+    }
+  }
+  if (typeof stored.mode === "string") state.mode = stored.mode;
+}
+
+/* --------------------------------- sliders -------------------------------- */
+
+const sliders = new Map();
+
+function buildParams() {
+  for (const spec of PARAM_SPECS) {
+    const host = GROUP_HOSTS[spec.group];
+    const row = document.createElement("label");
+    row.className = "row";
+
+    const name = document.createElement("span");
+    name.textContent = spec.label;
+
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = String(spec.min);
+    input.max = String(spec.max);
+    input.step = String(spec.step);
+    input.dataset.key = spec.key;
+    input.value = String(state.params[spec.key]);
+
+    const out = document.createElement("output");
+    out.textContent = formatValue(state.params[spec.key]);
+
+    input.addEventListener("input", () => {
+      const value = Number(input.value);
+      state.params[spec.key] = value;
+      out.textContent = formatValue(value);
+      save();
+    });
+
+    row.append(name, input, out);
+    host.append(row);
+    sliders.set(spec.key, { input, out });
+  }
+}
+
+function formatValue(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function syncSliders() {
+  for (const [key, { input, out }] of sliders) {
+    input.value = String(state.params[key]);
+    out.textContent = formatValue(state.params[key]);
+  }
+}
+
+/* -------------------------------- renderer -------------------------------- */
+
+/* Полос эквалайзера: ровно столько же пикселей в спектральной текстуре. */
+const SPECTRUM_BANDS = 48;
+
+function createRenderer(canvas) {
+  const gl = canvas.getContext("webgl", { alpha: true, antialias: true, premultipliedAlpha: true });
+  if (!gl) return null;
+
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+
+  // Спектр для варианта c: одна строка текстуры, обновляется из байтов.
+  const spectrumTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, spectrumTexture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, SPECTRUM_BANDS, 1, 0, gl.LUMINANCE,
+    gl.UNSIGNED_BYTE, new Uint8Array(SPECTRUM_BANDS));
+
+  let program = null;
+  let locations = new Map();
+  let width = 0;
+  let height = 0;
+
+  const compile = (type, source) => {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const info = gl.getShaderInfoLog(shader) || "нет info log";
+      gl.deleteShader(shader);
+      return { shader: null, info };
+    }
+    return { shader, info: "" };
+  };
+
+  const build = (fragmentSource) => {
+    const vs = compile(gl.VERTEX_SHADER, VERTEX_SRC);
+    if (!vs.shader) return { program: null, info: "vertex: " + vs.info };
+    const fs = compile(gl.FRAGMENT_SHADER, fragmentSource);
+    if (!fs.shader) {
+      gl.deleteShader(vs.shader);
+      return { program: null, info: fs.info };
+    }
+    const next = gl.createProgram();
+    gl.attachShader(next, vs.shader);
+    gl.attachShader(next, fs.shader);
+    gl.linkProgram(next);
+    gl.deleteShader(vs.shader);
+    gl.deleteShader(fs.shader);
+    if (!gl.getProgramParameter(next, gl.LINK_STATUS)) {
+      const info = gl.getProgramInfoLog(next) || "линковка не удалась";
+      gl.deleteProgram(next);
+      return { program: null, info };
+    }
+    return { program: next, info: "" };
+  };
+
+  const activate = (next) => {
+    if (program) gl.deleteProgram(program);
+    program = next;
+    locations = new Map();
+    gl.useProgram(program);
+    const position = gl.getAttribLocation(program, "aPosition");
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+  };
+
+  return {
+    apply(source) {
+      const result = build(source);
+      if (!result.program) return result;
+      activate(result.program);
+      return result;
+    },
+    draw(values, spectrum) {
+      if (!program) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const nextWidth = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+      const nextHeight = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+      if (nextWidth !== width || nextHeight !== height) {
+        width = nextWidth;
+        height = nextHeight;
+        canvas.width = width;
+        canvas.height = height;
+        gl.viewport(0, 0, width, height);
+      }
+
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, spectrumTexture);
+      if (spectrum) {
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, SPECTRUM_BANDS, 1, gl.LUMINANCE,
+          gl.UNSIGNED_BYTE, spectrum);
+      }
+
+      for (const name of Object.keys(values)) {
+        let location = locations.get(name);
+        if (location === undefined) {
+          location = gl.getUniformLocation(program, name) || null;
+          locations.set(name, location);
+        }
+        if (location) gl.uniform1f(location, values[name]);
+      }
+
+      let sampler = locations.get("uSpectrum");
+      if (sampler === undefined) {
+        sampler = gl.getUniformLocation(program, "uSpectrum") || null;
+        locations.set("uSpectrum", sampler);
+      }
+      if (sampler) gl.uniform1i(sampler, 0);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    },
+  };
+}
+
+const renderers = {};
+for (const key of Object.keys(canvases)) {
+  const renderer = createRenderer(canvases[key]);
+  renderers[key] = renderer;
+  if (!renderer) {
+    canvases[key].style.display = "none";
+    const fallback = document.getElementById("fallback-" + key);
+    if (fallback) fallback.style.display = "grid";
+    continue;
+  }
+  const result = renderer.apply(state.shaders[key]);
+  if (!result.program) setLog(key + ": " + result.info, "err");
+}
+
+/* ------------------------------ audio pipeline ----------------------------- */
+
+/**
+ * Копия математики из src/lib/media/audioSpectrum.ts: линейные магнитуды,
+ * энергия полосы как sqrt(sum(mag^2)), сжатие log1p, RMS, относительный flux
+ * и асимметричные огибающие в секундах. Держать в синхроне с оригиналом.
+ */
+const BAND_HZ = { bass: [30, 250], mid: [250, 4000], high: [4000, 12000] };
+const COMPRESSION = 0.01;
+const LOG_CEIL = Math.log1p(1 / COMPRESSION);
+const FLUX_GATE = 0.06;
+const ENVELOPE = {
+  volume: { attack: 0.025, release: 0.3 },
+  bass: { attack: 0.03, release: 0.28 },
+  mid: { attack: 0.04, release: 0.22 },
+  high: { attack: 0.015, release: 0.12 },
+  flux: { attack: 0.008, release: 0.14 },
+};
+const MAX_STEP_S = 0.1;
+const ZERO = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0 };
+const SILENT_SPECTRUM = new Uint8Array(SPECTRUM_BANDS);
+
+function clamp01(value) {
+  return value < 0 ? 0 : value > 1 ? 1 : value;
+}
+
+function compress(magnitude) {
+  if (!(magnitude > 0)) return 0;
+  return clamp01(Math.log1p(magnitude / COMPRESSION) / LOG_CEIL);
+}
+
+function damp(current, target, attack, release, dt) {
+  const tau = target > current ? attack : release;
+  return current + (target - current) * (1 - Math.exp(-dt / tau));
+}
+
+function binRange(analyser, lowHz, highHz) {
+  const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
+  return {
+    start: Math.max(0, Math.floor(lowHz / hzPerBin)),
+    end: Math.min(analyser.frequencyBinCount, Math.ceil(highHz / hzPerBin)),
+  };
+}
+
+function bandMagnitude(data, range) {
+  if (range.end <= range.start) return 0;
+  let power = 0;
+  for (let i = range.start; i < range.end; i++) power += data[i] * data[i];
+  return Math.sqrt(power);
+}
+
+function rms(data) {
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+  return Math.sqrt(sum / data.length);
+}
+
+function createReader(analyser) {
+  const frequencyData = new Float32Array(analyser.frequencyBinCount);
+  const timeData = new Float32Array(analyser.fftSize);
+  const magnitudes = new Float32Array(analyser.frequencyBinCount);
+  const previous = new Float32Array(analyser.frequencyBinCount);
+  const bassRange = binRange(analyser, BAND_HZ.bass[0], BAND_HZ.bass[1]);
+  const midRange = binRange(analyser, BAND_HZ.mid[0], BAND_HZ.mid[1]);
+  const highRange = binRange(analyser, BAND_HZ.high[0], BAND_HZ.high[1]);
+
+  let hasPrevious = false;
+  let current = { ...ZERO };
+
+  return {
+    reset() {
+      current = { ...ZERO };
+      previous.fill(0);
+      hasPrevious = false;
+    },
+    read(dt, active) {
+      const step = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), MAX_STEP_S) : 0;
+      let volume = 0;
+      let bass = 0;
+      let mid = 0;
+      let high = 0;
+      let flux = 0;
+
+      if (active) {
+        analyser.getFloatFrequencyData(frequencyData);
+        analyser.getFloatTimeDomainData(timeData);
+
+        for (let i = 0; i < magnitudes.length; i++) {
+          magnitudes[i] = Math.pow(10, frequencyData[i] / 20);
+        }
+
+        volume = compress(rms(timeData));
+        bass = compress(bandMagnitude(magnitudes, bassRange));
+        mid = compress(bandMagnitude(magnitudes, midRange));
+        high = compress(bandMagnitude(magnitudes, highRange));
+
+        if (hasPrevious) {
+          let positive = 0;
+          let total = 0;
+          for (let i = 0; i < magnitudes.length; i++) {
+            const delta = magnitudes[i] - previous[i];
+            if (delta > 0) positive += delta;
+            total += magnitudes[i];
+          }
+          flux = total > 1e-6 ? clamp01(positive / total) : 0;
+        }
+
+        previous.set(magnitudes);
+        hasPrevious = true;
+
+        if (volume < FLUX_GATE) flux = 0;
+      }
+
+      current = {
+        volume: damp(current.volume, volume, ENVELOPE.volume.attack, ENVELOPE.volume.release, step),
+        bass: damp(current.bass, bass, ENVELOPE.bass.attack, ENVELOPE.bass.release, step),
+        mid: damp(current.mid, mid, ENVELOPE.mid.attack, ENVELOPE.mid.release, step),
+        high: damp(current.high, high, ENVELOPE.high.attack, ENVELOPE.high.release, step),
+        flux: damp(current.flux, flux, ENVELOPE.flux.attack, ENVELOPE.flux.release, step),
+      };
+      return current;
+    },
+  };
+}
+
+/** Те же 48 полос в байты 0..255: их читает спектральная текстура варианта c. */
+function createSpectrumMeter(analyser) {
+  const frequencies = new Float32Array(analyser.frequencyBinCount);
+  const bands = new Uint8Array(SPECTRUM_BANDS);
+  const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
+  const edges = [];
+  for (let index = 0; index <= SPECTRUM_BANDS; index += 1) {
+    edges.push((Math.pow(14000 / 40, index / SPECTRUM_BANDS) * 40) / hzPerBin);
+  }
+
+  return () => {
+    analyser.getFloatFrequencyData(frequencies);
+    for (let band = 0; band < SPECTRUM_BANDS; band += 1) {
+      const start = Math.max(0, Math.floor(edges[band]));
+      const end = Math.min(frequencies.length, Math.ceil(edges[band + 1]));
+      let power = 0;
+      for (let index = start; index < end; index += 1) {
+        const magnitude = Math.pow(10, frequencies[index] / 20);
+        power += magnitude * magnitude;
+      }
+      bands[band] = Math.round(compress(Math.sqrt(power)) * 255);
+    }
+    return bands;
+  };
+}
+
+const audio = {
+  ctx: null,
+  analyser: null,
+  reader: null,
+  spectrum: null,
+  master: null,
+  synth: null,
+  element: null,
+  elementSource: null,
+  micStream: null,
+  micSource: null,
+  mode: "silence",
+  cycleStart: 0,
+};
+
+async function ensureAudio() {
+  if (!audio.ctx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return false;
+    const ctx = new Ctx();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0;
+    analyser.minDecibels = -100;
+    analyser.maxDecibels = 0;
+    const master = ctx.createGain();
+    master.gain.value = 0.8;
+    master.connect(analyser);
+    analyser.connect(ctx.destination);
+    audio.ctx = ctx;
+    audio.analyser = analyser;
+    audio.master = master;
+    audio.reader = createReader(analyser);
+    audio.spectrum = createSpectrumMeter(analyser);
+    audio.cycleStart = performance.now();
+  }
+  if (audio.ctx.state !== "running") {
+    try {
+      await audio.ctx.resume();
+    } catch {
+      /* браузер не дал resume без жеста — режим просто не зазвучит */
+    }
+  }
+  return true;
+}
+
+/**
+ * Синтетический спектр: банк осцилляторов по логарифмической сетке. Гейны
+ * переезжают независимо, поэтому полосы скачут по отдельности, как в треке.
+ */
+const SYNTH_FREQS = [70, 110, 180, 320, 550, 900, 1500, 2600, 4200, 6800, 10000];
+
+function buildSynth() {
+  const ctx = audio.ctx;
+  const bus = ctx.createGain();
+  bus.gain.value = 0.5;
+  bus.connect(audio.master);
+
+  const voices = SYNTH_FREQS.map((frequency, index) => {
+    const oscillator = ctx.createOscillator();
+    oscillator.type = index % 2 === 0 ? "sine" : "triangle";
+    oscillator.frequency.value = frequency;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    oscillator.connect(gain).connect(bus);
+    oscillator.start();
+    return { frequency, gain, target: 0 };
+  });
+
+  audio.synth = { bus, voices };
+  audio.cycleStart = performance.now();
+
+  window.setInterval(() => {
+    if (!audio.synth || !audio.ctx) return;
+    const on = audio.mode === "synth";
+    const now = audio.ctx.currentTime;
+    const speech = 0.45 + 0.55 * Math.abs(Math.sin(now * 1.1));
+    for (const voice of audio.synth.voices) {
+      if (on && Math.random() < 0.35) {
+        // Низы чаще громкие, верха тише — как в реальном спектре.
+        const tilt = 1 - (Math.log(voice.frequency / 70) / Math.log(10000 / 70)) * 0.55;
+        voice.target = Math.random() * tilt;
+      }
+      voice.gain.gain.setTargetAtTime(on ? voice.target * speech * 0.35 : 0, now, on ? 0.05 : 0.02);
+    }
+  }, 90);
+}
+
+async function startMic() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audio.micStream = stream;
+    audio.micSource = audio.ctx.createMediaStreamSource(stream);
+    audio.micSource.connect(audio.master);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function stopMic() {
+  if (audio.micSource) {
+    try {
+      audio.micSource.disconnect();
+    } catch {
+      /* уже отключён */
+    }
+    audio.micSource = null;
+  }
+  if (audio.micStream) {
+    for (const track of audio.micStream.getTracks()) track.stop();
+    audio.micStream = null;
+  }
+}
+
+function ensureElement() {
+  if (!audio.element) {
+    const element = new Audio();
+    element.loop = true;
+    audio.element = element;
+  }
+  if (!audio.elementSource) {
+    audio.elementSource = audio.ctx.createMediaElementSource(audio.element);
+    audio.elementSource.connect(audio.master);
+  }
+  return audio.element;
+}
+
+function syncModeButtons() {
+  for (const button of document.querySelectorAll("#modes button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.mode === state.mode));
+  }
+}
+
+async function setMode(mode) {
+  state.mode = mode;
+  audio.mode = mode;
+  syncModeButtons();
+  save();
+
+  if (mode === "silence") {
+    if (audio.reader) audio.reader.reset();
+    stopMic();
+    if (audio.element) audio.element.pause();
+    return;
+  }
+
+  const ready = await ensureAudio();
+  if (!ready) {
+    setLog("audiocontext недоступен в этом браузере", "err");
+    return;
+  }
+
+  if (mode === "synth") {
+    if (!audio.synth) buildSynth();
+    audio.cycleStart = performance.now();
+    setLog("синтетика: банк осцилляторов 70 гц — 10 кгц", "ok");
+    return;
+  }
+
+  if (mode === "mic") {
+    const ok = await startMic();
+    if (!ok) {
+      setLog("микрофон не дали — остаёмся в тишине", "err");
+      await setMode("silence");
+      return;
+    }
+    setLog("микрофон подключён", "ok");
+    return;
+  }
+
+  if (mode === "file") {
+    const element = ensureElement();
+    if (!element.src) {
+      document.getElementById("file").click();
+      return;
+    }
+    try {
+      await element.play();
+      setLog("файл играет", "ok");
+    } catch {
+      setLog("не удалось запустить файл — выбери его ещё раз", "err");
+    }
+  }
+}
+
+/* -------------------------------- the loop -------------------------------- */
+
+const bars = {
+  volume: document.getElementById("m-volume"),
+  bass: document.getElementById("m-bass"),
+  mid: document.getElementById("m-mid"),
+  high: document.getElementById("m-high"),
+  flux: document.getElementById("m-flux"),
+};
+
+let raf = 0;
+let lastFrame = performance.now();
+let seconds = 0;
+let frameCount = 0;
+let fpsWindow = 0;
+let fpsShown = 0;
+const fpsEl = document.getElementById("fps");
+
+function uniformValues(time, features) {
+  const p = state.params;
+  return {
+    uTime: time,
+    uVolume: features.volume,
+    uBass: features.bass,
+    uMid: features.mid,
+    uHigh: features.high,
+    uFlux: features.flux,
+    uRadiusBack: p.radiusBack,
+    uRadiusMid: p.radiusMid,
+    uRadiusFront: p.radiusFront,
+    uDeform: p.deform,
+    uSpeed: p.speed,
+    uLobes: Math.round(p.lobes),
+    uBreath: p.breath,
+    uEdge: p.edge,
+    uReveal: p.reveal,
+    uCrest: p.crest,
+    uNoise: p.noise,
+    uGain: p.gain,
+    uSpin: p.spin,
+    uBlend: p.blend,
+    uMerge: p.merge,
+    uAudioMix: p.audioMix,
+  };
+}
+
+function paint(features) {
+  for (const key of Object.keys(bars)) {
+    bars[key].style.width = Math.round(clamp01(features[key]) * 100) + "%";
+  }
+}
+
+function frame(now) {
+  if (document.hidden) {
+    raf = 0;
+    return;
+  }
+
+  const dt = Math.min(Math.max((now - lastFrame) / 1000, 0), 0.05);
+  lastFrame = now;
+  seconds += dt;
+
+  const active = audio.mode !== "silence" && audio.reader !== null;
+  const features = audio.reader ? audio.reader.read(dt, active) : ZERO;
+  const spectrum = active && audio.spectrum ? audio.spectrum() : SILENT_SPECTRUM;
+  const values = uniformValues(seconds, features);
+
+  for (const key of Object.keys(renderers)) {
+    const renderer = renderers[key];
+    if (renderer) renderer.draw(values, spectrum);
+  }
+
+  paint(features);
+
+  frameCount += 1;
+  fpsWindow += dt;
+  if (fpsWindow >= 0.5) {
+    fpsShown = Math.round(frameCount / fpsWindow);
+    frameCount = 0;
+    fpsWindow = 0;
+    fpsEl.textContent = fpsShown + " fps";
+  }
+
+  raf = window.requestAnimationFrame(frame);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || raf) return;
+  lastFrame = performance.now();
+  raf = window.requestAnimationFrame(frame);
+});
+
+/* --------------------------------- editors -------------------------------- */
+
+function syncEditorButtons() {
+  for (const button of document.querySelectorAll("#editors button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.editor === state.editor));
+  }
+}
+
+function showEditor(key) {
+  state.shaders[state.editor] = textarea.value;
+  state.editor = key;
+  textarea.value = state.shaders[key];
+  syncEditorButtons();
+  setLog("");
+}
+
+function compileActive() {
+  const key = state.editor;
+  const source = textarea.value;
+  const renderer = renderers[key];
+  if (!renderer) {
+    setLog("webgl недоступен, компилировать некуда", "err");
+    return;
+  }
+  const result = renderer.apply(source);
+  if (!result.program) {
+    setLog(key + ": " + result.info, "err");
+    return;
+  }
+  state.shaders[key] = source;
+  save();
+  setLog(key + ": скомпилировано", "ok");
+}
+
+/* --------------------------------- wiring --------------------------------- */
+
+for (const button of document.querySelectorAll("#modes button")) {
+  button.addEventListener("click", () => {
+    void setMode(button.dataset.mode);
+  });
+}
+
+for (const button of document.querySelectorAll("#editors button")) {
+  button.addEventListener("click", () => showEditor(button.dataset.editor));
+}
+
+document.getElementById("compile").addEventListener("click", compileActive);
+
+document.getElementById("copy-params").addEventListener("click", async () => {
+  const payload = JSON.stringify(
+    { params: state.params, shader: state.shaders[state.editor] },
+    null,
+    2,
+  );
+  try {
+    await navigator.clipboard.writeText(payload);
+    setLog("параметры и шейдер в буфере обмена", "ok");
+  } catch {
+    setLog(payload, "");
+  }
+});
+
+document.getElementById("reset").addEventListener("click", () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* хранилище недоступно, сбрасывать нечего */
+  }
+  window.location.reload();
+});
+
+document.getElementById("file").addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const ready = await ensureAudio();
+  if (!ready) return;
+  const element = ensureElement();
+  element.src = URL.createObjectURL(file);
+  try {
+    await element.play();
+    setLog(file.name + " играет", "ok");
+  } catch {
+    setLog("не удалось запустить файл", "err");
+  }
+});
+
+textarea.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    compileActive();
+  }
+});
+
+/* --------------------------------- startup -------------------------------- */
+
+restore();
+buildParams();
+syncSliders();
+syncModeButtons();
+textarea.value = state.shaders[state.editor];
+syncEditorButtons();
+
+if (state.mode !== "silence") {
+  // автоплей без жеста браузер всё равно не даст — вернёмся в тишину
+  state.mode = "silence";
+  audio.mode = "silence";
+  syncModeButtons();
+}
+
+raf = window.requestAnimationFrame(frame);
+</script>
+</body>
+</html>
