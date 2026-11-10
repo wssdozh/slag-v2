@@ -327,8 +327,8 @@ void main() {
 
     // Тона одного оттенка: back тёмное и насыщеннее, front почти белый.
     vec3 colBack = tint(uSat, uVal * (0.50 - 0.10 * smoothstep(0.0, 1.0, fb.y)));
-    vec3 colMid = tint(uSat * 0.62, uVal * (0.95 - 0.15 * smoothstep(0.0, 1.0, fm.y)));
-    vec3 colFront = tint(uSat * 0.18, uVal * (1.0 - 0.05 * smoothstep(0.0, 1.0, ff.y)));
+    vec3 colMid = tint(uSat * 0.82, uVal * (0.95 - 0.15 * smoothstep(0.0, 1.0, fm.y)));
+    vec3 colFront = tint(uSat * 0.34, uVal * (1.0 - 0.05 * smoothstep(0.0, 1.0, ff.y)));
 
     colMid += tint(uSat * 0.6, uVal) * fm.z * (0.05 + uHigh * 0.25 * uAudioMix);
 
@@ -1107,7 +1107,7 @@ function deriveParams(base, features, mode) {
   const lift = 0.6 * bright + 0.4 * rolloff;
   const target = {
     hue: 210 - 210 * mood,
-    sat: 0.52 + 0.38 * energy,
+    sat: 0.72 + 0.24 * energy,
     val: 0.68 + 0.3 * lift,
     deform: base.deform * (0.45 + 1.5 * shape) * (1 + 0.35 * accent * onset),
     warp: base.warp * (0.4 + 1.4 * shape),
