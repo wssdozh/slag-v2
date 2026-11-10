@@ -46,6 +46,7 @@ import {
   DEFAULT_INBOX_FOLDER,
   UI_LAYOUT,
   UI_BREAKPOINTS,
+  ACCENT_COLORS,
   AI_ENDPOINTS,
   DEFAULT_AI_MODELS,
 } from '../config';
@@ -273,11 +274,13 @@ const DEFAULT_UI_CONFIG: AppUiConfig = {
     fontScale: 'normal',
     density: 'normal',
     fontFamily: 'inter',
+    accent: 'blue',
   },
   mobile: {
     fontScale: 'normal',
     density: 'spacious',
     fontFamily: 'inter',
+    accent: 'blue',
   },
 };
 
@@ -676,7 +679,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
-  // Dynamically apply density, font scale and font family CSS properties to document root
+  // Dynamically apply density, font and accent CSS properties to document root
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const currentDevice = isMobile ? 'mobile' : 'desktop';
@@ -690,6 +693,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const fontCfg = getFontFamilyConfig(cfg.fontFamily);
     document.documentElement.style.setProperty('--slag-font-sans', fontCfg.cssSans);
     document.documentElement.style.setProperty('--slag-font-mono', fontCfg.cssMono);
+
+    // One hex repaints the whole accent family: theme.css derives strong/subtle/media from it.
+    const accent = ACCENT_COLORS[cfg.accent] ?? ACCENT_COLORS.blue;
+    document.documentElement.style.setProperty('--color-accent', accent.hex);
   }, [isMobile, uiConfig]);
 
   // Action History Stack for Undo capability (up to 20 snapshots)

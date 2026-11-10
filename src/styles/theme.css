@@ -90,7 +90,12 @@
   --text-dim: #52525b;
 
   --color-accent: #3b82f6;
-  --color-accent-subtle: rgba(59, 130, 246, 0.15);
+  --color-accent-subtle: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  /* The accent family derives from one chosen hex; the @theme values above are
+     compile-time defaults that Tailwind needs to emit the utility classes, and
+     this block wins the cascade. */
+  --color-accent-strong: color-mix(in srgb, var(--color-accent) 85%, #000);
+  --color-accent-media: color-mix(in srgb, var(--color-accent) 92%, #fff);
   --color-success: #10b981;
   --color-success-subtle: rgba(16, 185, 129, 0.15);
   --color-warning: #f59e0b;

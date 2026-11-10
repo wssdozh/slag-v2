@@ -5,7 +5,7 @@ import { SecretKeyField } from '../Settings/SecretKeyField';
 import { storage } from '../../lib/storage';
 import { openAppFolder } from '../../lib/folderOpener';
 import { getPlatformInfo, setupSystemHotkey, removeSystemHotkey, type PlatformInfo } from '../../lib/platform';
-import type { AiProvider } from '../../types';
+import type { AiProvider, UiAccent } from '../../types';
 import {
   Settings,
   X,
@@ -29,6 +29,7 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import type { AiSourceMode, SubscriptionAiTier } from '../../types';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
 import { FONT_SCALE_OPTIONS, FONT_FAMILY_OPTIONS } from '../../config/typography';
+import { ACCENT_COLORS } from '../../config';
 import { SETTINGS_TABS, settingsTabLabel } from '../../config/settingsTabs';
 
 const DENSITY_OPTIONS = [
@@ -647,8 +648,8 @@ export const SettingsModal: React.FC = () => {
                   </SettingsGroup>
                 )}
 
-                {/* Font Scale Control */}
-                <SettingsGroup title="Шрифт">
+                {/* Typography & accent */}
+                <SettingsGroup title="Оформление">
                   <SettingsSelect
                     label="Масштаб"
                     testId="font-scale-select"
@@ -676,6 +677,24 @@ export const SettingsModal: React.FC = () => {
                     value={uiConfig[selectedDevice].density}
                     onChange={(density) => updateUiConfig(selectedDevice, { density: density as typeof uiConfig[typeof selectedDevice]['density'] })}
                     options={DENSITY_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                  />
+                  <SettingsDivider />
+                  {/* The swatch paints preset data, not a literal invented here. */}
+                  <SettingsSelect
+                    label="Акцентный цвет"
+                    testId="accent-select"
+                    value={uiConfig[selectedDevice].accent}
+                    onChange={(accent) => updateUiConfig(selectedDevice, { accent: accent as UiAccent })}
+                    options={(Object.keys(ACCENT_COLORS) as UiAccent[]).map((key) => ({
+                      value: key,
+                      label: ACCENT_COLORS[key].label,
+                      icon: (
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-full border border-white/25"
+                          style={{ backgroundColor: ACCENT_COLORS[key].hex }}
+                        />
+                      ),
+                    }))}
                   />
                 </SettingsGroup>
 

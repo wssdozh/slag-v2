@@ -1,3 +1,18 @@
+import type { UiAccent } from '../types';
+
+/**
+ * Accent presets, not a free picker: one hex repaints the whole accent family in
+ * `theme.css`, and a random colour is how a dark UI ends up with an unreadable
+ * button. Order is the order in the settings list.
+ */
+export const ACCENT_COLORS: Record<UiAccent, { label: string; hex: string }> = {
+  blue: { label: 'Синий (по умолчанию)', hex: '#3b82f6' },
+  violet: { label: 'Фиолетовый', hex: '#8b5cf6' },
+  emerald: { label: 'Изумруд', hex: '#10b981' },
+  amber: { label: 'Янтарь', hex: '#f59e0b' },
+  rose: { label: 'Роза', hex: '#f43f5e' },
+};
+
 export const UI_BREAKPOINTS = {
   MOBILE: 768,
 } as const;

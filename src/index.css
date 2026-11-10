@@ -433,7 +433,7 @@
   --atomic-editor-accent-soft: rgba(255, 255, 255, 0.06);
   --atomic-editor-code-rail: rgba(255, 255, 255, 0.12); /* clean neutral monochrome rail */
   --atomic-editor-link: var(--color-accent);
-  --atomic-editor-link-hover: #93c5fd;
+  --atomic-editor-link-hover: color-mix(in srgb, var(--color-accent) 62%, white);
   --atomic-editor-code-bg: rgba(255, 255, 255, 0.03);
   --atomic-editor-selection-bg: var(--color-accent-subtle);
   --atomic-editor-measure: 100%;
