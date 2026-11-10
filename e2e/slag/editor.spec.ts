@@ -374,12 +374,13 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
 
     // Open folder picker dropdown (always available) and verify "Входящие" is not duplicated
     await folderPickerBtn.click();
-    const popover = page.locator('.absolute.z-40').filter({ hasText: 'Закрепить папку' });
+    // Select renders its options in a portal listbox, not as a plain dropdown box.
+    const popover = page.getByRole('listbox').last();
     await expect(popover).toBeVisible();
-    expect(await popover.locator('button', { hasText: 'Входящие' }).count()).toBe(1);
+    expect(await popover.getByRole('option', { name: /Входящие/ }).count()).toBeGreaterThan(0);
 
     // Select "Входящие" from dropdown to verify auto-pin
-    await popover.locator('button', { hasText: 'Входящие' }).click();
+    await popover.getByRole('option', { name: /Входящие/ }).first().click();
     await expect(page.locator('button[title*="закреплен" i]').first()).toBeVisible();
 
     // Toggle unpin back via pin button
