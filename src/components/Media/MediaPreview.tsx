@@ -72,6 +72,9 @@ export interface MediaPreviewProps {
  * One file, full screen, swipe to the next. Selection lives here rather than in the grid, the
  * way every gallery on a phone does it: open, look, tick, swipe on.
  *
+ * Photos and videos only. Audio has nothing to fill a screen with, so the picker lists it with
+ * a play button in the row and never opens this viewer.
+ *
  * Portalled to the body on purpose: the sheet owns a `translate`, and a translated ancestor is
  * a containing block for `position: fixed` — that is what used to shrink this viewer down to
  * the picker's panel.
@@ -199,14 +202,6 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
                       src={entryStreamSrc(entry.uri)}
                       isActive={slideIndex === index}
                       chromeVisible={isChromeVisible}
-                    />
-                  ) : entry.kind === 'audio' ? (
-                    <audio
-                      controls
-                      preload="metadata"
-                      src={entryStreamSrc(entry.uri)}
-                      className="w-full max-w-sm px-4"
-                      data-testid="viewer-audio"
                     />
                   ) : (
                     <PreviewImage item={entry} isActive={slideIndex === index} />
