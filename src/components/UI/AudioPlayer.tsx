@@ -196,7 +196,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-6 h-6 rounded-full bg-accent-strong hover:bg-accent-strong/90 motion-press flex items-center justify-center text-white shrink-0 cursor-pointer shadow-sm"
+          className="w-6 h-6 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 cursor-pointer shadow-sm"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >
           {isPlaying ? (
@@ -243,7 +243,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-7 h-7 rounded-full bg-accent-strong hover:bg-accent-strong/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer"
+          className="w-7 h-7 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
           aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >

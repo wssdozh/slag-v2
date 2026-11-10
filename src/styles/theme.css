@@ -48,6 +48,9 @@
   --color-mention: #38bdf8;
   /* Deeper accent for filled controls that need to sit quietly on dark. */
   --color-accent-strong: #2563eb;
+  /* Media transport (play/pause): same family as accent-strong, one step lighter
+     and bluer. The send button keeps accent-strong, so it stays the loudest blue. */
+  --color-accent-media: #3d8ae6;
   --color-success: #10b981;
   --color-success-subtle: rgba(16, 185, 129, 0.15);
   --color-warning: #f59e0b;

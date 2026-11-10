@@ -486,7 +486,7 @@ export const AudioPanel: React.FC = () => {
                 {/* Central Round Play / Pause */}
                 <button
                   onClick={togglePlay}
-                  className="w-13 h-13 rounded-full bg-accent-strong hover:bg-accent-strong/90 text-white flex items-center justify-center shadow-xl motion-press cursor-pointer"
+                  className="w-13 h-13 rounded-full bg-accent-media hover:bg-accent-media/90 text-white flex items-center justify-center shadow-xl motion-press cursor-pointer"
                   title={isPlaying ? 'Пауза (Пробел)' : 'Воспроизведение (Пробел)'}
                   aria-label={isPlaying ? 'Пауза' : 'Воспроизведение'}
                 >
