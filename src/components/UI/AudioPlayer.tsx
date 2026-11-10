@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
-import { formatAudioDuration } from '../../lib/media/audioHelper';
+import { formatAudioDuration, splitAudioName } from '../../lib/media/audioHelper';
 
 
 const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
@@ -24,7 +24,7 @@ const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 
 
 interface AudioPlayerProps {
   src: string;
-  /** Shown under the timeline when a card carries more than one track. */
+  /** Row header when a card carries more than one track: `Artist - Title.ext`. */
   name?: string;
   duration?: number;
   waveform?: number[];
@@ -112,6 +112,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const currentDur = duration > 0 ? duration : (initialDuration || 0);
   const progressPercent = currentDur > 0 ? (currentTime / currentDur) * 100 : 0;
+  const label = name ? splitAudioName(name) : null;
 
   // When the card itself is the bar, the owner paints it: no line inside the player.
   useEffect(() => {
@@ -234,90 +235,121 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     );
   }
 
+  const playButton = (
+    <button
+      type="button"
+      onClick={togglePlay}
+      className={`w-7 h-7 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer${label ? ' mt-0.5' : ''}`}
+      title={isPlaying ? 'Пауза' : 'Воспроизвести'}
+      aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
+    >
+      {isPlaying ? (
+        <Pause className="w-3 h-3 fill-current" />
+      ) : (
+        <Play className="w-3 h-3 fill-current ml-0.5" />
+      )}
+    </button>
+  );
+
+  /* Either an invisible scrub strip (the card paints the progress) or the capsule. */
+  const scrubTrack = onProgress ? (
+    <div
+      ref={waveTrackRef}
+      onMouseDown={handleMouseDown}
+      title="Перемотка"
+      className="h-6 min-w-0 flex-1 cursor-pointer"
+    />
+  ) : (
+    <div
+      ref={waveTrackRef}
+      onMouseDown={handleMouseDown}
+      title="Перемотка"
+      className="relative h-2 min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/[0.12]"
+    >
+      <div
+        style={{ transform: `scaleX(${progressPercent / 100})`, transformOrigin: 'left center' }}
+        className="h-full w-full rounded-full bg-white/85 transition-transform duration-100 ease-linear"
+      />
+    </div>
+  );
+
+  const durationText = (
+    <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-400">
+      {isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}
+    </span>
+  );
+
+  const timeContextText = timeContext ? (
+    <span className="shrink-0 font-mono text-[10px] leading-none text-zinc-500 select-none">
+      {timeContext}
+    </span>
+  ) : null;
+
+  const enrichControl = (onEnrich || transcript || enrichmentStatus === 'processing') ? (
+    <button
+      type="button"
+      onClick={handleTranscriptToggle}
+      disabled={enrichmentStatus === 'processing'}
+      className="h-5 w-5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] motion-press flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+      title={
+        enrichmentStatus === 'processing'
+          ? 'Идет расшифровка...'
+          : transcript
+          ? isExpanded
+            ? 'Скрыть текст'
+            : 'Показать текст'
+          : 'Расшифровать войс'
+      }
+      aria-label="Расшифровка"
+    >
+      {enrichmentStatus === 'processing' ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+      ) : transcript && isExpanded ? (
+        <ChevronUp className="w-4 h-4 text-zinc-200" strokeWidth={2.25} />
+      ) : transcript ? (
+        <ChevronDown className="w-4 h-4 text-zinc-400 hover:text-zinc-200" strokeWidth={2.25} />
+      ) : (
+        <TelegramTranscribeIcon className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
+      )}
+    </button>
+  ) : null;
+
   return (
     <div className="w-full flex flex-col">
-      <div className="flex w-full items-center gap-2 select-none">
-        <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={src} preload="metadata" />
 
-        {/* Compact play: the capsule carries the state, the button only starts it. */}
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="w-7 h-7 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer"
-          title={isPlaying ? 'Пауза' : 'Воспроизвести'}
-          aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
-        >
-          {isPlaying ? (
-            <Pause className="w-3 h-3 fill-current" />
-          ) : (
-            <Play className="w-3 h-3 fill-current ml-0.5" />
-          )}
-        </button>
-
-        {/* Either an invisible scrub strip (the card paints the progress) or the capsule. */}
-        {onProgress ? (
-          <div
-            ref={waveTrackRef}
-            onMouseDown={handleMouseDown}
-            title="Перемотка"
-            className="h-6 min-w-0 flex-1 cursor-pointer"
-          />
-        ) : (
-          <div
-            ref={waveTrackRef}
-            onMouseDown={handleMouseDown}
-            title="Перемотка"
-            className="relative h-2 min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/[0.12]"
-          >
-            <div
-              style={{ transform: `scaleX(${progressPercent / 100})`, transformOrigin: 'left center' }}
-              className="h-full w-full rounded-full bg-white/85 transition-transform duration-100 ease-linear"
-            />
+      {label ? (
+        /* A named track reads as a row: title and author above, the line under them. */
+        <div className="flex w-full gap-2 select-none">
+          {playButton}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1.5">
+              <span className="min-w-0 truncate text-[12.5px] font-medium leading-tight text-fg-primary">
+                {label.title}
+              </span>
+              {label.author && (
+                <>
+                  <span className="shrink-0 text-fg-dim">·</span>
+                  <span className="min-w-0 truncate text-[11.5px] text-fg-secondary">{label.author}</span>
+                </>
+              )}
+              <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                {durationText}
+                {timeContextText}
+                {enrichControl}
+              </span>
+            </div>
+            <div className="mt-1.5 flex">{scrubTrack}</div>
           </div>
-        )}
-
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-400">
-          {isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}
-        </span>
-
-        {timeContext && (
-          <span className="shrink-0 font-mono text-[10px] leading-none text-zinc-500 select-none">
-            {timeContext}
-          </span>
-        )}
-
-        {(onEnrich || transcript || enrichmentStatus === 'processing') && (
-          <button
-            type="button"
-            onClick={handleTranscriptToggle}
-            disabled={enrichmentStatus === 'processing'}
-            className="h-5 w-5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] motion-press flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-            title={
-              enrichmentStatus === 'processing'
-                ? 'Идет расшифровка...'
-                : transcript
-                ? isExpanded
-                  ? 'Скрыть текст'
-                  : 'Показать текст'
-                : 'Расшифровать войс'
-            }
-            aria-label="Расшифровка"
-          >
-            {enrichmentStatus === 'processing' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
-            ) : transcript && isExpanded ? (
-              <ChevronUp className="w-4 h-4 text-zinc-200" strokeWidth={2.25} />
-            ) : transcript ? (
-              <ChevronDown className="w-4 h-4 text-zinc-400 hover:text-zinc-200" strokeWidth={2.25} />
-            ) : (
-              <TelegramTranscribeIcon className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
-            )}
-          </button>
-        )}
-      </div>
-
-      {name && (
-        <span className="mt-0.5 truncate pl-9 text-[11px] text-fg-muted">{name}</span>
+        </div>
+      ) : (
+        <div className="flex w-full items-center gap-2 select-none">
+          {playButton}
+          {scrubTrack}
+          {durationText}
+          {timeContextText}
+          {enrichControl}
+        </div>
       )}
 
       {/* Telegram-style Transcript with user-approved divider line. Collapses by

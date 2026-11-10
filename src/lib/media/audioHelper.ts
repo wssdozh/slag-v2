@@ -40,6 +40,21 @@ export function detectAudioFormat(filename: string, mimeType?: string): string {
   return 'AUDIO';
 }
 
+const AUDIO_EXT_RE = /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|webm|mp4|3gp|amr)$/i;
+
+/**
+ * A track's filename is the only metadata a recording carries: `Artist - Title.ext`.
+ * Splits it for the row header, and degrades to the plain name when there is no dash.
+ */
+export function splitAudioName(name: string): { title: string; author: string } {
+  const clean = name.replace(AUDIO_EXT_RE, '').trim();
+  const cut = clean.lastIndexOf(' - ');
+  if (cut <= 0) return { title: clean, author: '' };
+  const author = clean.slice(0, cut).trim();
+  const title = clean.slice(cut + 3).trim();
+  return author && title ? { title, author } : { title: clean, author: '' };
+}
+
 export interface ExtractAudioOptions {
   folderScope: string | null;
   scopeMode: AudioScopeMode;

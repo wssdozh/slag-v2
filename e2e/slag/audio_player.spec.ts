@@ -56,7 +56,7 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
         content: '',
         folder: 'Входящие',
         tags: [],
-        attachments: [track('probe_a', 'первый_трек.wav'), track('probe_b', 'второй_трек.wav')],
+        attachments: [track('probe_a', 'babypills - первый_трек.wav'), track('probe_b', 'babypills - второй_трек.wav')],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
@@ -68,12 +68,20 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('main').first()).toBeVisible({ timeout: 20000 });
 
-  const card = page.locator('.group').filter({ hasText: 'первый_трек.wav' }).first();
+  const card = page.locator('.group').filter({ hasText: 'первый_трек' }).first();
   await expect(card).toBeVisible({ timeout: 10000 });
-  await expect(card.locator('text=первый_трек.wav')).toBeVisible();
-  await expect(card.locator('text=второй_трек.wav')).toBeVisible();
+  await expect(card.locator('text=первый_трек')).toBeVisible();
+  await expect(card.locator('text=второй_трек')).toBeVisible();
+  // Title and author sit above the line, not under it.
+  await expect(card.locator('text=babypills').first()).toBeVisible();
+  await expect(card.locator('text=.wav')).toHaveCount(0);
 
   const strip = card.locator('[title="Перемотка"]').first();
+  const headerBox = await card.locator('text=первый_трек').first().boundingBox();
+  const stripBox = await strip.boundingBox();
+  expect(headerBox).not.toBeNull();
+  expect(stripBox).not.toBeNull();
+  expect(headerBox!.y + headerBox!.height).toBeLessThan(stripBox!.y + 4);
   const box = await strip.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + box!.width * 0.5, box!.y + box!.height / 2);
