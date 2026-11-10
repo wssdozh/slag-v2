@@ -105,12 +105,14 @@ async function openAudioPanel(page: Page) {
 }
 
 async function boot(page: Page, kind: TrackKind) {
-  await page.setViewportSize({ width: 1000, height: 760 });
+  // Wide enough that the workspace keeps its side columns: below 1024px the
+  // dock folds the audio panel into the reading pane and the tab layout changes.
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('aside').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.dv-tab, .dockview-tab').first()).toBeVisible({ timeout: 20_000 });
   await seedTrack(page, kind);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.locator('aside').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.dv-tab, .dockview-tab').first()).toBeVisible({ timeout: 20_000 });
   return openAudioPanel(page);
 }
 
