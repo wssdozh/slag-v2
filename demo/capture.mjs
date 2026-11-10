@@ -29,6 +29,7 @@ const continuous = flag('continuous', '');
 const points = flag('points', '20,70,140').split(',').map(Number);
 const windowMs = Number(flag('window', '8')) * 1000;
 const outDir = flag('out', 'test-results/tracks');
+const valence = argv.includes('--valence');
 const settleMs = 2500;
 const sampleMs = 200;
 
@@ -58,6 +59,7 @@ for (const input of inputs) {
   await page.setInputFiles('#file', input);
   await page.waitForFunction(() => window.__lab && window.__lab.status().mode === 'file', null, { timeout: 25000 });
   await page.waitForTimeout(600);
+  if (valence) await page.evaluate(() => window.__lab.setValence(true));
 
   const rows = [];
   const slug = basename(input).replace(/\.[^.]+$/, '').replace(/[^\wа-яА-ЯёЁ]+/g, '-');

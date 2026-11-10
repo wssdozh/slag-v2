@@ -182,6 +182,7 @@
     </div>
     <div class="seg">
       <button type="button" id="record">записать csv</button>
+      <button type="button" id="valence-toggle" aria-pressed="false">лад в цвете</button>
     </div>
     <p class="quiet" id="record-hint">пресеты подменяют фичи — можно сравнивать без трека.</p>
     <div id="params-audio"></div>
@@ -424,6 +425,8 @@ const state = {
   shader: SHADER_B,
   mode: "silence",
   preset: "",
+  /** Лад в цвете: по умолчанию выключен, пока не подтверждён на слух. */
+  valence: false,
 };
 
 const canvases = {
@@ -1091,7 +1094,7 @@ let bpmLatch = false;
  *   дыхание  — секция сдвигает оттенок в пределах +-HUE_SWING градусов.
  * Внутри песни это один цвет и его тона, между песнями диапазон широкий.
  */
-const HUE_SWING = 28;
+const HUE_SWING = 18;
 /** Догон оттенка: смена трека переезжает за секунду, а не ползёт полминуты. */
 const HUE_TAU = 1;
 
@@ -1111,15 +1114,209 @@ const identityHist = new Float64Array(IDENTITY_BINS);
 let identityCount = 0;
 /** Характер файла, посчитанный один раз по всему буферу. */
 let trackIdentity = null;
+/** Лад файла: сдвигает оттенок в холод или тепло. */
+let trackValence = 0;
 /** Профиль последнего загруженного файла: нужен для калибровки. */
 let lastProfile = null;
+/** Последний декодированный буфер: по нему считаются срезы для проверок. */
+let lastBuffer = null;
+
+/* ------------------------- хрома и тональность ---------------------------- */
+
+/**
+ * Окно 16384 при 44.1 кГц — это 0.37 с и 2.7 Гц на бин: иначе на низких
+ * нотах полутон уже (13 Гц) уже главного лепестка окна, и терции соседних
+ * ступеней протекают друг в друга, из-за чего минор читается как мажор.
+ */
+const CHROMA_SIZE = 16384;
+const CHROMA_FRAMES = 200;
+const CHROMA_LOW_HZ = 55;
+const CHROMA_BASS_HZ = 400;
+const CHROMA_HIGH_HZ = 5000;
+/** Профили Крамхансля-Кесслера: 12 ступеней от тоники, major и minor. */
+const KEY_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const KEY_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const KEY_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+/** Radix-2 FFT на месте. Длина обязана быть степенью двойки. */
+function fft(real, imag) {
+  const size = real.length;
+  for (let i = 1, j = 0; i < size; i += 1) {
+    let bit = size >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      const swapReal = real[i];
+      real[i] = real[j];
+      real[j] = swapReal;
+      const swapImag = imag[i];
+      imag[i] = imag[j];
+      imag[j] = swapImag;
+    }
+  }
+  for (let len = 2; len <= size; len <<= 1) {
+    const angle = (-2 * Math.PI) / len;
+    const stepReal = Math.cos(angle);
+    const stepImag = Math.sin(angle);
+    const half = len >> 1;
+    for (let start = 0; start < size; start += len) {
+      let curReal = 1;
+      let curImag = 0;
+      for (let k = 0; k < half; k += 1) {
+        const leftReal = real[start + k];
+        const leftImag = imag[start + k];
+        const rightReal = real[start + k + half];
+        const rightImag = imag[start + k + half];
+        const tReal = rightReal * curReal - rightImag * curImag;
+        const tImag = rightReal * curImag + rightImag * curReal;
+        real[start + k] = leftReal + tReal;
+        imag[start + k] = leftImag + tImag;
+        real[start + k + half] = leftReal - tReal;
+        imag[start + k + half] = leftImag - tImag;
+        const nextReal = curReal * stepReal - curImag * stepImag;
+        curImag = curReal * stepImag + curImag * stepReal;
+        curReal = nextReal;
+      }
+    }
+  }
+}
+
+/**
+ * Средняя хромаграмма трека: кадры берутся равномерно по всему файлу,
+ * чтобы длинный трек не считался минуту. Возвращает полную хрому и
+ * басовую отдельно: относительный мажор и минор дают одинаковый набор
+ * ступеней, и различить их можно только по тому, что играет внизу.
+ */
+function chromaVector(data, sampleRate) {
+  const size = CHROMA_SIZE;
+  const binHz = sampleRate / size;
+  const lowBin = Math.max(1, Math.ceil(CHROMA_LOW_HZ / binHz));
+  const highBin = Math.min(size / 2 - 1, Math.floor(Math.min(CHROMA_HIGH_HZ, sampleRate * 0.45) / binHz));
+  const bassBin = Math.min(highBin, Math.floor(CHROMA_BASS_HZ / binHz));
+  const available = Math.floor(data.length / size);
+  if (available < 4 || highBin <= lowBin) return null;
+  const frames = Math.min(CHROMA_FRAMES, available);
+  const step = Math.max(1, Math.floor((data.length - size) / frames));
+  const window = new Float64Array(size);
+  for (let i = 0; i < size; i += 1) window[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1));
+  const real = new Float64Array(size);
+  const imag = new Float64Array(size);
+  const full = new Float64Array(12);
+  const bass = new Float64Array(12);
+
+  for (let frame = 0; frame < frames; frame += 1) {
+    const offset = frame * step;
+    for (let i = 0; i < size; i += 1) {
+      real[i] = data[offset + i] * window[i];
+      imag[i] = 0;
+    }
+    fft(real, imag);
+    for (let k = lowBin; k <= highBin; k += 1) {
+      const power = real[k] * real[k] + imag[k] * imag[k];
+      if (power <= 0) continue;
+      const frequency = k * binHz;
+      const pitch = ((Math.round(12 * Math.log2(frequency / 440)) + 69) % 12 + 12) % 12;
+      full[pitch] += power;
+      if (k <= bassBin) bass[pitch] += power;
+    }
+  }
+  return { full, bass };
+}
+
+function pearson(a, b) {
+  let meanA = 0;
+  let meanB = 0;
+  for (let i = 0; i < 12; i += 1) {
+    meanA += a[i];
+    meanB += b[i];
+  }
+  meanA /= 12;
+  meanB /= 12;
+  let num = 0;
+  let devA = 0;
+  let devB = 0;
+  for (let i = 0; i < 12; i += 1) {
+    num += (a[i] - meanA) * (b[i] - meanB);
+    devA += (a[i] - meanA) ** 2;
+    devB += (b[i] - meanB) ** 2;
+  }
+  return devA > 0 && devB > 0 ? num / Math.sqrt(devA * devB) : 0;
+}
+
+/**
+ * Ключ по Крамханслю-Шмуклеру: корреляция хромы с 24 профилями.
+ * confidence — лучший r (по литературе >0.7 чистый ключ, <0.3 атонально).
+ *
+ * Лад по разнице профилей не решается: на синтетических аккордах чистый
+ * мажор даёт всего +0.06, чистый минор −0.15…−0.24, а квинта без терции —
+ * +0.11, то есть «мажор» на пустом месте. Поэтому лад считается отдельно,
+ * по терции от найденной тоники: она и есть та самая minorness из
+ * литературы, и её видно напрямую в хроме.
+ */
+function detectKey(chroma) {
+  if (!chroma) return null;
+  const full = chroma.full;
+  let total = 0;
+  for (const value of full) total += value;
+  if (!(total > 0)) return null;
+  const normalised = Array.from(full, (value) => value / total);
+  const rotated = new Array(12);
+  let bestMajor = -1;
+  let bestMinor = -1;
+  let majorRoot = 0;
+  let minorRoot = 0;
+
+  for (let root = 0; root < 12; root += 1) {
+    for (let i = 0; i < 12; i += 1) rotated[i] = normalised[(i + root) % 12];
+    const major = pearson(rotated, KEY_MAJOR);
+    const minor = pearson(rotated, KEY_MINOR);
+    if (major > bestMajor) {
+      bestMajor = major;
+      majorRoot = root;
+    }
+    if (minor > bestMinor) {
+      bestMinor = minor;
+      minorRoot = root;
+    }
+  }
+
+  // Относительные тональности дают одинаковую хрому, поэтому между двумя
+  // кандидатами решает бас: тоника — это та, что звучит внизу.
+  let bassTotal = 0;
+  for (const value of chroma.bass) bassTotal += value;
+  let root = bestMajor > bestMinor ? majorRoot : minorRoot;
+  if (bassTotal > 0) {
+    root = chroma.bass[minorRoot] > chroma.bass[majorRoot] ? minorRoot : majorRoot;
+  }
+
+  const majorThird = normalised[(root + 4) % 12];
+  const minorThird = normalised[(root + 3) % 12];
+  const thirds = majorThird + minorThird;
+  const rootEnergy = normalised[root] + normalised[(root + 7) % 12];
+  const thirdScore = thirds > 0 ? (majorThird - minorThird) / thirds : 0;
+  const thirdEvidence = thirds / (thirds + rootEnergy + 1e-9);
+
+  const sorted = [...normalised].sort((a, b) => b - a);
+  return {
+    key: KEY_NAMES[root],
+    mode: thirdScore >= 0 ? "major" : "minor",
+    profileMode: bestMajor > bestMinor ? "major" : "minor",
+    major: bestMajor,
+    minor: bestMinor,
+    confidence: Math.max(bestMajor, bestMinor),
+    profileScore: bestMajor - bestMinor,
+    thirdScore,
+    thirdEvidence,
+    bassShare: bassTotal / (total + 1e-9),
+    purity: sorted.slice(0, 5).reduce((sum, value) => sum + value, 0),
+  };
+}
 
 /**
  * Профиль трека по декодированному буферу: громкость, яркость и плотность.
  * Считается один раз при загрузке файла, поэтому цвет известен с первой
  * секунды и не зависит от того, с какого места началось воспроизведение.
- * FFT не нужен: RMS, частота переходов через ноль и подъёмы огибающей
- * дают те же три оси, что и живой анализатор.
+ * Без FFT считаются три быстрые оси, хрома и ключ — отдельно, на 16384.
  */
 async function profileTrack(file) {
   if (!audio.ctx) return null;
@@ -1129,7 +1326,16 @@ async function profileTrack(file) {
   } catch {
     return null;
   }
-  const data = buffer.getChannelData(0);
+  lastBuffer = buffer;
+  return analyseBuffer(buffer, 0, 1);
+}
+
+/** Анализ куска буфера: доли 0…1, нужны для проверки устойчивости лада. */
+function analyseBuffer(buffer, from, to) {
+  const channel = buffer.getChannelData(0);
+  const start = Math.max(0, Math.min(channel.length, Math.floor(channel.length * from)));
+  const end = Math.max(start, Math.min(channel.length, Math.floor(channel.length * to)));
+  const data = channel.subarray(start, end);
   const total = data.length;
   if (total === 0) return null;
 
@@ -1176,11 +1382,35 @@ async function profileTrack(file) {
   const rms = Math.sqrt(sumSquares / total);
   const zeroCross = crossings / seconds;
   const rate = onsets / seconds;
+
+  // Темп: автокорреляция онсет-огибающей, 60…200 BPM.
+  const onsetCurve = new Float32Array(envelope.length);
+  for (let i = 1; i < envelope.length; i += 1) {
+    onsetCurve[i] = Math.max(0, envelope[i] - envelope[i - 1]);
+  }
+  const framesPerSecond = buffer.sampleRate / frame;
+  let bestLag = 0;
+  let bestScore = 0;
+  const minLag = Math.max(1, Math.round((60 * framesPerSecond) / 200));
+  const maxLag = Math.min(Math.round((60 * framesPerSecond) / 60), onsetCurve.length - 1);
+  for (let lag = minLag; lag <= maxLag; lag += 1) {
+    let score = 0;
+    for (let i = lag; i < onsetCurve.length; i += 1) score += onsetCurve[i] * onsetCurve[i - lag];
+    score /= Math.max(1, onsetCurve.length - lag);
+    if (score > bestScore) {
+      bestScore = score;
+      bestLag = lag;
+    }
+  }
+
+  const key = detectKey(chromaVector(data, buffer.sampleRate));
   return {
     seconds,
     rmsDb: 20 * Math.log10(rms + 1e-6),
     zeroCross,
     onsetsPerSecond: rate,
+    bpm: bestLag > 0 ? (60 * framesPerSecond) / bestLag : 0,
+    key,
   };
 }
 
@@ -1192,6 +1422,35 @@ function profileIdentity(profile) {
   );
   const pace = clamp01(profile.onsetsPerSecond / 4);
   return { loudness, brightness, pace, identity: 0.5 * loudness + 0.3 * brightness + 0.2 * pace };
+}
+
+/* ------------------------------- валентность ------------------------------ */
+
+/**
+ * Уверенность ключа и вес терции: ниже порога лад не считаем вообще.
+ * Границы взяты из литературы (r<0.3 — атонально, r>0.7 — чистый ключ)
+ * и из замеров: реальные треки дают evidence 0.05…0.20, синтетические
+ * трезвучия — 0.33, квинта без терции — 0.00000003.
+ */
+const VALENCE_CONFIDENCE = [0.45, 0.65];
+const VALENCE_EVIDENCE = [0.05, 0.15];
+/** Насколько лад поворачивает оттенок от температурной шкалы. */
+const VALENCE_SWING = 40;
+
+const ramp = (value, low, high) => clamp01((value - low) / (high - low));
+
+/**
+ * Валентность трека: -1 минор, +1 мажор, 0 когда лад не читается.
+ * Умножается на две уверенности, поэтому «наверное мажор» почти не
+ * двигает цвет, а «точно минор» двигает на полную.
+ */
+function profileValence(profile) {
+  const key = profile ? profile.key : null;
+  if (!key) return { value: 0, weight: 0 };
+  const weight =
+    ramp(key.confidence, VALENCE_CONFIDENCE[0], VALENCE_CONFIDENCE[1]) *
+    ramp(key.thirdEvidence, VALENCE_EVIDENCE[0], VALENCE_EVIDENCE[1]);
+  return { value: key.thirdScore * weight, weight };
 }
 
 /** Характер (0..1) -> оттенок: спокойное в синий, плотное в алый. */
@@ -1388,6 +1647,8 @@ const meters = {
 
 let lastRaw = { ...ZERO };
 let lastColor = { hue: 205, sat: 0.78, val: 0.92 };
+/** Оттенок трека без дыхания секции: по нему проверяется детерминизм. */
+let lastTrackHue = 205;
 let lastParams = null;
 
 let raf = 0;
@@ -1438,9 +1699,15 @@ function paintMeters(raw) {
 }
 
 function paintReadout(key, params) {
+  const keyInfo = lastProfile ? lastProfile.key : null;
   const colour = key === "base"
     ? ""
-    : "\nhue " + Math.round(params.hue) + " (трек " + moodTrace.identity.toFixed(2) + " · секция " + moodTrace.section.toFixed(2) + ")";
+    : "\nhue " + Math.round(params.hue) + " (трек " + moodTrace.identity.toFixed(2) +
+      " · секция " + moodTrace.section.toFixed(2) + ")" +
+      (keyInfo
+        ? "\n" + keyInfo.key + " " + keyInfo.mode + " · r " + keyInfo.confidence.toFixed(2) +
+          " · val " + trackValence.toFixed(2) + (state.valence ? "" : " (выкл)")
+        : "\nключ не читается");
   readouts[key].textContent =
     "deform " + params.deform.toFixed(2) + " ← " + driverTrace.deform + "\n" +
     "crest  " + params.crest.toFixed(2) + "  blend " + params.blend.toFixed(2) + "\n" +
@@ -1482,7 +1749,11 @@ function frame(now) {
     const mode = key === "base" ? "base" : key;
     const derived = deriveParams(state.params, features, mode);
     // hue: оттенок трека плюс дыхание секции, догоняем по короткой дуге
-    const hueTarget = mode === "base" ? derived.hue : colour.base + HUE_SWING * 2 * (colour.section - 0.5);
+    // hue: оттенок трека, поворот по ладу и дыхание секции
+    const valenceShift = state.valence ? VALENCE_SWING * trackValence : 0;
+    const hueTarget = mode === "base"
+      ? derived.hue
+      : colour.base - valenceShift + HUE_SWING * 2 * (colour.section - 0.5);
     if (hueSlow[key] === null) {
       hueSlow[key] = hueTarget; // первый кадр: сразу в свой оттенок, без пролёта
     } else {
@@ -1510,6 +1781,7 @@ function frame(now) {
     }
     if (key === "mood") {
       lastColor = { hue: params.hue, sat: params.sat, val: params.val };
+      lastTrackHue = colour.base - valenceShift;
       lastParams = params;
     }
     paintReadout(key, params);
@@ -1763,6 +2035,18 @@ for (const button of document.querySelectorAll("#presets button")) {
   });
 }
 
+const valenceToggle = document.getElementById("valence-toggle");
+valenceToggle.addEventListener("click", () => {
+  state.valence = !state.valence;
+  valenceToggle.setAttribute("aria-pressed", String(state.valence));
+  setLog(
+    state.valence
+      ? "лад в цвете: " + (trackValence >= 0 ? "мажор" : "минор") + " " + trackValence.toFixed(2)
+      : "лад в цвете выключен",
+    "ok",
+  );
+});
+
 document.getElementById("record").addEventListener("click", () => {
   if (recording) {
     stopRecording();
@@ -1803,6 +2087,7 @@ document.getElementById("file").addEventListener("change", async (event) => {
   const element = ensureElement();
   element.src = URL.createObjectURL(file);
   trackIdentity = null;
+  trackValence = 0;
   resetColour();
   try {
     await element.play();
@@ -1817,7 +2102,13 @@ document.getElementById("file").addEventListener("change", async (event) => {
       if (!profile) return;
       lastProfile = profile;
       trackIdentity = profileIdentity(profile).identity;
-      setLog(file.name + ": характер " + trackIdentity.toFixed(2), "ok");
+      trackValence = profileValence(profile).value;
+      const key = profile.key;
+      setLog(
+        file.name + ": " + (key ? key.key + " " + key.mode + " · r " + key.confidence.toFixed(2) : "ключ не читается") +
+          " · характер " + trackIdentity.toFixed(2),
+        "ok",
+      );
     });
   } catch {
     setLog("не удалось запустить файл", "err");
@@ -1848,6 +2139,11 @@ window.__lab = {
   play() {
     return audio.element ? audio.element.play() : Promise.resolve();
   },
+  profileSlice(from, to) {
+    if (!lastBuffer) return null;
+    const profile = analyseBuffer(lastBuffer, from, to);
+    return profile ? { ...profile, ...profileIdentity(profile), valence: profileValence(profile) } : null;
+  },
   raw() {
     return { ...lastRaw };
   },
@@ -1855,11 +2151,17 @@ window.__lab = {
     return { ...normalized };
   },
   color() {
-    return { ...lastColor };
+    return { ...lastColor, trackHue: lastTrackHue };
+  },
+  /** Включить поворот по ладу: нужно проверкам и съёмке. */
+  setValence(enabled) {
+    state.valence = Boolean(enabled);
+    document.getElementById("valence-toggle").setAttribute("aria-pressed", String(state.valence));
+    return state.valence;
   },
   profile() {
     if (!lastProfile) return null;
-    return { ...lastProfile, ...profileIdentity(lastProfile) };
+    return { ...lastProfile, ...profileIdentity(lastProfile), valence: profileValence(lastProfile) };
   },
   params() {
     return lastParams ? { ...lastParams } : null;
