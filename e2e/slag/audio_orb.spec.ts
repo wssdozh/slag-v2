@@ -107,10 +107,10 @@ async function openAudioPanel(page: Page) {
 async function boot(page: Page, kind: TrackKind) {
   await page.setViewportSize({ width: 1000, height: 760 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('aside').first()).toBeVisible({ timeout: 20_000 });
   await seedTrack(page, kind);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('aside').first()).toBeVisible({ timeout: 20_000 });
   return openAudioPanel(page);
 }
 

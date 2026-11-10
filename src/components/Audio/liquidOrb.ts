@@ -87,8 +87,8 @@ void main() {
     // darker than the middle one (that is the depth cue) with a thin lit limb,
     // otherwise the visible crescent reads as a flat navy blob.
     float backNd = clamp(back.z / back.y, 0.0, 1.0);
-    vec3 colBack = mix(vec3(0.12, 0.45, 0.88), vec3(0.02, 0.20, 0.52), smoothstep(0.0, 1.0, backNd));
-    colBack += vec3(0.10, 0.38, 0.70) * smoothstep(0.72, 0.98, backNd);
+    vec3 colBack = mix(vec3(0.14, 0.48, 0.90), vec3(0.02, 0.18, 0.48), smoothstep(0.0, 1.0, backNd));
+    colBack += vec3(0.08, 0.30, 0.60) * smoothstep(0.35, 1.0, backNd) * 0.7;
     vec3 colMid = mix(vec3(0.65, 0.96, 1.0), vec3(0.18, 0.65, 0.98),
                       smoothstep(0.0, 1.0, clamp(mid.z / mid.y, 0.0, 1.0)));
     vec3 colFront = mix(vec3(1.0), vec3(0.45, 0.88, 1.0),
@@ -96,8 +96,8 @@ void main() {
 
     // Highs shimmer on the middle rim: the cheapest way to show consonants.
     colMid += vec3(0.40, 0.90, 1.0)
-            * smoothstep(mid.y - 0.12, mid.y - 0.02, mid.z)
-            * (0.15 + uHigh * 0.35);
+            * smoothstep(mid.y - 0.22, mid.y - 0.02, mid.z)
+            * (0.08 + uHigh * 0.25);
 
     float aBack = back.x * 0.95;
     float aMid = mid.x * 0.88;
