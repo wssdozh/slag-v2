@@ -809,7 +809,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           <AudioPlayer
             src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
             duration={att.duration}
-            size={att.size}
             waveform={att.waveform}
             timeContext={isVoiceBubble ? formattedTime : undefined}
             transcript={att.extractedText}

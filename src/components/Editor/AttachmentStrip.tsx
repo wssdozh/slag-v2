@@ -107,7 +107,6 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                       src={srcs[att.id] ?? att.dataUrl ?? ''}
                       duration={att.duration}
                       waveform={att.waveform}
-                      size={att.size}
                       extractedText={att.extractedText}
                       enrichmentStatus={att.enrichmentStatus}
                     />

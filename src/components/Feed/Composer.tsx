@@ -864,7 +864,6 @@ export const Composer: React.FC<ComposerProps> = ({
                   <AudioPlayer
                     src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
                     duration={att.duration}
-                    size={att.size}
                     waveform={att.waveform}
                     compact={true}
                   />
