@@ -63,32 +63,13 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
     <div
       ref={drawerRef}
       data-motion-state={phase}
+      data-testid="audio-queue"
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
       className="absolute inset-0 z-30 bg-panel/95 backdrop-blur-xl flex flex-col overflow-hidden motion-fade"
     >
-      {/* Drawer Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-white tracking-wide">
-            Очередь воспроизведения
-          </span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-400">
-            {tracks.length}
-          </span>
-        </div>
-        <IconButton
-          size="md"
-          variant="ghost"
-          onClick={onClose}
-          title="Закрыть список"
-        >
-          <X className="w-4 h-4" />
-        </IconButton>
-      </div>
-
-      {/* Filter toolbar inside drawer */}
-      <div className="px-3 py-2 border-b border-white/[0.04] bg-white/[0.02] flex items-center justify-between gap-2 flex-wrap">
+      {/* One toolbar does the filters and the way out: no title row repeating the panel name. */}
+      <div className="px-3 pt-2 pb-2 border-b border-white/[0.08] flex items-center justify-between gap-2 flex-wrap">
         {/* Multi-type chips */}
         <div className="flex items-center gap-1.5">
           <button
@@ -115,18 +96,29 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
           </button>
         </div>
 
-        {/* Pinned Folder selector (when pinned) */}
-        {scopeMode === 'pinned' && (
-          <Select
-            size="sm"
+        <div className="flex items-center gap-1">
+          {/* Pinned Folder selector (when pinned) */}
+          {scopeMode === 'pinned' && (
+            <Select
+              size="sm"
+              variant="ghost"
+              value={pinnedFolder}
+              onChange={onSelectPinnedFolder}
+              options={folderOptions}
+              aria-label="Закреплённая папка аудио"
+              className="max-w-[150px] font-mono"
+            />
+          )}
+          <IconButton
+            size="md"
             variant="ghost"
-            value={pinnedFolder}
-            onChange={onSelectPinnedFolder}
-            options={folderOptions}
-            aria-label="Закреплённая папка аудио"
-            className="max-w-[150px] font-mono"
-          />
-        )}
+            onClick={onClose}
+            title="Закрыть список"
+            aria-label="Закрыть список"
+          >
+            <X className="w-4 h-4" />
+          </IconButton>
+        </div>
       </div>
 
       {/* Search Input */}
@@ -152,7 +144,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
       </div>
 
       {/* Playlist Items */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 pb-24 space-y-1">
+      <div className="flex-1 overflow-y-auto px-2 py-2 pb-24 space-y-1.5">
         {filteredTracks.length === 0 ? (
           <div className="py-12 text-center text-xs text-zinc-500">
             {searchQuery ? 'Ничего не найдено' : 'В списке нет треков'}
@@ -165,7 +157,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
               <div
                 key={track.id}
                 onClick={() => onSelectTrack(track)}
-                className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer select-none ${
+                className={`group flex items-center justify-between px-3 py-3 rounded-xl text-[13px] transition-colors cursor-pointer select-none ${
                   isCurrent
                     ? 'bg-white/[0.08] text-white'
                     : 'text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100'

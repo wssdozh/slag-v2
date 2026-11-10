@@ -391,16 +391,23 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const queueBtn = page.locator('button[aria-label="Очередь воспроизведения"]').first();
     await expect(queueBtn).toBeVisible();
 
-    // Open Queue drawer and select the voice note
+    // The drawer is one toolbar plus rows now: no title row repeating the panel name.
     await queueBtn.click();
-    await expect(page.locator('text=Очередь воспроизведения')).toBeVisible();
-    const audioPanel = page.locator('[role="tabpanel"]').filter({ hasText: 'Очередь воспроизведения' }).first();
-    await expect(audioPanel.locator('button', { hasText: 'Войсы' })).toBeVisible();
-    await expect(audioPanel.locator('button', { hasText: 'Файлы' })).toBeVisible();
-    const voiceTrackRow = page.locator('text=voice_16-12-53.webm').first();
+    const queue = page.getByTestId('audio-queue');
+    await expect(queue).toBeVisible();
+    await expect(queue.getByRole('button', { name: 'Войсы' })).toBeVisible();
+    await expect(queue.getByRole('button', { name: 'Файлы' })).toBeVisible();
+    await expect(queue.getByRole('button', { name: 'Закрыть список' })).toBeVisible();
+    await expect(page.locator('text=Очередь воспроизведения')).toHaveCount(0);
+    // The drawer fades in; a screenshot taken mid-fade shows the panel behind it.
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: 'test-results/screenshots/audio-queue-open.png' });
+
+    // Picking a row plays it and closes the drawer.
+    const voiceTrackRow = queue.locator('text=voice_16-12-53.webm').first();
     await expect(voiceTrackRow).toBeVisible();
     await voiceTrackRow.click();
-    await expect(page.locator('text=Очередь воспроизведения')).not.toBeVisible();
+    await expect(queue).toHaveCount(0);
 
     // Verify bottom bar utilities (speed, repeat, shuffle)
     const shuffleBtn = page.locator('button[aria-label="Перемешать"]');
