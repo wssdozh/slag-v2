@@ -1077,6 +1077,8 @@ const RANGES = {
 };
 
 const driverTrace = { deform: "base", crest: "base", blend: "base" };
+/** Была ли ритмика уверенной в прошлом кадре: гистерезис для BPM. */
+let bpmLatch = false;
 
 /**
  * Три варианта одного шейдера.
@@ -1109,7 +1111,11 @@ function deriveParams(base, features, mode) {
   const slow = mode === "mood";
   const shape = slow ? energy : 0.55 * punch + 0.45 * energy;
   const light = slow ? 0.6 * bright + 0.4 * rolloff : 0.5 * bright + 0.5 * punch;
-  const tempo = slow ? 0.55 * pace + 0.45 * (beatConf > 0.25 ? bpm : pace) : pace;
+  // BPM вмешивается только при уверенной ритмике и с гистерезисом,
+  // иначе темп дёргался бы на каждой смене секции.
+  const bpmTrusted = beatConf > (bpmLatch ? 0.25 : 0.35);
+  bpmLatch = bpmTrusted;
+  const tempo = slow ? 0.55 * pace + 0.45 * (bpmTrusted ? bpm : pace) : pace;
 
   driverTrace.deform = slow ? "energy" : "punch";
   driverTrace.crest = slow ? "bright" : "punch";
@@ -1120,7 +1126,10 @@ function deriveParams(base, features, mode) {
   // Цвет — шкала температуры: спокойный микс уходит в синий, плотный и быстрый
   // проходит через зелёный и жёлтый до красного. В кадре всегда один оттенок,
   // поэтому «разноцветности» нет — есть один цвет, который меняется целиком.
-  const mood = clamp01(0.5 * energy + 0.3 * bright + 0.2 * pace);
+  // Медиана энергии на плотных мастерах сидит около 0.8, поэтому сырую сумму
+  // сжимаем: рабочий диапазон 0.35…0.95 растягивается на весь круг.
+  const rawMood = clamp01(0.5 * energy + 0.3 * bright + 0.2 * pace);
+  const mood = clamp01((rawMood - 0.35) / 0.6);
   const lift = 0.6 * bright + 0.4 * rolloff;
   const target = {
     hue: 210 - 210 * mood,
@@ -1129,7 +1138,7 @@ function deriveParams(base, features, mode) {
     deform: base.deform * (0.45 + 1.5 * shape) * (1 + 0.35 * accent * onset),
     warp: base.warp * (0.4 + 1.4 * shape),
     speed: base.speed * (0.55 + 1.35 * tempo),
-    crest: base.crest * (0.35 + 1.7 * light) * (1 + 0.4 * accent * punch),
+    crest: base.crest * (0.30 + 2.4 * light) * (1 + 0.55 * accent * punch),
     blend: base.blend * (1.7 - 1.0 * light),
     edge: base.edge * (1.25 - 0.55 * light),
     noise: base.noise * (0.4 + 1.6 * flat),
@@ -1214,6 +1223,7 @@ const meters = {
 
 let lastRaw = { ...ZERO };
 let lastColor = { hue: 205, sat: 0.78, val: 0.92 };
+let lastParams = null;
 
 let raf = 0;
 let lastFrame = performance.now();
@@ -1315,7 +1325,10 @@ function frame(now) {
         ...paramUniforms(params),
       });
     }
-    if (key === "mood") lastColor = { hue: params.hue, sat: params.sat, val: params.val };
+    if (key === "mood") {
+      lastColor = { hue: params.hue, sat: params.sat, val: params.val };
+      lastParams = params;
+    }
     paintReadout(key, params);
   }
 
@@ -1650,6 +1663,9 @@ window.__lab = {
   },
   color() {
     return { ...lastColor };
+  },
+  params() {
+    return lastParams ? { ...lastParams } : null;
   },
 };
 /* --------------------------------- startup -------------------------------- */
