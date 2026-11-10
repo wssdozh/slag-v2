@@ -2,22 +2,24 @@ import { test, expect, type Page } from '@playwright/test';
 
 test.setTimeout(90_000);
 
-type OrbBands = { volume: number; bass: number; mid: number; high: number };
-type OrbDebug = { time: number; frames: number; bands: OrbBands };
+type OrbFeatures = { volume: number; bass: number; mid: number; high: number; flux: number; ring: number };
+type OrbDebug = { time: number; frames: number; features: OrbFeatures };
 
 const TONE = 'tone';
 const SILENCE = 'silence';
-type TrackKind = typeof TONE | typeof SILENCE;
+const BURST = 'burst';
+type TrackKind = typeof TONE | typeof SILENCE | typeof BURST;
 
 /**
- * A real 2 s wav, because the orb reads the actual Web Audio spectrum: a
- * generated 100 Hz + 2 kHz signal puts energy in bass and mid, an all-zero
- * buffer proves the orb does not invent motion out of silence.
+ * A real wav, because the orb reads the actual Web Audio spectrum: 100 Hz plus
+ * 2 kHz puts energy in bass and mid, an all-zero buffer proves the orb does not
+ * invent motion out of silence, and short bursts give the flux envelope its
+ * onsets.
  */
 async function seedTrack(page: Page, kind: TrackKind): Promise<void> {
   await page.evaluate((trackKind: TrackKind) => {
     const sampleRate = 44_100;
-    const seconds = trackKind === 'tone' ? 6 : 2;
+    const seconds = trackKind === 'silence' ? 2 : 6;
     const samples = sampleRate * seconds;
     const buffer = new ArrayBuffer(44 + samples * 2);
     const view = new DataView(buffer);
@@ -42,10 +44,11 @@ async function seedTrack(page: Page, kind: TrackKind): Promise<void> {
     for (let i = 0; i < samples; i++) {
       const t = i / sampleRate;
       const fade = Math.min(1, t * 50, (seconds - t) * 50);
+      const tonal = (Math.sin(2 * Math.PI * 100 * t) * 0.5 + Math.sin(2 * Math.PI * 2000 * t) * 0.15) * fade;
+      const sinceFirstBurst = t - 0.5;
+      const isBurst = sinceFirstBurst >= 0 && sinceFirstBurst % 1 < 0.012;
       const sample =
-        trackKind === 'tone'
-          ? (Math.sin(2 * Math.PI * 100 * t) * 0.5 + Math.sin(2 * Math.PI * 2000 * t) * 0.15) * fade
-          : 0;
+        trackKind === 'tone' ? tonal : trackKind === 'burst' && isBurst ? tonal : 0;
       view.setInt16(44 + i * 2, Math.round(sample * 32767), true);
     }
 
@@ -114,7 +117,7 @@ async function boot(page: Page, kind: TrackKind) {
 function readOrb(page: Page): Promise<OrbDebug | null> {
   return page.evaluate(() => {
     const debug = (window as Window & { __orbDebug?: OrbDebug }).__orbDebug;
-    return debug ? { ...debug, bands: { ...debug.bands } } : null;
+    return debug ? { ...debug, features: { ...debug.features } } : null;
   });
 }
 
@@ -130,13 +133,17 @@ test.describe('liquid orb motion', () => {
     // Poll the bass itself: the FFT needs one full window (~40 ms) before the
     // first spectrum exists, while loudness is already non-zero.
     await expect
-      .poll(async () => (await readOrb(page))?.bands.bass ?? 0, { timeout: 10_000 })
+      .poll(async () => (await readOrb(page))?.features.bass ?? 0, { timeout: 10_000 })
       .toBeGreaterThan(0.5);
 
-    const bands = (await readOrb(page))!.bands;
-    expect(bands.volume).toBeGreaterThan(0.2);
-    expect(bands.bass).toBeGreaterThan(bands.mid);
-    expect(bands.high).toBeLessThan(0.1);
+    const features = (await readOrb(page))!.features;
+    expect(features.volume).toBeGreaterThan(0.2);
+    expect(features.bass).toBeGreaterThan(features.mid);
+    expect(features.high).toBeLessThan(0.1);
+
+    // A sustained tone has no new energy frame to frame, so no shockwave.
+    await page.waitForTimeout(1_000);
+    expect((await readOrb(page))!.features.flux).toBeLessThan(0.15);
 
     await page.waitForTimeout(400);
     await canvas.screenshot({ path: 'test-results/screenshots/audio-orb-react.png' });
@@ -148,11 +155,34 @@ test.describe('liquid orb motion', () => {
     await play(page);
     await page.waitForTimeout(1_500);
 
-    const bands = (await readOrb(page))!.bands;
-    expect(bands.volume).toBeLessThan(0.08);
-    expect(bands.bass).toBeLessThan(0.08);
-    expect(bands.mid).toBeLessThan(0.08);
-    expect(bands.high).toBeLessThan(0.08);
+    const features = (await readOrb(page))!.features;
+    expect(features.volume).toBeLessThan(0.08);
+    expect(features.bass).toBeLessThan(0.08);
+    expect(features.mid).toBeLessThan(0.08);
+    expect(features.high).toBeLessThan(0.08);
+    expect(features.flux).toBeLessThan(0.05);
+  });
+
+  test('transients pop the flux envelope and fade between hits', async ({ page }) => {
+    const canvas = await boot(page, BURST);
+    await play(page);
+
+    // Poll in-page at 50 ms: a hit lives for the flux release (~140 ms) and a
+    // 1 s poll interval can step over every single one.
+    await page.waitForFunction(
+      () => ((window as Window & { __orbDebug?: OrbDebug }).__orbDebug?.features.flux ?? 0) > 0.4,
+      undefined,
+      { timeout: 10_000, polling: 50 },
+    );
+
+    // The ring lives for the length of the flux release; catch it at the peak.
+    await canvas.screenshot({ path: 'test-results/screenshots/audio-orb-shockwave.png' });
+
+    await page.waitForFunction(
+      () => ((window as Window & { __orbDebug?: OrbDebug }).__orbDebug?.features.flux ?? 0) < 0.12,
+      undefined,
+      { timeout: 4_000, polling: 50 },
+    );
   });
 
   test('time runs in seconds, the shape moves, and a pause settles the loop', async ({ page }) => {

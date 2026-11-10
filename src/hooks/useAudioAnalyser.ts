@@ -58,8 +58,8 @@ export function useAudioAnalyser(audioRef: RefObject<HTMLAudioElement | null>): 
           node.fftSize = ORB_FFT_SIZE;
           // Smoothing is done per second in audioSpectrum, not per analysis frame.
           node.smoothingTimeConstant = 0;
-          node.minDecibels = -90;
-          node.maxDecibels = -10;
+          node.minDecibels = -100;
+          node.maxDecibels = 0;
           const source = context.createMediaElementSource(element);
           source.connect(node);
           node.connect(context.destination);
