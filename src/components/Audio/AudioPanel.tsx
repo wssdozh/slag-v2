@@ -27,6 +27,7 @@ import {
 } from '../../lib/media/audioHelper';
 import { AudioCoverArt } from './AudioCoverArt';
 import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
+import { useAudioAnalyser } from '../../hooks/useAudioAnalyser';
 import { storage } from '../../lib/storage';
 import { Select } from '../UI/Select';
 
@@ -56,6 +57,7 @@ export const AudioPanel: React.FC = () => {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const analyser = useAudioAnalyser(audioRef);
 
   // Effective folder based on mode
   const effectiveFolder = scopeMode === 'active' ? currentFolder || DEFAULT_INBOX_FOLDER : pinnedFolder;
@@ -375,7 +377,7 @@ export const AudioPanel: React.FC = () => {
       />
 
       {/* Main Center Stage */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 min-h-0 overflow-y-auto">
+      <main className="relative z-10 flex flex-1 min-h-0 flex-col items-center justify-center overflow-y-auto overflow-x-hidden p-4">
         <div className="w-full max-w-sm flex flex-col items-center my-auto">
           {tracks.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-10 px-4">
@@ -404,7 +406,7 @@ export const AudioPanel: React.FC = () => {
           ) : (
             <>
               {/* 1. Square Art Tile (Clean, without buttons) */}
-              <AudioCoverArt track={currentTrack} isPlaying={isPlaying} audioRef={audioRef} />
+              <AudioCoverArt track={currentTrack} isPlaying={isPlaying} analyser={analyser} />
 
               {/* 2. Track Title (Like "The Lovecats" in reference) */}
               <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-full text-center mt-5 mb-1 px-2">
