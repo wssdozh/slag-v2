@@ -79,12 +79,12 @@ void main() {
     // Same silhouettes, inflated, used only to darken the seam under the layer
     // that sits above.
     vec3 seamMid = orb(p, centerMid,
-        0.46 + uBass * 0.06 + uVolume * 0.02 + 0.028, 0.030,
+        0.46 + uBass * 0.06 + uVolume * 0.02 + 0.020, 0.024,
         0.055 + uMid * 0.070, t * 0.47 + 0.5, 2.0,
         0.050 + uBass * 0.070, t * 0.53 - 0.3, 3.0);
 
     vec3 seamFront = orb(p, centerFront,
-        0.30 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03 + 0.026, 0.028,
+        0.30 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03 + 0.018, 0.022,
         0.035 + uHigh * 0.030, t * 0.90, 4.0,
         0.030 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
 
@@ -92,13 +92,13 @@ void main() {
     // bright in the middle to dark at its rim, which is what gives the stack
     // depth without any lighting.
     float backNd = clamp(back.z / back.y, 0.0, 1.0);
-    vec3 colBack = mix(vec3(0.16, 0.52, 0.95), vec3(0.02, 0.14, 0.42), smoothstep(0.0, 1.0, backNd));
+    vec3 colBack = mix(vec3(0.20, 0.58, 0.98), vec3(0.03, 0.20, 0.55), smoothstep(0.0, 1.0, backNd));
 
     float midNd = clamp(mid.z / mid.y, 0.0, 1.0);
-    vec3 colMid = mix(vec3(0.68, 0.97, 1.0), vec3(0.06, 0.46, 0.90), smoothstep(0.0, 1.0, midNd));
+    vec3 colMid = mix(vec3(0.75, 0.98, 1.0), vec3(0.08, 0.50, 0.92), smoothstep(0.0, 1.0, midNd));
 
     float frontNd = clamp(front.z / front.y, 0.0, 1.0);
-    vec3 colFront = mix(vec3(1.0), vec3(0.40, 0.86, 1.0), smoothstep(0.0, 1.0, frontNd));
+    vec3 colFront = mix(vec3(1.0), vec3(0.45, 0.88, 1.0), smoothstep(0.0, 1.0, frontNd));
 
     // Highs shimmer on the middle rim: the cheapest way to show consonants.
     colMid += vec3(0.40, 0.90, 1.0)
@@ -113,11 +113,11 @@ void main() {
     // lands on the previous one.
     vec3 color = colBack * aBack;
     float alpha = aBack;
-    color *= 1.0 - seamMid.x * 0.45;
+    color *= 1.0 - seamMid.x * 0.30;
 
     color = colMid * aMid + color * (1.0 - aMid);
     alpha = aMid + alpha * (1.0 - aMid);
-    color *= 1.0 - seamFront.x * 0.45;
+    color *= 1.0 - seamFront.x * 0.30;
 
     color = colFront * aFront + color * (1.0 - aFront);
     alpha = aFront + alpha * (1.0 - aFront);
