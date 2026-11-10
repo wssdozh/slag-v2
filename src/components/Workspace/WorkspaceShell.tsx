@@ -176,8 +176,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       timer = setTimeout(() => {
         const api = apiRef.current;
         // Fold decision only: dockview resizes the grid itself, a full recompute here lags the drag.
+        // 280 ms of silence: folding mid-drag reads as a glitch, not as a layout.
         if (api) syncAllGroupConstraints(api, true);
-      }, 150);
+      }, 280);
     };
     window.addEventListener('resize', handleResize);
     return () => {

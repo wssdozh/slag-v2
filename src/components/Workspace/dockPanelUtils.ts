@@ -1,6 +1,7 @@
 import type { DockviewApi, IDockviewPanel } from 'dockview-react';
 import { logger } from '../../lib/logger';
 import { isDesktopApp, openDetachedWindow } from '../../lib/windowControls';
+import { prefersReducedMotion } from '../../lib/motion';
 import {
   Layers,
   Kanban,
@@ -69,6 +70,10 @@ const UNFOLD_ABOVE_PX = 1120;
 let foldedSides: { id: string; column: string }[] | null = null;
 let isApplyingLayout = false;
 
+const DOCK_ANIMATING_CLASS = 'dockfold-animating';
+const DOCK_ANIMATION_MS = 220;
+let animationTimer: ReturnType<typeof setTimeout> | null = null;
+
 const applyGroupConstraints = (api: DockviewApi) => {
   const entries = api.groups
     .map(group => ({ group, active: group.activePanel }))
@@ -129,15 +134,9 @@ export const syncAllGroupConstraints = (api: DockviewApi, foldOnly = false) => {
       foldedSides = sides
         .filter(panel => panel.group !== feed.group)
         .map(panel => ({ id: panel.id, column: panel.group.id }));
-      // moveTo re-arranges the grid as it goes, so the pass repeats until nothing else wants to move.
-      for (let pass = 0; pass < 3; pass += 1) {
-        let movedNow = 0;
-        for (const panel of sides) {
-          if (panel.group === feed.group) continue;
-          panel.api.moveTo({ group: feed.group });
-          movedNow += 1;
-        }
-        if (!movedNow) break;
+      for (const panel of sides) {
+        if (panel.group === feed.group) continue;
+        panel.api.moveTo({ group: feed.group });
       }
       feed.api.setActive();
     } else {
@@ -167,12 +166,22 @@ export const syncAllGroupConstraints = (api: DockviewApi, foldOnly = false) => {
   };
 
   // No view-transition snapshot here: folding a column is two moves, and a full-window snapshot of a
-  // live audio orb costs more than the layout change itself.
+  // live audio orb costs more than the layout change itself. The panes glide on their own CSS
+  // transition instead (`.dockfold-animating .dv-view` in dockview-theme-slag.css).
   isApplyingLayout = true;
+  // dockview puts its own theme class on the shell root, so `.dockview-theme-slag` is not the
+  // element to hang this on.
+  const dock = document.querySelector<HTMLElement>('.dv-shell');
+  const animate = dock !== null && !prefersReducedMotion();
+  if (animate) dock.classList.add(DOCK_ANIMATING_CLASS);
   try {
     apply();
   } finally {
     isApplyingLayout = false;
+  }
+  if (animate) {
+    if (animationTimer) clearTimeout(animationTimer);
+    animationTimer = setTimeout(() => dock.classList.remove(DOCK_ANIMATING_CLASS), DOCK_ANIMATION_MS);
   }
 };
 

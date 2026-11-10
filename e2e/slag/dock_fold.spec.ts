@@ -50,6 +50,20 @@ test('side panels fold into the reading pane when the window is too narrow for f
   expect(narrow.reduce((sum, group) => sum + group.width, 0)).toBeLessThanOrEqual(950);
   await page.screenshot({ path: 'test-results/screenshots/dock-fold-narrow.png' });
 
+  // The glide is a scoped CSS transition: without the class on the dock it must not animate.
+  const transitions = await page.evaluate(() => {
+    const dock = document.querySelector('.dv-shell');
+    const view = document.querySelector('.dv-view');
+    if (!dock || !view) return { plain: '0s', animating: '0s' };
+    const plain = getComputedStyle(view).transitionDuration;
+    dock.classList.add('dockfold-animating');
+    const animating = getComputedStyle(view).transitionDuration;
+    dock.classList.remove('dockfold-animating');
+    return { plain, animating };
+  });
+  expect(transitions.plain).toBe('0s');
+  expect(transitions.animating).not.toBe('0s');
+
   // Hysteresis: 1050 is already above the fold threshold, but below the unfold one, so it must stay
   // folded instead of rebuilding the grid on every step of a slow window drag.
   await page.setViewportSize({ width: 1050, height: 900 });
