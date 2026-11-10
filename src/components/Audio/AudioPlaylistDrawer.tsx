@@ -4,9 +4,13 @@ import type { AudioTrack, AudioTypeFilter } from '../../lib/media/audioHelper';
 import { formatAudioDuration } from '../../lib/media/audioHelper';
 import type { FolderMeta } from '../../types';
 import { IconButton } from '../UI/IconButton';
+import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
 import { Select } from '../UI/Select';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import { usePresence } from '../../hooks/usePresence';
+
+/** The queue lists one of three states of the panel's type filter. */
+type QueueFilter = 'all' | 'voice' | 'file';
 
 interface AudioPlaylistDrawerProps {
   isOpen: boolean;
@@ -57,6 +61,20 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
     );
   }, [tracks, searchQuery]);
 
+  // The panel owns a set of enabled types; the queue shows the three states of that set.
+  const queueFilter: QueueFilter = typeFilters.length === 2 ? 'all' : typeFilters[0] === 'file' ? 'file' : 'voice';
+
+  const setQueueFilter = (next: QueueFilter) => {
+    if (next === 'all') {
+      if (!typeFilters.includes('voice')) onToggleTypeFilter('voice');
+      if (!typeFilters.includes('file')) onToggleTypeFilter('file');
+      return;
+    }
+    if (!typeFilters.includes(next)) onToggleTypeFilter(next);
+    const other: AudioTypeFilter = next === 'voice' ? 'file' : 'voice';
+    if (typeFilters.includes(other)) onToggleTypeFilter(other);
+  };
+
   const { ref: drawerRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
 
   if (!isPresent) return null;
@@ -72,31 +90,16 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
     >
       {/* One toolbar does the filters and the way out: no title row repeating the panel name. */}
       <div className="px-3 pt-2 pb-2 border-b border-white/[0.08] flex items-center justify-between gap-2 flex-wrap">
-        {/* Multi-type chips */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => onToggleTypeFilter('voice')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer ${
-              typeFilters.includes('voice')
-                ? 'bg-white/10 text-white font-medium border border-white/10'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <Mic className="w-3 h-3" />
-            <span>Войсы</span>
-          </button>
-          <button
-            onClick={() => onToggleTypeFilter('file')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer ${
-              typeFilters.includes('file')
-                ? 'bg-white/10 text-white font-medium border border-white/10'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <Music className="w-3 h-3" />
-            <span>Файлы</span>
-          </button>
-        </div>
+        <ResponsiveSegmented<QueueFilter>
+          value={queueFilter}
+          onChange={setQueueFilter}
+          options={[
+            { value: 'all', label: 'Всё' },
+            { value: 'voice', label: 'Войсы' },
+            { value: 'file', label: 'Файлы' },
+          ]}
+          ariaLabel="Фильтр очереди"
+        />
 
         <div className="flex items-center gap-1">
           {/* Pinned Folder selector (when pinned) */}

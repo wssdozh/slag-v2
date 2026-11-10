@@ -395,8 +395,10 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await queueBtn.click();
     const queue = page.getByTestId('audio-queue');
     await expect(queue).toBeVisible();
-    await expect(queue.getByRole('button', { name: 'Войсы' })).toBeVisible();
-    await expect(queue.getByRole('button', { name: 'Файлы' })).toBeVisible();
+    // One segment instead of two chips.
+    for (const label of ['Всё', 'Войсы', 'Файлы']) {
+      await expect(queue.getByRole('button', { name: label })).toBeVisible();
+    }
     await expect(queue.getByRole('button', { name: 'Закрыть список' })).toBeVisible();
     await expect(page.locator('text=Очередь воспроизведения')).toHaveCount(0);
     // The field is a button until it is needed.
