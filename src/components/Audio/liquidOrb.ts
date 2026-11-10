@@ -50,39 +50,43 @@ void main() {
     vec2 p = vUv;
     float t = uTime;
 
-    // Three objects, not three coatings on one silhouette. Each has its own
-    // center, size and harmonics, so the back ones peek out as crescents.
-    vec2 centerBack = vec2(0.06 * sin(t * 0.18), 0.05 * cos(t * 0.15))
+    // Three objects, not three coatings on one silhouette. The centers are
+    // far enough apart (relative to their radii) that the back and middle orbs
+    // peek out as crescents instead of reading as concentric rings.
+    vec2 centerBack = vec2(-0.14, 0.09)
+                    + 0.035 * vec2(sin(t * 0.17), cos(t * 0.13))
                     + vec2(uVolume * 0.020, uBass * 0.010);
-    vec2 centerMid = vec2(-0.07 * sin(t * 0.23 + 1.3), 0.045 * cos(t * 0.19 + 0.7))
+    vec2 centerMid = vec2(0.10, -0.05)
+                   + 0.030 * vec2(sin(t * 0.23 + 1.3), cos(t * 0.19 + 0.7))
                    + vec2(-uBass * 0.012, 0.0);
-    vec2 centerFront = vec2(0.05 * sin(t * 0.31 + 3.0) + uFlux * 0.030,
-                            -0.06 * cos(t * 0.27 + 1.9) + uMid * 0.015);
+    vec2 centerFront = vec2(0.26, 0.15)
+                     + 0.025 * vec2(sin(t * 0.31 + 2.7), cos(t * 0.27 + 1.9))
+                     + vec2(uFlux * 0.030, uMid * 0.015);
 
     float breath = sin(t * 1.1) * 0.012;
 
     // Back: loudness only, slow swell and drift.
     vec3 back = orb(p, centerBack,
-        0.46 + breath + uVolume * 0.10 + uBass * 0.03, 0.060,
+        0.56 + breath + uVolume * 0.08 + uBass * 0.03, 0.050,
         0.030 + uVolume * 0.020, t * 0.18, 2.0,
         0.020, t * 0.13 + 0.8, 3.0);
 
     // Middle: bass sets the size, mids bend the contour, counter-drifts.
     vec3 mid = orb(p, centerMid,
-        0.34 + uBass * 0.09 + uVolume * 0.03, 0.042,
+        0.40 + uBass * 0.08 + uVolume * 0.03, 0.040,
         0.028 + uMid * 0.045, t * 0.42 + 0.5, 2.0,
         0.022 + uBass * 0.040, t * 0.51 - 0.3, 3.0);
 
     // Front: small and hot, snaps with loudness and jumps on onsets.
     vec3 front = orb(p, centerFront,
-        0.18 + uMid * 0.05 + uVolume * 0.03 + uFlux * 0.05, 0.048,
+        0.19 + uMid * 0.04 + uVolume * 0.03 + uFlux * 0.04, 0.045,
         0.012 + uHigh * 0.020, t * 0.90, 4.0,
         0.010 + uMid * 0.015, t * 1.07 + 1.1, 2.0);
 
     // Palette is the visualisation gradient, not layout tokens.
-    vec3 colBack = mix(vec3(0.05, 0.32, 0.70), vec3(0.20, 0.66, 0.98),
-                       smoothstep(0.0, 0.95, clamp(back.z / back.y, 0.0, 1.0)));
-    vec3 colMid = mix(vec3(0.55, 0.93, 1.0), vec3(0.16, 0.60, 0.95),
+    vec3 colBack = mix(vec3(0.16, 0.55, 0.92), vec3(0.02, 0.24, 0.58),
+                       smoothstep(0.0, 1.0, clamp(back.z / back.y, 0.0, 1.0)));
+    vec3 colMid = mix(vec3(0.55, 0.93, 1.0), vec3(0.14, 0.58, 0.94),
                       smoothstep(0.0, 1.0, clamp(mid.z / mid.y, 0.0, 1.0)));
     vec3 colFront = mix(vec3(1.0), vec3(0.45, 0.88, 1.0),
                         smoothstep(0.0, 1.0, clamp(front.z / front.y, 0.0, 1.0)));
