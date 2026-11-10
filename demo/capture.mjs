@@ -62,12 +62,14 @@ for (const input of inputs) {
       const state = await page.evaluate(() => ({
         status: window.__lab.status(),
         raw: window.__lab.raw(),
+        normalized: window.__lab.normalized(),
         color: window.__lab.color(),
       }));
       rows.push({
         t: point + (Date.now() - started) / 1000,
         track: state.status.time,
         raw: state.raw,
+        normalized: state.normalized,
         color: state.color,
       });
       await page.waitForTimeout(sampleMs);
@@ -77,18 +79,20 @@ for (const input of inputs) {
   }
 
   const rawKeys = Object.keys(rows[0]?.raw ?? {});
+  const normKeys = Object.keys(rows[0]?.normalized ?? {});
   const lines = rows.map((row) =>
     [
       row.t.toFixed(2),
       row.track.toFixed(2),
       ...rawKeys.map((key) => Number(row.raw[key] ?? 0).toFixed(4)),
+      ...normKeys.map((key) => Number(row.normalized[key] ?? 0).toFixed(4)),
       row.color.hue.toFixed(2),
       row.color.sat.toFixed(4),
       row.color.val.toFixed(4),
     ].join(','),
   );
   const out = join(outDir, `${slug}.csv`);
-  writeFileSync(out, [['t', 'track', ...rawKeys, 'hue', 'sat', 'val'].join(','), ...lines].join('\n'), 'utf8');
+  writeFileSync(out, [['t', 'track', ...rawKeys, ...normKeys.map((key) => key + '_n'), 'hue', 'sat', 'val'].join(','), ...lines].join('\n'), 'utf8');
 
   const hues = rows.map((row) => row.color.hue);
   const sats = rows.map((row) => row.color.sat);

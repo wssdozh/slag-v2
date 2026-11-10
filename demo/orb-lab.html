@@ -982,12 +982,14 @@ function createReader(analyser) {
  * Пишет точки на 20 Гц, перцентили пересчитывает раз в секунду.
  */
 const NORMALIZE_KEYS = ["energy", "brightness", "rolloff", "flatness", "pace", "bpm", "punch", "onset", "sub"];
-const NORMALIZE_WINDOW_S = 10;
+/** Ударные фичи не центрируются: у них нормально быть низкими и редкими. */
+const TRANSIENT_KEYS = ["punch", "onset"];
+const NORMALIZE_WINDOW_S = 30;
 const NORMALIZE_RATE = 20;
 
 function createNormalizer() {
   const history = new Map(NORMALIZE_KEYS.map((key) => [key, []]));
-  const bounds = new Map(NORMALIZE_KEYS.map((key) => [key, { low: 0, high: 1 }]));
+  const bounds = new Map(NORMALIZE_KEYS.map((key) => [key, { low: 0, mid: 0.5, high: 1 }]));
   const output = { ...ZERO };
   let timer = 0;
   let recalc = 0;
@@ -1011,19 +1013,34 @@ function createNormalizer() {
       }
     }
 
-    if (recalc >= 1) {
+    if (recalc >= 2) {
       recalc = 0;
       for (const key of NORMALIZE_KEYS) {
         const list = history.get(key);
         if (list.length < 20) continue;
         const sorted = [...list].sort((a, b) => a - b);
-        bounds.set(key, { low: percentile(sorted, 0.05), high: percentile(sorted, 0.95) });
+        bounds.set(key, {
+          low: percentile(sorted, 0.05),
+          mid: percentile(sorted, 0.5),
+          high: percentile(sorted, 0.95),
+        });
       }
     }
 
     for (const key of NORMALIZE_KEYS) {
-      const { low, high } = bounds.get(key);
-      output[key] = clamp01((raw[key] - low) / Math.max(high - low, 1e-3));
+      const { low, mid, high } = bounds.get(key);
+      const value = raw[key];
+      // Медленные фичи сидят у своего максимума, поэтому обычный min-max даёт
+      // медиану около 0.9. Центрируем по медиане: типичное значение — 0.5,
+      // и у параметра есть ход в обе стороны. Ударные фичи так не трогаем:
+      // им положено быть редкими и резкими.
+      if (TRANSIENT_KEYS.includes(key)) {
+        output[key] = clamp01((value - low) / Math.max(high - low, 1e-3));
+      } else if (value <= mid) {
+        output[key] = clamp01(0.5 * ((value - low) / Math.max(mid - low, 1e-3)));
+      } else {
+        output[key] = clamp01(0.5 + 0.5 * ((value - mid) / Math.max(high - mid, 1e-3)));
+      }
     }
     return output;
   };
@@ -1627,6 +1644,9 @@ window.__lab = {
   },
   raw() {
     return { ...lastRaw };
+  },
+  normalized() {
+    return { ...normalized };
   },
   color() {
     return { ...lastColor };
