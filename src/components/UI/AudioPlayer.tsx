@@ -23,7 +23,8 @@ const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 
 );
 
 interface AudioPlayerProps {
-  src: string;
+  /** Missing means the bytes never reached this device: the row says so and arms no play. */
+  src?: string;
   /** Row header when a card carries more than one track: `Artist - Title.ext`. */
   name?: string;
   duration?: number;
@@ -116,7 +117,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!audioRef.current) return;
+    if (!audioRef.current || !src) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -191,8 +192,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-6 h-6 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 cursor-pointer shadow-sm"
-          title={isPlaying ? 'Пауза' : 'Воспроизвести'}
+          disabled={!src}
+          className="w-6 h-6 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 cursor-pointer shadow-sm disabled:cursor-default disabled:opacity-40"
+          title={src ? (isPlaying ? 'Пауза' : 'Воспроизвести') : 'Файла нет на устройстве'}
         >
           {isPlaying ? (
             <Pause className="w-3 h-3 fill-current" />
@@ -223,7 +225,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         </div>
 
         <span className="text-[11px] font-sans tabular-nums text-zinc-400 shrink-0">
-          {isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}
+          {src
+            ? (isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur))
+            : 'файла нет'}
         </span>
       </div>
     );
@@ -233,9 +237,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     <button
       type="button"
       onClick={togglePlay}
-      className="w-9 h-9 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer"
-      title={isPlaying ? 'Пауза' : 'Воспроизвести'}
-      aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
+      disabled={!src}
+      className="w-9 h-9 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer disabled:cursor-default disabled:opacity-40"
+      title={src ? (isPlaying ? 'Пауза' : 'Воспроизвести') : 'Файла нет на устройстве'}
+      aria-label={src ? (isPlaying ? 'Пауза' : 'Воспроизвести') : 'Файла нет на устройстве'}
     >
       {isPlaying ? (
         <Pause className="w-4 h-4 fill-current" />
@@ -261,7 +266,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const durationText = (
     <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-400">
-      {isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}
+      {src
+        ? (isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur))
+        : 'файла нет'}
     </span>
   );
 

@@ -58,7 +58,6 @@ export function computeSubscription(
       activeDevices: activeCount,
       maxCacheMb: 999999,
       usedCacheMb: 0,
-      allowAttachments: true,
       hasAiLease: true,
       isExpiringSoon: false,
     };
@@ -73,7 +72,6 @@ export function computeSubscription(
     activeDevices: 0,
     maxCacheMb: 0,
     usedCacheMb: 0,
-    allowAttachments: false,
     hasAiLease: false,
   };
 }

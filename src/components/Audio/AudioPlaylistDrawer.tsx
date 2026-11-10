@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, Mic, Music, Play, Pause, ExternalLink } from 'lucide-react';
+import { X, Search, Mic, Music, Play, Pause, ExternalLink, FileX } from 'lucide-react';
 import type { AudioTrack, AudioTypeFilter } from '../../lib/media/audioHelper';
 import { formatAudioDuration } from '../../lib/media/audioHelper';
 import type { FolderMeta } from '../../types';
@@ -16,6 +16,8 @@ interface AudioPlaylistDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   tracks: AudioTrack[];
+  /** Tracks whose bytes are not on this device: playable nowhere until sync delivers them. */
+  missingIds: string[];
   currentTrackId: string | null;
   isPlaying: boolean;
   onSelectTrack: (track: AudioTrack) => void;
@@ -33,6 +35,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
   isOpen,
   onClose,
   tracks,
+  missingIds,
   currentTrackId,
   isPlaying,
   onSelectTrack,
@@ -172,15 +175,18 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
         ) : (
           filteredTracks.map((track) => {
             const isCurrent = track.id === currentTrackId;
+            const isMissing = missingIds.includes(track.id);
 
             return (
               <div
                 key={track.id}
                 onClick={() => onSelectTrack(track)}
                 className={`group flex items-center justify-between px-3 py-3 rounded-xl text-[13px] transition-colors cursor-pointer select-none ${
-                  isCurrent
-                    ? 'bg-white/[0.08] text-white'
-                    : 'text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100'
+                  isMissing
+                    ? 'opacity-40'
+                    : isCurrent
+                      ? 'bg-white/[0.08] text-white'
+                      : 'text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100'
                 }`}
               >
                 {/* Left: cover art & Track Info */}
@@ -203,7 +209,9 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
                       </span>
                     )}
                     <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      {isCurrent && isPlaying ? (
+                      {isMissing ? (
+                        <FileX className="h-3.5 w-3.5" />
+                      ) : isCurrent && isPlaying ? (
                         <Pause className="h-3.5 w-3.5 fill-current" />
                       ) : (
                         <Play className="h-3.5 w-3.5 fill-current" />
@@ -221,7 +229,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
                       {track.name}
                     </span>
                     <span className="truncate text-2xs text-zinc-500">
-                      {track.itemTitle}
+                      {isMissing ? 'файла нет на устройстве' : track.itemTitle}
                     </span>
                   </div>
                 </div>

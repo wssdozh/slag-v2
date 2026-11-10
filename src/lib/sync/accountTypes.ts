@@ -10,7 +10,6 @@ export interface AccountInfo {
   maxDevices: number;
   maxCacheMb: number;
   usedCacheMb: number;
-  allowAttachments: boolean;
   hasAiLease: boolean;
   createdAt?: string;
 }

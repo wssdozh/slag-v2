@@ -28,6 +28,12 @@ export const SYNC_INTERVALS = {
   WS_PING_INTERVAL_MS: 25000,
 } as const;
 
+/**
+ * Attachment bytes ride the same encrypted bundle. One file per bundle: raw → data URL (1.33×)
+ * → AES-GCM → base64 (1.33×) is ~1.78× on the wire, and the relay rejects bodies over 16 MB.
+ */
+export const SYNC_ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024;
+
 export const SYNC_CRYPTO_CONSTANTS = {
   VAULT_SALT: 'slag-vault-salt-v1',
   ROOM_SALT: 'slag-relay-room-v1',

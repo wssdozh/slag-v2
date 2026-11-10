@@ -123,47 +123,86 @@ export class StorageService {
     const cached = this.attachmentUrlCache.get(id);
     if (cached) return cached;
 
-    const stored = await idbGetAttachment(id);
-    if (stored?.dataUrl) return stored.dataUrl;
+    // Disk first: a blob URL streams and keeps five megabytes out of a JS string. A file that
+    // only lives in IndexedDB still plays, as the base64 it was stored as.
+    if (isTauri()) {
+      try {
+        const path = await this.attachmentPathFor(id, relativePath);
+        if (path) {
+          const bytes = await readFile(path, { baseDir: BaseDirectory.AppData });
+          const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mimeType || 'application/octet-stream' }));
+          this.attachmentUrlCache.set(id, url);
+          return url;
+        }
+      } catch (err) {
+        fsLog.warn(`Failed to read attachment ${id} from disk`, err);
+      }
+    }
 
-    if (!isTauri()) return undefined;
+    const stored = await idbGetAttachment(id);
+    return stored?.dataUrl;
+  }
+
+  /**
+   * Bytes as a data URL, for shipping an attachment through sync. Reuses the resolver above so
+   * there is one answer to "where are this attachment's bytes" instead of two.
+   */
+  public async getAttachmentDataUrl(att: SlagAttachment): Promise<string | undefined> {
+    const url = await this.getAttachmentUrl(att.id, att.relativePath, att.mimeType);
+    if (!url) return undefined;
+    if (url.startsWith('data:')) return url;
     try {
-      const path = await this.attachmentPathFor(id, relativePath);
-      if (!path) return undefined;
-      const bytes = await readFile(path, { baseDir: BaseDirectory.AppData });
-      const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mimeType || 'application/octet-stream' }));
-      this.attachmentUrlCache.set(id, url);
-      return url;
+      const blob = await (await fetch(url)).blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
     } catch (err) {
-      fsLog.warn(`Failed to read attachment ${id} from disk`, err);
+      fsLog.warn(`Failed to read attachment bytes ${att.id}`, err);
       return undefined;
     }
   }
 
   /** Persist base64 bytes to .attachments/ once; markdown keeps only metadata. */
   private async persistAttachmentFiles(item: SlagItem, vault: VaultMeta = this.currentVault): Promise<void> {
+    for (const att of item.attachments || []) await this.persistAttachmentFile(att, vault);
+  }
+
+  private async persistAttachmentFile(att: SlagAttachment, vault: VaultMeta = this.currentVault): Promise<void> {
     if (!isTauri()) return;
-    for (const att of item.attachments || []) {
-      if (!att.dataUrl?.startsWith('data:')) continue;
-      if (this.persistedAttachmentIds.has(att.id)) continue;
+    if (!att.dataUrl?.startsWith('data:')) return;
+    if (this.persistedAttachmentIds.has(att.id)) return;
 
-      try {
-        const dir = this.getVaultAttachmentsPath(vault);
-        await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
-        const path = `${dir}/${this.attachmentBasename(att)}`;
-        if (await exists(path, { baseDir: BaseDirectory.AppData })) {
-          this.persistedAttachmentIds.add(att.id);
-          continue;
-        }
-
-        const response = await fetch(att.dataUrl);
-        const buffer = await response.arrayBuffer();
-        await writeFile(path, new Uint8Array(buffer), { baseDir: BaseDirectory.AppData });
+    try {
+      const dir = this.getVaultAttachmentsPath(vault);
+      await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
+      const path = `${dir}/${this.attachmentBasename(att)}`;
+      if (await exists(path, { baseDir: BaseDirectory.AppData })) {
         this.persistedAttachmentIds.add(att.id);
-      } catch (err) {
-        fsLog.warn(`Failed to persist attachment ${att.id}`, err);
+        return;
       }
+
+      const response = await fetch(att.dataUrl);
+      const buffer = await response.arrayBuffer();
+      await writeFile(path, new Uint8Array(buffer), { baseDir: BaseDirectory.AppData });
+      this.persistedAttachmentIds.add(att.id);
+    } catch (err) {
+      fsLog.warn(`Failed to persist attachment ${att.id}`, err);
     }
+  }
+
+  /**
+   * Bytes that arrived through sync. Not `saveAttachment`: its session cache would hold every
+   * received file as base64, and on a phone that is a hundred megabytes of string per album.
+   */
+  public async importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<void> {
+    this.attachmentUrlCache.delete(attachment.id);
+    this.attachmentNameIndex = null;
+    await idbSaveAttachment({ ...attachment, dataUrl });
+    await this.persistAttachmentFile({ ...attachment, dataUrl });
+    fsLog.info(`Imported synced attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB)`);
   }
 
   /** A note keeps attachment ids; the bytes belong in IndexedDB, once per attachment. */

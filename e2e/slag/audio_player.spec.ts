@@ -171,3 +171,50 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   await expect(page.locator('[data-testid="audio-row-meta"]')).toHaveCount(audioCount - 1);
   await expect(page.locator('text=voice_11-22-33')).toHaveCount(0);
 });
+
+test('a track whose bytes never arrived says so instead of arming a dead play button', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 90000 });
+
+  await page.evaluate(() => {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith('slag_items_')) continue;
+      const items = JSON.parse(localStorage.getItem(key) || '[]');
+      items.unshift({
+        id: 'probe_missing_audio',
+        type: 'note',
+        title: 'Трек с другого устройства',
+        content: '',
+        folder: 'Входящие',
+        tags: [],
+        // Metadata only: sync carried the note but the bytes are still on the other device.
+        attachments: [{
+          id: 'probe_missing_track',
+          name: 'nostalgia - пропавший трек.wav',
+          type: 'audio',
+          mimeType: 'audio/wav',
+          size: 64000,
+          duration: 4,
+          relativePath: '.attachments/nostalgia - пропавший трек.wav',
+        }],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      localStorage.setItem(key, JSON.stringify(items));
+      break;
+    }
+  });
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 90000 });
+
+  const card = page.locator('.group').filter({ hasText: 'пропавший трек' }).first();
+  await expect(card).toBeVisible({ timeout: 10000 });
+  const play = card.locator('button[title="Файла нет на устройстве"]').first();
+  await expect(play).toBeVisible();
+  await expect(play).toBeDisabled();
+  await expect(card.getByText('файла нет', { exact: true }).first()).toBeVisible();
+  await card.screenshot({ path: 'test-results/screenshots/audio-missing-file.png' });
+});

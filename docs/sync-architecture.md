@@ -19,7 +19,7 @@
 | `folder` | ✅ | `folder.path` | upsert + delete + rename |
 | `workspace` | ✅ | `'workspace_state'` | канбан-колонки, виды |
 | `trash` | ✅ | `item.id` | delete-tombstone + кросс-девайс восстановление из корзины |
-| `attachment` | ✅ (отдельно) | `attachment.id` | бинарник отдельным каналом, **не** base64 внутри item |
+| `attachment` | ✅ | `attachment.id` | байты отдельным изменением в том же бандле, один файл на бандл, ≤6 МБ, **не** base64 внутри item |
 | `assistantHistory` | ❌ | — | per-device (чат с ИИ) |
 | `composerDrafts` | ❌ | — | per-device (черновики) |
 | настройки (тема/AI/клавиши) | ❌ | — | per-device |
@@ -94,5 +94,5 @@ CREATE TABLE device_cursors (
    переводятся на операции из outbox (бандл временно остаётся полным снапшотом для совместимости).
    Чинит: удаление/переименование папок, `moveItem`/`restoreFromTrash` (сейчас не пушатся сразу).
 3. **Фаза 2** (relay): `sync_events` + `syncId` + `since`-курсор; бандлы становятся delta; LWW по `syncId`.
-4. **Фаза 3**: `trash` и `attachment` как полноценные entity (бинарники отдельным каналом).
+4. **Фаза 3**: `trash` — полноценная entity; `attachment` — сделано: байты едут изменением `attachment` в том же шифрованном бандле (один файл на бандл, ≤6 МБ, без чанков), приёмник пишет их в IndexedDB и `.attachments/`. Файл больше лимита не синкается и честно помечается в UI «файла нет на устройстве».
 5. **Фаза 4**: вынести `transport.ts`/`reconcile.ts`, `syncEngine.ts` — тонкий оркестратор.

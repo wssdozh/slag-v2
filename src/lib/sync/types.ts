@@ -24,7 +24,6 @@ export interface SubscriptionInfo {
   activeDevices: number;
   maxCacheMb: number;
   usedCacheMb: number;
-  allowAttachments: boolean;
   hasAiLease: boolean;
   isExpiringSoon?: boolean;
 }

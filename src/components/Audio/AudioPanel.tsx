@@ -14,6 +14,7 @@ import {
   ListMusic,
   Pin,
   Folder,
+  FileX,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -51,10 +52,11 @@ export const AudioPanel: React.FC = () => {
   const [speedIndex, setSpeedIndex] = useState<number>(0);
   const [isLoop, setIsLoop] = useState<boolean>(false);
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
-  const [volume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
-  const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
+  // Nothing in the panel exposes a volume slider: a state without a setter is a constant.
+  const volume = 1;
+  const [resolvedSrcs, setResolvedSrcs] = useState<Record<string, string | null>>({});
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -76,8 +78,9 @@ export const AudioPanel: React.FC = () => {
     });
   }, [items, effectiveFolder, scopeMode, typeFilters, inboxMode]);
 
-  // Notes restored from markdown carry attachment metadata without bytes. Resolve
-  // only the visible playlist, and keep blob: URLs out of the vault.
+  // Notes restored from markdown carry attachment metadata without bytes. Resolve only the
+  // visible playlist, and keep blob: URLs out of the vault. A `null` is a real answer: the bytes
+  // are on another device and the row must say so instead of arming a dead play button.
   useEffect(() => {
     const missing = tracks.filter(t => !t.url);
     if (missing.length === 0) return;
@@ -86,13 +89,9 @@ export const AudioPanel: React.FC = () => {
       missing.map(async t => [t.id, await storage.getAttachmentUrl(t.attachmentId, t.relativePath, t.mimeType)] as const)
     ).then(pairs => {
       if (!active) return;
-      const next: Record<string, string> = {};
-      for (const [id, url] of pairs) {
-        if (url) next[id] = url;
-      }
-      if (Object.keys(next).length > 0) {
-        setResolvedUrls(prev => ({ ...prev, ...next }));
-      }
+      const next: Record<string, string | null> = {};
+      for (const [id, url] of pairs) next[id] = url ?? null;
+      setResolvedSrcs(prev => ({ ...prev, ...next }));
     });
     return () => {
       active = false;
@@ -124,11 +123,13 @@ export const AudioPanel: React.FC = () => {
     if (!audio) return;
     audio.playbackRate = PLAYBACK_SPEEDS[speedIndex];
     audio.volume = isMuted ? 0 : volume;
-  }, [speedIndex, isMuted, volume]);
+  }, [speedIndex, isMuted]);
 
   // Sync audio source when track changes
   const trackId = currentTrack?.id;
-  const trackUrl = currentTrack ? (currentTrack.url || resolvedUrls[currentTrack.id]) : undefined;
+  const trackUrl = currentTrack ? (currentTrack.url || resolvedSrcs[currentTrack.id] || undefined) : undefined;
+  // The resolver already answered "nothing here": bytes never reached this device.
+  const trackMissing = currentTrack !== null && !trackUrl && resolvedSrcs[currentTrack.id] === null;
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -202,7 +203,7 @@ export const AudioPanel: React.FC = () => {
 
   // Toggle playback
   const togglePlay = () => {
-    if (!audioRef.current || !currentTrack) return;
+    if (!audioRef.current || !currentTrack || trackMissing) return;
     if (isPlaying) {
       audioRef.current.pause();
     } else {
@@ -341,6 +342,7 @@ export const AudioPanel: React.FC = () => {
       : trackLabel.title || currentTrack?.itemTitle || 'Аудиозапись'
     : 'Аудиозапись';
   const trackAuthor = trackLabel && !trackLabel.isRecorded ? trackLabel.author : '';
+  const missingTrackIds = tracks.filter(t => !t.url && resolvedSrcs[t.id] === null).map(t => t.id);
 
   return (
     <div
@@ -364,6 +366,7 @@ export const AudioPanel: React.FC = () => {
         isOpen={isPlaylistOpen}
         onClose={() => setIsPlaylistOpen(false)}
         tracks={tracks}
+        missingIds={missingTrackIds}
         currentTrackId={currentTrack?.id ?? null}
         isPlaying={isPlaying}
         onSelectTrack={(track) => {
@@ -419,9 +422,21 @@ export const AudioPanel: React.FC = () => {
               <AudioCoverArt track={currentTrack} isPlaying={isPlaying} analyser={analyser} />
 
               {/* 2. Track Title (parsed from `Artist - Title.ext`, extension dropped) */}
-              <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-full text-center mt-5 mb-1 px-2">
+              <h2
+                className={`text-lg sm:text-xl font-bold tracking-tight truncate max-w-full text-center mt-5 mb-1 px-2 ${
+                  trackMissing ? 'text-zinc-500' : 'text-white'
+                }`}
+              >
                 {trackTitle}
               </h2>
+
+              {/* The bytes never landed on this device: say so instead of faking a play button. */}
+              {trackMissing && (
+                <div className="mb-1 flex items-center justify-center gap-1.5 text-[11px] font-mono text-zinc-500">
+                  <FileX className="h-3 w-3" />
+                  файла нет на устройстве
+                </div>
+              )}
 
               {/* 3. Author line: who made it, before where it lives */}
               {trackAuthor && (
@@ -503,9 +518,14 @@ export const AudioPanel: React.FC = () => {
                 {/* Central Round Play / Pause */}
                 <button
                   onClick={togglePlay}
-                  className="w-13 h-13 rounded-full bg-accent-media hover:bg-accent-media/90 text-white flex items-center justify-center shadow-xl motion-press cursor-pointer"
-                  title={isPlaying ? 'Пауза (Пробел)' : 'Воспроизведение (Пробел)'}
-                  aria-label={isPlaying ? 'Пауза' : 'Воспроизведение'}
+                  disabled={trackMissing}
+                  className="w-13 h-13 rounded-full bg-accent-media hover:bg-accent-media/90 text-white flex items-center justify-center shadow-xl motion-press cursor-pointer disabled:cursor-default disabled:opacity-40"
+                  title={
+                    trackMissing
+                      ? 'Файла нет на устройстве'
+                      : isPlaying ? 'Пауза (Пробел)' : 'Воспроизведение (Пробел)'
+                  }
+                  aria-label={trackMissing ? 'Файла нет на устройстве' : isPlaying ? 'Пауза' : 'Воспроизведение'}
                 >
                   {isPlaying ? (
                     <Pause className="w-6 h-6 fill-current" />
@@ -591,7 +611,7 @@ export const AudioPanel: React.FC = () => {
                   title={isMuted ? 'Включить звук' : 'Выключить звук'}
                   aria-label="Громкость"
                 >
-                  {isMuted || volume === 0 ? (
+                  {isMuted ? (
                     <VolumeX className="w-4 h-4 text-red-400" />
                   ) : (
                     <Volume2 className="w-4 h-4" />

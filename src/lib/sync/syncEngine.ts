@@ -5,6 +5,7 @@ import { accountClient } from './account';
 export { accountClient };
 import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
+import { stripAttachmentData } from '../storage/attachmentData';
 import { SyncTransport } from './transport';
 import {
   addTrustedDeviceToConfig,
@@ -38,10 +39,11 @@ import type {
   DeviceProfile,
   DeviceSyncMode,
 } from './types';
-import type { SlagItem, FolderMeta, WorkspaceState, ComposerDraft, FullscreenDraft } from '../../types';
+import type { SlagItem, SlagAttachment, FolderMeta, WorkspaceState, ComposerDraft, FullscreenDraft } from '../../types';
 import {
   DEFAULT_SYNC_SERVER_URL,
   OFFICIAL_SYNC_DOMAINS,
+  SYNC_ATTACHMENT_MAX_BYTES,
   SYNC_STORAGE_KEYS,
   SYNC_INTERVALS,
   DEFAULT_INBOX_FOLDER,
@@ -53,6 +55,11 @@ const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
 const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
 
 const syncLog = logger.scope('SYNC');
+
+/** Cheap identity of an attachment's bytes: reading five megabytes to hash them is not. */
+function attachmentSignature(att: SlagAttachment): string {
+  return `${att.size}:${att.name}`;
+}
 
 /** A bundle handed to the relay but not yet confirmed; holds the bookkeeping commit applies. */
 interface PendingPush {
@@ -100,6 +107,10 @@ export class SyncEngine {
   private pendingPushes = new Map<string, PendingPush>();
   private wsSupportsBinary = false;
   private pushDirty = false;
+  /** One-shot: the next push may carry a single attachment. */
+  private attachmentPass = false;
+  /** Set when the relay refuses a bundle for quota: attachments wait for a restart. */
+  private attachmentSyncBlocked = false;
   private entityHashes = new Map<string, { sig: string; hash: string }>();
   private transport: SyncTransport;
 
@@ -167,7 +178,6 @@ export class SyncEngine {
         activeDevices: 0,
         maxCacheMb: 0,
         usedCacheMb: 0,
-        allowAttachments: false,
         hasAiLease: false,
         isExpiringSoon: false,
       },
@@ -260,6 +270,62 @@ export class SyncEngine {
 
   public getOutbox(): Outbox {
     return new Outbox(this.currentVaultId);
+  }
+
+  /**
+   * Attachment bytes are their own change type and their own bundle: one file per push, so a
+   * photo never rides inside a keystroke bundle. The pass is a one-shot flag the push consumes.
+   */
+  private scheduleAttachmentPass(): void {
+    if (this.attachmentSyncBlocked || !this.hasPendingAttachment()) return;
+    this.attachmentPass = true;
+    this.scheduleDebouncedPush(0);
+  }
+
+  /** Signature comparison only: no bytes are read to answer "is anything left to send". */
+  private hasPendingAttachment(): boolean {
+    const sent = this.loadSentHashes();
+    return storage.getItems().some((item) => (item.attachments ?? []).some((att) => {
+      const seen = sent[`att:${att.id}`];
+      return seen !== attachmentSignature(att) && seen !== `skip:${attachmentSignature(att)}`;
+    }));
+  }
+
+  /** Bytes of one attachment as a `dataUrl` change; true as soon as one was packed. */
+  private async packOneAttachment(
+    item: SlagItem,
+    changes: SyncChangeItem[],
+    sentHashes: Record<string, string>,
+    packedHashes: Record<string, string>
+  ): Promise<boolean> {
+    for (const att of item.attachments ?? []) {
+      const key = `att:${att.id}`;
+      const sig = attachmentSignature(att);
+      const seen = sentHashes[key];
+      if (seen === sig || seen === `skip:${sig}`) continue;
+
+      const dataUrl = await storage.getAttachmentDataUrl(att);
+      if (!dataUrl) continue;
+      if (dataUrl.length > SYNC_ATTACHMENT_MAX_BYTES * 1.4) {
+        // No new state for "give up": a marker in the sent-hashes map is already understood by
+        // every reader of it, while a second set would have to be loaded, cleared and migrated.
+        sentHashes[key] = `skip:${sig}`;
+        this.saveSentHashes(sentHashes);
+        syncLog.info(`Attachment too big to sync: "${att.name}" (${att.size} B)`);
+        continue;
+      }
+      changes.push({
+        id: att.id,
+        type: 'attachment',
+        action: 'upsert',
+        version: 1,
+        hash: sig,
+        payload: { attachment: { ...att, dataUrl: undefined }, dataUrl },
+      });
+      packedHashes[key] = sig;
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -577,6 +643,7 @@ export class SyncEngine {
       this.connectWebSocket();
       this.startIntervals();
       await this.pushLocalChanges();
+      this.scheduleAttachmentPass();
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
       const msg = err instanceof Error ? err.message : String(err);
@@ -862,6 +929,15 @@ export class SyncEngine {
             }
             hasItemsChanged = true;
           }
+        } else if (ch.type === 'attachment' && ch.action === 'upsert') {
+          const payload = ch.payload as { attachment?: SlagAttachment; dataUrl?: string } | undefined;
+          const attachment = payload?.attachment;
+          if (attachment?.id && payload?.dataUrl?.startsWith('data:')) {
+            await storage.importSyncedAttachment(attachment, payload.dataUrl);
+            // The note did not change, but the UI resolves attachment urls per item: reuse the
+            // single sync event instead of inventing a second one for bytes.
+            hasItemsChanged = true;
+          }
         } else if (ch.type === 'workspace' && ch.payload) {
           workspaceState = ch.payload as WorkspaceState;
           hasWorkspaceChanged = true;
@@ -986,7 +1062,9 @@ export class SyncEngine {
     const hashKey = this.getStateHashKey();
 
     try {
-      const items = storage.getItems();
+      // `getItems` re-hydrates `dataUrl` from the session cache, so a photo pasted a minute ago
+      // would ride inside the note's own payload. Metadata only; bytes travel as their own change.
+      const items = stripAttachmentData(storage.getItems());
       const folders = storage.getFolders();
       const workspaceState = storage.getWorkspaceState();
       const pendingOps = this.getOutbox().pending();
@@ -1070,6 +1148,18 @@ export class SyncEngine {
         hash: workspaceHash,
         payload: workspaceState,
       });
+
+      // One attachment per bundle, and only when the previous bundle is confirmed. A slow uplink
+      // then blocks one file instead of every note edit behind it.
+      // ponytail: no chunks and no re-seed. The relay keeps a bundle for 7 days, so a device that
+      // sleeps longer never gets the file. Upgrade: a `restore` request from the receiver clears
+      // its hash here and the bytes are pushed again.
+      if (this.attachmentPass) {
+        this.attachmentPass = false;
+        for (const item of items) {
+          if (await this.packOneAttachment(item, changes, sentHashes, packedHashes)) break;
+        }
+      }
 
       // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
       const syncedIds = this.loadSyncedIds();
@@ -1237,6 +1327,7 @@ export class SyncEngine {
     this.status.error = null;
     syncLog.info(`Bundle ${pending.bundleId} confirmed by relay (${pending.changes} changes)`);
     this.notify();
+    this.scheduleAttachmentPass();
   }
 
   private async deliverPushOverHttp(pending: PendingPush): Promise<void> {
@@ -1259,6 +1350,11 @@ export class SyncEngine {
         } else if (response.status === 401 || response.status === 403) {
           this.disconnect();
           throw new Error(response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете');
+        } else if (response.status === 413) {
+          // The plan's cache quota is counted in bundle bytes. Retrying the same ten-megabyte
+          // attachment would hammer the relay forever, so attachments rest until a restart.
+          this.attachmentSyncBlocked = true;
+          throw new Error('Квота сервера на синхронизацию кончилась: вложения больше не уходят');
         } else {
           throw new Error(`Sync push failed: HTTP ${response.status}`);
         }
