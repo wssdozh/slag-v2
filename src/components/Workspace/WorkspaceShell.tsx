@@ -21,6 +21,7 @@ import { WindowControls } from '../UI/WindowControls';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { isDesktopApp } from '../../lib/windowControls';
 import { useDockPanels } from './useDockPanels';
+import { syncAllGroupConstraints } from './dockPanelUtils';
 import { useCrossWindowDnd } from './useCrossWindowDnd';
 
 const WorkspaceContentPanel: React.FC<{
@@ -166,6 +167,23 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     effectiveInitialPanel,
     onWillDragPanel: handleWillDragPanel,
   });
+
+  // Window width decides whether the side panels stay columns or fold into the reading pane.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const handleResize = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const api = apiRef.current;
+        if (api) syncAllGroupConstraints(api);
+      }, 150);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   // Native window dragging
   useEffect(() => {

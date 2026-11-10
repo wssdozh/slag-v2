@@ -50,21 +50,71 @@ export const getPanelComponent = (panel: IDockviewPanel): string => {
   return panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
 };
 
+/** Panels that are allowed to fold into the reading pane when the window gets tight. */
+const SIDE_COMPONENTS = new Set(['assistant', 'audio', 'folder-info', 'logs']);
+
+/** Below this width the side panels stop being columns and become tabs of the reading pane. */
+const FOLD_BELOW_PX = 1024;
+
+/**
+ * Keeps the grid inside the window. Every open panel wants its own column; when the window cannot
+ * hold that, the side panels fold into tabs of the reading pane instead of pushing the grid past
+ * the window edge (dockview obeys the minimums it is given, and the right-hand pane ends up clipped
+ * by the frame). Widening the window unfolds them back.
+ */
 export const syncAllGroupConstraints = (api: DockviewApi) => {
-  api.groups.forEach(group => {
-    const active = group.activePanel;
-    if (!active) return;
+  const panels = api.panels;
+  const feed = panels.find(panel => getPanelComponent(panel) === 'feed') ?? panels[0];
+  if (!feed) return;
+
+  const fold = api.width > 0 && api.width < FOLD_BELOW_PX;
+  // moveTo re-arranges the grid as it goes, so the pass repeats until nothing else wants to move.
+  let moved = 0;
+  for (let pass = 0; pass < 3; pass += 1) {
+    let movedNow = 0;
+    for (const panel of [...api.panels]) {
+      if (!SIDE_COMPONENTS.has(getPanelComponent(panel))) continue;
+      if (fold && panel.group !== feed.group) {
+        panel.api.moveTo({ group: feed.group });
+        movedNow += 1;
+      } else if (!fold && panel.group === feed.group) {
+        panel.api.moveTo({ group: feed.group, position: 'right' });
+        movedNow += 1;
+      }
+    }
+    moved += movedNow;
+    if (!movedNow) break;
+  }
+  if (fold) feed.api.setActive();
+  if (moved) {
+    // Folding moves whole columns around, and the surviving panes keep whatever space they had.
+    // Hand the leftovers to the reading pane instead of leaving the sidebar half the window.
+    let used = 0;
+    for (const group of api.groups) {
+      if (group === feed.group || !group.activePanel) continue;
+      const width = getPanelMinWidth(getPanelComponent(group.activePanel));
+      group.api.setSize({ width });
+      used += width;
+    }
+    feed.group.api.setSize({ width: Math.max(getPanelMinWidth('feed'), api.width - used) });
+  }
+
+  const entries = api.groups
+    .map(group => ({ group, active: group.activePanel }))
+    .filter((entry): entry is { group: (typeof entry.group); active: IDockviewPanel } => Boolean(entry.active));
+  // Whatever is still split gets scaled minimums: the window is the hard limit, the rail minimums
+  // are just a comfortable default.
+  const totalMin = entries.reduce((sum, entry) => sum + getPanelMinWidth(getPanelComponent(entry.active)), 0);
+  const scale = api.width > 0 && totalMin > api.width ? api.width / totalMin : 1;
+  entries.forEach(({ group, active }) => {
     const comp = getPanelComponent(active);
-    const minWidth = getPanelMinWidth(comp);
     const maxWidth = getPanelMaxWidth(comp);
     try {
       group.api.setConstraints({
-        minimumWidth: minWidth,
+        minimumWidth: Math.floor(getPanelMinWidth(comp) * scale),
         maximumWidth: maxWidth,
       });
-      if (minWidth > 0 && group.api.width < minWidth) {
-        group.api.setSize({ width: minWidth });
-      } else if (maxWidth && group.api.width > maxWidth) {
+      if (maxWidth && group.api.width > maxWidth) {
         group.api.setSize({ width: maxWidth });
       }
     } catch {
