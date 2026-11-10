@@ -50,10 +50,39 @@ test('side panels fold into the reading pane when the window is too narrow for f
   expect(narrow.reduce((sum, group) => sum + group.width, 0)).toBeLessThanOrEqual(950);
   await page.screenshot({ path: 'test-results/screenshots/dock-fold-narrow.png' });
 
-  // Widening brings the columns back.
+  // Widening brings the previous split back, tab groups included.
   await page.setViewportSize({ width: 1600, height: 900 });
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1400);
   const back = await groups(page);
   expect(back.length).toBeGreaterThanOrEqual(4);
   expect(back.reduce((sum, group) => sum + group.width, 0)).toBeLessThanOrEqual(1600);
+  expect(back.some(group => group.tabs.includes('Аудиоплеер'))).toBe(true);
+  // «Ассистент» и «Инфо» были табами одной колонки — значит вернулся снапшот, а не по колонке на панель.
+  expect(back.some(group => group.tabs.includes('Ассистент') && group.tabs.includes('Инфо'))).toBe(true);
+  await page.screenshot({ path: 'test-results/screenshots/dock-fold-restored.png' });
+});
+
+test('a panel closed while folded does not reappear on widening', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await setupSlag(page, testInfo);
+  await page.waitForTimeout(2500);
+  await splitAudioIntoColumn(page);
+
+  await page.setViewportSize({ width: 950, height: 900 });
+  await page.waitForTimeout(1200);
+
+  const audioTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Аудиоплеер' }).first();
+  await audioTab.hover();
+  await audioTab.locator('.dv-default-tab-action').first().click();
+  await page.waitForTimeout(700);
+  expect((await groups(page)).some(group => group.tabs.includes('Аудиоплеер'))).toBe(false);
+
+  // The layout snapshot no longer matches the open panels, so the restore is skipped instead of
+  // resurrecting the closed tab.
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.waitForTimeout(1400);
+  const back = await groups(page);
+  expect(back.some(group => group.tabs.includes('Аудиоплеер'))).toBe(false);
+  expect(back.some(group => group.tabs.includes('Входящие'))).toBe(true);
 });
