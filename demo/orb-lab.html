@@ -216,7 +216,7 @@
 <script>
 "use strict";
 
-const STORAGE_KEY = "slag.orbLab.v6";
+const STORAGE_KEY = "slag.orbLab.v7";
 
 const VERTEX_SRC = `
 attribute vec2 aPosition;
@@ -237,6 +237,7 @@ uniform float uTime, uVolume, uBass, uMid, uHigh, uFlux;
 uniform float uRadiusBack, uRadiusMid, uRadiusFront;
 uniform float uDeform, uSpeed, uLobes, uBreath, uEdge, uBlend, uMerge, uCrest, uNoise, uAudioMix;
 uniform float uIdle, uIntensity, uWobble, uWarp;
+uniform float uHue, uSat, uVal;
 varying vec2 vUv;
 
 float hash21(vec2 p) {
@@ -279,6 +280,18 @@ vec3 fieldLayer(vec2 p, vec2 center, float base, float lobes, float phase, float
     return vec3(radius - r, nd, smoothstep(0.60, 1.0, nd));
 }
 
+// Один оттенок и его тона: hue фиксирован, меняются только насыщенность и
+// светимость, поэтому перелив остаётся монохромным.
+vec3 hsv2rgb(float h, float s, float v) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(vec3(h / 360.0) + K.xyz) * 6.0 - K.www);
+    return v * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), s);
+}
+
+vec3 tint(float sat, float val) {
+    return hsv2rgb(uHue, clamp(sat, 0.0, 0.95), clamp(val, 0.0, 1.0));
+}
+
 float smoothMax3(float a, float b, float c, float k) {
     float ka = clamp(k * a, -30.0, 30.0);
     float kb = clamp(k * b, -30.0, 30.0);
@@ -312,19 +325,17 @@ void main() {
     float aMid = smoothstep(-uBlend, uBlend, fm.x);
     float aFront = smoothstep(-uBlend, uBlend, ff.x);
 
-    vec3 colBack = mix(vec3(0.22, 0.60, 1.0), vec3(0.03, 0.18, 0.56),
-                       smoothstep(0.0, 1.0, fb.y) * 0.75);
-    vec3 colMid = mix(vec3(0.62, 0.96, 1.0), vec3(0.09, 0.48, 0.92),
-                      smoothstep(0.0, 1.0, fm.y) * 0.75);
-    vec3 colFront = mix(vec3(1.0), vec3(0.68, 0.94, 1.0),
-                        smoothstep(0.0, 1.0, ff.y) * 0.70);
+    // Тона одного оттенка: back тёмное и насыщеннее, front почти белый.
+    vec3 colBack = tint(uSat, uVal * (0.50 - 0.10 * smoothstep(0.0, 1.0, fb.y)));
+    vec3 colMid = tint(uSat * 0.62, uVal * (0.95 - 0.15 * smoothstep(0.0, 1.0, fm.y)));
+    vec3 colFront = tint(uSat * 0.18, uVal * (1.0 - 0.05 * smoothstep(0.0, 1.0, ff.y)));
 
-    colMid += vec3(0.40, 0.90, 1.0) * fm.z * (0.05 + uHigh * 0.25 * uAudioMix);
+    colMid += tint(uSat * 0.6, uVal) * fm.z * (0.05 + uHigh * 0.25 * uAudioMix);
 
     // Гребень только на внутренних стыках: внешняя кромка — это уже одна
     // общая поверхность, у неё нет «края верхнего слоя».
-    colMid += vec3(0.55, 0.90, 1.0) * pow(fm.z, 1.3) * uCrest * 0.75;
-    colFront += vec3(0.85, 0.98, 1.0) * pow(ff.z, 1.3) * uCrest * 0.9;
+    colMid += tint(uSat * 0.55, uVal) * pow(fm.z, 1.3) * uCrest * 0.75;
+    colFront += tint(uSat * 0.25, uVal) * pow(ff.z, 1.3) * uCrest * 0.9;
 
     vec3 color = mix(colBack, colMid, aMid);
     color = mix(color, colFront, aFront);
@@ -353,7 +364,10 @@ const DEFAULT_PARAMS = {
   idle: 0.02,
   intensity: 1,
   warp: 0.9,
-  moodAmount: 0.7,
+  moodAmount: 0.85,
+  hue: 205,
+  sat: 0.78,
+  val: 0.92,
   audioMix: 1,
 };
 
@@ -515,7 +529,7 @@ function syncSliders() {
 /* -------------------------------- renderer -------------------------------- */
 
 function createRenderer(canvas) {
-  const gl = canvas.getContext("webgl", { alpha: true, antialias: true, premultipliedAlpha: true });
+  const gl = canvas.getContext("webgl", { alpha: true, antialias: true, premultipliedAlpha: true, preserveDrawingBuffer: true });
   if (!gl) return null;
 
   const buffer = gl.createBuffer();
@@ -651,7 +665,7 @@ const ENVELOPE = {
 
 const MAX_STEP_S = 0.1;
 const PACE_WINDOW_S = 3;
-const PACE_FULL = 4;
+const PACE_FULL = 8;
 const CENTROID_LOW_HZ = 120;
 const CENTROID_HIGH_HZ = 6000;
 const ROLLOFF_LOW_HZ = 500;
@@ -728,6 +742,13 @@ function createReader(analyser) {
   let lastOnset = -1;
   let slowFlux = 0;
   let accent = 0;
+  let energy = 0;
+  let brightness = 0;
+  let pace = 0;
+  let punch = 0;
+  let flatness = 0;
+  let rolloff = 0;
+  let sub = 0;
   let onsetLevel = 0;
   let bpm = 0;
   let beatConf = 0;
@@ -787,6 +808,13 @@ function createReader(analyser) {
       lastOnset = -1;
       slowFlux = 0;
       accent = 0;
+      energy = 0;
+      brightness = 0;
+      pace = 0;
+      punch = 0;
+      flatness = 0;
+      rolloff = 0;
+      sub = 0;
       onsetLevel = 0;
       bpm = 0;
       beatConf = 0;
@@ -801,13 +829,8 @@ function createReader(analyser) {
       let mid = 0;
       let high = 0;
       let flux = 0;
-      let energy = 0;
-      let brightness = 0;
-      let pace = 0;
-      let punch = 0;
-      let flatness = 0;
-      let rolloff = 0;
-      let sub = 0;
+      // energy, brightness, pace, punch, flatness, rolloff и sub живут в замыкании:
+      // это огибающие, их нельзя пересоздавать на каждый кадр.
 
       if (active) {
         analyser.getFloatFrequencyData(frequencyData);
@@ -881,6 +904,7 @@ function createReader(analyser) {
         );
 
         sub = clamp01(bass / (bass + mid + high + 0.001));
+
 
         energy += (volume - energy) * (1 - Math.exp(-step / ENVELOPE.energy.release));
         brightness += (clamp01(rawBrightness) - brightness) * (1 - Math.exp(-step / ENVELOPE.brightness.release));
@@ -1019,6 +1043,8 @@ const LIMITS = {
   merge: { deadband: 0.3, maxDelta: 6 },
   noise: { deadband: 0.005, maxDelta: 0.6 },
   warp: { deadband: 0.02, maxDelta: 0.8 },
+  sat: { deadband: 0.005, maxDelta: 0.04 },
+  val: { deadband: 0.005, maxDelta: 0.05 },
 };
 
 const RANGES = {
@@ -1029,6 +1055,8 @@ const RANGES = {
   merge: [4, 40],
   noise: [0, 0.2],
   warp: [0, 2.5],
+  sat: [0.3, 0.9],
+  val: [0.5, 1],
 };
 
 const driverTrace = { deform: "base", crest: "base", blend: "base" };
@@ -1070,7 +1098,17 @@ function deriveParams(base, features, mode) {
   driverTrace.crest = slow ? "bright" : "punch";
   driverTrace.blend = slow ? "bright" : "punch";
 
+  // Один оттенок на кадр: hue медленно едет за настроением (синий -> бирюза -> индиго),
+  // но вся картинка всегда остаётся тонами одного цвета.
+  // Цвет — шкала температуры: спокойный микс уходит в синий, плотный и быстрый
+  // проходит через зелёный и жёлтый до красного. В кадре всегда один оттенок,
+  // поэтому «разноцветности» нет — есть один цвет, который меняется целиком.
+  const mood = clamp01(0.5 * energy + 0.3 * bright + 0.2 * pace);
+  const lift = 0.6 * bright + 0.4 * rolloff;
   const target = {
+    hue: 210 - 210 * mood,
+    sat: 0.52 + 0.38 * energy,
+    val: 0.68 + 0.3 * lift,
     deform: base.deform * (0.45 + 1.5 * shape) * (1 + 0.35 * accent * onset),
     warp: base.warp * (0.4 + 1.4 * shape),
     speed: base.speed * (0.55 + 1.35 * tempo),
@@ -1110,6 +1148,8 @@ function limitParams(key, params, dt) {
 
 const limiters = { base: {}, mood: {}, pulse: {} };
 const wobbles = { base: 0, mood: 0, pulse: 0 };
+/** Оттенок догоняет цель за секунды: цвет живёт по секциям, а не по ударам. */
+const hueSlow = { base: 205, mood: 240, pulse: 240 };
 
 /* ------------------------------ csv recording ----------------------------- */
 
@@ -1155,6 +1195,9 @@ const meters = {
   beat: document.getElementById("m-beat"),
 };
 
+let lastRaw = { ...ZERO };
+let lastColor = { hue: 205, sat: 0.78, val: 0.92 };
+
 let raf = 0;
 let lastFrame = performance.now();
 let seconds = 0;
@@ -1181,6 +1224,9 @@ function paramUniforms(params) {
     uIdle: params.idle,
     uIntensity: params.intensity,
     uWarp: params.warp,
+    uHue: params.hue,
+    uSat: params.sat,
+    uVal: params.val,
     uAudioMix: params.audioMix,
   };
 }
@@ -1218,6 +1264,7 @@ function frame(now) {
 
   const active = audio.mode !== "silence" && audio.reader !== null;
   const raw = audio.reader ? audio.reader.read(dt, active) : { ...ZERO };
+  lastRaw = raw;
 
   if (!normalizer) normalizer = createNormalizer();
   const mapped = normalizer(dt, raw);
@@ -1229,6 +1276,11 @@ function frame(now) {
   for (const key of panelKeys) {
     const mode = key === "base" ? "base" : key;
     const derived = deriveParams(state.params, features, mode);
+    // hue живёт на круге, поэтому догоняем цель по короткой дуге, а не по числам
+    const hueDelta = ((derived.hue - hueSlow[key] + 540) % 360) - 180;
+    hueSlow[key] += hueDelta * (1 - Math.exp(-dt / 12));
+    hueSlow[key] = ((hueSlow[key] % 360) + 360) % 360;
+    derived.hue = hueSlow[key];
     const params = limitParams(key, derived, dt);
 
     wobbles[key] += dt * params.speed * (0.5 + 1.5 * raw.volume * params.audioMix);
@@ -1246,6 +1298,7 @@ function frame(now) {
         ...paramUniforms(params),
       });
     }
+    if (key === "mood") lastColor = { hue: params.hue, sat: params.sat, val: params.val };
     paintReadout(key, params);
   }
 
@@ -1538,6 +1591,11 @@ document.getElementById("file").addEventListener("change", async (event) => {
   element.src = URL.createObjectURL(file);
   try {
     await element.play();
+    // Выбор файла сам включает режим: иначе анализатор остаётся в тишине.
+    state.mode = "file";
+    audio.mode = "file";
+    syncModeButtons();
+    save();
     setLog(file.name + " играет", "ok");
   } catch {
     setLog("не удалось запустить файл", "err");
@@ -1551,6 +1609,29 @@ textarea.addEventListener("keydown", (event) => {
   }
 });
 
+/* Стенд: наружу отдаём только то, что нужно для съёмки фич с трека. */
+window.__lab = {
+  status() {
+    const element = audio.element;
+    return {
+      mode: audio.mode,
+      time: element ? element.currentTime : 0,
+      duration: element ? element.duration : 0,
+    };
+  },
+  seek(seconds) {
+    if (audio.element) audio.element.currentTime = seconds;
+  },
+  play() {
+    return audio.element ? audio.element.play() : Promise.resolve();
+  },
+  raw() {
+    return { ...lastRaw };
+  },
+  color() {
+    return { ...lastColor };
+  },
+};
 /* --------------------------------- startup -------------------------------- */
 
 restore();
