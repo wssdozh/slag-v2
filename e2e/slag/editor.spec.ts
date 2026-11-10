@@ -144,6 +144,11 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const playBtn = voiceCard.locator('button[title*="Воспроизвести"]').first();
     await expect(playBtn).toBeVisible();
 
+    // The card body is the timeline: the fill starts empty and grows with the playhead.
+    const voiceFill = voiceCard.getByTestId('voice-progress');
+    await expect(voiceFill).toBeAttached();
+    await expect(voiceFill).toHaveCSS('transform', 'matrix(0, 0, 0, 1, 0, 0)');
+
     // Screenshot compact voice card
     await page.screenshot({
       path: 'test-results/screenshots/feed-audioplayer-monochrome.png',

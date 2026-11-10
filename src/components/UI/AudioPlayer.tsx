@@ -33,6 +33,8 @@ interface AudioPlayerProps {
   summary?: string;
   enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
   onEnrich?: () => void;
+  /** The owner paints the progress itself: the playhead as a 0..1 fraction. */
+  onProgress?: (fraction: number) => void;
 }
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
@@ -46,6 +48,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   summary: _summary,
   enrichmentStatus = 'idle',
   onEnrich,
+  onProgress,
 }) => {
   const transcript = propTranscript || propExtractedText;
   const [isPlaying, setIsPlaying] = useState(false);
@@ -99,6 +102,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const currentDur = duration > 0 ? duration : (initialDuration || 0);
   const progressPercent = currentDur > 0 ? (currentTime / currentDur) * 100 : 0;
+
+  // When the card itself is the bar, the owner paints it: no line inside the player.
+  useEffect(() => {
+    if (!onProgress) return;
+    onProgress(currentDur > 0 ? currentTime / currentDur : 0);
+  }, [currentTime, currentDur, onProgress]);
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -233,18 +242,27 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           )}
         </button>
 
-        {/* The capsule is the progress: it fills left to right as the voice plays. */}
-        <div
-          ref={waveTrackRef}
-          onMouseDown={handleMouseDown}
-          title="Перемотка"
-          className="relative h-2 min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/[0.12]"
-        >
+        {/* Either an invisible scrub strip (the card paints the progress) or the capsule. */}
+        {onProgress ? (
           <div
-            style={{ transform: `scaleX(${progressPercent / 100})`, transformOrigin: 'left center' }}
-            className="h-full w-full rounded-full bg-white/85 transition-transform duration-100 ease-linear"
+            ref={waveTrackRef}
+            onMouseDown={handleMouseDown}
+            title="Перемотка"
+            className="h-6 min-w-0 flex-1 cursor-pointer"
           />
-        </div>
+        ) : (
+          <div
+            ref={waveTrackRef}
+            onMouseDown={handleMouseDown}
+            title="Перемотка"
+            className="relative h-2 min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/[0.12]"
+          >
+            <div
+              style={{ transform: `scaleX(${progressPercent / 100})`, transformOrigin: 'left center' }}
+              className="h-full w-full rounded-full bg-white/85 transition-transform duration-100 ease-linear"
+            />
+          </div>
+        )}
 
         <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-400">
           {isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur)}
