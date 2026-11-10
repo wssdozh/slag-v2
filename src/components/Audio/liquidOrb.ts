@@ -49,60 +49,76 @@ void main() {
     vec2 p = vUv;
     float t = uTime;
 
-    // Vertical stack: one orb above another on the same axis, each one smaller
-    // and hotter than the one below. The overlap is deliberate: the lower orb
-    // shows as a bottom crescent, the upper one caps the pile.
-    vec2 centerBack = vec2(0.02 * sin(t * 0.17), -0.24 + 0.02 * cos(t * 0.13))
-                    + vec2(uVolume * 0.012, uBass * 0.008);
-    vec2 centerMid = vec2(0.03 * sin(t * 0.23 + 1.3), 0.06 + 0.02 * cos(t * 0.19 + 0.7))
-                   + vec2(-uBass * 0.010, 0.0);
-    vec2 centerFront = vec2(0.02 * sin(t * 0.31 + 2.7) + uFlux * 0.025,
-                            0.38 + 0.02 * cos(t * 0.27 + 1.9) + uMid * 0.010);
+    // Stacked on top of each other: the centers stay almost coincident, the
+    // radii step down 0.62 -> 0.46 -> 0.30, so every layer leaves a ring of the
+    // one below it. A dark groove at each boundary makes it read as separate
+    // discs instead of a bullseye.
+    vec2 centerBack = vec2(0.010 * sin(t * 0.17), 0.008 * cos(t * 0.13))
+                    + vec2(uVolume * 0.006, 0.0);
+    vec2 centerMid = vec2(-0.008 * sin(t * 0.23 + 1.3), 0.010 * cos(t * 0.19 + 0.7));
+    vec2 centerFront = vec2(0.006 * sin(t * 0.31 + 2.7) + uFlux * 0.020,
+                            0.006 * cos(t * 0.27 + 1.9));
 
-    float breath = sin(t * 1.1) * 0.014;
+    float breath = sin(t * 1.1) * 0.012;
 
-    // Deformation is deliberately large: a quiet orb should still look liquid,
-    // not like a circle with a wobble bolted on.
     vec3 back = orb(p, centerBack,
-        0.42 + breath + uVolume * 0.06, 0.050,
-        0.060 + uVolume * 0.050, t * 0.23, 2.0,
+        0.62 + breath + uVolume * 0.07, 0.055,
+        0.060 + uVolume * 0.045, t * 0.23, 2.0,
         0.045 + uBass * 0.035, t * 0.17 + 0.8, 3.0);
 
     vec3 mid = orb(p, centerMid,
-        0.32 + uBass * 0.06 + uVolume * 0.02, 0.040,
-        0.070 + uMid * 0.080, t * 0.47 + 0.5, 2.0,
-        0.055 + uBass * 0.080, t * 0.53 - 0.3, 3.0);
+        0.46 + uBass * 0.06 + uVolume * 0.02, 0.045,
+        0.055 + uMid * 0.070, t * 0.47 + 0.5, 2.0,
+        0.050 + uBass * 0.070, t * 0.53 - 0.3, 3.0);
 
     vec3 front = orb(p, centerFront,
-        0.18 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, 0.045,
-        0.035 + uHigh * 0.035, t * 0.90, 4.0,
-        0.028 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
+        0.30 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, 0.040,
+        0.035 + uHigh * 0.030, t * 0.90, 4.0,
+        0.030 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
 
-    // Palette is the visualisation gradient, not layout tokens. The back orb is
-    // darker than the middle one (that is the depth cue) with a soft lit limb.
+    // Same silhouettes, inflated, used only to darken the seam under the layer
+    // that sits above.
+    vec3 seamMid = orb(p, centerMid,
+        0.46 + uBass * 0.06 + uVolume * 0.02 + 0.028, 0.030,
+        0.055 + uMid * 0.070, t * 0.47 + 0.5, 2.0,
+        0.050 + uBass * 0.070, t * 0.53 - 0.3, 3.0);
+
+    vec3 seamFront = orb(p, centerFront,
+        0.30 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03 + 0.026, 0.028,
+        0.035 + uHigh * 0.030, t * 0.90, 4.0,
+        0.030 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
+
+    // Palette is the visualisation gradient, not layout tokens. Every disc runs
+    // bright in the middle to dark at its rim, which is what gives the stack
+    // depth without any lighting.
     float backNd = clamp(back.z / back.y, 0.0, 1.0);
-    vec3 colBack = mix(vec3(0.14, 0.48, 0.90), vec3(0.02, 0.18, 0.48), smoothstep(0.0, 1.0, backNd));
-    colBack += vec3(0.08, 0.30, 0.60) * smoothstep(0.35, 1.0, backNd) * 0.7;
-    vec3 colMid = mix(vec3(0.70, 0.97, 1.0), vec3(0.10, 0.55, 0.94),
-                      smoothstep(0.0, 1.0, clamp(mid.z / mid.y, 0.0, 1.0)));
-    vec3 colFront = mix(vec3(1.0), vec3(0.35, 0.82, 1.0),
-                        smoothstep(0.0, 1.0, clamp(front.z / front.y, 0.0, 1.0)));
+    vec3 colBack = mix(vec3(0.16, 0.52, 0.95), vec3(0.02, 0.14, 0.42), smoothstep(0.0, 1.0, backNd));
+
+    float midNd = clamp(mid.z / mid.y, 0.0, 1.0);
+    vec3 colMid = mix(vec3(0.68, 0.97, 1.0), vec3(0.06, 0.46, 0.90), smoothstep(0.0, 1.0, midNd));
+
+    float frontNd = clamp(front.z / front.y, 0.0, 1.0);
+    vec3 colFront = mix(vec3(1.0), vec3(0.40, 0.86, 1.0), smoothstep(0.0, 1.0, frontNd));
 
     // Highs shimmer on the middle rim: the cheapest way to show consonants.
     colMid += vec3(0.40, 0.90, 1.0)
-            * smoothstep(mid.y - 0.22, mid.y - 0.02, mid.z)
-            * (0.08 + uHigh * 0.25);
+            * smoothstep(mid.y - 0.10, mid.y - 0.01, mid.z)
+            * (0.06 + uHigh * 0.20);
 
-    float aBack = back.x * 0.96;
-    float aMid = mid.x * 0.90;
+    float aBack = back.x;
+    float aMid = mid.x;
     float aFront = front.x;
 
-    // Premultiplied stack, bottom to top. The slight translucency is what lets
-    // the silhouette underneath read as a second object instead of a halo.
+    // Premultiplied stack, bottom to top, with a dark seam where the next disc
+    // lands on the previous one.
     vec3 color = colBack * aBack;
     float alpha = aBack;
+    color *= 1.0 - seamMid.x * 0.45;
+
     color = colMid * aMid + color * (1.0 - aMid);
     alpha = aMid + alpha * (1.0 - aMid);
+    color *= 1.0 - seamFront.x * 0.45;
+
     color = colFront * aFront + color * (1.0 - aFront);
     alpha = aFront + alpha * (1.0 - aFront);
 
