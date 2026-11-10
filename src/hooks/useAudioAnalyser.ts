@@ -5,8 +5,6 @@ import { ORB_FFT_SIZE } from '../lib/media/audioSpectrum';
 
 const log = logger.scope('MEDIA');
 
-type AudioContextCtor = typeof AudioContext;
-
 /**
  * Owns the Web Audio graph for one `<audio>` element.
  *
@@ -27,8 +25,7 @@ export function useAudioAnalyser(audioRef: RefObject<HTMLAudioElement | null>): 
     const element = audioRef.current;
     if (!element) return;
 
-    const Ctor: AudioContextCtor | undefined =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext;
+    const Ctor = window.AudioContext;
     if (!Ctor) {
       log.warn('Web Audio is unavailable, the liquid orb will stay idle');
       return;

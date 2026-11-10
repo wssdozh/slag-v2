@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { AudioTrack } from '../../lib/media/audioHelper';
-import { createSpectrumReader, type OrbFeatures, type SpectrumReader } from '../../lib/media/audioSpectrum';
-import { createOrbRenderer, type OrbRenderer } from './liquidOrb';
+import { createSpectrumReader, ORB_SILENCE, type OrbFeatures } from '../../lib/media/audioSpectrum';
+import { createOrbRenderer } from './liquidOrb';
 import { prefersReducedMotion } from '../../lib/motion';
 
 interface AudioCoverArtProps {
@@ -9,8 +9,6 @@ interface AudioCoverArtProps {
   isPlaying: boolean;
   analyser: AnalyserNode | null;
 }
-
-const RESTING_FEATURES: OrbFeatures = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0 };
 
 /** The orb keeps moving this long after a pause so it settles into a calm shape. */
 const PAUSE_SETTLE_MS = 700;
@@ -35,8 +33,8 @@ const LiquidOrbCanvas: React.FC<{ isPlaying: boolean; analyser: AnalyserNode | n
   analyser,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const rendererRef = useRef<OrbRenderer | null>(null);
-  const readerRef = useRef<SpectrumReader | null>(null);
+  const rendererRef = useRef<ReturnType<typeof createOrbRenderer> | null>(null);
+  const readerRef = useRef<ReturnType<typeof createSpectrumReader> | null>(null);
   const isPlayingRef = useRef(isPlaying);
   const reducedMotionRef = useRef(false);
   const timeRef = useRef(0);
@@ -75,14 +73,14 @@ const LiquidOrbCanvas: React.FC<{ isPlaying: boolean; analyser: AnalyserNode | n
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    const drawFrame = (time: number, features: OrbFeatures) => {
-      renderer.draw({ timeSeconds: time, ...features });
+    const drawFrame = (time: number, dt: number, features: OrbFeatures) => {
+      renderer.draw({ timeSeconds: time, dt, features });
       framesRef.current += 1;
       publishDebug({ time, frames: framesRef.current, features });
     };
 
     if (reducedMotionRef.current) {
-      drawFrame(1, RESTING_FEATURES);
+      drawFrame(1, 0, ORB_SILENCE);
       return;
     }
 
@@ -101,8 +99,8 @@ const LiquidOrbCanvas: React.FC<{ isPlaying: boolean; analyser: AnalyserNode | n
       timeRef.current += dt;
 
       const reader = readerRef.current;
-      const features = reader ? reader.read(dt, isPlayingRef.current) : RESTING_FEATURES;
-      drawFrame(timeRef.current, features);
+      const features = reader ? reader.read(dt, isPlayingRef.current) : ORB_SILENCE;
+      drawFrame(timeRef.current, dt, features);
 
       if (!isPlayingRef.current && now >= settleUntil) {
         raf = 0;
