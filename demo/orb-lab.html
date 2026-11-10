@@ -14,7 +14,7 @@
     как сейчас — дословная копия src/components/Audio/liquidOrb.ts (тёмный шов, тёмный rim);
     a          — стоячие волны + растворяющиеся стыки;
     b          — одно поле (smooth max) + цветовые зоны по весам;
-    c          — эквалайзер: радиус на каждом угле из 48 полос спектра.
+    d          — свободная форма: три капли-поля, объединение с шейками.
 
   Числовой масштаб тот же, что в проде: vUv = aPosition в клип-спейсе, радиусы 0.62/0.46/0.30.
   Поэтому значения из слайдеров переносятся в liquidOrb.ts один в один.
@@ -29,10 +29,9 @@
     uIntensity — гейн аудио-вклада в радиус и форму
     uWarp      — насколько звук перекашивает фазу лепестков (b)
     uWobble    — интеграл фазы качания, ускоряется от громкости
-    uReveal            (a, c)
+    uReveal            (a)
     uBlend, uMerge     (b)
-    uGain, uSpin       (c)
-    uSpectrum          (c, sampler2D: 48x1, 40 Гц — 14 кГц)
+    uSpread, uSize     (d)
     uAudioMix
 
   Ctrl+Enter в редакторе перекомпилирует выбранную панель. Ошибка компиляции
@@ -256,7 +255,7 @@
 
 <h1>orb lab</h1>
 <p class="hint">
-  один clock и одни фичи на все три панели. правка glsl — <code>ctrl+enter</code>, страница не перезагружается.
+  один clock и одни фичи на все панели. правка glsl — <code>ctrl+enter</code>, страница не перезагружается.
   состояние (слайдеры и шейдеры) лежит в <code>localStorage</code>.
 </p>
 
@@ -277,9 +276,9 @@
     <div class="fallback" id="fallback-b">webgl недоступен</div>
   </div>
   <div class="panel">
-    <div class="panel-head"><b>c · эквалайзер</b></div>
-    <canvas id="canvas-c"></canvas>
-    <div class="fallback" id="fallback-c">webgl недоступен</div>
+    <div class="panel-head"><b>d · свободная форма</b></div>
+    <canvas id="canvas-d"></canvas>
+    <div class="fallback" id="fallback-d">webgl недоступен</div>
   </div>
 </div>
 
@@ -317,8 +316,8 @@
     <div id="params-b"></div>
   </div>
   <div class="group">
-    <h2>c · эквалайзер</h2>
-    <div id="params-c"></div>
+    <h2>d · свободная форма</h2>
+    <div id="params-d"></div>
   </div>
 </div>
 
@@ -328,7 +327,7 @@
       <button type="button" data-editor="current" aria-pressed="true">как сейчас</button>
       <button type="button" data-editor="a" aria-pressed="false">a</button>
       <button type="button" data-editor="b" aria-pressed="false">b</button>
-      <button type="button" data-editor="c" aria-pressed="false">c</button>
+      <button type="button" data-editor="d" aria-pressed="false">d</button>
     </div>
     <div class="seg">
       <button type="button" id="compile">применить (ctrl+enter)</button>
@@ -343,7 +342,7 @@
 <script>
 "use strict";
 
-const STORAGE_KEY = "slag.orbLab.v3";
+const STORAGE_KEY = "slag.orbLab.v4";
 
 const VERTEX_SRC = `
 attribute vec2 aPosition;
@@ -672,23 +671,18 @@ void main() {
 `;
 
 /* ---------------------------------------------------------------------------
-   вариант c. эквалайзер: радиус в каждом угле берётся из спектра (текстура
-   uSpectrum, 48 полос 40 Гц — 14 кГц), а не из гармоники. Три слоя читают
-   одни и те же полосы со своим сдвигом и фазой, поэтому их кромки идут в
-   разных местах и переплетаются, а не лежат бубликами.
+   вариант d. свободная форма: три капли с разведёнными центрами, и каждая —
+   поле, а не радиус по кругу. Одиночная капля звездообразна вокруг своего
+   центра, но объединение трёх разъезжается в гантель: появляются шейки,
+   вмятины и перемычки, которые рвутся, когда капли расходятся.
    --------------------------------------------------------------------------- */
-const SHADER_C = `
+const SHADER_D = `
 precision highp float;
 
 uniform float uTime, uVolume, uBass, uMid, uHigh, uFlux;
-uniform float uRadiusBack, uRadiusMid, uRadiusFront;
-uniform float uDeform, uSpeed, uLobes, uBreath, uEdge, uReveal, uCrest, uNoise, uGain, uSpin, uAudioMix;
-uniform float uIdle, uIntensity, uWobble;
-uniform sampler2D uSpectrum;
+uniform float uDeform, uEdge, uBlend, uMerge, uCrest, uNoise, uAudioMix;
+uniform float uIntensity, uWobble, uSpread, uSize;
 varying vec2 vUv;
-
-const float PI = 3.1415926536;
-const float TAU = 6.2831853072;
 
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -706,80 +700,65 @@ float fbm(vec2 p) {
     return valueNoise(p) * 0.6 + valueNoise(p * 2.13 + 17.0) * 0.3 + valueNoise(p * 4.37 + 41.0) * 0.1;
 }
 
-// Спектр не периодичен по кругу, поэтому угол переводится в 0..1 через
-// зеркало: на стыке 0 и 1 значение одно и то же, шва нет.
-float bandAt(float angle, float shift) {
-    float u = fract((angle + PI) / TAU + uTime * uSpin + shift);
-    float mirrored = u < 0.5 ? u * 2.0 : (1.0 - u) * 2.0;
-    return texture2D(uSpectrum, vec2(mirrored, 0.5)).r;
+float smoothMax3(float a, float b, float c, float k) {
+    float ka = clamp(k * a, -30.0, 30.0);
+    float kb = clamp(k * b, -30.0, 30.0);
+    float kc = clamp(k * c, -30.0, 30.0);
+    return log(exp(ka) + exp(kb) + exp(kc)) / k;
 }
 
-vec3 eqLayer(vec2 p, vec2 center, float base, float shift, float phase, float lag,
-             float noiseSeed, float audioRadius, float audioDeform) {
+// Поле капли: положительно внутри. Шум считается в координатах экрана и
+// прибавляется к радиусу как функция точки, поэтому граница гуляет не только
+// по лучу из центра.
+vec3 blob(vec2 p, vec2 center, float radius, float seed, float grow) {
     vec2 d = p - center;
     float r = length(d);
-    float ang = atan(d.y, d.x);
-    float band = bandAt(ang, shift);
-    float amp = uIdle * 0.5 + uDeform * audioDeform * uIntensity * uAudioMix;
-    float n = fbm(p * 2.6 + vec2(noiseSeed, noiseSeed * 1.7) + vec2(0.0, uTime * 0.18)) - 0.5;
-    float radius = base
-                 + uGain * band
-                 + base * (amp * cos(ang * uLobes + phase) * sin(uWobble + lag)
-                           + uBreath * sin(uTime * 0.7 + lag))
-                 + n * uNoise * 2.0
-                 + audioRadius * uIntensity * uAudioMix;
-    float nd = clamp(r / max(radius, 1e-3), 0.0, 1.4);
-    float cover = 1.0 - smoothstep(radius - uEdge, radius + uEdge, r);
-    return vec3(cover, nd, smoothstep(0.60, 1.0, nd));
+    float warp = (fbm(p * 2.2 + vec2(seed, seed * 1.7) + vec2(0.0, uTime * 0.16)) - 0.5) * uNoise * 2.4;
+    float rad = max(radius * (1.0 + grow) + warp, 0.02);
+    float nd = clamp(r / rad, 0.0, 1.6);
+    return vec3(rad - r, nd, smoothstep(0.65, 1.0, nd));
 }
 
 void main() {
     vec2 p = vUv;
-    float t = uTime;
 
-    vec2 centerBack = vec2(0.010 * sin(t * 0.17), 0.008 * cos(t * 0.13));
-    vec2 centerMid = vec2(-0.008 * sin(t * 0.23 + 1.3), 0.010 * cos(t * 0.19 + 0.7));
-    vec2 centerFront = vec2(0.006 * sin(t * 0.31 + 2.7), 0.006 * cos(t * 0.27 + 1.9));
+    // Капли медленно ходят по кругу: перемычки переезжают и рвутся.
+    vec2 c1 = uSpread * vec2(cos(uWobble * 0.23), sin(uWobble * 0.19));
+    vec2 c2 = uSpread * vec2(cos(uWobble * 0.17 + 2.1), sin(uWobble * 0.21 + 2.1));
+    vec2 c3 = uSpread * vec2(cos(uWobble * 0.27 + 4.2), sin(uWobble * 0.15 + 4.2));
 
-    vec3 back  = eqLayer(p, centerBack, uRadiusBack, 0.00, 0.0, 0.0, 0.0,
-                         uVolume * 0.05, uVolume);
-    vec3 mid   = eqLayer(p, centerMid, uRadiusMid, 0.33, 0.6, -0.9, 13.7,
-                         uBass * 0.05, uBass);
-    vec3 front = eqLayer(p, centerFront, uRadiusFront, 0.66, 1.2, -1.8, 31.3,
-                         uMid * 0.04 + uFlux * 0.03, uHigh * 0.7 + uMid * 0.3);
+    float grow1 = uDeform * uVolume * uIntensity * uAudioMix;
+    float grow2 = uDeform * uBass * uIntensity * uAudioMix;
+    float grow3 = uDeform * (uHigh * 0.7 + uMid * 0.3) * uIntensity * uAudioMix;
 
-    vec3 colBack = mix(vec3(0.22, 0.60, 1.0), vec3(0.04, 0.22, 0.62),
-                       smoothstep(0.0, 1.0, back.y) * 0.75);
-    vec3 colMid = mix(vec3(0.62, 0.96, 1.0), vec3(0.10, 0.52, 0.95),
-                      smoothstep(0.0, 1.0, mid.y) * 0.75);
-    vec3 colFront = mix(vec3(1.0), vec3(0.70, 0.95, 1.0),
-                        smoothstep(0.0, 1.0, front.y) * 0.70);
+    vec3 f1 = blob(p, c1, uSize, 0.0, grow1);
+    vec3 f2 = blob(p, c2, uSize * 0.86, 13.7, grow2);
+    vec3 f3 = blob(p, c3, uSize * 0.72, 31.3, grow3);
 
-    colMid += vec3(0.40, 0.90, 1.0) * mid.z * (0.05 + uHigh * 0.25 * uAudioMix) * uReveal;
-    colFront += vec3(0.75, 0.97, 1.0) * front.z * 0.10 * uReveal;
+    float outer = smoothMax3(f1.x, f2.x, f3.x, uMerge);
+    float alpha = smoothstep(-uEdge, uEdge, outer);
 
-    colBack += vec3(0.42, 0.78, 1.0) * pow(back.z, 1.3) * uCrest * 0.55;
-    colMid += vec3(0.55, 0.90, 1.0) * pow(mid.z, 1.3) * uCrest * 0.75;
-    colFront += vec3(0.85, 0.98, 1.0) * pow(front.z, 1.3) * uCrest * 0.9;
+    float w2 = smoothstep(-uBlend, uBlend, f2.x);
+    float w3 = smoothstep(-uBlend, uBlend, f3.x);
 
-    float aBack = back.x * (1.0 - back.z * uReveal * 0.35);
-    float aMid = mid.x * (1.0 - mid.z * uReveal * 0.55);
-    float aFront = front.x * (1.0 - front.z * uReveal * 0.65);
+    vec3 col1 = mix(vec3(0.22, 0.60, 1.0), vec3(0.03, 0.18, 0.56), smoothstep(0.0, 1.0, f1.y) * 0.8);
+    vec3 col2 = mix(vec3(0.62, 0.96, 1.0), vec3(0.09, 0.48, 0.92), smoothstep(0.0, 1.0, f2.y) * 0.8);
+    vec3 col3 = mix(vec3(1.0), vec3(0.70, 0.95, 1.0), smoothstep(0.0, 1.0, f3.y) * 0.75);
 
-    vec3 color = colBack * aBack;
-    float alpha = aBack;
+    col1 += vec3(0.42, 0.78, 1.0) * pow(f1.z, 1.3) * uCrest;
+    col2 += vec3(0.55, 0.90, 1.0) * pow(f2.z, 1.3) * uCrest;
+    col3 += vec3(0.85, 0.98, 1.0) * pow(f3.z, 1.3) * uCrest;
 
-    color = colMid * aMid + color * (1.0 - aMid);
-    alpha = aMid + alpha * (1.0 - aMid);
-
-    color = colFront * aFront + color * (1.0 - aFront);
-    alpha = aFront + alpha * (1.0 - aFront);
+    // Не среднее по трём (в глубине все веса равны единице, и цвет становится
+    // серым), а порядок капель: большая снизу, мелкая сверху.
+    vec3 color = mix(col1, col2, w2);
+    color = mix(color, col3, w3);
 
     if (alpha <= 0.004) {
         discard;
     }
 
-    gl_FragColor = vec4(color, alpha);
+    gl_FragColor = vec4(color * alpha, alpha);
 }
 `;
 
@@ -787,7 +766,7 @@ const DEFAULT_SHADERS = {
   current: SHADER_CURRENT,
   a: SHADER_A,
   b: SHADER_B,
-  c: SHADER_C,
+  d: SHADER_D,
 };
 
 const DEFAULT_PARAMS = {
@@ -804,8 +783,8 @@ const DEFAULT_PARAMS = {
   blend: 0.165,
   merge: 25,
   noise: 0.1,
-  gain: 0.2,
-  spin: 0.04,
+  spread: 0.24,
+  size: 0.3,
   idle: 0.02,
   intensity: 1,
   warp: 0.9,
@@ -830,8 +809,8 @@ const PARAM_SPECS = [
   { group: "a", key: "reveal", label: "reveal rim", min: 0, max: 1, step: 0.01 },
   { group: "b", key: "blend", label: "ширина зон", min: 0.02, max: 0.3, step: 0.005 },
   { group: "b", key: "merge", label: "слипание", min: 4, max: 30, step: 1 },
-  { group: "c", key: "gain", label: "полосы", min: 0, max: 0.35, step: 0.005 },
-  { group: "c", key: "spin", label: "дрейф", min: -0.2, max: 0.2, step: 0.005 },
+  { group: "d", key: "spread", label: "разлёт", min: 0, max: 0.35, step: 0.005 },
+  { group: "d", key: "size", label: "капля", min: 0.15, max: 0.6, step: 0.005 },
 ];
 
 const GROUP_HOSTS = {
@@ -839,7 +818,7 @@ const GROUP_HOSTS = {
   shape: document.getElementById("params-shape"),
   a: document.getElementById("params-a"),
   b: document.getElementById("params-b"),
-  c: document.getElementById("params-c"),
+  d: document.getElementById("params-d"),
 };
 
 const state = {
@@ -853,7 +832,7 @@ const canvases = {
   current: document.getElementById("canvas-current"),
   a: document.getElementById("canvas-a"),
   b: document.getElementById("canvas-b"),
-  c: document.getElementById("canvas-c"),
+  d: document.getElementById("canvas-d"),
 };
 
 const logEl = document.getElementById("log");
@@ -953,9 +932,6 @@ function syncSliders() {
 
 /* -------------------------------- renderer -------------------------------- */
 
-/* Полос эквалайзера: ровно столько же пикселей в спектральной текстуре. */
-const SPECTRUM_BANDS = 48;
-
 function createRenderer(canvas) {
   const gl = canvas.getContext("webgl", { alpha: true, antialias: true, premultipliedAlpha: true });
   if (!gl) return null;
@@ -963,16 +939,6 @@ function createRenderer(canvas) {
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
-
-  // Спектр для варианта c: одна строка текстуры, обновляется из байтов.
-  const spectrumTexture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, spectrumTexture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, SPECTRUM_BANDS, 1, 0, gl.LUMINANCE,
-    gl.UNSIGNED_BYTE, new Uint8Array(SPECTRUM_BANDS));
 
   let program = null;
   let locations = new Map();
@@ -1031,7 +997,7 @@ function createRenderer(canvas) {
       activate(result.program);
       return result;
     },
-    draw(values, spectrum) {
+    draw(values) {
       if (!program) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const nextWidth = Math.max(1, Math.floor(canvas.clientWidth * dpr));
@@ -1048,13 +1014,6 @@ function createRenderer(canvas) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(program);
 
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, spectrumTexture);
-      if (spectrum) {
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, SPECTRUM_BANDS, 1, gl.LUMINANCE,
-          gl.UNSIGNED_BYTE, spectrum);
-      }
-
       for (const name of Object.keys(values)) {
         let location = locations.get(name);
         if (location === undefined) {
@@ -1063,13 +1022,6 @@ function createRenderer(canvas) {
         }
         if (location) gl.uniform1f(location, values[name]);
       }
-
-      let sampler = locations.get("uSpectrum");
-      if (sampler === undefined) {
-        sampler = gl.getUniformLocation(program, "uSpectrum") || null;
-        locations.set("uSpectrum", sampler);
-      }
-      if (sampler) gl.uniform1i(sampler, 0);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     },
@@ -1110,7 +1062,6 @@ const ENVELOPE = {
 };
 const MAX_STEP_S = 0.1;
 const ZERO = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0 };
-const SILENT_SPECTRUM = new Uint8Array(SPECTRUM_BANDS);
 
 function clamp01(value) {
   return value < 0 ? 0 : value > 1 ? 1 : value;
@@ -1215,37 +1166,10 @@ function createReader(analyser) {
   };
 }
 
-/** Те же 48 полос в байты 0..255: их читает спектральная текстура варианта c. */
-function createSpectrumMeter(analyser) {
-  const frequencies = new Float32Array(analyser.frequencyBinCount);
-  const bands = new Uint8Array(SPECTRUM_BANDS);
-  const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
-  const edges = [];
-  for (let index = 0; index <= SPECTRUM_BANDS; index += 1) {
-    edges.push((Math.pow(14000 / 40, index / SPECTRUM_BANDS) * 40) / hzPerBin);
-  }
-
-  return () => {
-    analyser.getFloatFrequencyData(frequencies);
-    for (let band = 0; band < SPECTRUM_BANDS; band += 1) {
-      const start = Math.max(0, Math.floor(edges[band]));
-      const end = Math.min(frequencies.length, Math.ceil(edges[band + 1]));
-      let power = 0;
-      for (let index = start; index < end; index += 1) {
-        const magnitude = Math.pow(10, frequencies[index] / 20);
-        power += magnitude * magnitude;
-      }
-      bands[band] = Math.round(compress(Math.sqrt(power)) * 255);
-    }
-    return bands;
-  };
-}
-
 const audio = {
   ctx: null,
   analyser: null,
   reader: null,
-  spectrum: null,
   master: null,
   synth: null,
   element: null,
@@ -1274,7 +1198,6 @@ async function ensureAudio() {
     audio.analyser = analyser;
     audio.master = master;
     audio.reader = createReader(analyser);
-    audio.spectrum = createSpectrumMeter(analyser);
     audio.cycleStart = performance.now();
   }
   if (audio.ctx.state !== "running") {
@@ -1467,8 +1390,8 @@ function uniformValues(time, features) {
     uReveal: p.reveal,
     uCrest: p.crest,
     uNoise: p.noise,
-    uGain: p.gain,
-    uSpin: p.spin,
+    uSpread: p.spread,
+    uSize: p.size,
     uIdle: p.idle,
     uIntensity: p.intensity,
     uWarp: p.warp,
@@ -1500,12 +1423,11 @@ function frame(now) {
   // Фаза качания интегрируется с множителем от громкости: атака ускоряет
   // движение, но интеграл остаётся честным по времени (никаких time * volume).
   wobble += dt * state.params.speed * (0.5 + 1.5 * features.volume * state.params.audioMix);
-  const spectrum = active && audio.spectrum ? audio.spectrum() : SILENT_SPECTRUM;
   const values = uniformValues(seconds, features);
 
   for (const key of Object.keys(renderers)) {
     const renderer = renderers[key];
-    if (renderer) renderer.draw(values, spectrum);
+    if (renderer) renderer.draw(values);
   }
 
   paint(features);
