@@ -104,7 +104,11 @@ export function createOrbRenderer(canvas: HTMLCanvasElement): OrbRenderer | null
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      log.error('Liquid orb shader failed to compile', gl.getShaderInfoLog(shader) ?? 'unknown');
+      log.error(
+        `Liquid orb ${type === gl.VERTEX_SHADER ? 'vertex' : 'fragment'} shader failed: ${
+          gl.getShaderInfoLog(shader) ?? 'no info log'
+        }`,
+      );
       gl.deleteShader(shader);
       return null;
     }
@@ -185,7 +189,9 @@ export function createOrbRenderer(canvas: HTMLCanvasElement): OrbRenderer | null
       gl.deleteProgram(program);
       gl.deleteShader(vertexShader);
       gl.deleteShader(fragmentShader);
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      // No `WEBGL_lose_context` here: StrictMode (and any remount on the same
+      // canvas node) hands back the very same context, and a lost context
+      // accepts shaders only to fail them with an empty info log.
     },
   };
 }
