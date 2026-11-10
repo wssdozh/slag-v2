@@ -3,22 +3,20 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>orb lab — b и три настроения</title>
+<title>orb lab — b, фичи и настроение</title>
 <!--
   Лаборатория орба: один шейдер (план b) и три набора параметров.
 
     b · база       — ручки как есть, без макро-модуляции;
-    b · настроение — параметры медленно едут от энергии и яркости трека;
+    b · настроение — параметры медленно едут от энергии, яркости и тембра;
     b · пульс      — то же, но от атаки и темпа, быстро.
 
-  GLSL один на все три: варианты — это разные значения юниформ, посчитанные
-  в JS. Поэтому правка шейдера (ctrl+enter) применяется сразу ко всем панелям.
+  Конвейер:
+    AnalyserNode -> сырые фичи -> огибающие -> нормализация p5/p95 за 10 с
+                 -> маппинг (медленный драйвер × акцент) -> лимит скорости -> юниформы.
 
-  Макро-фичи считаются из того же AnalyserNode, что и полосы:
-    energy      RMS с медленной огибающей (tau 1.1 с) — «сколько в треке тела»;
-    brightness  спектральный центроид, лог-шкала 120 Гц..6 кГц — «насколько ярко»;
-    pace        плотность онсетов за последние 3 с — «насколько быстро»;
-    punch       быстрый RMS к медленному (crest factor) — «насколько долбит».
+  Сырые фичи: volume, bass, mid, high, flux, energy, brightness, pace, punch,
+  flatness, rolloff, sub, onset, bpm, beatConf.
 
   Открыть: file:// или http://127.0.0.1:5173/demo/orb-lab.html
 -->
@@ -58,12 +56,8 @@
   .panel-head span { font-family: var(--mono); font-size: 10px; color: var(--fg-3); }
   canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 10px; background: #000; }
   .readout {
-    margin-top: 8px;
-    font-family: var(--mono);
-    font-size: 10px;
-    line-height: 1.6;
-    color: var(--fg-3);
-    white-space: pre;
+    margin-top: 8px; font-family: var(--mono); font-size: 10px; line-height: 1.6;
+    color: var(--fg-3); white-space: pre;
   }
   .fallback {
     display: none; aspect-ratio: 1; place-items: center; padding: 12px;
@@ -72,24 +66,20 @@
 
   .meters {
     display: grid;
-    grid-template-columns: repeat(9, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 6px;
     max-width: 1000px;
-    margin: 14px 0 18px;
+    margin: 14px 0 6px;
   }
-  .meters.macro { margin-top: -8px; }
-  .meter span { display: block; margin-bottom: 4px; font-family: var(--mono); font-size: 10px; color: var(--fg-3); }
+  .meters.macro { margin-top: 0; margin-bottom: 18px; }
+  .meter span { display: block; margin-bottom: 4px; font-family: var(--mono); font-size: 9.5px; color: var(--fg-3); }
   .meter i { display: block; height: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
   .meter b { display: block; height: 100%; width: 0%; background: var(--accent); }
   .meter.macro b { background: #7ad0a0; }
 
   .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px 28px;
-    max-width: 1000px;
-    padding-top: 18px;
-    border-top: 1px solid var(--line);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px;
+    max-width: 1000px; padding-top: 18px; border-top: 1px solid var(--line);
   }
   .group h2 {
     margin: 0 0 8px; font-size: 11px; font-weight: 600;
@@ -129,8 +119,8 @@
 
 <h1>orb lab · b</h1>
 <p class="hint">
-  один шейдер, три набора параметров. макро-фичи идут с трека, варианты — разные способы их применить.
-  правка glsl — <code>ctrl+enter</code>.
+  один шейдер, три набора параметров. фичи нормализуются по треку, параметры идут с лимитом скорости.
+  правка glsl — <code>ctrl+enter</code>, запись фич — <code>csv</code>.
 </p>
 
 <div class="stage">
@@ -160,10 +150,18 @@
   <div class="meter"><span>mid</span><i><b id="m-mid"></b></i></div>
   <div class="meter"><span>high</span><i><b id="m-high"></b></i></div>
   <div class="meter"><span>flux</span><i><b id="m-flux"></b></i></div>
+  <div class="meter"><span>onset</span><i><b id="m-onset"></b></i></div>
+  <div class="meter"><span>flatness</span><i><b id="m-flatness"></b></i></div>
+  <div class="meter"><span>rolloff</span><i><b id="m-rolloff"></b></i></div>
+  <div class="meter"><span>sub</span><i><b id="m-sub"></b></i></div>
+  <div class="meter"><span>bpm</span><i><b id="m-bpm"></b></i></div>
+</div>
+<div class="meters macro">
   <div class="meter macro"><span>energy</span><i><b id="m-energy"></b></i></div>
   <div class="meter macro"><span>brightness</span><i><b id="m-brightness"></b></i></div>
   <div class="meter macro"><span>pace</span><i><b id="m-pace"></b></i></div>
   <div class="meter macro"><span>punch</span><i><b id="m-punch"></b></i></div>
+  <div class="meter macro"><span>beat conf</span><i><b id="m-beat"></b></i></div>
 </div>
 
 <div class="controls">
@@ -176,7 +174,16 @@
       <button type="button" data-mode="file" aria-pressed="false">файл</button>
     </div>
     <input type="file" id="file" accept="audio/*" hidden />
-    <p class="quiet">«тишина» отдаёт нули — смотреть чистую механику без звука.</p>
+    <div class="seg" id="presets">
+      <button type="button" data-preset="">живой звук</button>
+      <button type="button" data-preset="calm">эмбиент</button>
+      <button type="button" data-preset="verse">куплет</button>
+      <button type="button" data-preset="chorus">дроп</button>
+    </div>
+    <div class="seg">
+      <button type="button" id="record">записать csv</button>
+    </div>
+    <p class="quiet" id="record-hint">пресеты подменяют фичи — можно сравнивать без трека.</p>
     <div id="params-audio"></div>
   </div>
   <div class="group">
@@ -209,7 +216,7 @@
 <script>
 "use strict";
 
-const STORAGE_KEY = "slag.orbLab.v5";
+const STORAGE_KEY = "slag.orbLab.v6";
 
 const VERTEX_SRC = `
 attribute vec2 aPosition;
@@ -222,7 +229,6 @@ void main() {
 
 /* ---------------------------------------------------------------------------
    план b: один силуэт из smooth max трёх полей, внутри — зоны по весам.
-   Всё, что меняется между панелями, приходит через юниформы.
    --------------------------------------------------------------------------- */
 const SHADER_B = `
 precision highp float;
@@ -380,10 +386,30 @@ const GROUP_HOSTS = {
 
 const panelKeys = ["base", "mood", "pulse"];
 
+/** Состояния для проверки маппинга без трека: значения нормализованных фич. */
+const PRESETS = {
+  calm: {
+    volume: 0.25, bass: 0.2, mid: 0.15, high: 0.08, flux: 0.02,
+    energy: 0.2, brightness: 0.3, rolloff: 0.25, flatness: 0.15,
+    pace: 0.15, bpm: 0.15, punch: 0.15, onset: 0,
+  },
+  verse: {
+    volume: 0.5, bass: 0.45, mid: 0.4, high: 0.2, flux: 0.05,
+    energy: 0.45, brightness: 0.55, rolloff: 0.5, flatness: 0.3,
+    pace: 0.35, bpm: 0.35, punch: 0.35, onset: 0,
+  },
+  chorus: {
+    volume: 0.9, bass: 0.85, mid: 0.7, high: 0.55, flux: 0.15,
+    energy: 0.85, brightness: 0.75, rolloff: 0.8, flatness: 0.5,
+    pace: 0.7, bpm: 0.6, punch: 0.8, onset: 0,
+  },
+};
+
 const state = {
   params: { ...DEFAULT_PARAMS },
   shader: SHADER_B,
   mode: "silence",
+  preset: "",
 };
 
 const canvases = {
@@ -416,7 +442,7 @@ function save() {
       mode: state.mode,
     }));
   } catch {
-    /* приватный режим: живём без сохранения */
+    /* живём без сохранения */
   }
 }
 
@@ -600,32 +626,48 @@ for (const key of panelKeys) {
 
 /* ------------------------------ audio pipeline ----------------------------- */
 
-/**
- * Копия математики из src/lib/media/audioSpectrum.ts плюс макро-фичи:
- * energy (медленный RMS), brightness (центроид), pace (онсеты за 3 с),
- * punch (crest factor). Держать в синхроне с оригиналом для базовых полос.
- */
 const BAND_HZ = { bass: [30, 250], mid: [250, 4000], high: [4000, 12000] };
 const COMPRESSION = 0.01;
 const LOG_CEIL = Math.log1p(1 / COMPRESSION);
 const FLUX_GATE = 0.06;
+
+/** Огибающие: attack/release в секундах. */
 const ENVELOPE = {
   volume: { attack: 0.025, release: 0.3 },
   bass: { attack: 0.03, release: 0.28 },
   mid: { attack: 0.04, release: 0.22 },
   high: { attack: 0.015, release: 0.12 },
   flux: { attack: 0.008, release: 0.14 },
+  energy: { attack: 0.6, release: 2.5 },
+  brightness: { attack: 0.2, release: 0.9 },
+  pace: { attack: 0.4, release: 1.5 },
+  punch: { attack: 0.05, release: 0.45 },
+  flatness: { attack: 0.25, release: 0.8 },
+  rolloff: { attack: 0.2, release: 0.8 },
+  sub: { attack: 0.15, release: 0.9 },
+  bpm: { attack: 0.8, release: 2.0 },
+  beatConf: { attack: 0.4, release: 1.5 },
 };
-const MAX_STEP_S = 0.1;
-const ZERO = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0, energy: 0, brightness: 0, pace: 0, punch: 0 };
 
-/** Окно, за которое считается плотность онсетов. */
+const MAX_STEP_S = 0.1;
 const PACE_WINDOW_S = 3;
-/** Больше этого — считаем «быстро» (онсетов в секунду). */
 const PACE_FULL = 4;
-/** Центроид в герцах, который считается «тёмным» и «ярким». */
 const CENTROID_LOW_HZ = 120;
 const CENTROID_HIGH_HZ = 6000;
+const ROLLOFF_LOW_HZ = 500;
+const ROLLOFF_HIGH_HZ = 12000;
+const ACCENT_DECAY_S = 0.18;
+
+/** Частота огибающей онсетов для автокорреляции (Гц). */
+const ONSET_RATE_HZ = 20;
+const ONSET_WINDOW_S = 4;
+
+const ZERO = {
+  volume: 0, bass: 0, mid: 0, high: 0, flux: 0,
+  energy: 0, brightness: 0, pace: 0, punch: 0,
+  onset: 0, flatness: 0, rolloff: 0, sub: 0,
+  bpm: 0, beatConf: 0,
+};
 
 function clamp01(value) {
   return value < 0 ? 0 : value > 1 ? 1 : value;
@@ -662,37 +704,92 @@ function rms(data) {
   return Math.sqrt(sum / data.length);
 }
 
+/**
+ * Сырые фичи. Всё считается из одного FFT: полосы, центроид, rolloff,
+ * flatness, sub, onset, bpm по автокорреляции огибающей онсетов.
+ */
 function createReader(analyser) {
   const frequencyData = new Float32Array(analyser.frequencyBinCount);
   const timeData = new Float32Array(analyser.fftSize);
   const magnitudes = new Float32Array(analyser.frequencyBinCount);
   const previous = new Float32Array(analyser.frequencyBinCount);
+  const bins = analyser.frequencyBinCount;
   const bassRange = binRange(analyser, BAND_HZ.bass[0], BAND_HZ.bass[1]);
   const midRange = binRange(analyser, BAND_HZ.mid[0], BAND_HZ.mid[1]);
   const highRange = binRange(analyser, BAND_HZ.high[0], BAND_HZ.high[1]);
   const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
 
+  const onsetEnvelope = new Float32Array(ONSET_WINDOW_S * ONSET_RATE_HZ);
+  let onsetIndex = 0;
+  let onsetTimer = 0;
+
   let hasPrevious = false;
   let time = 0;
   let lastOnset = -1;
-  let energy = 0;
-  let brightness = 0;
-  let pace = 0;
-  let punch = 0;
+  let slowFlux = 0;
+  let accent = 0;
+  let onsetLevel = 0;
+  let bpm = 0;
+  let beatConf = 0;
+  let beatTimer = 0;
   const onsets = [];
   let current = { ...ZERO };
+
+  const estimateBeat = () => {
+    const size = onsetEnvelope.length;
+    let mean = 0;
+    for (let i = 0; i < size; i++) mean += onsetEnvelope[i];
+    mean /= size;
+    if (mean < 1e-4) {
+      bpm = 0;
+      beatConf = 0;
+      return;
+    }
+
+    // Лаги 60..180 BPM при частоте огибающей 20 Гц.
+    const minLag = Math.round((60 / 180) * ONSET_RATE_HZ);
+    const maxLag = Math.round((60 / 60) * ONSET_RATE_HZ);
+    let bestLag = 0;
+    let bestScore = 0;
+    let total = 0;
+
+    for (let lag = minLag; lag <= maxLag && lag < size; lag++) {
+      let score = 0;
+      for (let i = 0; i + lag < size; i++) {
+        score += (onsetEnvelope[i] - mean) * (onsetEnvelope[i + lag] - mean);
+      }
+      score /= size - lag;
+      total += Math.abs(score);
+      if (score > bestScore) {
+        bestScore = score;
+        bestLag = lag;
+      }
+    }
+
+    if (bestLag === 0) {
+      bpm = 0;
+      beatConf = 0;
+      return;
+    }
+    const average = total / Math.max(1, maxLag - minLag + 1);
+    const confidence = average > 1e-9 ? clamp01(bestScore / (average * 2.5)) : 0;
+    bpm = clamp01((60 * ONSET_RATE_HZ / bestLag - 60) / (180 - 60));
+    beatConf = confidence;
+  };
 
   return {
     reset() {
       current = { ...ZERO };
       previous.fill(0);
+      onsetEnvelope.fill(0);
       hasPrevious = false;
       time = 0;
       lastOnset = -1;
-      energy = 0;
-      brightness = 0;
-      pace = 0;
-      punch = 0;
+      slowFlux = 0;
+      accent = 0;
+      onsetLevel = 0;
+      bpm = 0;
+      beatConf = 0;
       onsets.length = 0;
     },
     read(dt, active) {
@@ -704,6 +801,13 @@ function createReader(analyser) {
       let mid = 0;
       let high = 0;
       let flux = 0;
+      let energy = 0;
+      let brightness = 0;
+      let pace = 0;
+      let punch = 0;
+      let flatness = 0;
+      let rolloff = 0;
+      let sub = 0;
 
       if (active) {
         analyser.getFloatFrequencyData(frequencyData);
@@ -711,11 +815,13 @@ function createReader(analyser) {
 
         let weighted = 0;
         let total = 0;
-        for (let i = 0; i < magnitudes.length; i++) {
+        let logSum = 0;
+        for (let i = 0; i < bins; i++) {
           const magnitude = Math.pow(10, frequencyData[i] / 20);
           magnitudes[i] = magnitude;
           weighted += magnitude * i;
           total += magnitude;
+          logSum += Math.log(magnitude + 1e-9);
         }
 
         volume = compress(rms(timeData));
@@ -726,47 +832,103 @@ function createReader(analyser) {
         if (hasPrevious) {
           let positive = 0;
           let sum = 0;
-          for (let i = 0; i < magnitudes.length; i++) {
+          for (let i = 0; i < bins; i++) {
             const delta = magnitudes[i] - previous[i];
             if (delta > 0) positive += delta;
             sum += magnitudes[i];
           }
           flux = sum > 1e-6 ? clamp01(positive / sum) : 0;
         }
-
         previous.set(magnitudes);
         hasPrevious = true;
         if (volume < FLUX_GATE) flux = 0;
 
-        // Спектральный центроид: «яркость» тембра, лог-шкала по частоте.
+        // Центроид: «яркость» тембра.
         const centroidHz = total > 1e-9 ? (weighted / total) * hzPerBin : 0;
         const rawBrightness = centroidHz > 1
           ? Math.log(centroidHz / CENTROID_LOW_HZ) / Math.log(CENTROID_HIGH_HZ / CENTROID_LOW_HZ)
           : 0;
 
-        energy += (volume - energy) * (1 - Math.exp(-step / 1.1));
-        brightness += (clamp01(rawBrightness) - brightness) * (1 - Math.exp(-step / 0.45));
+        // Flatness: геометрическое к арифметическому по 250 Гц — 8 кГц.
+        const flatStart = Math.max(0, Math.floor(250 / hzPerBin));
+        const flatEnd = Math.min(bins, Math.ceil(8000 / hzPerBin));
+        let flatLog = 0;
+        let flatSum = 0;
+        let flatCount = 0;
+        for (let i = flatStart; i < flatEnd; i++) {
+          flatLog += Math.log(magnitudes[i] + 1e-9);
+          flatSum += magnitudes[i];
+          flatCount += 1;
+        }
+        if (flatCount > 0 && flatSum > 1e-9) {
+          const geo = Math.exp(flatLog / flatCount);
+          flatness = clamp01(geo / (flatSum / flatCount));
+        }
+
+        // Rolloff 85%: выше — «воздух», ниже — «мясо».
+        let accumulate = 0;
+        let rolloffBin = bins - 1;
+        for (let i = 0; i < bins; i++) {
+          accumulate += magnitudes[i];
+          if (accumulate >= total * 0.85) {
+            rolloffBin = i;
+            break;
+          }
+        }
+        const rolloffHz = Math.max(1, rolloffBin * hzPerBin);
+        rolloff = clamp01(
+          Math.log(rolloffHz / ROLLOFF_LOW_HZ) / Math.log(ROLLOFF_HIGH_HZ / ROLLOFF_LOW_HZ),
+        );
+
+        sub = clamp01(bass / (bass + mid + high + 0.001));
+
+        energy += (volume - energy) * (1 - Math.exp(-step / ENVELOPE.energy.release));
+        brightness += (clamp01(rawBrightness) - brightness) * (1 - Math.exp(-step / ENVELOPE.brightness.release));
 
         // Онсеты: положительный скачок спектра выше гейта, не чаще 8 раз в секунду.
-        if (flux > 0.22 && volume > 0.05 && time - lastOnset > 0.12) {
+        slowFlux += (flux - slowFlux) * (1 - Math.exp(-step / 1.0));
+        const isOnset = flux > 0.22 && volume > 0.05 && time - lastOnset > 0.12;
+        if (isOnset) {
           lastOnset = time;
           onsets.push(time);
+          accent = 1;
         }
-        while (onsets.length > 0 && time - onsets[0] > PACE_WINDOW_S) onsets.shift();
-        const rate = onsets.length / PACE_WINDOW_S;
-        pace += (clamp01(rate / PACE_FULL) - pace) * (1 - Math.exp(-step / 0.8));
+        onsetLevel = clamp01(flux / (slowFlux + 0.15));
 
-        // Crest factor: короткий RMS против долгого. Долбит — значит выше.
+        while (onsets.length > 0 && time - onsets[0] > PACE_WINDOW_S) onsets.shift();
+        pace += (clamp01(onsets.length / PACE_WINDOW_S / PACE_FULL) - pace) * (1 - Math.exp(-step / ENVELOPE.pace.release));
+
         const crest = volume / (energy + 0.02);
-        const rawPunch = clamp01((crest - 0.85) / 1.2);
-        punch += (rawPunch - punch) * (1 - Math.exp(-step / 0.12));
+        punch += (clamp01((crest - 0.85) / 1.2) - punch) * (1 - Math.exp(-step / ENVELOPE.punch.release));
+
+        // Огибающая онсетов на фиксированной сетке 20 Гц для автокорреляции.
+        onsetTimer += step;
+        while (onsetTimer >= 1 / ONSET_RATE_HZ) {
+          onsetTimer -= 1 / ONSET_RATE_HZ;
+          onsetEnvelope[onsetIndex] = isOnset ? 1 : Math.max(0, onsetEnvelope[onsetIndex] * 0.6);
+          onsetIndex = (onsetIndex + 1) % onsetEnvelope.length;
+        }
+        beatTimer += step;
+        if (beatTimer >= 0.5) {
+          beatTimer = 0;
+          estimateBeat();
+        }
       } else {
         energy += (0 - energy) * (1 - Math.exp(-step / 0.6));
         brightness += (0 - brightness) * (1 - Math.exp(-step / 0.6));
         pace += (0 - pace) * (1 - Math.exp(-step / 0.6));
         punch += (0 - punch) * (1 - Math.exp(-step / 0.3));
+        flatness += (0 - flatness) * (1 - Math.exp(-step / 0.4));
+        rolloff += (0 - rolloff) * (1 - Math.exp(-step / 0.4));
+        sub += (0 - sub) * (1 - Math.exp(-step / 0.4));
+        onsetLevel += (0 - onsetLevel) * (1 - Math.exp(-step / 0.2));
         onsets.length = 0;
+        slowFlux = 0;
+        bpm += (0 - bpm) * (1 - Math.exp(-step / 0.8));
+        beatConf += (0 - beatConf) * (1 - Math.exp(-step / 0.8));
       }
+
+      accent *= Math.exp(-step / ACCENT_DECAY_S);
 
       current = {
         volume: damp(current.volume, volume, ENVELOPE.volume.attack, ENVELOPE.volume.release, step),
@@ -778,11 +940,346 @@ function createReader(analyser) {
         brightness,
         pace,
         punch,
+        flatness: damp(current.flatness, flatness, ENVELOPE.flatness.attack, ENVELOPE.flatness.release, step),
+        rolloff: damp(current.rolloff, rolloff, ENVELOPE.rolloff.attack, ENVELOPE.rolloff.release, step),
+        sub: damp(current.sub, sub, ENVELOPE.sub.attack, ENVELOPE.sub.release, step),
+        bpm: damp(current.bpm, bpm, ENVELOPE.bpm.attack, ENVELOPE.bpm.release, step),
+        beatConf: damp(current.beatConf, beatConf, ENVELOPE.beatConf.attack, ENVELOPE.beatConf.release, step),
+        onset: onsetLevel,
+        accent,
       };
       return current;
     },
   };
 }
+
+/**
+ * Нормализация по треку: скользящие p5/p95 за 10 с, значение в 0..1.
+ * Пишет точки на 20 Гц, перцентили пересчитывает раз в секунду.
+ */
+const NORMALIZE_KEYS = ["energy", "brightness", "rolloff", "flatness", "pace", "bpm", "punch", "onset", "sub"];
+const NORMALIZE_WINDOW_S = 10;
+const NORMALIZE_RATE = 20;
+
+function createNormalizer() {
+  const history = new Map(NORMALIZE_KEYS.map((key) => [key, []]));
+  const bounds = new Map(NORMALIZE_KEYS.map((key) => [key, { low: 0, high: 1 }]));
+  const output = { ...ZERO };
+  let timer = 0;
+  let recalc = 0;
+
+  const percentile = (sorted, ratio) => {
+    if (sorted.length === 0) return 0;
+    const index = Math.min(sorted.length - 1, Math.max(0, Math.round(ratio * (sorted.length - 1))));
+    return sorted[index];
+  };
+
+  return (dt, raw) => {
+    timer += dt;
+    recalc += dt;
+
+    if (timer >= 1 / NORMALIZE_RATE) {
+      timer = 0;
+      for (const key of NORMALIZE_KEYS) {
+        const list = history.get(key);
+        list.push(raw[key]);
+        if (list.length > NORMALIZE_WINDOW_S * NORMALIZE_RATE) list.shift();
+      }
+    }
+
+    if (recalc >= 1) {
+      recalc = 0;
+      for (const key of NORMALIZE_KEYS) {
+        const list = history.get(key);
+        if (list.length < 20) continue;
+        const sorted = [...list].sort((a, b) => a - b);
+        bounds.set(key, { low: percentile(sorted, 0.05), high: percentile(sorted, 0.95) });
+      }
+    }
+
+    for (const key of NORMALIZE_KEYS) {
+      const { low, high } = bounds.get(key);
+      output[key] = clamp01((raw[key] - low) / Math.max(high - low, 1e-3));
+    }
+    return output;
+  };
+}
+
+/* ------------------------------ mood mapping ------------------------------ */
+
+const lerp = (from, to, t) => from + (to - from) * t;
+const clampPositive = (value) => (value > 0 ? value : 0);
+
+/** Лимиты скорости и мёртвая зона: параметр не дёргается. */
+const LIMITS = {
+  deform: { deadband: 0.01, maxDelta: 0.6 },
+  crest: { deadband: 0.01, maxDelta: 0.5 },
+  blend: { deadband: 0.01, maxDelta: 0.5 },
+  edge: { deadband: 0.002, maxDelta: 0.1 },
+  merge: { deadband: 0.3, maxDelta: 6 },
+  noise: { deadband: 0.005, maxDelta: 0.6 },
+  warp: { deadband: 0.02, maxDelta: 0.8 },
+};
+
+const RANGES = {
+  deform: [0, 1.2],
+  crest: [0, 1],
+  blend: [0.02, 0.4],
+  edge: [0.02, 0.16],
+  merge: [4, 40],
+  noise: [0, 0.2],
+  warp: [0, 2.5],
+};
+
+const driverTrace = { deform: "base", crest: "base", blend: "base" };
+
+/**
+ * Три варианта одного шейдера.
+ * base   — ручки как есть.
+ * mood   — медленно: energy ведёт форму, brightness+rolloff — гребень и зоны,
+ *          flatness — шум, pace+bpm — скорость.
+ * pulse  — то же, но медленные драйверы заменены на punch/onset.
+ */
+function deriveParams(base, features, mode) {
+  if (mode === "base") {
+    driverTrace.deform = "—";
+    driverTrace.crest = "—";
+    driverTrace.blend = "—";
+    return base;
+  }
+  const amount = clamp01(base.moodAmount);
+  if (amount === 0) return base;
+
+  const energy = clamp01(features.energy);
+  const bright = clamp01(features.brightness);
+  const rolloff = clamp01(features.rolloff);
+  const flat = clamp01(features.flatness);
+  const pace = clamp01(features.pace);
+  const bpm = clamp01(features.bpm);
+  const punch = clamp01(features.punch);
+  const onset = clamp01(features.onset);
+  const accent = clamp01(features.accent);
+  const beatConf = clamp01(features.beatConf);
+
+  const slow = mode === "mood";
+  const shape = slow ? energy : 0.55 * punch + 0.45 * energy;
+  const light = slow ? 0.6 * bright + 0.4 * rolloff : 0.5 * bright + 0.5 * punch;
+  const tempo = slow ? 0.55 * pace + 0.45 * (beatConf > 0.25 ? bpm : pace) : pace;
+
+  driverTrace.deform = slow ? "energy" : "punch";
+  driverTrace.crest = slow ? "bright" : "punch";
+  driverTrace.blend = slow ? "bright" : "punch";
+
+  const target = {
+    deform: base.deform * (0.45 + 1.5 * shape) * (1 + 0.35 * accent * onset),
+    warp: base.warp * (0.4 + 1.4 * shape),
+    speed: base.speed * (0.55 + 1.35 * tempo),
+    crest: base.crest * (0.35 + 1.7 * light) * (1 + 0.4 * accent * punch),
+    blend: base.blend * (1.7 - 1.0 * light),
+    edge: base.edge * (1.25 - 0.55 * light),
+    noise: base.noise * (0.4 + 1.6 * flat),
+    merge: base.merge * (1.3 - 0.6 * shape),
+  };
+
+  const result = { ...base };
+  for (const key of Object.keys(target)) {
+    result[key] = lerp(base[key], clampPositive(target[key]), amount);
+  }
+  return result;
+}
+
+/** Ограничитель: мёртвая зона, лимит скорости и жёсткий диапазон. */
+function limitParams(key, params, dt) {
+  const store = limiters[key];
+  const result = { ...params };
+  for (const name of Object.keys(LIMITS)) {
+    const limit = LIMITS[name];
+    const range = RANGES[name];
+    const target = Math.min(range[1], Math.max(range[0], result[name]));
+    const previous = store[name] === undefined ? target : store[name];
+    let next = previous;
+    if (Math.abs(target - previous) >= limit.deadband) {
+      const delta = Math.min(limit.maxDelta * dt, Math.abs(target - previous));
+      next = previous + Math.sign(target - previous) * delta;
+    }
+    store[name] = next;
+    result[name] = next;
+  }
+  return result;
+}
+
+const limiters = { base: {}, mood: {}, pulse: {} };
+const wobbles = { base: 0, mood: 0, pulse: 0 };
+
+/* ------------------------------ csv recording ----------------------------- */
+
+let recording = null;
+
+function startRecording() {
+  recording = { started: performance.now(), rows: [], header: null };
+}
+
+function stopRecording() {
+  if (!recording) return;
+  const rows = recording.rows;
+  const header = ["t", ...Object.keys(ZERO), ...NORMALIZE_KEYS.map((key) => key + "_n")];
+  const csv = [header.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "orb-features.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+  setLog("записано строк: " + rows.length, "ok");
+  recording = null;
+}
+
+/* --------------------------------- the loop -------------------------------- */
+
+const meters = {
+  volume: document.getElementById("m-volume"),
+  bass: document.getElementById("m-bass"),
+  mid: document.getElementById("m-mid"),
+  high: document.getElementById("m-high"),
+  flux: document.getElementById("m-flux"),
+  onset: document.getElementById("m-onset"),
+  flatness: document.getElementById("m-flatness"),
+  rolloff: document.getElementById("m-rolloff"),
+  sub: document.getElementById("m-sub"),
+  bpm: document.getElementById("m-bpm"),
+  energy: document.getElementById("m-energy"),
+  brightness: document.getElementById("m-brightness"),
+  pace: document.getElementById("m-pace"),
+  punch: document.getElementById("m-punch"),
+  beat: document.getElementById("m-beat"),
+};
+
+let raf = 0;
+let lastFrame = performance.now();
+let seconds = 0;
+let frameCount = 0;
+let fpsWindow = 0;
+let sampleTimer = 0;
+let normalizer = null;
+const normalized = { ...ZERO };
+
+function paramUniforms(params) {
+  return {
+    uRadiusBack: params.radiusBack,
+    uRadiusMid: params.radiusMid,
+    uRadiusFront: params.radiusFront,
+    uDeform: params.deform,
+    uSpeed: params.speed,
+    uLobes: Math.round(params.lobes),
+    uBreath: params.breath,
+    uEdge: params.edge,
+    uBlend: params.blend,
+    uMerge: params.merge,
+    uCrest: params.crest,
+    uNoise: params.noise,
+    uIdle: params.idle,
+    uIntensity: params.intensity,
+    uWarp: params.warp,
+    uAudioMix: params.audioMix,
+  };
+}
+
+function paintMeters(raw) {
+  const values = {
+    ...raw,
+    energy: normalized.energy,
+    brightness: normalized.brightness,
+    pace: normalized.pace,
+    punch: normalized.punch,
+    beat: raw.beatConf,
+  };
+  for (const key of Object.keys(meters)) {
+    meters[key].style.width = Math.round(clamp01(values[key]) * 100) + "%";
+  }
+}
+
+function paintReadout(key, params) {
+  readouts[key].textContent =
+    "deform " + params.deform.toFixed(2) + " ← " + driverTrace.deform + "\n" +
+    "crest  " + params.crest.toFixed(2) + "  blend " + params.blend.toFixed(2) + "\n" +
+    "merge  " + params.merge.toFixed(1) + "  speed " + params.speed.toFixed(2);
+}
+
+function frame(now) {
+  if (document.hidden) {
+    raf = 0;
+    return;
+  }
+
+  const dt = Math.min(Math.max((now - lastFrame) / 1000, 0), 0.05);
+  lastFrame = now;
+  seconds += dt;
+
+  const active = audio.mode !== "silence" && audio.reader !== null;
+  const raw = audio.reader ? audio.reader.read(dt, active) : { ...ZERO };
+
+  if (!normalizer) normalizer = createNormalizer();
+  const mapped = normalizer(dt, raw);
+  Object.assign(normalized, mapped);
+
+  const features = state.preset ? { ...PRESETS[state.preset], accent: 0, beatConf: 1 } : { ...mapped, accent: raw.accent, beatConf: raw.beatConf };
+  const bands = state.preset ? PRESETS[state.preset] : raw;
+
+  for (const key of panelKeys) {
+    const mode = key === "base" ? "base" : key;
+    const derived = deriveParams(state.params, features, mode);
+    const params = limitParams(key, derived, dt);
+
+    wobbles[key] += dt * params.speed * (0.5 + 1.5 * raw.volume * params.audioMix);
+
+    const renderer = renderers[key];
+    if (renderer) {
+      renderer.draw({
+        uTime: seconds,
+        uWobble: wobbles[key],
+        uVolume: bands.volume,
+        uBass: bands.bass,
+        uMid: bands.mid,
+        uHigh: bands.high,
+        uFlux: bands.flux,
+        ...paramUniforms(params),
+      });
+    }
+    paintReadout(key, params);
+  }
+
+  paintMeters(raw);
+
+  if (recording) {
+    sampleTimer += dt;
+    if (sampleTimer >= 1 / NORMALIZE_RATE) {
+      sampleTimer = 0;
+      const t = ((performance.now() - recording.started) / 1000).toFixed(2);
+      recording.rows.push(
+        [t, ...Object.keys(ZERO).map((key) => Number(raw[key]).toFixed(4)), ...NORMALIZE_KEYS.map((key) => normalized[key].toFixed(4))].join(","),
+      );
+    }
+  }
+
+  frameCount += 1;
+  fpsWindow += dt;
+  if (fpsWindow >= 0.5) {
+    document.getElementById("fps").textContent = Math.round(frameCount / fpsWindow) + " fps";
+    frameCount = 0;
+    fpsWindow = 0;
+  }
+
+  raf = window.requestAnimationFrame(frame);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || raf) return;
+  lastFrame = performance.now();
+  raf = window.requestAnimationFrame(frame);
+});
+
+/* ------------------------------ audio graph -------------------------------- */
 
 const audio = {
   ctx: null,
@@ -826,7 +1323,6 @@ async function ensureAudio() {
   return true;
 }
 
-/** Синтетический спектр: банк осцилляторов по лог-сетке, гейны гуляют. */
 const SYNTH_FREQS = [70, 110, 180, 320, 550, 900, 1500, 2600, 4200, 6800, 10000];
 
 function buildSynth() {
@@ -910,6 +1406,12 @@ function syncModeButtons() {
   }
 }
 
+function syncPresetButtons() {
+  for (const button of document.querySelectorAll("#presets button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.preset === state.preset));
+  }
+}
+
 async function setMode(mode) {
   state.mode = mode;
   audio.mode = mode;
@@ -961,163 +1463,6 @@ async function setMode(mode) {
   }
 }
 
-/* ------------------------------ mood mapping ------------------------------ */
-
-const lerp = (from, to, t) => from + (to - from) * t;
-
-/**
- * Три варианта одного шейдера.
- * base   — ручки как есть.
- * mood   — медленно: энергия ведёт форму, яркость — гребень и ширину зон,
- *          темп — скорость. Всё через общий `глубина`.
- * pulse  — быстро: то же, но ведут атака (punch) и плотность онсетов.
- */
-function deriveParams(base, features, mode) {
-  if (mode === "base") return base;
-  const amount = clamp01(base.moodAmount);
-  if (amount === 0) return base;
-
-  const energy = clamp01(features.energy);
-  const bright = clamp01(features.brightness);
-  const pace = clamp01(features.pace);
-  const punch = clamp01(features.punch);
-
-  const slow = mode === "mood";
-  const shape = slow ? energy : 0.55 * punch + 0.45 * energy;
-  const tempo = slow ? 0.55 * energy + 0.45 * pace : pace;
-  const light = slow ? bright : 0.5 * bright + 0.5 * punch;
-
-  const target = {
-    deform: base.deform * (0.45 + 1.5 * shape),
-    warp: base.warp * (0.4 + 1.4 * shape),
-    speed: base.speed * (0.55 + 1.35 * tempo),
-    crest: base.crest * (0.35 + 1.7 * light),
-    blend: base.blend * (1.7 - 1.0 * light),
-    edge: base.edge * (1.25 - 0.55 * light),
-    noise: base.noise * (0.4 + 1.6 * punch),
-    merge: base.merge * (1.3 - 0.6 * shape),
-  };
-
-  const result = { ...base };
-  for (const key of Object.keys(target)) result[key] = lerp(base[key], clampPositive(target[key]), amount);
-  return result;
-}
-
-function clampPositive(value) {
-  return value > 0 ? value : 0;
-}
-
-/* --------------------------------- the loop -------------------------------- */
-
-const meters = {
-  volume: document.getElementById("m-volume"),
-  bass: document.getElementById("m-bass"),
-  mid: document.getElementById("m-mid"),
-  high: document.getElementById("m-high"),
-  flux: document.getElementById("m-flux"),
-  energy: document.getElementById("m-energy"),
-  brightness: document.getElementById("m-brightness"),
-  pace: document.getElementById("m-pace"),
-  punch: document.getElementById("m-punch"),
-};
-
-let raf = 0;
-let lastFrame = performance.now();
-let seconds = 0;
-let frameCount = 0;
-let fpsWindow = 0;
-const wobbles = { base: 0, mood: 0, pulse: 0 };
-
-function paramUniforms(params) {
-  return {
-    uRadiusBack: params.radiusBack,
-    uRadiusMid: params.radiusMid,
-    uRadiusFront: params.radiusFront,
-    uDeform: params.deform,
-    uSpeed: params.speed,
-    uLobes: Math.round(params.lobes),
-    uBreath: params.breath,
-    uEdge: params.edge,
-    uBlend: params.blend,
-    uMerge: params.merge,
-    uCrest: params.crest,
-    uNoise: params.noise,
-    uIdle: params.idle,
-    uIntensity: params.intensity,
-    uWarp: params.warp,
-    uAudioMix: params.audioMix,
-  };
-}
-
-function paintMeters(features) {
-  for (const key of Object.keys(meters)) {
-    meters[key].style.width = Math.round(clamp01(features[key]) * 100) + "%";
-  }
-}
-
-function paintReadout(key, params) {
-  readouts[key].textContent =
-    "deform " + params.deform.toFixed(2) +
-    "  speed " + params.speed.toFixed(2) +
-    "\ncrest " + params.crest.toFixed(2) +
-    "  blend " + params.blend.toFixed(2) +
-    "\nmerge " + params.merge.toFixed(1) +
-    "  noise " + params.noise.toFixed(2);
-}
-
-function frame(now) {
-  if (document.hidden) {
-    raf = 0;
-    return;
-  }
-
-  const dt = Math.min(Math.max((now - lastFrame) / 1000, 0), 0.05);
-  lastFrame = now;
-  seconds += dt;
-
-  const active = audio.mode !== "silence" && audio.reader !== null;
-  const features = audio.reader ? audio.reader.read(dt, active) : ZERO;
-
-  for (const key of panelKeys) {
-    const params = deriveParams(state.params, features, key === "base" ? "base" : key);
-    // Фаза качания своя у каждой панели: скорость в вариантах разная.
-    wobbles[key] += dt * params.speed * (0.5 + 1.5 * features.volume * params.audioMix);
-
-    const renderer = renderers[key];
-    if (renderer) {
-      renderer.draw({
-        uTime: seconds,
-        uWobble: wobbles[key],
-        uVolume: features.volume,
-        uBass: features.bass,
-        uMid: features.mid,
-        uHigh: features.high,
-        uFlux: features.flux,
-        ...paramUniforms(params),
-      });
-    }
-    paintReadout(key, params);
-  }
-
-  paintMeters(features);
-
-  frameCount += 1;
-  fpsWindow += dt;
-  if (fpsWindow >= 0.5) {
-    document.getElementById("fps").textContent = Math.round(frameCount / fpsWindow) + " fps";
-    frameCount = 0;
-    fpsWindow = 0;
-  }
-
-  raf = window.requestAnimationFrame(frame);
-}
-
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden || raf) return;
-  lastFrame = performance.now();
-  raf = window.requestAnimationFrame(frame);
-});
-
 /* --------------------------------- wiring --------------------------------- */
 
 function compileShader() {
@@ -1144,6 +1489,24 @@ for (const button of document.querySelectorAll("#modes button")) {
     void setMode(button.dataset.mode);
   });
 }
+
+for (const button of document.querySelectorAll("#presets button")) {
+  button.addEventListener("click", () => {
+    state.preset = button.dataset.preset;
+    syncPresetButtons();
+  });
+}
+
+document.getElementById("record").addEventListener("click", () => {
+  if (recording) {
+    stopRecording();
+    document.getElementById("record").textContent = "записать csv";
+    return;
+  }
+  startRecording();
+  document.getElementById("record").textContent = "остановить и скачать";
+  setLog("пишу фичи на 20 гц", "ok");
+});
 
 document.getElementById("compile").addEventListener("click", compileShader);
 
@@ -1194,6 +1557,7 @@ restore();
 buildParams();
 syncSliders();
 syncModeButtons();
+syncPresetButtons();
 textarea.value = state.shader;
 
 if (state.mode !== "silence") {
