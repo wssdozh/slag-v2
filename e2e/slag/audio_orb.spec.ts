@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 test.setTimeout(90_000);
 
-type OrbFeatures = { volume: number; bass: number; mid: number; high: number; flux: number; ring: number };
+type OrbFeatures = { volume: number; bass: number; mid: number; high: number; flux: number };
 type OrbDebug = { time: number; frames: number; features: OrbFeatures };
 
 const TONE = 'tone';
@@ -175,8 +175,8 @@ test.describe('liquid orb motion', () => {
       { timeout: 10_000, polling: 50 },
     );
 
-    // The ring lives for the length of the flux release; catch it at the peak.
-    await canvas.screenshot({ path: 'test-results/screenshots/audio-orb-shockwave.png' });
+    // The hot orb pops for the length of the flux release; catch it at the peak.
+    await canvas.screenshot({ path: 'test-results/screenshots/audio-orb-burst.png' });
 
     await page.waitForFunction(
       () => ((window as Window & { __orbDebug?: OrbDebug }).__orbDebug?.features.flux ?? 0) < 0.12,

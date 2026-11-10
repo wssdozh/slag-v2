@@ -31,7 +31,6 @@ uniform float uBass;
 uniform float uMid;
 uniform float uHigh;
 uniform float uFlux;
-uniform float uRing;
 varying vec2 vUv;
 
 // One liquid blob: an elastic radius with two harmonics. Returns
@@ -50,42 +49,37 @@ void main() {
     vec2 p = vUv;
     float t = uTime;
 
-    // Three objects, not three coatings on one silhouette. The centers are
-    // far enough apart (relative to their radii) that the back and middle orbs
-    // peek out as crescents instead of reading as concentric rings.
-    vec2 centerBack = vec2(-0.14, 0.09)
-                    + 0.035 * vec2(sin(t * 0.17), cos(t * 0.13))
-                    + vec2(uVolume * 0.020, uBass * 0.010);
-    vec2 centerMid = vec2(0.10, -0.05)
-                   + 0.030 * vec2(sin(t * 0.23 + 1.3), cos(t * 0.19 + 0.7))
-                   + vec2(-uBass * 0.012, 0.0);
-    vec2 centerFront = vec2(0.32, 0.20)
-                     + 0.025 * vec2(sin(t * 0.31 + 2.7), cos(t * 0.27 + 1.9))
-                     + vec2(uFlux * 0.030, uMid * 0.015);
+    // Vertical stack: one orb above another on the same axis, each one smaller
+    // and hotter than the one below. The overlap is deliberate: the lower orb
+    // shows as a bottom crescent, the upper one caps the pile.
+    vec2 centerBack = vec2(0.02 * sin(t * 0.17), -0.24 + 0.02 * cos(t * 0.13))
+                    + vec2(uVolume * 0.012, uBass * 0.008);
+    vec2 centerMid = vec2(0.03 * sin(t * 0.23 + 1.3), 0.06 + 0.02 * cos(t * 0.19 + 0.7))
+                   + vec2(-uBass * 0.010, 0.0);
+    vec2 centerFront = vec2(0.02 * sin(t * 0.31 + 2.7) + uFlux * 0.025,
+                            0.34 + 0.02 * cos(t * 0.27 + 1.9) + uMid * 0.010);
 
-    float breath = sin(t * 1.1) * 0.012;
+    float breath = sin(t * 1.1) * 0.014;
 
-    // Back: loudness only, slow swell and drift.
+    // Deformation is deliberately large: a quiet orb should still look liquid,
+    // not like a circle with a wobble bolted on.
     vec3 back = orb(p, centerBack,
-        0.60 + breath + uVolume * 0.08 + uBass * 0.03, 0.050,
-        0.030 + uVolume * 0.020, t * 0.18, 2.0,
-        0.020, t * 0.13 + 0.8, 3.0);
+        0.42 + breath + uVolume * 0.06, 0.050,
+        0.060 + uVolume * 0.050, t * 0.23, 2.0,
+        0.045 + uBass * 0.035, t * 0.17 + 0.8, 3.0);
 
-    // Middle: bass sets the size, mids bend the contour, counter-drifts.
     vec3 mid = orb(p, centerMid,
-        0.43 + uBass * 0.08 + uVolume * 0.03, 0.040,
-        0.028 + uMid * 0.045, t * 0.42 + 0.5, 2.0,
-        0.022 + uBass * 0.040, t * 0.51 - 0.3, 3.0);
+        0.32 + uBass * 0.06 + uVolume * 0.02, 0.040,
+        0.070 + uMid * 0.080, t * 0.47 + 0.5, 2.0,
+        0.055 + uBass * 0.080, t * 0.53 - 0.3, 3.0);
 
-    // Front: small and hot, snaps with loudness and jumps on onsets.
     vec3 front = orb(p, centerFront,
-        0.175 + uMid * 0.04 + uVolume * 0.03 + uFlux * 0.04, 0.045,
-        0.012 + uHigh * 0.020, t * 0.90, 4.0,
-        0.010 + uMid * 0.015, t * 1.07 + 1.1, 2.0);
+        0.20 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, 0.045,
+        0.035 + uHigh * 0.035, t * 0.90, 4.0,
+        0.028 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
 
     // Palette is the visualisation gradient, not layout tokens. The back orb is
-    // darker than the middle one (that is the depth cue) with a thin lit limb,
-    // otherwise the visible crescent reads as a flat navy blob.
+    // darker than the middle one (that is the depth cue) with a soft lit limb.
     float backNd = clamp(back.z / back.y, 0.0, 1.0);
     vec3 colBack = mix(vec3(0.14, 0.48, 0.90), vec3(0.02, 0.18, 0.48), smoothstep(0.0, 1.0, backNd));
     colBack += vec3(0.08, 0.30, 0.60) * smoothstep(0.35, 1.0, backNd) * 0.7;
@@ -99,11 +93,11 @@ void main() {
             * smoothstep(mid.y - 0.22, mid.y - 0.02, mid.z)
             * (0.08 + uHigh * 0.25);
 
-    float aBack = back.x * 0.95;
-    float aMid = mid.x * 0.88;
+    float aBack = back.x * 0.96;
+    float aMid = mid.x * 0.90;
     float aFront = front.x;
 
-    // Premultiplied stack, back to front. The slight translucency is what lets
+    // Premultiplied stack, bottom to top. The slight translucency is what lets
     // the silhouette underneath read as a second object instead of a halo.
     vec3 color = colBack * aBack;
     float alpha = aBack;
@@ -111,13 +105,6 @@ void main() {
     alpha = aMid + alpha * (1.0 - aMid);
     color = colFront * aFront + color * (1.0 - aFront);
     alpha = aFront + alpha * (1.0 - aFront);
-
-    // Onset shockwave leaves the hot orb and expands while it fades, so the hit
-    // reads as an impact instead of a hoop drawn around the whole stack.
-    float ringRadius = 0.12 + (1.0 - uRing) * 0.55;
-    float ring = (1.0 - smoothstep(0.0, 0.018, abs(length(p - centerFront) - ringRadius))) * uRing * uRing * 1.2;
-    color += vec3(0.55, 0.92, 1.0) * ring;
-    alpha = min(1.0, alpha + ring);
 
     if (alpha <= 0.004) {
         discard;
@@ -134,7 +121,6 @@ export interface OrbFrame {
   mid: number;
   high: number;
   flux: number;
-  ring: number;
 }
 
 export interface OrbRenderer {
@@ -208,7 +194,6 @@ export function createOrbRenderer(canvas: HTMLCanvasElement): OrbRenderer | null
   const midLocation = gl.getUniformLocation(program, 'uMid');
   const highLocation = gl.getUniformLocation(program, 'uHigh');
   const fluxLocation = gl.getUniformLocation(program, 'uFlux');
-  const ringLocation = gl.getUniformLocation(program, 'uRing');
 
   let width = 0;
   let height = 0;
@@ -236,7 +221,6 @@ export function createOrbRenderer(canvas: HTMLCanvasElement): OrbRenderer | null
       gl.uniform1f(midLocation, frame.mid);
       gl.uniform1f(highLocation, frame.high);
       gl.uniform1f(fluxLocation, frame.flux);
-      gl.uniform1f(ringLocation, frame.ring);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     },
     dispose() {

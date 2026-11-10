@@ -10,7 +10,7 @@ interface AudioCoverArtProps {
   analyser: AnalyserNode | null;
 }
 
-const RESTING_FEATURES: OrbFeatures = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0, ring: 0 };
+const RESTING_FEATURES: OrbFeatures = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0 };
 
 /** The orb keeps moving this long after a pause so it settles into a calm shape. */
 const PAUSE_SETTLE_MS = 700;

@@ -18,8 +18,6 @@ export interface OrbFeatures {
   high: number;
   /** Spectral flux: how much new energy appeared since the previous frame. */
   flux: number;
-  /** Same onset, released slowly: drives the expanding shockwave ring. */
-  ring: number;
 }
 
 export interface SpectrumReader {
@@ -49,13 +47,12 @@ const ENVELOPE = {
   mid: { attack: 0.04, release: 0.22 },
   high: { attack: 0.015, release: 0.12 },
   flux: { attack: 0.008, release: 0.14 },
-  ring: { attack: 0.008, release: 0.45 },
 } as const;
 
 /** First frame after a tab wakes up can carry a huge dt; never integrate it. */
 const MAX_STEP_S = 0.1;
 
-const ZERO: OrbFeatures = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0, ring: 0 };
+const ZERO: OrbFeatures = { volume: 0, bass: 0, mid: 0, high: 0, flux: 0 };
 
 interface BinRange {
   start: number;
@@ -162,7 +159,6 @@ export function createSpectrumReader(analyser: AnalyserNode): SpectrumReader {
         mid: damp(current.mid, mid, ENVELOPE.mid.attack, ENVELOPE.mid.release, step),
         high: damp(current.high, high, ENVELOPE.high.attack, ENVELOPE.high.release, step),
         flux: damp(current.flux, flux, ENVELOPE.flux.attack, ENVELOPE.flux.release, step),
-        ring: damp(current.ring, flux, ENVELOPE.ring.attack, ENVELOPE.ring.release, step),
       };
       return current;
     },
