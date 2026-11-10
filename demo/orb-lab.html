@@ -1081,6 +1081,179 @@ const driverTrace = { deform: "base", crest: "base", blend: "base" };
 let bpmLatch = false;
 
 /**
+ * Цвет — характер песни, а не её текущая громкость.
+ *
+ * Сквозная развёртка «настроение -> весь круг» обязательно читается как
+ * карусель: нормализованные фичи ходят по кругу (окно перецентровывается),
+ * и любой монотонный маппинг протаскивает цвет через все тона.
+ * Поэтому цвет разделён на два слоя:
+ *   оттенок  — из абсолютных фич трека (без нормализации), один на песню;
+ *   дыхание  — секция сдвигает оттенок в пределах +-HUE_SWING градусов.
+ * Внутри песни это один цвет и его тона, между песнями диапазон широкий.
+ */
+const HUE_SWING = 28;
+/** Догон оттенка: смена трека переезжает за секунду, а не ползёт полминуты. */
+const HUE_TAU = 1;
+
+/**
+ * Рабочий диапазон характера на реальной библиотеке.
+ * Замерено на девяти треках: 0.65…0.83, медиана 0.76.
+ */
+const IDENTITY_LOW = 0.65;
+const IDENTITY_HIGH = 0.83;
+/** Куда уходят края: спокойное — в синий, плотное — в алый. */
+const IDENTITY_HUE = [205, 10];
+/** Гистограмма характера: медиана по всему проигранному, без перецентровки. */
+const IDENTITY_BINS = 256;
+
+const moodTrace = { identity: 0.7, section: 0.5 };
+const identityHist = new Float64Array(IDENTITY_BINS);
+let identityCount = 0;
+/** Характер файла, посчитанный один раз по всему буферу. */
+let trackIdentity = null;
+/** Профиль последнего загруженного файла: нужен для калибровки. */
+let lastProfile = null;
+
+/**
+ * Профиль трека по декодированному буферу: громкость, яркость и плотность.
+ * Считается один раз при загрузке файла, поэтому цвет известен с первой
+ * секунды и не зависит от того, с какого места началось воспроизведение.
+ * FFT не нужен: RMS, частота переходов через ноль и подъёмы огибающей
+ * дают те же три оси, что и живой анализатор.
+ */
+async function profileTrack(file) {
+  if (!audio.ctx) return null;
+  let buffer;
+  try {
+    buffer = await audio.ctx.decodeAudioData(await file.arrayBuffer());
+  } catch {
+    return null;
+  }
+  const data = buffer.getChannelData(0);
+  const total = data.length;
+  if (total === 0) return null;
+
+  const seconds = total / buffer.sampleRate;
+  const frame = Math.max(256, Math.round(buffer.sampleRate * 0.02));
+  const envelope = [];
+  let sumSquares = 0;
+  let crossings = 0;
+  let previousSign = data[0] >= 0;
+  let frameSquares = 0;
+  let frameCount = 0;
+
+  for (let i = 0; i < total; i += 1) {
+    const value = data[i];
+    sumSquares += value * value;
+    const sign = value >= 0;
+    if (sign !== previousSign) {
+      crossings += 1;
+      previousSign = sign;
+    }
+    frameSquares += value * value;
+    frameCount += 1;
+    if (frameCount >= frame) {
+      envelope.push(Math.sqrt(frameSquares / frameCount));
+      frameSquares = 0;
+      frameCount = 0;
+    }
+  }
+
+  let mean = 0;
+  for (const value of envelope) mean += value;
+  mean = envelope.length > 0 ? mean / envelope.length : 0;
+  let onsets = 0;
+  let armed = true;
+  for (const value of envelope) {
+    if (armed && value > mean * 1.4) {
+      onsets += 1;
+      armed = false;
+    } else if (!armed && value < mean * 1.1) {
+      armed = true;
+    }
+  }
+
+  const rms = Math.sqrt(sumSquares / total);
+  const zeroCross = crossings / seconds;
+  const rate = onsets / seconds;
+  return {
+    seconds,
+    rmsDb: 20 * Math.log10(rms + 1e-6),
+    zeroCross,
+    onsetsPerSecond: rate,
+  };
+}
+
+/** Сырой профиль -> три оси 0..1 и общий характер. */
+function profileIdentity(profile) {
+  const loudness = clamp01((profile.rmsDb + 32) / 26);
+  const brightness = clamp01(
+    (Math.log10(profile.zeroCross + 1) - Math.log10(250)) / (Math.log10(6000) - Math.log10(250)),
+  );
+  const pace = clamp01(profile.onsetsPerSecond / 4);
+  return { loudness, brightness, pace, identity: 0.5 * loudness + 0.3 * brightness + 0.2 * pace };
+}
+
+/** Характер (0..1) -> оттенок: спокойное в синий, плотное в алый. */
+function identityHue(value) {
+  const part = clamp01((value - IDENTITY_LOW) / (IDENTITY_HIGH - IDENTITY_LOW));
+  return lerp(IDENTITY_HUE[0], IDENTITY_HUE[1], part);
+}
+
+/**
+ * Характер трека -> оттенок.
+ *
+ * Для файла берётся профиль, посчитанный по всему буферу: цвет известен
+ * с первой секунды и не ползёт. Для микрофона профиля нет, поэтому там
+ * медиана по всему проигранному — она сходится и дальше стоит.
+ * Скользящее окно не используется: оно перецентровывается и гонит цвет
+ * по кругу — это и была «карусель».
+ */
+function resolveIdentity(value) {
+  if (trackIdentity !== null) {
+    moodTrace.identity = trackIdentity;
+    return identityHue(trackIdentity);
+  }
+  const bin = Math.min(IDENTITY_BINS - 1, Math.max(0, Math.floor(value * IDENTITY_BINS)));
+  identityHist[bin] += 1;
+  identityCount += 1;
+  const half = identityCount / 2;
+  let acc = 0;
+  let median = value;
+  for (let i = 0; i < IDENTITY_BINS; i += 1) {
+    if (identityHist[i] === 0) continue;
+    const next = acc + identityHist[i];
+    if (next >= half) {
+      median = (i + (half - acc) / identityHist[i]) / IDENTITY_BINS;
+      break;
+    }
+    acc = next;
+  }
+  moodTrace.identity = median;
+  return identityHue(median);
+}
+
+/** Новый трек — новый характер: оттенок берём сразу, без переезда через весь круг. */
+function resetColour() {
+  identityHist.fill(0);
+  identityCount = 0;
+  for (const key of panelKeys) hueSlow[key] = null;
+}
+
+/** Цвет на кадр: оттенок трека (абсолютный) и секция (относительная). */
+function readColour(features) {
+  const energy = clamp01(features.absEnergy ?? features.energy ?? 0);
+  const bright = clamp01(features.absBrightness ?? features.brightness ?? 0);
+  const pace = clamp01(features.absPace ?? features.pace ?? 0);
+  const base = resolveIdentity(0.5 * energy + 0.3 * bright + 0.2 * pace);
+  const section = clamp01(
+    (0.5 * clamp01(features.energy) + 0.3 * clamp01(features.brightness) + 0.2 * clamp01(features.pace) - 0.35) / 0.6,
+  );
+  moodTrace.section = section;
+  return { base, section };
+}
+
+/**
  * Три варианта одного шейдера.
  * base   — ручки как есть.
  * mood   — медленно: energy ведёт форму, brightness+rolloff — гребень и зоны,
@@ -1121,18 +1294,10 @@ function deriveParams(base, features, mode) {
   driverTrace.crest = slow ? "bright" : "punch";
   driverTrace.blend = slow ? "bright" : "punch";
 
-  // Один оттенок на кадр: hue медленно едет за настроением (синий -> бирюза -> индиго),
-  // но вся картинка всегда остаётся тонами одного цвета.
-  // Цвет — шкала температуры: спокойный микс уходит в синий, плотный и быстрый
-  // проходит через зелёный и жёлтый до красного. В кадре всегда один оттенок,
-  // поэтому «разноцветности» нет — есть один цвет, который меняется целиком.
-  // Медиана энергии на плотных мастерах сидит около 0.8, поэтому сырую сумму
-  // сжимаем: рабочий диапазон 0.35…0.95 растягивается на весь круг.
-  const rawMood = clamp01(0.5 * energy + 0.3 * bright + 0.2 * pace);
-  const mood = clamp01((rawMood - 0.35) / 0.6);
+  // Два входа цвета считает readColour() один раз на кадр.
   const lift = 0.6 * bright + 0.4 * rolloff;
   const target = {
-    hue: 210 - 210 * mood,
+    hue: base.hue,
     sat: 0.72 + 0.24 * energy,
     val: 0.68 + 0.3 * lift,
     deform: base.deform * (0.45 + 1.5 * shape) * (1 + 0.35 * accent * onset),
@@ -1175,7 +1340,7 @@ function limitParams(key, params, dt) {
 const limiters = { base: {}, mood: {}, pulse: {} };
 const wobbles = { base: 0, mood: 0, pulse: 0 };
 /** Оттенок догоняет цель за секунды: цвет живёт по секциям, а не по ударам. */
-const hueSlow = { base: 205, mood: 240, pulse: 240 };
+const hueSlow = { base: null, mood: null, pulse: null };
 
 /* ------------------------------ csv recording ----------------------------- */
 
@@ -1273,10 +1438,13 @@ function paintMeters(raw) {
 }
 
 function paintReadout(key, params) {
+  const colour = key === "base"
+    ? ""
+    : "\nhue " + Math.round(params.hue) + " (трек " + moodTrace.identity.toFixed(2) + " · секция " + moodTrace.section.toFixed(2) + ")";
   readouts[key].textContent =
     "deform " + params.deform.toFixed(2) + " ← " + driverTrace.deform + "\n" +
     "crest  " + params.crest.toFixed(2) + "  blend " + params.blend.toFixed(2) + "\n" +
-    "merge  " + params.merge.toFixed(1) + "  speed " + params.speed.toFixed(2);
+    "merge  " + params.merge.toFixed(1) + "  speed " + params.speed.toFixed(2) + colour;
 }
 
 function frame(now) {
@@ -1297,15 +1465,30 @@ function frame(now) {
   const mapped = normalizer(dt, raw);
   Object.assign(normalized, mapped);
 
-  const features = state.preset ? { ...PRESETS[state.preset], accent: 0, beatConf: 1 } : { ...mapped, accent: raw.accent, beatConf: raw.beatConf };
+  const features = state.preset
+    ? { ...PRESETS[state.preset], accent: 0, beatConf: 1 }
+    : {
+        ...mapped,
+        accent: raw.accent,
+        beatConf: raw.beatConf,
+        absEnergy: raw.energy,
+        absBrightness: raw.brightness,
+        absPace: raw.pace,
+      };
   const bands = state.preset ? PRESETS[state.preset] : raw;
+  const colour = readColour(features);
 
   for (const key of panelKeys) {
     const mode = key === "base" ? "base" : key;
     const derived = deriveParams(state.params, features, mode);
-    // hue живёт на круге, поэтому догоняем цель по короткой дуге, а не по числам
-    const hueDelta = ((derived.hue - hueSlow[key] + 540) % 360) - 180;
-    hueSlow[key] += hueDelta * (1 - Math.exp(-dt / 12));
+    // hue: оттенок трека плюс дыхание секции, догоняем по короткой дуге
+    const hueTarget = mode === "base" ? derived.hue : colour.base + HUE_SWING * 2 * (colour.section - 0.5);
+    if (hueSlow[key] === null) {
+      hueSlow[key] = hueTarget; // первый кадр: сразу в свой оттенок, без пролёта
+    } else {
+      const hueDelta = ((hueTarget - hueSlow[key] + 540) % 360) - 180;
+      hueSlow[key] += hueDelta * (1 - Math.exp(-dt / HUE_TAU));
+    }
     hueSlow[key] = ((hueSlow[key] % 360) + 360) % 360;
     derived.hue = hueSlow[key];
     const params = limitParams(key, derived, dt);
@@ -1619,6 +1802,8 @@ document.getElementById("file").addEventListener("change", async (event) => {
   if (!ready) return;
   const element = ensureElement();
   element.src = URL.createObjectURL(file);
+  trackIdentity = null;
+  resetColour();
   try {
     await element.play();
     // Выбор файла сам включает режим: иначе анализатор остаётся в тишине.
@@ -1627,6 +1812,13 @@ document.getElementById("file").addEventListener("change", async (event) => {
     syncModeButtons();
     save();
     setLog(file.name + " играет", "ok");
+    // Профиль считаем в фоне: цвет досчитается через секунду, звук не ждёт.
+    profileTrack(file).then((profile) => {
+      if (!profile) return;
+      lastProfile = profile;
+      trackIdentity = profileIdentity(profile).identity;
+      setLog(file.name + ": характер " + trackIdentity.toFixed(2), "ok");
+    });
   } catch {
     setLog("не удалось запустить файл", "err");
   }
@@ -1651,6 +1843,7 @@ window.__lab = {
   },
   seek(seconds) {
     if (audio.element) audio.element.currentTime = seconds;
+    resetColour();
   },
   play() {
     return audio.element ? audio.element.play() : Promise.resolve();
@@ -1663,6 +1856,10 @@ window.__lab = {
   },
   color() {
     return { ...lastColor };
+  },
+  profile() {
+    if (!lastProfile) return null;
+    return { ...lastProfile, ...profileIdentity(lastProfile) };
   },
   params() {
     return lastParams ? { ...lastParams } : null;

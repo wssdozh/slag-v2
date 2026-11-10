@@ -142,9 +142,11 @@ for (const input of inputs) {
   }
 
   const hues = rows.map((row) => row.color.hue);
+  const profile = await page.evaluate(() => window.__lab.profile());
   summary.push({
     track: basename(input),
     rows: rows.length,
+    profile,
     hue: [+Math.min(...hues).toFixed(1), +Math.max(...hues).toFixed(1)],
     stats,
     errors,
