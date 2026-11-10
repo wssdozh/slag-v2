@@ -175,7 +175,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         const api = apiRef.current;
-        if (api) syncAllGroupConstraints(api);
+        // Fold decision only: dockview resizes the grid itself, a full recompute here lags the drag.
+        if (api) syncAllGroupConstraints(api, true);
       }, 150);
     };
     window.addEventListener('resize', handleResize);

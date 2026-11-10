@@ -50,6 +50,12 @@ test('side panels fold into the reading pane when the window is too narrow for f
   expect(narrow.reduce((sum, group) => sum + group.width, 0)).toBeLessThanOrEqual(950);
   await page.screenshot({ path: 'test-results/screenshots/dock-fold-narrow.png' });
 
+  // Hysteresis: 1050 is already above the fold threshold, but below the unfold one, so it must stay
+  // folded instead of rebuilding the grid on every step of a slow window drag.
+  await page.setViewportSize({ width: 1050, height: 900 });
+  await page.waitForTimeout(900);
+  expect(await groups(page)).toHaveLength(2);
+
   // Widening brings the previous split back, tab groups included.
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.waitForTimeout(1400);

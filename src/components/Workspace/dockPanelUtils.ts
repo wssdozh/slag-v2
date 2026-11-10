@@ -54,42 +54,72 @@ export const getPanelComponent = (panel: IDockviewPanel): string => {
 /** Panels that are allowed to fold into the reading pane when the window gets tight. */
 const SIDE_COMPONENTS = new Set(['assistant', 'audio', 'folder-info', 'logs']);
 
-/** Below this width the side panels stop being columns and become tabs of the reading pane. */
+/**
+ * Fold under the first width, unfold only above the second one. A window dragged across a single
+ * threshold would otherwise rebuild the grid on every frame.
+ */
 const FOLD_BELOW_PX = 1024;
+const UNFOLD_ABOVE_PX = 1120;
 
 /**
- * The split layout as it was before folding, so widening brings the columns, their widths and their
- * tab groups back instead of rebuilding one column per panel.
+ * Which column each side panel lived in before the fold, so widening puts the very same split back
+ * without recreating panels — a `fromJSON` restore remounts them and the editor loses its place.
  * ponytail: in memory only, so a restart in a narrow window starts folded. Persist it next to the
  * saved layout if that ever matters.
  */
-let unfoldedLayout: ReturnType<DockviewApi['toJSON']> | null = null;
+let foldedSides: { id: string; column: string }[] | null = null;
 let isApplyingLayout = false;
 
-const samePanelSet = (snapshot: ReturnType<DockviewApi['toJSON']>, panels: IDockviewPanel[]) =>
-  Object.keys(snapshot.panels).sort().join() === panels.map(panel => panel.id).sort().join();
+const applyGroupConstraints = (api: DockviewApi) => {
+  const entries = api.groups
+    .map(group => ({ group, active: group.activePanel }))
+    .filter((entry): entry is { group: (typeof entry.group); active: IDockviewPanel } => Boolean(entry.active));
+  // Whatever is still split gets scaled minimums: the window is the hard limit, the rail minimums
+  // are just a comfortable default.
+  const totalMin = entries.reduce((sum, entry) => sum + getPanelMinWidth(getPanelComponent(entry.active)), 0);
+  const scale = api.width > 0 && totalMin > api.width ? api.width / totalMin : 1;
+  entries.forEach(({ group, active }) => {
+    const comp = getPanelComponent(active);
+    const maxWidth = getPanelMaxWidth(comp);
+    try {
+      group.api.setConstraints({
+        minimumWidth: Math.floor(getPanelMinWidth(comp) * scale),
+        maximumWidth: maxWidth,
+      });
+      if (maxWidth && group.api.width > maxWidth) {
+        group.api.setSize({ width: maxWidth });
+      }
+    } catch {
+      // Group may be disposing
+    }
+  });
+};
 
 /**
- * Keeps the grid inside the window. Every open panel wants its own column; when the window cannot
- * hold that, the side panels fold into tabs of the reading pane instead of pushing the grid past
- * the window edge (dockview obeys the minimums it is given, and the right-hand pane ends up clipped
- * by the frame). Widening the window puts the previous split back.
+ * Decides whether the side panels are columns or tabs of the reading pane, then re-applies the
+ * group constraints. The resize path (`foldOnly`) never touches the constraints: dockview already
+ * resizes the grid itself, and recomputing on every frame is what made dragging the window crawl.
  */
-export const syncAllGroupConstraints = (api: DockviewApi) => {
+export const syncAllGroupConstraints = (api: DockviewApi, foldOnly = false) => {
   if (isApplyingLayout) return;
 
   const panels = api.panels;
   const feed = panels.find(panel => getPanelComponent(panel) === 'feed') ?? panels[0];
   if (!feed) return;
 
-  const fold = api.width > 0 && api.width < FOLD_BELOW_PX;
   const sides = panels.filter(panel => SIDE_COMPONENTS.has(getPanelComponent(panel)));
-  const changed = fold ? sides.some(panel => panel.group !== feed.group) : unfoldedLayout !== null;
+  const fold = api.width > 0 && api.width < (foldedSides ? UNFOLD_ABOVE_PX : FOLD_BELOW_PX);
+  const changed = fold ? sides.some(panel => panel.group !== feed.group) : foldedSides !== null;
+  if (!changed) {
+    if (!foldOnly) applyGroupConstraints(api);
+    return;
+  }
 
-  const apply = (layoutChanged: boolean) => {
+  const apply = () => {
     if (fold) {
-      // Before the first move, otherwise a half-folded tree becomes the thing we restore later.
-      unfoldedLayout ??= api.toJSON();
+      foldedSides = sides
+        .filter(panel => panel.group !== feed.group)
+        .map(panel => ({ id: panel.id, column: panel.group.id }));
       // moveTo re-arranges the grid as it goes, so the pass repeats until nothing else wants to move.
       for (let pass = 0; pass < 3; pass += 1) {
         let movedNow = 0;
@@ -102,65 +132,32 @@ export const syncAllGroupConstraints = (api: DockviewApi) => {
       }
       feed.api.setActive();
     } else {
-      const snapshot = unfoldedLayout;
-      unfoldedLayout = null;
-      if (snapshot && samePanelSet(snapshot, panels)) {
-        api.fromJSON(snapshot);
-      } else {
-        for (const panel of sides) {
-          if (panel.group === feed.group) panel.api.moveTo({ group: feed.group, position: 'right' });
-        }
+      const restore = foldedSides;
+      foldedSides = null;
+      // Every remembered column comes back as one column: the first panel opens the group next to
+      // the feed, the rest of its tabs move into it. Panels closed while folded are skipped.
+      const columns = new Map<string, string[]>();
+      for (const entry of restore ?? []) {
+        if (!api.getPanel(entry.id)) continue;
+        columns.set(entry.column, [...(columns.get(entry.column) ?? []), entry.id]);
+      }
+      for (const ids of columns.values()) {
+        const [head, ...rest] = ids;
+        api.getPanel(head)?.api.moveTo({ group: feed.group, position: 'right' });
+        const column = api.getPanel(head)?.group;
+        if (!column) continue;
+        for (const id of rest) api.getPanel(id)?.api.moveTo({ group: column });
       }
     }
-
-    if (layoutChanged) {
-      // Folding moves whole columns around, and the surviving panes keep whatever space they had.
-      // Hand the leftovers to the reading pane instead of leaving the sidebar half the window.
-      let used = 0;
-      for (const group of api.groups) {
-        if (group === feed.group || !group.activePanel) continue;
-        const width = getPanelMinWidth(getPanelComponent(group.activePanel));
-        group.api.setSize({ width });
-        used += width;
-      }
-      feed.group.api.setSize({ width: Math.max(getPanelMinWidth('feed'), api.width - used) });
-    }
-
-    const entries = api.groups
-      .map(group => ({ group, active: group.activePanel }))
-      .filter((entry): entry is { group: (typeof entry.group); active: IDockviewPanel } => Boolean(entry.active));
-    // Whatever is still split gets scaled minimums: the window is the hard limit, the rail minimums
-    // are just a comfortable default.
-    const totalMin = entries.reduce((sum, entry) => sum + getPanelMinWidth(getPanelComponent(entry.active)), 0);
-    const scale = api.width > 0 && totalMin > api.width ? api.width / totalMin : 1;
-    entries.forEach(({ group, active }) => {
-      const comp = getPanelComponent(active);
-      const maxWidth = getPanelMaxWidth(comp);
-      try {
-        group.api.setConstraints({
-          minimumWidth: Math.floor(getPanelMinWidth(comp) * scale),
-          maximumWidth: maxWidth,
-        });
-        if (maxWidth && group.api.width > maxWidth) {
-          group.api.setSize({ width: maxWidth });
-        }
-      } catch {
-        // Group may be disposing
-      }
-    });
+    if (!foldOnly) applyGroupConstraints(api);
   };
-
-  if (!changed) {
-    apply(false);
-    return;
-  }
 
   // The snapshot layer cross-fades the old grid into the new one; `data-motion-swap` in theme.css
   // owns the frames and the reduced-motion opt-out is inside `crossFade`.
   isApplyingLayout = true;
   crossFade(() => {
     try {
-      apply(true);
+      apply();
     } finally {
       isApplyingLayout = false;
     }

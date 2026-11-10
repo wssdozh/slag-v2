@@ -142,8 +142,15 @@ export function useDockPanels({
         `Dockview workspace shell mounted: ${effectiveInitialPanel ? `detached window [${effectiveInitialPanel.id}]` : 'primary window'}`
       );
 
+      // Dockview fires a layout change on every frame of a window resize, and saving serializes the
+      // whole grid into localStorage; coalesce a burst into one write.
+      let saveTimer: ReturnType<typeof setTimeout> | null = null;
+      const saveSoon = () => {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveLayout, 250);
+      };
       event.api.onDidLayoutChange(() => {
-        saveLayout();
+        saveSoon();
       });
 
       event.api.onDidActivePanelChange(() => {
