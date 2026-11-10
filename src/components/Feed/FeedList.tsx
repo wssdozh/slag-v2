@@ -58,8 +58,10 @@ export const FeedList: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Past the newest note there is nothing left to scroll, so the same drag opens search.
-  const { pull, handlers: pullHandlers } = usePullToSearch({ onTrigger: () => setIsSearchOpen(true) });
+  // Past either end there is nothing left to scroll, so the same drag opens search.
+  const { pull, side: pullSide, handlers: pullHandlers } = usePullToSearch({
+    onTrigger: () => setIsSearchOpen(true),
+  });
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   // Окно всегда прижато к новым записям: размер — единственная ручка.
@@ -584,12 +586,16 @@ export const FeedList: React.FC = () => {
 
       </div>
 
-      {/* Past the newest note there is nothing left to scroll, so the hint travels instead. */}
+      {/* Past either end there is nothing left to scroll, so the hint travels instead. */}
       {pull > 0 && (
         <div
           data-testid="feed-pull-search"
           className="absolute inset-x-0 z-30 flex justify-center pointer-events-none"
-          style={{ bottom: `calc(var(--composer-inset, 104px) + 8px + ${pull}px)` }}
+          style={
+            pullSide === 'top'
+              ? { top: `${8 + pull}px` }
+              : { bottom: `calc(var(--composer-inset, 104px) + 8px + ${pull}px)` }
+          }
         >
           <span
             className="flex items-center gap-1.5 rounded-full border border-subtle bg-surface-elevated px-3 py-1.5 text-[11px] font-medium text-fg-secondary shadow-xl"
