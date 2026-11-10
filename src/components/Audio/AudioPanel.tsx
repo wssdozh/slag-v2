@@ -11,9 +11,11 @@ import {
   Shuffle,
   Volume2,
   VolumeX,
-  ListMusic,
   Pin,
   Folder,
+  Mic,
+  Music,
+  ExternalLink,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -27,7 +29,6 @@ import {
   type AudioTypeFilter,
 } from '../../lib/media/audioHelper';
 import { AudioCoverArt } from './AudioCoverArt';
-import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
 import { storage } from '../../lib/storage';
 import { Select } from '../UI/Select';
 
@@ -40,7 +41,6 @@ export const AudioPanel: React.FC = () => {
   const [scopeMode, setScopeMode] = useState<AudioScopeMode>('active');
   const [pinnedFolder, setPinnedFolder] = useState<string>(currentFolder || DEFAULT_INBOX_FOLDER);
   const [typeFilters, setTypeFilters] = useState<AudioTypeFilter[]>(['voice', 'file']);
-  const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
 
   // Audio Playback State
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
@@ -353,33 +353,6 @@ export const AudioPanel: React.FC = () => {
         />
       )}
 
-      {/* Slide-over Playlist Drawer */}
-      <AudioPlaylistDrawer
-        isOpen={isPlaylistOpen}
-        onClose={() => setIsPlaylistOpen(false)}
-        tracks={tracks}
-        currentTrackId={currentTrack?.id ?? null}
-        isPlaying={isPlaying}
-        onSelectTrack={(track) => {
-          const idx = tracks.findIndex((t) => t.id === track.id);
-          if (idx !== -1) {
-            setCurrentTrackIndex(idx);
-            setIsPlaying(true);
-            setIsPlaylistOpen(false);
-          }
-        }}
-        onJumpToNote={(itemId) => {
-          scrollToItem(itemId);
-          setIsPlaylistOpen(false);
-        }}
-        typeFilters={typeFilters}
-        onToggleTypeFilter={toggleTypeFilter}
-        folders={folders}
-        scopeMode={scopeMode}
-        pinnedFolder={pinnedFolder}
-        onSelectPinnedFolder={(f) => setPinnedFolder(f)}
-      />
-
       {/* Main Center Stage */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 min-h-0 overflow-y-auto">
         <div className="w-full max-w-sm flex flex-col items-center my-auto">
@@ -398,12 +371,6 @@ export const AudioPanel: React.FC = () => {
                   className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-zinc-200 transition-colors cursor-pointer"
                 >
                   Активная папка
-                </button>
-                <button
-                  onClick={() => setIsPlaylistOpen(true)}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/10 text-zinc-400 transition-colors cursor-pointer"
-                >
-                  Очередь и фильтры
                 </button>
               </div>
             </div>
@@ -522,18 +489,8 @@ export const AudioPanel: React.FC = () => {
                 </button>
               </div>
 
-              {/* 6. Utility Controls Row: Queue, Shuffle, Loop | Speed, Volume */}
+              {/* 6. Utility Controls Row: Shuffle, Loop | Speed, Volume */}
               <div className="flex items-center justify-between w-full max-w-[270px] text-zinc-400 select-none mt-5">
-                {/* Queue Button */}
-                <button
-                  onClick={() => setIsPlaylistOpen(true)}
-                  className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
-                  title="Очередь воспроизведения"
-                  aria-label="Очередь воспроизведения"
-                >
-                  <ListMusic className="w-4 h-4" />
-                </button>
-
                 {/* Shuffle Button */}
                 <button
                   onClick={() => setIsShuffle((prev) => !prev)}
@@ -584,6 +541,83 @@ export const AudioPanel: React.FC = () => {
                     <Volume2 className="w-4 h-4" />
                   )}
                 </button>
+              </div>
+
+              {/* 7. The list is the panel: no drawer, no second search. */}
+              <div data-testid="audio-track-list" className="w-full mt-6 flex flex-col gap-1 text-left">
+                <div className="flex items-center gap-1.5 px-1 pb-1">
+                  <button
+                    onClick={() => toggleTypeFilter('voice')}
+                    aria-pressed={typeFilters.includes('voice')}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] transition-colors cursor-pointer ${
+                      typeFilters.includes('voice')
+                        ? 'bg-white/10 text-white'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    <Mic className="w-3 h-3" />
+                    <span>Войсы</span>
+                  </button>
+                  <button
+                    onClick={() => toggleTypeFilter('file')}
+                    aria-pressed={typeFilters.includes('file')}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] transition-colors cursor-pointer ${
+                      typeFilters.includes('file')
+                        ? 'bg-white/10 text-white'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    <Music className="w-3 h-3" />
+                    <span>Файлы</span>
+                  </button>
+                  <span className="ml-auto font-mono text-[10px] text-zinc-500">{tracks.length}</span>
+                </div>
+
+                {tracks.map((track, index) => {
+                  const isCurrent = track.id === currentTrack?.id;
+                  return (
+                    <div
+                      key={track.id}
+                      onClick={() => {
+                        setCurrentTrackIndex(index);
+                        setIsPlaying(true);
+                      }}
+                      className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 text-xs transition-colors cursor-pointer ${
+                        isCurrent
+                          ? 'bg-white/[0.08] text-white'
+                          : 'text-zinc-300 hover:bg-white/[0.04] hover:text-zinc-100'
+                      }`}
+                    >
+                      <span className="flex w-5 shrink-0 items-center justify-center font-mono text-[10px] text-zinc-500">
+                        {isCurrent && isPlaying ? (
+                          <Pause className="w-3 h-3 fill-current text-white" />
+                        ) : isCurrent ? (
+                          <Play className="w-3 h-3 fill-current text-white" />
+                        ) : (
+                          index + 1
+                        )}
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-medium">{track.name}</span>
+                        <span className="truncate text-[10px] text-zinc-500">{track.itemTitle}</span>
+                      </div>
+                      <span className="shrink-0 font-mono text-[10px] text-zinc-500">
+                        {formatAudioDuration(track.duration)}
+                      </span>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          scrollToItem(track.itemId);
+                        }}
+                        className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-white/[0.08] hover:text-zinc-200"
+                        title="Перейти к заметке"
+                        aria-label="Перейти к заметке"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
