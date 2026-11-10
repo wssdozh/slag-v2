@@ -71,7 +71,7 @@ const WorkspaceContentPanel: React.FC<{
             data-testid="composer-dock"
             className="absolute bottom-0 inset-x-0 pointer-events-none z-20 pb-3 px-2 sm:pl-4 sm:pr-[22px] flex justify-center"
           >
-            <div className="pointer-events-auto max-w-2xl w-full">
+            <div className="pointer-events-auto w-full max-w-[var(--feed-content-width,42rem)]">
               <Composer key={currentFolder} />
             </div>
           </div>

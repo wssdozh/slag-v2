@@ -245,6 +245,45 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     await page.screenshot({ path: 'test-results/screenshots/feed-column-min-width.png' });
   });
 
+  test('7.2 The composer dock follows the reading column instead of a fixed 42rem', async ({ page }) => {
+    // The column never grows past its pane, so the room has to be there before the drag.
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    const handle = page.getByTestId('feed-width-handle-right');
+    await expect(handle).toBeAttached();
+
+    const readWidth = () =>
+      page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--feed-content-width').trim()
+      );
+    await expect.poll(readWidth).toBe('672px');
+
+    const handleBox = await handle.boundingBox();
+    expect(handleBox).toBeTruthy();
+    if (!handleBox) return;
+
+    // Wider than the old 42rem cap: the composer used to stop here while the cards kept growing.
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(handleBox.x + 120, handleBox.y + 200, { steps: 8 });
+    await page.mouse.up();
+
+    const column = parseInt(await readWidth(), 10);
+    expect(column).toBeGreaterThan(672);
+
+    const dockWidth = await page
+      .locator('[data-testid="composer-dock"] > div')
+      .first()
+      .evaluate(el => Math.round(el.getBoundingClientRect().width));
+    expect(dockWidth).toBe(column);
+
+    const composerWidth = await page
+      .locator('[data-composer-root]')
+      .first()
+      .evaluate(el => Math.round(el.getBoundingClientRect().width));
+    expect(composerWidth).toBe(column);
+    await page.screenshot({ path: 'test-results/screenshots/feed-column-composer-aligned.png' });
+  });
+
   test('8. Image Lightbox full-screen gallery with Escape dismissal', async ({ page }) => {
     // Open an image in demo item or create one with base64 1x1 image
     const composerTextarea = page.locator('main textarea');
