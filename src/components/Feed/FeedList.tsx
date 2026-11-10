@@ -10,7 +10,7 @@ import React, {
 import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
 import type { SlagItem, SlagAttachment, LightboxImage } from '../../types';
-import { Inbox, UploadCloud, Sparkles, ChevronDown, Pin } from 'lucide-react';
+import { Inbox, UploadCloud, Sparkles, ChevronDown, Pin, Search } from 'lucide-react';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
@@ -19,7 +19,9 @@ import { PinnedBanner } from './PinnedBanner';
 import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
 import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
+import { usePullToSearch } from '../../hooks/gestures/usePullToSearch';
 import { noteGapPx } from '../../lib/time/dateUtils';
+import { UI_GESTURES } from '../../config';
 
 const WINDOW_CHUNK = 15;
 
@@ -50,10 +52,14 @@ export const FeedList: React.FC = () => {
     openLightbox,
     isPinnedOnlyFilter,
     togglePinnedOnlyFilter,
+    setIsSearchOpen,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Past the newest note there is nothing left to scroll, so the same drag opens search.
+  const { pull, handlers: pullHandlers } = usePullToSearch({ onTrigger: () => setIsSearchOpen(true) });
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   // Окно всегда прижато к новым записям: размер — единственная ручка.
@@ -458,6 +464,7 @@ export const FeedList: React.FC = () => {
         onDragEnter={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        {...pullHandlers}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 flex flex-col gap-6 relative scrollbar-thin"
         // Padding, not a spacer element: the column has a flex gap, so a spacer would add it too
         // and the anchor would stop a gap short of the composer. The dock height is published by
@@ -576,6 +583,22 @@ export const FeedList: React.FC = () => {
         )}
 
       </div>
+
+      {/* Past the newest note there is nothing left to scroll, so the hint travels instead. */}
+      {pull > 0 && (
+        <div
+          data-testid="feed-pull-search"
+          className="absolute inset-x-0 z-30 flex justify-center pointer-events-none"
+          style={{ bottom: `calc(var(--composer-inset, 104px) + 8px + ${pull}px)` }}
+        >
+          <span
+            className="flex items-center gap-1.5 rounded-full border border-subtle bg-surface-elevated px-3 py-1.5 text-[11px] font-medium text-fg-secondary shadow-xl"
+            style={{ opacity: Math.min(1, pull / UI_GESTURES.SEARCH_PULL_PX) }}
+          >
+            <Search className="h-3.5 w-3.5" /> поиск
+          </span>
+        </div>
+      )}
 
       {/* Floating scroll to bottom button: centered comfortably above the composer island */}
       {/* Mounted on purpose: it fades in when you scroll up, and a node that is
