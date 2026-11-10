@@ -19,6 +19,9 @@ export default defineConfig({
       args: [
         '--use-fake-ui-for-media-stream',
         '--use-fake-device-for-media-stream',
+        // Headless Chromium refuses software WebGL without this, and the orb
+        // canvas renders nothing (no debug state either) when it is missing.
+        '--enable-unsafe-swiftshader',
         '--disable-background-networking',
         '--disable-default-apps',
         '--disable-sync',
