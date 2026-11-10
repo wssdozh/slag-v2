@@ -399,9 +399,15 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await expect(queue.getByRole('button', { name: 'Файлы' })).toBeVisible();
     await expect(queue.getByRole('button', { name: 'Закрыть список' })).toBeVisible();
     await expect(page.locator('text=Очередь воспроизведения')).toHaveCount(0);
+    // The field is a button until it is needed.
+    await expect(queue.locator('input[type="text"]')).toHaveCount(0);
     // The drawer fades in; a screenshot taken mid-fade shows the panel behind it.
     await page.waitForTimeout(300);
     await page.screenshot({ path: 'test-results/screenshots/audio-queue-open.png' });
+
+    await queue.getByRole('button', { name: 'Поиск в очереди' }).click();
+    await expect(queue.locator('input[type="text"]')).toBeVisible();
+    await queue.getByRole('button', { name: 'Поиск в очереди' }).click();
 
     // Picking a row plays it and closes the drawer.
     const voiceTrackRow = queue.locator('text=voice_16-12-53.webm').first();
