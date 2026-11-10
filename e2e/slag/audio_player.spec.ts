@@ -49,6 +49,18 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
       const key = localStorage.key(i);
       if (!key?.startsWith('slag_items_')) continue;
       const items = JSON.parse(localStorage.getItem(key) || '[]');
+      const note = (id: string, title: string, attachments: object[]) => ({
+        id,
+        type: 'note',
+        title,
+        content: '',
+        folder: 'Входящие',
+        tags: [],
+        attachments,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
       items.unshift({
         id: 'probe_two_tracks',
         type: 'note',
@@ -60,6 +72,12 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
+      // One song: it carries metadata, so the row grows a title/author header.
+      items.unshift(note('probe_single_song', 'Одна песня', [track('probe_song', 'beatles - Hey Jude.wav')]));
+      // One recorded memo: its name is a machine stamp, so the row stays label-free.
+      items.unshift(
+        note('probe_single_memo', 'Голосовое', [{ ...track('probe_memo', 'voice_11-22-33.webm'), duration: 7 }]),
+      );
       localStorage.setItem(key, JSON.stringify(items));
       break;
     }
@@ -111,4 +129,34 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   expect(pausedStates[1]).toBe(false);
 
   await card.screenshot({ path: 'test-results/screenshots/voice-card-names.png' });
+
+  // A single named track gets the same header + line as a multi-track card.
+  const single = page.locator('.group').filter({ hasText: 'Hey Jude' }).first();
+  await expect(single).toBeVisible({ timeout: 10000 });
+  await expect(single.locator('text=beatles')).toBeVisible();
+  await expect(single.locator('text=.wav')).toHaveCount(0);
+  await expect(single.getByTestId('voice-progress')).toHaveCount(0);
+  await expect(single.getByTestId('audio-row-meta')).toBeVisible();
+
+  const singleStrip = single.locator('[title="Перемотка"]').first();
+  await expect(singleStrip).toBeVisible();
+  const songTitle = await single.locator('text=Hey Jude').first().boundingBox();
+  const songStrip = await singleStrip.boundingBox();
+  expect(songTitle).not.toBeNull();
+  expect(songStrip).not.toBeNull();
+  expect(songTitle!.y + songTitle!.height).toBeLessThan(songStrip!.y + 4);
+
+  // The play button and the right-hand block are the same height: one row, not two.
+  const playBox = await single.locator('button[title*="Воспроизвести"]').first().boundingBox();
+  const metaBox = await single.getByTestId('audio-row-meta').boundingBox();
+  expect(playBox).not.toBeNull();
+  expect(metaBox).not.toBeNull();
+  expect(Math.abs(playBox!.height - metaBox!.height)).toBeLessThanOrEqual(1);
+  await single.screenshot({ path: 'test-results/screenshots/voice-single-song.png' });
+
+  // A recorded memo has a machine name: no header, but it still owns a real line.
+  const audioCount = await page.locator('audio').count();
+  await expect(page.locator('[title="Перемотка"]')).toHaveCount(audioCount);
+  await expect(page.locator('[data-testid="audio-row-meta"]')).toHaveCount(audioCount - 1);
+  await expect(page.locator('text=voice_11-22-33')).toHaveCount(0);
 });

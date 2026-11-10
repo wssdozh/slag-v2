@@ -21,6 +21,7 @@ import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import {
   extractAudioTracks,
   formatAudioDuration,
+  audioTrackLabel,
   type AudioTrack,
   type AudioScopeMode,
   type AudioTypeFilter,
@@ -332,6 +333,15 @@ export const AudioPanel: React.FC = () => {
   const effectiveDuration = duration > 0 ? duration : (currentTrack?.duration || 0);
   const progressPercent = effectiveDuration > 0 ? (currentTime / effectiveDuration) * 100 : 0;
 
+  // A recorded memo has a machine name; the note title is the only human label it owns.
+  const trackLabel = currentTrack ? audioTrackLabel(currentTrack.name) : null;
+  const trackTitle = trackLabel
+    ? trackLabel.isRecorded
+      ? currentTrack?.itemTitle || 'Аудиозапись'
+      : trackLabel.title || currentTrack?.itemTitle || 'Аудиозапись'
+    : 'Аудиозапись';
+  const trackAuthor = trackLabel && !trackLabel.isRecorded ? trackLabel.author : '';
+
   return (
     <div
       tabIndex={0}
@@ -408,14 +418,21 @@ export const AudioPanel: React.FC = () => {
               {/* 1. Square Art Tile (Clean, without buttons) */}
               <AudioCoverArt track={currentTrack} isPlaying={isPlaying} analyser={analyser} />
 
-              {/* 2. Track Title (Like "The Lovecats" in reference) */}
+              {/* 2. Track Title (parsed from `Artist - Title.ext`, extension dropped) */}
               <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate max-w-full text-center mt-5 mb-1 px-2">
-                {currentTrack?.name || 'Аудиозапись'}
+                {trackTitle}
               </h2>
 
-              {/* 3. Subtitle: Note title • Folder • Format */}
+              {/* 3. Author line: who made it, before where it lives */}
+              {trackAuthor && (
+                <div className="text-xs text-zinc-400 text-center truncate max-w-full px-2 mb-1">
+                  {trackAuthor}
+                </div>
+              )}
+
+              {/* 4. Subtitle: Note title • Folder */}
               <div className="text-xs text-zinc-400 text-center flex items-center justify-center gap-1.5 max-w-full truncate px-2 mb-5">
-                {currentTrack?.itemTitle && (
+                {currentTrack?.itemTitle && currentTrack.itemTitle !== trackTitle && (
                   <button
                     onClick={() => scrollToItem(currentTrack.itemId)}
                     className="hover:text-zinc-200 transition-colors truncate cursor-pointer underline-offset-2 hover:underline"
@@ -424,10 +441,10 @@ export const AudioPanel: React.FC = () => {
                     {currentTrack.itemTitle}
                   </button>
                 )}
-                <span className="text-zinc-600">•</span>
+                {currentTrack?.itemTitle && currentTrack.itemTitle !== trackTitle && (
+                  <span className="text-zinc-600">•</span>
+                )}
                 <span className="text-zinc-500 truncate">{currentTrack?.itemFolder}</span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-zinc-500 text-[10px] font-mono uppercase">{currentTrack?.format}</span>
               </div>
 
               {/* 4. Scrubber Timeline: [0:49] ────── [3:39] */}

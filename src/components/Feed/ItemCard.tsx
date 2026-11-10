@@ -1,5 +1,5 @@
 import { formatBytes } from '../../lib/formatBytes';
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
@@ -180,7 +180,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   }, [aiSettings, item, updateItem, addToast]);
 
   const longPressTimerRef = useRef<number | null>(null);
-  const voiceProgressRef = useRef<HTMLDivElement | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const tapTimerRef = useRef<number | null>(null);
   const lastTapAtRef = useRef(0);
@@ -211,12 +210,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     observer.observe(row);
     return () => observer.disconnect();
   }, [item.tags, tagsRowWidth]);
-
-  // The voice card is its own progress bar: the playhead writes one transform, no re-render.
-  const handleVoiceProgress = useCallback((fraction: number) => {
-    const node = voiceProgressRef.current;
-    if (node) node.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
-  }, []);
 
   const copyItemText = () => {
     const text = (item.content || '').trim() || item.title;
@@ -608,17 +601,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             : 'bg-surface hover:bg-surface-hover'
         }`}
       >
-        {/* A pure voice note uses its whole body as the timeline: this layer is the playhead. */}
-        {isVoiceBubble && (
-          <div
-            ref={voiceProgressRef}
-            data-testid="voice-progress"
-            aria-hidden
-            className="pointer-events-none absolute inset-0 origin-left rounded-xl bg-white/[0.07]"
-            style={{ transform: 'scaleX(0)' }}
-          />
-        )}
-
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
         <div
           className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 ${
@@ -823,10 +805,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
       {/* Audio Notes Player */}
       {audioAttachments.map(att => (
-        <div key={att.id} className={isVoiceBubble ? 'relative z-10 w-full' : 'pt-0.5 w-full'}>
+        <div key={att.id} className={isVoiceBubble ? 'w-full' : 'w-full pt-1'}>
           <AudioPlayer
             src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
-            name={audioAttachments.length > 1 ? att.name : undefined}
+            name={att.name}
             duration={att.duration}
             waveform={att.waveform}
             timeContext={isVoiceBubble ? formattedTime : undefined}
@@ -834,7 +816,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             summary={att.summary}
             enrichmentStatus={att.enrichmentStatus}
             onEnrich={() => handleEnrichAttachment(att)}
-            onProgress={isVoiceBubble ? handleVoiceProgress : undefined}
           />
         </div>
       ))}

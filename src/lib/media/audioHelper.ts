@@ -55,6 +55,16 @@ export function splitAudioName(name: string): { title: string; author: string } 
   return author && title ? { title, author } : { title: clean, author: '' };
 }
 
+/** Recorders stamp `voice_11-30-52.webm`; that is a file id, not a track name. */
+export function isRecordedAudioName(name: string): boolean {
+  return /^(voice|square)_\d/i.test(name.trim());
+}
+
+/** One label for the feed row and the player header: who and what, never the extension. */
+export function audioTrackLabel(name: string): { title: string; author: string; isRecorded: boolean } {
+  return { ...splitAudioName(name), isRecorded: isRecordedAudioName(name) };
+}
+
 export interface ExtractAudioOptions {
   folderScope: string | null;
   scopeMode: AudioScopeMode;

@@ -144,10 +144,10 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const playBtn = voiceCard.locator('button[title*="Воспроизвести"]').first();
     await expect(playBtn).toBeVisible();
 
-    // The card body is the timeline: the fill starts empty and grows with the playhead.
-    const voiceFill = voiceCard.getByTestId('voice-progress');
-    await expect(voiceFill).toBeAttached();
-    await expect(voiceFill).toHaveCSS('transform', 'matrix(0, 0, 0, 1, 0, 0)');
+    // The row owns the timeline: every audio row has one line, and the card body no longer
+    // doubles as a playhead.
+    await expect(voiceCard.locator('[title="Перемотка"]').first()).toBeVisible();
+    await expect(voiceCard.getByTestId('voice-progress')).toHaveCount(0);
 
     // Screenshot compact voice card
     await page.screenshot({
@@ -356,8 +356,9 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const audioTab = page.locator('.dv-tab, [role="tab"]').filter({ hasText: 'Аудиоплеер' }).first();
     await expect(audioTab).toBeVisible();
 
-    // Verify Now Playing screen elements: track title, note link, clean ChatGPT voice orb canvas
-    await expect(page.locator('text=voice_16-12-53.webm')).toBeVisible();
+    // Verify Now Playing screen elements: parsed title without the file extension, note link,
+    // and the machine file name nowhere on screen. Clean ChatGPT voice orb canvas.
+    await expect(page.locator('text=voice_16-12-53.webm')).toHaveCount(0);
     await expect(page.locator('text=Голосовая заметка разработчика')).toBeVisible();
     await expect(page.locator('canvas[data-testid="chatgpt-orb-canvas"]')).toBeVisible();
 

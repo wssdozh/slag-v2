@@ -118,7 +118,7 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
     await expect(audioCard.locator('button[aria-label="Расшифровка"]')).toBeVisible();
 
     // --- Verify Raw Voice Note (with Telegram ->A button) ---
-    const rawAudioCard = page.locator('.group', { hasText: 'voice_raw.webm' });
+    const rawAudioCard = page.locator('.group', { hasText: 'voice_raw' });
     if (await rawAudioCard.isVisible()) {
       await expect(rawAudioCard.locator('button[aria-label="Расшифровка"]')).toBeVisible();
     }

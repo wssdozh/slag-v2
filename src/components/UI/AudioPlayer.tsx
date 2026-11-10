@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
-import { formatAudioDuration, splitAudioName } from '../../lib/media/audioHelper';
+import { formatAudioDuration, audioTrackLabel } from '../../lib/media/audioHelper';
 
 
 const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
@@ -35,8 +35,6 @@ interface AudioPlayerProps {
   summary?: string;
   enrichmentStatus?: 'idle' | 'processing' | 'ready' | 'error';
   onEnrich?: () => void;
-  /** The owner paints the progress itself: the playhead as a 0..1 fraction. */
-  onProgress?: (fraction: number) => void;
 }
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
@@ -51,7 +49,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   summary: _summary,
   enrichmentStatus = 'idle',
   onEnrich,
-  onProgress,
 }) => {
   const transcript = propTranscript || propExtractedText;
   const [isPlaying, setIsPlaying] = useState(false);
@@ -112,13 +109,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const currentDur = duration > 0 ? duration : (initialDuration || 0);
   const progressPercent = currentDur > 0 ? (currentTime / currentDur) * 100 : 0;
-  const label = name ? splitAudioName(name) : null;
-
-  // When the card itself is the bar, the owner paints it: no line inside the player.
-  useEffect(() => {
-    if (!onProgress) return;
-    onProgress(currentDur > 0 ? currentTime / currentDur : 0);
-  }, [currentTime, currentDur, onProgress]);
+  // Recorders stamp machine names (`voice_11-30-52`): those rows stay label-free.
+  const track = name ? audioTrackLabel(name) : null;
+  const header = track && !track.isRecorded ? track : null;
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -239,32 +232,24 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     <button
       type="button"
       onClick={togglePlay}
-      className={`w-7 h-7 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer${label ? ' mt-0.5' : ''}`}
+      className="w-9 h-9 rounded-full bg-accent-media hover:bg-accent-media/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer"
       title={isPlaying ? 'Пауза' : 'Воспроизвести'}
       aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
     >
       {isPlaying ? (
-        <Pause className="w-3 h-3 fill-current" />
+        <Pause className="w-4 h-4 fill-current" />
       ) : (
-        <Play className="w-3 h-3 fill-current ml-0.5" />
+        <Play className="w-4 h-4 fill-current ml-0.5" />
       )}
     </button>
   );
 
-  /* Either an invisible scrub strip (the card paints the progress) or the capsule. */
-  const scrubTrack = onProgress ? (
+  const scrubTrack = (
     <div
       ref={waveTrackRef}
       onMouseDown={handleMouseDown}
       title="Перемотка"
-      className="h-6 min-w-0 flex-1 cursor-pointer"
-    />
-  ) : (
-    <div
-      ref={waveTrackRef}
-      onMouseDown={handleMouseDown}
-      title="Перемотка"
-      className="relative h-2 min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/[0.12]"
+      className="relative h-2 w-full min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/[0.12]"
     >
       <div
         style={{ transform: `scaleX(${progressPercent / 100})`, transformOrigin: 'left center' }}
@@ -318,19 +303,22 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     <div className="w-full flex flex-col">
       <audio ref={audioRef} src={src} preload="metadata" />
 
-      {label ? (
+      {header ? (
         /* A named track reads as a row: title and author above, the line under them. */
-        <div className="flex w-full gap-2 select-none">
+        <div className="flex w-full items-center gap-2 select-none">
           {playButton}
-          <div className="min-w-0 flex-1">
+          <div
+            data-testid="audio-row-meta"
+            className="flex h-9 min-w-0 flex-1 flex-col justify-center gap-1.5"
+          >
             <div className="flex items-baseline gap-1.5">
               <span className="min-w-0 truncate text-[12.5px] font-medium leading-tight text-fg-primary">
-                {label.title}
+                {header.title}
               </span>
-              {label.author && (
+              {header.author && (
                 <>
                   <span className="shrink-0 text-fg-dim">·</span>
-                  <span className="min-w-0 truncate text-[11.5px] text-fg-secondary">{label.author}</span>
+                  <span className="min-w-0 truncate text-[11.5px] text-fg-secondary">{header.author}</span>
                 </>
               )}
               <span className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -339,7 +327,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 {enrichControl}
               </span>
             </div>
-            <div className="mt-1.5 flex">{scrubTrack}</div>
+            {scrubTrack}
           </div>
         </div>
       ) : (
