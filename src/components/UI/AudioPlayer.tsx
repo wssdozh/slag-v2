@@ -24,6 +24,8 @@ const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 
 
 interface AudioPlayerProps {
   src: string;
+  /** Shown under the timeline when a card carries more than one track. */
+  name?: string;
   duration?: number;
   waveform?: number[];
   compact?: boolean;
@@ -39,6 +41,7 @@ interface AudioPlayerProps {
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   src,
+  name,
   duration: initialDuration,
   waveform: customWaveform,
   compact = false,
@@ -88,15 +91,22 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       setIsPlaying(false);
       setCurrentTime(0);
     };
+    // The element is the truth: another player may start and pause this one behind our back.
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
     };
   }, [isScrubbing]);
 
@@ -132,6 +142,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   }, [duration, initialDuration]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // The card is draggable on desktop: without this the drag starts and no mousemove arrives.
+    e.preventDefault();
     e.stopPropagation();
     setIsScrubbing(true);
     seekFromEvent(e);
@@ -184,7 +196,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-6 h-6 rounded-full bg-white hover:bg-zinc-200 motion-press flex items-center justify-center text-black shrink-0 cursor-pointer shadow-sm"
+          className="w-6 h-6 rounded-full bg-accent-strong hover:bg-accent-strong/90 motion-press flex items-center justify-center text-white shrink-0 cursor-pointer shadow-sm"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >
           {isPlaying ? (
@@ -231,7 +243,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <button
           type="button"
           onClick={togglePlay}
-          className="w-7 h-7 rounded-full bg-white hover:bg-zinc-200 motion-press flex items-center justify-center text-black shrink-0 shadow-sm cursor-pointer"
+          className="w-7 h-7 rounded-full bg-accent-strong hover:bg-accent-strong/90 motion-press flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer"
           title={isPlaying ? 'Пауза' : 'Воспроизвести'}
           aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
         >
@@ -303,6 +315,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           </button>
         )}
       </div>
+
+      {name && (
+        <span className="mt-0.5 truncate pl-9 text-[11px] text-fg-muted">{name}</span>
+      )}
 
       {/* Telegram-style Transcript with user-approved divider line. Collapses by
           height, so folding it back does not snap the whole card. */}

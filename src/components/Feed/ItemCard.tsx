@@ -826,6 +826,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <div key={att.id} className={isVoiceBubble ? 'relative z-10 w-full' : 'pt-0.5 w-full'}>
           <AudioPlayer
             src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
+            name={audioAttachments.length > 1 ? att.name : undefined}
             duration={att.duration}
             waveform={att.waveform}
             timeContext={isVoiceBubble ? formattedTime : undefined}

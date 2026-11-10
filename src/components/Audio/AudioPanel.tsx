@@ -21,7 +21,6 @@ import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import {
   extractAudioTracks,
   formatAudioDuration,
-  setupAudioCollisionGuard,
   type AudioTrack,
   type AudioScopeMode,
   type AudioTypeFilter,
@@ -60,11 +59,6 @@ export const AudioPanel: React.FC = () => {
 
   // Effective folder based on mode
   const effectiveFolder = scopeMode === 'active' ? currentFolder || DEFAULT_INBOX_FOLDER : pinnedFolder;
-
-  // Collision guard on mount
-  useEffect(() => {
-    return setupAudioCollisionGuard();
-  }, []);
 
   // Same hierarchical folder list as every other picker in the app
   const folderOptions = useMemo(() => buildFolderOptions(folders), [folders]);
@@ -490,7 +484,7 @@ export const AudioPanel: React.FC = () => {
                 {/* Central Round Play / Pause */}
                 <button
                   onClick={togglePlay}
-                  className="w-13 h-13 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center shadow-xl motion-press cursor-pointer"
+                  className="w-13 h-13 rounded-full bg-accent-strong hover:bg-accent-strong/90 text-white flex items-center justify-center shadow-xl motion-press cursor-pointer"
                   title={isPlaying ? 'Пауза (Пробел)' : 'Воспроизведение (Пробел)'}
                   aria-label={isPlaying ? 'Пауза' : 'Воспроизведение'}
                 >

@@ -18,6 +18,7 @@ import { ToastContainer } from './components/UI/Toast';
 import { ImageLightbox } from './components/UI/ImageLightbox';
 import { Monitor } from 'lucide-react';
 import { enrichAttachment, extractFocalContext } from './lib/media/attachmentEnrichment';
+import { setupAudioCollisionGuard } from './lib/media/audioHelper';
 import type { LightboxImage } from './components/UI/ImageLightbox';
 
 const WorkspaceShell = lazy(() =>
@@ -93,6 +94,9 @@ const AppContent: React.FC = () => {
   }, [items, updateItem, aiSettings, updateLightboxImage]);
 
   useVisualViewportHeight();
+
+  // One voice at a time, everywhere: the feed, the editor, the audio panel.
+  useEffect(() => setupAudioCollisionGuard(), []);
 
   // Search sits in its own chunk (Orama index). Warm it after first paint so the
   // first mod+f does not stutter, without putting it on the startup critical path.
