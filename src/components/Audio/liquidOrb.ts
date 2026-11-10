@@ -57,7 +57,7 @@ void main() {
     vec2 centerMid = vec2(0.03 * sin(t * 0.23 + 1.3), 0.06 + 0.02 * cos(t * 0.19 + 0.7))
                    + vec2(-uBass * 0.010, 0.0);
     vec2 centerFront = vec2(0.02 * sin(t * 0.31 + 2.7) + uFlux * 0.025,
-                            0.34 + 0.02 * cos(t * 0.27 + 1.9) + uMid * 0.010);
+                            0.38 + 0.02 * cos(t * 0.27 + 1.9) + uMid * 0.010);
 
     float breath = sin(t * 1.1) * 0.014;
 
@@ -74,7 +74,7 @@ void main() {
         0.055 + uBass * 0.080, t * 0.53 - 0.3, 3.0);
 
     vec3 front = orb(p, centerFront,
-        0.20 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, 0.045,
+        0.18 + uMid * 0.04 + uVolume * 0.02 + uFlux * 0.03, 0.045,
         0.035 + uHigh * 0.035, t * 0.90, 4.0,
         0.028 + uMid * 0.035, t * 1.07 + 1.1, 3.0);
 
@@ -83,9 +83,9 @@ void main() {
     float backNd = clamp(back.z / back.y, 0.0, 1.0);
     vec3 colBack = mix(vec3(0.14, 0.48, 0.90), vec3(0.02, 0.18, 0.48), smoothstep(0.0, 1.0, backNd));
     colBack += vec3(0.08, 0.30, 0.60) * smoothstep(0.35, 1.0, backNd) * 0.7;
-    vec3 colMid = mix(vec3(0.65, 0.96, 1.0), vec3(0.18, 0.65, 0.98),
+    vec3 colMid = mix(vec3(0.70, 0.97, 1.0), vec3(0.10, 0.55, 0.94),
                       smoothstep(0.0, 1.0, clamp(mid.z / mid.y, 0.0, 1.0)));
-    vec3 colFront = mix(vec3(1.0), vec3(0.45, 0.88, 1.0),
+    vec3 colFront = mix(vec3(1.0), vec3(0.35, 0.82, 1.0),
                         smoothstep(0.0, 1.0, clamp(front.z / front.y, 0.0, 1.0)));
 
     // Highs shimmer on the middle rim: the cheapest way to show consonants.
