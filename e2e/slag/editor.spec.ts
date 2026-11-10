@@ -352,9 +352,8 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await expect(audioTab).toBeVisible();
 
     // Verify Now Playing screen elements: track title, note link, clean ChatGPT voice orb canvas
-    // The same name is also a row in the list under the player, hence `.first()`.
-    await expect(page.locator('text=voice_16-12-53.webm').first()).toBeVisible();
-    await expect(page.locator('text=Голосовая заметка разработчика').first()).toBeVisible();
+    await expect(page.locator('text=voice_16-12-53.webm')).toBeVisible();
+    await expect(page.locator('text=Голосовая заметка разработчика')).toBeVisible();
     await expect(page.locator('canvas[data-testid="chatgpt-orb-canvas"]')).toBeVisible();
 
     // Verify transport controls (5 buttons under timeline: -10s, Prev, Play/Pause, Next, +10s)
@@ -375,33 +374,32 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
 
     // Open folder picker dropdown (always available) and verify "Входящие" is not duplicated
     await folderPickerBtn.click();
-    const popover = page.getByRole('listbox').last();
+    const popover = page.locator('.absolute.z-40').filter({ hasText: 'Закрепить папку' });
     await expect(popover).toBeVisible();
-    expect(await popover.getByRole('option', { name: /Входящие/ }).count()).toBeGreaterThan(0);
+    expect(await popover.locator('button', { hasText: 'Входящие' }).count()).toBe(1);
 
     // Select "Входящие" from dropdown to verify auto-pin
-    await popover.getByRole('option', { name: /Входящие/ }).first().click();
+    await popover.locator('button', { hasText: 'Входящие' }).click();
     await expect(page.locator('button[title*="закреплен" i]').first()).toBeVisible();
 
     // Toggle unpin back via pin button
     await pinToggleBtn.click();
     await expect(page.locator('button[title*="активн" i]').first()).toBeVisible();
 
-    // The list is part of the panel now: no queue screen to open, no second search in it.
-    await expect(page.locator('button[aria-label="Очередь воспроизведения"]')).toHaveCount(0);
-    await expect(page.locator('text=Очередь воспроизведения')).toHaveCount(0);
+    // Verify Queue / Playlist button is present in bottom bar
+    const queueBtn = page.locator('button[aria-label="Очередь воспроизведения"]').first();
+    await expect(queueBtn).toBeVisible();
 
-    const trackList = page.getByTestId('audio-track-list');
-    await expect(trackList.getByRole('button', { name: 'Войсы' })).toBeVisible();
-    await expect(trackList.getByRole('button', { name: 'Файлы' })).toBeVisible();
-
-    for (const name of ['voice_16-12-53.webm', 'Never_Enough_The_Cure.mp3']) {
-      await expect(trackList.locator('text=' + name)).toBeVisible();
-    }
-
-    // Picking a row from the list under the player is how the track changes now.
-    await trackList.locator('text=Never_Enough_The_Cure.mp3').click();
-    await expect(page.locator('h2', { hasText: 'Never_Enough_The_Cure.mp3' })).toBeVisible();
+    // Open Queue drawer and select the voice note
+    await queueBtn.click();
+    await expect(page.locator('text=Очередь воспроизведения')).toBeVisible();
+    const audioPanel = page.locator('[role="tabpanel"]').filter({ hasText: 'Очередь воспроизведения' }).first();
+    await expect(audioPanel.locator('button', { hasText: 'Войсы' })).toBeVisible();
+    await expect(audioPanel.locator('button', { hasText: 'Файлы' })).toBeVisible();
+    const voiceTrackRow = page.locator('text=voice_16-12-53.webm').first();
+    await expect(voiceTrackRow).toBeVisible();
+    await voiceTrackRow.click();
+    await expect(page.locator('text=Очередь воспроизведения')).not.toBeVisible();
 
     // Verify bottom bar utilities (speed, repeat, shuffle)
     const shuffleBtn = page.locator('button[aria-label="Перемешать"]');
