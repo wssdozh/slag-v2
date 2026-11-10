@@ -75,6 +75,23 @@ before release:
 5. verify `/health` reports `authRequired=true`; anonymous pair creation and room access must return 401, while account login, approved-device access and authenticated websocket sync pass.
 6. invalidate disposable http-era sessions and rotate test credentials; never reuse tokens exposed during http testing.
 
+## session lifetime — 2026-11-10
+
+`SESSION_TTL_SECONDS` is 3 days, and `RelayDatabase.authenticate_hash` slides `expires_at` a full
+term forward whenever less than half of it is left. A device that keeps talking to the relay never
+has to log in again; an idle one dies after 3 days. The previous uncommitted `last_seen_at` write
+stays as it was; the renewal commits itself so it survives a restart.
+
+deployed `/opt/slag-relay/server.py` (previous copy: `/opt/slag-relay/backups/server-20261110T1150.py`),
+`systemctl restart slag-relay`, health 200, `NRestarts=0`. production smoke on a disposable account:
+fresh session `expiresAt` = +72 h; a session forced down to 60 s slid back to +72 h on one
+authenticated call and the value was visible from another sqlite connection; an expired session
+still answered 401. account and device rows were removed in the same stop window. `relay/test_relay.py`
+covers the same three cases (`test_session_slides_on_use`).
+
+note: writes to the live database from outside need the service stopped — the relay keeps one shared
+sqlite connection with an open write transaction, so an external writer just waits on the lock.
+
 ## ai gateway — 2026-11-09
 
 the subscription AI path is served by the relay at `POST /api/ai/chat`, which proxies

@@ -12,6 +12,7 @@ import sqlite3
 import struct
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.parse
@@ -22,7 +23,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
-from server import RelayDatabase, SlagRelayServer
+from server import RelayDatabase, SlagRelayServer, SESSION_TTL_SECONDS
 from unittest.mock import patch
 
 
@@ -553,6 +554,34 @@ class TestAccountRelay(RelayTestCase):
         self.assertEqual(account["devices"][0]["status"], "active")
         self.assertEqual((await self.http("POST", "/api/auth/logout", {}, logged_in["token"]))[0], 200)
         self.assertEqual((await self.http("GET", "/api/account", token=logged_in["token"]))[0], 401)
+
+    async def test_session_slides_on_use(self):
+        _, token, _ = await self.register()
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+        def expires_at() -> float:
+            # a separate connection on purpose: the slide has to be committed, not just live in
+            # the server's open transaction
+            with sqlite3.connect(self.server.db.db_path) as ext:
+                return ext.execute("SELECT expires_at FROM auth_sessions WHERE token_hash = ?",
+                                   (token_hash,)).fetchone()[0]
+
+        def set_expiry(when: float) -> None:
+            with self.server.db.conn:
+                self.server.db.conn.execute("UPDATE auth_sessions SET expires_at = ? WHERE token_hash = ?",
+                                            (when, token_hash))
+
+        # soon to die -> one authenticated call pushes it a full term forward
+        set_expiry(time.time() + 60)
+        self.assertEqual((await self.http("GET", "/api/account", token=token))[0], 200)
+        slid = expires_at()
+        self.assertGreater(slid, time.time() + SESSION_TTL_SECONDS - 60)
+        # fresh enough -> no row write on every request
+        self.assertEqual((await self.http("GET", "/api/account", token=token))[0], 200)
+        self.assertEqual(expires_at(), slid)
+        # an already dead session is not resurrected by the renewal
+        set_expiry(time.time() - 1)
+        self.assertEqual((await self.http("GET", "/api/account", token=token))[0], 401)
 
     async def test_bad_signature_and_single_use_challenge(self):
         identity = self.identity()

@@ -35,7 +35,7 @@ BUNDLE_FRAME_VERSION = 0x01
 PAIRING_TTL_SECONDS = 300
 CHALLENGE_TTL_SECONDS = 300
 DEVICE_REQUEST_TTL_SECONDS = 600
-SESSION_TTL_SECONDS = 12 * 3600
+SESSION_TTL_SECONDS = 3 * 24 * 3600
 PLANS = {
     "free": {"label": "Free", "devices": 2, "cache_mb": 1024},
     "smile": {"label": "Smile", "devices": 5, "cache_mb": 10 * 1024},
@@ -662,15 +662,24 @@ class RelayDatabase:
         return self.authenticate_hash(hash_token(token)) if token else None
 
     def authenticate_hash(self, token_hash: str) -> Optional[dict]:
+        now = time.time()
         row = self.conn.execute("""
             SELECT s.token_hash, s.account_id, s.device_id, s.expires_at, a.plan
             FROM auth_sessions s
             JOIN accounts a ON a.account_id = s.account_id
             JOIN devices d ON d.id = s.device_id AND d.account_id = s.account_id
             WHERE s.token_hash = ? AND s.expires_at > ? AND d.status = 'active' AND COALESCE(a.status, 'active') = 'active'
-        """, (token_hash, time.time())).fetchone()
+        """, (token_hash, now)).fetchone()
         if row:
-            self.conn.execute("UPDATE devices SET last_seen_at = ? WHERE id = ?", (time.time(), row["device_id"]))
+            # A used session slides forward, so an open app never gets logged out. Only once the
+            # half of the term is gone: the websocket authenticates every message and a row write
+            # per ping is waste.
+            renewed = self.conn.execute(
+                "UPDATE auth_sessions SET expires_at = ? WHERE token_hash = ? AND expires_at < ?",
+                (now + SESSION_TTL_SECONDS, token_hash, now + SESSION_TTL_SECONDS / 2))
+            self.conn.execute("UPDATE devices SET last_seen_at = ? WHERE id = ?", (now, row["device_id"]))
+            if renewed.rowcount:
+                self.conn.commit()
             return dict(row)
         return None
 
