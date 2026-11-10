@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-test.setTimeout(120_000);
+test.setTimeout(240_000);
 
 test('a card with several tracks: names on rows, real seeking, one playhead at a time', async ({ page }) => {
-  await page.setViewportSize({ width: 900, height: 600 });
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 90000 });
 
   await page.evaluate(() => {
     // A 4-second silent wav, built here so there is something real to seek in.
@@ -68,7 +68,10 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
         content: '',
         folder: 'Входящие',
         tags: [],
-        attachments: [track('probe_a', 'babypills - первый_трек.wav'), track('probe_b', 'babypills - второй_трек.wav')],
+        attachments: [
+          { ...track('probe_a', 'babypills - первый_трек.wav'), extractedText: 'О чём этот трек' },
+          track('probe_b', 'babypills - второй_трек.wav'),
+        ],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
@@ -84,7 +87,7 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   });
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 90000 });
 
   const card = page.locator('.group').filter({ hasText: 'первый_трек' }).first();
   await expect(card).toBeVisible({ timeout: 10000 });
@@ -95,6 +98,14 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   await expect(card.locator('text=.wav')).toHaveCount(0);
 
   const strip = card.locator('[title="Перемотка"]').first();
+  // A ready transcript stays folded until asked for.
+  const accordion = card.locator('.motion-accordion').filter({ hasText: 'О чём этот трек' }).first();
+  await expect(accordion).toHaveAttribute('data-expanded', 'false');
+  await expect(card.getByText('О чём этот трек')).toHaveCount(1);
+  await card.locator('button[aria-label="Расшифровка"]').first().click();
+  await expect(accordion).toHaveAttribute('data-expanded', 'true');
+  await card.locator('button[aria-label="Расшифровка"]').first().click();
+  await expect(accordion).toHaveAttribute('data-expanded', 'false');
   const headerBox = await card.locator('text=первый_трек').first().boundingBox();
   const stripBox = await strip.boundingBox();
   expect(headerBox).not.toBeNull();

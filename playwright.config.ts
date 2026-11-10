@@ -1,5 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// A second checkout (a worktree for the orb work) keeps its own dev server on 5173 and
+// `reuseExistingServer` would silently test that code instead. Set SLAG_E2E_PORT to run
+// this tree on its own port.
+const port = Number(process.env.SLAG_E2E_PORT || 5173);
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 45000,
@@ -12,7 +18,7 @@ export default defineConfig({
   workers: Number(process.env.PLAYWRIGHT_WORKERS ?? 6),
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL,
     trace: 'on-first-retry',
     permissions: ['microphone', 'camera'],
     launchOptions: {
@@ -36,8 +42,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx vite --port 5173 --host 127.0.0.1',
-    url: 'http://127.0.0.1:5173',
+    command: `npx vite --port ${port} --host 127.0.0.1`,
+    url: baseURL,
     reuseExistingServer: true,
     timeout: 30000,
   },

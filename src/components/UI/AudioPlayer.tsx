@@ -55,7 +55,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(initialDuration || 0);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(() => Boolean(transcript));
+  // A transcript is folded away by default: nobody asked to read it on open.
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveTrackRef = useRef<HTMLDivElement | null>(null);
