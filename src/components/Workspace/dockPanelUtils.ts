@@ -95,6 +95,15 @@ const applyGroupConstraints = (api: DockviewApi) => {
   });
 };
 
+/** Side panels living as tabs of the reading pane is the folded state, not a user choice. */
+export const isDockLayoutFolded = (api: DockviewApi): boolean => {
+  const feed = api.panels.find(panel => getPanelComponent(panel) === 'feed');
+  if (!feed) return false;
+  return api.panels.some(
+    panel => SIDE_COMPONENTS.has(getPanelComponent(panel)) && panel.group === feed.group
+  );
+};
+
 /**
  * Decides whether the side panels are columns or tabs of the reading pane, then re-applies the
  * group constraints. The resize path (`foldOnly`) never touches the constraints: dockview already
@@ -109,7 +118,8 @@ export const syncAllGroupConstraints = (api: DockviewApi, foldOnly = false) => {
 
   const sides = panels.filter(panel => SIDE_COMPONENTS.has(getPanelComponent(panel)));
   const fold = api.width > 0 && api.width < (foldedSides ? UNFOLD_ABOVE_PX : FOLD_BELOW_PX);
-  const changed = fold ? sides.some(panel => panel.group !== feed.group) : foldedSides !== null;
+  const spread = !fold && sides.some(panel => panel.group === feed.group);
+  const changed = fold ? sides.some(panel => panel.group !== feed.group) : foldedSides !== null || spread;
   if (!changed) {
     if (!foldOnly) applyGroupConstraints(api);
     return;
@@ -147,6 +157,11 @@ export const syncAllGroupConstraints = (api: DockviewApi, foldOnly = false) => {
         const column = api.getPanel(head)?.group;
         if (!column) continue;
         for (const id of rest) api.getPanel(id)?.api.moveTo({ group: column });
+      }
+      // Nothing was remembered (a folded layout came back from storage): give every side panel its
+      // own column, otherwise the folded tabs would stick around at any window width.
+      for (const panel of sides) {
+        if (panel.group === feed.group) panel.api.moveTo({ group: feed.group, position: 'right' });
       }
     }
     if (!foldOnly) applyGroupConstraints(api);

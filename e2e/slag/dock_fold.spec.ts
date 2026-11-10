@@ -92,3 +92,26 @@ test('a panel closed while folded does not reappear on widening', async ({ page 
   expect(back.some(group => group.tabs.includes('Аудиоплеер'))).toBe(false);
   expect(back.some(group => group.tabs.includes('Входящие'))).toBe(true);
 });
+
+test('a folded layout is never saved, so a reload brings the columns back', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await setupSlag(page, testInfo);
+  await page.waitForTimeout(2500);
+  await splitAudioIntoColumn(page);
+
+  const key = 'slag_workspace_layout_v2';
+  const savedWide = await page.evaluate(storageKey => localStorage.getItem(storageKey), key);
+
+  await page.setViewportSize({ width: 950, height: 900 });
+  await page.waitForTimeout(1500);
+  expect(await groups(page)).toHaveLength(2);
+  const savedFolded = await page.evaluate(storageKey => localStorage.getItem(storageKey), key);
+  expect(savedFolded).toBe(savedWide);
+
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.waitForTimeout(900);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000);
+  expect((await groups(page)).length).toBeGreaterThanOrEqual(4);
+});
