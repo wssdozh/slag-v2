@@ -168,17 +168,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     onWillDragPanel: handleWillDragPanel,
   });
 
-  // Window width decides whether the side panels stay columns or fold into the reading pane.
+  // Minimum widths are defined for a comfortable window; after a resize they are rescaled to what
+  // actually fits, otherwise the grid ends up wider than the frame and the right pane gets clipped.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const handleResize = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         const api = apiRef.current;
-        // Fold decision only: dockview resizes the grid itself, a full recompute here lags the drag.
-        // 280 ms of silence: folding mid-drag reads as a glitch, not as a layout.
-        if (api) syncAllGroupConstraints(api, true);
-      }, 280);
+        if (api) syncAllGroupConstraints(api);
+      }, 200);
     };
     window.addEventListener('resize', handleResize);
     return () => {

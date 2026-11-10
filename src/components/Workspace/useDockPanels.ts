@@ -13,7 +13,6 @@ import {
   getPanelMaxWidth,
   getPanelComponent,
   syncAllGroupConstraints,
-  isDockLayoutFolded,
   scaleLayoutToWidth,
   detachPanel,
 } from './dockPanelUtils';
@@ -82,9 +81,6 @@ export function useDockPanels({
 
   const saveLayout = useCallback(() => {
     if (effectiveInitialPanel || !apiRef.current) return;
-    // The fold follows the window width, so a folded grid must never become the saved layout: it
-    // would come back at any window size and never unfold again.
-    if (isDockLayoutFolded(apiRef.current)) return;
     try {
       const json = apiRef.current.toJSON();
       localStorage.setItem(WORKSPACE_LAYOUT_KEY, JSON.stringify(json));

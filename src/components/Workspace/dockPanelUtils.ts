@@ -1,7 +1,6 @@
 import type { DockviewApi, IDockviewPanel } from 'dockview-react';
 import { logger } from '../../lib/logger';
 import { isDesktopApp, openDetachedWindow } from '../../lib/windowControls';
-import { prefersReducedMotion } from '../../lib/motion';
 import {
   Layers,
   Kanban,
@@ -51,37 +50,21 @@ export const getPanelComponent = (panel: IDockviewPanel): string => {
   return panel.toJSON()?.contentComponent || panel.id.replace(/^panel_/, '').replace(/_\d+$/, '');
 };
 
-/** Panels that are allowed to fold into the reading pane when the window gets tight. */
-const SIDE_COMPONENTS = new Set(['assistant', 'audio', 'folder-info', 'logs']);
-
 /**
- * Fold under the first width, unfold only above the second one. A window dragged across a single
- * threshold would otherwise rebuild the grid on every frame.
+ * Keeps the panes inside the window. Dockview obeys the minimum widths it is given, and minimums
+ * that cannot all fit at once leave the grid wider than the frame — the right-hand pane is then
+ * clipped by the window edge. The minimums are scaled to the width that actually exists, so the
+ * panes just squeeze.
  */
-const FOLD_BELOW_PX = 1024;
-const UNFOLD_ABOVE_PX = 1120;
-
-/**
- * Which column each side panel lived in before the fold, so widening puts the very same split back
- * without recreating panels — a `fromJSON` restore remounts them and the editor loses its place.
- * ponytail: in memory only, so a restart in a narrow window starts folded. Persist it next to the
- * saved layout if that ever matters.
- */
-let foldedSides: { id: string; column: string }[] | null = null;
-let isApplyingLayout = false;
-
-const DOCK_ANIMATING_CLASS = 'dockfold-animating';
-const DOCK_ANIMATION_MS = 220;
-let animationTimer: ReturnType<typeof setTimeout> | null = null;
-
-const applyGroupConstraints = (api: DockviewApi) => {
+export const syncAllGroupConstraints = (api: DockviewApi) => {
   const entries = api.groups
     .map(group => ({ group, active: group.activePanel }))
     .filter((entry): entry is { group: (typeof entry.group); active: IDockviewPanel } => Boolean(entry.active));
-  // Whatever is still split gets scaled minimums: the window is the hard limit, the rail minimums
-  // are just a comfortable default.
   const totalMin = entries.reduce((sum, entry) => sum + getPanelMinWidth(getPanelComponent(entry.active)), 0);
-  const scale = api.width > 0 && totalMin > api.width ? api.width / totalMin : 1;
+  // Sashes between the columns eat width too, and rounding lands on the wrong side of the edge;
+  // without this inset the minimums add up to the whole frame and the last pane pokes past it.
+  const available = api.width - 8 * Math.max(0, entries.length - 1) - 8;
+  const scale = available > 0 && totalMin > available ? available / totalMin : 1;
   entries.forEach(({ group, active }) => {
     const comp = getPanelComponent(active);
     const maxWidth = getPanelMaxWidth(comp);
@@ -97,92 +80,6 @@ const applyGroupConstraints = (api: DockviewApi) => {
       // Group may be disposing
     }
   });
-};
-
-/** Side panels living as tabs of the reading pane is the folded state, not a user choice. */
-export const isDockLayoutFolded = (api: DockviewApi): boolean => {
-  const feed = api.panels.find(panel => getPanelComponent(panel) === 'feed');
-  if (!feed) return false;
-  return api.panels.some(
-    panel => SIDE_COMPONENTS.has(getPanelComponent(panel)) && panel.group === feed.group
-  );
-};
-
-/**
- * Decides whether the side panels are columns or tabs of the reading pane, then re-applies the
- * group constraints. The resize path (`foldOnly`) never touches the constraints: dockview already
- * resizes the grid itself, and recomputing on every frame is what made dragging the window crawl.
- */
-export const syncAllGroupConstraints = (api: DockviewApi, foldOnly = false) => {
-  if (isApplyingLayout) return;
-
-  const panels = api.panels;
-  const feed = panels.find(panel => getPanelComponent(panel) === 'feed') ?? panels[0];
-  if (!feed) return;
-
-  const sides = panels.filter(panel => SIDE_COMPONENTS.has(getPanelComponent(panel)));
-  const fold = api.width > 0 && api.width < (foldedSides ? UNFOLD_ABOVE_PX : FOLD_BELOW_PX);
-  const spread = !fold && sides.some(panel => panel.group === feed.group);
-  const changed = fold ? sides.some(panel => panel.group !== feed.group) : foldedSides !== null || spread;
-  if (!changed) {
-    if (!foldOnly) applyGroupConstraints(api);
-    return;
-  }
-
-  const apply = () => {
-    if (fold) {
-      foldedSides = sides
-        .filter(panel => panel.group !== feed.group)
-        .map(panel => ({ id: panel.id, column: panel.group.id }));
-      for (const panel of sides) {
-        if (panel.group === feed.group) continue;
-        panel.api.moveTo({ group: feed.group });
-      }
-      feed.api.setActive();
-    } else {
-      const restore = foldedSides;
-      foldedSides = null;
-      // Every remembered column comes back as one column: the first panel opens the group next to
-      // the feed, the rest of its tabs move into it. Panels closed while folded are skipped.
-      const columns = new Map<string, string[]>();
-      for (const entry of restore ?? []) {
-        if (!api.getPanel(entry.id)) continue;
-        columns.set(entry.column, [...(columns.get(entry.column) ?? []), entry.id]);
-      }
-      for (const ids of columns.values()) {
-        const [head, ...rest] = ids;
-        api.getPanel(head)?.api.moveTo({ group: feed.group, position: 'right' });
-        const column = api.getPanel(head)?.group;
-        if (!column) continue;
-        for (const id of rest) api.getPanel(id)?.api.moveTo({ group: column });
-      }
-      // Nothing was remembered (a folded layout came back from storage): give every side panel its
-      // own column, otherwise the folded tabs would stick around at any window width.
-      for (const panel of sides) {
-        if (panel.group === feed.group) panel.api.moveTo({ group: feed.group, position: 'right' });
-      }
-    }
-    if (!foldOnly) applyGroupConstraints(api);
-  };
-
-  // No view-transition snapshot here: folding a column is two moves, and a full-window snapshot of a
-  // live audio orb costs more than the layout change itself. The panes glide on their own CSS
-  // transition instead (`.dockfold-animating .dv-view` in dockview-theme-slag.css).
-  isApplyingLayout = true;
-  // dockview puts its own theme class on the shell root, so `.dockview-theme-slag` is not the
-  // element to hang this on.
-  const dock = document.querySelector<HTMLElement>('.dv-shell');
-  const animate = dock !== null && !prefersReducedMotion();
-  if (animate) dock.classList.add(DOCK_ANIMATING_CLASS);
-  try {
-    apply();
-  } finally {
-    isApplyingLayout = false;
-  }
-  if (animate) {
-    if (animationTimer) clearTimeout(animationTimer);
-    animationTimer = setTimeout(() => dock.classList.remove(DOCK_ANIMATING_CLASS), DOCK_ANIMATION_MS);
-  }
 };
 
 /**
