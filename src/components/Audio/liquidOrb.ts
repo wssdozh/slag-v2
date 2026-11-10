@@ -83,11 +83,13 @@ void main() {
         0.012 + uHigh * 0.020, t * 0.90, 4.0,
         0.010 + uMid * 0.015, t * 1.07 + 1.1, 2.0);
 
-    // Palette is the visualisation gradient, not layout tokens. The back orb
-    // glows along its edge, otherwise the visible crescent reads as flat navy.
-    vec3 colBack = mix(vec3(0.02, 0.22, 0.55), vec3(0.22, 0.64, 0.96),
-                       smoothstep(0.0, 1.0, clamp(back.z / back.y, 0.0, 1.0)));
-    vec3 colMid = mix(vec3(0.55, 0.93, 1.0), vec3(0.14, 0.58, 0.94),
+    // Palette is the visualisation gradient, not layout tokens. The back orb is
+    // darker than the middle one (that is the depth cue) with a thin lit limb,
+    // otherwise the visible crescent reads as a flat navy blob.
+    float backNd = clamp(back.z / back.y, 0.0, 1.0);
+    vec3 colBack = mix(vec3(0.12, 0.45, 0.88), vec3(0.02, 0.20, 0.52), smoothstep(0.0, 1.0, backNd));
+    colBack += vec3(0.10, 0.38, 0.70) * smoothstep(0.72, 0.98, backNd);
+    vec3 colMid = mix(vec3(0.65, 0.96, 1.0), vec3(0.18, 0.65, 0.98),
                       smoothstep(0.0, 1.0, clamp(mid.z / mid.y, 0.0, 1.0)));
     vec3 colFront = mix(vec3(1.0), vec3(0.45, 0.88, 1.0),
                         smoothstep(0.0, 1.0, clamp(front.z / front.y, 0.0, 1.0)));
@@ -110,10 +112,11 @@ void main() {
     color = colFront * aFront + color * (1.0 - aFront);
     alpha = aFront + alpha * (1.0 - aFront);
 
-    // Onset shockwave leaves the middle orb and expands while it fades.
-    float ringRadius = 0.52 + (1.0 - uRing) * 0.30;
-    float ring = (1.0 - smoothstep(0.0, 0.014, abs(length(p - centerMid) - ringRadius))) * uRing * uRing * 1.5;
-    color += vec3(0.50, 0.90, 1.0) * ring;
+    // Onset shockwave leaves the hot orb and expands while it fades, so the hit
+    // reads as an impact instead of a hoop drawn around the whole stack.
+    float ringRadius = 0.12 + (1.0 - uRing) * 0.55;
+    float ring = (1.0 - smoothstep(0.0, 0.018, abs(length(p - centerFront) - ringRadius))) * uRing * uRing * 1.2;
+    color += vec3(0.55, 0.92, 1.0) * ring;
     alpha = min(1.0, alpha + ring);
 
     if (alpha <= 0.004) {
