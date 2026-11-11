@@ -24,15 +24,13 @@ import { useFeedView } from './hooks/useFeedView';
 import { useBackup } from './hooks/useBackup';
 import { useAssistant } from './hooks/useAssistant';
 import { useAppearance } from './hooks/useAppearance';
+import { useRecurringRollover } from './hooks/useRecurringRollover';
 import { crossFade } from '../lib/motion';
 import {
   STORAGE_KEYS,
   DEFAULT_INBOX_FOLDER,
 } from '../config';
-import {
-  evaluateRecurringTasks,
-  getISODateString,
-} from '../lib/time/recurrenceHelper';
+import { evaluateRecurringTasks } from '../lib/time/recurrenceHelper';
 import {
   parseSubtasksFromContent,
   toggleCheckboxInContent,
@@ -171,52 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setItems(storage.getItems());
   }, []);
 
-  const runRecurringEvaluation = useCallback(() => {
-    const currentItems = storage.getItems();
-    const { updatedItems, changedCount } = evaluateRecurringTasks(currentItems);
-    if (changedCount > 0) {
-      storage.saveItems(updatedItems);
-      refreshData();
-      appLog.info(`Recurring tasks evaluated: ${changedCount} tasks rolled over/respawned`);
-    }
-  }, [refreshData]);
-
-  // Midnight transition and tab visibility wakeup listener
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    let timerId: number | undefined;
-
-    const scheduleMidnightCheck = () => {
-      const now = new Date();
-      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
-      const delayMs = Math.max(1000, nextMidnight.getTime() - now.getTime());
-
-      timerId = window.setTimeout(() => {
-        runRecurringEvaluation();
-        scheduleMidnightCheck();
-      }, delayMs);
-    };
-
-    scheduleMidnightCheck();
-
-    let lastCheckedDate = getISODateString(new Date());
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        const currentDate = getISODateString(new Date());
-        if (currentDate !== lastCheckedDate) {
-          lastCheckedDate = currentDate;
-          runRecurringEvaluation();
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (timerId !== undefined) clearTimeout(timerId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [runRecurringEvaluation]);
+  useRecurringRollover(refreshData);
 
   // Application Startup Log (guarded against React StrictMode double invocation)
   const hasLoggedInitRef = useRef(false);
