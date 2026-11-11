@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **344**, строк: **76990**, зон: **40**.
+Модулей: **345**, строк: **77089**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -13,7 +13,6 @@
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
 | `src/lib/sync/syncEngine.ts` | 1554 | 14 |
-| `src/lib/storage/index.ts` | 1366 | 25 |
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
 | `src/components/Feed/Composer.tsx` | 1094 | 4 |
@@ -22,6 +21,7 @@
 | `src/context/AppContext.tsx` | 996 | 52 |
 | `src/components/Feed/AssistantChat.tsx` | 995 | 2 |
 | `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
+| `src/lib/storage/index.ts` | 967 | 25 |
 | `src/components/Modals/SettingsModal.tsx` | 874 | 2 |
 | `e2e/slag/workspace.spec.ts` | 869 | 0 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
@@ -290,7 +290,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
-| `index.ts` | 7 | 74 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
+| `index.ts` | 7 | 75 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
 | `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
@@ -369,7 +369,7 @@
 | `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
 | `folderOpener.ts` | 72 | 4 | OpenFolderResult, openAppFolder |  |
 | `formatBytes.ts` | 7 | 5 | formatBytes |  |
-| `logger.ts` | 648 | 35 | LogListener, logger |  |
+| `logger.ts` | 648 | 36 | LogListener, logger |  |
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
@@ -409,15 +409,16 @@
 | `folderBrowser.ts` | 128 | 4 | listFolders, pickFolder, listFolderEntries, pickFilesFromSystem, readEntryBytes, +3 |  |
 | `imageCodec.ts` | 90 | 2 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 |  |
 
-## src/lib/storage — 6 файлов, 2100 строк
+## src/lib/storage — 7 файлов, 2199 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData |  |
-| `attachments.ts` | 209 | 1 | AttachmentStore |  |
+| `attachments.ts` | 209 | 2 | AttachmentStore |  |
 | `draftStore.ts` | 248 | 1 | DraftStore |  |
-| `index.ts` | 1366 | 25 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
+| `index.ts` | 967 | 25 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
 | `indexedDb.ts` | 143 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
+| `vaultFiles.ts` | 498 | 1 | VaultFilesDeps, VaultFiles |  |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
 
 ## src/lib/sync — 17 файлов, 6034 строк
@@ -462,7 +463,7 @@
 | `itemSchema.ts` | 46 | 1 | PropertySchemaItem, ITEM_MUTABLE_PROPERTIES, ITEM_UPDATES_SCHEMA | Single Source of Truth (SSOT) metadata registry for SlagItem mutable fields. |
 | `itemUpdates.ts` | 70 | 2 | applyItemUpdates |  |
 | `markdownSerializer.ts` | 198 | 5 | serializeItemToMarkdown, parseMarkdownToItem |  |
-| `noteFilename.ts` | 20 | 5 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
+| `noteFilename.ts` | 20 | 6 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
 | `stats.ts` | 66 | 2 | VaultStats, collectExistingTags, computeVaultStats |  |
 
 ## src/mcp — 6 файлов, 1296 строк
@@ -486,5 +487,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 108 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 109 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
