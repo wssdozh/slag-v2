@@ -1,4 +1,6 @@
 import { storage } from '../storage';
+import { persistIncomingBundle } from './applyBundle';
+import { attachmentSignature } from './attachmentSignature';
 import {
   loadSentHashes,
   loadSyncedIds,
@@ -25,7 +27,6 @@ import {
   renameDeviceInConfig,
   setDeviceSyncModeInConfig,
   setDeviceAiLeaseInConfig,
-  touchDeviceLastSeen,
   normalizeTrustedDevicesFromAccount,
   computeSubscription,
   parseStoredConfig,
@@ -36,7 +37,6 @@ import {
   deriveRoomId,
   encryptBundle,
   encodeBundleFrame,
-  decryptBundle,
   generateMnemonic,
   computeStateRootHash,
   computeHash,
@@ -50,14 +50,13 @@ import type {
   DeviceProfile,
   DeviceSyncMode,
 } from './types';
-import type { SlagItem, SlagAttachment, FolderMeta, WorkspaceState, ComposerDraft, FullscreenDraft } from '../../types';
+import type { SlagItem, FolderMeta, WorkspaceState } from '../../types';
 import {
   DEFAULT_SYNC_SERVER_URL,
   OFFICIAL_SYNC_DOMAINS,
   SYNC_ATTACHMENT_MAX_BYTES,
   SYNC_STORAGE_KEYS,
   SYNC_INTERVALS,
-  DEFAULT_INBOX_FOLDER,
 } from '../../config';
 import { isPrimaryWindow } from '../windowControls';
 
@@ -68,10 +67,6 @@ const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
 const syncLog = logger.scope('SYNC');
 
 /** Cheap identity of an attachment's bytes: reading five megabytes to hash them is not. */
-function attachmentSignature(att: SlagAttachment): string {
-  return `${att.size}:${att.name}`;
-}
-
 /** A bundle handed to the relay but not yet confirmed; holds the bookkeeping commit applies. */
 interface PendingPush {
   bundleId: string;
@@ -89,26 +84,26 @@ interface PendingPush {
 }
 
 export class SyncEngine {
-  private config: SyncConfig;
-  private status: SyncStatus;
+  public config: SyncConfig;
+  public status: SyncStatus;
   private listeners = new Set<(status: SyncStatus) => void>();
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
-  private activeVaultKey: CryptoKey | null = null;
-  private activeRoomId: string | null = null;
+  public activeVaultKey: CryptoKey | null = null;
+  public activeRoomId: string | null = null;
   private isProcessingSync = false;
   private sequence = 1;
-  private appliedBundleIds = new Set<string>();
-  private batchUpdating = false;
+  public appliedBundleIds = new Set<string>();
+  public batchUpdating = false;
   private forceFullPush = false;
-  private initGeneration = 0;
+  public initGeneration = 0;
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
-  private currentVaultId: string = 'default_vault';
+  public currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private pushDebounceDeadline = 0;
   private pushDebounceTrailing = false;
   /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
-  private importBuffer: {
+  public importBuffer: {
     items: SlagItem[];
     folders: FolderMeta[];
     workspace?: WorkspaceState;
@@ -256,7 +251,7 @@ export class SyncEngine {
     return () => this.listeners.delete(listener);
   }
 
-  private notify(): void {
+  public notify(): void {
     const current = this.getStatus();
     this.listeners.forEach((fn) => fn(current));
   }
@@ -377,7 +372,7 @@ export class SyncEngine {
    * Writing per bundle made replaying a backlog flicker: a note from an old bundle
    * appeared, then a newer bundle deleted or replaced it a second later.
    */
-  private stageImport(
+  public stageImport(
     items: SlagItem[],
     folders: FolderMeta[],
     workspace: WorkspaceState | undefined,
@@ -424,7 +419,7 @@ export class SyncEngine {
     );
   }
 
-  private get bookkeeping(): SyncScope {
+  public get bookkeeping(): SyncScope {
     return {
       vaultId: this.currentVaultId,
       roomId: this.activeRoomId,
@@ -440,7 +435,7 @@ export class SyncEngine {
     return storage.ensureVaultSyncId(this.currentVaultId);
   }
 
-  private usesAccountSync(): boolean {
+  public usesAccountSync(): boolean {
     return this.status.authRequired || accountClient.getToken(this.config.serverUrl) !== null;
   }
 
@@ -725,7 +720,7 @@ export class SyncEngine {
   private applyIncomingBundle(bundlePayload: unknown): Promise<void> {
     const generation = this.initGeneration;
     const applying = this.incomingQueue.then(async () => {
-      if (generation === this.initGeneration) await this.persistIncomingBundle(bundlePayload);
+      if (generation === this.initGeneration) await persistIncomingBundle(this, bundlePayload);
     });
     this.incomingQueue = applying.catch((error) => {
       syncLog.warn('Incoming bundle queue paused after failure:', error);
@@ -733,304 +728,7 @@ export class SyncEngine {
     return applying;
   }
 
-  private async persistIncomingBundle(bundlePayload: unknown): Promise<void> {
-    if (!this.activeVaultKey) return;
-    const generation = this.initGeneration;
-    const roomId = this.activeRoomId;
-
-    try {
-      this.status.state = 'syncing';
-      this.notify();
-
-      let bundle: SyncBundle;
-      if (
-        typeof bundlePayload === 'object' &&
-        bundlePayload !== null &&
-        'ciphertext' in bundlePayload
-      ) {
-        bundle = await decryptBundle(bundlePayload as EncryptedBundle, this.activeVaultKey);
-      } else {
-        if (this.usesAccountSync()) throw new Error('Account sync requires an encrypted bundle');
-        bundle = bundlePayload as SyncBundle;
-      }
-
-      if (generation !== this.initGeneration) return;
-      if (bundle.roomId !== roomId || !Array.isArray(bundle.changes)) throw new Error('Bundle room or changes are invalid');
-      if (typeof bundlePayload === 'object' && bundlePayload !== null && 'fromDeviceId' in bundlePayload &&
-          bundlePayload.fromDeviceId !== bundle.fromDeviceId) throw new Error('Bundle sender does not match authenticated envelope');
-      if (bundle.fromDeviceId === this.config.deviceId) {
-        return; // ignore self echo
-      }
-      if (this.appliedBundleIds.has(bundle.bundleId)) {
-        // ponytail: relay re-delivers pending bundles until ACK; skip a re-apply we already did.
-        await this.sendAck(bundle.bundleId);
-        return;
-      }
-
-      let sender = this.config.trustedDevices.find((d) => d.id === bundle.fromDeviceId);
-      if (!sender && this.usesAccountSync()) {
-        syncLog.warn(`Ignored bundle from unregistered account device: ${bundle.fromDeviceId}`);
-        if (this.batchUpdating) this.status.initialSync.rejected++;
-        // ACK means "do not redeliver", not "applied": without it the relay replays this
-        // bundle forever and the warning above floods the log.
-        try {
-          await this.sendAck(bundle.bundleId);
-        } catch (error) {
-          syncLog.warn('Failed to ACK rejected bundle:', error);
-        }
-        return;
-      }
-      if (!sender) {
-        sender = {
-          id: bundle.fromDeviceId,
-          name: `Устройство ${bundle.fromDeviceId.replace('slag-', '').slice(0, 8)}`,
-          platform: 'desktop',
-          isCurrent: false,
-          syncMode: 'read-write',
-          canRunAiLease: false,
-          pairedAt: new Date().toISOString(),
-          lastSeenAt: 'Только что',
-          allowedVaults: [this.currentVaultId],
-        };
-        this.addTrustedDevice(sender);
-      } else {
-        this.saveConfig({ trustedDevices: touchDeviceLastSeen(this.config.trustedDevices, bundle.fromDeviceId) });
-      }
-      if (sender.syncMode === 'receive-only') {
-        syncLog.warn(`Ignored mutation bundle from receive-only device: ${bundle.fromDeviceId}`);
-        if (this.batchUpdating) this.status.initialSync.rejected++;
-        return;
-      }
-      if (sender.allowedVaults !== undefined && !sender.allowedVaults.includes(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)) {
-        syncLog.warn(`Ignored bundle for vault ${this.currentVaultId} from device without access: ${bundle.fromDeviceId}`);
-        if (this.batchUpdating) this.status.initialSync.rejected++;
-        return;
-      }
-
-      syncLog.info(
-        `Received bundle ${bundle.bundleId} from ${bundle.fromDeviceId} (${bundle.changes.length} changes)`
-      );
-
-      let hasItemsChanged = false;
-      let hasFoldersChanged = false;
-      let hasWorkspaceChanged = false;
-      let hasDraftsChanged = false;
-      let workspaceState: WorkspaceState | undefined;
-
-      const currentItems: SlagItem[] = this.importBuffer ? [...this.importBuffer.items] : [...storage.getItems()];
-      const currentFolders: FolderMeta[] = this.importBuffer ? [...this.importBuffer.folders] : [...storage.getFolders()];
-      const tombstones = loadTombstones(this.bookkeeping);
-      let tombstonesDirty = false;
-
-      for (const ch of bundle.changes) {
-        if (ch.type === 'item') {
-          if (ch.action === 'upsert' && ch.payload) {
-            const incoming = ch.payload as SlagItem;
-            const tomb = tombstones[ch.id];
-            // ponytail: wall-clock LWW; server-assigned version when clocks skew matters.
-            if (tomb !== undefined && (incoming.updatedAt ?? 0) < tomb) continue;
-            const idx = currentItems.findIndex((it) => it.id === ch.id);
-            if (idx >= 0) {
-              if ((incoming.updatedAt ?? 0) < (currentItems[idx].updatedAt ?? 0)) continue;
-              currentItems[idx] = incoming;
-            } else {
-              currentItems.unshift(incoming);
-            }
-            if (tomb !== undefined) {
-              delete tombstones[ch.id];
-              tombstonesDirty = true;
-            }
-            hasItemsChanged = true;
-          } else if (ch.action === 'delete') {
-            const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
-            const idx = currentItems.findIndex((it) => it.id === ch.id);
-            if (idx >= 0 && (currentItems[idx].updatedAt ?? 0) <= deletedAt) {
-              currentItems.splice(idx, 1);
-              hasItemsChanged = true;
-            }
-            if (deletedAt > (tombstones[ch.id] ?? 0)) {
-              tombstones[ch.id] = deletedAt;
-              tombstonesDirty = true;
-            }
-          }
-        } else if (ch.type === 'folder') {
-          if (ch.action === 'upsert' && ch.payload) {
-            const incoming = ch.payload as FolderMeta;
-            const idx = currentFolders.findIndex((f) => f.path === ch.id);
-            if (idx >= 0) {
-              currentFolders[idx] = incoming;
-            } else {
-              currentFolders.push(incoming);
-            }
-            hasFoldersChanged = true;
-          } else if (ch.action === 'delete') {
-            const folderPath = ch.id;
-            const remaining = currentFolders.filter((f) => f.path !== folderPath && !f.path.startsWith(folderPath + '/'));
-            if (remaining.length !== currentFolders.length) {
-              currentFolders.length = 0;
-              currentFolders.push(...remaining);
-              hasFoldersChanged = true;
-              // Reroute child items to inbox
-              for (let i = 0; i < currentItems.length; i++) {
-                if (currentItems[i].folder === folderPath || currentItems[i].folder.startsWith(folderPath + '/')) {
-                  currentItems[i] = { ...currentItems[i], folder: DEFAULT_INBOX_FOLDER, updatedAt: Date.now() };
-                  hasItemsChanged = true;
-                }
-              }
-            }
-          } else if (ch.action === 'rename') {
-            const payload = ch.payload as { oldPath?: string; folder?: FolderMeta } | undefined;
-            const oldPath = payload?.oldPath;
-            const updatedFolder = payload?.folder || (ch.payload as FolderMeta);
-            if (oldPath && updatedFolder && updatedFolder.path) {
-              for (let i = 0; i < currentFolders.length; i++) {
-                if (currentFolders[i].path === oldPath) {
-                  currentFolders[i] = updatedFolder;
-                  hasFoldersChanged = true;
-                } else if (currentFolders[i].path.startsWith(oldPath + '/')) {
-                  const subPath = updatedFolder.path + currentFolders[i].path.slice(oldPath.length);
-                  const subName = subPath.split('/').pop() || currentFolders[i].name;
-                  currentFolders[i] = { ...currentFolders[i], path: subPath, name: subName };
-                  hasFoldersChanged = true;
-                }
-              }
-              for (let i = 0; i < currentItems.length; i++) {
-                if (currentItems[i].folder === oldPath) {
-                  currentItems[i] = { ...currentItems[i], folder: updatedFolder.path, updatedAt: Date.now() };
-                  hasItemsChanged = true;
-                } else if (currentItems[i].folder.startsWith(oldPath + '/')) {
-                  const subFolder = updatedFolder.path + currentItems[i].folder.slice(oldPath.length);
-                  currentItems[i] = { ...currentItems[i], folder: subFolder, updatedAt: Date.now() };
-                  hasItemsChanged = true;
-                }
-              }
-            }
-          }
-        } else if (ch.type === 'trash') {
-          if (ch.action === 'restore' && ch.payload) {
-            const restored = ch.payload as SlagItem;
-            const idx = currentItems.findIndex((it) => it.id === restored.id);
-            if (idx >= 0) {
-              currentItems[idx] = restored;
-            } else {
-              currentItems.unshift(restored);
-            }
-            if (tombstones[restored.id] !== undefined) {
-              delete tombstones[restored.id];
-              tombstonesDirty = true;
-            }
-            hasItemsChanged = true;
-          }
-        } else if (ch.type === 'attachment' && ch.action === 'upsert') {
-          const payload = ch.payload as { attachment?: SlagAttachment; dataUrl?: string } | undefined;
-          const attachment = payload?.attachment;
-          if (attachment?.id && payload?.dataUrl?.startsWith('data:')) {
-            syncLog.info(
-              `Received attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB, ${attachment.mimeType}) from ${bundle.fromDeviceId}`
-            );
-            await storage.importSyncedAttachment(attachment, payload.dataUrl);
-            // This device now holds the same bytes. Without the mark it would send them right
-            // back to the device it just got them from: a five-megabyte ping-pong, both ways.
-            const sentHashes = loadSentHashes(this.bookkeeping);
-            sentHashes[`att:${attachment.id}`] = attachmentSignature(attachment);
-            saveSentHashes(this.bookkeeping, sentHashes);
-            // The note did not change, but the UI resolves attachment urls per item: reuse the
-            // single sync event instead of inventing a second one for bytes.
-            hasItemsChanged = true;
-          } else {
-            syncLog.warn(`Ignored attachment change without usable bytes: ${ch.id}`);
-          }
-        } else if (ch.type === 'workspace' && ch.payload) {
-          workspaceState = ch.payload as WorkspaceState;
-          hasWorkspaceChanged = true;
-        } else if (ch.type === 'draft') {
-          const draftTombKey = `${SYNC_STORAGE_KEYS.DRAFT_TOMB_PREFIX}${this.currentVaultId}_${ch.id}`;
-          const lastDeletedAt = Number(localStorage.getItem(draftTombKey) || 0);
-
-          if (ch.id.startsWith('composer:')) {
-            const folder = ch.id.slice('composer:'.length);
-            if (ch.action === 'upsert' && ch.payload) {
-              const incoming = ch.payload as ComposerDraft;
-              if ((incoming.updatedAt ?? 0) <= lastDeletedAt) {
-                syncLog.info(`Ignored stale composer draft for "${folder}" (updatedAt <= deletedAt)`);
-                continue;
-              }
-              const existing = storage.getComposerDraft(folder);
-              if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
-                storage.saveComposerDraft(folder, incoming, 'remote');
-                hasDraftsChanged = true;
-                syncLog.info(`Applied remote composer draft for folder "${folder}" (${incoming.content.length} chars)`);
-              }
-            } else if (ch.action === 'delete') {
-              const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
-              localStorage.setItem(draftTombKey, String(deletedAt));
-              storage.deleteComposerDraft(folder, 'remote');
-              hasDraftsChanged = true;
-              syncLog.info(`Deleted remote composer draft for folder "${folder}"`);
-            }
-          } else if (ch.id.startsWith('fullscreen:')) {
-            const itemId = ch.id.slice('fullscreen:'.length);
-            if (ch.action === 'upsert' && ch.payload) {
-              const incoming = ch.payload as FullscreenDraft;
-              if ((incoming.updatedAt ?? 0) <= lastDeletedAt) {
-                syncLog.info(`Ignored stale fullscreen draft for "${itemId}" (updatedAt <= deletedAt)`);
-                continue;
-              }
-              const existing = storage.getFullscreenDraft(itemId);
-              if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
-                storage.saveFullscreenDraft(itemId, incoming, 'remote');
-                hasDraftsChanged = true;
-                syncLog.info(`Applied remote fullscreen draft for item "${itemId}" ("${incoming.title}")`);
-              }
-            } else if (ch.action === 'delete') {
-              const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
-              localStorage.setItem(draftTombKey, String(deletedAt));
-              storage.clearFullscreenDraft(itemId, 'remote');
-              hasDraftsChanged = true;
-              syncLog.info(`Cleared remote fullscreen draft for item "${itemId}"`);
-            }
-          }
-        }
-      }
-
-      if (tombstonesDirty) {
-        localStorage.setItem(tombstonesKey(this.bookkeeping), JSON.stringify(tombstones));
-      }
-
-      if (hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged) {
-        this.stageImport(currentItems, currentFolders, hasWorkspaceChanged ? workspaceState : undefined, {
-          items: hasItemsChanged,
-          folders: hasFoldersChanged,
-          workspace: hasWorkspaceChanged,
-          drafts: hasDraftsChanged,
-        });
-      }
-      if (generation !== this.initGeneration) return;
-
-      this.appliedBundleIds.add(bundle.bundleId);
-      if (this.batchUpdating) this.status.initialSync.processed++;
-      await this.sendAck(bundle.bundleId);
-      if (generation !== this.initGeneration) return;
-
-      this.status.lastSyncTime = new Date().toLocaleTimeString();
-      this.status.state = this.batchUpdating ? 'syncing' : 'connected';
-      this.notify();
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('Local state changed')) {
-        // Keep the bundle pending; the caller must not advance past a failed persist.
-        syncLog.warn('Local changed during sync persist; bundle remains pending');
-        throw err;
-      }
-      syncLog.error('Error applying incoming bundle:', err);
-      if (generation !== this.initGeneration) return;
-      this.status.state = 'error';
-      this.status.error = 'Не удалось расшифровать или сохранить изменения';
-      this.notify();
-      throw err;
-    }
-  }
-
-  private async sendAck(bundleId: string): Promise<void> {
+  public async sendAck(bundleId: string): Promise<void> {
     await this.transport.sendAck({
       bundleId,
       roomId: this.activeRoomId,

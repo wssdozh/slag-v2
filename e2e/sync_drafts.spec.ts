@@ -2,6 +2,8 @@ import { test, expect } from './support/selfhostFixture';
 
 test('composer draft emits draft op to outbox and packs into bundle', async ({ page }) => {
   await page.goto('/');
+  // The first spec of a run pays the cold Vite transform; wait for the shell, not a 5s default.
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
 
   const result = await page.evaluate(async () => {
