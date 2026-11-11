@@ -308,7 +308,7 @@ export class SyncEngine {
 
   /** Signature comparison only: no bytes are read to answer "is anything left to send". */
   private countPendingAttachments(): number {
-    const sent = this.loadSentHashes();
+    const sent = loadSentHashes(this.bookkeeping);
     let pending = 0;
     for (const item of storage.getItems()) {
       for (const att of item.attachments ?? []) {
@@ -349,7 +349,7 @@ export class SyncEngine {
         // No new state for "give up": a marker in the sent-hashes map is already understood by
         // every reader of it, while a second set would have to be loaded, cleared and migrated.
         sentHashes[key] = `skip:${sig}`;
-        this.saveSentHashes(sentHashes);
+        saveSentHashes(this.bookkeeping, sentHashes);
         syncLog.warn(
           `Attachment too big to sync: "${att.name}" (${Math.round(att.size / 1024)} KB > ${SYNC_ATTACHMENT_MAX_BYTES / 1024 / 1024} MB)`
         );
@@ -430,38 +430,6 @@ export class SyncEngine {
       roomId: this.activeRoomId,
       accountSync: this.usesAccountSync(),
     };
-  }
-
-  private getStateHashKey(vaultId?: string): string {
-    return stateHashKey(this.bookkeeping, vaultId);
-  }
-
-  private getSyncedIdsKey(vaultId?: string): string {
-    return syncedIdsKey(this.bookkeeping, vaultId);
-  }
-
-  private getTombstonesKey(vaultId?: string): string {
-    return tombstonesKey(this.bookkeeping, vaultId);
-  }
-
-  private loadSentHashes(): Record<string, string> {
-    return loadSentHashes(this.bookkeeping);
-  }
-
-  private saveSentHashes(hashes: Record<string, string>): void {
-    saveSentHashes(this.bookkeeping, hashes);
-  }
-
-  private loadSyncedIds(): Set<string> {
-    return loadSyncedIds(this.bookkeeping);
-  }
-
-  private loadTombstones(): Record<string, number> {
-    return loadTombstones(this.bookkeeping);
-  }
-
-  private ensureSyncedIdsSeed(): void {
-    seedSyncedIds(this.bookkeeping, storage.getItems().map((it) => it.id));
   }
 
   public getCurrentVaultId(): string {
@@ -646,7 +614,7 @@ export class SyncEngine {
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
 
-      this.ensureSyncedIdsSeed();
+      seedSyncedIds(this.bookkeeping, storage.getItems().map((it) => it.id));
       this.batchUpdating = initial;
       await this.fetchPendingBundlesHttp();
       if (generation !== this.initGeneration) return;
@@ -710,9 +678,9 @@ export class SyncEngine {
 
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
     if (newPhrase !== this.config.seedPhrase) {
-      localStorage.removeItem(this.getStateHashKey());
-      localStorage.removeItem(this.getSyncedIdsKey());
-      localStorage.removeItem(this.getTombstonesKey());
+      localStorage.removeItem(stateHashKey(this.bookkeeping));
+      localStorage.removeItem(syncedIdsKey(this.bookkeeping));
+      localStorage.removeItem(tombstonesKey(this.bookkeeping));
       this.getOutbox().clear();
       if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
     }
@@ -723,8 +691,8 @@ export class SyncEngine {
 
   public async updateServerUrl(url: string): Promise<void> {
     this.saveConfig({ serverUrl: url });
-    localStorage.removeItem(this.getSyncedIdsKey());
-    localStorage.removeItem(this.getTombstonesKey());
+    localStorage.removeItem(syncedIdsKey(this.bookkeeping));
+    localStorage.removeItem(tombstonesKey(this.bookkeeping));
     this.getOutbox().clear();
     this.disconnect();
     await this.init();
@@ -851,7 +819,7 @@ export class SyncEngine {
 
       const currentItems: SlagItem[] = this.importBuffer ? [...this.importBuffer.items] : [...storage.getItems()];
       const currentFolders: FolderMeta[] = this.importBuffer ? [...this.importBuffer.folders] : [...storage.getFolders()];
-      const tombstones = this.loadTombstones();
+      const tombstones = loadTombstones(this.bookkeeping);
       let tombstonesDirty = false;
 
       for (const ch of bundle.changes) {
@@ -963,9 +931,9 @@ export class SyncEngine {
             await storage.importSyncedAttachment(attachment, payload.dataUrl);
             // This device now holds the same bytes. Without the mark it would send them right
             // back to the device it just got them from: a five-megabyte ping-pong, both ways.
-            const sentHashes = this.loadSentHashes();
+            const sentHashes = loadSentHashes(this.bookkeeping);
             sentHashes[`att:${attachment.id}`] = attachmentSignature(attachment);
-            this.saveSentHashes(sentHashes);
+            saveSentHashes(this.bookkeeping, sentHashes);
             // The note did not change, but the UI resolves attachment urls per item: reuse the
             // single sync event instead of inventing a second one for bytes.
             hasItemsChanged = true;
@@ -1026,7 +994,7 @@ export class SyncEngine {
       }
 
       if (tombstonesDirty) {
-        localStorage.setItem(this.getTombstonesKey(), JSON.stringify(tombstones));
+        localStorage.setItem(tombstonesKey(this.bookkeeping), JSON.stringify(tombstones));
       }
 
       if (hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged) {
@@ -1093,7 +1061,7 @@ export class SyncEngine {
     this.isProcessingSync = true;
     const generation = this.initGeneration;
     const vaultKey = this.activeVaultKey;
-    const hashKey = this.getStateHashKey();
+    const hashKey = stateHashKey(this.bookkeeping);
 
     try {
       // `getItems` re-hydrates `dataUrl` from the session cache, so a photo pasted a minute ago
@@ -1125,12 +1093,12 @@ export class SyncEngine {
       const changes: SyncChangeItem[] = [];
       // Only entities whose hash differs from what this room already received go out;
       // sending the whole vault on every keystroke is what kept pushes at 60 changes.
-      let sentHashes = this.loadSentHashes();
+      let sentHashes = loadSentHashes(this.bookkeeping);
       if (this.forceFullPush) {
         this.forceFullPush = false;
         sentHashes = {};
         this.entityHashes.clear();
-        this.saveSentHashes({});
+        saveSentHashes(this.bookkeeping, {});
       }
       const packedHashes: Record<string, string> = {};
       const pack = (key: string, hash: string, change: SyncChangeItem) => {
@@ -1203,9 +1171,9 @@ export class SyncEngine {
       }
 
       // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
-      const syncedIds = this.loadSyncedIds();
+      const syncedIds = loadSyncedIds(this.bookkeeping);
       const currentIds = new Set(items.map((it) => it.id));
-      const tombstones = this.loadTombstones();
+      const tombstones = loadTombstones(this.bookkeeping);
       for (const id of syncedIds) {
         if (currentIds.has(id)) continue;
         const deletedAt = tombstones[id] ?? Date.now();
@@ -1356,12 +1324,12 @@ export class SyncEngine {
     this.pendingPushes.delete(pending.bundleId);
 
     localStorage.setItem(pending.hashKey, pending.stateHash);
-    this.saveSentHashes({ ...this.loadSentHashes(), ...pending.packedHashes });
+    saveSentHashes(this.bookkeeping, { ...loadSentHashes(this.bookkeeping), ...pending.packedHashes });
     if (!this.usesAccountSync() && this.currentVaultId === 'default_vault') {
       localStorage.setItem(LAST_STATE_HASH_KEY, pending.stateHash);
     }
-    localStorage.setItem(this.getSyncedIdsKey(), JSON.stringify(pending.syncedIds));
-    localStorage.setItem(this.getTombstonesKey(), JSON.stringify(pending.tombstones));
+    localStorage.setItem(syncedIdsKey(this.bookkeeping), JSON.stringify(pending.syncedIds));
+    localStorage.setItem(tombstonesKey(this.bookkeeping), JSON.stringify(pending.tombstones));
     this.getOutbox().markSynced(pending.opIds);
     this.status.lastSyncTime = new Date().toLocaleTimeString();
     this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
@@ -1573,7 +1541,7 @@ export class SyncEngine {
       trustedDevices: [],
     });
     this.disconnect();
-    localStorage.removeItem(this.getStateHashKey());
+    localStorage.removeItem(stateHashKey(this.bookkeeping));
     if (this.currentVaultId === 'default_vault') {
       localStorage.removeItem(LAST_STATE_HASH_KEY);
     }

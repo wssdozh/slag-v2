@@ -104,15 +104,6 @@ export class StorageService {
     this.attachments.save(attachment);
   }
 
-  private persistAttachmentFiles(item: SlagItem): Promise<void> {
-    return this.attachments.persistAll(item);
-  }
-
-  /** A note keeps attachment ids; the bytes belong in IndexedDB, once per attachment. */
-  private persistNewAttachments(items: SlagItem[]): void {
-    this.attachments.persistNew(items);
-  }
-
   /**
    * The index is a cache, never the source of truth: a note that does not fit here still has to
    * reach the disk. So a quota miss is a warning, not an exception.
@@ -129,10 +120,6 @@ export class StorageService {
     }
   }
 
-  /** Put back the bytes of the session's own attachments, so the UI sees them as it always has. */
-  private hydrateAttachmentData(items: SlagItem[]): SlagItem[] {
-    return this.attachments.hydrate(items);
-  }
   public subscribeChanges(listener: StorageChangeListener): () => void {
     this.changeListeners.add(listener);
     return () => this.changeListeners.delete(listener);
@@ -521,7 +508,7 @@ export class StorageService {
       // Write the replacement before removing the previous filename.
       const content = serializeItemToMarkdown(item);
       await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
-      await this.persistAttachmentFiles(item);
+      await this.attachments.persistAll(item);
 
       // The old path may be somebody else's file when two notes shared a title, so a rename
       // only deletes a file that is really this note.
@@ -1006,7 +993,7 @@ export class StorageService {
     let list: SlagItem[] = [];
     if (raw) {
       try {
-        list = this.hydrateAttachmentData(JSON.parse(raw));
+        list = this.attachments.hydrate(JSON.parse(raw));
       } catch {
         list = [];
       }
@@ -1040,7 +1027,7 @@ export class StorageService {
       fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     }
 
-    this.persistNewAttachments([updatedItem]);
+    this.attachments.persistNew([updatedItem]);
     this.cacheItems(this.getItemsKey(), items);
 
     if (isTauri()) {
@@ -1066,7 +1053,7 @@ export class StorageService {
         updated.unshift(item);
       }
     }
-    this.persistNewAttachments([...saveMap.values()]);
+    this.attachments.persistNew([...saveMap.values()]);
     this.cacheItems(this.getItemsKey(), updated);
 
     if (isTauri()) {
@@ -1090,7 +1077,7 @@ export class StorageService {
     const raw = localStorage.getItem(this.getTrashKey());
     if (!raw) return [];
     try {
-      return this.hydrateAttachmentData(JSON.parse(raw));
+      return this.attachments.hydrate(JSON.parse(raw));
     } catch {
       return [];
     }
