@@ -11,7 +11,6 @@ import type {
   FeedViewMode,
   AiItemFilter,
   ChatMessage,
-  MobileTabId,
   AppUiConfig,
   DeviceUiConfig,
   BackupSnapshotMeta,
@@ -26,15 +25,15 @@ import { backupService } from '../lib/backupService';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { openAppFolder } from '../lib/folderOpener';
-import { listenDesktopEvents, isDesktopApp, isMobilePlatform } from '../lib/windowControls';
+import { listenDesktopEvents, isMobilePlatform } from '../lib/windowControls';
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
-import { useIsMobile } from '../hooks/layout/useIsMobile';
 import { useGlobalHotkeys } from '../hooks/useGlobalHotkeys';
 import { useLayerStack, type AppLayer } from '../hooks/useLayerStack';
 import { useSuggestedActions, type ActionHistoryEntry } from '../hooks/useSuggestedActions';
 import { useOverlays } from './hooks/useOverlays';
-import { crossFade, swapScreen, type ScreenSwap } from '../lib/motion';
+import { useMobileNav } from './hooks/useMobileNav';
+import { crossFade } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
   STORAGE_KEYS,
@@ -64,7 +63,6 @@ export type { ToastMessage, AttachSheetRequest, ContextMenuTarget } from './appC
 const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
 const SIDEBAR_WIDTH_KEY = STORAGE_KEYS.SIDEBAR_WIDTH;
 const RIGHT_PANEL_WIDTH_KEY = STORAGE_KEYS.RIGHT_PANEL_WIDTH;
-const MOBILE_DOCK_TABS_KEY = STORAGE_KEYS.MOBILE_DOCK_TABS;
 const UI_CONFIG_KEY = STORAGE_KEYS.UI_CONFIG;
 
 const DEFAULT_UI_CONFIG: AppUiConfig = {
@@ -82,7 +80,6 @@ const DEFAULT_UI_CONFIG: AppUiConfig = {
   },
 };
 
-const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
 
 const DEFAULT_AI_SETTINGS: AiSettings = {
   sourceMode: 'subscription',
@@ -252,90 +249,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(clamped));
   };
 
-  // Mobile navigation & touch state: desktop and standalone popouts never default to phone layout
-  const isMobileScreen = useIsMobile(UI_BREAKPOINTS.MOBILE);
-  const [forceMobileMode, setForceMobileMode] = useState<boolean | null>(null);
-  const isDesktop = isDesktopApp();
-  const isStandalone = typeof window !== 'undefined' && Boolean(new URLSearchParams(window.location.search).get('panel'));
-  const isMobile = !isStandalone && (forceMobileMode !== null ? forceMobileMode : (isMobilePlatform() || (!isDesktop && isMobileScreen)));
-
-  const toggleMobileMode = useCallback(() => {
-    setForceMobileMode(prev => {
-      if (prev === null) return !isMobileScreen;
-      return !prev;
-    });
-  }, [isMobileScreen]);
-
-  const [activeMobileTab, setActiveMobileTabState] = useState<MobileTabId>(() => initialWorkspace.activeMobileTab || 'folders');
-  const [mobileActiveFolder, setMobileActiveFolderState] = useState<string | null>(null);
-  const [mobileFolderInfoOpen, setMobileFolderInfoOpenState] = useState<boolean>(false);
-  const [mobileActionSheetItem, setMobileActionSheetItem] = useState<SlagItem | null>(null);
-  const [mobileDockTabs, setMobileDockTabsState] = useState<MobileTabId[]>(() => {
-    try {
-      const saved = localStorage.getItem(MOBILE_DOCK_TABS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Ignore
-    }
-    return DEFAULT_MOBILE_DOCK_TABS;
-  });
-
-  const setMobileDockTabs = useCallback((tabs: MobileTabId[]) => {
-    setMobileDockTabsState(tabs);
-    try {
-      localStorage.setItem(MOBILE_DOCK_TABS_KEY, JSON.stringify(tabs));
-    } catch {
-      // Ignore
-    }
-  }, []);
-
-  // Tabs are peers (cross-fade or directional slide), entering a folder is a push, leaving is a pop.
-  // The depth and active tab live in refs so setters stay stable for the dock and Escape.
-  const mobileFolderRef = useRef<string | null>(null);
-  const activeTabRef = useRef<MobileTabId>(initialWorkspace.activeMobileTab || 'folders');
-  useEffect(() => {
-    activeTabRef.current = activeMobileTab;
-  }, [activeMobileTab]);
-
-  const folderDepth = (path: string | null) => (path ? path.split('/').length : 0);
-
-  const setActiveMobileTab = useCallback((next: React.SetStateAction<MobileTabId>) => {
-    const prev = activeTabRef.current;
-    const resolvedNext = typeof next === 'function' ? next(prev) : next;
-    const prevIdx = mobileDockTabs.indexOf(prev);
-    const nextIdx = mobileDockTabs.indexOf(resolvedNext);
-    const kind: ScreenSwap =
-      prevIdx !== -1 && nextIdx !== -1 && prevIdx !== nextIdx
-        ? nextIdx > prevIdx ? 'tab-next' : 'tab-prev'
-        : 'tab';
-
-    swapScreen(kind, () => setActiveMobileTabState(resolvedNext));
-  }, [mobileDockTabs]);
-
-  const setMobileActiveFolder = useCallback((folder: string | null) => {
-    const previous = mobileFolderRef.current;
-    mobileFolderRef.current = folder;
-    // Depth decides the direction: deeper is a push, shallower a pop, and a sibling
-    // folder is a lateral move, not a step back.
-    const previousDepth = previous === null ? 0 : folderDepth(previous);
-    const nextDepth = folder === null ? 0 : folderDepth(folder);
-    const kind: ScreenSwap =
-      folder === null || nextDepth < previousDepth
-        ? 'pop'
-        : previous === null || nextDepth > previousDepth
-          ? 'push'
-          : 'tab';
-    swapScreen(kind, () => {
-      setMobileActiveFolderState(folder);
-      if (folder) {
-        setCurrentFolder(folder);
-      }
-    });
-  }, []);
-
-  const setMobileFolderInfoOpen = useCallback((open: boolean) => {
-    swapScreen(open ? 'push' : 'pop', () => setMobileFolderInfoOpenState(open));
-  }, []);
+  const {
+    isMobile, forceMobileMode, toggleMobileMode,
+    activeMobileTab, setActiveMobileTab,
+    mobileActiveFolder, setMobileActiveFolder,
+    mobileFolderInfoOpen, setMobileFolderInfoOpen,
+    mobileActionSheetItem, setMobileActionSheetItem,
+    mobileDockTabs, setMobileDockTabs, remapMobileFolder,
+  } = useMobileNav(initialWorkspace, setCurrentFolder);
 
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
     try {
@@ -1080,11 +1001,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     // The profile modal and the phone screen point at the old path; follow the move.
     setFolderInfoTarget(previous => remap(previous));
-    setMobileActiveFolderState(previous => remap(previous));
-    mobileFolderRef.current = remap(mobileFolderRef.current);
+    remapMobileFolder(remap);
     refreshData();
     addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
-  }, [currentFolder, refreshData, addToast, setFolderInfoTarget]);
+  }, [currentFolder, refreshData, addToast, setFolderInfoTarget, remapMobileFolder]);
 
   const deleteFolder = (path: string) => {
     if (path === DEFAULT_INBOX_FOLDER) {
