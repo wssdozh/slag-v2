@@ -1,42 +1,53 @@
 # декомпозиция god-файлов по ответственности
 
-- **цель**: каждый файл отвечает за одну причину измениться; в `src/` нет файла >1000 строк, кроме `bip39Words.ts` (данные)
-- **трогаем**: `lib/storage`, `lib/sync`, `context`, `components/Feed/Composer`
-- **не трогаем**: `ItemCard.tsx` (1048 из 1150 — разметка одного вида), `localFallback.ts`
+- **цель**: каждый файл отвечает за одну причину измениться; в `src/` нет файла >1000 строк, кроме `bip39Words.ts` (данные) и осознанно оставленных
 - **готово когда**: `npm run check` зелёный, зоны e2e не хуже замера, `AppContextType` не изменился
 
-## сделано
+## итог по файлам
 
 | файл | было | стало |
 |---|---:|---:|
-| `context/AppContext.tsx` | 1740 | **1242** |
-| `lib/sync/syncEngine.ts` | 1594 | 1553 |
+| `context/AppContext.tsx` | 1740 | **995** |
+| `lib/sync/syncEngine.ts` | 1594 | 1554 |
 | `lib/storage/index.ts` | 1591 | 1366 |
+| `components/Feed/Composer.tsx` | 1211 | 1211 |
 
-вынесено:
+## вынесено из AppContext
 
 | ответственность | модуль | меняется когда |
 |---|---|---|
-| отчёты по хранилищу | `lib/vault/stats.ts` | меняется таксономия |
-| формат обмена (бэкап, obsidian-бандл) | `storage/vaultTransfer.ts` | меняется контракт обмена |
-| байты вложений | `storage/attachments.ts` | меняется хранение медиа |
-| леджеры дедупа синка | `sync/localBookkeeping.ts` | меняются правила «уже отправлено» |
-| поверхности: модалки, лайтбокс, меню, тосты, confirm | `context/hooks/useOverlays.ts` | появляется новая поверхность |
-| мобильная навигация | `context/hooks/useMobileNav.ts` | едет мобильный UX |
-| правила ленты (чистая функция + хук) | `context/feed/feedView.ts`, `context/hooks/useFeedView.ts` | меняются правила показа |
-| бэкап и восстановление | `context/hooks/useBackup.ts` | меняется формат бэкапа |
+| поверхности: модалки, лайтбокс, меню, тосты, `confirm`, шит вложений | `hooks/useOverlays.ts` | появляется новая поверхность |
+| мобильная навигация | `hooks/useMobileNav.ts` | едет мобильный UX |
+| правила ленты (чистая функция) | `context/feed/feedView.ts` | меняются правила показа |
+| настройки ленты + запись | `hooks/useFeedView.ts` | меняются настройки показа |
+| сессия ассистента | `hooks/useAssistant.ts` | меняется протокол чата |
+| бэкап и восстановление | `hooks/useBackup.ts` | меняется формат бэкапа |
+| внешний вид: ширины, плотность, шрифт, акцент | `hooks/useAppearance.ts` | меняется оформление |
+| ночная ротация повторяющихся задач | `hooks/useRecurringRollover.ts` | меняются правила повторов |
 
-проверено по ходу: `feed.spec.ts` 20/20 (после каждой стадии), `mobile.spec.ts` 21/21, `sync_attachment_transfer.spec.ts` 1/1.
+## вынесено из storage и sync
+
+| ответственность | модуль |
+|---|---|
+| отчёты по хранилищу | `lib/vault/stats.ts` |
+| формат обмена | `storage/vaultTransfer.ts` |
+| байты вложений | `storage/attachments.ts` |
+| леджеры дедупа | `sync/localBookkeeping.ts` |
 
 ## осталось
 
-1. `context/AppContext.tsx` (1242): `useAssistant` (чат, `aiSettings`, отправка), `useVault` (CRUD записей и папок), `useAppWiring` (эффекты: персистенс, события `storage`, полночь, хоткеи).
-2. `components/Feed/Composer.tsx` (1212): `useComposerFiles`, `useComposerSubmit`, `useComposerEditing` — логика, разметка остаётся.
-3. `lib/storage/index.ts` (1366): `vaultFiles.ts` (диск, ~450) и `vaultRegistry.ts` (~190).
-4. `lib/sync/syncEngine.ts` (1553): `bundleApplier.ts` с узким `BundleContext` (38 зависимостей → 8–10) и `authConfig.ts`.
+1. `storage/index.ts` (1366): `vaultFiles.ts` — диск, ~450 строк (самый рискованный: запись заметок), `vaultRegistry.ts` — жизнь хранилищ, ~190.
+2. `syncEngine.ts` (1554): `bundleApplier.ts` с узким `BundleContext` (38 зависимостей → 8–10) и `authConfig.ts`.
+3. `Composer.tsx` (1212): `useComposerFiles`, `useComposerSubmit`, `useComposerEditing` — логика, разметка остаётся.
+4. `AppContext` (995): остались CRUD записей и папок (`useVault`) — следующий разрез, но он уже не требует срочности.
+
+## проверки
+
+после каждой стадии: `feed.spec.ts` 20/20 (шесть раз за проход), `mobile.spec.ts` 21/21, `sync_attachment_transfer.spec.ts`, `recurring_streak.spec.ts`, `assistant_layout.spec.ts`. `npm run check` — ноль.
 
 ## заметки
 
-- **`e2e/backup_restore.spec.ts` ненадёжен**: переведён на общий `setupSlag` и широкий таймаут (был свой `goto` на 60 с, который срезала холодная трансляция vite). после этого тест доходит до восстановления и падает на том, что модалка настроек не закрывается по Escape **после** восстановления. без моих правок он падает раньше, на открытии модалки. похоже на настоящий баг слоёв, а не на рефакторинг — проверить отдельно.
-- вынос с обёртками не считается: если после переноса остались приватные форвардеры, файл не стал чище, а call-site'ы надо править.
-- первый спек прогона платит ~80 с за холодную трансляцию vite; бюджет поднят до 120/180 с.
+- **`e2e/backup_restore.spec.ts`**: переведён на общий `setupSlag` и широкий таймаут. после этого доходит до восстановления и падает на том, что модалка настроек не закрывается по Escape **после** восстановления — похоже на настоящий баг слоёв, не на рефакторинг. проверить отдельно.
+- **`e2e/assistant_layout.spec.ts`**: событие `slag:toggle-assistant` отправлялось до монтирования приложения и терялось. теперь ждёт `main`. починено.
+- вынос с обёртками не считается: если после переноса остались приватные форвардеры, файл не стал чище.
+- первый спек прогона платит ~80 с за холодную трансляцию vite; бюджет 120/180 с.

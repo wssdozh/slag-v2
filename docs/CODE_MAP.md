@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **340**, строк: **76874**, зон: **40**.
+Модулей: **343**, строк: **76953**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -13,20 +13,20 @@
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
 | `src/lib/sync/syncEngine.ts` | 1554 | 14 |
-| `src/lib/storage/index.ts` | 1366 | 23 |
-| `src/context/AppContext.tsx` | 1240 | 52 |
+| `src/lib/storage/index.ts` | 1366 | 25 |
 | `src/components/Feed/Composer.tsx` | 1212 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
 | `e2e/slag/views.spec.ts` | 1061 | 0 |
 | `src/lib/ai/localFallback.ts` | 1047 | 1 |
+| `src/context/AppContext.tsx` | 996 | 52 |
 | `src/components/Feed/AssistantChat.tsx` | 995 | 2 |
 | `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
 | `src/components/Modals/SettingsModal.tsx` | 874 | 2 |
 | `e2e/slag/workspace.spec.ts` | 869 | 0 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 
-## e2e (playwright) — 91 файлов, 16904 строк
+## e2e (playwright) — 91 файлов, 16906 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -289,7 +289,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
-| `index.ts` | 7 | 72 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
+| `index.ts` | 7 | 74 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
 | `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
@@ -297,11 +297,11 @@
 | `typography.ts` | 111 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, VISUAL_PRIORITIES, +2 |  |
 | `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES |  |
 
-## src/context — 2 файлов, 1472 строк
+## src/context — 2 файлов, 1228 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 1240 | 52 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
+| `AppContext.tsx` | 996 | 52 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
 | `appContext.types.ts` | 232 | 3 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/context/feed — 1 файлов, 89 строк
@@ -310,14 +310,17 @@
 |---|---:|---:|---|---|
 | `feedView.ts` | 89 | 1 | FeedViewQuery, selectVisibleItems |  |
 
-## src/context/hooks — 4 файлов, 725 строк
+## src/context/hooks — 7 файлов, 1046 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
+| `useAppearance.ts` | 119 | 1 | useAppearance |  |
+| `useAssistant.ts` | 139 | 1 | useAssistant |  |
 | `useBackup.ts` | 145 | 1 | useBackup |  |
 | `useFeedView.ts` | 215 | 1 | useFeedView |  |
 | `useMobileNav.ts` | 130 | 1 | DEFAULT_MOBILE_DOCK_TABS, useMobileNav |  |
 | `useOverlays.ts` | 235 | 1 | useOverlays |  |
+| `useRecurringRollover.ts` | 63 | 1 | useRecurringRollover |  |
 
 ## src/hooks — 9 файлов, 1292 строк
 
@@ -365,7 +368,7 @@
 | `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
 | `folderOpener.ts` | 72 | 4 | OpenFolderResult, openAppFolder |  |
 | `formatBytes.ts` | 7 | 5 | formatBytes |  |
-| `logger.ts` | 648 | 34 | LogListener, logger |  |
+| `logger.ts` | 648 | 35 | LogListener, logger |  |
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
@@ -412,7 +415,7 @@
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData |  |
 | `attachments.ts` | 209 | 1 | AttachmentStore |  |
 | `draftStore.ts` | 248 | 1 | DraftStore |  |
-| `index.ts` | 1366 | 23 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
+| `index.ts` | 1366 | 25 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
 | `indexedDb.ts` | 143 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
 
@@ -444,7 +447,7 @@
 |---|---:|---:|---|---|
 | `calendarLayout.ts` | 120 | 3 | LayoutPositionedTask, computeAntiOverlapLayout |  |
 | `dateUtils.ts` | 126 | 15 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, getTodayIso, getTomorrowIso, +11 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
-| `recurrenceHelper.ts` | 305 | 4 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 |  |
+| `recurrenceHelper.ts` | 305 | 5 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 |  |
 | `todoistTaskParser.ts` | 389 | 9 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +1 |  |
 
 ## src/lib/vault — 9 файлов, 789 строк
@@ -482,5 +485,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 105 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 107 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
