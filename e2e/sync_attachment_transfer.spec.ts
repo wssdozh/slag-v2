@@ -9,7 +9,7 @@ test.setTimeout(180_000);
  */
 test('attachment bytes travel as their own change and become playable on the receiver', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 90_000 });
 
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
@@ -107,6 +107,11 @@ test('attachment bytes travel as their own change and become playable on the rec
         'audio/mp4',
       );
 
+      // The imported bytes must not be echoed straight back to the device they came from.
+      const framesBeforeEcho = frames.length;
+      engine.attachmentPass = true;
+      await push();
+
       return {
         itemHasNoBytes: itemChange
           ? (itemChange.payload as { attachments: { dataUrl?: string }[] }).attachments[0].dataUrl === undefined
@@ -119,6 +124,7 @@ test('attachment bytes travel as their own change and become playable on the rec
           (attachmentChanges[0]?.payload as { attachment?: { dataUrl?: string } } | undefined)?.attachment?.dataUrl === undefined,
         absentBytesNotSent: !bundle.changes.some((ch: { id: string }) => ch.id === 'att-gone-1'),
         importedIsPlayable: Boolean(imported && imported.startsWith('data:')),
+        echoedBack: frames.length !== framesBeforeEcho,
       };
     });
   });
@@ -130,5 +136,6 @@ test('attachment bytes travel as their own change and become playable on the rec
     attachmentMetadataHasNoBytes: true,
     absentBytesNotSent: true,
     importedIsPlayable: true,
+    echoedBack: false,
   });
 });

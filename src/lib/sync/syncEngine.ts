@@ -934,6 +934,11 @@ export class SyncEngine {
           const attachment = payload?.attachment;
           if (attachment?.id && payload?.dataUrl?.startsWith('data:')) {
             await storage.importSyncedAttachment(attachment, payload.dataUrl);
+            // This device now holds the same bytes. Without the mark it would send them right
+            // back to the device it just got them from: a five-megabyte ping-pong, both ways.
+            const sentHashes = this.loadSentHashes();
+            sentHashes[`att:${attachment.id}`] = attachmentSignature(attachment);
+            this.saveSentHashes(sentHashes);
             // The note did not change, but the UI resolves attachment urls per item: reuse the
             // single sync event instead of inventing a second one for bytes.
             hasItemsChanged = true;
@@ -1075,7 +1080,9 @@ export class SyncEngine {
         localStorage.getItem(hashKey) ||
         (!this.usesAccountSync() && this.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
 
-      if (lastSyncedHash === stateHash && pendingOps.length === 0) {
+      // An attachment pass has nothing to do with the note state hash: it must get past the
+      // "nothing changed" gate, or unsent bytes on an otherwise untouched vault never leave.
+      if (!this.attachmentPass && lastSyncedHash === stateHash && pendingOps.length === 0) {
         // Nothing changed
         this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
         this.isProcessingSync = false;
