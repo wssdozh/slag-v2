@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **345**, строк: **77089**, зон: **40**.
+Модулей: **347**, строк: **77113**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -12,7 +12,7 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1554 | 14 |
+| `src/lib/sync/syncEngine.ts` | 1252 | 15 |
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
 | `src/components/Feed/Composer.tsx` | 1094 | 4 |
@@ -21,12 +21,12 @@
 | `src/context/AppContext.tsx` | 996 | 52 |
 | `src/components/Feed/AssistantChat.tsx` | 995 | 2 |
 | `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
-| `src/lib/storage/index.ts` | 967 | 25 |
+| `src/lib/storage/index.ts` | 967 | 26 |
 | `src/components/Modals/SettingsModal.tsx` | 874 | 2 |
 | `e2e/slag/workspace.spec.ts` | 869 | 0 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 
-## e2e (playwright) — 91 файлов, 16906 строк
+## e2e (playwright) — 91 файлов, 16908 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -290,7 +290,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
-| `index.ts` | 7 | 75 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
+| `index.ts` | 7 | 76 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
 | `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
@@ -369,7 +369,7 @@
 | `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
 | `folderOpener.ts` | 72 | 4 | OpenFolderResult, openAppFolder |  |
 | `formatBytes.ts` | 7 | 5 | formatBytes |  |
-| `logger.ts` | 648 | 36 | LogListener, logger |  |
+| `logger.ts` | 648 | 37 | LogListener, logger |  |
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
@@ -416,31 +416,33 @@
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData |  |
 | `attachments.ts` | 209 | 2 | AttachmentStore |  |
 | `draftStore.ts` | 248 | 1 | DraftStore |  |
-| `index.ts` | 967 | 25 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
+| `index.ts` | 967 | 26 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
 | `indexedDb.ts` | 143 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
 | `vaultFiles.ts` | 498 | 1 | VaultFilesDeps, VaultFiles |  |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
 
-## src/lib/sync — 17 файлов, 6034 строк
+## src/lib/sync — 19 файлов, 6056 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `account.ts` | 569 | 14 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 |  |
 | `accountCrypto.ts` | 262 | 5 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +4 |  |
 | `accountTypes.ts` | 90 | 6 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +5 |  |
+| `applyBundle.ts` | 318 | 1 | persistIncomingBundle |  |
+| `attachmentSignature.ts` | 6 | 2 | attachmentSignature |  |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
-| `crypto.ts` | 181 | 8 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 |  |
-| `devices.ts` | 238 | 1 | normalizeTrustedDevice, touchDeviceLastSeen, normalizeTrustedDevicesFromAccount, computeSubscription, createDefaultDeviceName, +8 |  |
+| `crypto.ts` | 181 | 9 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 |  |
+| `devices.ts` | 238 | 2 | normalizeTrustedDevice, touchDeviceLastSeen, normalizeTrustedDevicesFromAccount, computeSubscription, createDefaultDeviceName, +8 |  |
 | `entities/registry.ts` | 35 | 1 | createSyncOpFromStorageEvent |  |
 | `entities/types.ts` | 16 | 2 | SyncEntityKind, SyncAction, SyncOperation |  |
 | `index.ts` | 5 | 1 | * from ./types, * from ./crypto, * from ./pairing, * from ./syncEngine |  |
-| `localBookkeeping.ts` | 80 | 1 | SyncScope, stateHashKey, syncedIdsKey, tombstonesKey, sentHashesKey, +5 |  |
+| `localBookkeeping.ts` | 80 | 2 | SyncScope, stateHashKey, syncedIdsKey, tombstonesKey, sentHashesKey, +5 |  |
 | `outbox/outbox.ts` | 58 | 1 | Outbox |  |
 | `pairing.ts` | 180 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +3 |  |
-| `syncEngine.ts` | 1554 | 14 | SyncEngine, syncEngine, storage, accountClient |  |
+| `syncEngine.ts` | 1252 | 15 | SyncEngine, syncEngine, storage, accountClient |  |
 | `transport.ts` | 212 | 1 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport |  |
 | `twoFactorAuth.ts` | 295 | 1 | TotpConfig, WebAuthnConfig, TwoFactorState, base32Encode, base32Decode, +8 | Two-Factor Authentication (2FA) for Zero-Knowledge Vaults |
-| `types.ts` | 123 | 13 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
+| `types.ts` | 123 | 14 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
 | `vaultSharing.ts` | 84 | 3 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault |  |
 
 ## src/lib/time — 4 файлов, 940 строк
@@ -487,5 +489,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 109 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 111 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
