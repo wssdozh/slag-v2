@@ -7,26 +7,36 @@
 
 ## сделано
 
-| что | куда | было → стало |
+| файл | было | стало |
+|---|---:|---:|
+| `context/AppContext.tsx` | 1740 | **1242** |
+| `lib/sync/syncEngine.ts` | 1594 | 1553 |
+| `lib/storage/index.ts` | 1591 | 1366 |
+
+вынесено:
+
+| ответственность | модуль | меняется когда |
 |---|---|---|
-| `getVaultStats`, `getAllExistingTags` | `lib/vault/stats.ts` | отчёты отделены от персистенса |
-| `exportVaultAsJson`, `importVaultData`, `importVaultFromJson`, `exportObsidianBundle` | `storage/vaultTransfer.ts` | формат обмена отделён от записи на диск |
-| байты вложений: 4 кеша, 8 методов, disk-фоллбеки | `storage/attachments.ts` | `AttachmentStore` |
-| три леджера дедупа: `sentHashes`, `syncedIds`, `tombstones` | `sync/localBookkeeping.ts` | 9 методов → модуль |
-| обёртки-делегаты после выноса | удалены | файл зовёт модуль, а не свой приватный форвардер |
+| отчёты по хранилищу | `lib/vault/stats.ts` | меняется таксономия |
+| формат обмена (бэкап, obsidian-бандл) | `storage/vaultTransfer.ts` | меняется контракт обмена |
+| байты вложений | `storage/attachments.ts` | меняется хранение медиа |
+| леджеры дедупа синка | `sync/localBookkeeping.ts` | меняются правила «уже отправлено» |
+| поверхности: модалки, лайтбокс, меню, тосты, confirm | `context/hooks/useOverlays.ts` | появляется новая поверхность |
+| мобильная навигация | `context/hooks/useMobileNav.ts` | едет мобильный UX |
+| правила ленты (чистая функция + хук) | `context/feed/feedView.ts`, `context/hooks/useFeedView.ts` | меняются правила показа |
+| бэкап и восстановление | `context/hooks/useBackup.ts` | меняется формат бэкапа |
 
-`storage/index.ts` 1591 → 1365, `syncEngine.ts` 1594 → 1553.
-проверено: `npm run check` 0, `feed.spec.ts` + `sync_attachment_transfer.spec.ts` 21/21.
+проверено по ходу: `feed.spec.ts` 20/20 (после каждой стадии), `mobile.spec.ts` 21/21, `sync_attachment_transfer.spec.ts` 1/1.
 
-## осталось, по порядку
+## осталось
 
-1. `storage/index.ts` (1365): `vaultFiles.ts` — раскладка на диске, filename claiming, tauri-fs, скан, flush/remove (~450 строк, самая рискованная часть, трогает запись заметок); `vaultRegistry.ts` — создание/переключение/удаление хранилищ (~190). CRUD записей и индексный кеш остаются вместе: `saveItem` = файл + кеш + событие.
-2. `sync/syncEngine.ts` (1553): `bundleApplier.ts` + `BundleContext` на 8–10 членов (`applyIncomingBundle` трогает 38 членов класса — вот где настоящая работа), `authConfig.ts`.
-3. `components/Feed/Composer.tsx` (1211): `useComposerFiles` (drag&drop, вставка), `useComposerSubmit` (guard от дубля, вложения, авто-отправка), `useComposerEditing` (ввод, слэш-команды).
-4. `context/AppContext.tsx` (1739): `useOverlays` → `useMobileNav` → `useAssistant` → `useFeedView` → `useVault` → `useAppWiring`.
+1. `context/AppContext.tsx` (1242): `useAssistant` (чат, `aiSettings`, отправка), `useVault` (CRUD записей и папок), `useAppWiring` (эффекты: персистенс, события `storage`, полночь, хоткеи).
+2. `components/Feed/Composer.tsx` (1212): `useComposerFiles`, `useComposerSubmit`, `useComposerEditing` — логика, разметка остаётся.
+3. `lib/storage/index.ts` (1366): `vaultFiles.ts` (диск, ~450) и `vaultRegistry.ts` (~190).
+4. `lib/sync/syncEngine.ts` (1553): `bundleApplier.ts` с узким `BundleContext` (38 зависимостей → 8–10) и `authConfig.ts`.
 
-## выученное по ходу
+## заметки
 
-- **вынос с обёртками ничего не даёт**: первый заход в `syncEngine` добавил модуль и оставил 9 приватных форвардеров — файл стал короче на 10 строк. после удаления обёрток и правки call-site'ов стало −42. выносить надо вместе с вызовами.
-- `applyIncomingBundle` (592 строки) не «метод не там лежит», а «класс держит 38 зависимостей»: сначала надо сузить интерфейс, потом переносить.
-- первый спек прогона платит ~80 с за холодную трансляцию vite; бюджет поднят, тесты зелёные.
+- **`e2e/backup_restore.spec.ts` ненадёжен**: переведён на общий `setupSlag` и широкий таймаут (был свой `goto` на 60 с, который срезала холодная трансляция vite). после этого тест доходит до восстановления и падает на том, что модалка настроек не закрывается по Escape **после** восстановления. без моих правок он падает раньше, на открытии модалки. похоже на настоящий баг слоёв, а не на рефакторинг — проверить отдельно.
+- вынос с обёртками не считается: если после переноса остались приватные форвардеры, файл не стал чище, а call-site'ы надо править.
+- первый спек прогона платит ~80 с за холодную трансляцию vite; бюджет поднят до 120/180 с.

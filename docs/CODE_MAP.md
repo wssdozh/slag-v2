@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **337**, строк: **76716**, зон: **39**.
+Модулей: **340**, строк: **76874**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -13,8 +13,8 @@
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
 | `src/lib/sync/syncEngine.ts` | 1554 | 14 |
-| `src/context/AppContext.tsx` | 1532 | 52 |
-| `src/lib/storage/index.ts` | 1366 | 22 |
+| `src/lib/storage/index.ts` | 1366 | 23 |
+| `src/context/AppContext.tsx` | 1240 | 52 |
 | `src/components/Feed/Composer.tsx` | 1212 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
@@ -26,7 +26,7 @@
 | `e2e/slag/workspace.spec.ts` | 869 | 0 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 
-## e2e (playwright) — 91 файлов, 16903 строк
+## e2e (playwright) — 91 файлов, 16904 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -289,7 +289,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
-| `index.ts` | 7 | 69 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
+| `index.ts` | 7 | 72 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
 | `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
@@ -297,17 +297,25 @@
 | `typography.ts` | 111 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, VISUAL_PRIORITIES, +2 |  |
 | `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES |  |
 
-## src/context — 2 файлов, 1764 строк
+## src/context — 2 файлов, 1472 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 1532 | 52 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
+| `AppContext.tsx` | 1240 | 52 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
 | `appContext.types.ts` | 232 | 3 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
-## src/context/hooks — 2 файлов, 365 строк
+## src/context/feed — 1 файлов, 89 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
+| `feedView.ts` | 89 | 1 | FeedViewQuery, selectVisibleItems |  |
+
+## src/context/hooks — 4 файлов, 725 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `useBackup.ts` | 145 | 1 | useBackup |  |
+| `useFeedView.ts` | 215 | 1 | useFeedView |  |
 | `useMobileNav.ts` | 130 | 1 | DEFAULT_MOBILE_DOCK_TABS, useMobileNav |  |
 | `useOverlays.ts` | 235 | 1 | useOverlays |  |
 
@@ -365,7 +373,7 @@
 | `taskCompletion.ts` | 35 | 1 | applyTaskCompletion |  |
 | `taskUtils.ts` | 101 | 10 | parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, PRIORITY_LABELS |  |
 | `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
-| `windowControls.ts` | 444 | 13 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +17 |  |
+| `windowControls.ts` | 444 | 14 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +17 |  |
 
 ## src/lib/ai — 12 файлов, 3777 строк
 
@@ -404,7 +412,7 @@
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData |  |
 | `attachments.ts` | 209 | 1 | AttachmentStore |  |
 | `draftStore.ts` | 248 | 1 | DraftStore |  |
-| `index.ts` | 1366 | 22 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
+| `index.ts` | 1366 | 23 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
 | `indexedDb.ts` | 143 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
 
@@ -474,5 +482,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 101 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 105 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
