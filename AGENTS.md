@@ -15,7 +15,7 @@
 
 ## 2. Сдача
 
-- Всегда: `npm run lint` (0 warnings) и `npm run build`.
+- Всегда: `npm run check` (tsc + 0 warnings линтера, две строки вывода). Перед сдачей — `npm run build`.
 - Трогал `src/components/**` или `src/*.css`: `npx playwright test`, скриншот в `test-results/screenshots/`, показать в ответе `![Результат](<test-results/screenshots/…>)`.
 - Трогал `src-tauri/`: `npm run build:android`. Есть устройство в `adb devices` — поставить, запустить, снять `adb exec-out screencap -p`, проверить `read_image`.
 - Коммит — Conventional Commits на английском, по одной задаче.

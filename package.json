@@ -18,6 +18,7 @@
     "android:run": "adb shell am start -n com.slag.notes/com.slag.notes.MainActivity",
     "android:log": "adb logcat -s RustStdoutStderr:V SLAG:* chromium:I",
     "lint": "oxlint",
+    "check": "tsc -b && oxlint",
     "map:code": "node scripts/gen-code-map.mjs",
     "where": "node scripts/gen-code-map.mjs where",
     "test:e2e": "playwright test",
