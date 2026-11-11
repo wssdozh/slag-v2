@@ -1,0 +1,19 @@
+# ripgrep honours this file. Keeps agent search on the product, not on build noise.
+
+node_modules/
+dist/
+dist-ssr/
+test-results/
+playwright-report/
+coverage/
+.tmp/
+
+# Benchmark corpora are generated, not authored.
+bench/.data/
+bench/out/
+
+# Rust build output.
+src-tauri/target/
+src-tauri/target-*/
+
+*.log
