@@ -3,14 +3,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type {
   ReplyTarget,
   SlagItem,
-  SlagAttachment,
   FolderMeta,
   VaultMeta,
   AiSettings,
   SlagItemType,
-  SlagItemStatus,
   InboxMode,
-  LightboxImage,
   FeedViewMode,
   AiItemFilter,
   ChatMessage,
@@ -22,7 +19,6 @@ import type {
   SortField,
   SortOrder,
   FolderViewSettings,
-  ConfirmOptions,
 } from '../types';
 import { storage } from '../lib/storage';
 import { applyTaskCompletion } from '../lib/taskCompletion';
@@ -37,9 +33,9 @@ import { useIsMobile } from '../hooks/layout/useIsMobile';
 import { useGlobalHotkeys } from '../hooks/useGlobalHotkeys';
 import { useLayerStack, type AppLayer } from '../hooks/useLayerStack';
 import { useSuggestedActions, type ActionHistoryEntry } from '../hooks/useSuggestedActions';
+import { useOverlays } from './hooks/useOverlays';
 import { crossFade, swapScreen, type ScreenSwap } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
-import type { SettingsTabId } from '../config/settingsTabs';
 import {
   STORAGE_KEYS,
   DEFAULT_INBOX_FOLDER,
@@ -62,12 +58,7 @@ import {
 const uiLog = logger.scope('UI');
 const appLog = logger.scope('APP');
 
-import type {
-  AppContextType,
-  AttachSheetRequest,
-  ContextMenuTarget,
-  ToastMessage,
-} from './appContext.types';
+import type { AppContextType } from './appContext.types';
 export type { ToastMessage, AttachSheetRequest, ContextMenuTarget } from './appContext.types';
 
 const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
@@ -176,7 +167,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sortBy, setSortBy] = useState<SortField>(() => initialFolderSetting?.sortBy || initialWorkspace.sortBy || 'createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>(() => initialFolderSetting?.sortOrder || initialWorkspace.sortOrder || 'asc');
   const [hideCompletedTasks, setHideCompletedTasks] = useState<boolean>(() => initialFolderSetting?.hideCompletedTasks ?? initialWorkspace.hideCompletedTasks ?? false);
-  const [isFolderViewModalOpen, setIsFolderViewModalOpen] = useState(false);
   const [aiItemFilter, setAiItemFilter] = useState<AiItemFilter | null>(null);
 
   const togglePinnedOnlyFilter = useCallback(() => {
@@ -217,93 +207,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAiItemFilter(null);
   }, []);
 
-  // Lightbox state
-  const [lightboxImages, setLightboxImages] = useState<LightboxImage[]>([]);
-  const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
+  const {
+    lightboxImages, activeLightboxIndex,
+    openLightbox, closeLightbox, navigateLightbox, updateLightboxImage,
+    isFullscreenEditorOpen, setIsFullscreenEditorOpen,
+    isSearchOpen, setIsSearchOpen, isSettingsOpen, setIsSettingsOpen,
+    settingsTab, setSettingsTab, openSettingsModal, isLogViewerOpen, setIsLogViewerOpen,
+    isFolderModalOpen, setIsFolderModalOpen, folderModalParent, setFolderModalParent,
+    isFolderInfoModalOpen, setIsFolderInfoModalOpen, folderInfoTarget, setFolderInfoTarget,
+    isFolderViewModalOpen, setIsFolderViewModalOpen,
+    openFolderInfoModal, closeFolderInfoModal,
+    isVaultModalOpen, setIsVaultModalOpen, openVaultModal, closeVaultModal,
+    isTriageModalOpen, setIsTriageModalOpen,
+    isComposerModalOpen, setIsComposerModalOpen, composerModalOptions, setComposerModalOptions,
+    openComposerModal, closeComposerModal,
+    contextMenu, openContextMenu, closeContextMenu,
+    toasts, addToast, removeToast, confirmRequest, resolveConfirm, confirmAction,
+    attachSheet, openAttachSheet, closeAttachSheet,
+  } = useOverlays(currentFolder, initialWorkspace);
 
-  const openLightbox = useCallback((images: LightboxImage[], index: number = 0) => {
-    setLightboxImages(images);
-    setActiveLightboxIndex(index);
-  }, []);
-
-  const closeLightbox = useCallback(() => {
-    setActiveLightboxIndex(null);
-    setLightboxImages([]);
-  }, []);
-
-  const navigateLightbox = useCallback((newIndex: number) => {
-    setActiveLightboxIndex(newIndex);
-  }, []);
-
-  const updateLightboxImage = useCallback((id: string, updates: Partial<LightboxImage>) => {
-    setLightboxImages(prev => prev.map(img => img.id === id ? { ...img, ...updates } : img));
-  }, []);
-  
-  const [isFullscreenEditorOpen, setIsFullscreenEditorOpen] = useState<boolean>(() => {
-    const fsState = initialWorkspace.fullscreenEditorState;
-    if (fsState?.isOpen && fsState.itemId) {
-      const rawItems = storage.getItems();
-      return rawItems.some(it => it.id === fsState.itemId) || fsState.itemId.startsWith('draft_');
-    }
-    return false;
-  });
-  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [settingsTab, setSettingsTab] = useState<SettingsTabId>('account');
-
-  const openSettingsModal = useCallback((tab?: SettingsTabId) => {
-    if (tab) setSettingsTab(tab);
-    setIsSettingsOpen(true);
-  }, []);
-
-  const [isLogViewerOpen, setIsLogViewerOpen] = useState<boolean>(false);
-  const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
-  const [folderModalParent, setFolderModalParent] = useState<string | null>(null);
-  const [isFolderInfoModalOpen, setIsFolderInfoModalOpen] = useState<boolean>(false);
-  const [folderInfoTarget, setFolderInfoTarget] = useState<string | null>(null);
-
-  const openFolderInfoModal = useCallback((folderPath?: string) => {
-    setFolderInfoTarget(folderPath || currentFolder);
-    setIsFolderInfoModalOpen(true);
-  }, [currentFolder]);
-
-  const closeFolderInfoModal = useCallback(() => {
-    setIsFolderInfoModalOpen(false);
-    setFolderInfoTarget(null);
-  }, []);
-  const [isVaultModalOpen, setIsVaultModalOpen] = useState<boolean>(false);
-  const openVaultModal = useCallback(() => {
-    setIsVaultModalOpen(true);
-  }, []);
-  const closeVaultModal = useCallback(() => {
-    setIsVaultModalOpen(false);
-  }, []);
-  const [isTriageModalOpen, setIsTriageModalOpen] = useState<boolean>(false);
-  const [isComposerModalOpen, setIsComposerModalOpen] = useState<boolean>(false);
-  const [composerModalOptions, setComposerModalOptions] = useState<{
-    type?: SlagItemType;
-    status?: SlagItemStatus;
-    folder?: string;
-    dueDate?: string;
-    reminder?: string;
-  } | null>(null);
-
-  const openComposerModal = useCallback((options?: {
-    type?: SlagItemType;
-    status?: SlagItemStatus;
-    folder?: string;
-    dueDate?: string;
-    reminder?: string;
-  }) => {
-    setComposerModalOptions(options || null);
-    setIsComposerModalOpen(true);
-  }, []);
-
-  const closeComposerModal = useCallback(() => {
-    setIsComposerModalOpen(false);
-    setComposerModalOptions(null);
-  }, []);
-  const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
 
@@ -415,34 +337,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     swapScreen(open ? 'push' : 'pop', () => setMobileFolderInfoOpenState(open));
   }, []);
 
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  // One pending question at a time. The resolver lives in a ref so a re-render cannot drop it.
-  const [confirmRequest, setConfirmRequest] = useState<ConfirmOptions | null>(null);
-  const confirmResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
-
-  const resolveConfirm = useCallback((confirmed: boolean) => {
-    const resolve = confirmResolverRef.current;
-    confirmResolverRef.current = null;
-    setConfirmRequest(null);
-    resolve?.(confirmed);
-  }, []);
-
-  const confirmAction = useCallback((options: ConfirmOptions) => {
-    // A second question replaces the first: answering the stale one would answer the wrong thing.
-    confirmResolverRef.current?.(false);
-    return new Promise<boolean>((resolve) => {
-      confirmResolverRef.current = resolve;
-      setConfirmRequest(options);
-    });
-  }, []);
-
-  const [attachSheet, setAttachSheet] = useState<AttachSheetRequest | null>(null);
-  const openAttachSheet = useCallback((onAdd: (attachments: SlagAttachment[]) => void) => {
-    setAttachSheet({ onAdd });
-  }, []);
-  const closeAttachSheet = useCallback(() => setAttachSheet(null), []);
-
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
     try {
       const saved = localStorage.getItem(AI_SETTINGS_KEY);
@@ -509,16 +403,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Action History Stack for Undo capability (up to 20 snapshots)
   const actionHistoryRef = useRef<ActionHistoryEntry[]>([]);
 
-  const addToast = useCallback((
-    text: string,
-    type: 'info' | 'success' | 'error' = 'info',
-    action?: ToastMessage['action']
-  ) => {
-    const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
-    setToasts(prev => [...prev.slice(-2), { id, text, type, action }]);
-    logger.log(type === 'error' ? 'error' : 'info', 'UI', `Toast: ${text}`);
-  }, []);
-
   const undoLastAction = useCallback((): boolean => {
     const last = actionHistoryRef.current.pop();
     if (!last || last.itemSnapshots.length === 0) {
@@ -532,10 +416,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast(`Действие «${last.description}» отменено`, 'info');
     return true;
   }, [addToast]);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
 
   const refreshData = useCallback(() => {
     setVault(storage.getCurrentVault());
@@ -747,14 +627,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('storage', handleStorage);
   }, [refreshData]);
 
-  const openContextMenu = useCallback((target: ContextMenuTarget) => {
-    setContextMenu(target);
-  }, []);
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
-
   const layers: AppLayer[] = [
     // Topmost: it can be asked above any dialog, and Esc must answer it, not close what is behind.
     { isOpen: confirmRequest !== null, close: () => resolveConfirm(false) },
@@ -962,7 +834,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       folder: folder || DEFAULT_INBOX_FOLDER, tags: [], attachments: [], createdAt: now, updatedAt: now,
     });
     setIsFullscreenEditorOpen(true);
-  }, []);
+  }, [setIsFullscreenEditorOpen]);
 
   const updateItem = useCallback((item: SlagItem) => {
     const previous = storage.getItems().find(existing => existing.id === item.id);
@@ -1212,7 +1084,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mobileFolderRef.current = remap(mobileFolderRef.current);
     refreshData();
     addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
-  }, [currentFolder, refreshData, addToast]);
+  }, [currentFolder, refreshData, addToast, setFolderInfoTarget]);
 
   const deleteFolder = (path: string) => {
     if (path === DEFAULT_INBOX_FOLDER) {
@@ -1321,11 +1193,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const openFolderViewModal = useCallback(() => {
     setIsFolderViewModalOpen(true);
-  }, []);
+  }, [setIsFolderViewModalOpen]);
 
   const closeFolderViewModal = useCallback(() => {
     setIsFolderViewModalOpen(false);
-  }, []);
+  }, [setIsFolderViewModalOpen]);
 
   const updateCurrentFolderViewSettings = useCallback(
     (partial: Partial<FolderViewSettings>) => {
