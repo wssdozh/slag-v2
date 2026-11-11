@@ -4,22 +4,22 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **332**, строк: **76420**, зон: **38**.
+Модулей: **333**, строк: **76446**, зон: **38**.
 
 ## Самые длинные файлы
 
 | файл | строк | импортят |
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
-| `src/context/AppContext.tsx` | 1933 | 53 |
+| `src/context/AppContext.tsx` | 1740 | 53 |
 | `src/lib/sync/syncEngine.ts` | 1595 | 14 |
 | `src/lib/storage/index.ts` | 1592 | 21 |
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
-| `src/lib/ai/orchestrator.ts` | 1459 | 1 |
 | `src/components/Feed/Composer.tsx` | 1212 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
 | `e2e/slag/views.spec.ts` | 1061 | 0 |
+| `src/lib/ai/localFallback.ts` | 1047 | 1 |
 | `src/components/Feed/AssistantChat.tsx` | 995 | 2 |
 | `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
 | `src/components/Modals/SettingsModal.tsx` | 874 | 2 |
@@ -292,17 +292,18 @@
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
 | `index.ts` | 7 | 66 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
-| `settingsTabs.ts` | 33 | 3 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
+| `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
 | `sync.ts` | 44 | 1 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 |  |
 | `typography.ts` | 111 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, VISUAL_PRIORITIES, +2 |  |
 | `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES |  |
 
-## src/context — 1 файлов, 1933 строк
+## src/context — 2 файлов, 1972 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 1933 | 53 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContext, AppProvider, +1 | oxlint-disable react/only-export-components |
+| `AppContext.tsx` | 1740 | 53 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
+| `appContext.types.ts` | 232 | 2 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/hooks — 9 файлов, 1292 строк
 
@@ -339,12 +340,11 @@
 | `useIsMobile.ts` | 35 | 2 | useIsMobile |  |
 | `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight |  |
 
-## src/lib — 18 файлов, 3514 строк
+## src/lib — 17 файлов, 3488 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `aiService.ts` | 428 | 6 | CategorizeResult, TriageSuggestion, TriageProgress, TriageProgressCallback, categorizeDraft, +4 |  |
-| `autostart.ts` | 26 | 0 | isAutostartEnabled, setAutostart |  |
 | `backupService.ts` | 605 | 1 | SlagManifest, BackupService, backupService, DEFAULT_BACKUP_SETTINGS |  |
 | `chatMarkdown.ts` | 71 | 1 | ChatSegment, splitTaskBlocks |  |
 | `commands.ts` | 279 | 3 | CommandCategory, AppCommandContext, AppCommand, isMac, formatShortcut, +3 | ponytail: central command & hotkey engine for SLAG v2 without external depend… |
@@ -362,7 +362,7 @@
 | `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
 | `windowControls.ts` | 444 | 12 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +17 |  |
 
-## src/lib/ai — 11 файлов, 3764 строк
+## src/lib/ai — 12 файлов, 3777 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -372,11 +372,12 @@
 | `adapters/openAiResponsesAdapter.ts` | 219 | 1 | OpenAiResponsesAdapter |  |
 | `aiClient.ts` | 231 | 2 | AiResolvedTarget, PromptRequest, PromptResult, resolveKieEndpoint, resolveAiTarget, +4 |  |
 | `appGuide.ts` | 243 | 2 | APP_GUIDE_TOPICS, AppGuideTopic, getAppGuideContent | ponytail: curated topic catalog for in-app assistant UI navigation & feature … |
-| `orchestrator.ts` | 1459 | 1 | SendAssistantChatParams, SendAssistantChatResult, AssistantOrchestrator, assistantOrchestrator, resolveKieEndpoint, +3 |  |
+| `localFallback.ts` | 1047 | 1 | LocalFallbackParams, runLocalFallbackAgent | Offline intent chain: what the assistant does without an API key. |
+| `orchestrator.ts` | 405 | 1 | AssistantOrchestrator, assistantOrchestrator, resolveKieEndpoint, resolveAiTarget, extractActionBlock, +3 |  |
 | `prompt.ts` | 156 | 1 | buildSystemPrompt |  |
 | `toolDefinitions.ts` | 171 | 1 | getCanonicalTools |  |
 | `tools.ts` | 441 | 1 | createLocalToolExecutor |  |
-| `types.ts` | 61 | 6 | AssistantToolDefinition, ExecutedToolCall, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, +1 |  |
+| `types.ts` | 81 | 8 | AssistantToolDefinition, ExecutedToolCall, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, +3 |  |
 
 ## src/lib/media — 8 файлов, 1621 строк
 
@@ -464,5 +465,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 94 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 97 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
