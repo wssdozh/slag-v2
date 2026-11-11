@@ -118,8 +118,11 @@ export async function querySearch(
   }
 
   // A query that lands while the index is being built/synced waits for it instead of
-  // returning stale (or empty) results for the note the user just saved.
+  // returning stale (or empty) results for the note the user just saved. The index is
+  // built lazily, and ⌘K was its only trigger — the materials dock and the assistant
+  // tool searched an empty index until someone happened to open the search modal.
   if (buildPromise) await buildPromise;
+  else if (!dbInstance) await initSearchIndex(allItems);
   if (!dbInstance) return [];
 
   const started = performance.now();

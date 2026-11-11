@@ -22,6 +22,9 @@ export async function setupSlag(page: Page, testInfo: TestInfo) {
       localStorage.setItem('slag_ai_settings_v2', JSON.stringify({ sourceMode: 'byok' }));
     });
   }
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+  // `domcontentloaded` waits for the whole dev module graph to execute — seven
+  // hundred untransformed modules on a cold Vite cache. We do not care about that
+  // event, only that the app mounted.
+  await page.goto('/', { waitUntil: 'commit' });
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 60000 });
 }

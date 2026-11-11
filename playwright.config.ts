@@ -8,7 +8,9 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 45000,
+  // The first page load after a dependency change pays Vite's cold prebundle
+  // (~45s on this machine); every later load is 2s. 45s cut that first load off.
+  timeout: 90000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,

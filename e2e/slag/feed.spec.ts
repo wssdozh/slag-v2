@@ -501,6 +501,10 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
   });
 
   test('13. Assistant Feed Filtering with AI Chip', async ({ page }) => {
+    // The chip only appears for two or more matches, and the whole vault holds two
+    // demo records about design — so stay in the inbox scope, do not pick a folder.
+    await expect(page.locator('header')).toContainText('Входящие');
+
     // Switch to Assistant tab
     const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
     await assistantTab.click();
@@ -537,6 +541,9 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
 
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
+
+    // Settings opens on the account tab; the AI controls live behind their own tab.
+    await settingsModal.locator('button', { hasText: 'ИИ & Провайдеры' }).first().click();
 
     await settingsModal.locator('[data-testid="ai-source-mode"]').click();
     await page.locator('[data-testid="ai-source-byok"]').click();
@@ -637,6 +644,11 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
   });
 
   test('17. Linear-style Kanban Board with Inline Task Button and Orama Materials Search', async ({ page }) => {
+    // Materials dock lists the current folder only, and the demo article lives in
+    // База знаний — the kanban has to be opened there.
+    await page.locator('aside span', { hasText: 'База знаний' }).first().click();
+    await expect(page.locator('header')).toContainText('База знаний');
+
     // 1. Switch to Kanban view in header
     await switchToView(page, 'kanban');
 
