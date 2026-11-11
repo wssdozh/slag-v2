@@ -51,6 +51,8 @@ export type StorageChangeEvent =
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
 
 const fsLog = logger.scope('FS');
+/** Attachment bytes: which file was asked for, and where the answer came from. */
+const mediaLog = logger.scope('MEDIA');
 
 const VAULTS_KEY = STORAGE_KEYS.VAULTS;
 const CURRENT_VAULT_KEY = STORAGE_KEYS.CURRENT_VAULT;
@@ -132,15 +134,22 @@ export class StorageService {
           const bytes = await readFile(path, { baseDir: BaseDirectory.AppData });
           const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mimeType || 'application/octet-stream' }));
           this.attachmentUrlCache.set(id, url);
+          mediaLog.debug(`Attachment url from disk: ${path.split('/').pop()} (${Math.round(bytes.length / 1024)} KB)`);
           return url;
         }
       } catch (err) {
-        fsLog.warn(`Failed to read attachment ${id} from disk`, err);
+        mediaLog.warn(`Failed to read attachment ${id} from disk`, err);
       }
     }
 
     const stored = await idbGetAttachment(id);
-    return stored?.dataUrl;
+    if (stored?.dataUrl) {
+      mediaLog.debug(`Attachment url from IndexedDB: ${id} (${Math.round(stored.dataUrl.length / 1024)} KB base64)`);
+      return stored.dataUrl;
+    }
+    // The answer that used to be silent: nothing on this device can play this attachment.
+    mediaLog.warn(`Attachment bytes are not on this device: ${relativePath} (${mimeType || 'unknown mime'})`);
+    return undefined;
   }
 
   /**
@@ -150,17 +159,22 @@ export class StorageService {
   public async getAttachmentDataUrl(att: SlagAttachment): Promise<string | undefined> {
     const url = await this.getAttachmentUrl(att.id, att.relativePath, att.mimeType);
     if (!url) return undefined;
-    if (url.startsWith('data:')) return url;
+    if (url.startsWith('data:')) {
+      mediaLog.debug(`Attachment ready to sync as base64: ${att.name}`);
+      return url;
+    }
     try {
       const blob = await (await fetch(url)).blob();
-      return await new Promise<string>((resolve, reject) => {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(blob);
       });
+      mediaLog.debug(`Attachment ready to sync: ${att.name} (${Math.round(dataUrl.length / 1024)} KB base64)`);
+      return dataUrl;
     } catch (err) {
-      fsLog.warn(`Failed to read attachment bytes ${att.id}`, err);
+      mediaLog.warn(`Failed to read attachment bytes ${att.id}`, err);
       return undefined;
     }
   }
@@ -202,7 +216,9 @@ export class StorageService {
     this.attachmentNameIndex = null;
     await idbSaveAttachment({ ...attachment, dataUrl });
     await this.persistAttachmentFile({ ...attachment, dataUrl });
-    fsLog.info(`Imported synced attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB)`);
+    mediaLog.info(
+      `Imported synced attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB, ${attachment.mimeType})`
+    );
   }
 
   /** A note keeps attachment ids; the bytes belong in IndexedDB, once per attachment. */

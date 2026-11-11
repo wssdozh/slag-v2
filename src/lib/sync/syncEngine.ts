@@ -111,6 +111,8 @@ export class SyncEngine {
   private attachmentPass = false;
   /** Set when the relay refuses a bundle for quota: attachments wait for a restart. */
   private attachmentSyncBlocked = false;
+  /** Attachments with no bytes on this device, so every push does not re-stat the same files. */
+  private unreadableAttachments = new Set<string>();
   private entityHashes = new Map<string, { sig: string; hash: string }>();
   private transport: SyncTransport;
 
@@ -277,18 +279,34 @@ export class SyncEngine {
    * photo never rides inside a keystroke bundle. The pass is a one-shot flag the push consumes.
    */
   private scheduleAttachmentPass(): void {
-    if (this.attachmentSyncBlocked || !this.hasPendingAttachment()) return;
+    // init and every confirmed push both call this: one queued pass is enough for both.
+    if (this.attachmentPass) return;
+    if (this.attachmentSyncBlocked) {
+      syncLog.debug('Attachment pass skipped: relay refused the plan quota for this session');
+      return;
+    }
+    const pending = this.countPendingAttachments();
+    if (pending === 0) {
+      syncLog.debug('Attachment pass skipped: nothing left to deliver');
+      return;
+    }
+    syncLog.info(`Attachment pass queued: ${pending} file(s) not delivered yet`);
     this.attachmentPass = true;
     this.scheduleDebouncedPush(0);
   }
 
   /** Signature comparison only: no bytes are read to answer "is anything left to send". */
-  private hasPendingAttachment(): boolean {
+  private countPendingAttachments(): number {
     const sent = this.loadSentHashes();
-    return storage.getItems().some((item) => (item.attachments ?? []).some((att) => {
-      const seen = sent[`att:${att.id}`];
-      return seen !== attachmentSignature(att) && seen !== `skip:${attachmentSignature(att)}`;
-    }));
+    let pending = 0;
+    for (const item of storage.getItems()) {
+      for (const att of item.attachments ?? []) {
+        if (this.unreadableAttachments.has(att.id)) continue;
+        const seen = sent[`att:${att.id}`];
+        if (seen !== attachmentSignature(att) && seen !== `skip:${attachmentSignature(att)}`) pending++;
+      }
+    }
+    return pending;
   }
 
   /** Bytes of one attachment as a `dataUrl` change; true as soon as one was packed. */
@@ -302,16 +320,28 @@ export class SyncEngine {
       const key = `att:${att.id}`;
       const sig = attachmentSignature(att);
       const seen = sentHashes[key];
-      if (seen === sig || seen === `skip:${sig}`) continue;
+      if (seen === sig) continue;
+      if (seen === `skip:${sig}`) {
+        syncLog.debug(`Attachment already marked unsyncable: "${att.name}" (${att.size} B)`);
+        continue;
+      }
 
+      syncLog.debug(`Reading attachment bytes: "${att.name}" (${Math.round(att.size / 1024)} KB, ${att.mimeType})`);
       const dataUrl = await storage.getAttachmentDataUrl(att);
-      if (!dataUrl) continue;
+      if (!dataUrl) {
+        // Bytes can appear later (a download, a re-import), so this rests for the session only.
+        this.unreadableAttachments.add(att.id);
+        syncLog.warn(`Attachment has no local bytes, nothing to send: "${att.name}" (${att.relativePath})`);
+        continue;
+      }
       if (dataUrl.length > SYNC_ATTACHMENT_MAX_BYTES * 1.4) {
         // No new state for "give up": a marker in the sent-hashes map is already understood by
         // every reader of it, while a second set would have to be loaded, cleared and migrated.
         sentHashes[key] = `skip:${sig}`;
         this.saveSentHashes(sentHashes);
-        syncLog.info(`Attachment too big to sync: "${att.name}" (${att.size} B)`);
+        syncLog.warn(
+          `Attachment too big to sync: "${att.name}" (${Math.round(att.size / 1024)} KB > ${SYNC_ATTACHMENT_MAX_BYTES / 1024 / 1024} MB)`
+        );
         continue;
       }
       changes.push({
@@ -323,6 +353,9 @@ export class SyncEngine {
         payload: { attachment: { ...att, dataUrl: undefined }, dataUrl },
       });
       packedHashes[key] = sig;
+      syncLog.info(
+        `Attachment packed: "${att.name}" (${Math.round(att.size / 1024)} KB, ${Math.round(dataUrl.length / 1024)} KB as base64)`
+      );
       return true;
     }
     return false;
@@ -933,6 +966,9 @@ export class SyncEngine {
           const payload = ch.payload as { attachment?: SlagAttachment; dataUrl?: string } | undefined;
           const attachment = payload?.attachment;
           if (attachment?.id && payload?.dataUrl?.startsWith('data:')) {
+            syncLog.info(
+              `Received attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB, ${attachment.mimeType}) from ${bundle.fromDeviceId}`
+            );
             await storage.importSyncedAttachment(attachment, payload.dataUrl);
             // This device now holds the same bytes. Without the mark it would send them right
             // back to the device it just got them from: a five-megabyte ping-pong, both ways.
@@ -942,6 +978,8 @@ export class SyncEngine {
             // The note did not change, but the UI resolves attachment urls per item: reuse the
             // single sync event instead of inventing a second one for bytes.
             hasItemsChanged = true;
+          } else {
+            syncLog.warn(`Ignored attachment change without usable bytes: ${ch.id}`);
           }
         } else if (ch.type === 'workspace' && ch.payload) {
           workspaceState = ch.payload as WorkspaceState;
@@ -1163,9 +1201,14 @@ export class SyncEngine {
       // its hash here and the bytes are pushed again.
       if (this.attachmentPass) {
         this.attachmentPass = false;
+        let packedOne = false;
         for (const item of items) {
-          if (await this.packOneAttachment(item, changes, sentHashes, packedHashes)) break;
+          if (await this.packOneAttachment(item, changes, sentHashes, packedHashes)) {
+            packedOne = true;
+            break;
+          }
         }
+        if (!packedOne) syncLog.warn('Attachment pass found nothing it could read; files stay local');
       }
 
       // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.

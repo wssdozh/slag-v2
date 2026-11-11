@@ -31,9 +31,11 @@ import { AudioCoverArt } from './AudioCoverArt';
 import { AudioPlaylistDrawer } from './AudioPlaylistDrawer';
 import { useAudioAnalyser } from '../../hooks/useAudioAnalyser';
 import { storage } from '../../lib/storage';
+import { logger } from '../../lib/logger';
 import { Select } from '../UI/Select';
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;
+const mediaLog = logger.scope('MEDIA');
 
 export const AudioPanel: React.FC = () => {
   const { items, folders, currentFolder, inboxMode, scrollToItem, isMobile } = useApp();
@@ -60,6 +62,7 @@ export const AudioPanel: React.FC = () => {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const resolveSummaryRef = useRef<string>('');
   const analyser = useAudioAnalyser(audioRef);
 
   // Effective folder based on mode
@@ -91,6 +94,14 @@ export const AudioPanel: React.FC = () => {
       if (!active) return;
       const next: Record<string, string | null> = {};
       for (const [id, url] of pairs) next[id] = url ?? null;
+      const unresolved = pairs.filter(([, url]) => !url).map(([id]) => id);
+      const summary = `${pairs.length - unresolved.length}/${pairs.length}${unresolved.length ? ` missing ${unresolved.join(',')}` : ''}`;
+      // The effect re-runs whenever the items array identity changes; log the outcome, not a tick.
+      if (summary !== resolveSummaryRef.current) {
+        resolveSummaryRef.current = summary;
+        if (unresolved.length > 0) mediaLog.warn(`Playlist has unplayable tracks: ${summary}`);
+        else mediaLog.debug(`Playlist urls resolved: ${summary} playable`);
+      }
       setResolvedSrcs(prev => ({ ...prev, ...next }));
     });
     return () => {
@@ -108,6 +119,7 @@ export const AudioPanel: React.FC = () => {
   const isShuffleRef = useRef(isShuffle);
   const tracksLengthRef = useRef(tracks.length);
   const safeIndexRef = useRef(safeTrackIndex);
+  const currentTrackNameRef = useRef<string | null>(null);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -115,7 +127,8 @@ export const AudioPanel: React.FC = () => {
     isShuffleRef.current = isShuffle;
     tracksLengthRef.current = tracks.length;
     safeIndexRef.current = safeTrackIndex;
-  }, [isPlaying, isLoop, isShuffle, tracks.length, safeTrackIndex]);
+    currentTrackNameRef.current = currentTrack?.name ?? null;
+  }, [isPlaying, isLoop, isShuffle, tracks.length, safeTrackIndex, currentTrack?.name]);
 
   // Sync playback rate and volume
   useEffect(() => {
@@ -135,15 +148,20 @@ export const AudioPanel: React.FC = () => {
     if (!audio) return;
 
     if (trackUrl) {
+      const kind = trackUrl.startsWith('data:') ? 'base64' : trackUrl.startsWith('blob:') ? 'file' : 'url';
+      mediaLog.info(`Track loaded: "${currentTrack?.name}" from ${kind} (${currentTrack?.mimeType || 'no mime'})`);
       audio.src = trackUrl;
       if (isPlayingRef.current) {
-        audio.play().catch(() => {});
+        audio.play().catch((err: unknown) => {
+          mediaLog.warn(`Resume after track change was refused: ${err instanceof Error ? err.name : String(err)}`);
+        });
       }
     } else {
+      mediaLog.debug(`Track has no source yet: "${currentTrack?.name ?? 'none'}"`);
       audio.pause();
       audio.removeAttribute('src');
     }
-  }, [trackId, trackUrl]);
+  }, [trackId, trackUrl, currentTrack?.name, currentTrack?.mimeType]);
 
   // Audio events binding
   useEffect(() => {
@@ -157,11 +175,23 @@ export const AudioPanel: React.FC = () => {
     };
 
     const onLoadedMetadata = () => {
+      mediaLog.info(
+        `Metadata: duration ${Number.isFinite(audio.duration) ? audio.duration.toFixed(1) : '?'}s, src ${audio.currentSrc.split(':')[0] || 'none'}`
+      );
       if (audio.duration && isFinite(audio.duration)) {
         setDuration(audio.duration);
       } else if (currentTrack?.duration) {
         setDuration(currentTrack.duration);
       }
+    };
+
+    // The error that used to vanish: a src that cannot decode, or bytes that never arrived.
+    const onError = () => {
+      const code = audio.error?.code;
+      mediaLog.error(
+        `Audio element error ${code ?? '?'}: "${currentTrackNameRef.current}" (${audio.error?.message || 'no message'})`,
+        { src: audio.currentSrc.slice(0, 60), networkState: audio.networkState, readyState: audio.readyState }
+      );
     };
 
     const onEnded = () => {
@@ -183,11 +213,18 @@ export const AudioPanel: React.FC = () => {
       }
     };
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      mediaLog.info(`Play: "${currentTrackNameRef.current}"`);
+      setIsPlaying(true);
+    };
+    const onPause = () => {
+      mediaLog.debug(`Pause: "${currentTrackNameRef.current}"`);
+      setIsPlaying(false);
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('error', onError);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
@@ -195,6 +232,7 @@ export const AudioPanel: React.FC = () => {
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('error', onError);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
@@ -203,11 +241,16 @@ export const AudioPanel: React.FC = () => {
 
   // Toggle playback
   const togglePlay = () => {
-    if (!audioRef.current || !currentTrack || trackMissing) return;
+    if (!audioRef.current || !currentTrack || trackMissing) {
+      if (trackMissing) mediaLog.warn(`Play refused, bytes are not on this device: "${currentTrack?.name}"`);
+      return;
+    }
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch((err: unknown) => {
+        mediaLog.warn(`Play was refused: ${err instanceof Error ? err.name : String(err)} ("${currentTrack?.name}")`);
+      });
     }
   };
 

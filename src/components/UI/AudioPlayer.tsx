@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { formatAudioDuration, audioTrackLabel } from '../../lib/media/audioHelper';
+import { logger } from '../../lib/logger';
+
+const mediaLog = logger.scope('MEDIA');
 
 
 const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
@@ -91,11 +94,21 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       setCurrentTime(0);
     };
     // The element is the truth: another player may start and pause this one behind our back.
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      mediaLog.info(`Row playing: "${name || 'audio'}"`);
+      setIsPlaying(true);
+    };
     const onPause = () => setIsPlaying(false);
+    const onError = () => {
+      mediaLog.error(
+        `Row audio error ${audio.error?.code ?? '?'}: "${name || 'audio'}" (${audio.error?.message || 'no message'})`,
+        { src: audio.currentSrc.slice(0, 60) }
+      );
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('error', onError);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
@@ -103,11 +116,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('error', onError);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
     };
-  }, [isScrubbing]);
+  }, [isScrubbing, name]);
 
   const currentDur = duration > 0 ? duration : (initialDuration || 0);
   const progressPercent = currentDur > 0 ? (currentTime / currentDur) * 100 : 0;
@@ -117,12 +131,17 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!audioRef.current || !src) return;
+    if (!audioRef.current || !src) {
+      if (!src) mediaLog.warn(`Row play refused, bytes are not on this device: "${name || 'audio'}"`);
+      return;
+    }
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      audioRef.current.play().then(() => setIsPlaying(true)).catch((err: unknown) => {
+        mediaLog.warn(`Row play was refused: ${err instanceof Error ? err.name : String(err)} ("${name || 'audio'}")`);
+      });
     }
   };
 
