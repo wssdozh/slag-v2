@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **331**, строк: **76339**, зон: **38**.
+Модулей: **331**, строк: **76357**, зон: **38**.
 
 ## Самые длинные файлы
 
@@ -26,7 +26,7 @@
 | `e2e/slag/workspace.spec.ts` | 869 | 0 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 
-## e2e (playwright) — 91 файлов, 16887 строк
+## e2e (playwright) — 91 файлов, 16902 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -34,7 +34,7 @@
 - `e2e/slag/views.spec.ts` — 1061
 - `e2e/slag/workspace.spec.ts` — 869
 - `e2e/mobile.spec.ts` — 868
-- `e2e/slag/feed.spec.ts` — 790
+- `e2e/slag/feed.spec.ts` — 802
 - `e2e/admin_panel.spec.ts` — 491
 - `e2e/motion.spec.ts` — 443
 - `e2e/slag/feed_thumbs.spec.ts` — 351
@@ -339,7 +339,7 @@
 | `useIsMobile.ts` | 35 | 2 | useIsMobile |  |
 | `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight |  |
 
-## src/lib — 16 файлов, 3444 строк
+## src/lib — 16 файлов, 3447 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -354,7 +354,7 @@
 | `motion.ts` | 195 | 8 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
-| `searchService.ts` | 172 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
+| `searchService.ts` | 175 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
 | `taskCompletion.ts` | 35 | 1 | applyTaskCompletion |  |
 | `taskUtils.ts` | 101 | 10 | parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, PRIORITY_LABELS |  |
 | `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
