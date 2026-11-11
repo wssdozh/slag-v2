@@ -79,6 +79,52 @@ function purposeOf(source) {
 // --- collect ---------------------------------------------------------------
 
 const files = [...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'e2e'))].sort();
+
+// --- where <symbol> ---------------------------------------------------------
+// Same walk, no index file: 331 files parse in well under a second, and a cache
+// would only go stale.
+
+const DEFINITION = /^\s*export\s+(?:default\s+)?(?:async\s+)?(?:function|const|let|var|class|interface|type|enum)\s+/;
+
+if (process.argv[2] === 'where') {
+  const name = process.argv[3];
+  if (!name) {
+    console.error('usage: npm run where <symbol>');
+    process.exit(1);
+  }
+
+  const word = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+  const defs = [];
+  const uses = [];
+
+  for (const file of files) {
+    const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (!line.includes(name) || !word.test(line)) return;
+      const at = `${rel(file)}:${index + 1}`;
+      if (DEFINITION.test(line)) defs.push(at);
+      else if (/^\s*(?:import|export)\b/.test(line) || /from\s+['"]/.test(line)) uses.push(at);
+    });
+  }
+
+  if (!defs.length && !uses.length) {
+    const near = new Set();
+    for (const file of files) {
+      for (const exported of exportsOf(readFileSync(file, 'utf8'))) {
+        if (exported.toLowerCase().includes(name.toLowerCase())) near.add(exported);
+      }
+    }
+    console.error(`не найдено: ${name}`);
+    if (near.size) console.error(`похожие: ${[...near].slice(0, 8).join(', ')}`);
+    process.exit(1);
+  }
+
+  for (const at of defs) console.log(`def  ${at}`);
+  for (const at of uses) console.log(`used ${at}`);
+  console.log(`\n${defs.length} определений, ${uses.length} импортов`);
+  process.exit(0);
+}
+
 const modules = new Map();
 
 for (const file of files) {

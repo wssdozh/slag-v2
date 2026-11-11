@@ -19,6 +19,7 @@
     "android:log": "adb logcat -s RustStdoutStderr:V SLAG:* chromium:I",
     "lint": "oxlint",
     "map:code": "node scripts/gen-code-map.mjs",
+    "where": "node scripts/gen-code-map.mjs where",
     "test:e2e": "playwright test",
     "shots": "playwright test e2e/quick_shots.spec.ts",
     "preview": "vite preview",
