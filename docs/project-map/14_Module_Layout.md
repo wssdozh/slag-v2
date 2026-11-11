@@ -79,16 +79,6 @@ src/
 
 ## 4. Текущие размеры
 
-| Файл | Строк |
-|---|---:|
-| `lib/ai/orchestrator.ts` | ~1460 |
-| `lib/storage/index.ts` | ~1370 |
-| `lib/sync/syncEngine.ts` | ~1380 |
-| `context/AppContext.tsx` | ~1860 |
-| `components/Editor/FullscreenEditor.tsx` | ~960 |
-| `components/Feed/Composer.tsx` | ~1260 |
-| `components/Views/CalendarView.tsx` | ~550 |
-| `components/Admin/AdminPanel.tsx` | ~650 |
-| `components/Workspace/WorkspaceShell.tsx` | ~260 |
+Не держу здесь цифры второй раз: они гнили. Актуальная таблица «файл, строк, сколько импортят, что это» — в `docs/CODE_MAP.md`, генерится `npm run map:code` из самого дерева.
 
 Цель — держать файл под 1000 строк, кроме `AppContext` и сервисов, где идёт постепенный вынос.

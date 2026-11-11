@@ -33,6 +33,8 @@
 
 ## 4. Карта
 
+Где что лежит — `docs/CODE_MAP.md`: на каждый модуль строка с числом строк, числом импортёров, экспортами и одной фразой «что это». Генерится `npm run map:code`, руками не правится. Читаю его **до** того, как грепать: половина вопросов закрывается одной картой.
+
 ```text
 src/
   components/   UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
@@ -49,6 +51,25 @@ relay/          сервер синхронизации
 docs/project-map/  база знаний проекта, 15 документов
 ```
 
+Задача → файлы, чтобы не искать с нуля:
+
+| задача | начинать с |
+|---|---|
+| синхронизация: очередь, транспорт, конфликты | `src/lib/sync/syncEngine.ts`, `transport.ts`, `crypto.ts` |
+| экран синка, аккаунт, устройства | `src/components/Settings/`, `src/lib/sync/account.ts` |
+| лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx` |
+| композер, создание и сохранение записи | `src/components/Feed/Composer.tsx`, `src/lib/vault/markdownSerializer.ts` |
+| полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
+| канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
+| мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
+| ИИ-ассистент, инструменты, действия | `src/lib/ai/orchestrator.ts`, `tools.ts`, `actionParser.ts` |
+| поиск | `src/lib/searchService.ts` |
+| состояние приложения | `src/context/AppContext.tsx` |
+| вложения, аудио, вставка файлов | `src/lib/media/`, `src/lib/storage/index.ts` |
+| настройки, тема, типографика | `src/components/Modals/SettingsModal.tsx`, `src/styles/theme.css` |
+| MCP-сервер | `src/mcp/`, `vite.mcp.config.ts` |
+| e2e | `e2e/slag/` |
+
 Детали не пересказываю, читаю по вопросу:
 
 | Вопрос | Документ |
@@ -64,7 +85,7 @@ docs/project-map/  база знаний проекта, 15 документов
 
 ## 5. Порядок работы
 
-- Сначала `glob` / `grep` по затронутым файлам. О том, что уже есть в кодовой базе, не спрашивать.
+- Сначала `docs/CODE_MAP.md` и таблица «задача → файлы» выше, потом `glob` / `grep` по найденному. О том, что уже есть в кодовой базе, не спрашивать.
 - Неуверенность — один вопрос через `ask_user_question` с 2–4 вариантами, рекомендуемый первым.
 - Одна ошибка сборки или тестов три раза подряд — стоп, лог и вопрос, а не четвёртая попытка.
 - Сборки: `BUILD.md`. MCP: `docs/mcp-guide.md`.
