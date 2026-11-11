@@ -24,7 +24,8 @@ export async function setupSlag(page: Page, testInfo: TestInfo) {
   }
   // `domcontentloaded` waits for the whole dev module graph to execute — seven
   // hundred untransformed modules on a cold Vite cache. We do not care about that
-  // event, only that the app mounted.
+  // event, only that the app mounted. The first spec of a run pays the transform
+  // once (that is why the budget is this wide); every later spec is seconds.
   await page.goto('/', { waitUntil: 'commit' });
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 60000 });
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
 }
