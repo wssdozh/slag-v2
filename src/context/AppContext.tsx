@@ -522,14 +522,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const undoLastAction = useCallback((): boolean => {
     const last = actionHistoryRef.current.pop();
     if (!last || last.itemSnapshots.length === 0) {
-      addToast('РќРµС‚ РґРµР№СЃС‚РІРёР№ РґР»СЏ РѕС‚РјРµРЅС‹', 'info');
+      addToast('Нет действий для отмены', 'info');
       return false;
     }
     for (const snap of last.itemSnapshots) {
       storage.saveItem(snap);
     }
     setItems(storage.getItems());
-    addToast(`Р”РµР№СЃС‚РІРёРµ В«${last.description}В» РѕС‚РјРµРЅРµРЅРѕ`, 'info');
+    addToast(`Действие «${last.description}» отменено`, 'info');
     return true;
   }, [addToast]);
 
@@ -725,7 +725,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User Breadcrumbs: Modal visibility tracking
   useEffect(() => {
-    if (isSearchOpen) uiLog.debug('Search modal opened (вЊK)');
+    if (isSearchOpen) uiLog.debug('Search modal opened (⌘K)');
   }, [isSearchOpen]);
 
   useEffect(() => {
@@ -840,7 +840,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items.find(i => i.title.toLowerCase().includes(nameLower));
 
     if (!found) {
-      addToast(`Р—Р°РїРёСЃСЊ В«${cleanQuery}В» РЅРµ РЅР°Р№РґРµРЅР°`, 'info');
+      addToast(`Запись «${cleanQuery}» не найдена`, 'info');
       return;
     }
 
@@ -920,7 +920,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAiSettings(updated);
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
     uiLog.info(`AI settings updated: provider=${updated.provider}, model=${updated.model || 'default'}`);
-    addToast('РќР°СЃС‚СЂРѕР№РєРё СЃРѕС…СЂР°РЅРµРЅС‹', 'success');
+    addToast('Настройки сохранены', 'success');
   };
 
   const saveItem = useCallback((itemData: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }): SlagItem => {
@@ -980,10 +980,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItem(null);
     }
     refreshData();
-    // Р•РґРёРЅСЃС‚РІРµРЅРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє СѓРІРµРґРѕРјР»РµРЅРёСЏ РѕР± СѓРґР°Р»РµРЅРёРё: СЃР»РѕР№ РјРѕРґРµР»Рё, Р° РЅРµ РєР°Р¶РґС‹Р№ РІС‹Р·С‹РІР°СЋС‰РёР№.
-    addToast('Р—Р°РїРёСЃСЊ РІ РєРѕСЂР·РёРЅРµ', 'info', {
+    // Единственный источник уведомления об удалении: слой модели, а не каждый вызывающий.
+    addToast('Запись в корзине', 'info', {
       kind: 'restore',
-      label: 'Р’РµСЂРЅСѓС‚СЊ',
+      label: 'Вернуть',
       onClick: () => {
         storage.restoreFromTrash(id);
         refreshData();
@@ -999,7 +999,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         folder: restored.folder,
       });
       refreshData();
-      addToast(`Р—Р°РїРёСЃСЊ В«${restored.title}В» РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅР°`, 'success');
+      addToast(`Запись «${restored.title}» восстановлена`, 'success');
     }
   }, [refreshData, addToast]);
 
@@ -1014,7 +1014,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     storage.moveItem(itemId, targetFolder);
     refreshData();
-    addToast(`РџРµСЂРµРјРµС‰РµРЅРѕ РІ В«${targetFolder}В»`, 'success');
+    addToast(`Перемещено в «${targetFolder}»`, 'success');
   }, [items, refreshData, addToast]);
 
   const toggleTaskComplete = useCallback((itemId: string, subtaskId?: string) => {
@@ -1067,11 +1067,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (newStatus === 'done') {
         const completed = storage.getItems().find(existing => existing.id === itemId);
         const toastText = item.recurrence && completed && completed.streak !== undefined
-          ? `РўР°СЃРєР° РІС‹РїРѕР»РЅРµРЅР° (рџ”Ґ ${completed.streak})`
-          : 'РўР°СЃРєР° РІС‹РїРѕР»РЅРµРЅР°';
+          ? `Таска выполнена (🔥 ${completed.streak})`
+          : 'Таска выполнена';
         addToast(toastText, 'success');
       } else {
-        addToast('РўР°СЃРєР° РІРѕР·РѕР±РЅРѕРІР»РµРЅР°', 'info');
+        addToast('Таска возобновлена', 'info');
       }
     }
   }, [updateItem, addToast]);
@@ -1096,7 +1096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'done',
       recurrence: undefined,
     });
-    addToast('Р—Р°РґР°С‡Р° РЅР°РІСЃРµРіРґР° Р·Р°РІРµСЂС€РµРЅР°', 'success');
+    addToast('Задача навсегда завершена', 'success');
   }, [items, updateItem, addToast]);
 
   const { executeSuggestedAction, rejectAction } = useSuggestedActions({
@@ -1129,12 +1129,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         messages: newHistory.map(m => {
           let content = m.content || '';
           const actionItems = m.suggestedActions || (m.suggestedAction ? [m.suggestedAction] : []);
-          if (!content.trim() || content.startsWith('[РџРѕРґРіРѕС‚РѕРІР»РµРЅ С‡РµСЂРЅРѕРІРёРє')) {
+          if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
             if (actionItems.length > 0) {
-              content = actionItems.map(sa => `[РџРѕРґРіРѕС‚РѕРІР»РµРЅРѕ РґРµР№СЃС‚РІРёРµ: В«${sa.title}В»]`).join('\n');
+              content = actionItems.map(sa => `[Подготовлено действие: «${sa.title}»]`).join('\n');
             }
           }
-          return { role: m.role, content: content.trim() || '[РЎРѕРѕР±С‰РµРЅРёРµ]' };
+          return { role: m.role, content: content.trim() || '[Сообщение]' };
         }),
         currentFolder,
         settings: aiSettings,
@@ -1148,7 +1148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       let resolvedContent = response.content;
       if (!resolvedContent.trim() && response.suggestedAction) {
-        resolvedContent = `[РџРѕРґРіРѕС‚РѕРІР»РµРЅ С‡РµСЂРЅРѕРІРёРє ${response.suggestedAction.itemType || 'note'}: В«${response.suggestedAction.title}В»:\n${response.suggestedAction.content || ''}]`;
+        resolvedContent = `[Подготовлен черновик ${response.suggestedAction.itemType || 'note'}: «${response.suggestedAction.title}»:\n${response.suggestedAction.content || ''}]`;
       }
 
       const assistantMsg: ChatMessage = {
@@ -1168,7 +1168,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const errorMsg: ChatMessage = {
         id: 'msg_err_' + Date.now(),
         role: 'assistant',
-        content: `РћС€РёР±РєР° РѕР±СЂР°С‰РµРЅРёСЏ Рє РР: ${err.message || 'РЎР±РѕР№ СЃРµС‚Рё'}`,
+        content: `Ошибка обращения к ИИ: ${err.message || 'Сбой сети'}`,
         createdAt: Date.now(),
       };
       setChatMessages(prev => [...prev, errorMsg]);
@@ -1187,13 +1187,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
     setIsFolderModalOpen(false);
     setFolderModalParent(null);
-    addToast(`РџР°РїРєР° В«${folder.name}В» СЃРѕС…СЂР°РЅРµРЅР°`, 'success');
+    addToast(`Папка «${folder.name}» сохранена`, 'success');
   };
 
   const updateFolderDescription = useCallback((path: string, description: string) => {
     storage.updateFolderDescription(path, description);
     refreshData();
-    addToast('РћРїРёСЃР°РЅРёРµ РїР°РїРєРё РѕР±РЅРѕРІР»РµРЅРѕ', 'success');
+    addToast('Описание папки обновлено', 'success');
   }, [refreshData, addToast]);
 
   const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
@@ -1211,12 +1211,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMobileActiveFolderState(previous => remap(previous));
     mobileFolderRef.current = remap(mobileFolderRef.current);
     refreshData();
-    addToast(`РџР°РїРєР° РїРµСЂРµРёРјРµРЅРѕРІР°РЅР° РІ В«${updatedFolder.name}В»`, 'success');
+    addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
   }, [currentFolder, refreshData, addToast]);
 
   const deleteFolder = (path: string) => {
     if (path === DEFAULT_INBOX_FOLDER) {
-      addToast(`РџР°РїРєСѓ В«${DEFAULT_INBOX_FOLDER}В» РЅРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ`, 'error');
+      addToast(`Папку «${DEFAULT_INBOX_FOLDER}» нельзя удалить`, 'error');
       return;
     }
     storage.deleteFolder(path);
@@ -1224,7 +1224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentFolder(DEFAULT_INBOX_FOLDER);
     }
     refreshData();
-    addToast('РџР°РїРєР° СѓРґР°Р»РµРЅР°, Р·Р°РјРµС‚РєРё РїРµСЂРµРјРµС‰РµРЅС‹ РІРѕ Р’С…РѕРґСЏС‰РёРµ', 'info');
+    addToast('Папка удалена, заметки перемещены во Входящие', 'info');
   };
 
   const switchVault = (vaultId: string) => {
@@ -1248,7 +1248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshData();
     });
     void syncEngine.switchVault(vaultId);
-    addToast('РҐСЂР°РЅРёР»РёС‰Рµ РїРµСЂРµРєР»СЋС‡РµРЅРѕ', 'info');
+    addToast('Хранилище переключено', 'info');
   };
 
   const createVault = (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => {
@@ -1256,14 +1256,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!id && accountClient.isAuthenticated()) {
       void accountClient.registerVault(storage.ensureVaultSyncId(newMeta.id), newMeta.name)
         .then(() => syncEngine.switchVault(newMeta.id))
-        .catch((error) => addToast(`РҐСЂР°РЅРёР»РёС‰Рµ СЃРѕР·РґР°РЅРѕ Р»РѕРєР°Р»СЊРЅРѕ, РЅРѕ РЅРµ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅРѕ: ${error.message}`, 'error'));
+        .catch((error) => addToast(`Хранилище создано локально, но не зарегистрировано: ${error.message}`, 'error'));
     } else if (!id) {
       void syncEngine.switchVault(newMeta.id);
     }
     setCurrentFolder(DEFAULT_INBOX_FOLDER);
     setSelectedItem(null);
     refreshData();
-    addToast(`РЎРѕР·РґР°РЅРѕ С…СЂР°РЅРёР»РёС‰Рµ В«${name}В»`, 'success');
+    addToast(`Создано хранилище «${name}»`, 'success');
   };
 
   const deleteVault = (vaultId: string) => {
@@ -1280,9 +1280,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setVaults(storage.getVaults());
       refreshData();
-      addToast('РҐСЂР°РЅРёР»РёС‰Рµ СѓРґР°Р»РµРЅРѕ', 'info');
+      addToast('Хранилище удалено', 'info');
     } else {
-      addToast('РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ СЃРёСЃС‚РµРјРЅРѕРµ С…СЂР°РЅРёР»РёС‰Рµ', 'error');
+      addToast('Нельзя удалить системное хранилище', 'error');
     }
   };
 
@@ -1306,7 +1306,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const seedDemoData = useCallback(() => {
     storage.seedDemoData();
     refreshData();
-    addToast('РЎРѕР·РґР°РЅС‹ СЃС‚Р°СЂС‚РѕРІС‹Рµ РґРµРјРѕ-Р·Р°РјРµС‚РєРё Рё РїР°РїРєРё', 'success');
+    addToast('Созданы стартовые демо-заметки и папки', 'success');
   }, [refreshData, addToast]);
 
   const openCreateFolderModal = (parentPath?: string) => {
@@ -1476,10 +1476,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const snap = await backupService.createSnapshot('manual');
       await refreshBackupSnapshots();
-      addToast(`Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ СЃРѕР·РґР°РЅР° (${snap.notesCount} Р·Р°РјРµС‚РѕРє, ${Math.round(snap.sizeBytes / 1024)} РљР‘)`, 'success');
+      addToast(`Резервная копия создана (${snap.notesCount} заметок, ${Math.round(snap.sizeBytes / 1024)} КБ)`, 'success');
       return snap;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё';
+      const msg = err instanceof Error ? err.message : 'Ошибка создания резервной копии';
       addToast(msg, 'error');
       return null;
     }
@@ -1490,13 +1490,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const success = await backupService.restoreSnapshot(id);
       if (success) {
         refreshData();
-        addToast('РҐСЂР°РЅРёР»РёС‰Рµ СѓСЃРїРµС€РЅРѕ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРѕ РёР· СЃРЅРёРјРєР°', 'success');
+        addToast('Хранилище успешно восстановлено из снимка', 'success');
         return true;
       }
-      addToast('РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ СЃРЅРёРјРєР°', 'error');
+      addToast('Ошибка восстановления снимка', 'error');
       return false;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ';
+      const msg = err instanceof Error ? err.message : 'Ошибка восстановления';
       addToast(msg, 'error');
       return false;
     }
@@ -1506,9 +1506,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await backupService.deleteSnapshot(id);
       await refreshBackupSnapshots();
-      addToast('РЎРЅРёРјРѕРє СѓРґР°Р»С‘РЅ', 'info');
+      addToast('Снимок удалён', 'info');
     } catch {
-      addToast('РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ СЃРЅРёРјРєР°', 'error');
+      addToast('Ошибка удаления снимка', 'error');
     }
   }, [addToast, refreshBackupSnapshots]);
 
@@ -1516,13 +1516,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const success = await backupService.downloadSnapshot(id);
       if (success) {
-        addToast('РђСЂС…РёРІ СЃРЅРёРјРєР° СЃРєР°С‡Р°РЅ', 'success');
+        addToast('Архив снимка скачан', 'success');
         return true;
       }
-      addToast('РЎРЅРёРјРѕРє РЅРµ РЅР°Р№РґРµРЅ', 'error');
+      addToast('Снимок не найден', 'error');
       return false;
     } catch {
-      addToast('РћС€РёР±РєР° СЃРєР°С‡РёРІР°РЅРёСЏ СЃРЅРёРјРєР°', 'error');
+      addToast('Ошибка скачивания снимка', 'error');
       return false;
     }
   }, [addToast]);
@@ -1530,10 +1530,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const downloadVaultZip = useCallback(async (): Promise<string> => {
     try {
       const filename = await backupService.downloadCurrentVaultZip();
-      addToast(`РҐСЂР°РЅРёР»РёС‰Рµ СЌРєСЃРїРѕСЂС‚РёСЂРѕРІР°РЅРѕ (${filename})`, 'success');
+      addToast(`Хранилище экспортировано (${filename})`, 'success');
       return filename;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° СЌРєСЃРїРѕСЂС‚Р° Р°СЂС…РёРІР°';
+      const msg = err instanceof Error ? err.message : 'Ошибка экспорта архива';
       addToast(msg, 'error');
       return '';
     }
@@ -1543,10 +1543,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await backupService.restoreFromZip(file);
       refreshData();
-      addToast(`Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРѕ: ${res.itemsCount} Р·Р°РјРµС‚РѕРє, ${res.attachmentsCount} РјРµРґРёР°`, 'success');
+      addToast(`Восстановлено: ${res.itemsCount} заметок, ${res.attachmentsCount} медиа`, 'success');
       return res;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ РёР· Р°СЂС…РёРІР°';
+      const msg = err instanceof Error ? err.message : 'Ошибка восстановления из архива';
       addToast(msg, 'error');
       throw err;
     }

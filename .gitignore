@@ -77,3 +77,6 @@ relay/data/
 # Search benchmark artifacts (corpora are huge, they are generated)
 bench/.data/
 bench/out/
+
+# Test screenshots written by feed.spec.ts
+screenshots/

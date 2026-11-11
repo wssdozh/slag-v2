@@ -4,14 +4,14 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **333**, строк: **76446**, зон: **38**.
+Модулей: **331**, строк: **76339**, зон: **38**.
 
 ## Самые длинные файлы
 
 | файл | строк | импортят |
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
-| `src/context/AppContext.tsx` | 1740 | 53 |
+| `src/context/AppContext.tsx` | 1740 | 52 |
 | `src/lib/sync/syncEngine.ts` | 1595 | 14 |
 | `src/lib/storage/index.ts` | 1592 | 21 |
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
@@ -99,7 +99,7 @@
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
 | `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
-## src/components/Feed — 19 файлов, 6483 строк
+## src/components/Feed — 18 файлов, 6420 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -121,7 +121,6 @@
 | `TagSuggestionMenu.tsx` | 75 | 2 | TagMeta, TagSuggestionMenu |  |
 | `useComposerAutocomplete.ts` | 395 | 1 | UseComposerAutocompleteOptions, useComposerAutocomplete |  |
 | `useComposerDraft.ts` | 416 | 1 | ComposerDraftState, UseComposerDraftOptions, reviveReplyTarget, useComposerDraft |  |
-| `ViewModeSwitcher.tsx` | 63 | 0 | ViewModeSwitcherProps, ViewModeSwitcher |  |
 
 ## src/components/FolderProfile — 7 файлов, 693 строк
 
@@ -244,7 +243,7 @@
 | `MobileActionSheet.tsx` | 186 | 1 | MobileActionSheet |  |
 | `NumberInput.tsx` | 98 | 1 | NumberInputProps, NumberInput |  |
 | `PriorityBadge.tsx` | 75 | 5 | TaskPriority, LinearSignalBarsProps, LinearSignalBars |  |
-| `ResponsiveSegmented.tsx` | 186 | 5 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented |  |
+| `ResponsiveSegmented.tsx` | 186 | 4 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented |  |
 | `Select.tsx` | 352 | 10 | SelectOption, SelectProps, Select |  |
 | `SendButton.tsx` | 48 | 4 | SendButtonProps, SendButton |  |
 | `SheetPanel.tsx` | 353 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel |  |
@@ -302,7 +301,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 1740 | 53 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
+| `AppContext.tsx` | 1740 | 52 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
 | `appContext.types.ts` | 232 | 2 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/hooks — 9 файлов, 1292 строк
@@ -340,7 +339,7 @@
 | `useIsMobile.ts` | 35 | 2 | useIsMobile |  |
 | `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight |  |
 
-## src/lib — 17 файлов, 3488 строк
+## src/lib — 16 файлов, 3444 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -354,7 +353,6 @@
 | `logger.ts` | 648 | 31 | LogListener, logger |  |
 | `motion.ts` | 195 | 8 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
-| `notifications.ts` | 44 | 0 | sendDesktopNotification |  |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
 | `searchService.ts` | 172 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
 | `taskCompletion.ts` | 35 | 1 | applyTaskCompletion |  |
@@ -465,5 +463,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 97 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 96 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
