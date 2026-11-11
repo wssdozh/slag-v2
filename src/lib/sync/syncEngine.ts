@@ -1,4 +1,15 @@
 import { storage } from '../storage';
+import {
+  loadSentHashes,
+  loadSyncedIds,
+  loadTombstones,
+  saveSentHashes,
+  seedSyncedIds,
+  stateHashKey,
+  syncedIdsKey,
+  tombstonesKey,
+  type SyncScope,
+} from './localBookkeeping';
 export { storage };
 import { logger } from '../logger';
 import { accountClient } from './account';
@@ -413,64 +424,44 @@ export class SyncEngine {
     );
   }
 
+  private get bookkeeping(): SyncScope {
+    return {
+      vaultId: this.currentVaultId,
+      roomId: this.activeRoomId,
+      accountSync: this.usesAccountSync(),
+    };
+  }
+
   private getStateHashKey(vaultId?: string): string {
-    const vid = vaultId || this.currentVaultId;
-    // Account rooms have their own checkpoint: a new mapping must resend the full local state.
-    return this.usesAccountSync() && this.activeRoomId
-      ? `${LAST_STATE_HASH_KEY}_${vid}_${this.activeRoomId}`
-      : `${LAST_STATE_HASH_KEY}_${vid}`;
+    return stateHashKey(this.bookkeeping, vaultId);
   }
 
   private getSyncedIdsKey(vaultId?: string): string {
-    return `slag_sync_synced_ids_${vaultId || this.currentVaultId}`;
+    return syncedIdsKey(this.bookkeeping, vaultId);
   }
 
   private getTombstonesKey(vaultId?: string): string {
-    return `slag_sync_tombstones_${vaultId || this.currentVaultId}`;
-  }
-
-  private getSentHashesKey(vaultId?: string): string {
-    return `slag_sync_sent_hashes_${vaultId || this.currentVaultId}_${this.activeRoomId || 'local'}`;
+    return tombstonesKey(this.bookkeeping, vaultId);
   }
 
   private loadSentHashes(): Record<string, string> {
-    try {
-      const raw = localStorage.getItem(this.getSentHashesKey());
-      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
-    } catch {
-      return {};
-    }
+    return loadSentHashes(this.bookkeeping);
   }
 
   private saveSentHashes(hashes: Record<string, string>): void {
-    try {
-      localStorage.setItem(this.getSentHashesKey(), JSON.stringify(hashes));
-    } catch {
-      // Quota exceeded: the next push simply resends a few unchanged entities.
-    }
+    saveSentHashes(this.bookkeeping, hashes);
   }
 
   private loadSyncedIds(): Set<string> {
-    try {
-      const raw = localStorage.getItem(this.getSyncedIdsKey());
-      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
-    } catch {
-      return new Set();
-    }
+    return loadSyncedIds(this.bookkeeping);
   }
 
   private loadTombstones(): Record<string, number> {
-    try {
-      const raw = localStorage.getItem(this.getTombstonesKey());
-      return raw ? (JSON.parse(raw) as Record<string, number>) : {};
-    } catch {
-      return {};
-    }
+    return loadTombstones(this.bookkeeping);
   }
 
   private ensureSyncedIdsSeed(): void {
-    if (localStorage.getItem(this.getSyncedIdsKey())) return;
-    localStorage.setItem(this.getSyncedIdsKey(), JSON.stringify(storage.getItems().map((it) => it.id)));
+    seedSyncedIds(this.bookkeeping, storage.getItems().map((it) => it.id));
   }
 
   public getCurrentVaultId(): string {
