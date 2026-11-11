@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { setupSlag } from './support/slagSetup';
 
 test.describe('Backup & Restore System Verification', () => {
-  test.describe.configure({ timeout: 60000 });
+  // The shared setup pays the cold Vite transform on the first spec of a run; a 60s
+  // budget cut it off mid-flight.
+  test.describe.configure({ timeout: 180000 });
 
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+  test.beforeEach(async ({ page }, testInfo) => {
+    await setupSlag(page, testInfo);
   });
 
   test('Create snapshot, delete note, and restore vault from snapshot', async ({ page }) => {
-    test.setTimeout(60000);
     // 1. Accept any browser dialogs (confirm for restore)
     page.on('dialog', async (dialog) => {
       await dialog.accept();

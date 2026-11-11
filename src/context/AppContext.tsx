@@ -10,12 +10,9 @@ import type {
   ChatMessage,
   AppUiConfig,
   DeviceUiConfig,
-  BackupSnapshotMeta,
-  BackupSettings,
 } from '../types';
 import { storage } from '../lib/storage';
 import { applyTaskCompletion } from '../lib/taskCompletion';
-import { backupService } from '../lib/backupService';
 import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { openAppFolder } from '../lib/folderOpener';
@@ -28,6 +25,7 @@ import { useSuggestedActions, type ActionHistoryEntry } from '../hooks/useSugges
 import { useOverlays } from './hooks/useOverlays';
 import { useMobileNav } from './hooks/useMobileNav';
 import { useFeedView } from './hooks/useFeedView';
+import { useBackup } from './hooks/useBackup';
 import { crossFade } from '../lib/motion';
 import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
@@ -1067,121 +1065,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsFolderViewModalOpen(false);
   }, [setIsFolderViewModalOpen]);
 
-  const [backupSnapshots, setBackupSnapshots] = useState<BackupSnapshotMeta[]>([]);
-  const [backupSettings, setBackupSettings] = useState<BackupSettings>(() => backupService.getSettings());
-
-  const refreshBackupSnapshots = useCallback(async () => {
-    try {
-      const list = await backupService.getSnapshots();
-      setBackupSnapshots(list);
-    } catch {
-      // quiet fallback
-    }
-  }, []);
-
-  const updateBackupSettings = useCallback((settings: Partial<BackupSettings>) => {
-    const updated = backupService.saveSettings(settings);
-    setBackupSettings(updated);
-  }, []);
-
-  const createManualBackup = useCallback(async (): Promise<BackupSnapshotMeta | null> => {
-    try {
-      const snap = await backupService.createSnapshot('manual');
-      await refreshBackupSnapshots();
-      addToast(`Резервная копия создана (${snap.notesCount} заметок, ${Math.round(snap.sizeBytes / 1024)} КБ)`, 'success');
-      return snap;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка создания резервной копии';
-      addToast(msg, 'error');
-      return null;
-    }
-  }, [addToast, refreshBackupSnapshots]);
-
-  const restoreSnapshot = useCallback(async (id: string): Promise<boolean> => {
-    try {
-      const success = await backupService.restoreSnapshot(id);
-      if (success) {
-        refreshData();
-        addToast('Хранилище успешно восстановлено из снимка', 'success');
-        return true;
-      }
-      addToast('Ошибка восстановления снимка', 'error');
-      return false;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка восстановления';
-      addToast(msg, 'error');
-      return false;
-    }
-  }, [addToast, refreshData]);
-
-  const deleteSnapshot = useCallback(async (id: string): Promise<void> => {
-    try {
-      await backupService.deleteSnapshot(id);
-      await refreshBackupSnapshots();
-      addToast('Снимок удалён', 'info');
-    } catch {
-      addToast('Ошибка удаления снимка', 'error');
-    }
-  }, [addToast, refreshBackupSnapshots]);
-
-  const downloadSnapshot = useCallback(async (id: string): Promise<boolean> => {
-    try {
-      const success = await backupService.downloadSnapshot(id);
-      if (success) {
-        addToast('Архив снимка скачан', 'success');
-        return true;
-      }
-      addToast('Снимок не найден', 'error');
-      return false;
-    } catch {
-      addToast('Ошибка скачивания снимка', 'error');
-      return false;
-    }
-  }, [addToast]);
-
-  const downloadVaultZip = useCallback(async (): Promise<string> => {
-    try {
-      const filename = await backupService.downloadCurrentVaultZip();
-      addToast(`Хранилище экспортировано (${filename})`, 'success');
-      return filename;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка экспорта архива';
-      addToast(msg, 'error');
-      return '';
-    }
-  }, [addToast]);
-
-  const restoreFromZipFile = useCallback(async (file: File): Promise<{ itemsCount: number; attachmentsCount: number }> => {
-    try {
-      const res = await backupService.restoreFromZip(file);
-      refreshData();
-      addToast(`Восстановлено: ${res.itemsCount} заметок, ${res.attachmentsCount} медиа`, 'success');
-      return res;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка восстановления из архива';
-      addToast(msg, 'error');
-      throw err;
-    }
-  }, [addToast, refreshData]);
-
-  useEffect(() => {
-    let isMounted = true;
-    backupService.getSnapshots().then(list => {
-      if (isMounted) setBackupSnapshots(list);
-    }).catch(() => {});
-
-    backupService.checkAndRunAutoBackup().then(ran => {
-      if (ran && isMounted) {
-        backupService.getSnapshots().then(list => {
-          if (isMounted) setBackupSnapshots(list);
-        }).catch(() => {});
-      }
-    }).catch(() => {});
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const {
+    backupSnapshots, backupSettings, refreshBackupSnapshots, updateBackupSettings,
+    createManualBackup, restoreSnapshot, deleteSnapshot, downloadSnapshot,
+    downloadVaultZip, restoreFromZipFile,
+  } = useBackup(addToast, refreshData);
 
   return (
     <AppContext.Provider
