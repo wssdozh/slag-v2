@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **333**, строк: **76469**, зон: **38**.
+Модулей: **335**, строк: **76559**, зон: **38**.
 
 ## Самые длинные файлы
 
@@ -12,9 +12,9 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `src/context/AppContext.tsx` | 1740 | 52 |
-| `src/lib/sync/syncEngine.ts` | 1595 | 14 |
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
-| `src/lib/storage/index.ts` | 1524 | 21 |
+| `src/lib/sync/syncEngine.ts` | 1554 | 14 |
+| `src/lib/storage/index.ts` | 1366 | 21 |
 | `src/components/Feed/Composer.tsx` | 1212 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
@@ -289,7 +289,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
-| `index.ts` | 7 | 67 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
+| `index.ts` | 7 | 68 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
 | `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
@@ -350,7 +350,7 @@
 | `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
 | `folderOpener.ts` | 72 | 4 | OpenFolderResult, openAppFolder |  |
 | `formatBytes.ts` | 7 | 5 | formatBytes |  |
-| `logger.ts` | 648 | 32 | LogListener, logger |  |
+| `logger.ts` | 648 | 33 | LogListener, logger |  |
 | `motion.ts` | 195 | 8 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
@@ -390,17 +390,18 @@
 | `folderBrowser.ts` | 128 | 4 | listFolders, pickFolder, listFolderEntries, pickFilesFromSystem, readEntryBytes, +3 |  |
 | `imageCodec.ts` | 90 | 2 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 |  |
 
-## src/lib/storage — 5 файлов, 2049 строк
+## src/lib/storage — 6 файлов, 2100 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData |  |
+| `attachments.ts` | 209 | 1 | AttachmentStore |  |
 | `draftStore.ts` | 248 | 1 | DraftStore |  |
-| `index.ts` | 1524 | 21 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
-| `indexedDb.ts` | 143 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
+| `index.ts` | 1366 | 21 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
+| `indexedDb.ts` | 143 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
 
-## src/lib/sync — 16 файлов, 5995 строк
+## src/lib/sync — 17 файлов, 6034 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -413,9 +414,10 @@
 | `entities/registry.ts` | 35 | 1 | createSyncOpFromStorageEvent |  |
 | `entities/types.ts` | 16 | 2 | SyncEntityKind, SyncAction, SyncOperation |  |
 | `index.ts` | 5 | 1 | * from ./types, * from ./crypto, * from ./pairing, * from ./syncEngine |  |
+| `localBookkeeping.ts` | 80 | 1 | SyncScope, stateHashKey, syncedIdsKey, tombstonesKey, sentHashesKey, +5 |  |
 | `outbox/outbox.ts` | 58 | 1 | Outbox |  |
 | `pairing.ts` | 180 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +3 |  |
-| `syncEngine.ts` | 1595 | 14 | SyncEngine, syncEngine, storage, accountClient |  |
+| `syncEngine.ts` | 1554 | 14 | SyncEngine, syncEngine, storage, accountClient |  |
 | `transport.ts` | 212 | 1 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport |  |
 | `twoFactorAuth.ts` | 295 | 1 | TotpConfig, WebAuthnConfig, TwoFactorState, base32Encode, base32Decode, +8 | Two-Factor Authentication (2FA) for Zero-Knowledge Vaults |
 | `types.ts` | 123 | 13 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
@@ -465,5 +467,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 98 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 99 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
