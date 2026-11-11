@@ -1,10 +1,9 @@
 import { storage } from '../storage';
 import { persistIncomingBundle } from './applyBundle';
+import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
 import {
   loadSentHashes,
-  loadSyncedIds,
-  loadTombstones,
   saveSentHashes,
   seedSyncedIds,
   stateHashKey,
@@ -18,7 +17,6 @@ import { accountClient } from './account';
 export { accountClient };
 import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
-import { stripAttachmentData } from '../storage/attachmentData';
 import { SyncTransport } from './transport';
 import {
   addTrustedDeviceToConfig,
@@ -33,18 +31,14 @@ import {
   createInitialConfig,
 } from './devices';
 import {
+  computeHash,
   deriveVaultKey,
   deriveRoomId,
-  encryptBundle,
-  encodeBundleFrame,
   generateMnemonic,
-  computeStateRootHash,
-  computeHash,
 } from './crypto';
 import type {
   SyncConfig,
   SyncStatus,
-  SyncBundle,
   SyncChangeItem,
   EncryptedBundle,
   DeviceProfile,
@@ -68,7 +62,7 @@ const syncLog = logger.scope('SYNC');
 
 /** Cheap identity of an attachment's bytes: reading five megabytes to hash them is not. */
 /** A bundle handed to the relay but not yet confirmed; holds the bookkeeping commit applies. */
-interface PendingPush {
+export interface PendingPush {
   bundleId: string;
   encrypted: EncryptedBundle;
   frame: Uint8Array<ArrayBuffer>;
@@ -91,11 +85,11 @@ export class SyncEngine {
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   public activeVaultKey: CryptoKey | null = null;
   public activeRoomId: string | null = null;
-  private isProcessingSync = false;
-  private sequence = 1;
+  public isProcessingSync = false;
+  public sequence = 1;
   public appliedBundleIds = new Set<string>();
   public batchUpdating = false;
-  private forceFullPush = false;
+  public forceFullPush = false;
   public initGeneration = 0;
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   public currentVaultId: string = 'default_vault';
@@ -110,16 +104,16 @@ export class SyncEngine {
     detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean };
   } | null = null;
   private importTimer: ReturnType<typeof setTimeout> | null = null;
-  private pendingPushes = new Map<string, PendingPush>();
-  private wsSupportsBinary = false;
-  private pushDirty = false;
+  public pendingPushes = new Map<string, PendingPush>();
+  public wsSupportsBinary = false;
+  public pushDirty = false;
   /** One-shot: the next push may carry a single attachment. */
-  private attachmentPass = false;
+  public attachmentPass = false;
   /** Set when the relay refuses a bundle for quota: attachments wait for a restart. */
   private attachmentSyncBlocked = false;
   /** Attachments with no bytes on this device, so every push does not re-stat the same files. */
   private unreadableAttachments = new Set<string>();
-  private entityHashes = new Map<string, { sig: string; hash: string }>();
+  public entityHashes = new Map<string, { sig: string; hash: string }>();
   private transport: SyncTransport;
 
   constructor() {
@@ -272,7 +266,7 @@ export class SyncEngine {
       this.pushDebounceTimer = null;
       this.pushDebounceDeadline = 0;
       this.pushDebounceTrailing = false;
-      void this.pushLocalChanges();
+      void pushLocalChanges(this);
     }, delayMs);
   }
 
@@ -316,7 +310,7 @@ export class SyncEngine {
   }
 
   /** Bytes of one attachment as a `dataUrl` change; true as soon as one was packed. */
-  private async packOneAttachment(
+  public async packOneAttachment(
     item: SlagItem,
     changes: SyncChangeItem[],
     sentHashes: Record<string, string>,
@@ -629,7 +623,7 @@ export class SyncEngine {
       }
       this.connectWebSocket();
       this.startIntervals();
-      await this.pushLocalChanges();
+      await pushLocalChanges(this);
       this.scheduleAttachmentPass();
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
@@ -693,7 +687,7 @@ export class SyncEngine {
     await this.init();
   }
 
-  private get ws(): WebSocket | null {
+  public get ws(): WebSocket | null {
     return this.transport.getWebSocket();
   }
 
@@ -728,6 +722,10 @@ export class SyncEngine {
     return applying;
   }
 
+  public async pushLocalChanges(): Promise<void> {
+    return pushLocalChanges(this);
+  }
+
   public async sendAck(bundleId: string): Promise<void> {
     await this.transport.sendAck({
       bundleId,
@@ -739,278 +737,7 @@ export class SyncEngine {
     });
   }
 
-  public async pushLocalChanges(): Promise<void> {
-    if (this.status.authRequired && !accountClient.getToken(this.config.serverUrl)) return;
-    if (this.isProcessingSync || !this.activeVaultKey || !this.activeRoomId) {
-      // An edit landing mid-push must not be dropped: repush right after this bundle.
-      if (this.isProcessingSync) this.pushDirty = true;
-      syncLog.debug('Push skipped: engine is not ready', {
-        processing: this.isProcessingSync,
-        hasKey: Boolean(this.activeVaultKey),
-        hasRoom: Boolean(this.activeRoomId),
-      });
-      return;
-    }
-
-    if (this.status.initialSync.vaultId === this.currentVaultId &&
-        (this.status.initialSync.state === 'loading' || this.status.initialSync.state === 'error')) return;
-    if (this.config.localSyncMode === 'receive-only') return;
-
-    this.isProcessingSync = true;
-    const generation = this.initGeneration;
-    const vaultKey = this.activeVaultKey;
-    const hashKey = stateHashKey(this.bookkeeping);
-
-    try {
-      // `getItems` re-hydrates `dataUrl` from the session cache, so a photo pasted a minute ago
-      // would ride inside the note's own payload. Metadata only; bytes travel as their own change.
-      const items = stripAttachmentData(storage.getItems());
-      const folders = storage.getFolders();
-      const workspaceState = storage.getWorkspaceState();
-      const pendingOps = this.getOutbox().pending();
-
-      const stateHash = await computeStateRootHash(items, folders);
-      if (generation !== this.initGeneration) return;
-      const lastSyncedHash =
-        localStorage.getItem(hashKey) ||
-        (!this.usesAccountSync() && this.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
-
-      // An attachment pass has nothing to do with the note state hash: it must get past the
-      // "nothing changed" gate, or unsent bytes on an otherwise untouched vault never leave.
-      if (!this.attachmentPass && lastSyncedHash === stateHash && pendingOps.length === 0) {
-        // Nothing changed
-        this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
-        this.isProcessingSync = false;
-        this.notify();
-        return;
-      }
-
-      this.status.state = 'syncing';
-      this.notify();
-
-      const changes: SyncChangeItem[] = [];
-      // Only entities whose hash differs from what this room already received go out;
-      // sending the whole vault on every keystroke is what kept pushes at 60 changes.
-      let sentHashes = loadSentHashes(this.bookkeeping);
-      if (this.forceFullPush) {
-        this.forceFullPush = false;
-        sentHashes = {};
-        this.entityHashes.clear();
-        saveSentHashes(this.bookkeeping, {});
-      }
-      const packedHashes: Record<string, string> = {};
-      const pack = (key: string, hash: string, change: SyncChangeItem) => {
-        if (sentHashes[key] === hash) return;
-        changes.push(change);
-        packedHashes[key] = hash;
-      };
-
-      // Stringify + SHA-256 of every note on every keystroke is the only O(vault) work in
-      // the push path (11 ms at 50 notes, 182 ms at 5000). `updatedAt` is bumped by every
-      // storage mutation, so it is a cheap change signature: hash only what moved.
-      for (const item of items) {
-        const cacheKey = `item:${item.id}`;
-        const sig = `${item.updatedAt ?? 0}:${item.title?.length ?? 0}:${item.content?.length ?? 0}`;
-        const cached = this.entityHashes.get(cacheKey);
-        let itemHash: string;
-        if (cached && cached.sig === sig) {
-          itemHash = cached.hash;
-        } else {
-          itemHash = await computeHash(JSON.stringify(item));
-          this.entityHashes.set(cacheKey, { sig, hash: itemHash });
-        }
-        pack(cacheKey, itemHash, {
-          id: item.id,
-          type: 'item',
-          action: 'upsert',
-          version: 1,
-          hash: itemHash,
-          payload: item,
-        });
-      }
-
-      for (const folder of folders) {
-        const folderHash = await computeHash(JSON.stringify(folder));
-        pack(`folder:${folder.path}`, folderHash, {
-          id: folder.path,
-          type: 'folder',
-          action: 'upsert',
-          version: 1,
-          hash: folderHash,
-          payload: folder,
-        });
-      }
-
-      const workspaceHash = await computeHash(JSON.stringify(workspaceState));
-      pack('workspace:workspace_state', workspaceHash, {
-        id: 'workspace_state',
-        type: 'workspace',
-        action: 'upsert',
-        version: 1,
-        hash: workspaceHash,
-        payload: workspaceState,
-      });
-
-      // One attachment per bundle, and only when the previous bundle is confirmed. A slow uplink
-      // then blocks one file instead of every note edit behind it.
-      // ponytail: no chunks and no re-seed. The relay keeps a bundle for 7 days, so a device that
-      // sleeps longer never gets the file. Upgrade: a `restore` request from the receiver clears
-      // its hash here and the bytes are pushed again.
-      if (this.attachmentPass) {
-        this.attachmentPass = false;
-        let packedOne = false;
-        for (const item of items) {
-          if (await this.packOneAttachment(item, changes, sentHashes, packedHashes)) {
-            packedOne = true;
-            break;
-          }
-        }
-        if (!packedOne) syncLog.warn('Attachment pass found nothing it could read; files stay local');
-      }
-
-      // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
-      const syncedIds = loadSyncedIds(this.bookkeeping);
-      const currentIds = new Set(items.map((it) => it.id));
-      const tombstones = loadTombstones(this.bookkeeping);
-      for (const id of syncedIds) {
-        if (currentIds.has(id)) continue;
-        const deletedAt = tombstones[id] ?? Date.now();
-        tombstones[id] = deletedAt;
-        changes.push({
-          id,
-          type: 'item',
-          action: 'delete',
-          version: 1,
-          hash: String(deletedAt),
-          payload: { deletedAt },
-        });
-      }
-      for (const id of currentIds) {
-        delete tombstones[id];
-      }
-
-      // Pack folder mutations, trash operations, and drafts from Outbox
-      for (const op of pendingOps) {
-        if (op.kind === 'folder') {
-          if (op.action === 'delete') {
-            changes.push({
-              id: op.id,
-              type: 'folder',
-              action: 'delete',
-              version: 1,
-              hash: String(op.timestamp),
-              payload: { path: op.id },
-            });
-          } else if (op.action === 'rename') {
-            changes.push({
-              id: op.id,
-              type: 'folder',
-              action: 'rename',
-              version: 1,
-              hash: String(op.timestamp),
-              payload: { oldPath: op.oldPath, folder: op.payload },
-            });
-          }
-        } else if (op.kind === 'trash' && op.action === 'restore') {
-          changes.push({
-            id: op.id,
-            type: 'trash',
-            action: 'restore',
-            version: 1,
-            hash: String(op.timestamp),
-            payload: op.payload,
-          });
-        } else if (op.kind === 'draft') {
-          changes.push({
-            id: op.id,
-            type: 'draft',
-            action: op.action,
-            version: 1,
-            hash: String(op.timestamp),
-            payload: op.action === 'delete' ? { deletedAt: op.timestamp } : op.payload,
-          });
-        }
-      }
-
-      if (changes.length === 0) {
-        // Only outbox noise that changed nothing on disk: nothing to send.
-        syncLog.debug('Push skipped: no entity changed since the last bundle');
-        localStorage.setItem(hashKey, stateHash);
-        this.getOutbox().markSynced(pendingOps.map((o) => o.opId));
-        this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
-        return;
-      }
-
-      const bundle: SyncBundle = {
-        bundleId: `bnd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        roomId: this.activeRoomId,
-        fromDeviceId: this.config.deviceId,
-        sequence: this.sequence++,
-        stateRootHash: stateHash,
-        timestamp: new Date().toISOString(),
-        changes,
-      };
-
-      const encrypted = await encryptBundle(bundle, vaultKey);
-      if (generation !== this.initGeneration) return;
-
-      const pending: PendingPush = {
-        bundleId: bundle.bundleId,
-        encrypted,
-        frame: encodeBundleFrame(encrypted),
-        hashKey,
-        stateHash,
-        packedHashes,
-        syncedIds: [...currentIds],
-        tombstones: { ...tombstones },
-        opIds: pendingOps.map((o) => o.opId),
-        changes: changes.length,
-        settled: false,
-        fallbackTimer: null,
-      };
-
-      syncLog.info(
-        `Queued bundle ${pending.bundleId} (${changes.length} changes, ${encrypted.ciphertext.length} B) -> room ${this.activeRoomId.slice(0, 10)}...`
-      );
-
-      if (generation !== this.initGeneration) return;
-      this.pendingPushes.set(pending.bundleId, pending);
-      const ws = this.ws;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        // Fast path: the socket is already open, so the bundle leaves on it without waiting
-        // for a request/response round trip. The relay's `server_ack` commits the
-        // bookkeeping; if it never arrives the same bundle is replayed over HTTP below
-        // (the relay dedups by bundleId, so a double delivery is harmless).
-        pending.fallbackTimer = setTimeout(() => {
-          pending.fallbackTimer = null;
-          void this.deliverPushOverHttp(pending);
-        }, SYNC_INTERVALS.WS_ACK_TIMEOUT_MS);
-        try {
-          ws.send(this.wsSupportsBinary ? pending.frame : JSON.stringify({ type: 'bundle', bundle: encrypted }));
-          this.status.state = 'connected';
-          this.status.error = null;
-        } catch (error) {
-          syncLog.warn('Websocket push failed, falling back to HTTP:', error);
-          await this.deliverPushOverHttp(pending);
-        }
-      } else {
-        await this.deliverPushOverHttp(pending);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      syncLog.error('Failed to push sync bundle:', msg);
-      this.status.state = 'error';
-      this.status.error = msg;
-    } finally {
-      this.isProcessingSync = false;
-      if (this.pushDirty) {
-        this.pushDirty = false;
-        this.scheduleDebouncedPush(0);
-      }
-      this.notify();
-    }
-  }
-
+  
   /** Commits a confirmed push: hashes, tombstones and the outbox advance only once the relay has it. */
   private commitPush(pending: PendingPush): void {
     if (pending.settled) return;
@@ -1037,7 +764,7 @@ export class SyncEngine {
     this.scheduleAttachmentPass();
   }
 
-  private async deliverPushOverHttp(pending: PendingPush): Promise<void> {
+  public async deliverPushOverHttp(pending: PendingPush): Promise<void> {
     if (pending.settled) return;
     if (pending.fallbackTimer) {
       clearTimeout(pending.fallbackTimer);
@@ -1104,7 +831,7 @@ export class SyncEngine {
           void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Background pull failed:', error));
         }
         if (!wsOpen || this.getOutbox().pending().length > 0) {
-          void this.pushLocalChanges();
+          void pushLocalChanges(this);
         }
       }, intervalMs);
     }
