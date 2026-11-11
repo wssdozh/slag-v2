@@ -14,7 +14,6 @@ import type {
   FeedViewMode,
   AiItemFilter,
   ChatMessage,
-  SuggestedAction,
   MobileTabId,
   AppUiConfig,
   DeviceUiConfig,
@@ -63,205 +62,13 @@ import {
 const uiLog = logger.scope('UI');
 const appLog = logger.scope('APP');
 
-export interface ToastMessage {
-  id: string;
-  type: 'info' | 'success' | 'error';
-  text: string;
-  action?: {
-    kind: 'undo' | 'restore';
-    label: string;
-    onClick: () => void;
-  };
-}
-
-/** A surface asking for attachments: it passes only the place they should land. */
-export interface AttachSheetRequest {
-  onAdd: (attachments: SlagAttachment[]) => void;
-}
-
-export interface ContextMenuTarget {
-  x: number;
-  y: number;
-  type: 'item' | 'folder' | 'feed';
-  item?: SlagItem;
-  folder?: FolderMeta;
-}
-
-interface AppContextType {
-  vault: VaultMeta;
-  vaults: VaultMeta[];
-  folders: FolderMeta[];
-  currentFolder: string;
-  inboxMode: InboxMode;
-  setInboxMode: (mode: InboxMode) => void;
-  feedViewMode: FeedViewMode;
-  setFeedViewMode: (mode: FeedViewMode | ((prev: FeedViewMode) => FeedViewMode)) => void;
-  isKanbanMaterialsOpen: boolean;
-  setIsKanbanMaterialsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  items: SlagItem[];
-  filteredItems: SlagItem[];
-  selectedItem: SlagItem | null;
-  activeTypeFilter: SlagItemType | 'all';
-  activeTagFilter: string | null;
-  isPinnedOnlyFilter: boolean;
-  setIsPinnedOnlyFilter: (active: boolean) => void;
-  togglePinnedOnlyFilter: () => void;
-  aiItemFilter: AiItemFilter | null;
-  applyAiFilter: (itemIds: string[], queryLabel: string) => void;
-  clearAiFilter: () => void;
-  isFullscreenEditorOpen: boolean;
-  isSearchOpen: boolean;
-  isSettingsOpen: boolean;
-  toggleAssistant: () => void;
-  isLogViewerOpen: boolean;
-  isFolderModalOpen: boolean;
-  folderModalParent: string | null;
-  isTriageModalOpen: boolean;
-  aiSettings: AiSettings;
-  toasts: ToastMessage[];
-
-  // Assistant Chat State
-  chatMessages: ChatMessage[];
-  isChatLoading: boolean;
-  sendChatMessage: (text: string) => Promise<void>;
-  clearChatMessages: () => void;
-  executeSuggestedAction: (action: SuggestedAction, messageId?: string) => SlagItem | void;
-  rejectAction: (messageId: string) => void;
-
-  // Lightbox Gallery
-  lightboxImages: LightboxImage[];
-  activeLightboxIndex: number | null;
-  openLightbox: (images: LightboxImage[], index?: number) => void;
-  closeLightbox: () => void;
-  navigateLightbox: (newIndex: number) => void;
-  updateLightboxImage: (id: string, updates: Partial<LightboxImage>) => void;
-
-  // Layout & Resizing
-  sidebarWidth: number;
-  rightPanelWidth: number;
-  setSidebarWidth: (w: number) => void;
-  setRightPanelWidth: (w: number) => void;
-
-  // Context Menu
-  contextMenu: ContextMenuTarget | null;
-  openContextMenu: (target: ContextMenuTarget) => void;
-  closeContextMenu: () => void;
-
-  // Replies & Linking
-  replyTarget: ReplyTarget | null;
-  setReplyTarget: (target: ReplyTarget | null) => void;
-  highlightedItemId: string | null;
-  scrollToItem: (idOrTitle: string) => void;
-  navigateToFolder: (folder: string, itemId?: string) => void;
-
-  // Actions
-  setCurrentFolder: (folder: string) => void;
-  setActiveTypeFilter: (type: SlagItemType | 'all') => void;
-  setActiveTagFilter: (tag: string | null) => void;
-  setSelectedItem: (item: SlagItem | null) => void;
-  setIsFullscreenEditorOpen: (open: boolean) => void;
-  setIsSearchOpen: (open: boolean) => void;
-  setIsSettingsOpen: (open: boolean) => void;
-  settingsTab: SettingsTabId;
-  setSettingsTab: (tab: SettingsTabId) => void;
-  openSettingsModal: (tab?: SettingsTabId) => void;
-  setIsLogViewerOpen: (open: boolean) => void;
-  openCreateFolderModal: (parentPath?: string) => void;
-  closeFolderModal: () => void;
-  isFolderInfoModalOpen: boolean;
-  folderInfoTarget: string | null;
-  openFolderInfoModal: (folderPath?: string) => void;
-  closeFolderInfoModal: () => void;
-  renameFolder: (oldPath: string, updatedFolder: FolderMeta) => void;
-  setIsTriageModalOpen: (open: boolean) => void;
-  isComposerModalOpen: boolean;
-  composerModalOptions: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string } | null;
-  openComposerModal: (options?: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string }) => void;
-  closeComposerModal: () => void;
-
-  // Folder View & Filter Settings (Todoist / Linear style)
-  isFolderViewModalOpen: boolean;
-  setIsFolderViewModalOpen: (open: boolean) => void;
-  openFolderViewModal: () => void;
-  closeFolderViewModal: () => void;
-  sortBy: SortField;
-  setSortBy: (sort: SortField) => void;
-  sortOrder: SortOrder;
-  setSortOrder: (order: SortOrder) => void;
-  hideCompletedTasks: boolean;
-  setHideCompletedTasks: (hide: boolean) => void;
-  folderSettings: Record<string, FolderViewSettings>;
-  updateCurrentFolderViewSettings: (partial: Partial<FolderViewSettings>) => void;
-  resetCurrentFolderViewSettings: () => void;
-  
-  // Storage operations
-  saveItem: (item: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }) => SlagItem;
-  updateItem: (item: SlagItem) => void;
-  openNewNote: (folder: string) => void;
-  deleteItem: (id: string) => void;
-  restoreFromTrash: (id: string) => void;
-  toggleTaskComplete: (itemId: string, subtaskId?: string) => void;
-  completeTaskForever: (itemId: string) => void;
-  moveItem: (itemId: string, targetFolder: string) => void;
-  saveFolder: (folder: FolderMeta) => void;
-  updateFolderDescription: (path: string, description: string) => void;
-  deleteFolder: (path: string) => void;
-  switchVault: (vaultId: string) => void;
-  createVault: (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => void;
-  deleteVault: (vaultId: string) => void;
-  pickVaultDirectory: () => Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null>;
-  revealVaultInExplorer: () => Promise<void>;
-  openFolderInExplorer: (folderPath: string) => Promise<void>;
-  seedDemoData: () => void;
-  isVaultModalOpen: boolean;
-  openVaultModal: () => void;
-  closeVaultModal: () => void;
-  saveAiSettings: (settings: Partial<AiSettings>) => void;
-  addToast: (text: string, type?: 'info' | 'success' | 'error', action?: ToastMessage['action']) => void;
-  undoLastAction: () => boolean;
-  removeToast: (id: string) => void;
-  refreshData: () => void;
-
-  // The app's own question for irreversible actions, instead of window.confirm
-  confirmAction: (options: ConfirmOptions) => Promise<boolean>;
-  confirmRequest: ConfirmOptions | null;
-  resolveConfirm: (confirmed: boolean) => void;
-
-  // Attaching media: one sheet, the surface only says where the result lands
-  attachSheet: AttachSheetRequest | null;
-  openAttachSheet: (onAdd: (attachments: SlagAttachment[]) => void) => void;
-  closeAttachSheet: () => void;
-
-  // Backup operations & state
-  backupSnapshots: BackupSnapshotMeta[];
-  backupSettings: BackupSettings;
-  refreshBackupSnapshots: () => Promise<void>;
-  createManualBackup: () => Promise<BackupSnapshotMeta | null>;
-  restoreSnapshot: (id: string) => Promise<boolean>;
-  deleteSnapshot: (id: string) => Promise<void>;
-  downloadSnapshot: (id: string) => Promise<boolean>;
-  downloadVaultZip: () => Promise<string>;
-  restoreFromZipFile: (file: File) => Promise<{ itemsCount: number; attachmentsCount: number }>;
-  updateBackupSettings: (settings: Partial<BackupSettings>) => void;
-
-  // Mobile Navigation & Touch Actions
-  isMobile: boolean;
-  activeMobileTab: MobileTabId;
-  setActiveMobileTab: React.Dispatch<React.SetStateAction<MobileTabId>>;
-  mobileActiveFolder: string | null;
-  setMobileActiveFolder: (folder: string | null) => void;
-  mobileFolderInfoOpen: boolean;
-  setMobileFolderInfoOpen: (open: boolean) => void;
-  mobileActionSheetItem: SlagItem | null;
-  setMobileActionSheetItem: (item: SlagItem | null) => void;
-  mobileDockTabs: MobileTabId[];
-  setMobileDockTabs: (tabs: MobileTabId[]) => void;
-  dismissTopLayer: () => boolean;
-  toggleMobileMode: () => void;
-  forceMobileMode: boolean | null;
-  uiConfig: AppUiConfig;
-  updateUiConfig: (device: 'desktop' | 'mobile', updates: Partial<DeviceUiConfig>) => void;
-}
+import type {
+  AppContextType,
+  AttachSheetRequest,
+  ContextMenuTarget,
+  ToastMessage,
+} from './appContext.types';
+export type { ToastMessage, AttachSheetRequest, ContextMenuTarget } from './appContext.types';
 
 const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
 const SIDEBAR_WIDTH_KEY = STORAGE_KEYS.SIDEBAR_WIDTH;
@@ -715,14 +522,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const undoLastAction = useCallback((): boolean => {
     const last = actionHistoryRef.current.pop();
     if (!last || last.itemSnapshots.length === 0) {
-      addToast('Нет действий для отмены', 'info');
+      addToast('РќРµС‚ РґРµР№СЃС‚РІРёР№ РґР»СЏ РѕС‚РјРµРЅС‹', 'info');
       return false;
     }
     for (const snap of last.itemSnapshots) {
       storage.saveItem(snap);
     }
     setItems(storage.getItems());
-    addToast(`Действие «${last.description}» отменено`, 'info');
+    addToast(`Р”РµР№СЃС‚РІРёРµ В«${last.description}В» РѕС‚РјРµРЅРµРЅРѕ`, 'info');
     return true;
   }, [addToast]);
 
@@ -918,7 +725,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User Breadcrumbs: Modal visibility tracking
   useEffect(() => {
-    if (isSearchOpen) uiLog.debug('Search modal opened (⌘K)');
+    if (isSearchOpen) uiLog.debug('Search modal opened (вЊK)');
   }, [isSearchOpen]);
 
   useEffect(() => {
@@ -1033,7 +840,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items.find(i => i.title.toLowerCase().includes(nameLower));
 
     if (!found) {
-      addToast(`Запись «${cleanQuery}» не найдена`, 'info');
+      addToast(`Р—Р°РїРёСЃСЊ В«${cleanQuery}В» РЅРµ РЅР°Р№РґРµРЅР°`, 'info');
       return;
     }
 
@@ -1113,7 +920,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAiSettings(updated);
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
     uiLog.info(`AI settings updated: provider=${updated.provider}, model=${updated.model || 'default'}`);
-    addToast('Настройки сохранены', 'success');
+    addToast('РќР°СЃС‚СЂРѕР№РєРё СЃРѕС…СЂР°РЅРµРЅС‹', 'success');
   };
 
   const saveItem = useCallback((itemData: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }): SlagItem => {
@@ -1173,10 +980,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItem(null);
     }
     refreshData();
-    // Единственный источник уведомления об удалении: слой модели, а не каждый вызывающий.
-    addToast('Запись в корзине', 'info', {
+    // Р•РґРёРЅСЃС‚РІРµРЅРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє СѓРІРµРґРѕРјР»РµРЅРёСЏ РѕР± СѓРґР°Р»РµРЅРёРё: СЃР»РѕР№ РјРѕРґРµР»Рё, Р° РЅРµ РєР°Р¶РґС‹Р№ РІС‹Р·С‹РІР°СЋС‰РёР№.
+    addToast('Р—Р°РїРёСЃСЊ РІ РєРѕСЂР·РёРЅРµ', 'info', {
       kind: 'restore',
-      label: 'Вернуть',
+      label: 'Р’РµСЂРЅСѓС‚СЊ',
       onClick: () => {
         storage.restoreFromTrash(id);
         refreshData();
@@ -1192,7 +999,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         folder: restored.folder,
       });
       refreshData();
-      addToast(`Запись «${restored.title}» восстановлена`, 'success');
+      addToast(`Р—Р°РїРёСЃСЊ В«${restored.title}В» РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅР°`, 'success');
     }
   }, [refreshData, addToast]);
 
@@ -1207,7 +1014,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     storage.moveItem(itemId, targetFolder);
     refreshData();
-    addToast(`Перемещено в «${targetFolder}»`, 'success');
+    addToast(`РџРµСЂРµРјРµС‰РµРЅРѕ РІ В«${targetFolder}В»`, 'success');
   }, [items, refreshData, addToast]);
 
   const toggleTaskComplete = useCallback((itemId: string, subtaskId?: string) => {
@@ -1260,11 +1067,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (newStatus === 'done') {
         const completed = storage.getItems().find(existing => existing.id === itemId);
         const toastText = item.recurrence && completed && completed.streak !== undefined
-          ? `Таска выполнена (🔥 ${completed.streak})`
-          : 'Таска выполнена';
+          ? `РўР°СЃРєР° РІС‹РїРѕР»РЅРµРЅР° (рџ”Ґ ${completed.streak})`
+          : 'РўР°СЃРєР° РІС‹РїРѕР»РЅРµРЅР°';
         addToast(toastText, 'success');
       } else {
-        addToast('Таска возобновлена', 'info');
+        addToast('РўР°СЃРєР° РІРѕР·РѕР±РЅРѕРІР»РµРЅР°', 'info');
       }
     }
   }, [updateItem, addToast]);
@@ -1289,7 +1096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'done',
       recurrence: undefined,
     });
-    addToast('Задача навсегда завершена', 'success');
+    addToast('Р—Р°РґР°С‡Р° РЅР°РІСЃРµРіРґР° Р·Р°РІРµСЂС€РµРЅР°', 'success');
   }, [items, updateItem, addToast]);
 
   const { executeSuggestedAction, rejectAction } = useSuggestedActions({
@@ -1322,12 +1129,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         messages: newHistory.map(m => {
           let content = m.content || '';
           const actionItems = m.suggestedActions || (m.suggestedAction ? [m.suggestedAction] : []);
-          if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
+          if (!content.trim() || content.startsWith('[РџРѕРґРіРѕС‚РѕРІР»РµРЅ С‡РµСЂРЅРѕРІРёРє')) {
             if (actionItems.length > 0) {
-              content = actionItems.map(sa => `[Подготовлено действие: «${sa.title}»]`).join('\n');
+              content = actionItems.map(sa => `[РџРѕРґРіРѕС‚РѕРІР»РµРЅРѕ РґРµР№СЃС‚РІРёРµ: В«${sa.title}В»]`).join('\n');
             }
           }
-          return { role: m.role, content: content.trim() || '[Сообщение]' };
+          return { role: m.role, content: content.trim() || '[РЎРѕРѕР±С‰РµРЅРёРµ]' };
         }),
         currentFolder,
         settings: aiSettings,
@@ -1341,7 +1148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       let resolvedContent = response.content;
       if (!resolvedContent.trim() && response.suggestedAction) {
-        resolvedContent = `[Подготовлен черновик ${response.suggestedAction.itemType || 'note'}: «${response.suggestedAction.title}»:\n${response.suggestedAction.content || ''}]`;
+        resolvedContent = `[РџРѕРґРіРѕС‚РѕРІР»РµРЅ С‡РµСЂРЅРѕРІРёРє ${response.suggestedAction.itemType || 'note'}: В«${response.suggestedAction.title}В»:\n${response.suggestedAction.content || ''}]`;
       }
 
       const assistantMsg: ChatMessage = {
@@ -1361,7 +1168,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const errorMsg: ChatMessage = {
         id: 'msg_err_' + Date.now(),
         role: 'assistant',
-        content: `Ошибка обращения к ИИ: ${err.message || 'Сбой сети'}`,
+        content: `РћС€РёР±РєР° РѕР±СЂР°С‰РµРЅРёСЏ Рє РР: ${err.message || 'РЎР±РѕР№ СЃРµС‚Рё'}`,
         createdAt: Date.now(),
       };
       setChatMessages(prev => [...prev, errorMsg]);
@@ -1380,13 +1187,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
     setIsFolderModalOpen(false);
     setFolderModalParent(null);
-    addToast(`Папка «${folder.name}» сохранена`, 'success');
+    addToast(`РџР°РїРєР° В«${folder.name}В» СЃРѕС…СЂР°РЅРµРЅР°`, 'success');
   };
 
   const updateFolderDescription = useCallback((path: string, description: string) => {
     storage.updateFolderDescription(path, description);
     refreshData();
-    addToast('Описание папки обновлено', 'success');
+    addToast('РћРїРёСЃР°РЅРёРµ РїР°РїРєРё РѕР±РЅРѕРІР»РµРЅРѕ', 'success');
   }, [refreshData, addToast]);
 
   const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
@@ -1404,12 +1211,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMobileActiveFolderState(previous => remap(previous));
     mobileFolderRef.current = remap(mobileFolderRef.current);
     refreshData();
-    addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
+    addToast(`РџР°РїРєР° РїРµСЂРµРёРјРµРЅРѕРІР°РЅР° РІ В«${updatedFolder.name}В»`, 'success');
   }, [currentFolder, refreshData, addToast]);
 
   const deleteFolder = (path: string) => {
     if (path === DEFAULT_INBOX_FOLDER) {
-      addToast(`Папку «${DEFAULT_INBOX_FOLDER}» нельзя удалить`, 'error');
+      addToast(`РџР°РїРєСѓ В«${DEFAULT_INBOX_FOLDER}В» РЅРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ`, 'error');
       return;
     }
     storage.deleteFolder(path);
@@ -1417,7 +1224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentFolder(DEFAULT_INBOX_FOLDER);
     }
     refreshData();
-    addToast('Папка удалена, заметки перемещены во Входящие', 'info');
+    addToast('РџР°РїРєР° СѓРґР°Р»РµРЅР°, Р·Р°РјРµС‚РєРё РїРµСЂРµРјРµС‰РµРЅС‹ РІРѕ Р’С…РѕРґСЏС‰РёРµ', 'info');
   };
 
   const switchVault = (vaultId: string) => {
@@ -1441,7 +1248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshData();
     });
     void syncEngine.switchVault(vaultId);
-    addToast('Хранилище переключено', 'info');
+    addToast('РҐСЂР°РЅРёР»РёС‰Рµ РїРµСЂРµРєР»СЋС‡РµРЅРѕ', 'info');
   };
 
   const createVault = (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => {
@@ -1449,14 +1256,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!id && accountClient.isAuthenticated()) {
       void accountClient.registerVault(storage.ensureVaultSyncId(newMeta.id), newMeta.name)
         .then(() => syncEngine.switchVault(newMeta.id))
-        .catch((error) => addToast(`Хранилище создано локально, но не зарегистрировано: ${error.message}`, 'error'));
+        .catch((error) => addToast(`РҐСЂР°РЅРёР»РёС‰Рµ СЃРѕР·РґР°РЅРѕ Р»РѕРєР°Р»СЊРЅРѕ, РЅРѕ РЅРµ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅРѕ: ${error.message}`, 'error'));
     } else if (!id) {
       void syncEngine.switchVault(newMeta.id);
     }
     setCurrentFolder(DEFAULT_INBOX_FOLDER);
     setSelectedItem(null);
     refreshData();
-    addToast(`Создано хранилище «${name}»`, 'success');
+    addToast(`РЎРѕР·РґР°РЅРѕ С…СЂР°РЅРёР»РёС‰Рµ В«${name}В»`, 'success');
   };
 
   const deleteVault = (vaultId: string) => {
@@ -1473,9 +1280,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setVaults(storage.getVaults());
       refreshData();
-      addToast('Хранилище удалено', 'info');
+      addToast('РҐСЂР°РЅРёР»РёС‰Рµ СѓРґР°Р»РµРЅРѕ', 'info');
     } else {
-      addToast('Нельзя удалить системное хранилище', 'error');
+      addToast('РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ СЃРёСЃС‚РµРјРЅРѕРµ С…СЂР°РЅРёР»РёС‰Рµ', 'error');
     }
   };
 
@@ -1499,7 +1306,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const seedDemoData = useCallback(() => {
     storage.seedDemoData();
     refreshData();
-    addToast('Созданы стартовые демо-заметки и папки', 'success');
+    addToast('РЎРѕР·РґР°РЅС‹ СЃС‚Р°СЂС‚РѕРІС‹Рµ РґРµРјРѕ-Р·Р°РјРµС‚РєРё Рё РїР°РїРєРё', 'success');
   }, [refreshData, addToast]);
 
   const openCreateFolderModal = (parentPath?: string) => {
@@ -1669,10 +1476,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const snap = await backupService.createSnapshot('manual');
       await refreshBackupSnapshots();
-      addToast(`Резервная копия создана (${snap.notesCount} заметок, ${Math.round(snap.sizeBytes / 1024)} КБ)`, 'success');
+      addToast(`Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ СЃРѕР·РґР°РЅР° (${snap.notesCount} Р·Р°РјРµС‚РѕРє, ${Math.round(snap.sizeBytes / 1024)} РљР‘)`, 'success');
       return snap;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка создания резервной копии';
+      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё';
       addToast(msg, 'error');
       return null;
     }
@@ -1683,13 +1490,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const success = await backupService.restoreSnapshot(id);
       if (success) {
         refreshData();
-        addToast('Хранилище успешно восстановлено из снимка', 'success');
+        addToast('РҐСЂР°РЅРёР»РёС‰Рµ СѓСЃРїРµС€РЅРѕ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРѕ РёР· СЃРЅРёРјРєР°', 'success');
         return true;
       }
-      addToast('Ошибка восстановления снимка', 'error');
+      addToast('РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ СЃРЅРёРјРєР°', 'error');
       return false;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка восстановления';
+      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ';
       addToast(msg, 'error');
       return false;
     }
@@ -1699,9 +1506,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await backupService.deleteSnapshot(id);
       await refreshBackupSnapshots();
-      addToast('Снимок удалён', 'info');
+      addToast('РЎРЅРёРјРѕРє СѓРґР°Р»С‘РЅ', 'info');
     } catch {
-      addToast('Ошибка удаления снимка', 'error');
+      addToast('РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ СЃРЅРёРјРєР°', 'error');
     }
   }, [addToast, refreshBackupSnapshots]);
 
@@ -1709,13 +1516,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const success = await backupService.downloadSnapshot(id);
       if (success) {
-        addToast('Архив снимка скачан', 'success');
+        addToast('РђСЂС…РёРІ СЃРЅРёРјРєР° СЃРєР°С‡Р°РЅ', 'success');
         return true;
       }
-      addToast('Снимок не найден', 'error');
+      addToast('РЎРЅРёРјРѕРє РЅРµ РЅР°Р№РґРµРЅ', 'error');
       return false;
     } catch {
-      addToast('Ошибка скачивания снимка', 'error');
+      addToast('РћС€РёР±РєР° СЃРєР°С‡РёРІР°РЅРёСЏ СЃРЅРёРјРєР°', 'error');
       return false;
     }
   }, [addToast]);
@@ -1723,10 +1530,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const downloadVaultZip = useCallback(async (): Promise<string> => {
     try {
       const filename = await backupService.downloadCurrentVaultZip();
-      addToast(`Хранилище экспортировано (${filename})`, 'success');
+      addToast(`РҐСЂР°РЅРёР»РёС‰Рµ СЌРєСЃРїРѕСЂС‚РёСЂРѕРІР°РЅРѕ (${filename})`, 'success');
       return filename;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка экспорта архива';
+      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° СЌРєСЃРїРѕСЂС‚Р° Р°СЂС…РёРІР°';
       addToast(msg, 'error');
       return '';
     }
@@ -1736,10 +1543,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await backupService.restoreFromZip(file);
       refreshData();
-      addToast(`Восстановлено: ${res.itemsCount} заметок, ${res.attachmentsCount} медиа`, 'success');
+      addToast(`Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРѕ: ${res.itemsCount} Р·Р°РјРµС‚РѕРє, ${res.attachmentsCount} РјРµРґРёР°`, 'success');
       return res;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Ошибка восстановления из архива';
+      const msg = err instanceof Error ? err.message : 'РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ РёР· Р°СЂС…РёРІР°';
       addToast(msg, 'error');
       throw err;
     }
