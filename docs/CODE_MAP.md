@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **343**, строк: **76953**, зон: **40**.
+Модулей: **344**, строк: **76990**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -14,9 +14,9 @@
 | `e2e/slag/editor.spec.ts` | 1576 | 0 |
 | `src/lib/sync/syncEngine.ts` | 1554 | 14 |
 | `src/lib/storage/index.ts` | 1366 | 25 |
-| `src/components/Feed/Composer.tsx` | 1212 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
+| `src/components/Feed/Composer.tsx` | 1094 | 4 |
 | `e2e/slag/views.spec.ts` | 1061 | 0 |
 | `src/lib/ai/localFallback.ts` | 1047 | 1 |
 | `src/context/AppContext.tsx` | 996 | 52 |
@@ -99,7 +99,7 @@
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
 | `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
-## src/components/Feed — 18 файлов, 6420 строк
+## src/components/Feed — 19 файлов, 6457 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -107,7 +107,8 @@
 | `AssistantChat.tsx` | 995 | 2 | AssistantChat |  |
 | `BaseComposer.tsx` | 272 | 2 | BaseComposerProps, BaseComposer |  |
 | `chat/ChatTaskBlock.tsx` | 52 | 1 | ChatTaskBlock |  |
-| `Composer.tsx` | 1212 | 4 | ComposerProps, Composer |  |
+| `Composer.tsx` | 1094 | 4 | ComposerProps, Composer |  |
+| `composer/useComposerFiles.ts` | 155 | 1 | useComposerFiles |  |
 | `ComposerTaskControls.tsx` | 257 | 1 | ComposerTaskControlsProps, ComposerTaskControls |  |
 | `FeedColumnResizer.tsx` | 90 | 1 | FeedColumnResizer |  |
 | `FeedHeader.tsx` | 166 | 1 | FeedHeaderProps, FeedHeader |  |
@@ -485,5 +486,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 107 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 108 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
