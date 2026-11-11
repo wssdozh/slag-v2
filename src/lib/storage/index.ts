@@ -11,6 +11,8 @@ import type {
   FolderViewSettings,
 } from '../../types';
 import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownSerializer';
+import { collectExistingTags, computeVaultStats, type VaultStats } from '../vault/stats';
+export type { VaultStats } from '../vault/stats';
 import { generateDemoItems } from '../vault/demoVault';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 export { getSafeNoteFilename } from '../vault/noteFilename';
@@ -30,6 +32,14 @@ import {
 
 import { idbSaveAttachment, idbGetAttachment } from './indexedDb';
 import { stripAttachmentData } from './attachmentData';
+import {
+  buildVaultExportJson,
+  exportObsidianBundle,
+  importVaultPayload,
+  parseVaultBackup,
+  type VaultImportIo,
+  type VaultImportPayload,
+} from './vaultTransfer';
 import {
   DEFAULT_INBOX_FOLDER,
   STORAGE_KEYS,
@@ -1308,58 +1318,12 @@ export class StorageService {
 
   // Tag taxonomy index
   public getAllExistingTags(): string[] {
-    const items = this.getItems();
-    const tagSet = new Set<string>();
-    items.forEach(it => {
-      (it.tags || []).forEach(t => tagSet.add(t.toLowerCase().trim()));
-    });
-    return Array.from(tagSet).sort();
+    return collectExistingTags(this.getItems());
   }
 
   // Vault & Folder Statistics for AI RAG & Inspector
-  public getVaultStats(folderScope?: string): {
-    totalItems: number;
-    notesCount: number;
-    tasksCount: number;
-    articlesCount: number;
-    tags: Record<string, number>;
-    folders: Record<string, number>;
-    scope: string;
-  } {
-    const allItems = this.getItems();
-    const scopedItems = folderScope && folderScope !== DEFAULT_INBOX_FOLDER
-      ? allItems.filter(i => i.folder === folderScope)
-      : allItems;
-
-    const tags: Record<string, number> = {};
-    const folders: Record<string, number> = {};
-    let notesCount = 0;
-    let tasksCount = 0;
-    let articlesCount = 0;
-
-    scopedItems.forEach(it => {
-      if (it.type === 'note') notesCount++;
-      else if (it.type === 'task') tasksCount++;
-      else if (it.type === 'article') articlesCount++;
-
-      const folderName = it.folder || DEFAULT_INBOX_FOLDER;
-      folders[folderName] = (folders[folderName] || 0) + 1;
-
-      (it.tags || []).forEach(t => {
-        const clean = t.toLowerCase().trim();
-        if (clean) tags[clean] = (tags[clean] || 0) + 1;
-      });
-    });
-
-    return {
-      totalItems: scopedItems.length,
-      notesCount,
-      tasksCount,
-      articlesCount,
-      tags,
-      folders,
-      scope: folderScope || 'Все хранилище',
-    };
+  public getVaultStats(folderScope?: string): VaultStats {
+    return computeVaultStats(this.getItems(), folderScope);
   }
 
   public getAllComposerDrafts(): Record<string, ComposerDraft> {
@@ -1428,15 +1392,14 @@ export class StorageService {
 
   // Export current vault as Markdown files (ZIP or downloadable Blob)
   public exportVaultAsJson(): string {
-    return JSON.stringify({
+    return buildVaultExportJson({
       vault: this.currentVault,
       folders: this.getFolders(),
       items: this.getItems(),
       assistantHistory: this.getAssistantHistory(),
       workspaceState: this.getWorkspaceState(),
       composerDrafts: this.getAllComposerDrafts(),
-      exportedAt: new Date().toISOString(),
-    }, null, 2);
+    });
   }
 
   /** Persist received state before the relay can discard its only pending copy. */
@@ -1527,60 +1490,29 @@ export class StorageService {
     localStorage.setItem(this.getWorkspaceStateKey(), JSON.stringify(workspace));
   }
 
-  public importVaultData(data: {
-    folders?: FolderMeta[];
-    items?: SlagItem[];
-    assistantHistory?: ChatMessage[];
-    workspaceState?: WorkspaceState;
-    composerDrafts?: Record<string, ComposerDraft>;
-  }): boolean {
-    try {
-      if (Array.isArray(data.folders) && data.folders.length > 0) {
-        localStorage.setItem(this.getFoldersKey(), JSON.stringify(data.folders));
-      }
-      if (Array.isArray(data.items)) {
-        this.cacheItems(this.getItemsKey(), data.items);
-      }
-      if (Array.isArray(data.assistantHistory)) {
-        this.saveAssistantHistory(data.assistantHistory);
-      }
-      if (data.workspaceState && typeof data.workspaceState === 'object') {
-        this.saveWorkspaceState(data.workspaceState, 'remote');
-      }
-      if (data.composerDrafts && typeof data.composerDrafts === 'object') {
-        try {
-          localStorage.setItem(this.getDraftsKey(), JSON.stringify(data.composerDrafts));
-        } catch {
-          // ignore
-        }
-      }
-      fsLog.info(`Imported vault data: ${data.items?.length || 0} items, ${data.folders?.length || 0} folders`);
-      return true;
-    } catch (err) {
-      fsLog.error('Failed to import vault data:', err);
-      return false;
-    }
+  private transferIo(): VaultImportIo {
+    return {
+      foldersKey: () => this.getFoldersKey(),
+      itemsKey: () => this.getItemsKey(),
+      draftsKey: () => this.getDraftsKey(),
+      cacheItems: (key, items) => this.cacheItems(key, items),
+      saveAssistantHistory: (messages) => this.saveAssistantHistory(messages),
+      saveWorkspaceState: (state, origin) => this.saveWorkspaceState(state, origin),
+    };
+  }
+
+  public importVaultData(data: VaultImportPayload): boolean {
+    return importVaultPayload(data, this.transferIo());
   }
 
   public importVaultFromJson(jsonString: string): boolean {
-    try {
-      const data = JSON.parse(jsonString);
-      return this.importVaultData(data);
-    } catch (err) {
-      fsLog.error('Failed to import vault JSON backup:', err);
-      return false;
-    }
+    const payload = parseVaultBackup(jsonString);
+    return payload ? this.importVaultData(payload) : false;
   }
 
   // Obsidian Markdown bundle: returns array of { path: string, content: string }
   public exportObsidianBundle(): Array<{ path: string; content: string }> {
-    const items = this.getItems();
-    return items.map(item => {
-      const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-      const filePath = item.folder ? `${item.folder}/${filename}` : filename;
-      const content = serializeItemToMarkdown(item);
-      return { path: filePath, content };
-    });
+    return exportObsidianBundle(this.getItems());
   }
 }
 
