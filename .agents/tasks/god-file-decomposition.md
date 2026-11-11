@@ -1,41 +1,48 @@
 # декомпозиция god-файлов по ответственности
 
-## итог
+## где мы сейчас
 
-| файл | было | стало | вердикт |
+все три сервиса-«бога» ушли под тысячу строк. в топе самых длинных файлов остались только данные и виды.
+
+| файл | было | стало | что осталось |
 |---|---:|---:|---|
-| `context/AppContext.tsx` | 1740 | **995** | 8 модулей |
-| `lib/storage/index.ts` | 1591 | **966** | 4 слоя, включая диск |
-| `lib/sync/syncEngine.ts` | 1594 | **1252** | леджеры + слияние бандла |
-| `components/Feed/Composer.tsx` | 1211 | 1094 | файлы вынесены, дальше одна форма |
-| `components/Feed/ItemCard.tsx` | 1151 | 1151 | вид: 1048 из 1151 — разметка |
-| `components/Mobile/MobileCalendarView.tsx` | 1105 | 1105 | вид: 1071 из 1105 — разметка |
+| `context/AppContext.tsx` | 1740 | **996** | CRUD записей в провайдере, связан со стейтом |
+| `lib/storage/index.ts` | 1591 | **966** | реестр хранилищ (создание/переключение/удаление) |
+| `lib/sync/syncEngine.ts` | 1594 | **978** | соединение, конфиг и авторизация, начальный синк, админ устройств |
+| `components/Feed/Composer.tsx` | 1211 | 1094 | **осознанно**: одна форма |
+| `components/Feed/ItemCard.tsx` | 1151 | 1151 | **осознанно**: 1048 строк разметки |
+| `components/Mobile/MobileCalendarView.tsx` | 1105 | 1105 | **осознанно**: 1071 строка разметки |
+| `lib/sync/bip39Words.ts` | 2052 | 2052 | данные |
 
-## вынесено
+## вынесенные ответственности
 
-`context/`: `useOverlays`, `useMobileNav`, `feedView` + `useFeedView`, `useAssistant`, `useBackup`, `useAppearance`, `useRecurringRollover`, `appContext.types`.
+**context/** — `useOverlays` (поверхности), `useMobileNav`, `useFeedView` + `feedView` (правила ленты как чистая функция), `useAssistant`, `useBackup`, `useAppearance`, `useRecurringRollover`, `appContext.types`.
 
-`storage/`: `vaultFiles` (диск, 497 строк, контекст из 9 вопросов), `vaultTransfer`, `attachments`, `lib/vault/stats`.
+**storage/** — `vaultFiles` (диск: 497 строк, контекст из 9 вопросов), `vaultTransfer` (формат обмена), `attachments` (байты медиа), `lib/vault/stats` (отчёты).
 
-`sync/`: `localBookkeeping`, `applyBundle` (296 строк слияния), `attachmentSignature`.
+**sync/** — `localBookkeeping` (три леджера дедупа), `applyBundle` (317 строк слияния), `pushBundle` (291 строка сборки), `attachmentSignature`.
 
-`composer/`: `useComposerFiles`.
+**composer/** — `useComposerFiles` (подбор, drop, paste).
 
-## что осталось в `syncEngine` (1252) и почему пауза
+## метод
 
-остались: соединение (ws, интервалы, http), конфиг и авторизация, начальный синк, админ устройств, **`pushLocalChanges` — 271 строка, 22 члена**.
+границы методов ищутся **парсером TypeScript** (`ts.createSourceFile` → `node.getStart()/getEnd()`), а не счётчиком скобок: ручной токенизатор обрывался на шаблонных строках и срезал лишнее. это стоило трёх сломанных попыток на одном методе.
 
-`pushLocalChanges` вынести не удалось дважды: счётчик скобок обрывается раньше времени — внутри тела есть шаблонные строки и вложенные блоки, которые мой ручной токенизатор разбирает неверно. по правилу проекта остановился, дерево зелёное.
-
-**решение на следующий заход**: не считать скобки руками, а взять `typescript` (он уже в зависимостях) и найти границы узла через `ts.createSourceFile` → `node.getEnd()`. это даст точный диапазон метода без эвристик, и приём переиспользуется для любых будущих разрезов.
+вынос всегда идёт вместе с правкой call-site'ов: приватные обёртки-форвардеры удаляются, публичные фасады остаются только там, где метод зовут снаружи (UI, спеки).
 
 ## проверки
 
-`npm run check` — 0, `npm run build` — зелёный. финальный прогон: `feed` + `mobile` — **41/41**. раннее за сессию: `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` 3/3, `sync_attachment_transfer`, `assistant_layout`, `backup_restore`.
+`npm run check` — 0, `npm run build` — зелёный.
+e2e за сессию: `feed` 20/20 (шесть раз), `mobile` 21/21, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `assistant_layout`, `backup_restore`.
+
+## что осталось
+
+1. `syncEngine` (978): соединение (ws + интервалы + http), конфиг и авторизация, начальный синк, админ устройств — четыре причины измениться в одном файле.
+2. `storage` (966): реестр хранилищ.
+3. `AppContext` (996): CRUD записей.
 
 ## заметки
 
-- три спека имели один дефект: свой `goto` и 5-секундное ожидание против холодной трансляции vite. все три переведены на ожидание `main`.
-- `backup_restore` вскрыл реальный дефект: модалка настроек не закрывается по Escape после восстановления.
-- диск в e2e не проверяется (в браузере `isTauri()` ложно); правки `VaultFiles` подтверждены типами и сборкой, настоящая проверка — десктоп-билд.
-- уроки: монолит ищется по размеру, а не по имени; границы метода — только через парсер.
+- три спека имели один дефект: свой `goto` и 5-секундное ожидание против холодной трансляции vite (`backup_restore`, `assistant_layout`, `sync_drafts`). все переведены на ожидание `main` с бюджетом 120 с.
+- **`backup_restore` вскрыл реальный дефект**: модалка настроек не закрывается по Escape после восстановления. не починено.
+- **диск в e2e не проверяется**: в браузере `isTauri()` ложно, `flushItemToDisk` — no-op. правки `VaultFiles` подтверждены типами и сборкой; настоящая проверка — десктоп-билд.
