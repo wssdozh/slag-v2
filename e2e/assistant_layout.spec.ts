@@ -41,6 +41,8 @@ async function seedAssistantHistory(page: import('@playwright/test').Page) {
 }
 
 async function openAssistantDock(page: import('@playwright/test').Page) {
+  // The event is listened for after mount; dispatching before that silently drops it.
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('slag:toggle-assistant')));
   await expect(page.getByTestId('assistant-messages')).toBeVisible();
 }

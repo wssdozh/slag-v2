@@ -7,13 +7,9 @@ import type {
   VaultMeta,
   AiSettings,
   SlagItemType,
-  ChatMessage,
-  AppUiConfig,
-  DeviceUiConfig,
 } from '../types';
 import { storage } from '../lib/storage';
 import { applyTaskCompletion } from '../lib/taskCompletion';
-import { sendAssistantChat } from '../lib/aiService';
 import { logger } from '../lib/logger';
 import { openAppFolder } from '../lib/folderOpener';
 import { listenDesktopEvents } from '../lib/windowControls';
@@ -26,15 +22,12 @@ import { useOverlays } from './hooks/useOverlays';
 import { useMobileNav } from './hooks/useMobileNav';
 import { useFeedView } from './hooks/useFeedView';
 import { useBackup } from './hooks/useBackup';
+import { useAssistant } from './hooks/useAssistant';
+import { useAppearance } from './hooks/useAppearance';
 import { crossFade } from '../lib/motion';
-import { getFontScaleMultiplier, getFontFamilyConfig } from '../config/typography';
 import {
   STORAGE_KEYS,
   DEFAULT_INBOX_FOLDER,
-  UI_LAYOUT,
-  ACCENT_COLORS,
-  AI_ENDPOINTS,
-  DEFAULT_AI_MODELS,
 } from '../config';
 import {
   evaluateRecurringTasks,
@@ -53,43 +46,7 @@ import type { AppContextType } from './appContext.types';
 export type { ToastMessage, AttachSheetRequest, ContextMenuTarget } from './appContext.types';
 
 const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
-const SIDEBAR_WIDTH_KEY = STORAGE_KEYS.SIDEBAR_WIDTH;
-const RIGHT_PANEL_WIDTH_KEY = STORAGE_KEYS.RIGHT_PANEL_WIDTH;
-const UI_CONFIG_KEY = STORAGE_KEYS.UI_CONFIG;
 
-const DEFAULT_UI_CONFIG: AppUiConfig = {
-  desktop: {
-    fontScale: 'normal',
-    density: 'normal',
-    fontFamily: 'inter',
-    accent: 'blue',
-  },
-  mobile: {
-    fontScale: 'normal',
-    density: 'spacious',
-    fontFamily: 'inter',
-    accent: 'blue',
-  },
-};
-
-
-const DEFAULT_AI_SETTINGS: AiSettings = {
-  sourceMode: 'subscription',
-  subscriptionModel: 'fast',
-  provider: 'groq',
-  groqApiKey: '',
-  kieApiKey: '',
-  kieBaseUrl: AI_ENDPOINTS.DEFAULT_KIE_BASE_URL,
-  geminiApiKey: '',
-  model: DEFAULT_AI_MODELS.GROQ_DEFAULT,
-  reasoningEffort: 'low',
-  autoTagging: true,
-  autoTriage: true,
-  webSearchEnabled: false,
-  maxTagsPerNote: 3,
-  allowNewTags: true,
-  tagCaseStyle: 'lowercase',
-};
 
 export const AppContext = createContext<AppContextType | null>(null);
 
@@ -103,8 +60,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     : DEFAULT_INBOX_FOLDER;
 
   const [currentFolder, setCurrentFolder] = useState<string>(initialCurFolder);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
-  const [isChatLoading, setIsChatLoading] = useState(false);
   const [items, setItems] = useState<SlagItem[]>(() => {
     const rawItems = storage.getItems();
     const { updatedItems, changedCount } = evaluateRecurringTasks(rawItems);
@@ -151,6 +106,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   } = useFeedView(currentFolder, items, initialWorkspace);
 
   const {
+    chatMessages, setChatMessages, isChatLoading,
+    aiSettings, setAiSettings,
+    sendChatMessage, clearChatMessages,
+  } = useAssistant(currentFolder, folders, items, applyAiFilter);
+
+  const {
     lightboxImages, activeLightboxIndex,
     openLightbox, closeLightbox, navigateLightbox, updateLightboxImage,
     isFullscreenEditorOpen, setIsFullscreenEditorOpen,
@@ -172,29 +133,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
 
-  // Resizable panel widths
-  const [sidebarWidth, setSidebarWidthState] = useState<number>(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? Number(saved) : 256;
-  });
-
-  const [rightPanelWidth, setRightPanelWidthState] = useState<number>(() => {
-    const saved = localStorage.getItem(RIGHT_PANEL_WIDTH_KEY);
-    return saved ? Number(saved) : 288;
-  });
-
-  const setSidebarWidth = (w: number) => {
-    const clamped = Math.max(UI_LAYOUT.SIDEBAR_MIN_WIDTH, Math.min(UI_LAYOUT.SIDEBAR_MAX_WIDTH, w));
-    setSidebarWidthState(clamped);
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clamped));
-  };
-
-  const setRightPanelWidth = (w: number) => {
-    const clamped = Math.max(UI_LAYOUT.RIGHT_PANEL_MIN_WIDTH, Math.min(UI_LAYOUT.RIGHT_PANEL_MAX_WIDTH, w));
-    setRightPanelWidthState(clamped);
-    localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(clamped));
-  };
-
   const {
     isMobile, forceMobileMode, toggleMobileMode,
     activeMobileTab, setActiveMobileTab,
@@ -204,68 +142,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mobileDockTabs, setMobileDockTabs, remapMobileFolder,
   } = useMobileNav(initialWorkspace, setCurrentFolder);
 
-  const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
-    try {
-      const saved = localStorage.getItem(AI_SETTINGS_KEY);
-      return saved ? { ...DEFAULT_AI_SETTINGS, ...JSON.parse(saved) } : DEFAULT_AI_SETTINGS;
-    } catch {
-      return DEFAULT_AI_SETTINGS;
-    }
-  });
-
-  const [uiConfig, setUiConfig] = useState<AppUiConfig>(() => {
-    try {
-      const saved = localStorage.getItem(UI_CONFIG_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return {
-          desktop: { ...DEFAULT_UI_CONFIG.desktop, ...parsed.desktop },
-          mobile: { ...DEFAULT_UI_CONFIG.mobile, ...parsed.mobile },
-        };
-      }
-      return DEFAULT_UI_CONFIG;
-    } catch {
-      return DEFAULT_UI_CONFIG;
-    }
-  });
-
-  const updateUiConfig = useCallback((device: 'desktop' | 'mobile', updates: Partial<DeviceUiConfig>) => {
-    setUiConfig(prev => {
-      const next: AppUiConfig = {
-        ...prev,
-        [device]: {
-          ...prev[device],
-          ...updates,
-        },
-      };
-      try {
-        localStorage.setItem(UI_CONFIG_KEY, JSON.stringify(next));
-      } catch {
-        // Ignore
-      }
-      return next;
-    });
-  }, []);
-
-  // Dynamically apply density, font and accent CSS properties to document root
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const currentDevice = isMobile ? 'mobile' : 'desktop';
-    const cfg = uiConfig[currentDevice];
-
-    document.documentElement.dataset.density = cfg.density;
-
-    const scaleNum = getFontScaleMultiplier(cfg.fontScale);
-    document.documentElement.style.setProperty('--slag-font-scale', String(scaleNum));
-
-    const fontCfg = getFontFamilyConfig(cfg.fontFamily);
-    document.documentElement.style.setProperty('--slag-font-sans', fontCfg.cssSans);
-    document.documentElement.style.setProperty('--slag-font-mono', fontCfg.cssMono);
-
-    // One hex repaints the whole accent family: theme.css derives strong/subtle/media from it.
-    const accent = ACCENT_COLORS[cfg.accent] ?? ACCENT_COLORS.blue;
-    document.documentElement.style.setProperty('--color-accent', accent.hex);
-  }, [isMobile, uiConfig]);
+  const {
+    sidebarWidth, rightPanelWidth, setSidebarWidth, setRightPanelWidth,
+    uiConfig, updateUiConfig,
+  } = useAppearance(isMobile);
 
   // Action History Stack for Undo capability (up to 20 snapshots)
   const actionHistoryRef = useRef<ActionHistoryEntry[]>([]);
@@ -456,11 +336,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     hideCompletedTasks,
     folderSettings,
   ]);
-
-  // Assistant history persistence in Vault
-  useEffect(() => {
-    storage.saveAssistantHistory(chatMessages);
-  }, [chatMessages]);
 
   const prevViewRef = useRef(feedViewMode);
   useEffect(() => {
@@ -848,78 +723,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setChatMessages,
     actionHistoryRef,
   });
-
-  const sendChatMessage = useCallback(async (userText: string) => {
-    if (!userText.trim()) return;
-
-    const userMsg: ChatMessage = {
-      id: 'msg_' + Date.now(),
-      role: 'user',
-      content: userText.trim(),
-      createdAt: Date.now(),
-    };
-
-    const newHistory = [...chatMessages, userMsg];
-    setChatMessages(newHistory);
-    setIsChatLoading(true);
-
-    try {
-      const response = await sendAssistantChat({
-        messages: newHistory.map(m => {
-          let content = m.content || '';
-          const actionItems = m.suggestedActions || (m.suggestedAction ? [m.suggestedAction] : []);
-          if (!content.trim() || content.startsWith('[Подготовлен черновик')) {
-            if (actionItems.length > 0) {
-              content = actionItems.map(sa => `[Подготовлено действие: «${sa.title}»]`).join('\n');
-            }
-          }
-          return { role: m.role, content: content.trim() || '[Сообщение]' };
-        }),
-        currentFolder,
-        settings: aiSettings,
-        folders,
-        allItems: items,
-      });
-
-      if (response.feedFilter) {
-        applyAiFilter(response.feedFilter.itemIds, response.feedFilter.queryLabel);
-      }
-
-      let resolvedContent = response.content;
-      if (!resolvedContent.trim() && response.suggestedAction) {
-        resolvedContent = `[Подготовлен черновик ${response.suggestedAction.itemType || 'note'}: «${response.suggestedAction.title}»:\n${response.suggestedAction.content || ''}]`;
-      }
-
-      const assistantMsg: ChatMessage = {
-        id: 'msg_res_' + Date.now(),
-        role: 'assistant',
-        content: resolvedContent,
-        createdAt: Date.now(),
-        reasoning: response.reasoning,
-        reasoningTimeMs: response.reasoningTimeMs,
-        toolCalls: response.toolCalls,
-        suggestedAction: response.suggestedAction,
-        suggestedActions: response.suggestedActions,
-      };
-
-      setChatMessages(prev => [...prev, assistantMsg]);
-    } catch (err: any) {
-      const errorMsg: ChatMessage = {
-        id: 'msg_err_' + Date.now(),
-        role: 'assistant',
-        content: `Ошибка обращения к ИИ: ${err.message || 'Сбой сети'}`,
-        createdAt: Date.now(),
-      };
-      setChatMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setIsChatLoading(false);
-    }
-  }, [chatMessages, currentFolder, aiSettings, folders, items, applyAiFilter]);
-
-  const clearChatMessages = useCallback(() => {
-    storage.clearAssistantHistory();
-    setChatMessages([]);
-  }, []);
 
   const saveFolder = (folder: FolderMeta) => {
     storage.saveFolder(folder);
