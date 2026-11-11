@@ -1,3 +1,5 @@
+import type { AiSettings, ChatToolCall, FolderMeta, SlagItem, SuggestedAction } from '../../types';
+
 export interface AssistantToolDefinition {
   name: string;
   description: string;
@@ -57,4 +59,22 @@ export interface LlmAdapterTurnResponse {
 
 export interface LlmProtocolAdapter {
   executeTurn(request: LlmAdapterTurnRequest): Promise<LlmAdapterTurnResponse>;
+}
+
+export interface SendAssistantChatParams {
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  currentFolder: string;
+  settings: AiSettings;
+  folders: FolderMeta[];
+  allItems: SlagItem[];
+}
+
+export interface SendAssistantChatResult {
+  content: string;
+  reasoning?: string;
+  reasoningTimeMs?: number;
+  toolCalls?: ChatToolCall[];
+  suggestedAction?: SuggestedAction;
+  suggestedActions?: SuggestedAction[];
+  feedFilter?: { itemIds: string[]; queryLabel: string };
 }
