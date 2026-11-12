@@ -36,6 +36,50 @@ function filterByType(items: SlagItem[], typeFilter?: string): SlagItem[] {
   return items.filter(item => item.type === typeFilter);
 }
 
+// Orama ships a stemmer for english only, and stemming is off unless one is passed at
+// create(); `language: 'russian'` therefore indexes whole inflected words («правил»,
+// «правилами») and there is no stem to fall back on. A typo in another grammatical case
+// («прафилам») is then two edits away from every form the note actually holds, so
+// tolerance 1 can never bridge it. Trimming the inflectional tail puts the comparison back
+// on the stem — «прафил» vs «правил» is one edit — which is the pass that finds the note.
+const RU_ENDINGS = [
+  'ами', 'ями', 'ыми', 'ими', 'ого', 'его', 'ому', 'ему',
+  'ах', 'ях', 'ам', 'ям', 'ов', 'ев', 'ей', 'ой', 'ий', 'ый',
+  'ая', 'яя', 'ое', 'ее', 'ые', 'ие', 'ом', 'ем', 'ую', 'юю',
+  'а', 'я', 'о', 'е', 'ы', 'и', 'у', 'ю', 'ь',
+];
+
+function stemToken(token: string): string | null {
+  if (token.length < 6) return null;
+  for (const ending of RU_ENDINGS) {
+    if (token.endsWith(ending) && token.length - ending.length >= 4) {
+      return token.slice(0, token.length - ending.length);
+    }
+  }
+  return null;
+}
+
+// The index has no stopword list either, so «по» and «как» are ordinary tokens. In the
+// per-token pass that is fatal: «по» prefix-matches «повестки» and lands in ten notes,
+// while «как» matched exactly one unrelated note and scored a full 1/1 — enough to outrank
+// the note the rare token actually pointed at. Filler never carries the intent, so it is
+// dropped before either pass.
+const RU_STOPWORDS = new Set([
+  'а', 'без', 'более', 'больше', 'бы', 'был', 'была', 'были', 'было', 'быть',
+  'в', 'вам', 'вас', 'ведь', 'весь', 'во', 'вот', 'все', 'всё', 'всего', 'всегда',
+  'всю', 'вы', 'где', 'да', 'даже', 'для', 'до', 'его', 'ее', 'её', 'ей', 'ему',
+  'если', 'есть', 'еще', 'ещё', 'же', 'за', 'зачем', 'здесь', 'и', 'из', 'или',
+  'им', 'их', 'к', 'как', 'какая', 'какой', 'когда', 'кто', 'куда', 'ли', 'мне',
+  'мой', 'моя', 'мы', 'на', 'над', 'нас', 'не', 'него',
+  'нее', 'неё', 'ни', 'ним', 'них', 'но', 'ну', 'о', 'об', 'однако', 'он',
+  'она', 'они', 'от', 'по', 'под', 'после', 'потом', 'потому', 'почти', 'при',
+  'про', 'сам', 'с', 'себе', 'себя', 'сейчас', 'со', 'совсем', 'так', 'также',
+  'там', 'тебе', 'тебя', 'тем', 'теперь', 'то', 'тогда', 'того', 'тоже', 'только',
+  'том', 'тот', 'тут', 'ты', 'у', 'уж', 'уже', 'хоть', 'чего', 'чем', 'через',
+  'что', 'чтоб', 'чтобы', 'эта', 'эти', 'это', 'этого', 'этой', 'этом', 'этот',
+  'эту', 'я',
+]);
+
 async function syncIndex(items: SlagItem[]): Promise<void> {
   const started = performance.now();
   const { create, insertMultiple, remove } = await import('@orama/orama');
@@ -127,9 +171,11 @@ export async function querySearch(
 
   const started = performance.now();
   const tokens = trimmed.split(/\s+/).filter(Boolean);
+  const contentTokens = tokens.filter(token => !RU_STOPWORDS.has(token));
+  const searched = contentTokens.length > 0 ? contentTokens : tokens;
   // Typo tolerance costs ~5x and on phrases it turns a 10k vault into a second-long stall,
   // so it stays on single-token queries where it actually catches the typo.
-  const tolerance = tokens.length > 1 ? 0 : SEARCH_LIMITS.TYPO_TOLERANCE;
+  const tolerance = searched.length > 1 ? 0 : SEARCH_LIMITS.TYPO_TOLERANCE;
 
   const done = (results: SlagItem[], how: string): SlagItem[] => {
     searchLog.trace(`"${queryText}" -> ${results.length} hits via ${how} (${Math.round(performance.now() - started)}ms)`);
@@ -139,11 +185,26 @@ export async function querySearch(
   try {
     const { search } = await import('@orama/orama');
 
-    const phrase = await search(dbInstance, {
-      term: trimmed,
+    let phrase = await search(dbInstance, {
+      term: searched.join(' '),
       tolerance,
+      // 0 = every word must match. Orama defaults to 1 ("any word"), which made the phrase
+      // pass an OR over filler: «поищи по заметкам по прафилам как жить вообще» matched ten
+      // notes through «по»/«как» alone and returned early, so the token pass never ran.
+      threshold: 0,
       limit: SEARCH_LIMITS.ORAMA_PHRASE_LIMIT,
     });
+    if (phrase.hits.length === 0 && searched.length === 1) {
+      const stem = stemToken(searched[0]);
+      if (stem) {
+        phrase = await search(dbInstance, {
+          term: stem,
+          tolerance,
+          threshold: 0,
+          limit: SEARCH_LIMITS.ORAMA_PHRASE_LIMIT,
+        });
+      }
+    }
     const byId = new Map(allItems.map(item => [item.id, item] as const));
     const inHitOrder = (ids: string[]): SlagItem[] =>
       ids.map(id => byId.get(id)).filter((item): item is SlagItem => item !== undefined);
@@ -154,19 +215,30 @@ export async function querySearch(
     );
     if (phraseHits.length > 0) return done(phraseHits, 'orama phrase');
 
-    if (tokens.length > 1) {
-      // A filler word ("по", "как") matches most of the vault, a typo-matched one matches two
-      // notes. Scoring each hit by how rare the token it matched is keeps the second group on
-      // top, which is what "relevance" has to mean for a phrase query.
-      const unique = [...new Set(tokens)];
+    if (searched.length > 1) {
+      // A word that matched ten notes says little, one that matched a single note says a lot:
+      // scoring each hit by 1/df keeps the rare, typo-recovered token on top instead of the
+      // words every note happens to share.
+      const unique = [...new Set(searched)];
       const scored = new Map<string, { item: SlagItem; score: number; order: number }>();
       let order = 0;
       for (const token of unique) {
-        const result = await search(dbInstance, {
+        let result = await search(dbInstance, {
           term: token,
           tolerance: SEARCH_LIMITS.TYPO_TOLERANCE,
           limit: SEARCH_LIMITS.ORAMA_KEYWORD_LIMIT,
         });
+        if (result.hits.length === 0) {
+          // No word in the vault is one edit away from the token as typed; try its stem.
+          const stem = stemToken(token);
+          if (stem) {
+            result = await search(dbInstance, {
+              term: stem,
+              tolerance: SEARCH_LIMITS.TYPO_TOLERANCE,
+              limit: SEARCH_LIMITS.ORAMA_KEYWORD_LIMIT,
+            });
+          }
+        }
         const weight = 1 / Math.max(1, result.hits.length);
         for (const hit of result.hits) {
           const id = (hit.document as { id: string }).id;

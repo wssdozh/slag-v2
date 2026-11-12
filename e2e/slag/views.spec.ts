@@ -301,11 +301,13 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     });
   });
 
-  // Still skipped, and not because of selectors. Ranking now follows Orama's order and rare
-  // tokens outrank filler, yet the note this test wants («12 правил эффективности») does not
-  // surface even in the untruncated pool for «прафилам». Until someone traces the tokenizer,
-  // asserting it here would only document a wish.
-  test.skip('24. Typo-Tolerant Note Search and Multi-step Agentic Tool Calling Verification', async ({ page }) => {
+  // The note is «12 правил эффективности», and «прафилам» is a typo of «правилам» — a form
+  // the note never contains: it holds «правил» (title) and «правилами» (body). With no russian
+  // stemmer in Orama the index keeps whole words, so the typo sits two edits from every form
+  // the note has and tolerance 1 cannot reach it; the note only matched through filler noise.
+  // searchService now scores content tokens only and retries a token that found nothing on its
+  // inflectional stem («прафил» vs «правил» is one edit), which puts the note first.
+  test('24. Typo-Tolerant Note Search and Multi-step Agentic Tool Calling Verification', async ({ page }) => {
     // 1. Switch to Assistant tab
     const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
     await assistantTab.click();
@@ -318,9 +320,13 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     await textarea.press('Enter');
 
     // 3. The typo still finds the note, and it is the top hit rather than the fifth.
-    // Results collapse past three, so open the list when the header is there.
+    // Results collapse past three, so expand the list — the search is async, so the header
+    // is not in the DOM on the line after Enter and must be waited for, not probed once.
     const searchHeader = page.locator('button', { hasText: /Найдено \d+ в хранилище/ }).first();
-    if (await searchHeader.isVisible().catch(() => false)) await searchHeader.click();
+    const hasHeader = await searchHeader
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true, () => false);
+    if (hasHeader) await searchHeader.click();
     const matchedResult = page.locator('button[title*="12 правил эффективности"]').first();
     await expect(matchedResult).toBeVisible({ timeout: 5000 });
     await expect(page.locator('button[title^="Перейти к"]').first()).toHaveAttribute('title', /12 правил эффективности/);
