@@ -174,12 +174,10 @@ test.describe('Multimedia Attachment Enrichment E2E', () => {
     await expect(searchModal).not.toBeVisible();
   });
 
-  // The chrome now stops its own clicks, so opening the panel no longer closes the viewer —
-  // that part is fixed and below is the closest the spec got. What still fails is the 'T'
-  // toggle: the first press leaves the panel visible, which means the panel is already open
-  // by the time the key arrives. That is a product question (who owns the panel state, the
-  // card button or the viewer), not a selector, so the check stays parked.
-  test.skip('the lightbox OCR panel opens without closing the viewer', async ({ page }) => {
+  // The chrome stops its own clicks, so a chrome button no longer closes the viewer it lives
+  // in. The panel belongs to the viewer: it is mounted only while open, 'T' toggles it from the
+  // first press and Escape closes the panel before the viewer.
+  test('the lightbox OCR panel opens without closing the viewer', async ({ page }) => {
     const now = Date.now();
     await page.addInitScript((imageNote) => {
       localStorage.setItem('slag_items_default_vault', JSON.stringify([imageNote]));

@@ -334,12 +334,16 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           )}
         </div>
 
-        <LightboxTextPanel
-          image={currentImage}
-          isOpen={isTextPanelOpen}
-          onClose={() => setIsTextPanelOpen(false)}
-          onRetryEnrich={isVideo ? undefined : onRetryEnrich}
-        />
+        {/* The panel is the viewer's own state: closed means gone. Left mounted at zero width,
+            it kept its text in the tree long after 'T' had closed it. */}
+        {isTextPanelOpen && (
+          <LightboxTextPanel
+            image={currentImage}
+            isOpen
+            onClose={() => setIsTextPanelOpen(false)}
+            onRetryEnrich={isVideo ? undefined : onRetryEnrich}
+          />
+        )}
       </div>
 
       <div className="absolute inset-x-0 bottom-0 z-10 hidden h-12 items-center justify-center border-t border-white/[0.06] bg-black/40 backdrop-blur-md sm:flex">
