@@ -31,15 +31,16 @@ test('received bundles are written once per burst, after the burst, and render o
     try {
       await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle: bundle('one') }));
       await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle: bundle('two') }));
-      // Two bundles, one ACK each, nothing written yet: the burst is still being collected.
+      // Two bundles, nothing ACKed and nothing written yet: the burst is still being collected.
       const beforeFlush = { writes, rendered, acks: sent.length };
       await new Promise((resolve) => setTimeout(resolve, 200));
-      const whileWriting = { writes, rendered };
+      const whileWriting = { writes, rendered, acks: sent.length };
       release();
       await new Promise((resolve) => setTimeout(resolve, 100));
       const afterWrite = {
         writes,
         rendered,
+        acks: sent.length,
         stored: ['one', 'two'].filter((id) => storage.getItems().some((it) => it.id === id)),
       };
       return { beforeFlush, whileWriting, afterWrite };
@@ -50,21 +51,17 @@ test('received bundles are written once per burst, after the burst, and render o
     }
   });
   expect(result).toEqual({
-    beforeFlush: { writes: 0, rendered: 0, acks: 2 },
-    whileWriting: { writes: 1, rendered: 0 },
-    afterWrite: { writes: 1, rendered: 1, stored: ['one', 'two'] },
+    beforeFlush: { writes: 0, rendered: 0, acks: 0 },
+    whileWriting: { writes: 1, rendered: 0, acks: 0 },
+    afterWrite: { writes: 1, rendered: 1, acks: 2, stored: ['one', 'two'] },
   });
 });
 
-// fixme: the import buffer moved the ACK in front of the write. A bundle is staged in memory and
-// ACKed immediately; the flush that persists it is fired on a timer and its rejection is dropped
-// (`void this.flushStagedImport()`), so a failed write loses the bundle for good: the relay has
-// it ACKed, `appliedBundleIds` already holds it, nothing is on disk and `status` stays
-// 'connected'. Measured: one ACK, applied true, stored false, no error. Before the buffer the
-// ACK waited for `importSyncedVaultData`, so an unwritten bundle stayed pending and the relay
-// delivered it again. Product-side fix (hold the ACK until the burst write resolves, or re-queue
-// the buffer on failure) — not a test fix.
-test.fixme('received bundles never ACK a write that failed', async ({ page }) => {
+// The ACK belongs to the write, not to the merge: a staged bundle is confirmed to the relay only
+// after the burst lands on disk. When that write fails, the relay keeps its copy (no ACK), the id
+// leaves `appliedBundleIds` (a re-delivery applies again instead of being skipped) and the failure
+// is visible in `status` — silent 'connected' over an empty disk was the data loss.
+test('received bundles never ACK a write that failed', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
   const result = await page.evaluate(async () => {
@@ -82,24 +79,32 @@ test.fixme('received bundles never ACK a write that failed', async ({ page }) =>
       changes: [{ type: 'item', action: 'upsert', id: 'failed', payload: { id: 'failed', title: 'failed', type: 'note', content: 'x', folder: 'Входящие' } }],
     };
     try {
-      let failure = '';
-      try {
-        await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle }));
-      } catch (error) {
-        failure = error instanceof Error ? error.message : String(error);
-      }
+      await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle }));
       await new Promise((resolve) => setTimeout(resolve, 250));
-      return {
+      const afterFailure = {
         acks: sent.length,
-        failure,
         state: engine.status.state,
+        error: engine.status.error,
         applied: engine.appliedBundleIds.has('failed'),
         stored: storage.getItems().some((it) => it.id === 'failed'),
       };
+      // Disk back: the relay re-delivers the bundle it was never told about, and it lands.
+      storage.importSyncedVaultData = original;
+      await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle }));
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const afterRetry = {
+        acks: sent.length,
+        applied: engine.appliedBundleIds.has('failed'),
+        stored: storage.getItems().some((it) => it.id === 'failed'),
+      };
+      return { afterFailure, afterRetry };
     } finally {
       storage.importSyncedVaultData = original;
       engine.disconnect();
     }
   });
-  expect(result).toEqual({ acks: 0, failure: 'disk full', state: 'error', applied: false, stored: false });
+  expect(result).toEqual({
+    afterFailure: { acks: 0, state: 'error', error: 'disk full', applied: false, stored: false },
+    afterRetry: { acks: 1, applied: true, stored: true },
+  });
 });

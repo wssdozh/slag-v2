@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { test, expect } from './support/accountHarness';
 
@@ -28,16 +28,33 @@ async function openCabinet(page: Page, origin: string, relayUrl: string) {
     if ([origin, relayUrl].includes(url.origin)) return route.continue();
     return route.abort('blockedbyclient');
   });
+  // «Открыть приложение» pops the entry the user came from, so the cabinet has to be
+  // opened from the app: a direct load has only a blank tab behind it.
+  await page.goto(`${origin}/`);
   await page.goto(`${origin}/?page=account`);
   await expect(page.getByRole('heading', { name: 'SLAG ID' })).toBeVisible({ timeout: 90_000 });
 }
 
-test('account cabinet registration, approval, sharing and same-name vault sidebar', async ({ browser, accountHarness }) => {
-  test.setTimeout(240_000);
-  const origin = new URL(accountHarness.appUrl).origin;
-  const { relayUrl } = accountHarness;
-  const hostVaultId = randomUUID();
-  const guestVaultId = randomUUID();
+async function acceptConfirm(page: Page, action: string) {
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: action, exact: true }).click();
+}
+
+interface SharedCabinet {
+  host: Page;
+  guest: Page;
+  failures: string[];
+  guestDeviceId: string;
+  close: () => Promise<void>;
+}
+
+/**
+ * Registers the host account, approves the guest device, renames it and invites it
+ * to the host vault. Both cabinet scenarios start from this state.
+ */
+async function setupSharedCabinet(browser: Browser, { appUrl, relayUrl }: { appUrl: string; relayUrl: string }): Promise<SharedCabinet> {
+  const origin = new URL(appUrl).origin;
   const hostDeviceId = randomUUID();
   const guestDeviceId = randomUUID();
   const hostContext = await browser.newContext();
@@ -47,9 +64,14 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
   const failures: string[] = [];
   host.on('pageerror', (error) => failures.push(error.message));
   guest.on('pageerror', (error) => failures.push(error.message));
+  const close = async () => {
+    await hostContext.close();
+    await guestContext.close();
+  };
+
   try {
-    await seedIsolatedBrowser(hostContext, relayUrl, hostVaultId, hostDeviceId, 'Account host browser');
-    await seedIsolatedBrowser(guestContext, relayUrl, guestVaultId, guestDeviceId, 'Account guest browser');
+    await seedIsolatedBrowser(hostContext, relayUrl, randomUUID(), hostDeviceId, 'Account host browser');
+    await seedIsolatedBrowser(guestContext, relayUrl, randomUUID(), guestDeviceId, 'Account guest browser');
     await openCabinet(host, origin, relayUrl);
     await host.getByRole('button', { name: 'Создать аккаунт', exact: true }).click();
     const seed = await host.getByTestId('account-generated-seed').locator(':scope > span').evaluateAll(
@@ -90,6 +112,18 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     await host.getByLabel('Права', { exact: true }).selectOption('receive-only');
     await host.getByRole('button', { name: 'Отправить приглашение', exact: true }).click();
     await expect(host.getByRole('status')).toContainText('Приглашение отправлено', { timeout: 30_000 });
+  } catch (error) {
+    await close();
+    throw error;
+  }
+
+  return { host, guest, failures, guestDeviceId, close };
+}
+
+test('account cabinet registration, approval, sharing and same-name vault sidebar', async ({ browser, accountHarness }) => {
+  test.setTimeout(240_000);
+  const { guest, failures, close } = await setupSharedCabinet(browser, accountHarness);
+  try {
     await guest.getByRole('button', { name: 'Обновить', exact: true }).click();
     await expect(guest.getByText('Приглашения', { exact: true })).toBeVisible();
     await guest.screenshot({ path: 'test-results/screenshots/account-vault-invitation.png', fullPage: true });
@@ -101,20 +135,6 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
     expect(vaults.map((vault: { name: string }) => vault.name)).toEqual(['Account integration vault', 'Account integration vault']);
     await expect(guest.getByText(/Account integration vault · /)).toHaveCount(2);
     await guest.screenshot({ path: 'test-results/screenshots/account-vault-connected.png', fullPage: true });
-
-    // A revoked device stays in the single device list, so the owner can bring it back or drop it.
-    host.on('dialog', (dialog) => void dialog.accept());
-    const guestRow = host.getByTestId(`device-row-${guestDeviceId}`);
-    await guestRow.getByRole('button', { name: 'Отозвать', exact: true }).click();
-    await expect(guestRow).toContainText('отозвано');
-    await expect(guestRow.getByRole('button', { name: 'Вернуть', exact: true })).toBeVisible();
-    await host.screenshot({ path: 'test-results/screenshots/account-devices-revoked.png', fullPage: true });
-    await guestRow.getByRole('button', { name: 'Вернуть', exact: true }).click();
-    await expect(host.getByRole('status')).toContainText('Устройство снова активно');
-    await expect(guestRow).toContainText('активно');
-    await host.getByRole('button', { name: /^Вернуть доступ .*Account integration vault$/ }).click();
-    await expect(host.getByRole('status')).toContainText('Доступ снова предложен');
-    await host.screenshot({ path: 'test-results/screenshots/account-devices-restored.png', fullPage: true });
 
     await guest.getByRole('button', { name: 'Открыть приложение', exact: true }).click();
     const currentVault = await guest.evaluate(() => JSON.parse(localStorage.getItem('slag_current_vault_v2')!));
@@ -129,8 +149,38 @@ test('account cabinet registration, approval, sharing and same-name vault sideba
       .filter((key) => key.startsWith('slag_items_'))
       .every((key) => JSON.parse(localStorage.getItem(key)!).length === 0))).toBe(true);
   } finally {
-    await hostContext.close();
-    await guestContext.close();
+    await close();
+  }
+});
+
+// The cabinet asks before destructive actions through AppContext.confirmAction; ConfirmDialog and
+// ToastContainer are now mounted on the standalone ?page=account branch too, so the promise resolves.
+test('a revoked device stays in the cabinet list and gets its access back', async ({ browser, accountHarness }) => {
+  test.setTimeout(240_000);
+  const { host, guest, failures, guestDeviceId, close } = await setupSharedCabinet(browser, accountHarness);
+  try {
+    await guest.getByRole('button', { name: 'Обновить', exact: true }).click();
+    await expect(guest.getByText('Приглашения', { exact: true })).toBeVisible();
+    await guest.getByRole('button', { name: 'Подключить', exact: true }).click();
+    await expect(guest.getByRole('status')).toContainText('Приглашение принято.', { timeout: 30_000 });
+
+    // A revoked device stays in the single device list, so the owner can bring it back or drop it.
+    // Revoking is destructive, so the app asks in its own dialog first.
+    const guestRow = host.getByTestId(`device-row-${guestDeviceId}`);
+    await guestRow.getByRole('button', { name: 'Отозвать', exact: true }).click();
+    await acceptConfirm(host, 'Отозвать');
+    await expect(guestRow).toContainText('отозвано');
+    await expect(guestRow.getByRole('button', { name: 'Вернуть', exact: true })).toBeVisible();
+    await host.screenshot({ path: 'test-results/screenshots/account-devices-revoked.png', fullPage: true });
+    await guestRow.getByRole('button', { name: 'Вернуть', exact: true }).click();
+    await expect(host.getByRole('status')).toContainText('Устройство снова активно');
+    await expect(guestRow).toContainText('активно');
+    await host.getByRole('button', { name: /^Вернуть доступ .*Account integration vault$/ }).click();
+    await expect(host.getByRole('status')).toContainText('Доступ снова предложен');
+    await host.screenshot({ path: 'test-results/screenshots/account-devices-restored.png', fullPage: true });
+    expect(failures).toEqual([]);
+  } finally {
+    await close();
   }
 });
 

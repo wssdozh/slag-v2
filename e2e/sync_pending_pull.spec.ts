@@ -2,7 +2,8 @@ import { test, expect } from './support/selfhostFixture';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  // The first page load in a cold run pays Vite's transform of the whole module graph.
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 120000 });
 });
 
 test('concurrent pending pulls share one request until applying finishes, then allow another pull', async ({ page }) => {
@@ -161,7 +162,7 @@ for (const staleStatus of [200, 503]) {
   });
 }
 
-test('redelivered applied bundle is ACKed again without persisting or notifying twice', async ({ page }) => {
+test('a re-delivered pending bundle is written once and ACKed once, when the write lands', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const path = '/src/lib/sync/syncEngine.ts';
     const { SyncEngine, storage } = await import(/* @vite-ignore */ path);
@@ -173,12 +174,15 @@ test('redelivered applied bundle is ACKed again without persisting or notifying 
     let writes = 0;
     let updates = 0;
     const acks: string[][] = [];
+    const acksBeforeWrite: number[] = [];
+    let written = 0;
     const onUpdate = () => { updates++; };
     window.addEventListener('slag-sync-updated', onUpdate);
-    storage.importSyncedVaultData = async () => { writes++; };
+    storage.importSyncedVaultData = async () => { writes++; written++; };
     const bundle = { bundleId: 'redelivered', roomId: 'room_dedup', fromDeviceId: 'other', changes: [{ type: 'item', action: 'upsert', id: 'item', payload: { id: 'item', title: 'remote item' } }] };
     window.fetch = async (input, init) => {
       if (new URL(String(input)).pathname.endsWith('/ack')) {
+        acksBeforeWrite.push(written);
         acks.push(JSON.parse(String(init!.body)).bundleIds);
         return Response.json({});
       }
@@ -189,7 +193,7 @@ test('redelivered applied bundle is ACKed again without persisting or notifying 
       await engine.fetchPendingBundlesHttp();
       // Imports are staged and flushed on a 120 ms timer so a burst of bundles renders once.
       await new Promise((resolve) => setTimeout(resolve, 250));
-      return { writes, updates, acks, applied: [...engine.appliedBundleIds] };
+      return { writes, updates, acks, acksBeforeWrite, applied: [...engine.appliedBundleIds] };
     } finally {
       window.fetch = originalFetch;
       storage.importSyncedVaultData = originalImport;
@@ -197,5 +201,7 @@ test('redelivered applied bundle is ACKed again without persisting or notifying 
       engine.disconnect();
     }
   });
-  expect(result).toEqual({ writes: 1, updates: 1, acks: [['redelivered'], ['redelivered']], applied: ['redelivered'] });
+  // One write for two deliveries, one render, and the single ACK arrives only after the write:
+  // the relay keeps its copy until this device actually has the bundle.
+  expect(result).toEqual({ writes: 1, updates: 1, acks: [['redelivered']], acksBeforeWrite: [1], applied: ['redelivered'] });
 });

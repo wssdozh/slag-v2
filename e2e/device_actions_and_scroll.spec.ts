@@ -37,31 +37,29 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    const settingsBtn = page.locator('button[title*="Настройки"]').first();
-    await expect(settingsBtn).toBeVisible({ timeout: 10000 });
-    await settingsBtn.click();
+    await page.getByTestId('sidebar-settings-btn').click();
 
-    const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
+    const settingsModal = page.getByRole('dialog').filter({ has: page.getByTestId('settings-tab-sync') });
     await expect(settingsModal).toBeVisible();
 
-    const syncTabBtn = settingsModal.locator('button[data-testid="settings-tab-sync"]');
+    const syncTabBtn = settingsModal.getByTestId('settings-tab-sync');
     await syncTabBtn.click();
     await expect(settingsModal.getByRole('button', { name: 'Синхронизировать', exact: true })).toBeVisible();
 
-    // 3. Test Sync Mode Toggle (Read-Write vs Receive-Only) on the current device
-    const devicesTabBtn = settingsModal.locator('button[data-tab="devices"]');
-    await devicesTabBtn.click();
+    // 3. Test Sync Mode Toggle (Read-Write vs Receive-Only) on the current device.
+    // The mode is a select in the devices tab, not a pair of toggle buttons.
+    await settingsModal.getByTestId('settings-tab-devices').click();
 
-    const syncModeBtn = settingsModal.locator('button', { hasText: /Чтение и запись|Полный доступ/ }).first();
-    await expect(syncModeBtn).toBeVisible();
+    const syncModeBtn = settingsModal.getByRole('button', { name: 'Локальная синхронизация', exact: true });
+    await expect(syncModeBtn).toContainText('Чтение и запись');
     await syncModeBtn.click();
     await page.getByRole('option', { name: 'Только чтение', exact: true }).click();
-    await expect(settingsModal.getByRole('button', { name: 'Локальная синхронизация' })).toContainText('Только чтение');
+    await expect(syncModeBtn).toContainText('Только чтение');
 
     // Toggle back to Read-Write through the shared dropdown.
-    await settingsModal.getByRole('button', { name: 'Локальная синхронизация' }).click();
+    await syncModeBtn.click();
     await page.getByRole('option', { name: 'Чтение и запись', exact: true }).click();
-    await expect(settingsModal.locator('button', { hasText: /Чтение и запись|Полный доступ/ }).first()).toBeVisible();
+    await expect(syncModeBtn).toContainText('Чтение и запись');
 
     // Take screenshot of Device Actions UI
     await page.screenshot({
@@ -71,16 +69,16 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
 
     // 4. Test Panic Re-keying (Key Rotation)
     await syncTabBtn.click();
-    page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('Сменить ключ хранилища');
-      await dialog.accept();
-    });
-
-    const rotateKeyBtn = settingsModal.locator('button', { hasText: 'Сменить ключ' });
+    const rotateKeyBtn = settingsModal.getByRole('button', { name: 'Сменить ключ', exact: true });
     await expect(rotateKeyBtn).toBeVisible();
     await rotateKeyBtn.click();
 
+    // Irreversible actions ask in the app's own confirm dialog, not window.confirm.
+    const confirm = page.getByRole('alertdialog', { name: 'Сменить ключ хранилища?' });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button', { name: 'Сменить ключ', exact: true }).click();
+
     // Wait for toast confirmation
-    await expect(page.locator('text=Ключ хранилища изменён')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByTestId('toast').filter({ hasText: 'Ключ хранилища изменён' })).toBeVisible({ timeout: 8000 });
   });
 });
