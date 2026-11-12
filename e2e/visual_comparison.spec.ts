@@ -49,10 +49,15 @@ test.describe('Visual Comparison Suite', () => {
     await page.screenshot({ path: 'test-results/screenshots/after_folder_info_desktop.png' });
 
     // 5. Triage Modal
-    const triageBtn = page.locator('button:has-text("Запустить")').first();
+    // The button lives in the inbox header and its label is on the aria attribute, not in the
+    // text - `has-text("Запустить")` never matched, so this step quietly captured the feed twice.
+    const triageBtn = page.locator('button[aria-label="Запустить ИИ-Сортировку"]').first();
     if (await appear(triageBtn)) {
       await triageBtn.click();
-      await page.waitForTimeout(200);
+      // The modal is a lazy overlay: clicking starts a chunk load, so a fixed sleep captures the
+      // feed underneath and the file name lies about what it holds.
+      await page.getByRole('dialog', { name: 'Сортировка входящих' }).waitFor({ state: 'visible', timeout: 10000 });
+      await page.waitForTimeout(300);
       await page.screenshot({ path: 'test-results/screenshots/after_modal_triage.png' });
       await page.keyboard.press('Escape');
       await page.waitForTimeout(200);
