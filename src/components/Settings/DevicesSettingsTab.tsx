@@ -1,69 +1,32 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  Copy,
-  Database,
-  Edit2,
-  Laptop,
-  Loader2,
-  Shield,
-  Smartphone,
-  Trash2,
-  X,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { storage } from '../../lib/storage';
 import { accountClient } from '../../lib/sync/account';
-import { encryptVaultKeyForDevice } from '../../lib/sync/accountCrypto';
 import type { AccountDevice } from '../../lib/sync/accountTypes';
-import { validateMnemonic } from '../../lib/sync/crypto';
-import {
-  approveAccountPairingSession,
-  approvePairingSession,
-  claimPairingSession,
-  createPairingSession,
-  pollPairingPayload,
-  pollPairingSession,
-  rejectPairingSession,
-} from '../../lib/sync/pairing';
 import { syncEngine } from '../../lib/sync/syncEngine';
-import type {
-  DeviceProfile,
-  DeviceSyncMode,
-  PairingExchangePayload,
-  SyncConfig,
-  SyncStatus,
-} from '../../lib/sync/types';
-import { acceptSharedVault, installSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
-import { getVaultDisplayName } from '../../lib/vaultDisplay';
-import { SettingsGroup, SettingsRow, SettingsDivider, SettingsSelect, SettingsSwitch } from './SettingsUI';
+import type { DeviceProfile, DeviceSyncMode, SyncConfig, SyncStatus } from '../../lib/sync/types';
+import { acceptSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
+import { LocalSyncModeGroup, PairDeviceButton, PairDeviceModal } from './devices/DeviceActions';
+import { DeviceList } from './devices/DeviceList';
+import { DevicePermissions } from './devices/DevicePermissions';
+import { useDevicePairing } from './devices/useDevicePairing';
+import { SettingsGroup, SettingsDivider, SettingsRow } from './SettingsUI';
 
 export const DevicesSettingsTab: React.FC = () => {
   const { switchVault, createVault, vaults, isMobile, addToast } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [accountState, setAccountState] = useState(accountClient.getState());
-  const [isPairModalOpen, setIsPairModalOpen] = useState(false);
-  const [pairMode, setPairMode] = useState<'host' | 'guest'>('host');
-  const [hostPin, setHostPin] = useState<string | null>(null);
-  const [hostSessionId, setHostSessionId] = useState<string | null>(null);
-  const [hostPinTtl, setHostPinTtl] = useState(300);
-  const [isGeneratingPin, setIsGeneratingPin] = useState(false);
-  const [pendingApproval, setPendingApproval] = useState<{ sas: string; guestDeviceId?: string } | null>(null);
-  const [isApproving, setIsApproving] = useState(false);
-  const [guestInputPin, setGuestInputPin] = useState('');
-  const [guestSasCode, setGuestSasCode] = useState<string | null>(null);
-  const [isClaimingPin, setIsClaimingPin] = useState(false);
-  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
-  const [editingDeviceName, setEditingDeviceName] = useState('');
   const [managingDevice, setManagingDevice] = useState<AccountDevice | DeviceProfile | null>(null);
   const [grantMode, setGrantMode] = useState<DeviceSyncMode>('read-write');
   const [busyVaultId, setBusyVaultId] = useState<string | null>(null);
-  const isPollingRef = useRef(false);
 
   const hosted = status.authRequired || accountClient.isAuthenticated();
   const locked = status.authRequired && !accountClient.isAuthenticated();
   const account = accountState.account;
   const sub = status.subscription;
+  const pairing = useDevicePairing({ config, hosted, locked, accountDevices: accountState.devices });
+  const { isModalOpen: isPairModalOpen, setModalOpen } = pairing;
 
   useEffect(() => syncEngine.subscribe((next) => {
     setStatus(next);
@@ -77,230 +40,12 @@ export const DevicesSettingsTab: React.FC = () => {
       if (event.key !== 'Escape' || (!managingDevice && !isPairModalOpen)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (isPairModalOpen) setIsPairModalOpen(false);
+      if (isPairModalOpen) setModalOpen(false);
       else setManagingDevice(null);
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isPairModalOpen, managingDevice]);
-
-  useEffect(() => {
-    if (!hostPin || hostPinTtl <= 0) return;
-    const interval = setInterval(() => {
-      setHostPinTtl((current) => {
-        if (current <= 1) {
-          setHostPin(null);
-          setHostSessionId(null);
-          setPendingApproval(null);
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [hostPin, hostPinTtl]);
-
-  useEffect(() => {
-    if (!hostSessionId || pendingApproval) return;
-    let active = true;
-    const interval = setInterval(async () => {
-      if (!active || isPollingRef.current) return;
-      isPollingRef.current = true;
-      try {
-        const result = await pollPairingSession(config.serverUrl, hostSessionId);
-        if (active && result.status === 'pending_approval' && result.sasCode) {
-          setPendingApproval({ sas: result.sasCode, guestDeviceId: result.guestDeviceId });
-          setIsPairModalOpen(true);
-          setPairMode('host');
-        }
-      } catch (error) {
-        if (active) {
-          addToast(`Не удалось проверить привязку: ${error instanceof Error ? error.message : String(error)}`, 'error');
-          setHostSessionId(null);
-          setHostPin(null);
-        }
-      } finally {
-        isPollingRef.current = false;
-      }
-    }, 1500);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [config.serverUrl, hostSessionId, pendingApproval, addToast]);
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      addToast('Скопировано в буфер обмена', 'success');
-    } catch (error) {
-      addToast(`Не удалось скопировать PIN: ${error instanceof Error ? error.message : String(error)}`, 'error');
-    }
-  };
-
-  const handleGeneratePin = async () => {
-    if (locked) return;
-    setIsGeneratingPin(true);
-    setPendingApproval(null);
-    try {
-      const session = await createPairingSession(config.serverUrl, config.deviceId);
-      setHostPin(session.pin);
-      setHostSessionId(session.sessionId);
-      setHostPinTtl(session.expiresIn);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      addToast(`Ошибка генерации: ${message}`, 'error');
-    } finally {
-      setIsGeneratingPin(false);
-    }
-  };
-
-  const handleOpenPairModal = () => {
-    setIsPairModalOpen(true);
-    setPairMode('host');
-    if (!hostPin) void handleGeneratePin();
-  };
-
-  const handleApprovePairing = async () => {
-    if (!hostSessionId || !pendingApproval) return;
-    setIsApproving(true);
-    try {
-      const currentVault = storage.getCurrentVault();
-      let ok: boolean;
-      if (hosted) {
-        const guest = accountState.devices.find((device) => device.id === pendingApproval.guestDeviceId);
-        if (!guest) throw new Error('Гостевое устройство не найдено в аккаунте');
-        const seedPhrase = syncEngine.getVaultSeedPhrase(currentVault.id);
-        if (!seedPhrase) throw new Error('Ключ текущего хранилища недоступен');
-        const encryptedKey = await encryptVaultKeyForDevice(seedPhrase, guest.publicKey);
-        const syncId = storage.ensureVaultSyncId(currentVault.id);
-        await accountClient.registerVault(syncId, currentVault.name);
-        ok = await approveAccountPairingSession(config.serverUrl, hostSessionId, {
-          vaultId: syncId,
-          vaultName: currentVault.name,
-          mode: 'read-write',
-          encryptedKey,
-        });
-      } else {
-        const payload: PairingExchangePayload = {
-          seedPhrase: config.seedPhrase,
-          vaultId: currentVault.id,
-          vaultName: currentVault.name,
-          hostDeviceId: config.deviceId,
-          hostDeviceName: config.deviceName,
-          hostPlatform: 'desktop',
-          allowedVaults: [currentVault.id],
-        };
-        ok = await approvePairingSession(config.serverUrl, hostSessionId, JSON.stringify(payload));
-      }
-      if (!ok) throw new Error('Сервер отклонил подтверждение');
-
-      if (!hosted) {
-        syncEngine.addTrustedDevice({
-          id: `slag-guest-${pendingApproval.sas}`,
-          name: `Устройство ${pendingApproval.sas}`,
-          platform: 'desktop',
-          isCurrent: false,
-          syncMode: 'read-write',
-          canRunAiLease: false,
-          pairedAt: new Date().toISOString(),
-          lastSeenAt: 'Только что',
-          allowedVaults: [currentVault.id],
-        });
-      } else {
-        await accountClient.refresh();
-      }
-      addToast(`Устройство подключено к «${currentVault.name}»`, 'success');
-      setHostPin(null);
-      setHostSessionId(null);
-      setPendingApproval(null);
-      setIsPairModalOpen(false);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      addToast(`Ошибка подтверждения: ${message}`, 'error');
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  const handleRejectPairing = async () => {
-    if (!hostSessionId) return;
-    try {
-      await rejectPairingSession(config.serverUrl, hostSessionId);
-      setHostPin(null);
-      setHostSessionId(null);
-      setPendingApproval(null);
-      setIsPairModalOpen(false);
-    } catch (error) {
-      addToast(`Не удалось отклонить привязку: ${error instanceof Error ? error.message : String(error)}`, 'error');
-    }
-  };
-
-  const handleClaimGuestPin = async () => {
-    if (!guestInputPin.trim() || locked) return;
-    setIsClaimingPin(true);
-    setGuestSasCode(null);
-    try {
-      const ephemeralPk = `pk_eph_${crypto.getRandomValues(new Uint32Array(2)).join('')}`;
-      const claimed = await claimPairingSession(config.serverUrl, guestInputPin.trim(), ephemeralPk, config.deviceId);
-      setGuestSasCode(claimed.sasCode);
-      const rawPayload = await pollPairingPayload(
-        config.serverUrl,
-        claimed.sessionId,
-        config.deviceId,
-        60_000,
-        1500,
-      );
-      const parsed = JSON.parse(rawPayload) as PairingExchangePayload;
-
-      if (parsed.encryptedKey) {
-        const result = await installSharedVault({
-          vaultId: parsed.vaultId,
-          vaultName: parsed.vaultName,
-          encryptedKey: parsed.encryptedKey,
-        }, config.deviceId, { createVault, switchVault });
-        addToast(
-          `${result === 'merged' ? 'Хранилище объединено' : 'Хранилище добавлено'}: «${parsed.vaultName}»`,
-          'success',
-        );
-      } else {
-        const receivedSeed = parsed.seedPhrase || rawPayload;
-        if (!validateMnemonic(receivedSeed)) throw new Error('Получен некорректный ключ хранилища');
-        syncEngine.setVaultSeedPhrase(parsed.vaultId, receivedSeed);
-        const existing = storage.getVaults().find((vault) => vault.id === parsed.vaultId);
-        if (existing) switchVault(existing.id);
-        else {
-          createVault(parsed.vaultName, 'indexeddb', undefined, parsed.vaultId);
-          await syncEngine.switchVault(parsed.vaultId);
-        }
-        addToast(`Хранилище «${parsed.vaultName}» подключено`, 'success');
-      }
-
-      if (!hosted && parsed.hostDeviceId) {
-        syncEngine.addTrustedDevice({
-          id: parsed.hostDeviceId,
-          name: parsed.hostDeviceName || 'Основное устройство',
-          platform: parsed.hostPlatform || 'desktop',
-          isCurrent: false,
-          syncMode: 'read-write',
-          canRunAiLease: false,
-          pairedAt: new Date().toISOString(),
-          lastSeenAt: 'Только что',
-          allowedVaults: [parsed.vaultId],
-        });
-      }
-      await accountClient.refresh();
-      setGuestInputPin('');
-      setGuestSasCode(null);
-      setIsPairModalOpen(false);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      addToast(message, 'error');
-      setGuestSasCode(null);
-    } finally {
-      setIsClaimingPin(false);
-    }
-  };
+  }, [isPairModalOpen, managingDevice, setModalOpen]);
 
   const handleAcceptInvitation = async (vaultId: string) => {
     const invitation = accountState.invitations.find((item) => item.vaultId === vaultId);
@@ -335,12 +80,26 @@ export const DevicesSettingsTab: React.FC = () => {
     }
   };
 
-  const handleSaveRename = async () => {
-    if (!editingDeviceId) return;
-    const name = editingDeviceName.trim();
-    if (hosted) await accountClient.renameDevice(editingDeviceId, name);
-    else syncEngine.renameDevice(editingDeviceId, name);
-    setEditingDeviceId(null);
+  const handleRenameDevice = async (deviceId: string, name: string) => {
+    if (hosted) await accountClient.renameDevice(deviceId, name.trim());
+    else syncEngine.renameDevice(deviceId, name.trim());
+    setConfig(syncEngine.getConfig());
+  };
+
+  const handleRevokeDevice = (device: AccountDevice | DeviceProfile) => {
+    if ('status' in device) void accountClient.revokeDevice(device.id);
+    else {
+      syncEngine.removeTrustedDevice(device.id);
+      setConfig(syncEngine.getConfig());
+    }
+  };
+
+  const handleApproveDevice = async (deviceId: string) => {
+    await accountClient.approveDevice(deviceId);
+  };
+
+  const handleLocalSyncModeChange = (mode: DeviceSyncMode) => {
+    syncEngine.setDeviceSyncMode(config.deviceId, mode);
     setConfig(syncEngine.getConfig());
   };
 
@@ -373,12 +132,14 @@ export const DevicesSettingsTab: React.FC = () => {
     }
   };
 
-  const formatTtl = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const activeDevices = account
     ? accountState.devices.filter((device) => device.status === 'active').length
     : 1 + config.trustedDevices.length;
   const maxDevices = account?.maxDevices ?? sub.maxDevices;
   const limitsKnown = Boolean(account) || maxDevices > 0;
+  const devices = hosted
+    ? accountState.devices.filter((device) => device.id !== config.deviceId && device.status !== 'revoked')
+    : config.trustedDevices;
 
   return (
     <div className="flex flex-col gap-3 text-fg-primary">
@@ -398,137 +159,36 @@ export const DevicesSettingsTab: React.FC = () => {
         </SettingsGroup>
       )}
 
-      <SettingsGroup title="Подключённые устройства" action={<span className="text-2xs font-mono text-fg-muted" title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}>{limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices}</span>}>
-        <SettingsRow icon={isMobile ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />} label={config.deviceName} description={<span className="font-mono">{config.deviceId} · это устройство</span>} />
-        {(hosted ? accountState.devices.filter((device) => device.id !== config.deviceId && device.status !== 'revoked') : config.trustedDevices).map((device) => {
-          const isAccountDevice = 'status' in device;
-          return (
-            <React.Fragment key={device.id}>
-              <SettingsDivider />
-              <SettingsRow
-                icon={device.platform === 'mobile' ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />}
-                label={editingDeviceId === device.id ? (
-                  <input autoFocus aria-label="Имя устройства" value={editingDeviceName} onChange={(event) => setEditingDeviceName(event.target.value)} onBlur={() => void handleSaveRename()} onKeyDown={(event) => { if (event.key === 'Enter') void handleSaveRename(); }} className="w-full px-1.5 py-0.5 text-xs text-fg-primary bg-transparent border border-border-subtle rounded-md outline-none" />
-                ) : (
-                  <button type="button" onClick={() => { setEditingDeviceId(device.id); setEditingDeviceName(device.name); }} className="flex items-center gap-1.5 text-xs text-fg-primary cursor-pointer"><span className="truncate">{device.name}</span><Edit2 className="w-3 h-3 text-fg-dim" /></button>
-                )}
-                description={<span className="font-mono break-all">{device.id}{isAccountDevice && device.status === 'pending' ? ' · ожидает подтверждения' : ''}</span>}
-                right={<span className="flex items-center gap-2">
-                  {isAccountDevice && device.status === 'pending' ? (
-                    <button type="button" onClick={() => void accountClient.approveDevice(device.id)} className="text-2xs text-fg-secondary cursor-pointer">Подтвердить</button>
-                  ) : (
-                    <button type="button" onClick={() => setManagingDevice(device)} title="Доступ к хранилищам" aria-label={`Доступ ${device.name} к хранилищам`} className="px-2 py-1 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover cursor-pointer">Доступ к базам</button>
-                  )}
-                  <button type="button" onClick={() => {
-                    if (isAccountDevice) void accountClient.revokeDevice(device.id);
-                    else { syncEngine.removeTrustedDevice(device.id); setConfig(syncEngine.getConfig()); }
-                  }} title="Отозвать устройство" aria-label={`Отозвать ${device.name}`} className="p-1 text-fg-dim hover:text-danger cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
-                </span>}
-              />
-            </React.Fragment>
-          );
-        })}
-      </SettingsGroup>
+      <DeviceList
+        isMobile={isMobile}
+        currentDeviceName={config.deviceName}
+        currentDeviceId={config.deviceId}
+        devices={devices}
+        activeDevices={activeDevices}
+        maxDevices={maxDevices}
+        limitsKnown={limitsKnown}
+        onRename={handleRenameDevice}
+        onManage={setManagingDevice}
+        onRevoke={handleRevokeDevice}
+        onApprove={handleApproveDevice}
+      />
 
-      <SettingsGroup title="Это устройство">
-        <SettingsSelect label="Локальная синхронизация" value={config.localSyncMode ?? 'read-write'} onChange={(next) => { syncEngine.setDeviceSyncMode(config.deviceId, next as DeviceSyncMode); setConfig(syncEngine.getConfig()); }} options={[
-          { value: 'read-write', label: 'Чтение и запись' },
-          { value: 'receive-only', label: 'Только чтение' },
-        ]} />
-      </SettingsGroup>
+      <LocalSyncModeGroup value={config.localSyncMode ?? 'read-write'} onChange={handleLocalSyncModeChange} />
 
-      <SettingsGroup>
-        <SettingsRow label="Привязать устройство" testId="btn-open-pair-modal" disabled={locked} onClick={handleOpenPairModal} />
-      </SettingsGroup>
+      <PairDeviceButton disabled={locked} onClick={pairing.openModal} />
 
-      {/* Pairing Modal */}
-      {isPairModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-canvas/85 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setIsPairModalOpen(false); }}>
-          <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-border-subtle rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-              <span className="text-xs font-semibold text-fg-primary">Привязка устройства</span>
-              <button type="button" aria-label="Закрыть привязку" onClick={() => setIsPairModalOpen(false)} className="p-1 text-fg-secondary cursor-pointer"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="p-4 flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-1 border-b border-border-subtle pb-2">
-                <button type="button" data-testid="pair-modal-tab-host" onClick={() => { setPairMode('host'); if (!hostPin) void handleGeneratePin(); }} className={`py-1.5 rounded-md text-xs cursor-pointer ${pairMode === 'host' ? 'bg-surface-hover text-fg-primary' : 'text-fg-secondary'}`}>Показать PIN</button>
-                <button type="button" data-testid="pair-modal-tab-guest" onClick={() => { setPairMode('guest'); setPendingApproval(null); }} className={`py-1.5 rounded-md text-xs cursor-pointer ${pairMode === 'guest' ? 'bg-surface-hover text-fg-primary' : 'text-fg-secondary'}`}>Ввести PIN</button>
-              </div>
-              {pairMode === 'host' ? (
-                pendingApproval ? (
-                  <div className="flex flex-col gap-3 py-2">
-                    <div className="text-xs text-fg-primary">Запрос на подключение</div>
-                    <div className="font-mono text-lg text-success">Код проверки: <strong>{pendingApproval.sas}</strong></div>
-                    <p className="text-2xs text-fg-secondary">Сверьте код на втором устройстве. Будет открыт доступ только к текущему хранилищу.</p>
-                    <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => void handleRejectPairing()} className="px-3 py-1.5 text-xs text-fg-secondary cursor-pointer">Отклонить</button>
-                      <button type="button" disabled={isApproving} onClick={() => void handleApprovePairing()} className="px-3.5 py-1.5 bg-fg-primary text-canvas font-semibold text-xs rounded-md disabled:opacity-50 cursor-pointer">{isApproving ? 'Подтверждение…' : 'Разрешить доступ'}</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-3 py-3">
-                    <span className="text-2xs text-fg-muted font-mono">ОДНОРАЗОВЫЙ КОД</span>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-2xl font-bold tracking-widest text-fg-primary">{isGeneratingPin ? '…' : hostPin || '000-000'}</span>
-                      {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin)} className="p-1.5 text-fg-secondary cursor-pointer"><Copy className="w-4 h-4" /></button>}
-                    </div>
-                    <span className="font-mono text-2xs text-fg-muted">Действует: {formatTtl(hostPinTtl)}</span>
-                  </div>
-                )
-              ) : guestSasCode ? (
-                <div className="flex flex-col items-center gap-3 py-6"><Loader2 className="w-6 h-6 text-success animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-success">{guestSasCode}</strong></span><span className="text-2xs text-fg-muted">Подтвердите подключение на первом устройстве</span></div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <label className="text-2xs text-fg-secondary">PIN с первого устройства</label>
-                  <input autoFocus placeholder="123-456" value={guestInputPin} onChange={(event) => {
-                    const digits = event.target.value.replace(/\D/g, '').slice(0, 6);
-                    setGuestInputPin(digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
-                  }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleClaimGuestPin(); } }} maxLength={7} className="w-full bg-transparent border border-border-subtle rounded-md px-3 py-2 text-center font-mono text-lg tracking-widest text-fg-primary outline-none" />
-                  <button type="button" disabled={isClaimingPin || guestInputPin.length !== 7} onClick={() => void handleClaimGuestPin()} className="w-full py-2 bg-fg-primary text-canvas font-semibold text-xs rounded-md disabled:opacity-50 cursor-pointer">{isClaimingPin ? 'Связывание…' : 'Подключить устройство'}</button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <PairDeviceModal pairing={pairing} />
 
-      {/* Managing Vault Access Modal */}
       {managingDevice && (
-        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-canvas/60 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setManagingDevice(null); }}>
-          <div className="w-full max-w-sm bg-surface-elevated border border-border-subtle rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-              <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-success" /><span className="text-xs font-semibold">Доступ к хранилищам</span></div>
-              <button type="button" aria-label="Закрыть доступ" onClick={() => setManagingDevice(null)} className="p-1 text-fg-secondary cursor-pointer"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="p-4 flex flex-col gap-3">
-              <div><div className="text-xs text-fg-primary">{managingDevice.name}</div><div className="font-mono text-2xs text-fg-muted">{managingDevice.id}</div></div>
-              {'status' in managingDevice && (
-                <SettingsGroup title="Приглашение">
-                  <SettingsSelect label="Режим доступа" value={grantMode} onChange={(mode) => setGrantMode(mode as DeviceSyncMode)} options={[
-                    { value: 'read-write', label: 'Чтение и изменение' },
-                    { value: 'receive-only', label: 'Только чтение' },
-                  ]} />
-                </SettingsGroup>
-              )}
-              <SettingsGroup title="Хранилища" className="max-h-56 overflow-y-auto">
-                {vaults.map((vault, index) => {
-                  const grant = 'status' in managingDevice
-                    ? accountState.vaults.find((item) => item.id === (vault.syncId || vault.id))?.grants.find((item) => item.deviceId === managingDevice.id)
-                    : undefined;
-                  const allowed = 'status' in managingDevice
-                    ? Boolean(grant && grant.status !== 'revoked')
-                    : Boolean(managingDevice.allowedVaults?.includes(vault.id));
-                  return (
-                    <React.Fragment key={vault.id}>
-                      {index > 0 && <SettingsDivider />}
-                      <SettingsRow icon={<Database className="w-3.5 h-3.5" />} label={getVaultDisplayName(vault, vaults)} description={grant?.status === 'pending' ? 'Ожидает' : grant?.status === 'accepted' ? (grant.mode === 'receive-only' ? 'Только чтение' : 'Подключено') : undefined} right={<SettingsSwitch checked={allowed} onChange={() => void handleToggleVaultAccess(vault.id)} label={`Доступ к ${getVaultDisplayName(vault, vaults)}`} />} />
-                    </React.Fragment>
-                  );
-                })}
-              </SettingsGroup>
-            </div>
-          </div>
-        </div>
+        <DevicePermissions
+          device={managingDevice}
+          vaults={vaults}
+          accountVaults={accountState.vaults}
+          grantMode={grantMode}
+          onGrantModeChange={setGrantMode}
+          onToggleVaultAccess={handleToggleVaultAccess}
+          onClose={() => setManagingDevice(null)}
+        />
       )}
     </div>
   );
