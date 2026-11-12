@@ -145,12 +145,41 @@ export class StorageService {
   }
 
   /**
+   * The note index, parsed once per stored value.
+   *
+   * One keystroke used to parse the same key three times: `saveItem` reads the whole list,
+   * rewrites it, and the UI reads it straight back. The raw string is kept next to the parse,
+   * so a write from another window or from the sync engine invalidates this copy the moment
+   * the bytes differ — the cache can never outlive the value it mirrors.
+   */
+  private itemsIndexCache: { key: string; raw: string; items: SlagItem[] } | null = null;
+
+  private readItemsIndex(key: string): SlagItem[] {
+    const raw = localStorage.getItem(key) ?? '';
+    const cached = this.itemsIndexCache;
+    if (cached && cached.key === key && cached.raw === raw) return cached.items;
+    let parsed: SlagItem[] = [];
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = [];
+      }
+    }
+    this.itemsIndexCache = { key, raw, items: parsed };
+    return parsed;
+  }
+
+  /**
    * The index is a cache, never the source of truth: a note that does not fit here still has to
    * reach the disk. So a quota miss is a warning, not an exception.
    */
   public cacheItems(key: string, items: SlagItem[]): void {
     try {
-      localStorage.setItem(key, JSON.stringify(stripAttachmentData(items)));
+      const stored = stripAttachmentData(items);
+      const raw = JSON.stringify(stored);
+      localStorage.setItem(key, raw);
+      if (key === this.getItemsKey()) this.itemsIndexCache = { key, raw, items: stored };
     } catch (err) {
       fsLog.warn('Storage index write failed, notes keep landing on disk', {
         key,
@@ -356,15 +385,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   // Items API
   public getItems(folder?: string): SlagItem[] {
-    const raw = localStorage.getItem(this.getItemsKey());
-    let list: SlagItem[] = [];
-    if (raw) {
-      try {
-        list = this.attachments.hydrate(JSON.parse(raw));
-      } catch {
-        list = [];
-      }
-    }
+    // Copies, not the cached objects: callers trim, move and re-save items in place
+    // (`moveItem` mutates `folder`), and that must not reach the shared parse.
+    const list = this.attachments.hydrate(this.readItemsIndex(this.getItemsKey())).map(item => ({ ...item }));
     if (folder) {
       return list.filter(i => i.folder === folder);
     }
