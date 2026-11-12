@@ -1455,6 +1455,16 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
   });
 
   test('45. Enhanced Context Menu with AI Decomposition, Duplicate, Priority, Deadline', async ({ page }) => {
+    // The demo vault ships with a relay subscription, so "Разобрать с ИИ" would leave for the
+    // network and answer whenever that request settles — long past the toast's own 2.8 s life.
+    // Answer 503 here: the triage resolves through its local fallback, and the toast is a state
+    // to wait for, not a race against the relay.
+    await page.route('**/api/ai/chat', (route) => route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: '{"error":"e2e: relay offline"}',
+    }));
+
     const card = page.locator('[id^="item-"]').first();
     await expect(card).toBeVisible();
     await card.click({ button: 'right' });
@@ -1484,7 +1494,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await secondCard.click({ button: 'right' });
     const aiBtn = page.locator('.fixed.z-50 button', { hasText: 'Разобрать с ИИ' });
     await aiBtn.click();
-    await expect(page.locator('text=Запись разобрана')).toBeVisible();
+    await expect(page.getByTestId('toast').filter({ hasText: 'Запись разобрана' })).toBeVisible({ timeout: 15000 });
   });
 
   test('46. FullscreenEditor: Desktop Sticky Top Toolbar and Mobile Telegram-style Bottom Bar', async ({ page }) => {

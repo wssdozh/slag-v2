@@ -80,11 +80,47 @@ test('an attached image survives a reload', async ({ page }) => {
   // bytes in IndexedDB.
   await page.locator('main textarea').first().fill('заметка с картинкой');
   await page.keyboard.press('Enter');
-  await expect(page.locator('img[alt="shot.webp"]').first()).toBeVisible({ timeout: 10000 });
+  const note = page.locator('[id^="item-"]', { hasText: 'заметка с картинкой' }).first();
+  await expect(note).toBeVisible({ timeout: 10000 });
+  await expect(note.locator('img[alt="shot.webp"]')).toBeVisible({ timeout: 10000 });
+
+  // The note itself is already in `localStorage` — that write is synchronous. The bytes are
+  // not: `saveAttachment` fires the IndexedDB put and never awaits it. Reload inside that gap
+  // aborts the transaction, and the note comes back with a "нет файла" slot. So wait for the
+  // record, not for the picture above.
+  await expect.poll(
+    () => page.evaluate(async () => {
+      const request = indexedDB.open('slag_v2_blobs');
+      return await new Promise<string[]>((resolve) => {
+        request.onerror = () => resolve([]);
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('attachments')) {
+            db.close();
+            resolve([]);
+            return;
+          }
+          const all = db.transaction('attachments', 'readonly').objectStore('attachments').getAll();
+          all.onerror = () => { db.close(); resolve([]); };
+          all.onsuccess = () => {
+            db.close();
+            resolve((all.result as Array<{ name?: string; dataUrl?: string }>)
+              .filter((attachment) => Boolean(attachment.dataUrl))
+              .map((attachment) => attachment.name || ''));
+          };
+        };
+      });
+    }),
+    { timeout: 15000 },
+  ).toContain('shot.webp');
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  const image = page.locator('img[alt="shot.webp"]').first();
+  // The card's own picture, not any tile that happens to share the name: the right panel's
+  // media grid renders a src-less <img> while the bytes are still being read back.
+  const image = page.locator('[id^="item-"]', { hasText: 'заметка с картинкой' }).locator('img[alt="shot.webp"]').first();
   await expect(image).toBeVisible({ timeout: 20000 });
+  // Off-screen and lazy means "empty" for Chromium's loader; the pixels only arrive once asked.
+  await image.scrollIntoViewIfNeeded();
   // A src is not enough: a broken image also has one. It has to have decoded into pixels.
   await expect.poll(
     () => image.evaluate((el: HTMLImageElement) => el.naturalWidth),
