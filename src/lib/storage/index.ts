@@ -39,6 +39,14 @@ import {
   pickVaultDirectory,
 } from './vaultRegistry';
 import {
+  readFolders,
+  writeFolder,
+  renameFolderTree,
+  describeFolder,
+  eraseFolder,
+  folderStorageKey,
+} from './folderStore';
+import {
   buildVaultExportJson,
   exportObsidianBundle,
   importVaultPayload,
@@ -69,7 +77,6 @@ const fsLog = logger.scope('FS');
 /** Attachment bytes: which file was asked for, and where the answer came from. */
 
 const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
-const FOLDERS_STORAGE_PREFIX = STORAGE_KEYS.FOLDERS_PREFIX;
 const TRASH_STORAGE_PREFIX = STORAGE_KEYS.TRASH_PREFIX;
 const DRAFTS_STORAGE_PREFIX = STORAGE_KEYS.DRAFTS_PREFIX;
 const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
@@ -85,7 +92,7 @@ export class StorageService {
   private crossWindowDraftChannel: BroadcastChannel | null = null;
   private attachments = new AttachmentStore(() => this.getVaultAttachmentsPath());
 
-  private files = new VaultFiles({
+  public files = new VaultFiles({
     getVault: () => this.currentVault,
     getItems: (folder) => this.getItems(folder),
     getFolders: () => this.getFolders(),
@@ -122,7 +129,7 @@ export class StorageService {
    * The index is a cache, never the source of truth: a note that does not fit here still has to
    * reach the disk. So a quota miss is a warning, not an exception.
    */
-  private cacheItems(key: string, items: SlagItem[]): void {
+  public cacheItems(key: string, items: SlagItem[]): void {
     try {
       localStorage.setItem(key, JSON.stringify(stripAttachmentData(items)));
     } catch (err) {
@@ -292,15 +299,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return pickVaultDirectory();
   }
 
-  private getItemsKey(): string {
+  public getItemsKey(): string {
     return `${ITEMS_STORAGE_PREFIX}${this.currentVault.id}`;
   }
 
   private getFoldersKey(): string {
-    return `${FOLDERS_STORAGE_PREFIX}${this.currentVault.id}`;
+    return folderStorageKey(this);
   }
 
-  private getDraftsKey(): string {
+  public getDraftsKey(): string {
     return `${DRAFTS_STORAGE_PREFIX}${this.currentVault.id}`;
   }
 
@@ -323,134 +330,23 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   // Folders API
   public getFolders(): FolderMeta[] {
-    const raw = localStorage.getItem(this.getFoldersKey());
-    if (!raw) return DEFAULT_FOLDERS;
-    try {
-      const parsed: FolderMeta[] = JSON.parse(raw);
-      let changed = false;
-      // Ensure inbox always exists
-      if (!parsed.some(f => f.path === DEFAULT_INBOX_FOLDER)) {
-        parsed.unshift(DEFAULT_FOLDERS[0]);
-        changed = true;
-      }
-      if (changed) {
-        localStorage.setItem(this.getFoldersKey(), JSON.stringify(parsed));
-      }
-      return parsed;
-    } catch {
-      return DEFAULT_FOLDERS;
-    }
+    return readFolders(this);
   }
 
   public saveFolder(folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
-    const folders = this.getFolders().filter(f => f.path !== folder.path);
-    folders.push(folder);
-    localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
-    fsLog.info(`Saved folder "${folder.name}" (${folder.path})`);
-    if (isTauri()) {
-      void this.files.flushStateToDisk();
-    }
-    this.emitChange({ kind: 'folder', action: 'upsert', id: folder.path, payload: folder, origin });
+    writeFolder(this, folder, origin);
   }
 
   public renameFolder(oldPath: string, updatedFolder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
-    if (oldPath === DEFAULT_INBOX_FOLDER) return; // Cannot rename system inbox
-
-    // 1. Update folders list
-    const folders = this.getFolders().map(f => {
-      if (f.path === oldPath) {
-        return updatedFolder;
-      }
-      if (f.path.startsWith(oldPath + '/')) {
-        const subPath = updatedFolder.path + f.path.slice(oldPath.length);
-        const subName = subPath.split('/').pop() || f.name;
-        return { ...f, path: subPath, name: subName };
-      }
-      return f;
-    });
-    localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
-
-    // 2. Update items belonging to this folder and its subfolders
-    const items = this.getItems().map(it => {
-      if (it.folder === oldPath) {
-        return { ...it, folder: updatedFolder.path, updatedAt: Date.now() };
-      }
-      if (it.folder.startsWith(oldPath + '/')) {
-        const subFolder = updatedFolder.path + it.folder.slice(oldPath.length);
-        return { ...it, folder: subFolder, updatedAt: Date.now() };
-      }
-      return it;
-    });
-    this.cacheItems(this.getItemsKey(), items);
-
-    fsLog.info(`Renamed folder "${oldPath}" to "${updatedFolder.path}"`);
-    if (isTauri()) {
-      void this.files.renameFolderOnDisk(oldPath, updatedFolder.path, items);
-    }
-    this.emitChange({ kind: 'folder', action: 'rename', id: updatedFolder.path, payload: updatedFolder, oldPath, origin });
+    renameFolderTree(this, oldPath, updatedFolder, origin);
   }
 
   public updateFolderDescription(path: string, description: string, origin: 'local' | 'remote' = 'local'): void {
-    let targetFolder: FolderMeta | undefined;
-    const folders = this.getFolders().map(f => {
-      if (f.path === path) {
-        targetFolder = { ...f, description };
-        return targetFolder;
-      }
-      return f;
-    });
-    localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
-    fsLog.debug(`Updated description for folder "${path}"`);
-    if (isTauri()) {
-      void this.files.flushStateToDisk();
-    }
-    if (targetFolder) {
-      this.emitChange({ kind: 'folder', action: 'upsert', id: path, payload: targetFolder, origin });
-    }
+    describeFolder(this, path, description, origin);
   }
 
   public deleteFolder(path: string, origin: 'local' | 'remote' = 'local'): void {
-    if (path === DEFAULT_INBOX_FOLDER) return; // Cannot delete system inbox
-    const folders = this.getFolders().filter(f => f.path !== path && !f.path.startsWith(path + '/'));
-    localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
-
-    // Move orphan items to inbox
-    const items = this.getItems();
-    const movedItems: { item: SlagItem; oldFolder: string }[] = [];
-    const updatedItems = items.map(it => {
-      if (it.folder === path || it.folder.startsWith(path + '/')) {
-        const oldFolder = it.folder;
-        const updated: SlagItem = { ...it, folder: DEFAULT_INBOX_FOLDER, updatedAt: Date.now() };
-        movedItems.push({ item: updated, oldFolder });
-        return updated;
-      }
-      return it;
-    });
-    this.cacheItems(this.getItemsKey(), updatedItems);
-
-    // Clean up drafts for deleted folder and any subfolders
-    const drafts = this.getAllComposerDrafts();
-    let draftsChanged = false;
-    for (const key of Object.keys(drafts)) {
-      if (key === path || key.startsWith(path + '/')) {
-        delete drafts[key];
-        draftsChanged = true;
-      }
-    }
-    if (draftsChanged) {
-      try {
-        localStorage.setItem(this.getDraftsKey(), JSON.stringify(drafts));
-      } catch {
-        // ignore
-      }
-    }
-
-    if (isTauri()) {
-      void this.files.deleteFolderOnDisk(path, movedItems);
-    }
-
-    fsLog.info(`Deleted folder "${path}", items re-routed to Inbox`);
-    this.emitChange({ kind: 'folder', action: 'delete', id: path, origin });
+    eraseFolder(this, path, origin);
   }
 
   // Items API
