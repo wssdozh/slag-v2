@@ -49,7 +49,11 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       }
       if (engine.appliedBundleIds.has(bundle.bundleId)) {
         // ponytail: relay re-delivers pending bundles until ACK; skip a re-apply we already did.
-        await engine.sendAck(bundle.bundleId);
+        // If this id is still sitting in the import buffer, the ACK belongs to that write —
+        // sending it here would confirm a bundle this device has not persisted yet.
+        if (!engine.importBuffer?.bundles.includes(bundle.bundleId)) {
+          await engine.sendAck(bundle.bundleId);
+        }
         return;
       }
 
@@ -283,20 +287,25 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         localStorage.setItem(tombstonesKey(engine.bookkeeping), JSON.stringify(tombstones));
       }
 
-      if (hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged) {
+      const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged;
+      if (generation !== engine.initGeneration) return;
+
+      engine.appliedBundleIds.add(bundle.bundleId);
+      if (engine.batchUpdating) engine.status.initialSync.processed++;
+      if (staged) {
+        // The ACK belongs to the write, not to the merge: the flush sends it once the buffer
+        // is on disk, so a failed write leaves the bundle pending and the relay re-delivers it.
         engine.stageImport(currentItems, currentFolders, hasWorkspaceChanged ? workspaceState : undefined, {
           items: hasItemsChanged,
           folders: hasFoldersChanged,
           workspace: hasWorkspaceChanged,
           drafts: hasDraftsChanged,
-        });
+        }, bundle.bundleId);
+      } else {
+        // Nothing to persist: no write exists for the ACK to outrun.
+        await engine.sendAck(bundle.bundleId);
+        if (generation !== engine.initGeneration) return;
       }
-      if (generation !== engine.initGeneration) return;
-
-      engine.appliedBundleIds.add(bundle.bundleId);
-      if (engine.batchUpdating) engine.status.initialSync.processed++;
-      await engine.sendAck(bundle.bundleId);
-      if (generation !== engine.initGeneration) return;
 
       engine.status.lastSyncTime = new Date().toLocaleTimeString();
       engine.status.state = engine.batchUpdating ? 'syncing' : 'connected';

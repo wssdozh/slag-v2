@@ -104,6 +104,8 @@ export class SyncEngine {
     folders: FolderMeta[];
     workspace?: WorkspaceState;
     detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean };
+    /** Bundles in this burst. They are ACKed only once the write below lands. */
+    bundles: string[];
   } | null = null;
   private importTimer: ReturnType<typeof setTimeout> | null = null;
   public pendingPushes = new Map<string, PendingPush>();
@@ -364,9 +366,12 @@ export class SyncEngine {
     items: SlagItem[],
     folders: FolderMeta[],
     workspace: WorkspaceState | undefined,
-    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean }
+    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean },
+    bundleId: string
   ): void {
     const previous = this.importBuffer?.detail;
+    const bundles = this.importBuffer?.bundles ?? [];
+    if (!bundles.includes(bundleId)) bundles.push(bundleId);
     this.importBuffer = {
       items,
       folders,
@@ -377,11 +382,12 @@ export class SyncEngine {
         workspace: detail.workspace || Boolean(previous?.workspace),
         drafts: detail.drafts || Boolean(previous?.drafts),
       },
+      bundles,
     };
     if (this.batchUpdating || this.importTimer) return;
     this.importTimer = setTimeout(() => {
       this.importTimer = null;
-      void this.flushStagedImport();
+      void this.flushStagedImport().catch((error) => syncLog.error('Staged sync import failed:', error));
     }, 120);
   }
 
@@ -393,7 +399,24 @@ export class SyncEngine {
     const buffered = this.importBuffer;
     if (!buffered) return;
     this.importBuffer = null;
-    await storage.importSyncedVaultData(buffered);
+    const generation = this.initGeneration;
+    try {
+      await storage.importSyncedVaultData(buffered);
+    } catch (error) {
+      // Nothing reached the disk, so the relay must not be told this burst is done: dropping
+      // the ids makes a re-delivery apply again instead of being skipped as "already applied".
+      for (const bundleId of buffered.bundles) this.appliedBundleIds.delete(bundleId);
+      const msg = error instanceof Error ? error.message : String(error);
+      syncLog.error('Failed to persist staged sync import:', msg);
+      // A session that already reconnected has no business showing this session's error:
+      // its own pull still holds the unACKed bundles.
+      if (generation === this.initGeneration) {
+        this.status.state = 'error';
+        this.status.error = msg;
+        this.notify();
+      }
+      throw error;
+    }
     // One render per burst, after the final state is on disk.
     window.dispatchEvent(
       new CustomEvent('slag-sync-updated', {
@@ -405,6 +428,17 @@ export class SyncEngine {
         },
       })
     );
+    // Only now is the relay allowed to forget its copy of these bundles. A re-delivery before
+    // this point still hits the `appliedBundleIds` check, so nothing is applied twice.
+    for (const bundleId of buffered.bundles) {
+      if (generation !== this.initGeneration) return;
+      try {
+        await this.sendAck(bundleId);
+      } catch (error) {
+        // An unconfirmed ACK only means another delivery; the state is already on disk.
+        syncLog.warn(`Failed to ACK applied bundle ${bundleId}:`, error);
+      }
+    }
   }
 
   public get bookkeeping(): SyncScope {
