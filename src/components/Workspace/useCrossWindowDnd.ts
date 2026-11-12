@@ -1,3 +1,5 @@
+// Dragging a note between workspace panels: the preview rect, the drop target under the pointer,
+// and the dockview group it lands in.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { DockviewApi, IDockviewPanel, DockviewGroupPanel } from 'dockview-react';
 import {

@@ -1,3 +1,4 @@
+// The desktop calendar: month and week grids, drag to reschedule, and the overdue drawer.
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';

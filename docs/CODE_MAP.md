@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **440**, строк: **81718**, зон: **45**.
+Модулей: **440**, строк: **81724**, зон: **45**.
 
 ## Самые длинные файлы
 
@@ -22,7 +22,7 @@
 | `src/lib/storage/index.ts` | 701 | 34 |
 | `src/components/Feed/Composer.tsx` | 700 | 4 |
 | `src/components/Editor/FullscreenEditor.tsx` | 640 | 1 |
-| `src/components/Workspace/useCrossWindowDnd.ts` | 612 | 1 |
+| `src/components/Workspace/useCrossWindowDnd.ts` | 614 | 1 |
 | `src/lib/backupService.ts` | 606 | 1 |
 | `src/lib/media/attachmentEnrichment.ts` | 600 | 4 |
 
@@ -49,11 +49,11 @@
 | `demo.tsx` | 68 | 0 | Playground |  |
 | `main.tsx` | 11 | 0 |  |  |
 
-## src/components — 1 файлов, 55 строк
+## src/components — 1 файлов, 56 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `InitialSyncBoundary.tsx` | 55 | 1 | InitialSyncBoundary |  |
+| `InitialSyncBoundary.tsx` | 56 | 1 | InitialSyncBoundary | Holds the shell until the first sync settles, so nobody is shown half a vault. |
 
 ## src/components/Account — 1 файлов, 349 строк
 
@@ -182,12 +182,12 @@
 |---|---:|---:|---|---|
 | `LandingPage.tsx` | 502 | 1 | LandingPage |  |
 
-## src/components/Logs — 2 файлов, 463 строк
+## src/components/Logs — 2 файлов, 464 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `LogModal.tsx` | 23 | 2 | LogModal |  |
-| `LogViewer.tsx` | 440 | 3 | LogViewer |  |
+| `LogViewer.tsx` | 441 | 3 | LogViewer | The log panel: filters by scope and level, copy and clear, docked and modal v… |
 
 ## src/components/Media — 9 файлов, 1401 строк
 
@@ -227,7 +227,7 @@
 | `MobileShell.tsx` | 112 | 1 | MobileShell |  |
 | `MobileTasksView.tsx` | 276 | 1 | MobileTasksView |  |
 
-## src/components/Modals — 10 файлов, 2357 строк
+## src/components/Modals — 10 файлов, 2358 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -239,7 +239,7 @@
 | `FolderModal.tsx` | 166 | 2 | FolderModal |  |
 | `FolderViewModal.tsx` | 318 | 2 | FolderViewModal |  |
 | `SettingsModal.tsx` | 210 | 2 | SettingsModal | The settings shell: a rail of tabs, the mobile and desktop frames, and the pi… |
-| `TriageModal.tsx` | 484 | 1 | TriageModal |  |
+| `TriageModal.tsx` | 485 | 1 | TriageModal | AI triage of the inbox: one batch of notes, folders and tags confirmed in a s… |
 | `VaultModal.tsx` | 283 | 2 | VaultModal |  |
 
 ## src/components/RightPanel — 3 файлов, 446 строк
@@ -328,7 +328,7 @@
 |---|---:|---:|---|---|
 | `VaultSwitcherMenu.tsx` | 228 | 3 | VaultSwitcherMenuProps, VaultSwitcherMenu |  |
 
-## src/components/Views — 13 файлов, 2652 строк
+## src/components/Views — 13 файлов, 2653 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -337,7 +337,7 @@
 | `calendarHelpers.ts` | 66 | 4 | getPriorityBadge, cleanTimeFromTitle, formatDurationBadge |  |
 | `CalendarMonthView.tsx` | 210 | 1 | CalendarMonthViewProps, CalendarMonthView |  |
 | `CalendarTaskBlock.tsx` | 339 | 1 | AllDayTaskPillProps, AllDayTaskPill, TimedTaskBlockProps, TimedTaskBlock |  |
-| `CalendarView.tsx` | 547 | 1 | CalendarView |  |
+| `CalendarView.tsx` | 548 | 1 | CalendarView | The desktop calendar: month and week grids, drag to reschedule, and the overd… |
 | `kanban/KanbanCard.tsx` | 218 | 1 | KanbanCardProps, KanbanCard |  |
 | `kanban/KanbanColumn.tsx` | 116 | 1 | KanbanColumnProps, KanbanColumn |  |
 | `kanban/KanbanMaterialsDock.tsx` | 192 | 1 | KanbanMaterialsDockProps, KanbanMaterialsDock |  |
@@ -346,13 +346,13 @@
 | `KanbanBoard.tsx` | 168 | 2 | KanbanBoard |  |
 | `useCalendarInteractions.ts` | 276 | 1 | DEFAULT_HOUR_HEIGHT, MIN_HOUR_HEIGHT, MAX_HOUR_HEIGHT, TimelineResizingState, ResizingTaskState, +1 |  |
 
-## src/components/Workspace — 5 файлов, 1502 строк
+## src/components/Workspace — 5 файлов, 1504 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `dockPanelUtils.ts` | 216 | 4 | WORKSPACE_LAYOUT_KEY, wsLog, PANELS_TO_ADD, PANEL_CONSTRAINTS, getPanelMinWidth, +5 |  |
 | `GroupHeaderActions.tsx` | 110 | 1 | GroupHeaderActions |  |
-| `useCrossWindowDnd.ts` | 612 | 1 | DropPreviewRect, DropTargetResult, UseCrossWindowDndOptions, useCrossWindowDnd |  |
+| `useCrossWindowDnd.ts` | 614 | 1 | DropPreviewRect, DropTargetResult, UseCrossWindowDndOptions, useCrossWindowDnd | Dragging a note between workspace panels: the preview rect, the drop target u… |
 | `useDockPanels.ts` | 274 | 1 | UseDockPanelsOptions, useDockPanels |  |
 | `WorkspaceShell.tsx` | 290 | 1 | WorkspaceShellProps, WorkspaceShell |  |
 

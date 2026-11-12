@@ -1,3 +1,4 @@
+// Holds the shell until the first sync settles, so nobody is shown half a vault.
 import { useEffect, useState, type ReactNode } from 'react';
 import { useApp } from '../context/AppContext';
 import { syncEngine } from '../lib/sync/syncEngine';

@@ -1,3 +1,4 @@
+// The log panel: filters by scope and level, copy and clear, docked and modal variants.
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { logger } from '../../lib/logger/logger';
 import { openAppFolder } from '../../lib/platform/folderOpener';

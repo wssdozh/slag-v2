@@ -1,3 +1,4 @@
+// AI triage of the inbox: one batch of notes, folders and tags confirmed in a single pass.
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
