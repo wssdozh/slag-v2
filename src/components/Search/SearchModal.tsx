@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem } from '../../types';
-import { querySearch, initSearchIndex } from '../../lib/searchService';
+import { querySearch, initSearchIndex, preloadSearchEngine } from '../../lib/searchService';
 import {
   formatShortcut,
   APP_COMMANDS,
@@ -423,6 +423,21 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
 
 export const SearchModal: React.FC = () => {
   const { isSearchOpen, items } = useApp();
+
+  // This chunk is already prefetched on idle from App; Orama itself is a second lazy chunk
+  // inside searchService, and its download+eval was the first ⌘K's extra cost on top of the
+  // index build. Ask for it on idle as well: never on the startup path.
+  useEffect(() => {
+    const preload = () => {
+      void preloadSearchEngine();
+    };
+    if (typeof requestIdleCallback === 'function') {
+      const handle = requestIdleCallback(preload, { timeout: 3000 });
+      return () => cancelIdleCallback(handle);
+    }
+    const timer = setTimeout(preload, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Lazy index: sync on open. The sync is incremental, so this stays cheap even
   // after every keystroke that changed a note — and it must start before the query

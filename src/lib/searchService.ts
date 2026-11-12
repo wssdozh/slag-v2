@@ -27,6 +27,18 @@ function loadOrama(): Promise<OramaModule> {
   return oramaModule;
 }
 
+// Orama lives in its own lazy chunk (~76 kB, 25 kB gzip). On the 1000-note probe the first
+// index build paid its fetch+eval before indexing a single note (31–40 ms on the dev server),
+// and the palette paid that on the first ⌘K. The caller asks for it while the browser is
+// idle, so the cost lands after first paint instead of on the startup path.
+export async function preloadSearchEngine(): Promise<void> {
+  try {
+    await loadOrama();
+  } catch (err) {
+    searchLog.warn('Failed to preload Orama:', err);
+  }
+}
+
 // ponytail: orama in js holds up to ~10k notes; 100k is a different engine (fts5 in rust),
 // not a bigger index. Chunked build keeps the first index from freezing the modal.
 const BUILD_CHUNK = 500;
