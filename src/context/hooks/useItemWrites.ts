@@ -1,3 +1,4 @@
+// Every write to a note: create, save, delete, restore from trash, move, complete a task.
 import { useCallback } from 'react';
 import type { SlagItem, SlagItemType } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -9,7 +10,7 @@ import type { ToastMessage } from '../appContext.types';
 
 const uiLog = logger.scope('UI');
 
-export interface ItemActionsDeps {
+export interface ItemWritesDeps {
   items: SlagItem[];
   currentFolder: string;
   selectedItem: SlagItem | null;
@@ -26,7 +27,7 @@ export interface ItemActionsDeps {
  * storage service and comes back through refreshData; the provider owns that list
  * and hands it in, so this is never a second source of truth.
  */
-export function useItemActions(deps: ItemActionsDeps) {
+export function useItemWrites(deps: ItemWritesDeps) {
   const {
     items, currentFolder, selectedItem, setSelectedItem,
     addToast, refreshData, setIsFullscreenEditorOpen,

@@ -22,7 +22,7 @@ import { useFeedView } from './hooks/useFeedView';
 import { useBackup } from './hooks/useBackup';
 import { useAssistant } from './hooks/useAssistant';
 import { useAppearance } from './hooks/useAppearance';
-import { useItemActions } from './hooks/useItemActions';
+import { useItemWrites } from './hooks/useItemWrites';
 import { useFolderAdmin } from './hooks/useFolderAdmin';
 import { useVaults } from './hooks/useVaults';
 import { useRecurringRollover } from './hooks/useRecurringRollover';
@@ -488,7 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const {
     saveItem, openNewNote, updateItem, deleteItem, restoreFromTrash, moveItem,
     toggleTaskComplete, completeTaskForever,
-  } = useItemActions({
+  } = useItemWrites({
     items, currentFolder, selectedItem, setSelectedItem,
     addToast, refreshData, setIsFullscreenEditorOpen,
   });
