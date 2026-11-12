@@ -20,13 +20,13 @@ import { createSyncOpFromStorageEvent } from './entities/registry';
 import { SyncTransport } from './transport';
 import { connectSocket, handleIncoming, acknowledgeBundle } from './syncSocket';
 import {
-  addTrustedDeviceToConfig,
-  setDeviceAllowedVaultsInConfig,
-  removeTrustedDeviceFromConfig,
-  renameDeviceInConfig,
-  setDeviceSyncModeInConfig,
-  normalizeTrustedDevicesFromAccount,
-} from './devices';
+  applyAccountDevices,
+  addTrustedDevice,
+  setDeviceAllowedVaults,
+  removeTrustedDevice,
+  renameDevice,
+  setDeviceSyncMode,
+} from './deviceAdmin';
 import {
   computeSubscription,
   loadConfig,
@@ -192,15 +192,7 @@ export class SyncEngine {
     this.status.subscription = computeSubscription(this);
     accountClient.subscribe((accountState) => {
       this.status.isAuthenticated = accountClient.getToken(this.config.serverUrl) !== null;
-      if (!this.usesAccountSync()) return;
-      this.config.trustedDevices = normalizeTrustedDevicesFromAccount(accountState, this.config.deviceId);
-      const ownVault = accountState.vaults.find((vault) => vault.id === this.getSyncVaultId());
-      const ownGrant = ownVault && ownVault.grants.find((grant) => grant.deviceId === this.config.deviceId);
-      if (ownGrant && ownGrant.status === 'accepted') this.config.localSyncMode = ownGrant.mode;
-      if (!this.status.isAuthenticated || !ownGrant || ownGrant.status !== 'accepted') {
-        if (this.activeRoomId || this.ws) this.disconnect();
-      }
-      this.notify();
+      applyAccountDevices(this, accountState);
     });
 
     if (typeof storage !== 'undefined' && typeof storage.subscribeChanges === 'function') {
@@ -851,25 +843,15 @@ export class SyncEngine {
     this.notify();
   }
 
-  public addTrustedDevice(device: DeviceProfile): void {
-    this.saveConfig(addTrustedDeviceToConfig(this.config, device));
-  }
+  public addTrustedDevice(device: DeviceProfile): void { addTrustedDevice(this, device); }
 
-  public setDeviceAllowedVaults(deviceId: string, allowedVaults: string[]): void {
-    this.saveConfig(setDeviceAllowedVaultsInConfig(this.config, deviceId, allowedVaults));
-  }
+  public setDeviceAllowedVaults(deviceId: string, allowedVaults: string[]): void { setDeviceAllowedVaults(this, deviceId, allowedVaults); }
 
-  public removeTrustedDevice(deviceId: string): void {
-    this.saveConfig(removeTrustedDeviceFromConfig(this.config, deviceId));
-  }
+  public removeTrustedDevice(deviceId: string): void { removeTrustedDevice(this, deviceId); }
 
-  public renameDevice(deviceId: string, newName: string): void {
-    this.saveConfig(renameDeviceInConfig(this.config, deviceId, newName));
-  }
+  public renameDevice(deviceId: string, newName: string): void { renameDevice(this, deviceId, newName); }
 
-  public setDeviceSyncMode(deviceId: string, mode: DeviceSyncMode): void {
-    this.saveConfig(setDeviceSyncModeInConfig(this.config, deviceId, mode));
-  }
+  public setDeviceSyncMode(deviceId: string, mode: DeviceSyncMode): void { setDeviceSyncMode(this, deviceId, mode); }
 
   public async rotateVaultKey(): Promise<string> {
     if (this.usesAccountSync()) {
