@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **429**, строк: **80960**, зон: **45**.
+Модулей: **434**, строк: **81090**, зон: **45**.
 
 ## Самые длинные файлы
 
@@ -15,27 +15,27 @@
 | `e2e/slag/views.spec.ts` | 1076 | 0 |
 | `src/lib/sync/syncEngine.ts` | 899 | 17 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
-| `e2e/mobile.spec.ts` | 871 | 0 |
+| `e2e/mobile.spec.ts` | 874 | 0 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
 | `src/components/Feed/ItemCard.tsx` | 789 | 1 |
-| `src/context/AppContext.tsx` | 715 | 59 |
+| `src/context/AppContext.tsx` | 715 | 62 |
 | `src/components/Feed/Composer.tsx` | 699 | 4 |
 | `src/lib/storage/index.ts` | 665 | 34 |
 | `src/components/Editor/FullscreenEditor.tsx` | 639 | 1 |
-| `src/components/Views/KanbanBoard.tsx` | 634 | 2 |
 | `src/components/Feed/FeedList.tsx` | 633 | 2 |
 | `src/components/Workspace/useCrossWindowDnd.ts` | 612 | 1 |
+| `src/lib/backupService.ts` | 605 | 1 |
 
-## e2e (playwright) — 91 файлов, 17564 строк
+## e2e (playwright) — 91 файлов, 17569 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
 - `e2e/slag/editor.spec.ts` — 1588
 - `e2e/slag/views.spec.ts` — 1076
 - `e2e/slag/workspace.spec.ts` — 885
-- `e2e/mobile.spec.ts` — 871
+- `e2e/mobile.spec.ts` — 874
 - `e2e/slag/feed.spec.ts` — 802
-- `e2e/admin_panel.spec.ts` — 491
+- `e2e/admin_panel.spec.ts` — 493
 - `e2e/motion.spec.ts` — 451
 - `e2e/initial_sync_engine.spec.ts` — 359
 - `e2e/slag/feed_thumbs.spec.ts` — 351
@@ -308,7 +308,7 @@
 | `Select.tsx` | 352 | 10 | SelectOption, SelectProps, Select |  |
 | `SendButton.tsx` | 48 | 4 | SendButtonProps, SendButton |  |
 | `SheetPanel.tsx` | 353 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel |  |
-| `TagChip.tsx` | 81 | 4 | TagChipProps, TagChip |  |
+| `TagChip.tsx` | 81 | 5 | TagChipProps, TagChip |  |
 | `TaskStatusMark.tsx` | 49 | 4 | TaskStatusMarkProps, TaskStatusMark |  |
 | `Toast.tsx` | 172 | 2 | ToastContainer |  |
 | `ToolbarButton.tsx` | 58 | 3 | ToolbarButtonProps, ToolbarButton |  |
@@ -322,7 +322,7 @@
 |---|---:|---:|---|---|
 | `VaultSwitcherMenu.tsx` | 228 | 3 | VaultSwitcherMenuProps, VaultSwitcherMenu |  |
 
-## src/components/Views — 8 файлов, 2525 строк
+## src/components/Views — 13 файлов, 2650 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -332,7 +332,12 @@
 | `CalendarMonthView.tsx` | 210 | 1 | CalendarMonthViewProps, CalendarMonthView |  |
 | `CalendarTaskBlock.tsx` | 340 | 1 | AllDayTaskPillProps, AllDayTaskPill, TimedTaskBlockProps, TimedTaskBlock |  |
 | `CalendarView.tsx` | 547 | 1 | CalendarView |  |
-| `KanbanBoard.tsx` | 634 | 2 | KanbanBoard |  |
+| `kanban/KanbanCard.tsx` | 218 | 1 | KanbanCardProps, KanbanCard |  |
+| `kanban/KanbanColumn.tsx` | 116 | 1 | KanbanColumnProps, KanbanColumn |  |
+| `kanban/KanbanMaterialsDock.tsx` | 192 | 1 | KanbanMaterialsDockProps, KanbanMaterialsDock |  |
+| `kanban/kanbanModel.ts` | 32 | 5 | KanbanColumnIconType, KanbanColumnConfig, KANBAN_COLUMNS, isOverdue, getTaskKey |  |
+| `kanban/KanbanStatusIcon.tsx` | 33 | 2 | KanbanStatusIconProps, KanbanStatusIcon |  |
+| `KanbanBoard.tsx` | 168 | 2 | KanbanBoard |  |
 | `useCalendarInteractions.ts` | 276 | 1 | DEFAULT_HOUR_HEIGHT, MIN_HOUR_HEIGHT, MAX_HOUR_HEIGHT, TimelineResizingState, ResizingTaskState, +1 |  |
 
 ## src/components/Workspace — 5 файлов, 1502 строк
@@ -362,7 +367,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 715 | 59 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
+| `AppContext.tsx` | 715 | 62 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
 | `appContext.types.ts` | 228 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/context/feed — 1 файлов, 89 строк
@@ -400,7 +405,7 @@
 |---|---:|---:|---|---|
 | `useDragToScroll.ts` | 232 | 2 | DragToScrollOptions, useDragToScroll |  |
 | `usePhotoPager.ts` | 320 | 2 | PhotoPagerOptions, usePhotoPager |  |
-| `usePointerDnd.ts` | 244 | 2 | DragItemPayload, UsePointerDndOptions, PointerDndState, usePointerDnd |  |
+| `usePointerDnd.ts` | 244 | 5 | DragItemPayload, UsePointerDndOptions, PointerDndState, usePointerDnd |  |
 | `usePullToSearch.ts` | 88 | 1 | usePullToSearch | Pull a list past either end to open search. |
 | `useSheetDrag.ts` | 157 | 1 | useSheetDrag | Drag-to-dismiss for a one-detent sheet — a content-sized panel with nothing t… |
 | `useSwipeGesture.ts` | 50 | 2 | SwipeGestureOptions, useSwipeGesture |  |
@@ -596,5 +601,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 155 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 159 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
