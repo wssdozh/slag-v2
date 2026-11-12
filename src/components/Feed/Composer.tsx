@@ -1,46 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment } from '../../types';
-import { storage } from '../../lib/storage';
+import type { SlagItem, SlagItemType, SlagItemStatus } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { VideoRecorder } from '../UI/VideoRecorder';
-import { AudioPlayer } from '../UI/AudioPlayer';
-import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { useComposerMedia } from '../../hooks/media/useComposerMedia';
-import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
-import { categorizeDraft } from '../../lib/ai/aiService';
-import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
-import { extractFolderToken, parseTodoistInput, extractAndStripTags, type ParsedTodoistTask } from '../../lib/time/todoistTaskParser';
-import { parseSubtasksFromContent } from '../../lib/tasks/taskUtils';
+import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/time/todoistTaskParser';
 import { BaseComposer } from './BaseComposer';
 import { useComposerFiles } from './composer/useComposerFiles';
-import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
 import { ToolbarButton } from '../UI/ToolbarButton';
 import { ComposerTaskControls } from './ComposerTaskControls';
 import { SlashCommandMenu } from './SlashCommandMenu';
-import { type SlashCommand } from '../../types/slashCommands';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { TagSuggestionMenu } from './TagSuggestionMenu';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 import { SuggestionMenuHeader } from './SuggestionMenuHeader';
-import { getTodayIso, getTomorrowIso, formatDueDateLabel } from '../../lib/time/dateUtils';
+import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
 import {
-  Paperclip,
-  Mic,
-  Video,
-  Sparkles,
   CheckSquare,
   X,
-  Loader2,
   Maximize2,
-  CornerUpLeft,
   FileText,
   StickyNote,
   Lock,
+  Paperclip,
 } from 'lucide-react';
 import { useComposerDraft } from './useComposerDraft';
 import { useComposerAutocomplete } from './useComposerAutocomplete';
+import { ComposerReplyBanner } from './composer/ComposerReplyBanner';
+import { ComposerAttachmentStrip } from './composer/ComposerAttachmentStrip';
+import { ComposerTypeSelector } from './composer/ComposerTypeSelector';
+import { ComposerAiButton } from './composer/ComposerAiButton';
+import { ComposerRecordButton } from './composer/ComposerRecordButton';
+import { useComposerAiTags } from './composer/useComposerAiTags';
+import { useComposerSlashCommands } from './composer/useComposerSlashCommands';
+import { useComposerSubmit } from './composer/useComposerSubmit';
+import { resolveComposerFields, type ComposerDismissals } from './composer/composerFields';
 
 export interface ComposerProps {
   isModal?: boolean;
@@ -91,7 +86,6 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
   const [reminder] = useState<string | undefined>(initialReminder);
-  const [isGeneratingAiTags, setIsGeneratingAiTags] = useState(false);
 
   // Todoist parser & Ghost-chips state
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
@@ -143,9 +137,6 @@ export const Composer: React.FC<ComposerProps> = ({
       setDismissedTags(new Set());
     },
   });
-
-  // The draft keeps attachment metadata; the bytes are resolved on demand.
-  const attachmentSrcs = useAttachmentSrcs(attachments);
 
   const {
     wikiQuery,
@@ -205,6 +196,35 @@ export const Composer: React.FC<ComposerProps> = ({
     cancelRecording,
   } = useComposerMedia({ addToast });
 
+  const { isGeneratingAiTags, generateAiTags } = useComposerAiTags({
+    content,
+    attachmentCount: attachments.length,
+    currentFolder,
+    folders,
+    aiSettings,
+    setContent,
+    setTargetFolder,
+    addToast,
+  });
+
+  const { executeSlashCommand } = useComposerSlashCommands({
+    content,
+    setContent,
+    textareaRef,
+    setItemType,
+    setDueDate,
+    setPriority,
+    setIsDateDismissed,
+    setIsPriorityDismissed,
+    setSlashQuery,
+    setIsRecordingAudio,
+    setIsRecordingVideo,
+    activeFolder,
+    resetDraftState,
+    generateAiTags,
+    addToast,
+  });
+
   // 150ms debounced Todoist parsing when content changes
   useEffect(() => {
     if (!content.trim()) return;
@@ -251,132 +271,16 @@ export const Composer: React.FC<ComposerProps> = ({
     updateAutocompleteQueries(text, cursorPos);
   };
 
-
-  const handleSmartAiTags = async () => {
-    if (!content.trim() && attachments.length === 0) {
-      addToast('Введите текст заметки для ИИ', 'info');
-      return;
-    }
-
-    setIsGeneratingAiTags(true);
-    try {
-      const res = await categorizeDraft(content, currentFolder, folders, aiSettings);
-      const folderToken = res.targetFolder && res.targetFolder !== currentFolder
-        ? `@${folders.find(f => f.path === res.targetFolder)?.name ?? res.targetFolder}`
-        : '';
-      const tokens = [folderToken, ...res.tags.map(t => `#${t}`)].filter(Boolean).join(' ');
-      if (tokens) {
-        setContent(prev => `${prev.trimEnd()}${prev.trim() ? ' ' : ''}${tokens} `);
-      }
-      if (res.targetFolder && res.targetFolder !== currentFolder) {
-        setTargetFolder(res.targetFolder);
-        addToast(`Папка «${res.targetFolder}» · ${res.tags.map(t => '#' + t).join(' ')}`, 'success');
-      } else if (res.tags.length > 0) {
-        addToast(`Теги: ${res.tags.map(t => '#' + t).join(' ')}`, 'success');
-      } else {
-        addToast('ИИ не нашел подходящих тегов', 'info');
-      }
-    } catch {
-      addToast('Ошибка запроса к ИИ', 'error');
-    } finally {
-      setIsGeneratingAiTags(false);
-    }
-  };
-
-  const executeSlashCommand = (cmd: SlashCommand) => {
-    const el = textareaRef.current;
-    const cursorPos = el ? el.selectionStart || content.length : content.length;
-    const textBefore = content.slice(0, cursorPos);
-    const textAfter = content.slice(cursorPos);
-    const slashMatch = textBefore.match(/(?:^|\s)\/([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
-
-    let newCursor = cursorPos;
-
-    if (slashMatch && slashMatch.index !== undefined) {
-      const isStartOfLine = slashMatch[0].startsWith('/');
-      const replaceStart = isStartOfLine ? slashMatch.index : slashMatch.index + 1;
-      const newText = textBefore.slice(0, replaceStart) + textAfter;
-      newCursor = replaceStart;
-      setContent(newText);
-    }
-    setSlashQuery(null);
-
-    // Execute command action
-    switch (cmd.id) {
-      case 'task':
-        setItemType('task');
-        addToast('Режим переключен: Таска', 'info');
-        break;
-      case 'note':
-        setItemType('note');
-        addToast('Режим переключен: Заметка', 'info');
-        break;
-      case 'article':
-        setItemType('article');
-        addToast('Режим переключен: Статья', 'info');
-        break;
-      case 'today':
-        setItemType('task');
-        setDueDate(getTodayIso());
-        setIsDateDismissed(false);
-        addToast('Дедлайн установлен на сегодня', 'info');
-        break;
-      case 'tomorrow':
-        setItemType('task');
-        setDueDate(getTomorrowIso());
-        setIsDateDismissed(false);
-        addToast('Дедлайн установлен на завтра', 'info');
-        break;
-      case 'urgent':
-        setItemType('task');
-        setPriority('high');
-        setIsPriorityDismissed(false);
-        addToast('Приоритет: Urgent (P1)', 'info');
-        break;
-      case 'high':
-        setItemType('task');
-        setPriority('high');
-        setIsPriorityDismissed(false);
-        addToast('Приоритет: High (P2)', 'info');
-        break;
-      case 'medium':
-        setItemType('task');
-        setPriority('medium');
-        setIsPriorityDismissed(false);
-        addToast('Приоритет: Medium (P3)', 'info');
-        break;
-      case 'low':
-        setItemType('task');
-        setPriority('low');
-        setIsPriorityDismissed(false);
-        addToast('Приоритет: Low (P4)', 'info');
-        break;
-      case 'ai':
-        handleSmartAiTags();
-        break;
-      case 'audio':
-        setIsRecordingAudio(true);
-        break;
-      case 'video':
-        setIsRecordingVideo(true);
-        break;
-      case 'clear':
-        storage.deleteComposerDraft(activeFolder);
-        resetDraftState();
-        addToast('Черновик очищен', 'info');
-        return;
-    }
-
-    setTimeout(() => {
-      if (el) {
-        el.focus({ preventScroll: true });
-        el.setSelectionRange(newCursor, newCursor);
-      }
-    }, 10);
-  };
-
   const removeAttachment = (id: string) => {
     setAttachments(attachments.filter(a => a.id !== id));
+  };
+
+  const dismissals: ComposerDismissals = {
+    isPriorityDismissed,
+    isDateDismissed,
+    isRecurrenceDismissed,
+    isDurationDismissed,
+    dismissedTags,
   };
 
   const effectivePriority = itemType === 'task'
@@ -415,221 +319,71 @@ export const Composer: React.FC<ComposerProps> = ({
     isDraggingOver, handleDragOver, handleDragLeave, handleDrop, handlePaste,
   } = useComposerFiles({ addToast, setAttachments, textareaRef, isModal, isActive });
 
-  // Защита от повторного создания: второй вызов в том же тике видит те же данные
-  // и успел бы создать дубль, потому что состояние очищается уже после рендера.
-  const sendGuardRef = useRef(false);
-  const sendItemWithAttachments = (attachmentsToSend: SlagAttachment[]) => {
-    if (sendGuardRef.current) return;
-    if (!content.trim() && attachmentsToSend.length === 0) return;
-    sendGuardRef.current = true;
-    queueMicrotask(() => { sendGuardRef.current = false; });
-
-    // Parse Todoist input synchronously for immediate state accuracy
-    const currentParsed = parseTodoistInput(content);
-
-    // `@Папка` and `#тег` are composer syntax: both are stripped before saving.
-    const { cleanContent: withoutFolder, folder: inlineFolder } = extractFolderToken(content, folders);
-    const { cleanContent, tags: extractedTags } = extractAndStripTags(withoutFolder);
-    const finalContent = (cleanContent || withoutFolder || content).trim();
-
-    let title = '';
-    const lines = finalContent.split('\n');
-    const firstLine = lines[0].replace(/^#+\s*/, '').trim();
-
-    if (itemType === 'article') {
-      title = firstLine || 'Новая статья';
-    } else if (itemType === 'task') {
-      title = currentParsed.cleanTitle || 'Новая таска';
-    } else if (firstLine) {
-      title = firstLine.slice(0, 50);
-    } else if (attachmentsToSend.length > 0) {
-      const first = attachmentsToSend[0];
-      if (first.type === 'audio') title = 'Голосовая заметка';
-      else if (first.type === 'video') title = 'Видео-сообщение';
-      else if (first.type === 'image') title = 'Изображение';
-      else title = first.name || 'Вложение';
-    } else {
-      title = 'Заметка';
-    }
-
-    const rawGhostTags = currentParsed.tags.filter(t => !dismissedTags.has(t));
-    const activeExtractedTags = extractedTags.filter(t => !dismissedTags.has(t));
-    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...activeExtractedTags]));
-
-    const subtasks = itemType === 'task' ? parseSubtasksFromContent(finalContent) : [];
-
-    const taskPriority = itemType === 'task'
-      ? (!isPriorityDismissed && currentParsed.priority
-          ? currentParsed.priority
-          : priority)
-      : undefined;
-
-    const taskRecurrence = itemType === 'task'
-      ? (!isRecurrenceDismissed && currentParsed.recurrence
-          ? currentParsed.recurrence
-          : recurrence)
-      : undefined;
-
-    const taskDueDate = itemType === 'task'
-      ? (!isDateDismissed && currentParsed.dueDate
-          ? currentParsed.dueDate
-          : (dueDate || (taskRecurrence ? getTodayIso() : undefined)))
-      : undefined;
-
-    const taskReminder = itemType === 'task'
-      ? (!isDateDismissed && currentParsed.reminder
-          ? currentParsed.reminder
-          : (reminder || undefined))
-      : undefined;
-
-    const taskDuration = itemType === 'task'
-      ? (!isDurationDismissed && currentParsed.duration !== undefined
-          ? currentParsed.duration
-          : duration)
-      : undefined;
-
-    const destinationFolder = inlineFolder?.path || targetFolder || effectiveDefaultFolder;
-    const saved = saveItem({
-      type: itemType,
-      title,
-      content: finalContent,
-      folder: destinationFolder,
-      tags: finalTags,
-      attachments: attachmentsToSend,
-      replyToId: replyTarget?.id,
-      status: itemType === 'task' ? taskStatus : undefined,
-      priority: taskPriority,
-      dueDate: taskDueDate,
-      reminder: taskReminder,
-      duration: taskDuration,
-      recurrence: taskRecurrence,
-      subtasks: subtasks.length > 0 ? subtasks : undefined,
-    });
-
-    if (attachmentsToSend.length > 0 && canEnrichAttachments(aiSettings)) {
-      enrichItemAttachments(saved, updateItem, aiSettings).catch(() => {});
-    }
-
-    if (aiSettings.autoTagging && finalTags.length === 0 && content.trim().length >= 15) {
-      categorizeDraft(content.trim(), destinationFolder, folders, aiSettings).then(res => {
-        if (res.tags && res.tags.length > 0) {
-          updateItem({ ...saved, tags: res.tags, updatedAt: Date.now() });
-        }
-      }).catch(() => {
-        // quiet fallback
-      });
-    }
-
-    storage.deleteComposerDraft(destinationFolder);
-    storage.deleteComposerDraft(activeFolder);
-    resetDraftState();
-    if (onComplete) {
-      onComplete();
-    } else {
-      requestAnimationFrame(() => {
-        // Only reclaim focus if it actually left. Retyping the caret into an
-        // already focused field re-opens the keyboard on Android and reads as a
-        // second bounce right after the note lands.
-        const field = textareaRef.current;
-        if (field && document.activeElement !== field) {
-          field.focus({ preventScroll: true });
-        }
-      });
-    }
-  };
-
-  const handleSend = () => {
-    sendItemWithAttachments(attachments);
-  };
-
-  const handleRecordedAudio = (att: SlagAttachment, autoSend?: boolean) => {
-    setIsRecordingAudio(false);
-    setRecordMode('idle');
-    setLockHint(null);
-
-    if (autoSend) {
-      const merged = [...attachments, att];
-      sendItemWithAttachments(merged);
-    } else {
-      setAttachments(prev => [...prev, att]);
-    }
-  };
-
-  const handleRecordedVideo = (att: SlagAttachment, autoSend?: boolean) => {
-    setIsRecordingVideo(false);
-    setRecordMode('idle');
-    setLockHint(null);
-
-    if (autoSend) {
-      const merged = [...attachments, att];
-      sendItemWithAttachments(merged);
-    } else {
-      setAttachments(prev => [...prev, att]);
-    }
-  };
+  const { handleSend, handleRecordedAudio, handleRecordedVideo } = useComposerSubmit({
+    content,
+    itemType,
+    tags,
+    attachments,
+    priority,
+    dueDate,
+    reminder,
+    duration,
+    recurrence,
+    taskStatus,
+    replyTarget,
+    targetFolder,
+    effectiveDefaultFolder,
+    activeFolder,
+    folders,
+    aiSettings,
+    dismissals,
+    saveItem,
+    updateItem,
+    setAttachments,
+    setIsRecordingAudio,
+    setIsRecordingVideo,
+    setRecordMode,
+    setLockHint,
+    resetDraftState,
+    textareaRef,
+    onComplete,
+  });
 
   // Expand into Fullscreen Focus Mode directly from composer
   const handleExpandToFullscreen = () => {
-    const { cleanContent: withoutFolder, folder: inlineFolder } = extractFolderToken(content, folders);
-    const { cleanContent, tags: extractedTags } = extractAndStripTags(withoutFolder);
-    const finalContent = (cleanContent || withoutFolder || content).trim();
-    const lines = finalContent.split('\n');
-    const firstLine = lines[0]?.replace(/^#+\s*/, '').trim() || (itemType === 'article' ? 'Новая статья' : 'Черновик');
-    const currentParsed = parseTodoistInput(content);
+    const fields = resolveComposerFields({
+      content,
+      folders,
+      itemType,
+      tags,
+      priority,
+      dueDate,
+      reminder,
+      duration,
+      recurrence,
+      dismissals,
+    });
 
+    const firstLine = fields.firstLine || (itemType === 'article' ? 'Новая статья' : 'Черновик');
     const taskTitle = itemType === 'task'
-      ? (currentParsed.cleanTitle || 'Новая таска')
+      ? (fields.cleanTitle || 'Новая таска')
       : firstLine;
-
-    const rawGhostTags = currentParsed.tags.filter(t => !dismissedTags.has(t));
-    const activeExtractedTags = extractedTags.filter(t => !dismissedTags.has(t));
-    const finalTags = Array.from(new Set([...tags, ...rawGhostTags, ...activeExtractedTags]));
-
-    const taskPriority = itemType === 'task'
-      ? (!isPriorityDismissed && currentParsed.priority
-          ? currentParsed.priority
-          : priority)
-      : undefined;
-
-    const taskRecurrence = itemType === 'task'
-      ? (!isRecurrenceDismissed && currentParsed.recurrence
-          ? currentParsed.recurrence
-          : recurrence)
-      : undefined;
-
-    const taskDueDate = itemType === 'task'
-      ? (!isDateDismissed && currentParsed.dueDate
-          ? currentParsed.dueDate
-          : (dueDate || (taskRecurrence ? getTodayIso() : undefined)))
-      : undefined;
-
-    const taskReminder = itemType === 'task'
-      ? (!isDateDismissed && currentParsed.reminder
-          ? currentParsed.reminder
-          : (reminder || undefined))
-      : undefined;
-
-    const taskDuration = itemType === 'task'
-      ? (!isDurationDismissed && currentParsed.duration !== undefined
-          ? currentParsed.duration
-          : duration)
-      : undefined;
 
     // Create a temporary draft object in memory WITHOUT saving to vault storage yet
     const draftItem: SlagItem = {
       id: 'draft_' + Date.now(),
       type: itemType,
       title: taskTitle,
-      content: finalContent,
-      folder: inlineFolder?.path || targetFolder || currentFolder,
-      tags: finalTags,
+      content: fields.finalContent,
+      folder: fields.folder?.path || targetFolder || currentFolder,
+      tags: fields.tags,
       attachments,
       replyToId: replyTarget?.id,
-      priority: taskPriority,
-      dueDate: taskDueDate,
-      reminder: taskReminder,
-      duration: taskDuration,
-      recurrence: taskRecurrence,
+      priority: fields.priority,
+      dueDate: fields.dueDate,
+      reminder: fields.reminder,
+      duration: fields.duration,
+      recurrence: fields.recurrence,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -709,99 +463,13 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  // The banner collapses instead of vanishing, so sending or cancelling a reply
-  // does not yank the whole composer up by the height of the row.
-  const [stickyReply, setStickyReply] = useState(replyTarget);
-  if (replyTarget && replyTarget !== stickyReply) setStickyReply(replyTarget);
-  const bannerReply = replyTarget ?? stickyReply;
-
   const topSlot = (
     <>
-        {/* Reply Banner (Flat, Anti-Matryoshka) */}
-        <div className="motion-accordion w-full" data-expanded={Boolean(replyTarget)}>
-        <div className="motion-accordion-inner">
-        {bannerReply && (
-        <div className="flex items-center pb-1.5 pt-0.5 border-b border-white/[0.06] text-xs text-zinc-400 select-none min-h-[28px]">
-          <div className="flex items-center gap-1.5 truncate min-w-0">
-            <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-            <span className="text-[11px] font-mono text-zinc-500 shrink-0">
-              {bannerReply.type === 'task' ? 'Ответ на таску:' : bannerReply.type === 'article' ? 'Ответ на статью:' : 'Ответ:'}
-            </span>
-            <span className="truncate text-zinc-300 font-medium text-xs">
-              {bannerReply.title || bannerReply.content.slice(0, 45)}
-            </span>
-          </div>
-        </div>
-        )}
-        </div>
-        </div>
+      {/* Reply Banner (Flat, Anti-Matryoshka) */}
+      <ComposerReplyBanner replyTarget={replyTarget} />
 
       {/* Attachments Preview Strip */}
-      {attachments.length > 0 && (
-        <div data-composer-attachments="" className="flex items-center gap-2 py-1 overflow-x-auto scrollbar-none whitespace-nowrap">
-          {attachments.map(att => (
-            <div key={att.id} className="shrink-0 flex items-center">
-              {att.type === 'audio' ? (
-                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.05] border border-white/[0.08] relative group">
-                  <AudioPlayer
-                    src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
-                    duration={att.duration}
-                    waveform={att.waveform}
-                    compact={true}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(att.id)}
-                    className="p-1 rounded-full text-zinc-400 hover:text-rose-400 hover:bg-white/[0.08] transition-colors cursor-pointer"
-                    title="Удалить войс"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : att.type === 'video' ? (
-                <div className="relative group p-0.5">
-                  <VideoCirclePlayer src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''} compact={true} />
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(att.id)}
-                    className="absolute -top-1 -right-1 p-1 rounded-full bg-black/80 border border-white/20 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer shadow-md"
-                    title="Удалить видео-кружок"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : att.type === 'image' ? (
-                <div className="relative group rounded-lg overflow-hidden border border-white/[0.08] bg-black/40">
-                  <img src={attachmentSrcs[att.id] ?? att.dataUrl} alt={att.name} className="w-11 h-11 object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(att.id)}
-                    className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/70 text-zinc-300 hover:text-white transition-colors cursor-pointer"
-                    title="Удалить"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-zinc-300 relative group">
-                  <Paperclip className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  <span className="text-[11px] font-mono text-zinc-300 truncate max-w-[120px]">{att.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(att.id)}
-                    className="p-0.5 rounded text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
-                    title="Удалить"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Hidden File / Image inputs */}
+      <ComposerAttachmentStrip attachments={attachments} onRemove={removeAttachment} />
     </>
   );
 
@@ -897,60 +565,10 @@ export const Composer: React.FC<ComposerProps> = ({
       )}
 
       {/* +AI Smart Tagging Button - Icon Only */}
-      <ToolbarButton
-        size="md"
-        className="composer-toolbar-control composer-toolbar-icon"
-        onClick={handleSmartAiTags}
-        disabled={isGeneratingAiTags}
-        title="ИИ классификация: папка и теги (+AI)"
-        aria-label="ИИ классификация: папка и теги (+AI)"
-        icon={
-          isGeneratingAiTags ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Sparkles className="w-4 h-4" />
-          )
-        }
-      >
-        <span className="sr-only">+AI</span>
-      </ToolbarButton>
+      <ComposerAiButton isGenerating={isGeneratingAiTags} onClick={generateAiTags} />
 
       {/* Record Type Selector (Ghost droplist: icon + label + chevron, larger touch target) */}
-      <ResponsiveSegmented<SlagItemType>
-        value={itemType}
-        onChange={setItemType}
-        options={[
-          {
-            value: 'note',
-            label: 'Заметка',
-            showLabelInTrigger: true,
-            icon: <StickyNote className="w-4 h-4" />,
-            title: 'Заметка',
-            ariaLabel: 'Заметка',
-          },
-          {
-            value: 'task',
-            label: 'Таска',
-            showLabelInTrigger: true,
-            icon: <CheckSquare className="w-4 h-4" />,
-            title: 'Таска',
-            ariaLabel: 'Таска',
-          },
-          {
-            value: 'article',
-            label: 'Статья',
-            showLabelInTrigger: true,
-            icon: <FileText className="w-4 h-4" />,
-            title: 'Статья',
-            ariaLabel: 'Статья',
-          },
-        ]}
-        triggerClassName="composer-toolbar-control composer-record-type"
-        compact={true}
-        size="md"
-        direction="up"
-        ariaLabel="Сменить тип записи"
-      />
+      <ComposerTypeSelector value={itemType} onChange={setItemType} />
 
       {/* Task properties sit with the type selector, under the input */}
       {itemType === 'task' && (
@@ -998,26 +616,13 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const sendButton =
     !content.trim() && attachments.length === 0 ? (
-      <button
-        type="button"
+      <ComposerRecordButton
+        mediaType={mobileMediaType}
         onPointerDown={handleMobileMediaPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
-        className="composer-toolbar-control composer-toolbar-icon w-ctrl-md h-ctrl-md rounded-md flex items-center justify-center motion-press shrink-0 cursor-pointer touch-none bg-transparent hover:bg-surface-hover text-fg-secondary hover:text-fg-primary"
-        title={
-          mobileMediaType === 'audio'
-            ? 'Записать аудио (удерживайте) / Кликните для видео'
-            : 'Записать видео (удерживайте) / Кликните для аудио'
-        }
-        aria-label={mobileMediaType === 'audio' ? 'Записать голосовую заметку' : 'Записать видео'}
-      >
-        {mobileMediaType === 'audio' ? (
-          <Mic className="w-4 h-4 transition-transform duration-150" />
-        ) : (
-          <Video className="w-4 h-4 transition-transform duration-150" />
-        )}
-      </button>
+      />
     ) : undefined;
 
   return (
