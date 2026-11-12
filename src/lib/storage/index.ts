@@ -20,8 +20,6 @@ import { isTauri } from '@tauri-apps/api/core';
 import {
   writeTextFile,
   mkdir,
-  remove,
-  exists,
   BaseDirectory,
 } from '@tauri-apps/plugin-fs';
 
@@ -46,6 +44,13 @@ import {
   eraseFolder,
   folderStorageKey,
 } from './folderStore';
+import {
+  trashStorageKey,
+  readTrash,
+  trashItem,
+  recoverFromTrash,
+  purgeTrash,
+} from './trashStore';
 import {
   buildVaultExportJson,
   exportObsidianBundle,
@@ -77,7 +82,6 @@ const fsLog = logger.scope('FS');
 /** Attachment bytes: which file was asked for, and where the answer came from. */
 
 const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
-const TRASH_STORAGE_PREFIX = STORAGE_KEYS.TRASH_PREFIX;
 const DRAFTS_STORAGE_PREFIX = STORAGE_KEYS.DRAFTS_PREFIX;
 const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
 
@@ -90,9 +94,9 @@ export class StorageService {
   private changeListeners: Set<StorageChangeListener> = new Set();
   private instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   private crossWindowDraftChannel: BroadcastChannel | null = null;
-  private attachments = new AttachmentStore(() => this.getVaultAttachmentsPath());
+  public attachments = new AttachmentStore(() => this.getVaultAttachmentsPath());
 
-  public files = new VaultFiles({
+  public files: VaultFiles = new VaultFiles({
     getVault: () => this.currentVault,
     getItems: (folder) => this.getItems(folder),
     getFolders: () => this.getFolders(),
@@ -101,7 +105,7 @@ export class StorageService {
     cacheItems: (key, items) => this.cacheItems(key, items),
     getItemsKey: () => this.getItemsKey(),
     getFoldersKey: () => this.getFoldersKey(),
-    getTrashKey: () => this.getTrashKey(),
+    getTrashKey: () => trashStorageKey(this),
     attachments: this.attachments,
   });
 
@@ -431,79 +435,20 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     }
   }
 
-  private getTrashKey(): string {
-    return `${TRASH_STORAGE_PREFIX}${this.currentVault.id}`;
-  }
-
   public getTrashItems(): SlagItem[] {
-    const raw = localStorage.getItem(this.getTrashKey());
-    if (!raw) return [];
-    try {
-      return this.attachments.hydrate(JSON.parse(raw));
-    } catch {
-      return [];
-    }
+    return readTrash(this);
   }
 
   public moveToTrash(id: string, origin: 'local' | 'remote' = 'local'): void {
-    const items = this.getItems();
-    const item = items.find(i => i.id === id);
-    if (!item) return;
-
-    // Remove from active items
-    const remaining = items.filter(i => i.id !== id);
-    this.cacheItems(this.getItemsKey(), remaining);
-
-    // Save to .trash
-    const trash = this.getTrashItems();
-    trash.unshift({ ...item, updatedAt: Date.now() });
-    this.cacheItems(this.getTrashKey(), trash);
-    fsLog.info(`Moved "${item.title || item.id}" to .trash`);
-
-    if (isTauri()) {
-      void this.files.removeItemFromDisk(item);
-    }
-    this.emitChange({ kind: 'item', action: 'delete', id, payload: item, origin });
+    trashItem(this, id, origin);
   }
 
   public restoreFromTrash(id: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
-    const trash = this.getTrashItems();
-    const item = trash.find(i => i.id === id);
-    if (!item) return null;
-
-    // Remove from trash
-    const remainingTrash = trash.filter(i => i.id !== id);
-    this.cacheItems(this.getTrashKey(), remainingTrash);
-
-    // Restore to active items
-    this.saveItem(item, origin);
-    fsLog.info(`Restored "${item.title || item.id}" from .trash to "${item.folder}"`);
-
-    if (isTauri()) {
-      void this.files.restoreItemOnDisk(item);
-    }
-    this.emitChange({ kind: 'trash', action: 'restore', id: item.id, payload: item, origin });
-    return item;
+    return recoverFromTrash(this, id, origin);
   }
 
   public emptyTrash(origin: 'local' | 'remote' = 'local'): void {
-    localStorage.removeItem(this.getTrashKey());
-    fsLog.info('Emptied .trash folder');
-
-    if (isTauri()) {
-      void (async () => {
-        try {
-          const trashPath = this.files.getVaultTrashPath();
-          if (await exists(trashPath, { baseDir: BaseDirectory.AppData })) {
-            await remove(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
-            await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
-          }
-        } catch (e) {
-          fsLog.warn('Failed to empty .trash on disk:', e);
-        }
-      })();
-    }
-    this.emitChange({ kind: 'trash', action: 'purge', id: '*', origin });
+    purgeTrash(this, origin);
   }
 
   public deleteItem(id: string, origin: 'local' | 'remote' = 'local'): void {
