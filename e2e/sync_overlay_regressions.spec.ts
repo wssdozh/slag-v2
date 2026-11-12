@@ -3,7 +3,8 @@ import { test, expect } from './support/selfhostFixture';
 for (const caller of ['direct', 'debounce'] as const) {
   test(`${caller} push never pulls before it pushes`, async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+    // The first page load in a cold run pays Vite's transform of the whole module graph.
+    await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 120000 });
     const result = await page.evaluate(async (caller) => {
       const { SyncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
       const engine = new SyncEngine();
@@ -111,15 +112,23 @@ test('a slow draft throttle never delays a note push', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { SyncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
     const engine = new SyncEngine();
+    // The debounce timer calls the push module directly, not the engine's own method, so a
+    // stub on `engine.pushLocalChanges` never fires. A ready engine is what makes the timer
+    // observable: every real push attempt announces itself by entering the `syncing` state.
+    engine.activeRoomId = 'room_draft_throttle';
+    engine.activeVaultKey = {};
     let fires = 0;
-    engine.pushLocalChanges = async () => { fires++; };
-    engine.scheduleDebouncedPush(1000);
+    const unsubscribe = engine.subscribe((status) => {
+      if (status.state === 'syncing') fires++;
+    });
+    engine.scheduleDebouncedPush(1000, true); // a draft keystroke: slow and trailing
     await new Promise<void>((resolve) => setTimeout(resolve, 20));
-    engine.scheduleDebouncedPush(50);
+    engine.scheduleDebouncedPush(50); // a note edit: the faster deadline has to win
     await new Promise<void>((resolve) => setTimeout(resolve, 250));
     const early = fires;
     await new Promise<void>((resolve) => setTimeout(resolve, 900));
     const afterDraftWindow = fires;
+    unsubscribe();
     engine.disconnect();
     return { early, afterDraftWindow };
   });

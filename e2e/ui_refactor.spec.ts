@@ -2,6 +2,10 @@ import { test, expect } from '@playwright/test';
 
 // Exercise the shared components directly, without account/vault state.
 test('shared menus preserve positioning, selection and formatting', async ({ page }) => {
+  // This test owns geometry: a popover leans in with `translate: 0 -6px`, and sampling its
+  // box mid-flight measured the lean, not the anchor. Reduced motion drops the lean; the
+  // anchoring, selection and formatting code under test is untouched.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await page.evaluate(async () => {
     // Reuse the exact React instance the app already loaded, otherwise hooks get a second copy.
@@ -39,13 +43,27 @@ test('shared menus preserve positioning, selection and formatting', async ({ pag
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  const menu = page.locator('body > div').filter({ has: page.getByRole('button', { name: 'two', exact: true }) }).last();
-  const firstPosition = await menu.boundingBox();
-  const triggerPosition = await trigger.boundingBox();
-  expect(firstPosition!.x).toBe(2);
-  expect(firstPosition!.y).toBe(triggerPosition!.y + triggerPosition!.height + 6);
-  expect(firstPosition!.width).toBe(150);
-  await page.getByRole('button', { name: 'two', exact: true }).click();
+  const optionTwo = page.getByRole('button', { name: 'two', exact: true });
+  const menu = page.locator('body > div').filter({ has: optionTwo }).last();
+  const viewport = page.viewportSize()!;
+
+  // Anchored: the menu's left edge lines up with the trigger and sits 6px under it.
+  const firstPosition = (await menu.boundingBox())!;
+  const triggerPosition = (await trigger.boundingBox())!;
+  expect(firstPosition.x).toBe(triggerPosition.x);
+  expect(firstPosition.y).toBe(triggerPosition.y + triggerPosition.height + 6);
+  // No magic width: the menu has to hold every option, and never hang off the viewport.
+  for (const label of ['one', 'two']) {
+    const option = (await page.getByRole('button', { name: label, exact: true }).boundingBox())!;
+    expect(option.x).toBeGreaterThanOrEqual(firstPosition.x);
+    expect(option.x + option.width).toBeLessThanOrEqual(firstPosition.x + firstPosition.width);
+    expect(option.y).toBeGreaterThanOrEqual(firstPosition.y);
+    expect(option.y + option.height).toBeLessThanOrEqual(firstPosition.y + firstPosition.height);
+  }
+  expect(firstPosition.x).toBeGreaterThanOrEqual(0);
+  expect(firstPosition.x + firstPosition.width).toBeLessThanOrEqual(viewport.width);
+
+  await optionTwo.click();
   await expect(trigger).toContainText('two');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await trigger.click();
@@ -54,14 +72,20 @@ test('shared menus preserve positioning, selection and formatting', async ({ pag
   await trigger.click();
   await page.mouse.click(600, 100);
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  // No room below: the menu flips above the trigger and still fits the viewport.
   await page.locator('#trigger').evaluate(el => { el.style.left = 'calc(100vw - 40px)'; el.style.top = 'calc(100vh - 50px)'; });
   await trigger.click();
-  const edgePosition = await menu.boundingBox();
-  const edgeTrigger = await trigger.boundingBox();
-  expect(edgePosition!.x).toBe(page.viewportSize()!.width - 160 - 8);
-  expect(edgePosition!.y + edgePosition!.height).toBe(edgeTrigger!.y - 6);
+  const edgePosition = (await menu.boundingBox())!;
+  const edgeTrigger = (await trigger.boundingBox())!;
+  expect(edgePosition.y + edgePosition.height).toBe(edgeTrigger.y - 6);
+  expect(edgePosition.x).toBeGreaterThanOrEqual(0);
+  expect(edgePosition.x + edgePosition.width).toBeLessThanOrEqual(viewport.width - 8);
+  // A viewport change re-anchors the open menu instead of leaving it off-screen.
   await page.setViewportSize({ width: 900, height: 700 });
-  await expect.poll(async () => (await menu.boundingBox())!.x).toBe(900 - 160 - 8);
+  await expect.poll(async () => {
+    const box = (await menu.boundingBox())!;
+    return box.x + box.width <= 900 - 8;
+  }).toBe(true);
   await expect(page.locator('[data-folder-item="inbox"]')).toHaveAttribute('data-selected', 'true');
   await expect(page.locator('[data-tag-item="test"]')).toHaveAttribute('data-selected', 'true');
   await page.keyboard.press('Escape');

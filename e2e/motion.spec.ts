@@ -91,11 +91,15 @@ test('a toast holds under the cursor, snaps back, then leaves by swipe', async (
 
 test('a closed toast leaves through its exit state before unmounting', async ({ page }) => {
   await page.goto('/');
-  const card = await createTask(page, 'Тост выход ' + Date.now());
+  const title = 'Тост выход ' + Date.now();
+  const card = await createTask(page, title);
   await card.locator('button[aria-label="Изменить статус таски"]').click();
 
   const toast = page.getByTestId('toast').filter({ hasText: 'Таска выполнена' });
   await expect(toast).toBeVisible();
+  // A plain success toast has no controls of its own: it closes on its own timer.
+  // Move off the card first, or hovering holds that timer.
+  await page.mouse.move(4, 4);
   const state = await toast.evaluate(element => new Promise<{ phase: string; connected: boolean }>(resolve => {
     const observer = new MutationObserver(() => {
       if (element.getAttribute('data-motion-state') === 'exiting') {
@@ -104,18 +108,22 @@ test('a closed toast leaves through its exit state before unmounting', async ({ 
       }
     });
     observer.observe(element, { attributes: true });
-    element.querySelector<HTMLButtonElement>('button[aria-label="Закрыть уведомление"]')!.click();
   }));
   expect(state).toEqual({ phase: 'exiting', connected: true });
   await expect(toast).toHaveCount(0);
 
   // A real pointer click on a control inside the toast must not be eaten by the
-  // drag handler: unknown intent means no pointer capture.
-  await card.locator('button[aria-label="Изменить статус таски"]').click();
-  const second = page.getByTestId('toast').filter({ hasText: 'Таска возобновлена' });
-  await expect(second).toBeVisible();
-  await second.getByRole('button', { name: 'Закрыть уведомление' }).click();
-  await expect(second).toHaveCount(0);
+  // drag handler: unknown intent means no pointer capture. The trash toast is the
+  // one that carries an action, so its "Вернуть" button is that control.
+  await card.click({ button: 'right' });
+  await page.locator('.fixed.z-50').getByRole('button', { name: 'Удалить' }).click();
+
+  const trashToast = page.getByTestId('toast').filter({ hasText: 'Запись в корзине' });
+  await expect(trashToast).toBeVisible();
+  await trashToast.getByRole('button', { name: 'Вернуть' }).click();
+  // The action ran: the note is back in the feed, and the toast left on its own.
+  await expect(page.locator('.group', { hasText: title })).toBeVisible();
+  await expect(trashToast).toHaveCount(0);
 });
 
 test('a fresh note lands, and the list settles when one is deleted', async ({ page }) => {

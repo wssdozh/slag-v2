@@ -1,8 +1,19 @@
 import { test, expect } from '@playwright/test';
 
-test('temporary playground opens real dialogs and toast variants on isolated origin', async ({ page }) => {
+/** The one origin the playground boots on: `src/demo.tsx` refuses every other port. */
+const PLAYGROUND_PORT = '5174';
+
+test('temporary playground opens real dialogs and toast variants on isolated origin', async ({ page, baseURL }) => {
+  // `playwright.config.ts` starts a single server on `SLAG_E2E_PORT`, so an ordinary
+  // run serves the app somewhere else and `/demo.html` answers with the playground's
+  // own "wrong port" notice. That is not a broken playground — it has no origin here.
+  test.skip(
+    !baseURL || new URL(baseURL).port !== PLAYGROUND_PORT,
+    `the playground needs its own origin: SLAG_E2E_PORT=${PLAYGROUND_PORT} npx playwright test e2e/ui_playground.spec.ts`,
+  );
+
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('http://127.0.0.1:5174/demo.html');
+  await page.goto('/demo.html');
   await expect(page.getByRole('heading', { name: 'ui playground' })).toBeVisible();
   for (const label of ['успех', 'ошибка', 'информация', 'с действием']) {
     await page.getByRole('button', { name: label, exact: true }).click();

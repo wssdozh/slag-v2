@@ -144,6 +144,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
     >
       <div
         data-testid="viewer-chrome-top"
+        // The root closes the viewer on any click on desktop, so the chrome has to stop it:
+        // without this every button up here opened its own panel and closed the viewer at once.
+        onClick={(event) => event.stopPropagation()}
         className={`absolute inset-x-0 top-0 z-30 flex items-center gap-1 bg-gradient-to-b from-black/80 to-transparent px-2 pb-8 pt-[max(var(--sat),0.5rem)] transition-opacity duration-150 ${chrome}`}
       >
         <button

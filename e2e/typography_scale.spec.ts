@@ -94,7 +94,7 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     await page.screenshot({ path: 'test-results/screenshots/typography_unified.png' });
   });
 
-  test('Focus Editor matches note palette #141417 and circular checkbox style', async ({ page }) => {
+  test('Focus Editor matches the note palette and circular checkbox style', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
@@ -108,11 +108,23 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     const editorModal = page.locator('[data-testid="fullscreen-editor-modal"]');
     await expect(editorModal).toBeVisible({ timeout: 5000 });
 
-    // 1. Verify Note Palette (#141417 = rgb(20, 20, 23))
-    const modalBg = await editorModal.evaluate((el) => {
-      return getComputedStyle(el).backgroundColor;
+    // 1. Verify the note palette: the editor paints the same surface as a note card.
+    // The hardcoded #141417 is gone — every surface comes from `--color-surface` now,
+    // and a second palette for the editor is exactly what this assertion exists to catch.
+    const palette = await editorModal.evaluate((el) => {
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--color-surface)';
+      document.body.appendChild(probe);
+      const surface = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return {
+        token: getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim(),
+        surface,
+        modal: getComputedStyle(el).backgroundColor,
+      };
     });
-    expect(modalBg).toBe('rgb(20, 20, 23)');
+    expect(palette.token).toBe('#1f1f1f');
+    expect(palette.modal).toBe(palette.surface);
 
     // 2. Type task subtasks into editor to test checkbox rendering
     const cmContent = page.locator('.cm-content').first();

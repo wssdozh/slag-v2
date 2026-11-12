@@ -6,9 +6,15 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     const cryptoMod = await import(/* @vite-ignore */ '/src/lib/sync/crypto.ts');
+    const { stateHashKey, syncedIdsKey, tombstonesKey } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
     return withSyncHarness(async ({ engine, push, init }) => {
       await init('synthetic delete seed');
-      localStorage.setItem(engine.getSyncedIdsKey(), JSON.stringify(['ghost-note']));
+      const scope = engine.bookkeeping;
+      // init pushed the empty vault already, and a push whose state hash matches the last
+      // checkpoint is skipped before the diff is walked: forget the checkpoint, not the intent.
+      localStorage.removeItem(stateHashKey(scope));
+      localStorage.removeItem('slag_sync_last_state_hash');
+      localStorage.setItem(syncedIdsKey(scope), JSON.stringify(['ghost-note']));
       const key = await cryptoMod.deriveVaultKey('synthetic delete seed');
       let captured: { changes?: Array<{ id: string; type: string; action: string }> } = {};
       window.fetch = async (_url, opts) => {
@@ -21,8 +27,8 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
       const deleteChanges = (captured.changes || []).filter((c) => c.type === 'item' && c.action === 'delete');
       return {
         hasDelete: deleteChanges.some((c) => c.id === 'ghost-note'),
-        syncedIdsUpdated: !JSON.parse(localStorage.getItem(engine.getSyncedIdsKey()) || '[]').includes('ghost-note'),
-        tombstoneStored: Object.prototype.hasOwnProperty.call(JSON.parse(localStorage.getItem(engine.getTombstonesKey()) || '{}'), 'ghost-note'),
+        syncedIdsUpdated: !JSON.parse(localStorage.getItem(syncedIdsKey(scope)) || '[]').includes('ghost-note'),
+        tombstoneStored: Object.prototype.hasOwnProperty.call(JSON.parse(localStorage.getItem(tombstonesKey(scope)) || '{}'), 'ghost-note'),
       };
     });
   });
@@ -44,15 +50,21 @@ test('delete wins over stale upsert and restore wins over delete', async ({ page
         bundleId, roomId, fromDeviceId: 'other-device', sequence: 1,
         stateRootHash: 'x', timestamp: new Date().toISOString(), changes,
       });
-      await engine.applyIncomingBundle(makeBundle('b1', [
+      // Bundles are merged into the import buffer and written once per burst on a 120 ms timer,
+      // so the vault on disk only reflects a bundle after the flush.
+      const deliver = async (bundle: unknown) => {
+        await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle }));
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      };
+      await deliver(makeBundle('b1', [
         { id: 'n1', type: 'item', action: 'delete', version: 1, hash: '200', payload: { deletedAt: 200 } },
       ]));
       const deleted = !storage.getItems().some((it) => it.id === 'n1');
-      await engine.applyIncomingBundle(makeBundle('b2', [
+      await deliver(makeBundle('b2', [
         { id: 'n1', type: 'item', action: 'upsert', version: 1, hash: 'h', payload: { ...base, updatedAt: 100 } },
       ]));
       const staleNotResurrected = !storage.getItems().some((it) => it.id === 'n1');
-      await engine.applyIncomingBundle(makeBundle('b3', [
+      await deliver(makeBundle('b3', [
         { id: 'n1', type: 'item', action: 'upsert', version: 1, hash: 'h', payload: { ...base, updatedAt: 300 } },
       ]));
       const restored = storage.getItems().some((it) => it.id === 'n1');
@@ -81,9 +93,14 @@ test('folder rename and deletion propagate to folders, nested items, and outbox'
         bundleId, roomId, fromDeviceId: 'other-device', sequence: 1,
         stateRootHash: 'x', timestamp: new Date().toISOString(), changes,
       });
+      // Bundles land in the import buffer and reach the vault on the 120 ms flush.
+      const deliver = async (bundle: unknown) => {
+        await engine.handleIncomingMessage(JSON.stringify({ type: 'bundle', bundle }));
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      };
 
       // 2. Incoming folder rename: "Тест" -> "НовыйТест"
-      await engine.applyIncomingBundle(makeBundle('b-rename', [
+      await deliver(makeBundle('b-rename', [
         {
           id: 'НовыйТест',
           type: 'folder',
@@ -98,7 +115,7 @@ test('folder rename and deletion propagate to folders, nested items, and outbox'
       const itemFolderRenamed = storage.getItemById('note-folder-1')?.folder === 'НовыйТест';
 
       // 3. Incoming folder delete: "НовыйТест"
-      await engine.applyIncomingBundle(makeBundle('b-del', [
+      await deliver(makeBundle('b-del', [
         { id: 'НовыйТест', type: 'folder', action: 'delete', version: 1, hash: '2', payload: { path: 'НовыйТест' } },
       ]));
 

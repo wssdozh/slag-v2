@@ -39,7 +39,8 @@ test.describe('Sync Device Access Control & Registration', () => {
       await page.locator('button[title*="Настройки"], button:has-text("Настройки")').first().click();
       const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
       await expect(settingsModal).toBeVisible();
-      await settingsModal.locator('button', { hasText: 'Устройства' }).click();
+      // "Устройства" is the rail tab here, not the account row "Подключённые устройства".
+      await settingsModal.getByTestId('settings-tab-devices').click();
     }
 
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
