@@ -78,5 +78,6 @@ relay/data/
 bench/.data/
 bench/out/
 
-# Test screenshots written by feed.spec.ts
-screenshots/
+# Test screenshots written by the specs at the repo root.
+# Anchored on purpose: docs/screenshots is tracked documentation.
+/screenshots/
