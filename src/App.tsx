@@ -62,7 +62,17 @@ const AppContent: React.FC = () => {
     items,
     updateItem,
     aiSettings,
+    isFullscreenEditorOpen,
   } = useApp();
+
+  // A lazy component starts importing the moment React renders it, so the editor's CodeMirror
+  // chunk (641 kB, the second biggest in the build) used to land on the first paint even though
+  // the editor renders null until a note opens. Mount it on first open and keep it mounted
+  // afterwards: unmounting on close would cut the exit animation short.
+  const [isEditorMounted, setIsEditorMounted] = useState(false);
+  if (isFullscreenEditorOpen && !isEditorMounted) {
+    setIsEditorMounted(true);
+  }
 
   const handleRetryEnrich = useCallback(async (image: LightboxImage) => {
     if (!image.itemId || !image.id) return;
@@ -207,9 +217,11 @@ const AppContent: React.FC = () => {
         </div>
 
         <MobileActionSheet />
-        <Suspense fallback={null}>
-          <FullscreenEditor />
-        </Suspense>
+        {(isEditorMounted || isFullscreenEditorOpen) && (
+          <Suspense fallback={null}>
+            <FullscreenEditor />
+          </Suspense>
+        )}
         <Suspense fallback={null}>
           <SearchModal />
         </Suspense>
@@ -254,12 +266,16 @@ const AppContent: React.FC = () => {
 
       {/* Global Modals & Overlays */}
       <Suspense fallback={null}>
-        <FullscreenEditor />
         <SettingsModal />
         <TriageModal />
         <LogModal />
         <SearchModal />
       </Suspense>
+      {(isEditorMounted || isFullscreenEditorOpen) && (
+        <Suspense fallback={null}>
+          <FullscreenEditor />
+        </Suspense>
+      )}
       <FolderModal />
       <FolderInfoModal />
       <FolderViewModal />
