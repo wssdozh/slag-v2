@@ -187,6 +187,8 @@ test('redelivered applied bundle is ACKed again without persisting or notifying 
     try {
       await engine.fetchPendingBundlesHttp();
       await engine.fetchPendingBundlesHttp();
+      // Imports are staged and flushed on a 120 ms timer so a burst of bundles renders once.
+      await new Promise((resolve) => setTimeout(resolve, 250));
       return { writes, updates, acks, applied: [...engine.appliedBundleIds] };
     } finally {
       window.fetch = originalFetch;

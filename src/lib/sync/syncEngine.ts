@@ -547,7 +547,9 @@ export class SyncEngine {
         }));
         this.notify();
       }
-      connectSocket(this);
+      // Through the public method on purpose: the e2e harness replaces it to keep a synthetic
+      // socket, and init used to call it that way before the socket moved to its own module.
+      this.connectWebSocket();
       this.startIntervals();
       await pushLocalChanges(this);
       this.scheduleAttachmentPass();
