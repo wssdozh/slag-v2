@@ -1,70 +1,8 @@
 import type { LogEntry, LogLevel, LogScope } from '../types';
 import { STORAGE_KEYS, UI_DELAYS } from '../config';
+import { maskSensitiveString, sanitizeForLog } from './logRedaction';
 
 export type LogListener = (entry: LogEntry) => void;
-
-// Mask sensitive keys (Groq, Gemini, KIE, Bearer tokens, general secrets)
-const SENSITIVE_PATTERNS = [
-  /gsk_[a-zA-Z0-9_-]{20,}/g,
-  /AIzaSy[a-zA-Z0-9_-]{30,}/g,
-  /sk-kie-[a-zA-Z0-9_-]+/gi,
-  /sk-[a-zA-Z0-9_-]{20,}/gi,
-  /Bearer\s+[a-zA-Z0-9._-]+/gi,
-  /key=[a-zA-Z0-9_-]{20,}/gi,
-];
-
-function maskSensitiveString(str: string): string {
-  let masked = str;
-  for (const pattern of SENSITIVE_PATTERNS) {
-    masked = masked.replace(pattern, (match) => {
-      if (match.startsWith('Bearer ')) {
-        return 'Bearer [REDACTED_TOKEN]';
-      }
-      if (match.startsWith('key=')) {
-        return 'key=[REDACTED_KEY]';
-      }
-      return `${match.slice(0, 6)}...[REDACTED]`;
-    });
-  }
-  return masked;
-}
-
-function sanitizeData(data: unknown, depth = 0): unknown {
-  if (depth > 5) return '[Truncated: Max Depth]';
-  if (typeof data === 'string') {
-    return maskSensitiveString(data);
-  }
-  if (data === null || data === undefined || typeof data !== 'object') {
-    return data;
-  }
-  if (Array.isArray(data)) {
-    return data.map(item => sanitizeData(item, depth + 1));
-  }
-  if (data instanceof Error) {
-    return {
-      name: data.name,
-      message: maskSensitiveString(data.message),
-      stack: data.stack ? maskSensitiveString(data.stack) : undefined,
-    };
-  }
-
-  const sanitized: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
-    const lowerKey = key.toLowerCase();
-    if (
-      lowerKey.includes('key') ||
-      lowerKey.includes('secret') ||
-      lowerKey.includes('token') ||
-      lowerKey.includes('password') ||
-      lowerKey.includes('authorization')
-    ) {
-      sanitized[key] = '[REDACTED_SECRET]';
-    } else {
-      sanitized[key] = sanitizeData(val, depth + 1);
-    }
-  }
-  return sanitized;
-}
 
 // Styling badges for browser console
 const SCOPE_STYLES: Record<LogScope, { bg: string; fg: string }> = {
@@ -220,7 +158,7 @@ class LoggerEngine {
     let dataPart = '';
     if (entry.data !== undefined) {
       try {
-        dataPart = ` | ${JSON.stringify(sanitizeData(entry.data))}`;
+        dataPart = ` | ${JSON.stringify(sanitizeForLog(entry.data))}`;
       } catch {
         dataPart = ` | [unserializable payload]`;
       }
@@ -376,7 +314,7 @@ class LoggerEngine {
     durationMs?: number
   ): void {
     const cleanMessage = maskSensitiveString(message);
-    const sanitizedData = data !== undefined ? sanitizeData(data) : undefined;
+    const sanitizedData = data !== undefined ? sanitizeForLog(data) : undefined;
 
     const entry: LogEntry = {
       id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
