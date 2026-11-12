@@ -12,12 +12,18 @@ const baseURL = `http://127.0.0.1:${port}`;
 const PLAYGROUND_PORT = 5174;
 const playgroundURL = `http://127.0.0.1:${PLAYGROUND_PORT}`;
 
+// Every server this runner starts keeps its own pre-bundled deps: worktrees share one
+// node_modules, and two Vite instances rewriting `.vite/deps` at once end in EPERM and
+// 504 responses from whichever lost the race.
+const cacheEnv = { SLAG_VITE_CACHE_DIR: 'node_modules/.vite-e2e' };
+
 const servers: Parameters<typeof defineConfig>[0]['webServer'] = [
   {
     command: `npx vite --port ${port} --host 127.0.0.1`,
     url: baseURL,
     reuseExistingServer: true,
     timeout: 30000,
+    env: cacheEnv,
   },
 ];
 
@@ -27,6 +33,7 @@ if (port !== PLAYGROUND_PORT) {
     url: `${playgroundURL}/demo.html`,
     reuseExistingServer: true,
     timeout: 30000,
+    env: cacheEnv,
   });
 }
 

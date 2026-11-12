@@ -74,6 +74,11 @@ function devFolderOpenerPlugin() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), devFolderOpenerPlugin()],
+  // Several checkouts share one node_modules (worktrees junction it), and two dev servers
+  // rewriting the same pre-bundled deps directory is a rename race on Windows: one of them
+  // gets EPERM and serves 504 "outdated optimize dep" until it is restarted. Give a run its
+  // own cache when asked.
+  cacheDir: process.env.SLAG_VITE_CACHE_DIR || 'node_modules/.vite',
   server: {
     host: true,
     port: 5173,

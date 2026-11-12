@@ -46,8 +46,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    // Wait for the mobile header or main content to load
-    await expect(page.locator('header').first()).toBeVisible({ timeout: 15000 });
+    // The first page load in a cold run pays Vite's transform of the whole module graph.
+    await expect(page.locator('header').first()).toBeVisible({ timeout: 120000 });
   });
 
   test('1. Mobile Root Folders View & Linear Floating Dock', async ({ page }) => {
