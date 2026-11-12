@@ -1,3 +1,4 @@
+// The ⌘K palette: one query, hits grouped by kind, and keyboard navigation through them.
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';

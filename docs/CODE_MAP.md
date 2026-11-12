@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **440**, строк: **81724**, зон: **45**.
+Модулей: **441**, строк: **81795**, зон: **45**.
 
 ## Самые длинные файлы
 
@@ -13,8 +13,8 @@
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1588 | 0 |
 | `e2e/slag/views.spec.ts` | 1076 | 0 |
-| `src/lib/sync/syncEngine.ts` | 899 | 17 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
+| `src/lib/sync/syncEngine.ts` | 881 | 17 |
 | `e2e/mobile.spec.ts` | 874 | 0 |
 | `src/components/Feed/ItemCard.tsx` | 807 | 1 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
@@ -41,11 +41,11 @@
 - `e2e/slag/feed_thumbs.spec.ts` — 351
 - `e2e/mcp_server.spec.ts` — 337
 
-## src — 3 файлов, 505 строк
+## src — 3 файлов, 527 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `App.tsx` | 426 | 1 | App |  |
+| `App.tsx` | 448 | 1 | App |  |
 | `demo.tsx` | 68 | 0 | Playground |  |
 | `main.tsx` | 11 | 0 |  |  |
 
@@ -75,14 +75,14 @@
 | `useAdminActions.ts` | 293 | 1 | GrantSubscriptionInput, AdminActionsDeps, useAdminActions |  |
 | `useAdminData.ts` | 248 | 7 | AdminStats, AdminDevice, AdminVault, AdminAccount, BillingStats, +7 | Interfaces from AdminPanel.tsx |
 
-## src/components/Audio — 9 файлов, 1848 строк
+## src/components/Audio — 9 файлов, 1849 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AudioCoverArt.tsx` | 157 | 1 | AudioCoverArt |  |
 | `AudioPanel.tsx` | 280 | 2 | AudioPanel |  |
 | `AudioPlaylistDrawer.tsx` | 265 | 1 | AudioPlaylistDrawer |  |
-| `liquidOrb.ts` | 418 | 1 | OrbFrame, createOrbRenderer |  |
+| `liquidOrb.ts` | 419 | 1 | OrbFrame, createOrbRenderer | The canvas orb that breathes with the audio: blobs driven by spectrum feature… |
 | `panel/AudioArtwork.tsx` | 73 | 1 | AudioArtwork |  |
 | `panel/AudioScrubber.tsx` | 82 | 1 | AudioScrubber |  |
 | `panel/AudioTransport.tsx` | 182 | 1 | AudioTransport |  |
@@ -176,11 +176,11 @@
 | `folderStatsConfig.ts` | 35 | 2 | FolderStatKey, FolderStatDefinition, FOLDER_STATS, recordCountLabel |  |
 | `useFolderProfileEdit.ts` | 150 | 2 | FolderProfileEditMode, FolderProfileEditOptions, FolderProfileEdit, useFolderProfileEdit |  |
 
-## src/components/Landing — 1 файлов, 502 строк
+## src/components/Landing — 1 файлов, 503 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `LandingPage.tsx` | 502 | 1 | LandingPage |  |
+| `LandingPage.tsx` | 503 | 1 | LandingPage | The public page: what SLAG is, what it costs, and the way into the app or the… |
 
 ## src/components/Logs — 2 файлов, 464 строк
 
@@ -227,14 +227,14 @@
 | `MobileShell.tsx` | 112 | 1 | MobileShell |  |
 | `MobileTasksView.tsx` | 276 | 1 | MobileTasksView |  |
 
-## src/components/Modals — 10 файлов, 2358 строк
+## src/components/Modals — 10 файлов, 2359 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `BaseModal.tsx` | 156 | 10 | BaseModalProps, BaseModal |  |
 | `ComposerModal.tsx` | 59 | 2 | ComposerModal |  |
 | `ConfirmDialog.tsx` | 55 | 1 | ConfirmDialog | The app's own question for irreversible actions. It replaces `window.confirm`… |
-| `DiffModal.tsx` | 532 | 1 | DiffModalItemEntry, DiffModalProps, DiffModal |  |
+| `DiffModal.tsx` | 533 | 1 | DiffModalItemEntry, DiffModalProps, DiffModal | What an AI edit would change, before it is applied: the line diff and the acc… |
 | `FolderInfoModal.tsx` | 94 | 2 | FolderInfoModal |  |
 | `FolderModal.tsx` | 166 | 2 | FolderModal |  |
 | `FolderViewModal.tsx` | 318 | 2 | FolderViewModal |  |
@@ -250,11 +250,11 @@
 | `FolderMediaTabs.tsx` | 311 | 1 | FolderMediaTabsProps, FolderMediaTabs |  |
 | `useFolderMedia.ts` | 117 | 4 | FolderMediaData, useFolderMedia |  |
 
-## src/components/Search — 1 файлов, 459 строк
+## src/components/Search — 1 файлов, 460 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `SearchModal.tsx` | 459 | 3 | SearchModal |  |
+| `SearchModal.tsx` | 460 | 3 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
 
 ## src/components/Settings — 16 файлов, 2266 строк
 
@@ -525,17 +525,18 @@
 | `vaultRegistry.ts` | 199 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 | Which vault the app is looking at: the registry kept in localStorage, and the… |
 | `vaultTransfer.ts` | 102 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 |  |
 
-## src/lib/sync — 22 файлов, 6050 строк
+## src/lib/sync — 23 файлов, 6093 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `account.ts` | 570 | 18 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 | The sync account: session and sign-in, what the plan is, and the device ident… |
+| `account.ts` | 570 | 19 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 | The sync account: session and sign-in, what the plan is, and the device ident… |
 | `accountCrypto.ts` | 257 | 5 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 |  |
 | `accountTypes.ts` | 90 | 11 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +5 |  |
 | `applyBundle.ts` | 327 | 1 | persistIncomingBundle | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 6 | 2 | attachmentSignature |  |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
 | `crypto.ts` | 181 | 10 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 | Generates a cryptographically secure 12-word recovery seed phrase |
+| `deviceAdmin.ts` | 61 | 1 | DeviceAdminHost, applyAccountDevices, addTrustedDevice, setDeviceAllowedVaults, removeTrustedDevice, +2 | Who may read this vault: the trusted-device list mirrored into the sync confi… |
 | `devices.ts` | 218 | 3 | normalizeTrustedDevice, touchDeviceLastSeen, normalizeTrustedDevicesFromAccount, computeSubscription, createDefaultDeviceName, +7 |  |
 | `entities/registry.ts` | 35 | 1 | createSyncOpFromStorageEvent |  |
 | `entities/types.ts` | 16 | 2 | SyncEntityKind, SyncAction, SyncOperation |  |
@@ -545,11 +546,11 @@
 | `pairing.ts` | 170 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `pushBundle.ts` | 292 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 140 | 2 | SyncConfigHost, computeSubscription, loadConfig, saveConfig, authHeaders, +3 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 899 | 17 | PendingPush, SyncEngine, syncEngine, storage, accountClient |  |
+| `syncEngine.ts` | 881 | 17 | PendingPush, SyncEngine, syncEngine, storage, accountClient |  |
 | `syncSocket.ts` | 41 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `transport.ts` | 208 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport |  |
 | `twoFactorAuth.ts` | 198 | 1 | TotpConfig, WebAuthnConfig, TwoFactorState, base32Encode, base32Decode, +6 | Two-Factor Authentication (2FA) for Zero-Knowledge Vaults |
-| `types.ts` | 123 | 22 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
+| `types.ts` | 123 | 23 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
 | `vaultSharing.ts` | 84 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault |  |
 
 ## src/lib/tasks — 2 файлов, 144 строк
@@ -592,7 +593,7 @@
 | `stats.ts` | 66 | 2 | VaultStats, collectExistingTags, computeVaultStats |  |
 | `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
 
-## src/mcp — 6 файлов, 1296 строк
+## src/mcp — 6 файлов, 1297 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -601,11 +602,11 @@
 | `resources.ts` | 130 | 2 | registerMcpResources |  |
 | `tools.ts` | 379 | 2 | registerMcpTools |  |
 | `types.ts` | 82 | 2 | McpVaultConfig, VaultStateData, NoteMatch, SaveNoteSchema, GetNoteSchema, +6 |  |
-| `vault.ts` | 578 | 5 | resolveVaultConfig, McpVault, getSafeNoteFilename |  |
+| `vault.ts` | 579 | 5 | resolveVaultConfig, McpVault, getSafeNoteFilename | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
 
-## src/types — 2 файлов, 608 строк
+## src/types — 2 файлов, 609 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 162 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 430 | 162 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |

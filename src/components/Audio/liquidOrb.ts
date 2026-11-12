@@ -1,3 +1,4 @@
+// The canvas orb that breathes with the audio: blobs driven by spectrum features, no libraries.
 import { logger } from '../../lib/logger/logger';
 import type { OrbFeatures } from '../../lib/media/audioSpectrum';
 

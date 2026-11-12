@@ -1,3 +1,4 @@
+// What an AI edit would change, before it is applied: the line diff and the accept/reject pair.
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   ArrowLeft,

@@ -1,3 +1,4 @@
+// The domain, in one place: notes, folders, vaults, attachments, sync and AI settings.
 export type SlagItemType = 'note' | 'article' | 'task';
 export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'done';
 export type SlagItemStatus = TaskStatus;

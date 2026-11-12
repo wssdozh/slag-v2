@@ -1,3 +1,4 @@
+// The vault as the MCP server sees it: files on disk, frontmatter, attachments - no browser here.
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';

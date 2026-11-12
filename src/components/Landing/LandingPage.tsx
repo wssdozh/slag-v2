@@ -1,3 +1,4 @@
+// The public page: what SLAG is, what it costs, and the way into the app or the cabinet.
 import { navigatePage } from '../../lib/navigation';
 import React, { useState } from 'react';
 import {
