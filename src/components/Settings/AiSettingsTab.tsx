@@ -1,3 +1,4 @@
+// Where the model comes from: the SLAG subscription or your own key, and what it is told to do.
 import React, { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

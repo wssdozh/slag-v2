@@ -1,3 +1,4 @@
+// The log viewer, docked inside settings instead of floating over the feed.
 import React from 'react';
 import { LogViewer } from '../Logs/LogViewer';
 

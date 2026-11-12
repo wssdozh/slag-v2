@@ -1,3 +1,4 @@
+// The settings shell: a rail of tabs, the mobile and desktop frames, and the pinned footer.
 import React, { useEffect, useRef } from 'react';
 import { usePresence } from '../../hooks/usePresence';
 import { useApp } from '../../context/AppContext';

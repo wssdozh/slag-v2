@@ -1,3 +1,4 @@
+// The hotkey catalogue, rendered from the same table the keydown handler reads.
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {

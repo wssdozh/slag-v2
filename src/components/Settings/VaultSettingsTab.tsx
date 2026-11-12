@@ -1,3 +1,4 @@
+// The vault itself: backups, snapshots, export and import, and the folders on disk.
 import React, { useState } from 'react';
 import { Archive, Download, History, Plus, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

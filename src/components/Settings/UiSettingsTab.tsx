@@ -1,3 +1,4 @@
+// How it looks: accent, fonts, density, panel widths and the mobile dock.
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { UiAccent } from '../../types';

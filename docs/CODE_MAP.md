@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **355**, строк: **77540**, зон: **40**.
+Модулей: **361**, строк: **77671**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -19,12 +19,12 @@
 | `src/lib/ai/localFallback.ts` | 1047 | 1 |
 | `src/components/Feed/AssistantChat.tsx` | 995 | 2 |
 | `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
-| `src/components/Modals/SettingsModal.tsx` | 874 | 2 |
 | `e2e/slag/workspace.spec.ts` | 873 | 0 |
 | `src/lib/sync/syncEngine.ts` | 872 | 16 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
-| `src/lib/storage/index.ts` | 728 | 32 |
+| `src/context/AppContext.tsx` | 720 | 56 |
+| `src/components/Audio/AudioPanel.tsx` | 715 | 2 |
 
 ## e2e (playwright) — 91 файлов, 16918 строк
 
@@ -177,7 +177,7 @@
 | `MobileShell.tsx` | 112 | 1 | MobileShell |  |
 | `MobileTasksView.tsx` | 325 | 1 | MobileTasksView |  |
 
-## src/components/Modals — 10 файлов, 3021 строк
+## src/components/Modals — 10 файлов, 2357 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -188,7 +188,7 @@
 | `FolderInfoModal.tsx` | 94 | 2 | FolderInfoModal |  |
 | `FolderModal.tsx` | 166 | 2 | FolderModal |  |
 | `FolderViewModal.tsx` | 318 | 2 | FolderViewModal |  |
-| `SettingsModal.tsx` | 874 | 2 | SettingsModal |  |
+| `SettingsModal.tsx` | 210 | 2 | SettingsModal | The settings shell: a rail of tabs, the mobile and desktop frames, and the pi… |
 | `TriageModal.tsx` | 484 | 1 | TriageModal |  |
 | `VaultModal.tsx` | 283 | 2 | VaultModal |  |
 
@@ -206,16 +206,21 @@
 |---|---:|---:|---|---|
 | `SearchModal.tsx` | 444 | 3 | SearchModal |  |
 
-## src/components/Settings — 6 файлов, 1260 строк
+## src/components/Settings — 11 файлов, 2008 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AccountSettingsTab.tsx` | 66 | 1 | AccountSettingsTab | Первый раздел настроек: кто я, сколько места и куда идти за остальным. |
+| `AiSettingsTab.tsx` | 300 | 1 | AiSettingsTab | Where the model comes from: the SLAG subscription or your own key, and what i… |
 | `DevicesSettingsTab.tsx` | 536 | 1 | DevicesSettingsTab |  |
+| `LogsSettingsTab.tsx` | 12 | 1 | LogsSettingsTab | The log viewer, docked inside settings instead of floating over the feed. |
 | `MobileDockSettings.tsx` | 230 | 1 | MobileDockSettings |  |
 | `SecretKeyField.tsx` | 49 | 1 | SecretKeyField | A secret, rendered as one settings row: the input is the row. |
-| `SettingsUI.tsx` | 296 | 7 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 |  |
+| `SettingsUI.tsx` | 296 | 10 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 |  |
+| `ShortcutsSettingsTab.tsx` | 101 | 1 | ShortcutsSettingsTab | The hotkey catalogue, rendered from the same table the keydown handler reads. |
 | `SyncSettingsTab.tsx` | 83 | 1 | SyncSettingsTab | Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседни… |
+| `UiSettingsTab.tsx` | 115 | 1 | UiSettingsTab | How it looks: accent, fonts, density, panel widths and the mobile dock. |
+| `VaultSettingsTab.tsx` | 220 | 1 | VaultSettingsTab | The vault itself: backups, snapshots, export and import, and the folders on d… |
 
 ## src/components/Sidebar — 3 файлов, 498 строк
 
@@ -290,7 +295,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
-| `index.ts` | 7 | 83 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
+| `index.ts` | 7 | 84 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
 | `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
@@ -302,7 +307,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 720 | 52 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
+| `AppContext.tsx` | 720 | 56 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
 | `appContext.types.ts` | 232 | 6 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/context/feed — 1 файлов, 89 строк
@@ -320,7 +325,7 @@
 | `useBackup.ts` | 145 | 1 | useBackup | Backup and restore: snapshots on disk, the manual one, the zip round trip. |
 | `useFeedView.ts` | 215 | 1 | useFeedView | How the feed is looking: which folder, which view, which filters, which order. |
 | `useFolderAdmin.ts` | 101 | 1 | useFolderAdmin | What a folder itself can do: save, describe, rename, delete, and the create m… |
-| `useItemActions.ts` | 223 | 1 | ItemActionsDeps, useItemActions | Every write to a note: create, save, delete, restore from trash, move, comple… |
+| `useItemWrites.ts` | 223 | 1 | ItemWritesDeps, useItemWrites | Every write to a note: create, save, delete, restore from trash, move, comple… |
 | `useMobileNav.ts` | 130 | 1 | DEFAULT_MOBILE_DOCK_TABS, useMobileNav |  |
 | `useOverlays.ts` | 235 | 1 | useOverlays | Everything that lives on top of the app: modals, lightbox, context menu, toas… |
 | `useRecurringRollover.ts` | 63 | 1 | useRecurringRollover | Recurring tasks roll over on their own schedule: at midnight, and when the tab |
@@ -372,7 +377,7 @@
 | `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
 | `folderOpener.ts` | 72 | 5 | OpenFolderResult, openAppFolder |  |
 | `formatBytes.ts` | 7 | 5 | formatBytes |  |
-| `logger.ts` | 648 | 42 | LogListener, logger |  |
+| `logger.ts` | 648 | 43 | LogListener, logger |  |
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
@@ -412,16 +417,17 @@
 | `folderBrowser.ts` | 128 | 4 | listFolders, pickFolder, listFolderEntries, pickFilesFromSystem, readEntryBytes, +3 | Folders the person already granted; the grant survives restarts and app updat… |
 | `imageCodec.ts` | 90 | 2 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 |  |
 
-## src/lib/storage — 9 файлов, 2330 строк
+## src/lib/storage — 10 файлов, 2377 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData | Attachments as they belong in the localStorage index: metadata only. |
-| `attachments.ts` | 209 | 2 | AttachmentStore |  |
+| `attachments.ts` | 209 | 3 | AttachmentStore |  |
 | `draftStore.ts` | 248 | 1 | DraftStore |  |
 | `folderStore.ts` | 171 | 1 | FolderStoreHost, folderStorageKey, readFolders, writeFolder, renameFolderTree, +2 | Writing folders: save, rename with the note cascade, describe, delete and re-… |
-| `index.ts` | 728 | 32 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
+| `index.ts` | 673 | 33 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
 | `indexedDb.ts` | 143 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
+| `trashStore.ts` | 102 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash, +1 |  |
 | `vaultFiles.ts` | 498 | 1 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 199 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 | Which vault the app is looking at: the registry kept in localStorage, and the… |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
@@ -497,5 +503,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 116 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 117 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
