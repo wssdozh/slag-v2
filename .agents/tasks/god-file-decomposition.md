@@ -2,15 +2,18 @@
 
 ## где мы сейчас
 
-все три сервиса-«бога» ушли под тысячу строк, модалка настроек — под триста. в топе самых длинных файлов остались только данные, виды и один длинный класс логгера.
+все три сервиса-«бога» ушли под тысячу строк, модалка настроек — под триста, редактор — под семьсот. в топе самых длинных файлов остались данные, виды и два честно-широких класса.
 
 | файл | было | стало | что осталось |
 |---|---:|---:|---|
-| `lib/sync/syncEngine.ts` | 1594 | **871** | начальный синк, админ устройств, http-доставка и pull |
+| `lib/sync/syncEngine.ts` | 1594 | **873** | начальный синк, админ устройств, http-доставка и pull |
 | `context/AppContext.tsx` | 1740 | **719** | состояние хранилищ и папок, объект контекста, слои Escape |
 | `lib/storage/index.ts` | 1591 | **672** | CRUD записей, кэш и события, делегирование диску, медиа, папкам, корзине |
+| `components/Editor/FullscreenEditor.tsx` | 989 | **638** | CodeMirror-вью, горячие клавиши, обвязка шита |
+| `lib/logger.ts` | 647 | **585** | уровни, скоупы, слушатели, буфер, ретеншн, персист |
 | `components/Feed/AssistantChat.tsx` | 994 | **233** | состояние, подписки, отправка, diff-модалка |
 | `components/Modals/SettingsModal.tsx` | 873 | **208** | рельса вкладок, мобильный и десктопный каркас, подвал |
+| `components/Settings/DevicesSettingsTab.tsx` | 535 | **195** | сборка: инвайты, режим доступа, раскладка по частям |
 | `lib/ai/localFallback.ts` | 1046 | **1** | реэкспорт; сама цепочка в `lib/ai/fallback/` |
 | `components/Feed/Composer.tsx` | 1211 | 1093 | **осознанно**: одна форма |
 | `components/Feed/ItemCard.tsx` | 1151 | 1151 | **осознанно**: 1048 строк разметки |
@@ -25,11 +28,15 @@
 
 **context/** — `useOverlays` (поверхности), `useMobileNav`, `useFeedView` + `feedView` (правила ленты как чистая функция), `useAssistant`, `useBackup`, `useAppearance`, `useRecurringRollover`, `useItemWrites` (запись, удаление, восстановление, перемещение), `useFolderAdmin` (папка: сохранить, описать, переименовать, удалить), `useVaults` (переключить, создать, удалить хранилище, выбрать папку, показать в проводнике), `appContext.types`.
 
-**components/Settings/** — по вкладке на файл: `AiSettingsTab` (301, своя форма и сабмит), `VaultSettingsTab` (218, снимки и импорт), `UiSettingsTab` (113), `ShortcutsSettingsTab` (99), `LogsSettingsTab` (10).
+**components/Settings/** — по вкладке на файл: `AiSettingsTab` (301, своя форма и сабмит), `VaultSettingsTab` (218, снимки и импорт), `UiSettingsTab` (113), `ShortcutsSettingsTab` (99), `LogsSettingsTab` (10). **devices/** — список, карточка, права, действия и `useDevicePairing` (318 строк флоу привязки).
 
-**storage/** — `vaultFiles` (диск: 497 строк, контекст из 9 вопросов), `vaultRegistry` (какое хранилище открыто: реестр в localStorage, переключение, создание, удаление, выбор папки), `folderStore` (запись папок: сохранить, переименовать с каскадом, описать, удалить с переносом заметок), `vaultTransfer` (формат обмена), `attachments` (байты медиа), `lib/vault/stats` (отчёты).
+**components/Editor/fullscreen/** — `useEditorAttachments` (160: drop, вставка, скрепка, `![[файл]]`), `useEditorAiActions` (70: папка и теги), `EditorTaskFields` (291: строка свойств таски).
 
-**sync/** — `localBookkeeping` (три леджера дедупа), `applyBundle` (317 строк слияния), `pushBundle` (291 строка сборки), `syncConfig` (где лежит конфиг, заголовки авторизации, сид-фраза), `syncSocket` (39 строк: открыть сокет, принять кадр, подтвердить бандл), `attachmentSignature`.
+**storage/** — `vaultFiles` (диск: 497 строк, контекст из 9 вопросов), `vaultRegistry` (какое хранилище открыто: реестр в localStorage, переключение, создание, удаление, выбор папки), `folderStore` (запись папок: сохранить, переименовать с каскадом, описать, удалить с переносом заметок), `trashStore` (что значит удалить и как отменить), `vaultTransfer` (формат обмена), `attachments` (байты медиа), `lib/vault/stats` (отчёты).
+
+**sync/** — `localBookkeeping` (три леджера дедупа), `applyBundle` (317 строк слияния), `pushBundle` (291 строка сборки), `syncConfig` (где лежит конфиг, заголовки авторизации, сид-фраза), `syncSocket` (41 строка: открыть сокет, принять кадр, подтвердить бандл), `attachmentSignature`.
+
+**lib/logRedaction.ts** — что никогда не попадёт в лог: шесть регулярок, заглушки, лимит глубины.
 
 **composer/** — `useComposerFiles` (подбор, drop, paste).
 
@@ -42,17 +49,16 @@
 ## проверки
 
 `npm run check` — 0 ошибок и 0 предупреждений на каждом шаге, `npm run build` — зелёный.
-e2e за сессию: `feed` 20/20 (трижды), `workspace` 49/53/72 (после починки спек), `mobile` 21/21, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `sync_connection_lifecycle` + `sync_push_transport` + `sync_pending_pull` (7 зелёных после починки), `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout`, `backup_restore` 2/2.
 
-**проверено за сессию** (6 воркеров, если не сказано иное): `feed` 20/20 (трижды), `mobile` 21/21, `workspace` 10 passed + 1 skip, `sync_push_transport` + `sync_pending_pull` + `sync_connection_lifecycle` 10/10, `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout` 1/1, `backup_restore` 2/2, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4.
+зелёные (6 воркеров, если не сказано иное): `feed` 20/20 (трижды), `mobile` 21/21, `workspace` 10 passed + 1 skip, `sync_push_transport` + `sync_pending_pull` + `sync_connection_lifecycle` 10/10, `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout` 1/1, `backup_restore` 2/2, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `editor` 16/19.
 
 ## что осталось
 
-1. `syncEngine` (871): начальный синк (`init` — сто строк), админ устройств, http-доставка и pull. шов «доставка» пробовали — тянет 17 членов, один `commitPush` связывает всё; режется только сокет.
+1. `syncEngine` (873): начальный синк (`init` — сто строк), админ устройств, http-доставка и pull. шов «доставка» пробовали — тянет 17 членов, один `commitPush` связывает всё; режется только сокет.
 2. `storage` (672): CRUD записей, черновики и настройки в одном классе.
 3. `AppContext` (719): состояние хранилищ и папок, слои Escape, объект контекста на 150 полей.
-4. `components/Editor/FullscreenEditor.tsx` (990), `components/Audio/AudioPanel.tsx` (714), `components/UI/ContextMenu.tsx` (711) — последние крупные не-разметочные компоненты.
-5. **`e2e/slag/views.spec.ts` красный на 9 тестах из 22** — все ассистентские (24, 25.1–25.4, 26, 27, 5) плюс 28 (аудио). проверено на baseline `2d1c945`: те же падения, к рефакторингу отношения не имеют. это отдельная задача: спеки ждут текстов и ответов, которые офлайн-цепочка больше не выдаёт.
+4. `components/Editor/EditorToolbar.tsx` (575) — следующий чистый шов: верхняя панель и панель разметки отрезаются по группам JSX. плюс `AudioPanel` (714) и `ContextMenu` (711).
+5. **устаревшие спеки, проверенные на baseline** (не регресс): `views.spec.ts` — 9 из 22 (ассистентские 24, 25.1–25.4, 26, 27, 5 и аудио 28); `editor.spec.ts` — 3 из 19 (32, 33, 46). отдельная задача: спеки ждут текстов и разметки, которых продукт больше не выдаёт.
 
 ## заметки
 
