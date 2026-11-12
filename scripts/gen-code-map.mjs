@@ -86,6 +86,24 @@ const files = [...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'e2e'))].sort();
 
 const DEFINITION = /^\s*export\s+(?:default\s+)?(?:async\s+)?(?:function|const|let|var|class|interface|type|enum)\s+/;
 
+// A named import list can span lines (`import {\n  a,\n  b,\n} from './x'`). Matching the
+// symbol against one line reported zero importers for exactly the long lists that matter.
+const IMPORT_BLOCK_RE = /(?:^|\n)[ \t]*(?:import|export)[ \t]+(?:type[ \t]+)?\{([^}]*)\}[ \t]*from[ \t]*['"]([^'"]+)['"]/g;
+
+function importSites(source, name) {
+  const sites = [];
+  for (const match of source.matchAll(IMPORT_BLOCK_RE)) {
+    const listStart = match.index + match[0].indexOf('{') + 1;
+    for (const piece of match[1].split(',')) {
+      const [original, local] = piece.split(/\s+as\s+/).map((part) => part.trim());
+      if (original !== name && local !== name) continue;
+      const at = listStart + match[1].indexOf(piece) + piece.indexOf(original);
+      sites.push(source.slice(0, at).split('\n').length);
+    }
+  }
+  return sites;
+}
+
 if (process.argv[2] === 'where') {
   const name = process.argv[3];
   if (!name) {
@@ -98,13 +116,12 @@ if (process.argv[2] === 'where') {
   const uses = [];
 
   for (const file of files) {
-    const lines = readFileSync(file, 'utf8').split(/\r?\n/);
-    lines.forEach((line, index) => {
+    const source = readFileSync(file, 'utf8');
+    source.split(/\r?\n/).forEach((line, index) => {
       if (!line.includes(name) || !word.test(line)) return;
-      const at = `${rel(file)}:${index + 1}`;
-      if (DEFINITION.test(line)) defs.push(at);
-      else if (/^\s*(?:import|export)\b/.test(line) || /from\s+['"]/.test(line)) uses.push(at);
+      if (DEFINITION.test(line)) defs.push(`${rel(file)}:${index + 1}`);
     });
+    for (const line of importSites(source, name)) uses.push(`${rel(file)}:${line}`);
   }
 
   if (!defs.length && !uses.length) {
