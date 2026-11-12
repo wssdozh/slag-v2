@@ -47,28 +47,28 @@
 
 **composer/** — `useComposerFiles` (подбор, drop, paste).
 
-## раскладка по доменам (запрошено отдельно)
+## раскладка по доменам (сделано)
 
-плоские модули в `src/lib` и `src/hooks` группируются по смыслу, **без фанатизма**: папка появляется там, где рядом лежит два-три родственника, одиночки остаются плоско.
+плоские модули `src/lib` и `src/hooks` разложены по смыслу, **без фанатизма**: папка только там, где рядом лежит два-три родственника, одиночки остались плоско.
 
 ```
 lib/logger/     logger.ts, logRedaction.ts
-lib/platform/   platform.ts, windowControls.ts, folderOpener.ts, navigation.ts
+lib/platform/   platform.ts, windowControls.ts, folderOpener.ts
 lib/text/       chatMarkdown.ts, diffUtils.ts, formatBytes.ts
 lib/tasks/      taskCompletion.ts, taskUtils.ts
-lib/ui/         motion.ts, commands.ts
 lib/vault/      + vaultDisplay.ts
 lib/ai/         + aiService.ts
-lib/media/      + blobToDataUrl.ts (появился после дедупа)
-плоско:         searchService.ts, backupService.ts
+lib/media/      + blobToDataUrl.ts
+плоско:         searchService.ts, backupService.ts, navigation.ts, motion.ts, commands.ts
 
 hooks/media/    useAttachmentSrc.ts, useAudioAnalyser.ts, useComposerMedia.ts
 hooks/ui/       useLayerStack.ts, usePresence.ts, useGlobalHotkeys.ts
-hooks/items/    useItemActions.ts, useSuggestedActions.ts
-плоско:         useCalendarSchedule.ts
+плоско:         useItemActions.ts, useSuggestedActions.ts, useCalendarSchedule.ts
 ```
 
-импорты правит `tsc`: любой пропущенный путь — красная сборка, а не тихая ошибка. после переезда `npm run map:code` и обновление дерева в `AGENTS.md` / `docs/project-map/14_Module_Layout.md`.
+19 файлов переехали через `git mv`, 148 импортов поправлены в 114 файлах. `navigation.ts` и `motion.ts`/`commands.ts` остались плоско намеренно: `ui/` из анимации и хоткеев был бы папкой ради папки. шесть e2e-спек ходили в модули по строковому пути — их `tsc` не видит, поправлены руками.
+
+импорты правит `tsc`: любой пропущенный путь — красная сборка, а не тихая ошибка. `npm run map:code` и деревья в `AGENTS.md` / `docs/project-map/14_Module_Layout.md` обновлены.
 
 ## метод
 
