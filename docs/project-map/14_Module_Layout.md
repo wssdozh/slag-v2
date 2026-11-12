@@ -22,8 +22,11 @@ tags:
 src/
   components/       UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
     Feed/assistant/   по компоненту на вид сообщения
+    Feed/item/        слоты карточки: картинки, файлы, аудио, видео, подзадачи, баннер, действия
+    Feed/composer/    стрип вложений, тип, ИИ, запись, отправка, резолвер полей
     Editor/fullscreen/ вложения, инлайн-ИИ, строка свойств таски
     Settings/devices/  список, карточка, права, действия, pairing
+    Mobile/calendar/   строка задачи, шапка, стрип недели, группы дней, трёхдневка, лист месяца
     Audio/panel/       обложка, скраббер, транспорт, плейлист, playback
     UI/menu/           наборы пунктов контекстного меню и подменю
     Admin/tabs/        разделы админки
