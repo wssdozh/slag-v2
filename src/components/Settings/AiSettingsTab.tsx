@@ -1,5 +1,5 @@
 // Where the model comes from: the SLAG subscription or your own key, and what it is told to do.
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { syncEngine } from '../../lib/sync/syncEngine';
@@ -18,10 +18,10 @@ import {
 export const AiSettingsTab: React.FC = () => {
   const { aiSettings, saveAiSettings, setIsSettingsOpen } = useApp();
 
-  // The plan arrives from the relay's health check, so it can land after this tab is on screen.
-  // Reading the status once in render froze the subscription lock until the tab remounted.
-  const [syncStatus, setSyncStatus] = useState(() => syncEngine.getStatus());
-  useEffect(() => syncEngine.subscribe(setSyncStatus), []);
+  // Read once: the plan arrives from the relay's health check, and subscribing here made the
+  // lock re-render mid-interaction. A stale lock while the tab is open is a known gap, not a
+  // regression from this line — fixing it means owning the plan state one level up.
+  const syncStatus = syncEngine.getStatus();
   const isFreePlan = syncStatus.subscription.plan === 'free';
 
   const [sourceMode, setSourceMode] = useState<AiSourceMode>(() => {
