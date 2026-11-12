@@ -1,4 +1,7 @@
-export function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'): {
+import type { SlagItemPriority } from '../../types';
+import { priorityTone } from '../UI/priorityTone';
+
+export function getPriorityBadge(priority?: SlagItemPriority): {
   bg: string;
   border: string;
   text: string;
@@ -6,8 +9,8 @@ export function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'):
   checkboxBorder: string;
   checkboxHover: string;
 } {
-  switch (priority) {
-    case 'high':
+  switch (priorityTone(priority)) {
+    case 'rose':
       return {
         bg: 'bg-rose-500/12 hover:bg-rose-500/18',
         border: 'border-rose-500/35',
@@ -16,7 +19,7 @@ export function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'):
         checkboxBorder: 'border-rose-500',
         checkboxHover: 'hover:border-rose-400 hover:bg-rose-500/25 text-rose-300',
       };
-    case 'medium':
+    case 'amber':
       return {
         bg: 'bg-amber-500/12 hover:bg-amber-500/18',
         border: 'border-amber-500/35',
@@ -25,7 +28,7 @@ export function getPriorityBadge(priority?: 'none' | 'low' | 'medium' | 'high'):
         checkboxBorder: 'border-amber-400',
         checkboxHover: 'hover:border-amber-300 hover:bg-amber-400/25 text-amber-300',
       };
-    case 'low':
+    case 'blue':
       return {
         bg: 'bg-blue-500/12 hover:bg-blue-500/18',
         border: 'border-blue-500/35',

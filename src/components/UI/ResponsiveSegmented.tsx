@@ -1,6 +1,8 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { MenuDropdown } from './MenuDropdown';
 import { ChevronDown, Check } from 'lucide-react';
+import type { SegmentedVariant } from './segmentedVariants';
+import { SEGMENTED_STRIP_CLASSES } from './segmentedVariants';
 
 export interface SegmentedOption<T extends string = string> {
   value: T;
@@ -8,6 +10,12 @@ export interface SegmentedOption<T extends string = string> {
   icon?: React.ReactNode;
   showLabelInExpanded?: boolean;
   showLabelInTrigger?: boolean;
+  /** Класс подписи: мобильные полосы прячут часть подписи на узком экране. */
+  labelClassName?: string;
+  /** Домешать класс кнопке: у сегментов в полосе бывает своя раскладка иконки и подписи. */
+  buttonClassName?: string;
+  /** Хвост кнопки с доступом к активности: счётчик статуса и подобное. */
+  trailing?: (isSelected: boolean) => React.ReactNode;
   title?: string;
   ariaLabel?: string;
 }
@@ -22,6 +30,8 @@ export interface ResponsiveSegmentedProps<T extends string = string> {
   className?: string;
   triggerClassName?: string;
   ariaLabel?: string;
+  /** Геометрия полосы: кит-вариант по умолчанию, `xs`/`plain`/`tabs` — мобильные шапки. */
+  variant?: SegmentedVariant;
 }
 
 export function ResponsiveSegmented<T extends string = string>({
@@ -34,9 +44,12 @@ export function ResponsiveSegmented<T extends string = string>({
   className = '',
   triggerClassName = '',
   ariaLabel,
+  variant = 'default',
 }: ResponsiveSegmentedProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find((opt) => opt.value === value) || options[0];
+  const strip = variant === 'default' ? null : SEGMENTED_STRIP_CLASSES[variant];
+  const hasIndicator = !compact && (!strip || strip.indicator !== null);
 
   const heightClass = size === 'sm' ? 'h-ctrl-sm' : 'h-ctrl-md';
 
@@ -60,15 +73,15 @@ export function ResponsiveSegmented<T extends string = string>({
   }, [value]);
 
   useLayoutEffect(() => {
-    if (compact) return;
+    if (!hasIndicator) return;
     updateIndicator();
-  }, [updateIndicator, options, compact]);
+  }, [updateIndicator, options, hasIndicator]);
 
   useEffect(() => {
-    if (compact) return;
+    if (!hasIndicator) return;
     window.addEventListener('resize', updateIndicator);
     return () => window.removeEventListener('resize', updateIndicator);
-  }, [updateIndicator, compact]);
+  }, [updateIndicator, hasIndicator]);
 
   // Compact Mode: Single dropdown trigger button displaying current active option
   if (compact) {
@@ -134,6 +147,55 @@ export function ResponsiveSegmented<T extends string = string>({
           );
         })}
       </MenuDropdown>
+    );
+  }
+
+  // Mobile strip: the same slots, but the paddings/height of the host header
+  if (strip) {
+    return (
+      <div
+        ref={containerRef}
+        aria-label={ariaLabel}
+        className={`${strip.container} ${className}`.trim()}
+      >
+        {strip.indicator && indicatorStyle.ready && (
+          <div
+            data-testid={strip.indicator.testId}
+            className={strip.indicator.className}
+            style={{
+              transform: `translateX(${indicatorStyle.left}px)`,
+              width: `${indicatorStyle.width}px`,
+              transitionTimingFunction: 'var(--ease-settle)',
+            }}
+          />
+        )}
+        {options.map((opt) => {
+          const isSelected = opt.value === value;
+          const showExpandedLabel = opt.showLabelInExpanded ?? true;
+
+          return (
+            <button
+              key={opt.value}
+              data-segmented-value={strip.indicator ? opt.value : undefined}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              title={opt.title}
+              aria-label={opt.ariaLabel || opt.label}
+              className={`${strip.button} ${opt.buttonClassName ?? ''} ${isSelected ? strip.activeButton(indicatorStyle.ready) : strip.idleButton}`}
+            >
+              {opt.icon}
+              {showExpandedLabel && opt.label && (
+                opt.labelClassName ? (
+                  <span className={opt.labelClassName}>{opt.label}</span>
+                ) : (
+                  <span>{opt.label}</span>
+                )
+              )}
+              {opt.trailing?.(isSelected)}
+            </button>
+          );
+        })}
+      </div>
     );
   }
 

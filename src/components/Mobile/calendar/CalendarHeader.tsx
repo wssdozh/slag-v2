@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown, ListTodo, Columns } from 'lucide-react';
 import type { MobileCalendarMode } from './calendarRange';
+import { ResponsiveSegmented, type SegmentedOption } from '../../UI/ResponsiveSegmented';
 
 export interface CalendarHeaderProps {
   embedded: boolean;
@@ -14,6 +15,21 @@ export interface CalendarHeaderProps {
   onGoToToday: () => void;
   onChangeMode: (mode: MobileCalendarMode) => void;
 }
+
+const MODE_OPTIONS: SegmentedOption<MobileCalendarMode>[] = [
+  {
+    value: 'agenda',
+    label: 'Список',
+    icon: <ListTodo className="w-3 h-3" />,
+    title: 'Режим списка (Повестка)',
+  },
+  {
+    value: '3day',
+    label: '3 дня',
+    icon: <Columns className="w-3 h-3" />,
+    title: 'Режим 3 дня (24 часа)',
+  },
+];
 
 /** Одна строка 44px: месяц-дропдаун, «Сегодня», переключатель «Список / 3 дня». */
 export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
@@ -62,34 +78,12 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
       </div>
 
       {/* Center: Layout toggle [Список | 3 дня] */}
-      <div className="flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.08] shrink-0">
-        <button
-          type="button"
-          onClick={() => onChangeMode('agenda')}
-          className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-            mode === 'agenda'
-              ? 'bg-white/10 text-white shadow-xs font-semibold'
-              : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-          title="Режим списка (Повестка)"
-        >
-          <ListTodo className="w-3 h-3" />
-          <span>Список</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onChangeMode('3day')}
-          className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-            mode === '3day'
-              ? 'bg-white/10 text-white shadow-xs font-semibold'
-              : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-          title="Режим 3 дня (24 часа)"
-        >
-          <Columns className="w-3 h-3" />
-          <span>3 дня</span>
-        </button>
-      </div>
+      <ResponsiveSegmented<MobileCalendarMode>
+        variant="xs"
+        value={mode}
+        onChange={onChangeMode}
+        options={MODE_OPTIONS}
+      />
 
       {/* Right: ViewModeSwitcher / Extra slot */}
       {rightSlot && (

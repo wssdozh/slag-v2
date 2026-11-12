@@ -1,6 +1,7 @@
 import React from 'react';
 import type { SlagItem } from '../../types';
 import type { LayoutPositionedTask } from '../../lib/time/calendarLayout';
+import { timedBlockBox } from '../../lib/time/calendarLayout';
 import { getPriorityBadge, formatDurationBadge } from './calendarHelpers';
 import { baseTaskId } from '../../lib/tasks/taskUtils';
 import { Check, ListTodo } from 'lucide-react';
@@ -138,9 +139,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
   const isResizing = resizingTask?.taskId === task.id;
   const realTaskId = baseTaskId(task.id);
 
-  const colWidth = 94 / totalCols;
-  const left = 3 + colIndex * colWidth;
-  const width = totalCols > 1 ? colWidth - 1 : 94;
+  const box = timedBlockBox(colIndex, totalCols);
 
   const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
@@ -187,8 +186,8 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
       style={{
         top: `${topPx}px`,
         height: `${heightPx}px`,
-        left: `${left}%`,
-        width: `${width}%`,
+        left: `${box.left}%`,
+        width: `${box.width}%`,
       }}
       className={`group/card absolute rounded-lg border select-none transition-[color,background-color,border-color,opacity] duration-75 z-10 shadow-sm touch-none ${styling.bg} ${styling.border} ${styling.text} ${
         isCompact

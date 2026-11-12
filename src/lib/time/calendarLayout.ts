@@ -12,6 +12,24 @@ export interface LayoutPositionedTask {
   totalCols: number;
 }
 
+export interface TimedBlockBox {
+  left: number;
+  width: number;
+}
+
+/**
+ * Геометрия блока по времени в процентах: колонки анти-наложения ужимаются внутри
+ * дня, одиночная таска занимает всю ширину. `colIndex`/`totalCols` приходят из
+ * `computeAntiOverlapLayout`.
+ */
+export function timedBlockBox(colIndex: number, totalCols: number): TimedBlockBox {
+  const colWidth = 94 / totalCols;
+  return {
+    left: 3 + colIndex * colWidth,
+    width: totalCols > 1 ? colWidth - 1 : 94,
+  };
+}
+
 /**
  * Calculates anti-overlap column positions for timed calendar tasks so simultaneous
  * tasks cleanly split column width instead of occluding each other.

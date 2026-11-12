@@ -2,6 +2,7 @@ import React from 'react';
 import type { SlagItem } from '../../../types';
 import { getTaskTimeSlot } from '../../../lib/time/todoistTaskParser';
 import { TaskStatusMark } from '../../UI/TaskStatusMark';
+import { PRIORITY_TONE_TEXT, priorityTone } from '../../UI/priorityTone';
 import { MoreVertical } from 'lucide-react';
 import { formatClockLabel } from './calendarPositions';
 
@@ -43,17 +44,7 @@ export const CalendarTaskRow: React.FC<CalendarTaskRowProps> = ({
         >
           <TaskStatusMark
             done={isDone}
-            className={`w-4 h-4 ${
-              isDone
-                ? ''
-                : task.priority === 'high'
-                ? 'text-rose-400'
-                : task.priority === 'medium'
-                ? 'text-amber-400'
-                : task.priority === 'low'
-                ? 'text-blue-400'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
+            className={`w-4 h-4 ${isDone ? '' : PRIORITY_TONE_TEXT[priorityTone(task.priority)]}`}
           />
         </button>
       </div>

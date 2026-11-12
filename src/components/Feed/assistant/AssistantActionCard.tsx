@@ -14,6 +14,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { LinearSignalBars } from '../../UI/PriorityBadge';
+import { PRIORITY_TONE_CHIP, priorityTone } from '../../UI/priorityTone';
 import { TagChip } from '../../UI/TagChip';
 import type { SuggestedAction } from '../../../types';
 
@@ -66,6 +67,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
   const isRejected = actionState === 'rejected';
   const isApplied = actionState === 'applied';
   const isExecuting = actionState === 'executing';
+  const actionPriority = action.updates?.priority || action.priority;
 
   return (
     <div
@@ -124,15 +126,11 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
             <span className={isRejected ? 'line-through text-zinc-500' : isApplied ? 'text-zinc-300' : 'text-zinc-100'}>
               {action.title}
             </span>
-            {(action.updates?.priority || action.priority) && !isRejected && (
+            {actionPriority && !isRejected && (
               <span className="flex items-center gap-1 shrink-0">
-                <LinearSignalBars priority={(action.updates?.priority || action.priority)!} className="w-3 h-3" />
-                <span className={`text-2xs font-mono px-1.5 py-0.5 rounded font-semibold ${
-                  (action.updates?.priority || action.priority) === 'high' ? 'bg-rose-500/15 text-rose-300' :
-                  (action.updates?.priority || action.priority) === 'medium' ? 'bg-amber-500/15 text-amber-300' :
-                  'bg-blue-500/15 text-blue-300'
-                }`}>
-                  {(action.updates?.priority || action.priority)!.toUpperCase()}
+                <LinearSignalBars priority={actionPriority} className="w-3 h-3" />
+                <span className={`text-2xs font-mono px-1.5 py-0.5 rounded font-semibold ${PRIORITY_TONE_CHIP[priorityTone(actionPriority)]}`}>
+                  {actionPriority.toUpperCase()}
                 </span>
               </span>
             )}
@@ -207,11 +205,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                       </span>
                     )}
                     {up.priority && up.priority !== 'none' && (
-                      <span className={`px-1.5 py-0.5 rounded text-2xs font-mono font-semibold ${
-                        up.priority === 'high' ? 'bg-rose-500/15 text-rose-300' :
-                        up.priority === 'medium' ? 'bg-amber-500/15 text-amber-300' :
-                        'bg-blue-500/15 text-blue-300'
-                      }`}>
+                      <span className={`px-1.5 py-0.5 rounded text-2xs font-mono font-semibold ${PRIORITY_TONE_CHIP[priorityTone(up.priority)]}`}>
                         {up.priority.toUpperCase()}
                       </span>
                     )}

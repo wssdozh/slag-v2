@@ -91,20 +91,6 @@ export function scrollTopForHour(hour: number, hourHeight = HOUR_HEIGHT): number
   return Math.max(0, hour - 1) * hourHeight;
 }
 
-export interface TimedBlockBox {
-  left: number;
-  width: number;
-}
-
-/** Колонки анти-наложения → проценты ширины внутри дня. */
-export function timedBlockBox(colIndex: number, totalCols: number): TimedBlockBox {
-  const colWidth = 94 / totalCols;
-  return {
-    left: 3 + colIndex * colWidth,
-    width: totalCols > 1 ? colWidth - 1 : 94,
-  };
-}
-
 export interface ThreeDayColumn {
   day: CalendarDay;
   isToday: boolean;

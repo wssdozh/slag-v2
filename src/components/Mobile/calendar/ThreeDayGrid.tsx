@@ -3,13 +3,9 @@ import type { SlagItem } from '../../../types';
 import { RUSSIAN_WEEKDAYS } from '../../../lib/time/dateUtils';
 import { Repeat, X } from 'lucide-react';
 import type { CalendarSlotTarget, ThreeDayColumn } from './calendarPositions';
-import {
-  formatClockLabel,
-  HOURS_24,
-  HOUR_HEIGHT,
-  realTaskId,
-  timedBlockBox,
-} from './calendarPositions';
+import { formatClockLabel, HOURS_24, HOUR_HEIGHT, realTaskId } from './calendarPositions';
+import { timedBlockBox } from '../../../lib/time/calendarLayout';
+import { PRIORITY_TONE_DOT, priorityTone } from '../../UI/priorityTone';
 
 export interface ThreeDayGridProps {
   columns: ThreeDayColumn[];
@@ -211,13 +207,7 @@ export const ThreeDayGrid: React.FC<ThreeDayGridProps> = ({
                     <div className="flex items-start gap-1 min-w-0">
                       {task.priority && task.priority !== 'none' && (
                         <span
-                          className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${
-                            task.priority === 'high'
-                              ? 'bg-rose-500'
-                              : task.priority === 'medium'
-                              ? 'bg-amber-400'
-                              : 'bg-blue-400'
-                          }`}
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${PRIORITY_TONE_DOT[priorityTone(task.priority)]}`}
                         />
                       )}
                       <span

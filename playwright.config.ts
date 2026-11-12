@@ -12,10 +12,10 @@ const baseURL = `http://127.0.0.1:${port}`;
 const PLAYGROUND_PORT = 5174;
 const playgroundURL = `http://127.0.0.1:${PLAYGROUND_PORT}`;
 
-// Every server this runner starts keeps its own pre-bundled deps: worktrees share one
-// node_modules, and two Vite instances rewriting `.vite/deps` at once end in EPERM and
-// 504 responses from whichever lost the race.
-const cacheEnv = { SLAG_VITE_CACHE_DIR: 'node_modules/.vite-e2e' };
+// Each server this runner starts gets its own pre-bundled deps directory. Worktrees share one
+// node_modules through a junction, and two Vite instances rewriting `.vite/deps` at once end in
+// EPERM on the rename, after which the loser serves 504s and the page never mounts.
+const cacheFor = (name: string) => ({ SLAG_VITE_CACHE_DIR: `${process.env.TEMP ?? '.'}/slag-vite-${name}` });
 
 const servers: Parameters<typeof defineConfig>[0]['webServer'] = [
   {
@@ -23,7 +23,7 @@ const servers: Parameters<typeof defineConfig>[0]['webServer'] = [
     url: baseURL,
     reuseExistingServer: true,
     timeout: 30000,
-    env: cacheEnv,
+    env: cacheFor(`app-${port}`),
   },
 ];
 
@@ -33,7 +33,7 @@ if (port !== PLAYGROUND_PORT) {
     url: `${playgroundURL}/demo.html`,
     reuseExistingServer: true,
     timeout: 30000,
-    env: cacheEnv,
+    env: cacheFor(`playground-${PLAYGROUND_PORT}`),
   });
 }
 
