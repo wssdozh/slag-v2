@@ -150,6 +150,10 @@ const AppContent: React.FC = () => {
         <Suspense fallback={<div className="min-h-screen bg-canvas-subtle" />}>
           <AccountCabinet />
         </Suspense>
+        {/* The cabinet asks its own questions and shows its own toasts; without these two the
+            confirm promise never resolves and every destructive action becomes a silent no-op. */}
+        <ToastContainer />
+        <ConfirmDialog />
       </div>
     );
   }
@@ -160,6 +164,8 @@ const AppContent: React.FC = () => {
         <Suspense fallback={<div className="min-h-screen bg-canvas-subtle" />}>
           <AdminPanel />
         </Suspense>
+        <ToastContainer />
+        <ConfirmDialog />
       </div>
     );
   }
