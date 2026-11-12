@@ -7,7 +7,7 @@ test.use({
 });
 
 /** Long-press is a touch gesture, and Playwright's touchscreen only taps. */
-async function longPress(page: import('@playwright/test').Page, locator: import('@playwright/test').Locator) {
+async function pressAndHold(locator: import('@playwright/test').Locator) {
   await locator.evaluate(element => {
     const point = { clientX: 120, clientY: 260 };
     const touch = new Touch({
@@ -28,11 +28,36 @@ async function longPress(page: import('@playwright/test').Page, locator: import(
       changedTouches: [touch],
     }));
   });
-  await page.waitForTimeout(700);
+}
+
+/**
+ * Wait for the sheet to stop moving.
+ *
+ * `data-motion-state="open"` is not an "entrance finished" signal: `usePresence` flips the
+ * phase one frame after mount, and that flip is what *starts* the `.motion-sheet` translate
+ * from 100% to 0 — measured on this build, the panel is still at `translate: 0px 100%`
+ * (top 844 of an 844px viewport) on that frame and only comes to rest at 471. The old fixed
+ * 700ms wait after the press covered the 200ms slide with ~50ms to spare, so on a busy frame
+ * the "resting" box was read mid-slide, and the snap-back comparison failed against a
+ * baseline that was never the resting place.
+ */
+async function waitForStillSheet(panel: import('@playwright/test').Locator) {
+  await expect(panel).toHaveAttribute('data-motion-state', 'open');
+  await panel.evaluate(async element => {
+    const deadline = performance.now() + 5_000;
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    while (performance.now() < deadline) {
+      const running = element.getAnimations({ subtree: true })
+        .some(animation => animation.playState === 'running');
+      if (!running) return;
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    }
+  });
 }
 
 test('the action sheet drags 1:1, snaps back, then dismisses', async ({ page }) => {
-  await page.goto('/');
+  // The first load in a cold tree pays Vite's transform of the whole module graph.
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.locator('button', { hasText: 'Входящие' }).first().click();
 
   const text = 'Жест шита ' + Date.now();
@@ -41,11 +66,11 @@ test('the action sheet drags 1:1, snaps back, then dismisses', async ({ page }) 
   const card = page.locator('.group', { hasText: text });
   await expect(card).toBeVisible();
 
-  await longPress(page, card);
+  await pressAndHold(card);
   const sheet = page.getByTestId('action-sheet');
   const panel = page.getByTestId('sheet-panel');
   await expect(sheet).toBeVisible();
-  await expect(panel).toHaveAttribute('data-motion-state', 'open');
+  await waitForStillSheet(panel);
   const rest = (await panel.boundingBox())!;
 
   const handle = page.locator('[data-sheet-handle]');
@@ -61,10 +86,18 @@ test('the action sheet drags 1:1, snaps back, then dismisses', async ({ page }) 
     await page.mouse.move(x, y + step * 6);
   }
   await page.mouse.up();
+
+  // "Came back" means the settle transition is over and the panel is home. The ease overshoots
+  // past home on its way, so a box sampled mid-animation can sit within tolerance while still
+  // travelling — the second drag then starts on a moving sheet.
   await expect.poll(async () => {
-    const b = await panel.boundingBox();
-    return b ? Math.abs(b.y - rest.y) : 999;
-  }).toBeLessThan(1.5);
+    const sample = await panel.evaluate(element => ({
+      top: element.getBoundingClientRect().top,
+      running: element.getAnimations({ subtree: true })
+        .some(animation => animation.playState === 'running'),
+    }));
+    return sample.running ? Number.POSITIVE_INFINITY : Math.abs(sample.top - rest.y);
+  }, { message: 'the sheet settles back to its resting place instead of dismissing' }).toBeLessThan(1.5);
 
   // A fast drag tracks the pointer exactly, then commits.
   await page.mouse.move(x, y);
