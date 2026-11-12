@@ -9,8 +9,8 @@ import React, {
 } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
-import type { SlagItem, SlagAttachment, LightboxImage } from '../../types';
-import { Inbox, UploadCloud, Sparkles, ChevronDown, Pin, Search } from 'lucide-react';
+import type { SlagAttachment, LightboxImage } from '../../types';
+import { Inbox, Sparkles, Pin } from 'lucide-react';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
@@ -20,10 +20,17 @@ import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
 import { usePullToSearch } from '../../hooks/gestures/usePullToSearch';
-import { noteGapPx } from '../../lib/time/dateUtils';
-import { UI_GESTURES } from '../../config';
-
-const WINDOW_CHUNK = 15;
+import { FeedDropOverlay } from './list/FeedDropOverlay';
+import { FeedDateBubble } from './list/FeedDateBubble';
+import { FeedScrollHint } from './list/FeedScrollHint';
+import {
+  WINDOW_CHUNK,
+  groupFeedByDate,
+  hasOlderItems,
+  nextWindowSize,
+  takeWindow,
+  windowSizeAroundTarget,
+} from './list/feedWindow';
 
 function subscribeToNow() {
   return () => {};
@@ -131,12 +138,8 @@ export const FeedList: React.FC = () => {
     setPrevHighlightKey(highlightKey);
     if (highlightedItemId) {
       const targetIdx = filteredItems.findIndex(i => i.id === highlightedItemId);
-      if (targetIdx !== -1) {
-        const start = Math.max(0, filteredItems.length - windowSize);
-        if (targetIdx < start) {
-          setWindowSize(Math.max(windowSize, filteredItems.length - targetIdx + 10));
-        }
-      }
+      const grown = windowSizeAroundTarget(windowSize, filteredItems.length, targetIdx);
+      if (grown !== windowSize) setWindowSize(grown);
     }
   }
 
@@ -146,16 +149,11 @@ export const FeedList: React.FC = () => {
   const prevItemsLengthRef = useRef<number>(filteredItems.length);
 
   const todayMidnight = useSyncExternalStore(subscribeToNow, getTodayMidnight, () => 0);
-  const yesterdayMidnight = todayMidnight - 86400000;
-  const currentYear = new Date(todayMidnight || 0).getFullYear();
 
   // Windowed items: последние `windowSize` записей, новее всегда в кадре
-  const windowedItems = useMemo(
-    () => filteredItems.slice(Math.max(0, filteredItems.length - windowSize)),
-    [filteredItems, windowSize]
-  );
+  const windowedItems = useMemo(() => takeWindow(filteredItems, windowSize), [filteredItems, windowSize]);
 
-  const hasMoreOlder = filteredItems.length > windowSize;
+  const hasMoreOlder = hasOlderItems(filteredItems.length, windowSize);
 
   // Cards glide when the list shrinks or reorders; a fresh note lands instead.
   useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'));
@@ -171,7 +169,7 @@ export const FeedList: React.FC = () => {
     prevScrollTopRef.current = container.scrollTop;
     isPrependRef.current = true;
 
-    setWindowSize(prev => Math.min(prev + WINDOW_CHUNK, filteredItems.length));
+    setWindowSize(prev => nextWindowSize(prev, filteredItems.length));
   }, [hasMoreOlder, filteredItems.length]);
 
   const isStuckToBottomRef = useRef(true);
@@ -420,38 +418,11 @@ export const FeedList: React.FC = () => {
     }
   };
 
-  // Group items by calendar date using pure timestamp calculations. Inside a group the gap comes
-  // from the time between two neighbours, so the list breathes instead of stepping evenly.
-  const grouped = useMemo(() => {
-    const groups: { dateLabel: string; items: { item: SlagItem; gap: number }[] }[] = [];
-    let currentGroup: { dateLabel: string; items: { item: SlagItem; gap: number }[] } | null = null;
-
-    windowedItems.forEach((item, index) => {
-      let label = '';
-      if (item.createdAt >= todayMidnight) {
-        label = 'Сегодня';
-      } else if (item.createdAt >= yesterdayMidnight) {
-        label = 'Вчера';
-      } else {
-        const itemDate = new Date(item.createdAt);
-        label = itemDate.toLocaleDateString('ru-RU', {
-          day: 'numeric',
-          month: 'long',
-          year: itemDate.getFullYear() !== currentYear ? 'numeric' : undefined,
-        });
-      }
-
-      const gap = index === 0 ? 0 : noteGapPx(windowedItems[index - 1].createdAt, item.createdAt);
-      if (!currentGroup || currentGroup.dateLabel !== label) {
-        currentGroup = { dateLabel: label, items: [{ item, gap: 0 }] };
-        groups.push(currentGroup);
-      } else {
-        currentGroup.items.push({ item, gap });
-      }
-    });
-
-    return groups;
-  }, [windowedItems, todayMidnight, yesterdayMidnight, currentYear]);
+  // Группы по календарным дням и шаг между соседями считает feedWindow: здесь остаётся «сейчас».
+  const grouped = useMemo(
+    () => groupFeedByDate(windowedItems, todayMidnight),
+    [windowedItems, todayMidnight],
+  );
 
   return (
     <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
@@ -474,17 +445,7 @@ export const FeedList: React.FC = () => {
         style={{ paddingBottom: 'calc(var(--composer-inset, 104px) + 4px)' }}
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
-        {isDraggingOver && (
-          <div className="absolute inset-2 z-30 rounded-2xl bg-canvas border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none motion-fade">
-            <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
-            <span className="text-sm font-medium text-zinc-200">
-              Перетащите файлы сюда для создания заметки
-            </span>
-            <span className="text-xs text-zinc-500 font-mono">
-              Изображения, аудио, видео или документы сохранятся в локальное хранилище
-            </span>
-          </div>
-        )}
+        <FeedDropOverlay isVisible={isDraggingOver} />
 
         {filteredItems.length === 0 ? (
           <EmptyState
@@ -557,12 +518,7 @@ export const FeedList: React.FC = () => {
 
             {grouped.map(group => (
               <div key={group.dateLabel} className="flex flex-col gap-2">
-                {/* Telegram-style date bubble */}
-                <div className="flex justify-center py-1 select-none">
-                  <span className="px-3 py-0.5 rounded-full bg-surface-elevated border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
-                    {group.dateLabel}
-                  </span>
-                </div>
+                <FeedDateBubble label={group.dateLabel} />
 
                 {/* List of cards: the step between two notes is their own gap, not the column's */}
                 <div className="flex flex-col">
@@ -586,47 +542,12 @@ export const FeedList: React.FC = () => {
 
       </div>
 
-      {/* Past either end there is nothing left to scroll, so the hint travels instead. */}
-      {pull > 0 && (
-        <div
-          data-testid="feed-pull-search"
-          className="absolute inset-x-0 z-30 flex justify-center pointer-events-none"
-          style={
-            pullSide === 'top'
-              ? { top: `${8 + pull}px` }
-              : { bottom: `calc(var(--composer-inset, 104px) + 8px + ${pull}px)` }
-          }
-        >
-          <span
-            className="flex items-center gap-1.5 rounded-full border border-subtle bg-surface-elevated px-3 py-1.5 text-[11px] font-medium text-fg-secondary shadow-xl"
-            style={{ opacity: Math.min(1, pull / UI_GESTURES.SEARCH_PULL_PX) }}
-          >
-            <Search className="h-3.5 w-3.5" /> поиск
-          </span>
-        </div>
-      )}
-
-      {/* Floating scroll to bottom button: centered comfortably above the composer island */}
-      {/* Mounted on purpose: it fades in when you scroll up, and a node that is
-          deleted on the first frame of the way back can only blink out. */}
-      <div
-        aria-hidden={!showScrollBottom}
-        style={{ bottom: 'calc(var(--composer-inset, 104px) + 8px)' }}
-        className={`absolute inset-x-0 pointer-events-none z-30 flex justify-center px-4 transition-opacity duration-150 ${
-          showScrollBottom ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-          <button
-            type="button"
-            onClick={scrollToBottom}
-            tabIndex={showScrollBottom ? 0 : -1}
-            className={`${showScrollBottom ? 'pointer-events-auto' : 'pointer-events-none'} w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer motion-press group`}
-            title="К последним заметкам"
-            aria-label="Прокрутить к последним заметкам"
-          >
-            <ChevronDown className="w-5 h-5 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-y-0.5" />
-          </button>
-      </div>
+      <FeedScrollHint
+        pull={pull}
+        pullSide={pullSide}
+        isBottomButtonVisible={showScrollBottom}
+        onScrollToBottom={scrollToBottom}
+      />
     </div>
   );
 };

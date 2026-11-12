@@ -1,0 +1,29 @@
+import React, { memo } from 'react';
+import { UploadCloud } from 'lucide-react';
+
+export interface FeedDropOverlayProps {
+  /** Показывать ли рамку: файлы держат над лентой. */
+  isVisible: boolean;
+}
+
+/**
+ * Рамка поверх ленты, пока над ней держат файлы: что именно произойдёт, если отпустить.
+ * Сама ловит события не она — их обрабатывает прокручиваемый контейнер под ней.
+ */
+const FeedDropOverlayComponent: React.FC<FeedDropOverlayProps> = ({ isVisible }) => {
+  if (!isVisible) return null;
+
+  return (
+    <div className="absolute inset-2 z-30 rounded-2xl bg-canvas border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none motion-fade">
+      <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
+      <span className="text-sm font-medium text-zinc-200">
+        Перетащите файлы сюда для создания заметки
+      </span>
+      <span className="text-xs text-zinc-500 font-mono">
+        Изображения, аудио, видео или документы сохранятся в локальное хранилище
+      </span>
+    </div>
+  );
+};
+
+export const FeedDropOverlay = memo(FeedDropOverlayComponent);
