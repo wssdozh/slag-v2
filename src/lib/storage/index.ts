@@ -1,4 +1,3 @@
-import { DraftStore } from './draftStore';
 import type {
   SlagItem,
   FolderMeta,
@@ -50,6 +49,26 @@ import {
   recoverFromTrash,
 } from './trashStore';
 import {
+  draftsStorageKey,
+  workspaceStateStorageKey,
+  readComposerDrafts,
+  readComposerDraft,
+  writeComposerDraft,
+  eraseComposerDraft,
+  readFullscreenDraft,
+  writeFullscreenDraft,
+  eraseFullscreenDraft,
+  readFullscreenWidth,
+  writeFullscreenWidth,
+  readAssistantHistory,
+  writeAssistantHistory,
+  eraseAssistantHistory,
+  readWorkspaceState,
+  writeWorkspaceState,
+  readFolderViewSettings,
+  writeFolderViewSettings,
+} from './settingsStore';
+import {
   buildVaultExportJson,
   importVaultPayload,
   parseVaultBackup,
@@ -79,14 +98,11 @@ const fsLog = logger.scope('FS');
 /** Attachment bytes: which file was asked for, and where the answer came from. */
 
 const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
-const DRAFTS_STORAGE_PREFIX = STORAGE_KEYS.DRAFTS_PREFIX;
-const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
 
 export class StorageService {
   public currentVault: VaultMeta;
-  private draftStore: DraftStore;
   private changeListeners: Set<StorageChangeListener> = new Set();
-  private instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+  public instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   private crossWindowDraftChannel: BroadcastChannel | null = null;
   public attachments = new AttachmentStore(() => this.getVaultAttachmentsPath());
 
@@ -193,17 +209,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   constructor() {
     this.currentVault = initCurrentVault(this);
-    this.draftStore = new DraftStore({
-      getVaultId: () => this.currentVault.id,
-      emitChange: (event) => this.emitChange(event),
-      getChannel: () => this.crossWindowDraftChannel,
-      instanceId: this.instanceId,
-    });
     this.initDefaultsIfNeeded();
     this.initCrossWindowDraftSync();
     if (isTauri()) {
       void this.files.initTauriFs();
     }
+  }
+
+  public getDraftChannel(): BroadcastChannel | null {
+    return this.crossWindowDraftChannel;
   }
 
   private initCrossWindowDraftSync(): void {
@@ -303,11 +317,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public getDraftsKey(): string {
-    return `${DRAFTS_STORAGE_PREFIX}${this.currentVault.id}`;
-  }
-
-  private getWorkspaceStateKey(): string {
-    return `${WORKSPACE_STATE_PREFIX}${this.currentVault.id}`;
+    return draftsStorageKey(this);
   }
 
   public initDefaultsIfNeeded(): void {
@@ -463,67 +473,67 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public getAllComposerDrafts(): Record<string, ComposerDraft> {
-    return this.draftStore.getAllComposerDrafts();
+    return readComposerDrafts(this);
   }
 
   public getComposerDraft(folderPath: string): ComposerDraft | null {
-    return this.draftStore.getComposerDraft(folderPath);
+    return readComposerDraft(this, folderPath);
   }
 
   public saveComposerDraft(folderPath: string, draft: ComposerDraft, origin: 'local' | 'remote' = 'local'): void {
-    return this.draftStore.saveComposerDraft(folderPath, draft, origin);
+    writeComposerDraft(this, folderPath, draft, origin);
   }
 
   public deleteComposerDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
-    return this.draftStore.deleteComposerDraft(folderPath, origin);
+    eraseComposerDraft(this, folderPath, origin);
   }
 
   public getFullscreenDraft(itemId: string): FullscreenDraft | null {
-    return this.draftStore.getFullscreenDraft(itemId);
+    return readFullscreenDraft(this, itemId);
   }
 
   public saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin: 'local' | 'remote' = 'local'): void {
-    return this.draftStore.saveFullscreenDraft(itemId, draft, origin);
+    writeFullscreenDraft(this, itemId, draft, origin);
   }
 
   public clearFullscreenDraft(itemId: string, origin: 'local' | 'remote' = 'local'): void {
-    return this.draftStore.clearFullscreenDraft(itemId, origin);
+    eraseFullscreenDraft(this, itemId, origin);
   }
 
   public getFullscreenWidth(): boolean {
-    return this.draftStore.getFullscreenWidth();
+    return readFullscreenWidth(this);
   }
 
   public saveFullscreenWidth(isFullWidth: boolean): void {
-    return this.draftStore.saveFullscreenWidth(isFullWidth);
+    writeFullscreenWidth(this, isFullWidth);
   }
 
   public getAssistantHistory(): ChatMessage[] {
-    return this.draftStore.getAssistantHistory();
+    return readAssistantHistory(this);
   }
 
   public saveAssistantHistory(messages: ChatMessage[]): void {
-    return this.draftStore.saveAssistantHistory(messages);
+    writeAssistantHistory(this, messages);
   }
 
   public clearAssistantHistory(): void {
-    return this.draftStore.clearAssistantHistory();
+    eraseAssistantHistory(this);
   }
 
   public getWorkspaceState(): WorkspaceState {
-    return this.draftStore.getWorkspaceState();
+    return readWorkspaceState(this);
   }
 
   public saveWorkspaceState(partialState: Partial<WorkspaceState>, origin: 'local' | 'remote' = 'local'): void {
-    return this.draftStore.saveWorkspaceState(partialState, origin);
+    writeWorkspaceState(this, partialState, origin);
   }
 
   public getFolderViewSettings(folderPath: string): FolderViewSettings {
-    return this.draftStore.getFolderViewSettings(folderPath);
+    return readFolderViewSettings(this, folderPath);
   }
 
   public saveFolderViewSettings(folderPath: string, settings: Partial<FolderViewSettings>): void {
-    return this.draftStore.saveFolderViewSettings(folderPath, settings);
+    writeFolderViewSettings(this, folderPath, settings);
   }
 
   // Export current vault as Markdown files (ZIP or downloadable Blob)
@@ -623,7 +633,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     if (!this.importVaultData({ items: data.items, folders: data.folders })) {
       throw new Error('Failed to store received vault data');
     }
-    localStorage.setItem(this.getWorkspaceStateKey(), JSON.stringify(workspace));
+    localStorage.setItem(workspaceStateStorageKey(this), JSON.stringify(workspace));
   }
 
   private transferIo(): VaultImportIo {
