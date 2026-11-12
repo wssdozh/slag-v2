@@ -26,10 +26,16 @@ import {
   setDeviceSyncModeInConfig,
   setDeviceAiLeaseInConfig,
   normalizeTrustedDevicesFromAccount,
-  computeSubscription,
-  parseStoredConfig,
-  createInitialConfig,
 } from './devices';
+import {
+  computeSubscription,
+  loadConfig,
+  saveConfig,
+  authHeaders,
+  refreshServerAuth,
+  getVaultSeedPhrase,
+  setVaultSeedPhrase,
+} from './syncConfig';
 import {
   computeHash,
   deriveVaultKey,
@@ -46,17 +52,13 @@ import type {
 } from './types';
 import type { SlagItem, FolderMeta, WorkspaceState } from '../../types';
 import {
-  DEFAULT_SYNC_SERVER_URL,
-  OFFICIAL_SYNC_DOMAINS,
   SYNC_ATTACHMENT_MAX_BYTES,
   SYNC_STORAGE_KEYS,
   SYNC_INTERVALS,
 } from '../../config';
 import { isPrimaryWindow } from '../windowControls';
 
-const SYNC_CONFIG_KEY = SYNC_STORAGE_KEYS.SYNC_CONFIG;
 const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
-const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
 
 const syncLog = logger.scope('SYNC');
 
@@ -184,8 +186,8 @@ export class SyncEngine {
         isExpiringSoon: false,
       },
     };
-    this.config = this.loadConfig(this.currentVaultId);
-    this.status.subscription = this.computeSubscription(this.config);
+    this.config = loadConfig(this, this.currentVaultId);
+    this.status.subscription = computeSubscription(this);
     accountClient.subscribe((accountState) => {
       this.status.isAuthenticated = accountClient.getToken(this.config.serverUrl) !== null;
       if (!this.usesAccountSync()) return;
@@ -219,14 +221,6 @@ export class SyncEngine {
     }
   }
 
-  private computeSubscription(cfg: SyncConfig): SyncStatus['subscription'] {
-    return computeSubscription(
-      cfg,
-      accountClient.getState(),
-      accountClient.getToken(cfg.serverUrl) !== null,
-      this.status.authRequired
-    );
-  }
   public getConfig(): SyncConfig {
     return { ...this.config };
   }
@@ -235,7 +229,7 @@ export class SyncEngine {
     return {
       ...this.status,
       initialSync: { ...this.status.initialSync },
-      subscription: this.computeSubscription(this.config),
+      subscription: computeSubscription(this),
     };
   }
 
@@ -433,77 +427,8 @@ export class SyncEngine {
     return this.status.authRequired || accountClient.getToken(this.config.serverUrl) !== null;
   }
 
-  private authHeaders(includeJson = false): Record<string, string> {
-    const headers: Record<string, string> = {};
-    if (includeJson) headers['Content-Type'] = 'application/json';
-    const token = accountClient.getToken(this.config.serverUrl);
-    if (token) headers.Authorization = `Bearer ${token}`;
-    return headers;
-  }
-
-  private async refreshServerAuth(): Promise<boolean> {
-    try {
-      const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
-      const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(SYNC_INTERVALS.HEALTH_TIMEOUT_MS) });
-      if (!response.ok) throw new Error(`Health check failed: HTTP ${response.status}`);
-      const health = await response.json();
-      this.status.authRequired = Boolean(health.authRequired);
-    } catch {
-      const isOfficial = OFFICIAL_SYNC_DOMAINS.some((domain) => this.config.serverUrl.includes(domain));
-      this.status.authRequired = isOfficial;
-    }
-    this.status.isAuthenticated = accountClient.getToken(this.config.serverUrl) !== null;
-    this.notify();
-    return !this.status.authRequired || this.status.isAuthenticated;
-  }
-
-  private loadConfig(targetVaultId?: string): SyncConfig {
-    const vid = targetVaultId || (typeof storage !== 'undefined' && storage.getCurrentVault ? storage.getCurrentVault()?.id : 'default_vault') || 'default_vault';
-    this.currentVaultId = vid;
-    const key = `${SYNC_CONFIG_KEY}_${vid}`;
-    try {
-      let raw = localStorage.getItem(key);
-      if (!raw && vid === 'default_vault') {
-        raw = localStorage.getItem(SYNC_CONFIG_KEY);
-      }
-      if (raw) {
-        return parseStoredConfig(
-          raw,
-          DEFAULT_SERVER_URL,
-          accountClient.getToken(DEFAULT_SERVER_URL) !== null,
-          accountClient.getSession()?.deviceId
-        );
-      }
-    } catch {
-      // fallback
-    }
-
-    const baseRaw = localStorage.getItem(SYNC_CONFIG_KEY) || localStorage.getItem(`${SYNC_CONFIG_KEY}_default_vault`);
-    const initial = createInitialConfig(
-      DEFAULT_SERVER_URL,
-      baseRaw,
-      accountClient.getToken(DEFAULT_SERVER_URL) !== null,
-      accountClient.getSession()?.deviceId
-    );
-    this.saveConfig(initial);
-    return initial;
-  }
-
   public saveConfig(newConfig: Partial<SyncConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-    try {
-      const key = `${SYNC_CONFIG_KEY}_${this.currentVaultId}`;
-      localStorage.setItem(key, JSON.stringify(this.config));
-      if (this.currentVaultId === 'default_vault') {
-        localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(this.config));
-      }
-    } catch (e) {
-      syncLog.error('Failed to save sync config:', e);
-    }
-    if (this.status) {
-      this.status.subscription = this.computeSubscription(this.config);
-      this.notify();
-    }
+    saveConfig(this, newConfig);
   }
 
   public beginInitialSync(vaultId: string): void {
@@ -533,8 +458,8 @@ export class SyncEngine {
     syncLog.info(`SyncEngine switching to vault: ${vaultId}`);
     this.disconnect();
     this.currentVaultId = vaultId;
-    this.config = this.loadConfig(vaultId);
-    this.status.subscription = this.computeSubscription(this.config);
+    this.config = loadConfig(this, vaultId);
+    this.status.subscription = computeSubscription(this);
     this.status.currentRoomId = null;
     this.notify();
     await this.init();
@@ -560,7 +485,7 @@ export class SyncEngine {
       this.status.state = 'syncing';
       this.notify();
 
-      const canSync = await this.refreshServerAuth();
+      const canSync = await refreshServerAuth(this);
       if (generation !== this.initGeneration) return;
       if (!canSync) {
         this.status.state = 'idle';
@@ -638,31 +563,11 @@ export class SyncEngine {
   }
 
   public getVaultSeedPhrase(vaultId: string): string | null {
-    if (vaultId === this.currentVaultId) return this.config.seedPhrase;
-    try {
-      const raw = localStorage.getItem(`${SYNC_CONFIG_KEY}_${vaultId}`);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return typeof parsed.seedPhrase === 'string' ? parsed.seedPhrase : null;
-    } catch {
-      return null;
-    }
+    return getVaultSeedPhrase(this, vaultId);
   }
 
   public setVaultSeedPhrase(vaultId: string, seedPhrase: string): void {
-    if (vaultId === this.currentVaultId) {
-      this.saveConfig({ seedPhrase });
-      return;
-    }
-    const raw = localStorage.getItem(`${SYNC_CONFIG_KEY}_${vaultId}`);
-    const base = raw ? JSON.parse(raw) : this.config;
-    localStorage.setItem(`${SYNC_CONFIG_KEY}_${vaultId}`, JSON.stringify({
-      ...base,
-      deviceId: this.config.deviceId,
-      deviceName: this.config.deviceName,
-      serverUrl: this.config.serverUrl,
-      seedPhrase,
-    }));
+    setVaultSeedPhrase(this, vaultId, seedPhrase);
   }
 
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
@@ -733,7 +638,7 @@ export class SyncEngine {
       serverUrl: this.config.serverUrl,
       vaultId: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
       deviceId: this.config.deviceId,
-      authHeaders: (includeJson) => this.authHeaders(includeJson),
+      authHeaders: (includeJson) => authHeaders(this, includeJson),
     });
   }
 
@@ -775,7 +680,7 @@ export class SyncEngine {
       const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
       const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
         method: 'POST',
-        headers: this.authHeaders(true),
+        headers: authHeaders(this, true),
         body: JSON.stringify(pending.encrypted),
       });
       if (!response.ok) {
@@ -857,7 +762,7 @@ export class SyncEngine {
         const previousCursor = cursor;
         if (cursor > 0) params.set('since', String(cursor));
         const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
-          headers: this.authHeaders(),
+          headers: authHeaders(this),
           signal: AbortSignal.timeout(30_000),
         });
         if (generation !== this.initGeneration) return;
@@ -954,7 +859,7 @@ export class SyncEngine {
   public async rotateVaultKey(): Promise<string> {
     if (this.usesAccountSync()) {
       const response = await fetch(`${this.config.serverUrl.replace(/\/+$/, '')}/api/vaults/${encodeURIComponent(this.getSyncVaultId())}/rotate`, {
-        method: 'POST', headers: this.authHeaders(true), body: '{}',
+        method: 'POST', headers: authHeaders(this, true), body: '{}',
       });
       if (!response.ok) throw new Error('Сервер не подтвердил отзыв старых ключей');
       await accountClient.refresh();
