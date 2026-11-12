@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **361**, строк: **77671**, зон: **40**.
+Модулей: **361**, строк: **77694**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -19,20 +19,20 @@
 | `src/lib/ai/localFallback.ts` | 1047 | 1 |
 | `src/components/Feed/AssistantChat.tsx` | 995 | 2 |
 | `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
-| `e2e/slag/workspace.spec.ts` | 873 | 0 |
-| `src/lib/sync/syncEngine.ts` | 872 | 16 |
+| `e2e/slag/workspace.spec.ts` | 885 | 0 |
+| `src/lib/sync/syncEngine.ts` | 874 | 16 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
 | `src/context/AppContext.tsx` | 720 | 56 |
 | `src/components/Audio/AudioPanel.tsx` | 715 | 2 |
 
-## e2e (playwright) — 91 файлов, 16918 строк
+## e2e (playwright) — 91 файлов, 16939 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
 - `e2e/slag/editor.spec.ts` — 1576
 - `e2e/slag/views.spec.ts` — 1061
-- `e2e/slag/workspace.spec.ts` — 873
+- `e2e/slag/workspace.spec.ts` — 885
 - `e2e/mobile.spec.ts` — 868
 - `e2e/slag/feed.spec.ts` — 802
 - `e2e/admin_panel.spec.ts` — 491
@@ -432,7 +432,7 @@
 | `vaultRegistry.ts` | 199 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 | Which vault the app is looking at: the registry kept in localStorage, and the… |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
 
-## src/lib/sync — 22 файлов, 6149 строк
+## src/lib/sync — 22 файлов, 6151 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -452,7 +452,7 @@
 | `pairing.ts` | 180 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +3 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `pushBundle.ts` | 292 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 140 | 2 | SyncConfigHost, computeSubscription, loadConfig, saveConfig, authHeaders, +3 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 872 | 16 | PendingPush, SyncEngine, syncEngine, storage, accountClient |  |
+| `syncEngine.ts` | 874 | 16 | PendingPush, SyncEngine, syncEngine, storage, accountClient |  |
 | `syncSocket.ts` | 41 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `transport.ts` | 212 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport |  |
 | `twoFactorAuth.ts` | 295 | 1 | TotpConfig, WebAuthnConfig, TwoFactorState, base32Encode, base32Decode, +8 | Two-Factor Authentication (2FA) for Zero-Knowledge Vaults |
