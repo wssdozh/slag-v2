@@ -778,7 +778,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
           return (
             <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-              <div className="text-sm text-zinc-200 leading-relaxed font-normal whitespace-pre-wrap">
+              <div className="text-sm text-zinc-200 leading-relaxed font-normal">
                 <MarkdownRenderer content={textToRender} onWikiLinkClick={scrollToItem} />
               </div>
             </div>
