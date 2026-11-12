@@ -29,6 +29,16 @@ import { stripAttachmentData } from './attachmentData';
 import { AttachmentStore } from './attachments';
 import { VaultFiles } from './vaultFiles';
 import {
+  initCurrentVault,
+  getVaults,
+  saveVaultMeta,
+  ensureVaultSyncId,
+  switchVault,
+  createVault,
+  deleteVault,
+  pickVaultDirectory,
+} from './vaultRegistry';
+import {
   buildVaultExportJson,
   exportObsidianBundle,
   importVaultPayload,
@@ -41,7 +51,6 @@ import {
   STORAGE_KEYS,
   DEFAULT_WORKSPACE_STATE,
   DEFAULT_FOLDERS,
-  DEFAULT_VAULT_META,
 } from '../../config';
 
 export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
@@ -59,20 +68,17 @@ export type StorageChangeListener = (event: StorageChangeEvent) => void;
 const fsLog = logger.scope('FS');
 /** Attachment bytes: which file was asked for, and where the answer came from. */
 
-const VAULTS_KEY = STORAGE_KEYS.VAULTS;
-const CURRENT_VAULT_KEY = STORAGE_KEYS.CURRENT_VAULT;
 const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
 const FOLDERS_STORAGE_PREFIX = STORAGE_KEYS.FOLDERS_PREFIX;
 const TRASH_STORAGE_PREFIX = STORAGE_KEYS.TRASH_PREFIX;
 const DRAFTS_STORAGE_PREFIX = STORAGE_KEYS.DRAFTS_PREFIX;
-const ASSISTANT_STORAGE_PREFIX = STORAGE_KEYS.ASSISTANT_PREFIX;
 const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
 
 // Initial demo & onboarding items
 export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
 export class StorageService {
-  private currentVault: VaultMeta;
+  public currentVault: VaultMeta;
   private draftStore: DraftStore;
   private changeListeners: Set<StorageChangeListener> = new Set();
   private instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -180,7 +186,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   constructor() {
-    this.currentVault = this.initCurrentVault();
+    this.currentVault = initCurrentVault(this);
     this.draftStore = new DraftStore({
       getVaultId: () => this.currentVault.id,
       emitChange: (event) => this.emitChange(event),
@@ -235,117 +241,33 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     }
   }
 
-  // Vault disk paths for strict multi-vault isolation
-  private initCurrentVault(): VaultMeta {
-    const saved = localStorage.getItem(CURRENT_VAULT_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object' && parsed.id) {
-          // Auto-migrate old default vault name to 'main'
-          if (parsed.id === 'default_vault' && (parsed.name === 'Основное хранилище (Vault)' || !parsed.name)) {
-            parsed.name = 'main';
-            localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(parsed));
-          }
-          this.currentVault = parsed;
-          return parsed;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    const defaultVault: VaultMeta = { ...DEFAULT_VAULT_META };
-    this.currentVault = defaultVault;
-    localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(defaultVault));
-    this.saveVaultMeta(defaultVault);
-    return defaultVault;
-  }
-
   public getCurrentVault(): VaultMeta {
     return this.currentVault;
   }
 
   public getVaults(): VaultMeta[] {
-    const raw = localStorage.getItem(VAULTS_KEY);
-    if (!raw) return this.currentVault ? [this.currentVault] : [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        let changed = false;
-        const vaults = parsed
-          .filter(v => v && typeof v === 'object' && v.id)
-          .map(v => {
-            if (v.id === 'default_vault' && (v.name === 'Основное хранилище (Vault)' || !v.name)) {
-              changed = true;
-              return { ...v, name: 'main' };
-            }
-            return v;
-          });
-        if (changed) {
-          localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
-        }
-        return vaults.length > 0 ? vaults : (this.currentVault ? [this.currentVault] : []);
-      }
-      return this.currentVault ? [this.currentVault] : [];
-    } catch {
-      return this.currentVault ? [this.currentVault] : [];
-    }
+    return getVaults(this);
   }
 
   public ensureVaultSyncId(vaultId: string): string {
-    const vault = this.getVaults().find((entry) => entry.id === vaultId);
-    if (!vault) throw new Error('Хранилище не найдено');
-    if (vault.syncId) return vault.syncId;
-    const syncId = vault.id === 'default_vault' ? `vault_${crypto.randomUUID()}` : vault.id;
-    const updated = { ...vault, syncId };
-    this.saveVaultMeta(updated);
-    if (this.currentVault.id === vaultId) {
-      this.currentVault = { ...this.currentVault, syncId };
-      localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(this.currentVault));
-    }
-    return syncId;
+    return ensureVaultSyncId(this, vaultId);
   }
 
   public saveVaultMeta(vault: VaultMeta): void {
-    if (!vault || !vault.id) return;
-    const list = this.getVaults().filter(v => v && v.id !== vault.id);
-    list.push(vault);
-    localStorage.setItem(VAULTS_KEY, JSON.stringify(list));
+    return saveVaultMeta(this, vault);
   }
 
   public switchVault(vaultId: string): VaultMeta {
-    const vaults = this.getVaults();
-    const target = vaults.find(v => v.id === vaultId);
-    if (target) {
-      this.currentVault = { ...target, isCurrent: true };
-      localStorage.setItem(CURRENT_VAULT_KEY, JSON.stringify(this.currentVault));
-      this.initDefaultsIfNeeded();
-      fsLog.info(`Switched vault to "${this.currentVault.name}" (${this.currentVault.id})`);
-      if (isTauri()) {
-        void this.files.syncCurrentVaultFs();
-      }
-      return this.currentVault;
-    }
-    return this.currentVault;
+    return switchVault(this, vaultId);
   }
 
   public createVault(
     name: string,
-    mode: 'indexeddb' | 'fsa' | 'tauri' = isTauri() ? 'tauri' : 'indexeddb',
+    mode?: 'indexeddb' | 'fsa' | 'tauri',
     path?: string,
     id?: string
   ): VaultMeta {
-    const resolvedMode = isTauri() && mode === 'indexeddb' ? 'tauri' : mode;
-    const newVault: VaultMeta = {
-      id: id?.trim() || `vault_${crypto.randomUUID()}`,
-      name,
-      mode: resolvedMode,
-      path,
-      isCurrent: true,
-    };
-    this.saveVaultMeta(newVault);
-    fsLog.info(`Created new vault "${name}" (${newVault.id}) [${resolvedMode}]${path ? ` at ${path}` : ''}`);
-    return this.switchVault(newVault.id);
+    return createVault(this, name, mode, path, id);
   }
 
   public seedDemoData(): SlagItem[] {
@@ -363,68 +285,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public deleteVault(vaultId: string): boolean {
-    if (vaultId === 'default_vault') {
-      return false; // Cannot delete default root vault
-    }
-    if (vaultId === this.currentVault.id) {
-      this.switchVault('default_vault');
-    }
-    const vaults = this.getVaults().filter(v => v.id !== vaultId);
-    localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
-    try {
-      localStorage.removeItem(`${ITEMS_STORAGE_PREFIX}${vaultId}`);
-      localStorage.removeItem(`${FOLDERS_STORAGE_PREFIX}${vaultId}`);
-      localStorage.removeItem(`${DRAFTS_STORAGE_PREFIX}${vaultId}`);
-      localStorage.removeItem(`${ASSISTANT_STORAGE_PREFIX}${vaultId}`);
-      localStorage.removeItem(`${WORKSPACE_STATE_PREFIX}${vaultId}`);
-    } catch {
-      // ignore
-    }
-    if (isTauri()) {
-      try {
-        const vaultDir = `vaults/${vaultId}`;
-        void remove(vaultDir, { baseDir: BaseDirectory.AppData, recursive: true });
-      } catch (err) {
-        fsLog.warn(`Failed to clean up vault directory on disk:`, err);
-      }
-    }
-    fsLog.info(`Deleted vault "${vaultId}"`);
-    return true;
+    return deleteVault(this, vaultId);
   }
 
   public async pickDirectory(): Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null> {
-    if (isTauri()) {
-      try {
-        const { open } = await import('@tauri-apps/plugin-dialog');
-        const selected = await open({
-          directory: true,
-          multiple: false,
-          title: 'Выберите папку хранилища',
-        });
-        if (selected && typeof selected === 'string') {
-          const folderName = selected.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'Папка';
-          return { name: folderName, path: selected, mode: 'tauri' };
-        }
-        return null;
-      } catch (err) {
-        fsLog.error('Tauri folder picker error:', err);
-        return null;
-      }
-    }
-
-    if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
-      try {
-        const dirHandle = await (window as any).showDirectoryPicker();
-        return { name: dirHandle.name || 'Локальный Vault', mode: 'fsa' };
-      } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          fsLog.warn('showDirectoryPicker error:', err);
-        }
-        return null;
-      }
-    }
-
-    return null;
+    return pickVaultDirectory();
   }
 
   private getItemsKey(): string {
@@ -443,7 +308,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return `${WORKSPACE_STATE_PREFIX}${this.currentVault.id}`;
   }
 
-  private initDefaultsIfNeeded(): void {
+  public initDefaultsIfNeeded(): void {
     const foldersKey = this.getFoldersKey();
     if (!localStorage.getItem(foldersKey)) {
       localStorage.setItem(foldersKey, JSON.stringify(DEFAULT_FOLDERS));
