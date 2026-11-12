@@ -526,7 +526,7 @@ export const FeedList: React.FC = () => {
                     <ItemCard
                       key={item.id}
                       item={item}
-                      style={gap > 0 ? { marginTop: gap } : undefined}
+                      gap={gap}
                       isHighlighted={highlightedItemId === item.id}
                       repliesCount={replyMetaMap.countMap.get(item.id) || 0}
                       firstReplyId={replyMetaMap.firstReplyMap.get(item.id) || null}

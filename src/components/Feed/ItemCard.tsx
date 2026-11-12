@@ -34,6 +34,13 @@ const CARD_TRANSITION =
   'background-color var(--slag-motion-base) var(--ease-standard), ' +
   'border-color var(--slag-motion-base) var(--ease-standard)';
 
+/**
+ * The card re-renders whenever anything in the app context moves, and remark re-parses the
+ * whole note on every render. The content and its handler are the only inputs, so the parse
+ * result is memoized: same note in, same subtree out.
+ */
+const CardMarkdown = React.memo(MarkdownRenderer);
+
 export interface ItemCardProps {
   item: SlagItem;
   isHighlighted?: boolean;
@@ -41,8 +48,12 @@ export interface ItemCardProps {
   firstReplyId?: string | null;
   replyParent?: SlagItem | null;
   onImageClick?: (img: SlagAttachment, currentItem: SlagItem) => void;
-  /** Layout offset from the list (the gap between two notes), merged into the card box. */
-  style?: React.CSSProperties;
+  /**
+   * Layout offset from the list: the gap between two notes, merged into the card box.
+   * A number, not a style object: the list rebuilds an object every render and that
+   * alone was enough to defeat the memo on every card.
+   */
+  gap?: number;
 }
 
 const formatDueDate = (rawDate?: string): string => {
@@ -88,7 +99,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   firstReplyId = null,
   replyParent = null,
   onImageClick,
-  style,
+  gap,
 }) => {
   const {
     toggleTaskComplete,
@@ -435,6 +446,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
   const shouldRenderBottomBar = (shape !== 'voice' && shape !== 'file') || hasBottomMeta;
 
+  // The step before the card is a number, so its style object outlives the list's re-renders.
+  const cardStyle = useMemo<React.CSSProperties | undefined>(
+    () => (gap && gap > 0 ? { marginTop: gap } : undefined),
+    [gap],
+  );
+
   const handleOpenArticle = useCallback(() => {
     setSelectedItem(item);
     setIsFullscreenEditorOpen(true);
@@ -516,7 +533,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           // One declaration for the card: a separate `transition-colors` class would
           // be overridden here, which is why the hover colour used to snap.
           transition: swipeOffset ? 'none' : CARD_TRANSITION,
-          ...style,
+          ...cardStyle,
         }}
         className={`group relative flex flex-col ${
           isVoiceBubble || isFileBubble
@@ -567,7 +584,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                     : 'text-zinc-100'
                 }`}
               >
-                <MarkdownRenderer
+                <CardMarkdown
                   content={item.title}
                   inline
                   onWikiLinkClick={scrollToItem}
@@ -577,7 +594,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
               {taskBodyContent && (
                 <div className="mt-1 text-sm text-zinc-300 leading-relaxed font-normal">
-                  <MarkdownRenderer content={taskBodyContent} onWikiLinkClick={scrollToItem} />
+                  <CardMarkdown content={taskBodyContent} onWikiLinkClick={scrollToItem} />
                 </div>
               )}
             </div>
@@ -622,7 +639,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           return (
             <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
               <div className="text-sm text-zinc-200 leading-relaxed font-normal">
-                <MarkdownRenderer content={textToRender} onWikiLinkClick={scrollToItem} />
+                <CardMarkdown content={textToRender} onWikiLinkClick={scrollToItem} />
               </div>
             </div>
           );
