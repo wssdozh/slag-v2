@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **384**, строк: **78470**, зон: **40**.
+Модулей: **388**, строк: **78646**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -16,7 +16,6 @@
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
 | `src/components/Feed/Composer.tsx` | 1094 | 4 |
 | `e2e/slag/views.spec.ts` | 1061 | 0 |
-| `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
 | `src/lib/sync/syncEngine.ts` | 874 | 17 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
@@ -25,6 +24,7 @@
 | `src/components/Audio/AudioPanel.tsx` | 715 | 2 |
 | `src/components/UI/ContextMenu.tsx` | 712 | 1 |
 | `src/lib/storage/index.ts` | 673 | 33 |
+| `src/components/Admin/AdminPanel.tsx` | 646 | 1 |
 
 ## e2e (playwright) — 91 файлов, 16939 строк
 
@@ -89,13 +89,16 @@
 |---|---:|---:|---|---|
 | `QuickComposerWindow.tsx` | 102 | 1 | QuickComposerWindow |  |
 
-## src/components/Editor — 5 файлов, 2420 строк
+## src/components/Editor — 8 файлов, 2593 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AttachmentStrip.tsx` | 219 | 1 | AttachmentStripProps, AttachmentStrip |  |
 | `EditorToolbar.tsx` | 576 | 1 | EditorToolbarProps, EditorToolbar |  |
-| `FullscreenEditor.tsx` | 990 | 1 | FullscreenEditor |  |
+| `fullscreen/EditorTaskFields.tsx` | 292 | 1 | EditorTaskFieldsProps, EditorTaskFields |  |
+| `fullscreen/useEditorAiActions.ts` | 71 | 1 | EditorAiActionsOptions, useEditorAiActions |  |
+| `fullscreen/useEditorAttachments.ts` | 161 | 1 | EditorAttachmentsOptions, useEditorAttachments |  |
+| `FullscreenEditor.tsx` | 639 | 1 | FullscreenEditor |  |
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
 | `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
@@ -379,7 +382,7 @@
 | `useIsMobile.ts` | 35 | 2 | useIsMobile | Hook to detect mobile screens (< 768px by default). |
 | `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight | Publishes the visual viewport height as `--vvh`. |
 
-## src/lib — 16 файлов, 3447 строк
+## src/lib — 17 файлов, 3450 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -390,7 +393,8 @@
 | `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
 | `folderOpener.ts` | 72 | 5 | OpenFolderResult, openAppFolder |  |
 | `formatBytes.ts` | 7 | 5 | formatBytes |  |
-| `logger.ts` | 648 | 43 | LogListener, logger |  |
+| `logger.ts` | 586 | 43 | LogListener, logger |  |
+| `logRedaction.ts` | 65 | 1 | maskSensitiveString, sanitizeForLog | Masking secrets in log messages and payloads; the one place that knows what a… |
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
@@ -526,5 +530,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 128 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 131 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
