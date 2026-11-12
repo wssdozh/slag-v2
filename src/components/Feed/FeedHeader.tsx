@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { ActiveFilterBadges } from './ActiveFilterBadges';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { materialsInFolder } from '../../lib/vault/folderItems';
 import {
   Folder,
   Inbox,
@@ -46,15 +47,10 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
 
-  const folderMaterialsCount = useMemo(() => {
-    return items.filter(item => {
-      const inFolder =
-        currentFolder === DEFAULT_INBOX_FOLDER
-          ? true
-          : item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
-      return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
-    }).length;
-  }, [items, currentFolder]);
+  const folderMaterialsCount = useMemo(
+    () => materialsInFolder(items, currentFolder).length,
+    [items, currentFolder],
+  );
 
   const inboxUnsortedCount = useMemo(() => {
     return isInbox ? items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length : 0;

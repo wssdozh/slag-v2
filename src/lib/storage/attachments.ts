@@ -10,6 +10,7 @@ import {
   BaseDirectory,
 } from '@tauri-apps/plugin-fs';
 import { idbSaveAttachment, idbGetAttachment } from './indexedDb';
+import { blobToDataUrl } from '../blobToDataUrl';
 
 /**
  * The bytes of attachments, and only them.
@@ -116,12 +117,7 @@ export class AttachmentStore {
     }
     try {
       const blob = await (await fetch(url)).blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(blob);
-      });
+      const dataUrl = await blobToDataUrl(blob);
       mediaLog.debug(`Attachment ready to sync: ${att.name} (${Math.round(dataUrl.length / 1024)} KB base64)`);
       return dataUrl;
     } catch (err) {

@@ -5,6 +5,7 @@ import {
   STORED_IMAGE_QUALITY,
   UNCOMPRESSIBLE_IMAGE_TYPES,
 } from './imageCodec';
+import { blobToDataUrl } from '../blobToDataUrl';
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif', 'bmp', 'svg'];
 const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'];
@@ -97,12 +98,7 @@ export async function processFileListToAttachments(
   const attachments: SlagAttachment[] = [];
 
   for (const file of files) {
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    const dataUrl = await blobToDataUrl(file);
 
     attachments.push(await attachmentFromDataUrl({
       name: file.name,

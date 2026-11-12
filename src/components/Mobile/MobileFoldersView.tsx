@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { materialsInFolder } from '../../lib/vault/folderItems';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { useComposerInset } from '../../hooks/layout/useComposerInset';
@@ -82,15 +83,10 @@ export const MobileFoldersView: React.FC = () => {
     isPinnedOnlyFilter ||
     (isInbox && inboxMode !== 'all');
 
-  const folderMaterialsCount = useMemo(() => {
-    return items.filter(item => {
-      const inFolder =
-        currentFolder === DEFAULT_INBOX_FOLDER
-          ? true
-          : item.folder === currentFolder || item.folder.startsWith(currentFolder + '/');
-      return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
-    }).length;
-  }, [items, currentFolder]);
+  const folderMaterialsCount = useMemo(
+    () => materialsInFolder(items, currentFolder).length,
+    [items, currentFolder],
+  );
 
   const inboxUnsortedCount = useMemo(() => {
     return isInbox ? items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length : 0;

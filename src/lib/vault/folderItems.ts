@@ -16,3 +16,21 @@ export function itemsInFolder(items: SlagItem[], folderPath: string): SlagItem[]
   const prefix = `${folderPath}/`;
   return items.filter(item => item.folder === folderPath || item.folder.startsWith(prefix));
 }
+
+/**
+ * The reading material a folder shows in the materials dock: notes and articles, never
+ * archived tasks.
+ *
+ * The inbox is the one place where this does *not* behave like `itemsInFolder` — in the inbox
+ * the dock mirrors the feed and counts the whole vault. Both headers ask here so the two
+ * numbers can never drift apart.
+ */
+export function materialsInFolder(items: SlagItem[], folderPath: string): SlagItem[] {
+  return items.filter(item => {
+    const inFolder =
+      folderPath === DEFAULT_INBOX_FOLDER
+        ? true
+        : item.folder === folderPath || item.folder.startsWith(`${folderPath}/`);
+    return inFolder && !item.isArchived && (item.type === 'note' || item.type === 'article');
+  });
+}

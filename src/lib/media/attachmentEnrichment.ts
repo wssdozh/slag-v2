@@ -3,6 +3,7 @@ import { logger } from '../logger';
 import { storage } from '../storage';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, AI_LIMITS } from '../../config';
 import { downscaleImageDataUrl } from './imageCodec';
+import { blobToDataUrl } from '../blobToDataUrl';
 import { syncEngine } from '../sync/syncEngine';
 import { accountClient } from '../sync/account';
 
@@ -441,12 +442,7 @@ async function withBytes(attachment: SlagAttachment): Promise<SlagAttachment> {
   if (url.startsWith('data:')) return { ...attachment, dataUrl: url };
 
   const blob = await (await fetch(url)).blob();
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+  const dataUrl = await blobToDataUrl(blob);
   return { ...attachment, dataUrl };
 }
 
