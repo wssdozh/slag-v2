@@ -38,16 +38,20 @@
 ```text
 src/
   components/   UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
-  context/      AppContext — единственный стейт-хаб
+                (+ подпапки зон: Feed/assistant, Editor/fullscreen, Settings/devices,
+                 Audio/panel, UI/menu, Admin/tabs)
+  context/      AppContext — единственный стейт-хаб; hooks/ — записи, папки, хранилища, лента
   hooks/        gestures/ (drag, swipe), layout/ (размеры, мобильность), остальное плоско
-  lib/          ai/ (LLM), storage/ (диск и черновики), sync/ (relay), vault/ (модель),
-                time/ (даты и календарь), media/ (вложения и аудио), плоские утилиты
+  lib/          ai/ (LLM + fallback/ по интентам), storage/ (диск, реестр, папки, корзина),
+                sync/ (relay: движок, конфиг, сокет), vault/ (модель), time/ (даты),
+                media/ (вложения и аудио), плоские утилиты
   types/        доменные типы
   mcp/          MCP-сервер, собирается отдельным конфигом
   styles/       theme.css — токены
 src-tauri/      Rust: десктоп и Android
 e2e/            Playwright: slag/ по зонам + support/
 relay/          сервер синхронизации
+scripts/        инструменты репозитория: gen-code-map.mjs (карта и `where`), иконки Android
 docs/project-map/  база знаний проекта, 15 документов
 ```
 

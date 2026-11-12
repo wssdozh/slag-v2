@@ -21,12 +21,18 @@ tags:
 ```text
 src/
   components/       UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
+    Feed/assistant/   по компоненту на вид сообщения
+    Editor/fullscreen/ вложения, инлайн-ИИ, строка свойств таски
+    Settings/devices/  список, карточка, права, действия, pairing
+    Audio/panel/       обложка, скраббер, транспорт, плейлист, playback
+    UI/menu/           наборы пунктов контекстного меню и подменю
+    Admin/tabs/        разделы админки
   context/          AppContext — единственный стейт-хаб; hooks/ — записи, папки, хранилища, поверхности, лента
   hooks/
     gestures/       drag, pointer dnd, sheet drag, swipe
     layout/         container width, flip layout, is mobile, visual viewport
   lib/
-    ai/             оркестратор, tools, prompt, action parser, адаптеры
+    ai/             оркестратор, tools, prompt, action parser, адаптеры; fallback/ — по файлу на группу интентов
     storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
     sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
     vault/          модель записи: schema, updates, markdown serializer, filename, demo
@@ -35,9 +41,10 @@ src/
   mcp/              MCP-сервер, отдельная сборка
   styles/           theme.css — токены
   types/            доменные типы
+scripts/            инструменты репозитория: gen-code-map.mjs (карта и `where`), build-android-icons.py
 ```
 
-`src/lib/*` остаётся плоским для одиночных модулей: `logger`, `commands`, `motion`, `platform`, `windowControls`, `searchService`, `backupService`, `aiService`, `navigation`, `notifications`, `folderOpener`, `diffUtils`, `formatBytes`, `vaultDisplay`, `taskUtils`, `taskCompletion`.
+`src/lib/*` остаётся плоским для одиночных модулей: `logger`, `logRedaction`, `commands`, `motion`, `platform`, `windowControls`, `searchService`, `backupService`, `aiService`, `navigation`, `folderOpener`, `diffUtils`, `formatBytes`, `vaultDisplay`, `taskUtils`, `taskCompletion`.
 
 ---
 
