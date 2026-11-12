@@ -66,7 +66,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
           await page.emulateMedia({ reducedMotion: 'no-preference' });
         }
       }
-      await scope.locator('form > .motion-fade').evaluate(async (element) => {
+      await scope.locator('.motion-settings-tab').evaluate(async (element) => {
         await Promise.all(element.getAnimations().map(animation => animation.finished));
       });
       await page.screenshot({ path: `test-results/screenshots/settings-${tab}-${viewport.width}.png` });
