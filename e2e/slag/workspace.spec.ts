@@ -237,6 +237,8 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     await secondaryTrigger.click();
     const mainOption = page.locator('.absolute.bottom-full button', { hasText: 'main' });
     await mainOption.click();
+    // The menu stays mounted through its exit transition, so wait it out before counting triggers.
+    await expect(mainOption).toBeHidden();
     await expect(page.locator('aside button', { hasText: 'main' })).toBeVisible();
 
     // 12. Delete "secondary" vault via trash icon in dropdown
@@ -539,6 +541,8 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     await currentTrigger.click();
     const mainOption = page.locator('.absolute.bottom-full button', { hasText: 'main' });
     await mainOption.click();
+    // The menu stays mounted through its exit transition, so wait it out before counting triggers.
+    await expect(mainOption).toBeHidden();
     await expect(page.locator('aside button', { hasText: 'main' })).toBeVisible();
 
     await vaultTrigger.click();
