@@ -76,8 +76,14 @@ test.describe('Backup & Restore System Verification', () => {
     await expect(restoreBtn).toBeVisible();
     await restoreBtn.click();
 
-    // Wait for toast or completion
-    await page.waitForTimeout(500);
+    // The app asks its own question instead of window.confirm, so answer it here.
+    const confirmDialog = page.getByRole('alertdialog');
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByRole('button', { name: 'Восстановить', exact: true }).click();
+    await expect(confirmDialog).not.toBeVisible();
+
+    // Wait for the restore to finish
+    await expect(page.getByText('Хранилище успешно восстановлено из снимка')).toBeVisible({ timeout: 10000 });
 
     // Close settings modal
     await page.keyboard.press('Escape');
