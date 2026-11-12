@@ -6,6 +6,30 @@ import { defineConfig, devices } from '@playwright/test';
 const port = Number(process.env.SLAG_E2E_PORT || 5173);
 const baseURL = `http://127.0.0.1:${port}`;
 
+// The UI playground boots only on its own origin (`src/demo.tsx` refuses every other port), so
+// the runner starts a second server for it. When this tree already runs there, one server is
+// enough: it serves both the app and `/demo.html`.
+const PLAYGROUND_PORT = 5174;
+const playgroundURL = `http://127.0.0.1:${PLAYGROUND_PORT}`;
+
+const servers: Parameters<typeof defineConfig>[0]['webServer'] = [
+  {
+    command: `npx vite --port ${port} --host 127.0.0.1`,
+    url: baseURL,
+    reuseExistingServer: true,
+    timeout: 30000,
+  },
+];
+
+if (port !== PLAYGROUND_PORT) {
+  servers.push({
+    command: `npx vite --port ${PLAYGROUND_PORT} --host 127.0.0.1`,
+    url: `${playgroundURL}/demo.html`,
+    reuseExistingServer: true,
+    timeout: 30000,
+  });
+}
+
 export default defineConfig({
   testDir: './e2e',
   // The first page load after a dependency change pays Vite's cold transform of the
@@ -43,10 +67,5 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: `npx vite --port ${port} --host 127.0.0.1`,
-    url: baseURL,
-    reuseExistingServer: true,
-    timeout: 30000,
-  },
+  webServer: servers,
 });
