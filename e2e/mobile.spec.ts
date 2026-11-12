@@ -1,4 +1,14 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+
+/**
+ * The sheet travels with a damped spring painted from `requestAnimationFrame`, so it is not a
+ * CSS animation and `getAnimations()` never reports it. The caret inside the editor is an
+ * infinite CSS animation one level down, so "no running animations" is not a finish signal
+ * either. `data-sheet-rest` is the surface itself saying it has landed.
+ */
+const waitForSheetRest = async (sheet: Locator) => {
+  await expect(sheet).toHaveAttribute('data-sheet-rest', 'true', { timeout: 15000 });
+};
 
 /** Долгое нажатие: Playwright не умеет touch-hold, а меню на мобилке теперь только на нём. */
 const longPress = async (page: Page, selector: string) => {
@@ -707,7 +717,7 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
 
     const sheet = page.locator('[data-testid="editor-sheet"]');
     await expect(sheet).toBeVisible();
-    await page.waitForTimeout(320);
+    await waitForSheetRest(sheet);
 
     const box = await sheet.boundingBox();
     expect(box).not.toBeNull();
@@ -732,9 +742,9 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
     // committed the sheet — wait for the container instead of the 5 s default on the handle.
     await expect(sheet).toBeVisible({ timeout: 15000 });
     await expect(handle).toBeVisible({ timeout: 15000 });
-    await page.waitForTimeout(320);
+    await waitForSheetRest(sheet);
 
-    const drag = async (deltaY: number) => {
+    const drag = async (deltaY: number, settlement: 'rest' | 'gone' = 'rest') => {
       const hb = await handle.boundingBox();
       expect(hb).not.toBeNull();
       const x = hb!.x + hb!.width / 2;
@@ -746,7 +756,8 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
         await page.mouse.move(x, startY + (deltaY * i) / steps);
       }
       await page.mouse.up();
-      await page.waitForTimeout(360);
+      if (settlement === 'gone') await expect(sheet).toHaveCount(0, { timeout: 15000 });
+      else await waitForSheetRest(sheet);
     };
 
     await drag(-320);
@@ -760,7 +771,7 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
     const barBox = await page.getByTestId('mobile-editor-bar').boundingBox();
     expect(Math.abs(barBox!.y + barBox!.height - page.viewportSize()!.height)).toBeLessThan(2);
 
-    await drag(420);
+    await drag(420, 'gone');
     await expect(sheet).toHaveCount(0, { timeout: 5000 });
   });
 
@@ -771,7 +782,7 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
     const sheet = page.locator('[data-testid="editor-sheet"]');
     const handle = page.locator('[data-sheet-handle]').first();
     await expect(sheet).toBeVisible();
-    await page.waitForTimeout(320);
+    await waitForSheetRest(sheet);
 
     // Развернуть шторку ручкой, чтобы проверить именно полноэкранный случай.
     const hb = await handle.boundingBox();
@@ -781,12 +792,12 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
       await page.mouse.move(hb!.x + hb!.width / 2, hb!.y + hb!.height / 2 - (320 * i) / 10);
     }
     await page.mouse.up();
-    await page.waitForTimeout(360);
+    await waitForSheetRest(sheet);
     expect(Math.abs((await sheet.boundingBox())!.y)).toBeLessThan(2);
 
     // Жест по телу: события touch, потому что обработчик намеренно нативный
     // (только cancelable touchmove может отобрать скролл у браузера).
-    const pullBody = async (deltaY: number) => {
+    const pullBody = async (deltaY: number, settlement: 'rest' | 'gone') => {
       await page.locator('[data-editor-body]').first().evaluate(async (el, dy) => {
         const at = (y: number) => new Touch({ identifier: 2, target: el, clientX: 120, clientY: y });
         const fire = (type: string, y: number, touches: Touch[]) => {
@@ -810,17 +821,18 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
         }
         fire('touchend', start + dy, []);
       }, deltaY);
-      await page.waitForTimeout(420);
+      if (settlement === 'gone') await expect(sheet).toHaveCount(0, { timeout: 15000 });
+      else await waitForSheetRest(sheet);
     };
 
     // Первый рывок: из полного размера — в половину, не в закрытие.
-    await pullBody(340);
+    await pullBody(340, 'rest');
     const collapsed = await sheet.boundingBox();
     expect(collapsed!.y).toBeGreaterThan(300);
     await page.screenshot({ path: 'test-results/screenshots/mobile_body_pull_half.png' });
 
     // Второй: из половины — закрыть.
-    await pullBody(460);
+    await pullBody(460, 'gone');
     await expect(sheet).toHaveCount(0, { timeout: 5000 });
   });
 
@@ -831,7 +843,7 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
     const sheet = page.locator('[data-testid="editor-sheet"]');
     const handle = page.locator('[data-sheet-handle]').first();
     await expect(sheet).toBeVisible();
-    await page.waitForTimeout(320);
+    await waitForSheetRest(sheet);
 
     // В свёрнутой шторке тулбар компактный — разворачиваем, чтобы пикер был в кадре.
     const hb = await handle.boundingBox();
@@ -841,7 +853,7 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
       await page.mouse.move(hb!.x + hb!.width / 2, hb!.y + hb!.height / 2 - (320 * i) / 10);
     }
     await page.mouse.up();
-    await page.waitForTimeout(360);
+    await waitForSheetRest(sheet);
 
     await sheet.locator('[aria-haspopup="listbox"]').first().click();
     const list = page.locator('[role="listbox"]').first();

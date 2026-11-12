@@ -8,6 +8,49 @@ export interface SheetPanelApi {
   setBar: (node: HTMLDivElement | null) => void;
 }
 
+/** A pointer sample, kept only for the release velocity. */
+interface PointerSample {
+  y: number;
+  time: number;
+}
+
+interface DragSession {
+  start: number;
+  y: number;
+  moved: boolean;
+  samples: PointerSample[];
+}
+
+/** How far ahead the release velocity is projected, in seconds of travel. */
+const RELEASE_PROJECTION_SECONDS = 0.18;
+/**
+ * The fling may not carry the surface past the next detent on its own. Without this cap a
+ * 320px pull from "whole" dismissed the sheet instead of folding it back whenever the last
+ * pointer samples happened to be dense — the same gesture, two outcomes, decided by frames.
+ */
+const RELEASE_TRAVEL_CAP = 0.25;
+/** A coalesced pair of pointer events can report a 32px jump in 1ms. */
+const RELEASE_VELOCITY_CAP = 4000;
+const RELEASE_WINDOW_MS = 100;
+/** The spring is analytic and lands well inside this; the timer is a safety net. */
+const SPRING_DEADLINE_MS = 1200;
+/** A finger that rested this long before lifting is not a fling. */
+const RELEASE_REST_MS = 100;
+
+const clamp = (value: number, limit: number): number => Math.max(-limit, Math.min(limit, value));
+
+/**
+ * Release speed over a trailing window instead of the last sample pair: one noisy pair
+ * decides whether the finger was a fling, and under load the events coalesce.
+ */
+function releaseVelocity(session: DragSession): number {
+  const samples = session.samples;
+  if (samples.length < 2) return 0;
+  const last = samples[samples.length - 1];
+  const elapsed = Math.max(8, last.time - samples[0].time);
+  return clamp(((last.y - samples[0].y) / elapsed) * 1000, RELEASE_VELOCITY_CAP);
+}
+
 export interface SheetPanelProps {
   /** Off on desktop: the same markup becomes a plain panel and the spring never runs. */
   enabled: boolean;
@@ -34,6 +77,11 @@ export interface SheetPanelProps {
  * because resizing the content every pointer frame is what turns a spring into a slideshow of
  * layouts. The bar is counter-translated by the spring instead, so it stays on the screen edge
  * while the panel travels.
+ *
+ * The motion is painted from `requestAnimationFrame`, so it is not a CSS animation and
+ * `getAnimations()` never reports it. `data-sheet-rest` is how the surface says it has arrived:
+ * present while the spring sits on a detent, absent while it travels. Tests wait on that instead
+ * of guessing a duration.
  */
 export const SheetPanel: React.FC<SheetPanelProps> = ({
   enabled,
@@ -55,8 +103,17 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
   const barNodeRef = useRef<HTMLDivElement | null>(null);
   const [bodyNode, setBody] = useState<HTMLDivElement | null>(null);
   const [barNode, setBar] = useState<HTMLDivElement | null>(null);
-  const physics = useRef({ y: 0, velocity: 0, target: 0, frame: 0, time: 0, height: 0, initialized: false });
-  const drag = useRef<{ start: number; y: number; last: number; time: number; moved: boolean } | null>(null);
+  const physics = useRef({
+    y: 0,
+    velocity: 0,
+    target: 0,
+    frame: 0,
+    timer: 0,
+    time: 0,
+    height: 0,
+    initialized: false,
+  });
+  const drag = useRef<DragSession | null>(null);
   const options = useRef({ expanded, exiting, rest, onExpandedChange, onDismiss, onExited });
   useLayoutEffect(() => {
     options.current = { expanded, exiting, rest, onExpandedChange, onDismiss, onExited };
@@ -67,6 +124,14 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
     bodyNodeRef.current = bodyNode;
     barNodeRef.current = barNode;
   }, [bodyNode, barNode]);
+
+  /** The spring is the only thing that knows when the surface has arrived. */
+  const setRest = useCallback((rest: boolean) => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    if (rest) panel.dataset.sheetRest = 'true';
+    else delete panel.dataset.sheetRest;
+  }, []);
 
   const paint = useCallback(() => {
     const state = physics.current;
@@ -102,16 +167,24 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
   const settle = useCallback((target: number, velocity?: number) => {
     const state = physics.current;
     cancelAnimationFrame(state.frame);
+    window.clearTimeout(state.timer);
     state.target = target;
     if (velocity !== undefined) state.velocity = velocity;
     state.time = 0;
+    setRest(false);
     const finish = () => {
+      cancelAnimationFrame(state.frame);
+      window.clearTimeout(state.timer);
       state.y = state.target;
       state.velocity = 0;
       paint();
+      setRest(true);
       if (options.current.exiting) options.current.onExited();
     };
     if (prefersReducedMotion()) { finish(); return; }
+    // A paused frame loop — hidden tab, a throttled WebView — would otherwise leave the
+    // surface between detents forever and never report the exit. Every spring is bounded.
+    state.timer = window.setTimeout(finish, SPRING_DEADLINE_MS);
     const tick = (time: number) => {
       const dt = state.time ? Math.min((time - state.time) / 1000, 0.032) : 1 / 60;
       state.time = time;
@@ -131,7 +204,7 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
       else state.frame = requestAnimationFrame(tick);
     };
     state.frame = requestAnimationFrame(tick);
-  }, [paint]);
+  }, [paint, setRest]);
 
   useLayoutEffect(() => {
     if (!enabled) return;
@@ -152,6 +225,7 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
     return () => {
       window.removeEventListener('resize', update);
       cancelAnimationFrame(state.frame);
+      window.clearTimeout(state.timer);
     };
   }, [enabled, expanded, exiting, paint, settle]);
 
@@ -169,7 +243,9 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
     const half = height * options.current.rest;
     const state = physics.current;
     const wasExpanded = options.current.expanded;
-    const projected = state.y + velocity * 0.18;
+    // The release velocity decides the detent, never the whole gesture: capped, so a fling
+    // cannot skip a detent and two identical pulls cannot land in different places.
+    const projected = state.y + clamp(velocity * RELEASE_PROJECTION_SECONDS, height * RELEASE_TRAVEL_CAP);
     if (wasExpanded) {
       if (projected > height * 0.82) {
         options.current.onDismiss();
@@ -191,8 +267,15 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
 
   const beginDrag = useCallback((clientY: number, timeStamp: number) => {
     cancelAnimationFrame(physics.current.frame);
-    drag.current = { start: clientY, y: physics.current.y, last: clientY, time: timeStamp, moved: false };
-  }, []);
+    window.clearTimeout(physics.current.timer);
+    setRest(false);
+    drag.current = {
+      start: clientY,
+      y: physics.current.y,
+      moved: false,
+      samples: [{ y: clientY, time: timeStamp }],
+    };
+  }, [setRest]);
 
   const moveDrag = useCallback((clientY: number, timeStamp: number) => {
     const session = drag.current;
@@ -200,9 +283,10 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
     const delta = clientY - session.start;
     if (!session.moved && Math.abs(delta) < 6) return false;
     session.moved = true;
-    physics.current.velocity = ((clientY - session.last) / Math.max(1, timeStamp - session.time)) * 1000;
-    session.last = clientY;
-    session.time = timeStamp;
+    const samples = session.samples;
+    samples.push({ y: clientY, time: timeStamp });
+    while (samples.length > 2 && timeStamp - samples[0].time > RELEASE_WINDOW_MS) samples.shift();
+    physics.current.velocity = releaseVelocity(session);
     const y = session.y + delta;
     physics.current.y = y < 0 ? y * 0.15 : y;
     paint();
@@ -213,11 +297,13 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
     const session = drag.current;
     drag.current = null;
     if (!session) return;
-    const velocity = timeStamp - session.time > 100 ? 0 : physics.current.velocity;
     if (!session.moved) {
       settle(options.current.expanded ? 0 : sheetHeight() * options.current.rest, 0);
       return;
     }
+    const last = session.samples[session.samples.length - 1];
+    // A finger that came to rest before lifting is not a fling.
+    const velocity = timeStamp - last.time > RELEASE_REST_MS ? 0 : releaseVelocity(session);
     commitDrag(velocity);
   }, [commitDrag, settle, sheetHeight]);
 

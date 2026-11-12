@@ -69,7 +69,9 @@ test('the action sheet drags 1:1, snaps back, then dismisses', async ({ page }) 
   await pressAndHold(card);
   const sheet = page.getByTestId('action-sheet');
   const panel = page.getByTestId('sheet-panel');
-  await expect(sheet).toBeVisible();
+  // The sheet is a lazy overlay now: the long press mounts it and pulls its chunk, so on a cold
+  // tree the first appearance is a network hop away, not a frame.
+  await expect(sheet).toBeVisible({ timeout: 15000 });
   await waitForStillSheet(panel);
   const rest = (await panel.boundingBox())!;
 
