@@ -1,30 +1,16 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemStatus, SlagAttachment } from '../../types';
-import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
-import { LinearSignalBars } from '../UI/PriorityBadge';
-import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/time/recurrenceHelper';
-import { DEFAULT_INBOX_FOLDER } from '../../config';
+import type { SlagItem, SlagItemStatus } from '../../types';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
 import {
-  CheckCircle2,
-  Circle,
-  X,
-  UploadCloud,
-  Clock,
   Check,
-  Calendar,
-  Repeat,
+  UploadCloud,
 } from 'lucide-react';
-import { Select } from '../UI/Select';
 import { SheetPanel } from '../UI/SheetPanel';
 import { TagChip } from '../UI/TagChip';
-import { DatePickerPopover } from '../UI/DatePickerPopover';
-import { formatDueDateLabel } from '../../lib/time/dateUtils';
-import { categorizeDraft, generateSmartTags } from '../../lib/aiService';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/usePresence';
 import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
@@ -32,6 +18,9 @@ import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
 import { EditorToolbar } from './EditorToolbar';
+import { EditorTaskFields } from './fullscreen/EditorTaskFields';
+import { useEditorAttachments } from './fullscreen/useEditorAttachments';
+import { useEditorAiActions } from './fullscreen/useEditorAiActions';
 
 let activeEditorView: EditorView | null = null;
 
@@ -123,7 +112,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
   const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // Phone editor sits as a half sheet (56% of the surface) and grows to the full window when
   // the handle is pulled up. Reset belongs to render: a new note starts folded.
@@ -314,152 +302,36 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     insertMarkdown('\n| Колонка 1 | Колонка 2 |\n|---|---|\n| Запись 1 | Запись 2 |\n', '');
   }, [insertMarkdown]);
 
-  const handleAiDecomposeInline = useCallback(async () => {
-    addToast('ИИ определяет папку и теги...', 'info');
-    try {
-      const fullText = `${title ? title + '\n' : ''}${content}`.trim();
-      const res = await categorizeDraft(fullText, folder || DEFAULT_INBOX_FOLDER, folders, aiSettings);
-      if (res.targetFolder && res.targetFolder !== folder) {
-        setFolder(res.targetFolder);
-      }
-      if (res.tags && res.tags.length > 0) {
-        setTags(prev => Array.from(new Set([...prev, ...res.tags])));
-      }
-      const folderNotice = res.targetFolder && res.targetFolder !== folder ? `папка: ${res.targetFolder}` : '';
-      const tagsNotice = res.tags.length > 0 ? `теги: #${res.tags.join(' #')}` : '';
-      const details = [folderNotice, tagsNotice].filter(Boolean).join(', ');
-      addToast(`Запись разобрана${details ? ` (${details})` : ''}: ${res.reason}`, 'success');
-    } catch {
-      addToast('Не удалось разобрать запись через ИИ', 'error');
-    }
-  }, [title, content, folder, folders, aiSettings, addToast, setFolder, setTags]);
+  const { handleAiDecomposeInline, handleAiTagsInline } = useEditorAiActions({
+    title,
+    content,
+    folder,
+    folders,
+    aiSettings,
+    addToast,
+    setFolder,
+    setTags,
+  });
 
-  const handleAiTagsInline = useCallback(async () => {
-    addToast('Подбор тегов...', 'info');
-    try {
-      const newTags = await generateSmartTags(content || title, aiSettings);
-      if (newTags.length > 0) {
-        setTags(prev => Array.from(new Set([...prev, ...newTags])));
-        addToast(`Добавлены теги: #${newTags.join(' #')}`, 'success');
-      } else {
-        addToast('Новых подходящих тегов не найдено', 'info');
-      }
-    } catch {
-      addToast('Ошибка генерации тегов', 'error');
-    }
-  }, [content, title, aiSettings, addToast, setTags]);
-
-  const insertAttachmentMarkdown = useCallback((attName: string) => {
-    const link = `![[${attName}]]\n`;
-    const view = getEditorView();
-    if (view) {
-      const pos = view.state.selection.main.head;
-      view.dispatch({
-        changes: { from: pos, insert: link },
-        selection: { anchor: pos + link.length },
-      });
-      view.focus();
-      addToast(`Ссылка ![[${attName}]] добавлена в позицию курсора`, 'info');
-    } else {
-      setContent(prev => (prev.trim() ? prev + '\n\n' + link : link));
-      addToast(`Ссылка ![[${attName}]] добавлена в текст`, 'info');
-    }
-  }, [getEditorView, addToast, setContent]);
-
-  const handleAttachmentsAdded = useCallback((newAtts: SlagAttachment[]) => {
-    setAttachments(prev => [...prev, ...newAtts]);
-    setIsAttachmentsCollapsed(false);
-    const links = newAtts.map(a => `![[${a.name}]]`).join('\n') + '\n';
-    const view = getEditorView();
-    if (view) {
-      const pos = view.state.selection.main.head;
-      view.dispatch({
-        changes: { from: pos, insert: links },
-        selection: { anchor: pos + links.length },
-      });
-      view.focus();
-    } else {
-      setContent(prev => (prev.trim() ? prev + '\n\n' + links : links));
-    }
-    addToast(`Добавлено медиа: ${newAtts.length} ${newAtts.length === 1 ? 'файл' : 'файла'}`, 'success');
-  }, [getEditorView, addToast, setAttachments, setContent]);
-
-  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
-    const files: File[] = [];
-    if (e.clipboardData.items) {
-      for (let i = 0; i < e.clipboardData.items.length; i++) {
-        const it = e.clipboardData.items[i];
-        if (it.kind === 'file') {
-          const file = it.getAsFile();
-          if (file) files.push(file);
-        }
-      }
-    }
-
-    if (files.length > 0) {
-      e.preventDefault();
-      try {
-        const processed = await processFileListToAttachments(files);
-        if (processed.length > 0) {
-          handleAttachmentsAdded(processed);
-        }
-      } catch {
-        addToast('Не удалось вставить медиа из буфера', 'error');
-      }
-    }
-  }, [handleAttachmentsAdded, addToast]);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('Files')) {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDraggingOver(true);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('Files')) {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDraggingOver(false);
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        try {
-          const processed = await processFileListToAttachments(e.dataTransfer.files);
-          if (processed.length > 0) {
-            handleAttachmentsAdded(processed);
-          }
-        } catch {
-          addToast('Не удалось обработать файлы', 'error');
-        }
-      }
-    }
-  };
-
-  const handleAttachClick = useCallback(() => {
-    openAttachSheet((attachments) => {
-      if (attachments.length > 0) handleAttachmentsAdded(attachments);
-    });
-  }, [openAttachSheet, handleAttachmentsAdded]);
-
-  const moveAttachment = (index: number, direction: 'up' | 'down') => {
-    const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= attachments.length) return;
-    const next = [...attachments];
-    const it = next[index];
-    next[index] = next[targetIdx];
-    next[targetIdx] = it;
-    setAttachments(next);
-  };
-
-  const removeAttachment = (id: string) => {
-    setAttachments(attachments.filter(a => a.id !== id));
-  };
+  const {
+    isDraggingOver,
+    insertAttachmentMarkdown,
+    handlePaste,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleAttachClick,
+    moveAttachment,
+    removeAttachment,
+  } = useEditorAttachments({
+    getEditorView,
+    attachments,
+    setAttachments,
+    setContent,
+    setIsAttachmentsCollapsed,
+    addToast,
+    openAttachSheet,
+  });
 
   return (
     <div
@@ -604,247 +476,24 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
             >
               {/* Task Controls Row */}
               {type === 'task' && (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-300">
-                  {/* Status Selector */}
-                  <div className="flex items-center shrink-0">
-                    <Select
-                      size="sm"
-                      variant="ghost"
-                      direction="down"
-                      value={status}
-                      onChange={(val) => setStatus(val as SlagItemStatus)}
-                      options={[
-                        {
-                          value: 'backlog',
-                          label: 'Бэклог',
-                          icon: <Circle className="w-3.5 h-3.5 text-zinc-500" />,
-                          color: 'text-zinc-500',
-                        },
-                        {
-                          value: 'todo',
-                          label: 'К выполнению',
-                          icon: <Circle className="w-3.5 h-3.5 text-zinc-400" />,
-                          color: 'text-zinc-400',
-                        },
-                        {
-                          value: 'in_progress',
-                          label: 'В работе',
-                          icon: <Clock className="w-3.5 h-3.5 text-blue-400" />,
-                          color: 'text-blue-400',
-                        },
-                        {
-                          value: 'done',
-                          label: 'Выполнено',
-                          icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
-                          color: 'text-emerald-400',
-                        },
-                      ]}
-                      className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
-                    />
-                  </div>
-
-                  {/* Priority Selector */}
-                  <div className="flex items-center shrink-0">
-                    <Select
-                      size="sm"
-                      variant="ghost"
-                      direction="down"
-                      value={priority}
-                      onChange={(val) => setPriority(val as 'none' | 'low' | 'medium' | 'high')}
-                      options={[
-                        {
-                          value: 'none',
-                          label: 'Обычный',
-                          icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
-                          color: 'text-zinc-400',
-                        },
-                        {
-                          value: 'low',
-                          label: 'Низкий',
-                          icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
-                          color: 'text-zinc-300',
-                        },
-                        {
-                          value: 'medium',
-                          label: 'Средний',
-                          icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
-                          color: 'text-amber-400',
-                        },
-                        {
-                          value: 'high',
-                          label: 'Высокий',
-                          icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
-                          color: 'text-rose-400',
-                        },
-                      ]}
-                      className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
-                    />
-                  </div>
-
-                  {/* Due Date Trigger */}
-                  <div className="relative shrink-0">
-                    {dueDate ? (
-                      <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs transition-colors shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setIsDatePickerOpen(prev => !prev)}
-                          className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
-                          title="Изменить срок"
-                        >
-                          <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                          <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDueDate('')}
-                          className="p-0.5 text-blue-400 hover:text-rose-400 transition-colors cursor-pointer"
-                          title="Снять срок"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsDatePickerOpen(prev => !prev)}
-                        className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                        title="Установить срок таски"
-                      >
-                        <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span>Срок</span>
-                      </button>
-                    )}
-
-                    <DatePickerPopover
-                      isOpen={isDatePickerOpen}
-                      value={dueDate}
-                      onChange={(newDate) => {
-                        setDueDate(newDate);
-                        setIsDatePickerOpen(false);
-                      }}
-                      onClear={() => {
-                        setDueDate('');
-                        setIsDatePickerOpen(false);
-                      }}
-                      onClose={() => setIsDatePickerOpen(false)}
-                      direction="down"
-                    />
-                  </div>
-
-                  {/* Duration Selector */}
-                  <div className="relative shrink-0">
-                    {duration !== undefined ? (
-                      <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-white/[0.08] border border-white/[0.12] text-xs text-white transition-colors shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                          className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors cursor-pointer"
-                          title="Изменить длительность"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                          <span className="font-medium max-w-[70px] truncate">
-                            {duration >= 60
-                              ? `${Math.floor(duration / 60)}ч${duration % 60 ? ` ${duration % 60}м` : ''}`
-                              : `${duration}м`}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDuration(undefined)}
-                          className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                          title="Снять длительность"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-                        className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                        title="Установить длительность таски"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span>Длительность</span>
-                      </button>
-                    )}
-
-                    {isDurationDropdownOpen && (
-                      <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
-                        {[15, 30, 45, 60, 90, 120].map(mins => (
-                          <button
-                            key={mins}
-                            type="button"
-                            onClick={() => {
-                              setDuration(mins);
-                              setIsDurationDropdownOpen(false);
-                            }}
-                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                              duration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
-                            }`}
-                          >
-                            <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Recurrence Selector */}
-                  <div className="relative shrink-0">
-                    {recurrence ? (
-                      <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-xs transition-colors shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                          className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-                          title="Изменить повторение"
-                        >
-                          <Repeat className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span className="font-medium max-w-[85px] truncate">
-                            {formatRecurrenceLabel(recurrence)}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRecurrence(undefined)}
-                          className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
-                          title="Снять повторение"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-                        className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                        title="Повторяющаяся таска"
-                      >
-                        <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span>Повтор</span>
-                      </button>
-                    )}
-
-                    {isRecurrenceDropdownOpen && (
-                      <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
-                        {RECURRENCE_PRESETS.map(opt => (
-                          <button
-                            key={opt.label}
-                            type="button"
-                            onClick={() => {
-                              setRecurrence(opt.rule);
-                              setIsRecurrenceDropdownOpen(false);
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
-                          >
-                            <span>{opt.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <EditorTaskFields
+                  status={status}
+                  setStatus={setStatus}
+                  priority={priority}
+                  setPriority={setPriority}
+                  dueDate={dueDate}
+                  setDueDate={setDueDate}
+                  duration={duration}
+                  setDuration={setDuration}
+                  recurrence={recurrence}
+                  setRecurrence={setRecurrence}
+                  isDatePickerOpen={isDatePickerOpen}
+                  setIsDatePickerOpen={setIsDatePickerOpen}
+                  isDurationDropdownOpen={isDurationDropdownOpen}
+                  setIsDurationDropdownOpen={setIsDurationDropdownOpen}
+                  isRecurrenceDropdownOpen={isRecurrenceDropdownOpen}
+                  setIsRecurrenceDropdownOpen={setIsRecurrenceDropdownOpen}
+                />
               )}
 
               {/* Subtle Divider between Task Controls and Tags */}
