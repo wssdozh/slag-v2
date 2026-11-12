@@ -155,23 +155,32 @@ export async function querySearch(
     if (phraseHits.length > 0) return done(phraseHits, 'orama phrase');
 
     if (tokens.length > 1) {
-      // First appearance wins: Orama ranks every token's hits, and the union keeps that order.
-      const ids: string[] = [];
-      const seen = new Set<string>();
-      for (const token of tokens) {
+      // A filler word ("по", "как") matches most of the vault, a typo-matched one matches two
+      // notes. Scoring each hit by how rare the token it matched is keeps the second group on
+      // top, which is what "relevance" has to mean for a phrase query.
+      const unique = [...new Set(tokens)];
+      const scored = new Map<string, { item: SlagItem; score: number; order: number }>();
+      let order = 0;
+      for (const token of unique) {
         const result = await search(dbInstance, {
           term: token,
           tolerance: SEARCH_LIMITS.TYPO_TOLERANCE,
           limit: SEARCH_LIMITS.ORAMA_KEYWORD_LIMIT,
         });
+        const weight = 1 / Math.max(1, result.hits.length);
         for (const hit of result.hits) {
           const id = (hit.document as { id: string }).id;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          ids.push(id);
+          const item = byId.get(id);
+          if (!item) continue;
+          const entry = scored.get(id);
+          if (entry) entry.score += weight;
+          else scored.set(id, { item, score: weight, order: order++ });
         }
       }
-      const keywordHits = filterByType(inHitOrder(ids), typeFilter);
+      const ranked = [...scored.values()]
+        .sort((a, b) => b.score - a.score || a.order - b.order)
+        .map(entry => entry.item);
+      const keywordHits = filterByType(ranked, typeFilter);
       if (keywordHits.length > 0) return done(keywordHits, 'orama keywords');
     }
   } catch (err) {

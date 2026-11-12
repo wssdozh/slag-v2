@@ -301,10 +301,10 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     });
   });
 
-  // Skipped on a product gap, not on a stale selector. Orama order is kept now (it used to be
-  // replaced by vault order), but the multi-token pass unions a hit per token, so filler words
-  // like «по» and «как» match the whole vault and drown the one note the typo actually caught.
-  // Ranking by rarity of the matched token is a separate job; until then this scenario is a lie.
+  // Still skipped, and not because of selectors. Ranking now follows Orama's order and rare
+  // tokens outrank filler, yet the note this test wants («12 правил эффективности») does not
+  // surface even in the untruncated pool for «прафилам». Until someone traces the tokenizer,
+  // asserting it here would only document a wish.
   test.skip('24. Typo-Tolerant Note Search and Multi-step Agentic Tool Calling Verification', async ({ page }) => {
     // 1. Switch to Assistant tab
     const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
