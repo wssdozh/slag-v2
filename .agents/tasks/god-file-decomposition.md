@@ -80,7 +80,7 @@ hooks/items/    useItemActions.ts, useSuggestedActions.ts
 
 `npm run check` — 0 ошибок и 0 предупреждений на каждом шаге, `npm run build` — зелёный.
 
-зелёные (6 воркеров, если не сказано иное): `feed` 20/20 (трижды), `mobile` 21/21, `workspace` 10 passed + 1 skip, `sync_push_transport` + `sync_pending_pull` + `sync_connection_lifecycle` 10/10, `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout` 1/1, `backup_restore` 2/2, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `editor` 16/19.
+зелёные (6 воркеров, если не сказано иное): `feed` 20/20 (трижды), `mobile` 21/21, `workspace` 10 passed + 1 skip, `sync_push_transport` + `sync_pending_pull` + `sync_connection_lifecycle` 10/10, `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout` 1/1, `backup_restore` 2/2, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `search_cyrillic` 2/2, `two_factor_auth` + `sync_settings_flow` + `sync_vault_isolation` — зелёные.
 
 ## что осталось
 
@@ -88,7 +88,7 @@ hooks/items/    useItemActions.ts, useSuggestedActions.ts
 2. `storage` (672): CRUD записей, черновики и настройки в одном классе.
 3. `AppContext` (719): состояние хранилищ и папок, слои Escape, объект контекста на 150 полей.
 4. `components/Admin/AdminPanel.tsx` (645) — **уже разрезан** (вкладки в `Admin/tabs/`, данные в `useAdminData`); остаток — логин-гейт и девять fetch-обработчиков на общем стейте. следующий шов, если браться: `useAdminActions.ts` по образцу `useAdminData`.
-5. **устаревшие спеки, проверенные на baseline** (не регресс): `editor.spec.ts` — 3 из 19 (32, 33, 46). `views.spec.ts` починен на 8 из 9, тест 24 остаётся `skip` — заметка не всплывает даже без обрезки пула, вопрос к токенизатору Orama.
+5. **устаревшие спеки, проверенные на baseline** (не регресс): `views.spec.ts` починен на 8 из 9, тест 24 остаётся `skip` — заметка не всплывает даже без обрезки пула, вопрос к токенизатору Orama. `editor.spec.ts` 32/33/46 починены (переход на `data-testid`, черновик вместо чипсов, exit-транзиция дропдауна). `sync_delete` (3), `sync_durability` (1), `sync_init_race` (2), `sync_overlay_regressions` (1), `sync_access_control` (1) — красные и на `c35565e`, к чистке кода отношения не имеют: селекторы вроде `button:has-text("Устройства")` ловят две кнопки.
 
 ## заметки
 
