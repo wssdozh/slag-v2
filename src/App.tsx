@@ -107,6 +107,10 @@ const AppContent: React.FC = () => {
     attachSheet,
     contextMenu,
     mobileActionSheetItem,
+    isSettingsOpen,
+    isTriageModalOpen,
+    isLogViewerOpen,
+    isSearchOpen,
   } = useApp();
 
   // A lazy component starts importing the moment React renders it, so the editor's CodeMirror
@@ -123,6 +127,10 @@ const AppContent: React.FC = () => {
   const isLightboxMounted = useMountedOnOpen(activeLightboxIndex !== null);
   const isContextMenuMounted = useMountedOnOpen(contextMenu !== null);
   const isActionSheetMounted = useMountedOnOpen(mobileActionSheetItem !== null);
+  const isSettingsMounted = useMountedOnOpen(isSettingsOpen);
+  const isTriageModalMounted = useMountedOnOpen(isTriageModalOpen);
+  const isLogModalMounted = useMountedOnOpen(isLogViewerOpen);
+  const isSearchModalMounted = useMountedOnOpen(isSearchOpen);
 
   const handleRetryEnrich = useCallback(async (image: LightboxImage) => {
     if (!image.itemId || !image.id) return;
@@ -280,10 +288,12 @@ const AppContent: React.FC = () => {
             <FullscreenEditor />
           </Suspense>
         )}
-        <Suspense fallback={null}>
+        <LazyOverlay mounted={isSearchModalMounted}>
           <SearchModal />
-        </Suspense>
-        <SettingsModal />
+        </LazyOverlay>
+        <LazyOverlay mounted={isSettingsMounted}>
+          <SettingsModal />
+        </LazyOverlay>
         <LazyOverlay mounted={isFolderModalMounted}>
           <FolderModal />
         </LazyOverlay>
@@ -293,11 +303,15 @@ const AppContent: React.FC = () => {
         <LazyOverlay mounted={isFolderViewModalMounted}>
           <FolderViewModal />
         </LazyOverlay>
-        <TriageModal />
+        <LazyOverlay mounted={isTriageModalMounted}>
+          <TriageModal />
+        </LazyOverlay>
         <LazyOverlay mounted={isComposerModalMounted}>
           <ComposerModal />
         </LazyOverlay>
-        <LogModal />
+        <LazyOverlay mounted={isLogModalMounted}>
+          <LogModal />
+        </LazyOverlay>
         </InitialSyncBoundary>
         <LazyOverlay mounted={isVaultModalMounted}>
           <VaultModal />
@@ -342,13 +356,21 @@ const AppContent: React.FC = () => {
         <MobileActionSheet />
       </LazyOverlay>
 
-      {/* Global Modals & Overlays */}
-      <Suspense fallback={null}>
+      {/* Global Modals & Overlays. Each mounts on its first open: a `lazy()` component is
+          imported the moment React renders it, so always-rendered modals used to land on the
+          first frame even though they are closed for the whole first minute of work. */}
+      <LazyOverlay mounted={isSettingsMounted}>
         <SettingsModal />
+      </LazyOverlay>
+      <LazyOverlay mounted={isTriageModalMounted}>
         <TriageModal />
+      </LazyOverlay>
+      <LazyOverlay mounted={isLogModalMounted}>
         <LogModal />
+      </LazyOverlay>
+      <LazyOverlay mounted={isSearchModalMounted}>
         <SearchModal />
-      </Suspense>
+      </LazyOverlay>
       {(isEditorMounted) && (
         <Suspense fallback={null}>
           <FullscreenEditor />
