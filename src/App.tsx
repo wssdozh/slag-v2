@@ -4,18 +4,8 @@ import { navigatePage } from './lib/navigation';
 import { MobileShell } from './components/Mobile/MobileShell';
 import { useVisualViewportHeight } from './hooks/layout/useVisualViewportHeight';
 import { InitialSyncBoundary } from './components/InitialSyncBoundary';
-import { MobileActionSheet } from './components/UI/MobileActionSheet';
 import { ConfirmDialog } from './components/Modals/ConfirmDialog';
-import { AttachSheet } from './components/Media/AttachSheet';
-import { FolderModal } from './components/Modals/FolderModal';
-import { FolderInfoModal } from './components/Modals/FolderInfoModal';
-import { FolderViewModal } from './components/Modals/FolderViewModal';
-import { VaultModal } from './components/Modals/VaultModal';
-import { ComposerModal } from './components/Modals/ComposerModal';
-import { QuickComposerWindow } from './components/Composer/QuickComposerWindow';
-import { ContextMenu } from './components/UI/ContextMenu';
 import { ToastContainer } from './components/UI/Toast';
-import { ImageLightbox } from './components/UI/ImageLightbox';
 import { Monitor } from 'lucide-react';
 import { enrichAttachment, extractFocalContext } from './lib/media/attachmentEnrichment';
 import { setupAudioCollisionGuard } from './lib/media/audioHelper';
@@ -48,6 +38,52 @@ const AccountCabinet = lazy(() =>
 const AdminPanel = lazy(() =>
   import('./components/Admin/AdminPanel').then((m) => ({ default: m.AdminPanel }))
 );
+const FolderModal = lazy(() =>
+  import('./components/Modals/FolderModal').then((m) => ({ default: m.FolderModal }))
+);
+const FolderInfoModal = lazy(() =>
+  import('./components/Modals/FolderInfoModal').then((m) => ({ default: m.FolderInfoModal }))
+);
+const FolderViewModal = lazy(() =>
+  import('./components/Modals/FolderViewModal').then((m) => ({ default: m.FolderViewModal }))
+);
+const VaultModal = lazy(() =>
+  import('./components/Modals/VaultModal').then((m) => ({ default: m.VaultModal }))
+);
+const ComposerModal = lazy(() =>
+  import('./components/Modals/ComposerModal').then((m) => ({ default: m.ComposerModal }))
+);
+const QuickComposerWindow = lazy(() =>
+  import('./components/Composer/QuickComposerWindow').then((m) => ({ default: m.QuickComposerWindow }))
+);
+const AttachSheet = lazy(() =>
+  import('./components/Media/AttachSheet').then((m) => ({ default: m.AttachSheet }))
+);
+const ImageLightbox = lazy(() =>
+  import('./components/UI/ImageLightbox').then((m) => ({ default: m.ImageLightbox }))
+);
+const ContextMenu = lazy(() =>
+  import('./components/UI/ContextMenu').then((m) => ({ default: m.ContextMenu }))
+);
+const MobileActionSheet = lazy(() =>
+  import('./components/UI/MobileActionSheet').then((m) => ({ default: m.MobileActionSheet }))
+);
+
+/**
+ * `lazy()` only defers the import until React first renders the component, and these overlays
+ * are rendered on every boot even though they are closed for the whole first minute of work.
+ * Mount one on its first open and keep it mounted afterwards: an unmount on close would cut
+ * the exit animation short (the same reason the editor stays mounted once it has been opened).
+ */
+const useMountedOnOpen = (isOpen: boolean) => {
+  const [hasMounted, setHasMounted] = useState(false);
+  if (isOpen && !hasMounted) setHasMounted(true);
+  return hasMounted;
+};
+
+/** A lazy overlay that has not been opened yet renders nothing, so its chunk stays on the shelf. */
+const LazyOverlay: React.FC<{ mounted: boolean; children: React.ReactNode }> = ({ mounted, children }) =>
+  mounted ? <Suspense fallback={null}>{children}</Suspense> : null;
 
 const AppContent: React.FC = () => {
   const {
@@ -63,16 +99,30 @@ const AppContent: React.FC = () => {
     updateItem,
     aiSettings,
     isFullscreenEditorOpen,
+    isFolderModalOpen,
+    isFolderInfoModalOpen,
+    isFolderViewModalOpen,
+    isVaultModalOpen,
+    isComposerModalOpen,
+    attachSheet,
+    contextMenu,
+    mobileActionSheetItem,
   } = useApp();
 
   // A lazy component starts importing the moment React renders it, so the editor's CodeMirror
   // chunk (641 kB, the second biggest in the build) used to land on the first paint even though
   // the editor renders null until a note opens. Mount it on first open and keep it mounted
   // afterwards: unmounting on close would cut the exit animation short.
-  const [isEditorMounted, setIsEditorMounted] = useState(false);
-  if (isFullscreenEditorOpen && !isEditorMounted) {
-    setIsEditorMounted(true);
-  }
+  const isEditorMounted = useMountedOnOpen(isFullscreenEditorOpen);
+  const isFolderModalMounted = useMountedOnOpen(isFolderModalOpen);
+  const isFolderInfoModalMounted = useMountedOnOpen(isFolderInfoModalOpen);
+  const isFolderViewModalMounted = useMountedOnOpen(isFolderViewModalOpen);
+  const isVaultModalMounted = useMountedOnOpen(isVaultModalOpen);
+  const isComposerModalMounted = useMountedOnOpen(isComposerModalOpen);
+  const isAttachSheetMounted = useMountedOnOpen(attachSheet !== null);
+  const isLightboxMounted = useMountedOnOpen(activeLightboxIndex !== null);
+  const isContextMenuMounted = useMountedOnOpen(contextMenu !== null);
+  const isActionSheetMounted = useMountedOnOpen(mobileActionSheetItem !== null);
 
   const handleRetryEnrich = useCallback(async (image: LightboxImage) => {
     if (!image.itemId || !image.id) return;
@@ -141,7 +191,11 @@ const AppContent: React.FC = () => {
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const isQuickComposer = urlParams?.get('window') === 'quick-composer';
   if (isQuickComposer) {
-    return <QuickComposerWindow />;
+    return (
+      <Suspense fallback={null}>
+        <QuickComposerWindow />
+      </Suspense>
+    );
   }
 
   if (currentPage === 'landing') {
@@ -191,7 +245,9 @@ const AppContent: React.FC = () => {
             <WorkspaceShell initialPanel={{ id: standalonePanelId, title: standalonePanelTitle }} />
           </Suspense>
         </InitialSyncBoundary>
-        <VaultModal />
+        <LazyOverlay mounted={isVaultModalMounted}>
+          <VaultModal />
+        </LazyOverlay>
         <ToastContainer />
       </div>
     );
@@ -216,8 +272,10 @@ const AppContent: React.FC = () => {
           <MobileShell />
         </div>
 
-        <MobileActionSheet />
-        {(isEditorMounted || isFullscreenEditorOpen) && (
+        <LazyOverlay mounted={isActionSheetMounted}>
+          <MobileActionSheet />
+        </LazyOverlay>
+        {isEditorMounted && (
           <Suspense fallback={null}>
             <FullscreenEditor />
           </Suspense>
@@ -226,25 +284,39 @@ const AppContent: React.FC = () => {
           <SearchModal />
         </Suspense>
         <SettingsModal />
-        <FolderModal />
-        <FolderInfoModal />
-        <FolderViewModal />
+        <LazyOverlay mounted={isFolderModalMounted}>
+          <FolderModal />
+        </LazyOverlay>
+        <LazyOverlay mounted={isFolderInfoModalMounted}>
+          <FolderInfoModal />
+        </LazyOverlay>
+        <LazyOverlay mounted={isFolderViewModalMounted}>
+          <FolderViewModal />
+        </LazyOverlay>
         <TriageModal />
-        <ComposerModal />
+        <LazyOverlay mounted={isComposerModalMounted}>
+          <ComposerModal />
+        </LazyOverlay>
         <LogModal />
         </InitialSyncBoundary>
-        <VaultModal />
+        <LazyOverlay mounted={isVaultModalMounted}>
+          <VaultModal />
+        </LazyOverlay>
         <ToastContainer />
-        <ImageLightbox
-          images={lightboxImages}
-          currentIndex={activeLightboxIndex ?? 0}
-          isOpen={activeLightboxIndex !== null}
-          onClose={closeLightbox}
-          onNavigate={navigateLightbox}
-          onRetryEnrich={handleRetryEnrich}
-        />
+        <LazyOverlay mounted={isLightboxMounted}>
+          <ImageLightbox
+            images={lightboxImages}
+            currentIndex={activeLightboxIndex ?? 0}
+            isOpen={activeLightboxIndex !== null}
+            onClose={closeLightbox}
+            onNavigate={navigateLightbox}
+            onRetryEnrich={handleRetryEnrich}
+          />
+        </LazyOverlay>
         <ConfirmDialog />
-        <AttachSheet />
+        <LazyOverlay mounted={isAttachSheetMounted}>
+          <AttachSheet />
+        </LazyOverlay>
       </div>
     );
   }
@@ -261,8 +333,14 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Global Right-Click Context Menu (Desktop) & Mobile Action Sheet (Touch) */}
-      {!isMobile && <ContextMenu />}
-      <MobileActionSheet />
+      {!isMobile && (
+        <LazyOverlay mounted={isContextMenuMounted}>
+          <ContextMenu />
+        </LazyOverlay>
+      )}
+      <LazyOverlay mounted={isActionSheetMounted}>
+        <MobileActionSheet />
+      </LazyOverlay>
 
       {/* Global Modals & Overlays */}
       <Suspense fallback={null}>
@@ -271,28 +349,42 @@ const AppContent: React.FC = () => {
         <LogModal />
         <SearchModal />
       </Suspense>
-      {(isEditorMounted || isFullscreenEditorOpen) && (
+      {(isEditorMounted) && (
         <Suspense fallback={null}>
           <FullscreenEditor />
         </Suspense>
       )}
-      <FolderModal />
-      <FolderInfoModal />
-      <FolderViewModal />
-      <ComposerModal />
+      <LazyOverlay mounted={isFolderModalMounted}>
+        <FolderModal />
+      </LazyOverlay>
+      <LazyOverlay mounted={isFolderInfoModalMounted}>
+        <FolderInfoModal />
+      </LazyOverlay>
+      <LazyOverlay mounted={isFolderViewModalMounted}>
+        <FolderViewModal />
+      </LazyOverlay>
+      <LazyOverlay mounted={isComposerModalMounted}>
+        <ComposerModal />
+      </LazyOverlay>
       </InitialSyncBoundary>
-      <VaultModal />
+      <LazyOverlay mounted={isVaultModalMounted}>
+        <VaultModal />
+      </LazyOverlay>
       <ToastContainer />
-      <ImageLightbox
-        images={lightboxImages}
-        currentIndex={activeLightboxIndex ?? 0}
-        isOpen={activeLightboxIndex !== null}
-        onClose={closeLightbox}
-        onNavigate={navigateLightbox}
-        onRetryEnrich={handleRetryEnrich}
-      />
+      <LazyOverlay mounted={isLightboxMounted}>
+        <ImageLightbox
+          images={lightboxImages}
+          currentIndex={activeLightboxIndex ?? 0}
+          isOpen={activeLightboxIndex !== null}
+          onClose={closeLightbox}
+          onNavigate={navigateLightbox}
+          onRetryEnrich={handleRetryEnrich}
+        />
+      </LazyOverlay>
       {/* Last in the tree: it asks above whatever dialog is open, so it must paint above them. */}
-      <AttachSheet />
+      <LazyOverlay mounted={isAttachSheetMounted}>
+        <AttachSheet />
+      </LazyOverlay>
       <ConfirmDialog />
     </div>
   );
