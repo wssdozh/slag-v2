@@ -99,6 +99,9 @@ export class OpenAiResponsesAdapter implements LlmProtocolAdapter {
         'Authorization': authHeader,
       },
       body: JSON.stringify(payload),
+      // The sibling adapter already gave up after 10 s; without this the UI waits forever on a
+      // relay that is down and the caller never reaches its local fallback.
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
