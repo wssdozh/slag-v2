@@ -1,3 +1,4 @@
+// The live socket: open it for the current room, accept a frame, acknowledge a bundle.
 import { authHeaders } from './syncConfig';
 import type { SyncTransport } from './transport';
 import type { SyncConfig, SyncStatus } from './types';

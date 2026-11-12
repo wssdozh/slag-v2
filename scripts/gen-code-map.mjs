@@ -62,16 +62,39 @@ function exportsOf(source) {
   return [...names];
 }
 
+const clip = (text) => (text.length > 78 ? `${text.slice(0, 77)}…` : text);
+
+function docLine(block) {
+  for (const raw of block) {
+    const text = raw
+      .trim()
+      .replace(/^\/\*+/, '')
+      .replace(/^\/+/, '')
+      .replace(/\*+\/$/, '')
+      .replace(/^\*+/, '')
+      .trim();
+    if (!text || text.startsWith('@')) continue;
+    return text;
+  }
+  return '';
+}
+
+// Two places carry a module's one-liner: a header comment above the imports, and the doc
+// comment sitting right on top of the first export. Most files here use the second.
 function purposeOf(source) {
-  const lines = source.split(/\r?\n/).slice(0, 40);
-  for (const line of lines) {
+  const lines = source.split(/\r?\n/);
+  for (const line of lines.slice(0, 40)) {
     const trimmed = line.trim();
     if (/^(import|export)\b/.test(trimmed)) break;
-    const comment = /^(?:\/\/|\*|\/\*\*?)\s*(.*)$/.exec(trimmed);
-    if (!comment) continue;
-    const text = comment[1].replace(/\*\/\s*$/, '').trim();
-    if (!text || text.startsWith('@') || text.startsWith('eslint')) continue;
-    return text.length > 78 ? `${text.slice(0, 77)}…` : text;
+    if (!/^(?:\/\/|\*|\/\*)/.test(trimmed)) continue;
+    const text = docLine([trimmed]);
+    if (text) return clip(text);
+  }
+  for (let i = 1; i < Math.min(lines.length, 200); i += 1) {
+    if (!/^export\b/.test(lines[i].trim())) continue;
+    let start = i;
+    while (start > 0 && /^\s*(?:\/\/|\*|\/\*)/.test(lines[start - 1])) start -= 1;
+    return start === i ? '' : clip(docLine(lines.slice(start, i)));
   }
   return '';
 }

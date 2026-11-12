@@ -1,3 +1,4 @@
+// Which vault the app is looking at: the registry kept in localStorage, and the switch between them.
 import type { VaultMeta } from '../../types';
 import { STORAGE_KEYS, DEFAULT_VAULT_META } from '../../config';
 import { logger } from '../logger';
@@ -20,6 +21,7 @@ export interface VaultRegistryHost {
   syncCurrentVaultFs(): Promise<boolean>;
 }
 
+// Which vault the app is looking at: the registry kept in localStorage, and the switch between them.
 // Which vault the app is looking at: the registry kept in localStorage, and the switch between them.
 export function initCurrentVault(store: VaultRegistryHost): VaultMeta {
   const saved = localStorage.getItem(CURRENT_VAULT_KEY);

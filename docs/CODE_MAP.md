@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **355**, строк: **77534**, зон: **40**.
+Модулей: **355**, строк: **77540**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -72,7 +72,7 @@
 | `tabs/BillingTab.tsx` | 329 | 1 | BillingTab |  |
 | `tabs/RelayTab.tsx` | 237 | 1 | RelayTab |  |
 | `tabs/SecurityTab.tsx` | 71 | 1 | SecurityTab |  |
-| `useAdminData.ts` | 248 | 6 | AdminStats, AdminDevice, AdminVault, AdminAccount, BillingStats, +7 |  |
+| `useAdminData.ts` | 248 | 6 | AdminStats, AdminDevice, AdminVault, AdminAccount, BillingStats, +7 | Interfaces from AdminPanel.tsx |
 
 ## src/components/Audio — 4 файлов, 1555 строк
 
@@ -108,16 +108,16 @@
 | `BaseComposer.tsx` | 272 | 2 | BaseComposerProps, BaseComposer |  |
 | `chat/ChatTaskBlock.tsx` | 52 | 1 | ChatTaskBlock |  |
 | `Composer.tsx` | 1094 | 4 | ComposerProps, Composer |  |
-| `composer/useComposerFiles.ts` | 155 | 1 | useComposerFiles |  |
+| `composer/useComposerFiles.ts` | 155 | 1 | useComposerFiles | Getting files into the composer: picker, drop, paste. |
 | `ComposerTaskControls.tsx` | 257 | 1 | ComposerTaskControlsProps, ComposerTaskControls |  |
-| `FeedColumnResizer.tsx` | 90 | 1 | FeedColumnResizer |  |
+| `FeedColumnResizer.tsx` | 90 | 1 | FeedColumnResizer | Grab strips on both sides of the reading column. The width is published as |
 | `FeedHeader.tsx` | 166 | 1 | FeedHeaderProps, FeedHeader |  |
 | `FeedList.tsx` | 633 | 2 | FeedList |  |
 | `FolderSuggestionMenu.tsx` | 101 | 1 | FolderSuggestionMenu |  |
 | `ItemCard.tsx` | 1151 | 1 | ItemCardProps, ItemCard |  |
 | `PinnedBanner.tsx` | 217 | 1 | PinnedBanner |  |
 | `SlashCommandMenu.tsx` | 101 | 1 | SlashCommandMenu |  |
-| `SuggestionMenuHeader.tsx` | 28 | 4 | SuggestionMenuHeader |  |
+| `SuggestionMenuHeader.tsx` | 28 | 4 | SuggestionMenuHeader | Общая шапка подсказок композера (@ папки, # теги, / команды). |
 | `SuggestionMenuShell.tsx` | 61 | 4 | SuggestionMenuShell |  |
 | `TagSuggestionMenu.tsx` | 75 | 2 | TagMeta, TagSuggestionMenu |  |
 | `useComposerAutocomplete.ts` | 395 | 1 | UseComposerAutocompleteOptions, useComposerAutocomplete |  |
@@ -152,14 +152,14 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AttachSheet.tsx` | 203 | 1 | AttachSheet |  |
+| `AttachSheet.tsx` | 203 | 1 | AttachSheet | One place that attaches things. On the phone it is the picker itself — tabs o… |
 | `DesktopSources.tsx` | 83 | 1 | DesktopSourcesProps, DesktopSources |  |
 | `FolderBrowser.tsx` | 143 | 1 | FolderBrowserProps, FolderBrowser |  |
 | `MediaGrid.tsx` | 327 | 1 | MediaGridProps, MediaGrid |  |
 | `MediaPreview.tsx` | 234 | 1 | MediaPreviewProps, MediaPreview |  |
 | `MobilePicker.tsx` | 114 | 1 | MobilePickerProps, MobilePicker |  |
-| `useDeviceGallery.ts` | 80 | 1 | useDeviceGallery |  |
-| `useFolderBrowser.ts` | 90 | 1 | useFolderBrowser |  |
+| `useDeviceGallery.ts` | 80 | 1 | useDeviceGallery | Rows of the device gallery, paged. Permission is part of the state: a grid th… |
+| `useFolderBrowser.ts` | 90 | 1 | useFolderBrowser | The folders tab: granted folders, the files inside one of them, and the syste… |
 | `ViewerVideo.tsx` | 127 | 2 | ViewerVideoProps, ViewerVideo |  |
 
 ## src/components/Mobile — 10 файлов, 2467 строк
@@ -170,7 +170,7 @@
 | `MobileAudioView.tsx` | 12 | 1 | MobileAudioView |  |
 | `MobileCalendarView.tsx` | 1105 | 3 | MobileCalendarView |  |
 | `MobileFloatingDock.tsx` | 159 | 1 | MobileFloatingDockProps, MobileFloatingDock |  |
-| `MobileFolderInfoView.tsx` | 70 | 1 | MobileFolderInfoView |  |
+| `MobileFolderInfoView.tsx` | 70 | 1 | MobileFolderInfoView | Phone container: the profile fills the screen, editing happens in place. |
 | `MobileFoldersView.tsx` | 394 | 1 | MobileFoldersView |  |
 | `MobileScreenHeader.tsx` | 86 | 5 | MobileScreenHeaderProps, MobileScreenHeader |  |
 | `MobileSettingsView.tsx` | 133 | 1 | MobileSettingsView |  |
@@ -183,7 +183,7 @@
 |---|---:|---:|---|---|
 | `BaseModal.tsx` | 156 | 10 | BaseModalProps, BaseModal |  |
 | `ComposerModal.tsx` | 59 | 2 | ComposerModal |  |
-| `ConfirmDialog.tsx` | 55 | 1 | ConfirmDialog |  |
+| `ConfirmDialog.tsx` | 55 | 1 | ConfirmDialog | The app's own question for irreversible actions. It replaces `window.confirm`… |
 | `DiffModal.tsx` | 532 | 1 | DiffModalItemEntry, DiffModalProps, DiffModal |  |
 | `FolderInfoModal.tsx` | 94 | 2 | FolderInfoModal |  |
 | `FolderModal.tsx` | 166 | 2 | FolderModal |  |
@@ -196,7 +196,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `FolderInfoPanel.tsx` | 18 | 1 | FolderInfoPanel |  |
+| `FolderInfoPanel.tsx` | 18 | 1 | FolderInfoPanel | Dock panel container: the same profile, laid out for a narrow column. |
 | `FolderMediaTabs.tsx` | 313 | 1 | FolderMediaTabId, FolderMediaTabsProps, FolderMediaTabs |  |
 | `useFolderMedia.ts` | 117 | 4 | FolderMediaData, useFolderMedia |  |
 
@@ -210,12 +210,12 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AccountSettingsTab.tsx` | 66 | 1 | AccountSettingsTab |  |
+| `AccountSettingsTab.tsx` | 66 | 1 | AccountSettingsTab | Первый раздел настроек: кто я, сколько места и куда идти за остальным. |
 | `DevicesSettingsTab.tsx` | 536 | 1 | DevicesSettingsTab |  |
 | `MobileDockSettings.tsx` | 230 | 1 | MobileDockSettings |  |
-| `SecretKeyField.tsx` | 49 | 1 | SecretKeyField |  |
+| `SecretKeyField.tsx` | 49 | 1 | SecretKeyField | A secret, rendered as one settings row: the input is the row. |
 | `SettingsUI.tsx` | 296 | 7 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 |  |
-| `SyncSettingsTab.tsx` | 83 | 1 | SyncSettingsTab |  |
+| `SyncSettingsTab.tsx` | 83 | 1 | SyncSettingsTab | Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседни… |
 
 ## src/components/Sidebar — 3 файлов, 498 строк
 
@@ -254,7 +254,7 @@
 | `ToolbarButton.tsx` | 58 | 2 | ToolbarButtonProps, ToolbarButton |  |
 | `VideoCirclePlayer.tsx` | 145 | 3 | VideoCirclePlayer |  |
 | `VideoRecorder.tsx` | 212 | 1 | VideoRecorder |  |
-| `WindowControls.tsx` | 50 | 1 | WindowControls |  |
+| `WindowControls.tsx` | 50 | 1 | WindowControls | ponytail: fixed top-right 34px controls matching dockview tab row. ceiling: w… |
 
 ## src/components/Vault — 1 файлов, 228 строк
 
@@ -296,7 +296,7 @@
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
 | `sync.ts` | 44 | 1 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 |  |
 | `typography.ts` | 111 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, VISUAL_PRIORITIES, +2 |  |
-| `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES |  |
+| `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
 ## src/context — 2 файлов, 952 строк
 
@@ -309,35 +309,35 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `feedView.ts` | 89 | 1 | FeedViewQuery, selectVisibleItems |  |
+| `feedView.ts` | 89 | 1 | FeedViewQuery, selectVisibleItems | Which records the feed shows, and in what order. |
 
-## src/context/hooks — 10 файлов, 1514 строк
+## src/context/hooks — 10 файлов, 1515 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useAppearance.ts` | 119 | 1 | useAppearance |  |
-| `useAssistant.ts` | 139 | 1 | useAssistant |  |
-| `useBackup.ts` | 145 | 1 | useBackup |  |
-| `useFeedView.ts` | 215 | 1 | useFeedView |  |
-| `useFolderAdmin.ts` | 101 | 1 | useFolderAdmin |  |
-| `useItemActions.ts` | 222 | 1 | ItemActionsDeps, useItemActions |  |
+| `useAppearance.ts` | 119 | 1 | useAppearance | How the app looks: panel widths, density, font, accent. |
+| `useAssistant.ts` | 139 | 1 | useAssistant | The assistant session: the transcript, the model it talks to, and one send. |
+| `useBackup.ts` | 145 | 1 | useBackup | Backup and restore: snapshots on disk, the manual one, the zip round trip. |
+| `useFeedView.ts` | 215 | 1 | useFeedView | How the feed is looking: which folder, which view, which filters, which order. |
+| `useFolderAdmin.ts` | 101 | 1 | useFolderAdmin | What a folder itself can do: save, describe, rename, delete, and the create m… |
+| `useItemActions.ts` | 223 | 1 | ItemActionsDeps, useItemActions | Every write to a note: create, save, delete, restore from trash, move, comple… |
 | `useMobileNav.ts` | 130 | 1 | DEFAULT_MOBILE_DOCK_TABS, useMobileNav |  |
-| `useOverlays.ts` | 235 | 1 | useOverlays |  |
-| `useRecurringRollover.ts` | 63 | 1 | useRecurringRollover |  |
-| `useVaults.ts` | 145 | 1 | useVaults |  |
+| `useOverlays.ts` | 235 | 1 | useOverlays | Everything that lives on top of the app: modals, lightbox, context menu, toas… |
+| `useRecurringRollover.ts` | 63 | 1 | useRecurringRollover | Recurring tasks roll over on their own schedule: at midnight, and when the tab |
+| `useVaults.ts` | 145 | 1 | useVaults | What a vault can do: switch to it, create it, delete it, pick its folder on d… |
 
 ## src/hooks — 9 файлов, 1292 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useAttachmentSrc.ts` | 50 | 6 | AttachmentSrcs, useAttachmentSrcs, useAttachmentSrc |  |
-| `useAudioAnalyser.ts` | 88 | 1 | useAudioAnalyser |  |
+| `useAudioAnalyser.ts` | 88 | 1 | useAudioAnalyser | Owns the Web Audio graph for one `<audio>` element. |
 | `useCalendarSchedule.ts` | 127 | 2 | CalendarTask, UseCalendarScheduleParams, CalendarScheduleResult, useCalendarSchedule |  |
 | `useComposerMedia.ts` | 203 | 1 | UseComposerMediaOptions, useComposerMedia |  |
 | `useGlobalHotkeys.ts` | 54 | 1 | useGlobalHotkeys |  |
 | `useItemActions.ts` | 280 | 3 | PRIORITY_LABELS, TYPE_LABELS, useItemActions |  |
 | `useLayerStack.ts` | 122 | 1 | AppLayer, useLayerStack |  |
-| `usePresence.ts` | 92 | 28 | usePresence |  |
+| `usePresence.ts` | 92 | 28 | usePresence | Keeps the existing DOM during exit. CSS owns the duration and destination. |
 | `useSuggestedActions.ts` | 276 | 1 | ActionHistoryEntry, useSuggestedActions |  |
 
 ## src/hooks/gestures — 6 файлов, 1091 строк
@@ -347,19 +347,19 @@
 | `useDragToScroll.ts` | 232 | 2 | DragToScrollOptions, useDragToScroll |  |
 | `usePhotoPager.ts` | 320 | 2 | PhotoPagerOptions, usePhotoPager |  |
 | `usePointerDnd.ts` | 244 | 2 | DragItemPayload, UsePointerDndOptions, PointerDndState, usePointerDnd |  |
-| `usePullToSearch.ts` | 88 | 1 | usePullToSearch |  |
-| `useSheetDrag.ts` | 157 | 1 | useSheetDrag |  |
+| `usePullToSearch.ts` | 88 | 1 | usePullToSearch | Pull a list past either end to open search. |
+| `useSheetDrag.ts` | 157 | 1 | useSheetDrag | Drag-to-dismiss for a one-detent sheet — a content-sized panel with nothing t… |
 | `useSwipeGesture.ts` | 50 | 2 | SwipeGestureOptions, useSwipeGesture |  |
 
 ## src/hooks/layout — 5 файлов, 282 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useComposerInset.ts` | 38 | 2 | useComposerInset |  |
+| `useComposerInset.ts` | 38 | 2 | useComposerInset | Height of the dock the composer sits in. |
 | `useEditorPaneRect.ts` | 58 | 1 | EditorPaneRect, useEditorPaneRect |  |
-| `useFlipLayout.ts` | 96 | 2 | useFlipLayout |  |
-| `useIsMobile.ts` | 35 | 2 | useIsMobile |  |
-| `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight |  |
+| `useFlipLayout.ts` | 96 | 2 | useFlipLayout | Layout motion for a list, driven by whatever `signature` the caller passes. |
+| `useIsMobile.ts` | 35 | 2 | useIsMobile | Hook to detect mobile screens (< 768px by default). |
+| `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight | Publishes the visual viewport height as `--vvh`. |
 
 ## src/lib — 16 файлов, 3447 строк
 
@@ -377,8 +377,8 @@
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
 | `searchService.ts` | 175 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
-| `taskCompletion.ts` | 35 | 1 | applyTaskCompletion |  |
-| `taskUtils.ts` | 101 | 10 | parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, PRIORITY_LABELS |  |
+| `taskCompletion.ts` | 35 | 1 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
+| `taskUtils.ts` | 101 | 10 | parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, PRIORITY_LABELS | Extracts subtasks from markdown checkboxes: `- [ ] title` or `- [x] title`. |
 | `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
 | `windowControls.ts` | 444 | 14 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +17 |  |
 
@@ -403,51 +403,51 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `attachmentEnrichment.ts` | 603 | 4 | resolveRelayMedia, canEnrichAttachments, buildImageInstruction, extractFocalContext, dataUrlToBlob, +3 |  |
+| `attachmentEnrichment.ts` | 603 | 4 | resolveRelayMedia, canEnrichAttachments, buildImageInstruction, extractFocalContext, dataUrlToBlob, +3 | Subscription mode routes images and audio through the relay: the Groq key liv… |
 | `audioHelper.ts` | 186 | 6 | AudioTrack, AudioScopeMode, AudioTypeFilter, detectAudioFormat, splitAudioName, +6 |  |
 | `audioSpectrum.ts` | 439 | 3 | OrbFeatures, ORB_SILENCE, ORB_FFT_SIZE, createSpectrumReader | Features for the liquid orb. |
 | `byteCodec.ts` | 16 | 3 | bytesToBase64, base64ToBytes, toArrayBuffer |  |
-| `deviceGallery.ts` | 40 | 1 | isDeviceGalleryAvailable, getGalleryAccess, requestGalleryAccess, listDeviceMedia, DeviceMediaItem, +1 |  |
-| `fileDropHelper.ts` | 119 | 4 | MAX_ATTACHMENT_BYTES, attachmentType, attachmentFromDataUrl, processFileListToAttachments |  |
-| `folderBrowser.ts` | 128 | 4 | listFolders, pickFolder, listFolderEntries, pickFilesFromSystem, readEntryBytes, +3 |  |
+| `deviceGallery.ts` | 40 | 1 | isDeviceGalleryAvailable, getGalleryAccess, requestGalleryAccess, listDeviceMedia, DeviceMediaItem, +1 | The device gallery. Only Android has one: rows come from MediaStore through |
+| `fileDropHelper.ts` | 119 | 4 | MAX_ATTACHMENT_BYTES, attachmentType, attachmentFromDataUrl, processFileListToAttachments | What the storage layer takes inline without turning into a memory problem. |
+| `folderBrowser.ts` | 128 | 4 | listFolders, pickFolder, listFolderEntries, pickFilesFromSystem, readEntryBytes, +3 | Folders the person already granted; the grant survives restarts and app updat… |
 | `imageCodec.ts` | 90 | 2 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 |  |
 
-## src/lib/storage — 9 файлов, 2327 строк
+## src/lib/storage — 9 файлов, 2330 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData |  |
+| `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData | Attachments as they belong in the localStorage index: metadata only. |
 | `attachments.ts` | 209 | 2 | AttachmentStore |  |
 | `draftStore.ts` | 248 | 1 | DraftStore |  |
-| `folderStore.ts` | 170 | 1 | FolderStoreHost, folderStorageKey, readFolders, writeFolder, renameFolderTree, +2 |  |
+| `folderStore.ts` | 171 | 1 | FolderStoreHost, folderStorageKey, readFolders, writeFolder, renameFolderTree, +2 | Writing folders: save, rename with the note cascade, describe, delete and re-… |
 | `index.ts` | 728 | 32 | StorageChangeEvent, StorageChangeListener, DEFAULT_ITEMS, StorageService, storage, +5 |  |
 | `indexedDb.ts` | 143 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
-| `vaultFiles.ts` | 498 | 1 | VaultFilesDeps, VaultFiles |  |
-| `vaultRegistry.ts` | 197 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 |  |
+| `vaultFiles.ts` | 498 | 1 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultRegistry.ts` | 199 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 | Which vault the app is looking at: the registry kept in localStorage, and the… |
 | `vaultTransfer.ts` | 113 | 1 | VaultSnapshot, exportObsidianBundle, buildVaultExportJson, VaultImportIo, VaultImportPayload, +2 |  |
 
-## src/lib/sync — 22 файлов, 6147 строк
+## src/lib/sync — 22 файлов, 6149 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `account.ts` | 569 | 17 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 |  |
 | `accountCrypto.ts` | 262 | 5 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +4 |  |
 | `accountTypes.ts` | 90 | 6 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +5 |  |
-| `applyBundle.ts` | 318 | 1 | persistIncomingBundle |  |
+| `applyBundle.ts` | 318 | 1 | persistIncomingBundle | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 6 | 2 | attachmentSignature |  |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
-| `crypto.ts` | 181 | 10 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 |  |
+| `crypto.ts` | 181 | 10 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 | Generates a cryptographically secure 12-word recovery seed phrase |
 | `devices.ts` | 238 | 3 | normalizeTrustedDevice, touchDeviceLastSeen, normalizeTrustedDevicesFromAccount, computeSubscription, createDefaultDeviceName, +8 |  |
 | `entities/registry.ts` | 35 | 1 | createSyncOpFromStorageEvent |  |
 | `entities/types.ts` | 16 | 2 | SyncEntityKind, SyncAction, SyncOperation |  |
 | `index.ts` | 5 | 2 | * from ./types, * from ./crypto, * from ./pairing, * from ./syncEngine |  |
 | `localBookkeeping.ts` | 80 | 3 | SyncScope, stateHashKey, syncedIdsKey, tombstonesKey, sentHashesKey, +5 |  |
 | `outbox/outbox.ts` | 58 | 1 | Outbox |  |
-| `pairing.ts` | 180 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +3 |  |
-| `pushBundle.ts` | 292 | 1 | pushLocalChanges |  |
-| `syncConfig.ts` | 139 | 2 | SyncConfigHost, computeSubscription, loadConfig, saveConfig, authHeaders, +3 |  |
+| `pairing.ts` | 180 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +3 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
+| `pushBundle.ts` | 292 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
+| `syncConfig.ts` | 140 | 2 | SyncConfigHost, computeSubscription, loadConfig, saveConfig, authHeaders, +3 | Where the sync config lives per vault, how requests are authorized, how a see… |
 | `syncEngine.ts` | 872 | 16 | PendingPush, SyncEngine, syncEngine, storage, accountClient |  |
-| `syncSocket.ts` | 40 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle |  |
+| `syncSocket.ts` | 41 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `transport.ts` | 212 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport |  |
 | `twoFactorAuth.ts` | 295 | 1 | TotpConfig, WebAuthnConfig, TwoFactorState, base32Encode, base32Decode, +8 | Two-Factor Authentication (2FA) for Zero-Knowledge Vaults |
 | `types.ts` | 123 | 17 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
@@ -466,13 +466,13 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `demoVault.ts` | 238 | 1 | generateDemoItems |  |
-| `folderItems.ts` | 19 | 1 | itemsInFolder |  |
+| `demoVault.ts` | 238 | 1 | generateDemoItems | Generates a clean, cohesive set of starter demo items across the default fold… |
+| `folderItems.ts` | 19 | 1 | itemsInFolder | Records that belong to a folder. Inbox is a leaf: it holds only the items that |
 | `folderOptions.ts` | 94 | 6 | FolderSelectOption, buildFolderOptions |  |
-| `folderPaths.ts` | 38 | 3 | sanitizeFolderName, parentPathOf, folderPathForName, folderPathUnder, isFolderPathFree, +2 |  |
+| `folderPaths.ts` | 38 | 3 | sanitizeFolderName, parentPathOf, folderPathForName, folderPathUnder, isFolderPathFree, +2 | Folder names are file names on disk, so the OS-forbidden characters become da… |
 | `itemSchema.ts` | 46 | 1 | PropertySchemaItem, ITEM_MUTABLE_PROPERTIES, ITEM_UPDATES_SCHEMA | Single Source of Truth (SSOT) metadata registry for SlagItem mutable fields. |
-| `itemUpdates.ts` | 70 | 2 | applyItemUpdates |  |
-| `markdownSerializer.ts` | 198 | 5 | serializeItemToMarkdown, parseMarkdownToItem |  |
+| `itemUpdates.ts` | 70 | 2 | applyItemUpdates | Applies a partial update to an item without touching storage. |
+| `markdownSerializer.ts` | 198 | 5 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |
 | `noteFilename.ts` | 20 | 6 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
 | `stats.ts` | 66 | 2 | VaultStats, collectExistingTags, computeVaultStats |  |
 
