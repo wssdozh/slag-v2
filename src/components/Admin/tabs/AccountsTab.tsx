@@ -1,6 +1,7 @@
 import React from 'react';
 import { SparklineChart, BarChart } from '../Charts';
 import type { AdminAccount, AnalyticsData } from '../useAdminData';
+import { shortId } from '../../../lib/text/shortId';
 import {
   Check,
   Clock,
@@ -28,10 +29,6 @@ interface AccountsTabProps {
 }
 
 const PLANS: Array<'free' | 'smile' | 'angry'> = ['free', 'smile', 'angry'];
-
-function shortId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
-}
 
 export const AccountsTab: React.FC<AccountsTabProps> = ({
   period,

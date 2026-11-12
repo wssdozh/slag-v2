@@ -2,6 +2,7 @@ import React from 'react';
 import { BarChart } from '../Charts';
 import type { AdminRoom, AdminStats, AnalyticsData } from '../useAdminData';
 import { formatBytes } from '../../../lib/text/formatBytes';
+import { shortId } from '../../../lib/text/shortId';
 import { Activity, AlertTriangle, Database, Loader2, Radio, Wrench } from 'lucide-react';
 
 interface RelayTabProps {
@@ -22,10 +23,6 @@ function formatUptime(seconds: number): string {
   if (d > 0) return `${d}д ${h}ч`;
   if (h > 0) return `${h}ч ${m}м`;
   return `${seconds}с`;
-}
-
-function shortId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
 }
 
 export const RelayTab: React.FC<RelayTabProps> = ({

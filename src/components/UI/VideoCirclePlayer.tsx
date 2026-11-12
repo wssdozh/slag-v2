@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { bindMediaEvents } from '../../lib/media/mediaEvents';
 
 interface VideoCirclePlayerProps {
   src: string;
@@ -30,15 +31,11 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
       setProgressFraction(0);
     };
 
-    video.addEventListener('timeupdate', onTimeUpdate);
-    video.addEventListener('loadedmetadata', onLoadedMetadata);
-    video.addEventListener('ended', onEnded);
-
-    return () => {
-      video.removeEventListener('timeupdate', onTimeUpdate);
-      video.removeEventListener('loadedmetadata', onLoadedMetadata);
-      video.removeEventListener('ended', onEnded);
-    };
+    return bindMediaEvents(video, {
+      onTimeUpdate,
+      onLoadedMetadata,
+      onEnded,
+    });
   }, []);
 
   const togglePlay = (e: React.MouseEvent) => {

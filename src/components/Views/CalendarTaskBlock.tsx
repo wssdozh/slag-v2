@@ -2,6 +2,7 @@ import React from 'react';
 import type { SlagItem } from '../../types';
 import type { LayoutPositionedTask } from '../../lib/time/calendarLayout';
 import { getPriorityBadge, formatDurationBadge } from './calendarHelpers';
+import { baseTaskId } from '../../lib/tasks/taskUtils';
 import { Check, ListTodo } from 'lucide-react';
 
 export interface AllDayTaskPillProps {
@@ -28,7 +29,7 @@ export const AllDayTaskPill: React.FC<AllDayTaskPillProps> = ({
   const isDone = task.status === 'done';
   const styling = getPriorityBadge(task.priority);
   const isDragging = draggingTaskId === task.id;
-  const realTaskId = task.id.replace(/_virtual_.*$/, '');
+  const realTaskId = baseTaskId(task.id);
 
   return (
     <div
@@ -135,7 +136,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
   const styling = getPriorityBadge(task.priority);
   const isDragging = draggingTaskId === task.id;
   const isResizing = resizingTask?.taskId === task.id;
-  const realTaskId = task.id.replace(/_virtual_.*$/, '');
+  const realTaskId = baseTaskId(task.id);
 
   const colWidth = 94 / totalCols;
   const left = 3 + colIndex * colWidth;

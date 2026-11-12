@@ -2,6 +2,7 @@ import React from 'react';
 import type { SlagItem } from '../../types';
 import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
 import { getPriorityBadge } from './calendarHelpers';
+import { baseTaskId } from '../../lib/tasks/taskUtils';
 import {
   Calendar as CalendarIcon,
   Check,
@@ -99,7 +100,7 @@ export const CalendarExpandedDayModal: React.FC<CalendarExpandedDayModalProps> =
               const styling = getPriorityBadge(task.priority);
               const isDone = task.status === 'done';
               const isDragging = draggingTaskId === task.id;
-              const realTaskId = task.id.replace(/_virtual_.*$/, '');
+              const realTaskId = baseTaskId(task.id);
 
               return (
                 <div

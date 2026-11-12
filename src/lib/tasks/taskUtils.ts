@@ -1,6 +1,14 @@
 import type { SlagSubtask } from '../../types';
 
 /**
+ * The calendar projects a recurring task into every occurrence as
+ * `<id>_virtual_<date>`; the record behind each projection keeps the base id.
+ */
+export function baseTaskId(id: string): string {
+  return id.replace(/_virtual_.*$/, '');
+}
+
+/**
  * Extracts subtasks from markdown checkboxes: `- [ ] title` or `- [x] title`.
  * Supports CommonMark list markers (-, *, +) and arbitrary indentation.
  */

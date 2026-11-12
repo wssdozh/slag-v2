@@ -1,9 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { AdminAccount } from './useAdminData';
-
-function shortId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
-}
+import { shortId } from '../../lib/text/shortId';
 
 export interface GrantSubscriptionInput {
   accountId: string;

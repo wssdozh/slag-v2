@@ -3,6 +3,7 @@ import type { SlagItem } from '../../types';
 import type { MonthCalendarCell } from '../../lib/time/dateUtils';
 import { RUSSIAN_WEEKDAYS } from '../../lib/time/dateUtils';
 import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
+import { baseTaskId } from '../../lib/tasks/taskUtils';
 import { Plus, Repeat } from 'lucide-react';
 
 export interface CalendarMonthViewProps {
@@ -140,7 +141,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     const slot = getTaskTimeSlot(task);
                     const styling = getPriorityBadge(task.priority);
                     const isDone = task.status === 'done';
-                    const realTaskId = task.id.replace(/_virtual_.*$/, '');
+                    const realTaskId = baseTaskId(task.id);
 
                     return (
                       <div

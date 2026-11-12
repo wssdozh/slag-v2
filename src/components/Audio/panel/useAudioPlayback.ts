@@ -4,6 +4,7 @@ import { storage } from '../../../lib/storage';
 import { logger } from '../../../lib/logger/logger';
 import { useAudioAnalyser } from '../../../hooks/media/useAudioAnalyser';
 import type { AudioTrack } from '../../../lib/media/audioHelper';
+import { bindMediaEvents } from '../../../lib/media/mediaEvents';
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;
 // Nothing in the panel exposes a volume slider: a constant, not state.
@@ -195,21 +196,14 @@ export function useAudioPlayback(tracks: AudioTrack[]): AudioPlayback {
       setIsPlaying(false);
     };
 
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('error', onError);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
-
-    return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('error', onError);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
-    };
+    return bindMediaEvents(audio, {
+      onTimeUpdate,
+      onLoadedMetadata,
+      onError,
+      onEnded,
+      onPlay,
+      onPause,
+    });
   }, [isScrubbing, currentTrack?.duration]);
 
   // Toggle playback

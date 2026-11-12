@@ -1,6 +1,7 @@
 import React from 'react';
 import { DistributionGauge } from '../Charts';
 import type { AiLog, AiStats, AnalyticsData } from '../useAdminData';
+import { shortId } from '../../../lib/text/shortId';
 import { Activity, Loader2, Sparkles, TrendingUp } from 'lucide-react';
 
 interface AiTabProps {
@@ -9,10 +10,6 @@ interface AiTabProps {
   analytics: AnalyticsData | null;
   actionBusy: boolean;
   onAiPing: () => void;
-}
-
-function shortId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
 }
 
 export const AiTab: React.FC<AiTabProps> = ({

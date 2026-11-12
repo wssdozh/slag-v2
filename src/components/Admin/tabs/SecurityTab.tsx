@@ -1,13 +1,10 @@
 import React from 'react';
 import type { AuditLog } from '../useAdminData';
+import { shortId } from '../../../lib/text/shortId';
 
 interface SecurityTabProps {
   securityStats: { blockedAccountsCount: number; revokedDevicesCount: number } | null;
   auditLogs: AuditLog[];
-}
-
-function shortId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
 }
 
 export const SecurityTab: React.FC<SecurityTabProps> = ({

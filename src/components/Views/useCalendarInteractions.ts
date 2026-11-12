@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { SlagItem } from '../../types';
 import { formatDurationBadge } from './calendarHelpers';
+import { baseTaskId } from '../../lib/tasks/taskUtils';
 
 export const DEFAULT_HOUR_HEIGHT = 52;
 export const MIN_HOUR_HEIGHT = 44;
@@ -240,7 +241,7 @@ export function useCalendarInteractions({
         isJustResizedRef.current = false;
       }, 200);
 
-      const realId = taskId.replace(/_virtual_.*$/, '');
+      const realId = baseTaskId(taskId);
       const target = items.find(i => i.id === realId);
       if (target) {
         updateItem({

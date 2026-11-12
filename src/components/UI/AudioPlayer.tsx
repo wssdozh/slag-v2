@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { formatAudioDuration, audioTrackLabel } from '../../lib/media/audioHelper';
+import { bindMediaEvents } from '../../lib/media/mediaEvents';
 import { logger } from '../../lib/logger/logger';
 
 const mediaLog = logger.scope('MEDIA');
@@ -106,21 +107,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       );
     };
 
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('error', onError);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
-
-    return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('error', onError);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
-    };
+    return bindMediaEvents(audio, {
+      onTimeUpdate,
+      onLoadedMetadata,
+      onEnded,
+      onPlay,
+      onPause,
+      onError,
+    });
   }, [isScrubbing, name]);
 
   const currentDur = duration > 0 ? duration : (initialDuration || 0);

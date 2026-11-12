@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SparklineChart, FunnelChart } from '../Charts';
 import type { AdminAccount, AnalyticsData, BillingStats, BillingTransaction } from '../useAdminData';
+import { shortId } from '../../../lib/text/shortId';
 import { Clock, CreditCard } from 'lucide-react';
 
 interface BillingTabProps {
@@ -12,10 +13,6 @@ interface BillingTabProps {
   actionBusy: boolean;
   onGrantSubscription: (data: { accountId: string; plan: 'smile' | 'angry'; days: number; amount: number }) => void;
   onQuickGrant: (accountId: string, plan: 'smile' | 'angry', days: number) => void;
-}
-
-function shortId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
 }
 
 export const BillingTab: React.FC<BillingTabProps> = ({
