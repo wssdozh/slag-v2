@@ -71,36 +71,6 @@ export const FONT_SCALE_OPTIONS: Record<UiFontScale, FontScaleOption> = {
   },
 };
 
-/**
- * 4-уровневая иерархическая матрица внимания (Visual Hierarchy)
- * P1 (Фокус, 50мс): В чем суть? (Заголовки карточек, задачи)
- * P2 (Детали, 200мс): Подробности и действия (Тело заметок, подзадачи, чат)
- * P3 (Контекст, 500мс): Где это находится? (Папки, теги, цитаты)
- * P4 (Служебное): Технические параметры (Бейджи типов, даты, размер, хоткеи)
- */
-export const VISUAL_PRIORITIES = {
-  P1: {
-    role: 'Главный фокус',
-    description: 'Заголовок заметки или текст задачи, который человек замечает первым',
-    defaultToken: 'text-base font-medium text-zinc-100',
-  },
-  P2: {
-    role: 'Детали и действие',
-    description: 'Основной текст заметки, чеклист подзадач, текст ответов ассистента',
-    defaultToken: 'text-sm font-normal text-zinc-300 leading-relaxed',
-  },
-  P3: {
-    role: 'Контекст и связи',
-    description: 'Папка размещения, теги, родительская цитата, вспомогательные кнопки',
-    defaultToken: 'text-xs font-normal text-zinc-400',
-  },
-  P4: {
-    role: 'Служебные метаданные',
-    description: 'Время создания, размер файла, бейдж типа ("Таска", "Статья"), шорткаты',
-    defaultToken: 'text-2xs font-mono text-zinc-500 tracking-wider',
-  },
-} as const;
-
 export function getFontScaleMultiplier(scale: UiFontScale): number {
   return FONT_SCALE_OPTIONS[scale]?.multiplier ?? 1.0;
 }

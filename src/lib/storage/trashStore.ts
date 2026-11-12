@@ -2,7 +2,6 @@ import type { SlagItem, VaultMeta } from '../../types';
 import { STORAGE_KEYS } from '../../config';
 import { logger } from '../logger';
 import { isTauri } from '@tauri-apps/api/core';
-import { remove, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs';
 import type { AttachmentStore } from './attachments';
 import type { StorageChangeEvent } from '.';
 
@@ -16,7 +15,6 @@ export interface TrashStoreHost {
   files: {
     removeItemFromDisk(item: SlagItem): Promise<void>;
     restoreItemOnDisk(item: SlagItem): Promise<void>;
-    getVaultTrashPath(): string;
   };
   getItems(): SlagItem[];
   saveItem(item: SlagItem, origin?: 'local' | 'remote'): SlagItem;
@@ -78,24 +76,4 @@ export function recoverFromTrash(store: TrashStoreHost, id: string, origin: 'loc
   }
   store.emitChange({ kind: 'trash', action: 'restore', id: item.id, payload: item, origin });
   return item;
-}
-
-export function purgeTrash(store: TrashStoreHost, origin: 'local' | 'remote' = 'local'): void {
-  localStorage.removeItem(trashStorageKey(store));
-  fsLog.info('Emptied .trash folder');
-
-  if (isTauri()) {
-    void (async () => {
-      try {
-        const trashPath = store.files.getVaultTrashPath();
-        if (await exists(trashPath, { baseDir: BaseDirectory.AppData })) {
-          await remove(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
-          await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
-        }
-      } catch (e) {
-        fsLog.warn('Failed to empty .trash on disk:', e);
-      }
-    })();
-  }
-  store.emitChange({ kind: 'trash', action: 'purge', id: '*', origin });
 }

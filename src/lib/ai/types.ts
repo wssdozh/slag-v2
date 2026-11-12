@@ -6,13 +6,6 @@ export interface AssistantToolDefinition {
   parameters: Record<string, any>;
 }
 
-export interface ExecutedToolCall {
-  id: string;
-  name: string;
-  args: Record<string, any>;
-  result: any;
-}
-
 export interface AdapterTurnHistoryItem {
   role: 'assistant' | 'user';
   content: string;

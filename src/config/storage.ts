@@ -2,13 +2,6 @@ import type { WorkspaceState, FolderMeta, VaultMeta, BackupSettings } from '../t
 
 export const DEFAULT_INBOX_FOLDER = 'Входящие';
 
-export const SPECIAL_DIRS = {
-  ATTACHMENTS: '.attachments',
-  TRASH: '.trash',
-  NOTES: 'notes',
-  VAULTS: 'vaults',
-} as const;
-
 export const STORAGE_KEYS = {
   VAULTS: 'slag_vaults_v2',
   CURRENT_VAULT: 'slag_current_vault_v2',

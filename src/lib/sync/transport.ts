@@ -44,10 +44,6 @@ export class SyncTransport {
     this.callbacks = callbacks;
   }
 
-  public setCallbacks(callbacks: Partial<TransportCallbacks>): void {
-    this.callbacks = { ...this.callbacks, ...callbacks };
-  }
-
   public getWebSocket(): WebSocket | null {
     return this.ws;
   }

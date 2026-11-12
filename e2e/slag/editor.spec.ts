@@ -196,9 +196,8 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await textarea.fill('вот такая вот собачка\n#паста');
     await page.waitForTimeout(200);
 
-    // Verify tag preview badge appears in composer toolbar
-    const previewTag = page.locator('span', { hasText: '#паста' }).first();
-    await expect(previewTag).toBeVisible();
+    // The composer keeps the tag as plain text now; there is no preview badge to look at.
+    await expect(textarea).toHaveValue(/#паста/);
 
     // Screenshot composer with active tag preview
     await page.screenshot({
@@ -216,7 +215,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await noteCard.scrollIntoViewIfNeeded();
 
     // Verify note body has clean content without trailing '#паста'
-    const noteBody = noteCard.locator('.whitespace-pre-wrap').first();
+    const noteBody = noteCard.locator('p').first();
     await expect(noteBody).toHaveText('вот такая вот собачка');
 
     // Verify tag is present in bottom bar as clickable tag button
@@ -509,10 +508,12 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // Verify FullscreenEditor opened with task properties
     await expect(page.locator('button', { hasText: 'Бэклог' })).toBeVisible();
 
-    // Change status to "В работе" via status Select
+    // Change status to "В работе" via status Select. The option list outlives its close by one
+    // exit transition, so a bare hasText match finds both the option and the trigger.
     await page.locator('button', { hasText: 'Бэклог' }).click();
     await page.locator('button', { hasText: 'В работе' }).click();
-    await expect(page.locator('button', { hasText: 'В работе' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'В работе' })).toBeHidden();
+    await expect(page.locator('button[aria-haspopup="listbox"]', { hasText: 'В работе' })).toBeVisible();
 
     // Add subtask via native Markdown in live preview editor and test auto-continuation
     const editorRoot = page.locator('#fullscreen-editor-root');
@@ -1517,8 +1518,9 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(200);
 
-    // Verify Telegram-style bottom bar is visible
-    const mobileBottomBar = page.locator('.md\\:hidden.fixed.bottom-0');
+    // Verify Telegram-style bottom bar is visible. It sits inside the editor sheet, so it is
+    // anchored `absolute`, not `fixed` — the class list is not a stable handle, the test id is.
+    const mobileBottomBar = page.getByTestId('mobile-editor-bar');
     await expect(mobileBottomBar).toBeVisible();
 
     // Verify top settings are still at the top

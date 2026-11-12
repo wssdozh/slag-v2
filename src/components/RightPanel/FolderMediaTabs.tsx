@@ -9,10 +9,8 @@ import {
 } from 'lucide-react';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import type { FolderMediaData } from './useFolderMedia';
-import type { LightboxImage } from '../../types';
+import type { FolderMediaTabId, LightboxImage } from '../../types';
 import { storage } from '../../lib/storage';
-
-export type FolderMediaTabId = 'media' | 'audio' | 'files' | 'links' | 'tags';
 
 export interface FolderMediaTabsProps {
   mediaData: FolderMediaData;

@@ -215,23 +215,3 @@ export function setDeviceSyncModeInConfig(
     trustedDevices: list,
   };
 }
-
-export function setDeviceAiLeaseInConfig(
-  config: SyncConfig,
-  deviceId: string,
-  canRun: boolean
-): SyncConfig {
-  if (deviceId === config.deviceId) {
-    return {
-      ...config,
-      canRunAiLease: canRun,
-    };
-  }
-  const list = config.trustedDevices.map((d) =>
-    d.id === deviceId ? { ...d, canRunAiLease: canRun } : d
-  );
-  return {
-    ...config,
-    trustedDevices: list,
-  };
-}

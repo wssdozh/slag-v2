@@ -7,8 +7,6 @@ import type {
   WorkspaceState,
 } from '../../types';
 import { logger } from '../logger';
-import { serializeItemToMarkdown } from '../vault/markdownSerializer';
-import { getSafeNoteFilename } from '../vault/noteFilename';
 
 /**
  * Moving a vault in and out. This is the interchange format — a backup file, a
@@ -26,15 +24,6 @@ export interface VaultSnapshot {
   assistantHistory: ChatMessage[];
   workspaceState: WorkspaceState;
   composerDrafts: Record<string, ComposerDraft>;
-}
-
-/** What the vault looks like on disk, for a human or another app. */
-export function exportObsidianBundle(items: SlagItem[]): Array<{ path: string; content: string }> {
-  return items.map((item) => {
-    const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-    const filePath = item.folder ? `${item.folder}/${filename}` : filename;
-    return { path: filePath, content: serializeItemToMarkdown(item) };
-  });
 }
 
 export function buildVaultExportJson(snapshot: VaultSnapshot): string {

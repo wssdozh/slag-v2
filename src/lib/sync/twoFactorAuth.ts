@@ -2,7 +2,7 @@
  * Two-Factor Authentication (2FA) for Zero-Knowledge Vaults
  * Implements:
  * 1. TOTP (RFC 6238) via pure Web Crypto API (HMAC-SHA1, Base32, 6-digit codes)
- * 2. WebAuthn / Passkeys (FIDO2) via native navigator.credentials API
+ * 2. WebAuthn / Passkeys (FIDO2): feature detection and the stored credential state
  */
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -161,98 +161,6 @@ export function isWebAuthnAvailable(): boolean {
 }
 
 /**
- * Registers a native Passkey (Touch ID, Windows Hello, YubiKey) for vault authorization.
- */
-export async function registerPasskey(
-  vaultName: string,
-  userName = 'Владелец хранилища'
-): Promise<{ credentialId: string; transports?: string[] } | null> {
-  if (!isWebAuthnAvailable()) return null;
-
-  try {
-    const challenge = new Uint8Array(32);
-    crypto.getRandomValues(challenge);
-
-    const userId = new Uint8Array(16);
-    crypto.getRandomValues(userId);
-
-    const credential = (await navigator.credentials.create({
-      publicKey: {
-        challenge,
-        rp: {
-          name: 'SLAG Vault',
-          id: window.location.hostname || 'localhost',
-        },
-        user: {
-          id: userId,
-          name: userName,
-          displayName: `${userName} (${vaultName})`,
-        },
-        pubKeyCredParams: [
-          { type: 'public-key', alg: -7 },  // ES256
-          { type: 'public-key', alg: -257 }, // RS256
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform', // Touch ID / Windows Hello / Face ID
-          userVerification: 'required',
-        },
-        timeout: 60000,
-        attestation: 'none',
-      },
-    })) as PublicKeyCredential | null;
-
-    if (!credential) return null;
-
-    const rawIdBytes = new Uint8Array(credential.rawId);
-    const b64Id = btoa(String.fromCharCode.apply(null, rawIdBytes as unknown as number[]));
-    const transports = (credential.response as AuthenticatorAttestationResponse).getTransports?.() || [];
-
-    return {
-      credentialId: b64Id,
-      transports,
-    };
-  } catch (err) {
-    console.warn('[WebAuthn] Passkey registration canceled or failed:', err);
-    return null;
-  }
-}
-
-/**
- * Verifies user presence via Touch ID, Windows Hello or Passkey.
- */
-export async function verifyPasskey(credentialId?: string): Promise<boolean> {
-  if (!isWebAuthnAvailable()) return false;
-
-  try {
-    const challenge = new Uint8Array(32);
-    crypto.getRandomValues(challenge);
-
-    const allowCredentials = credentialId
-      ? [
-          {
-            type: 'public-key' as const,
-            id: Uint8Array.from(atob(credentialId), (c) => c.charCodeAt(0)),
-          },
-        ]
-      : [];
-
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        allowCredentials,
-        userVerification: 'required',
-        timeout: 60000,
-      },
-    });
-
-    return Boolean(assertion);
-  } catch (err) {
-    console.warn('[WebAuthn] Verification failed or canceled:', err);
-    return false;
-  }
-}
-
-/**
  * Local storage manager for 2FA settings.
  */
 export class TwoFactorManager {
@@ -285,10 +193,5 @@ export class TwoFactorManager {
       // ignore
     }
     return updated;
-  }
-
-  public static isAny2FaEnabled(): boolean {
-    const cfg = this.getConfig();
-    return cfg.totp.enabled || cfg.webauthn.enabled;
   }
 }

@@ -91,27 +91,6 @@ export const saveDetachedWindow = (entry: SavedDetachedWindow): void => {
   }
 };
 
-export const updateDetachedWindowBounds = (
-  label: string,
-  bounds: { left: number; top: number; width: number; height: number }
-): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    const list = getSavedDetachedWindows();
-    const target = list.find(w => w.label === label);
-    if (target) {
-      target.left = bounds.left;
-      target.top = bounds.top;
-      target.width = bounds.width;
-      target.height = bounds.height;
-      localStorage.setItem(DETACHED_WINDOWS_KEY, JSON.stringify(list));
-      wsLog.debug(`Updated detached window bounds [${label}]`, bounds);
-    }
-  } catch (err) {
-    wsLog.error(`Failed to update detached window bounds [${label}]`, err);
-  }
-};
-
 export const removeDetachedWindow = (label: string): void => {
   if (typeof window === 'undefined') return;
   try {
@@ -228,36 +207,6 @@ export const openDetachedWindow = async (
   } catch (err) {
     wsLog.error(`Failed to open detached native window for [${panelId}]`, err);
     return false;
-  }
-};
-
-export const restoreDetachedWindows = async (): Promise<void> => {
-  if (!isTauri()) return;
-  try {
-    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-    const saved = getSavedDetachedWindows();
-    if (saved.length > 0) {
-      wsLog.info(`Restoring detached windows from saved session (${saved.length} windows)`, saved);
-    }
-    for (const item of saved) {
-      const existing = await WebviewWindow.getByLabel(item.label);
-      if (!existing) {
-        wsLog.debug(`Spawning restored detached window [${item.label}] for [${item.panelId}]`);
-        await openDetachedWindow(
-          item.panelId,
-          item.title,
-          {
-            left: item.left,
-            top: item.top,
-            width: item.width,
-            height: item.height,
-          },
-          item.label
-        );
-      }
-    }
-  } catch (err) {
-    wsLog.error('Failed to restore detached windows', err);
   }
 };
 

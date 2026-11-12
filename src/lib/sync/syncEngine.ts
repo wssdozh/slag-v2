@@ -25,7 +25,6 @@ import {
   removeTrustedDeviceFromConfig,
   renameDeviceInConfig,
   setDeviceSyncModeInConfig,
-  setDeviceAiLeaseInConfig,
   normalizeTrustedDevicesFromAccount,
 } from './devices';
 import {
@@ -785,10 +784,6 @@ export class SyncEngine {
     }
   }
 
-  public setSubscriptionPlan(plan: 'free' | 'smile' | 'angry'): void {
-    this.saveConfig({ subscriptionPlan: plan });
-  }
-
   public setBgSyncInterval(minutes: 0 | 10 | 30): void {
     this.saveConfig({ bgSyncIntervalMinutes: minutes });
     this.startIntervals();
@@ -840,10 +835,6 @@ export class SyncEngine {
 
   public setDeviceSyncMode(deviceId: string, mode: DeviceSyncMode): void {
     this.saveConfig(setDeviceSyncModeInConfig(this.config, deviceId, mode));
-  }
-
-  public setDeviceAiLease(deviceId: string, canRun: boolean): void {
-    this.saveConfig(setDeviceAiLeaseInConfig(this.config, deviceId, canRun));
   }
 
   public async rotateVaultKey(): Promise<string> {

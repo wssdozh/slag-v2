@@ -137,16 +137,6 @@ export async function pollPairingSession(
   return res.json();
 }
 
-/** Legacy exchange compatibility fallback */
-export async function sendPairingPayload(
-  serverUrl: string,
-  sessionId: string,
-  _hostDeviceId: string,
-  payloadText: string
-): Promise<boolean> {
-  return approvePairingSession(serverUrl, sessionId, payloadText);
-}
-
 /** Guest device polls for the exchanged payload until received or timeout */
 export async function pollPairingPayload(
   serverUrl: string,

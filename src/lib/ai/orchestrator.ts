@@ -15,7 +15,7 @@ export { extractActionBlock, cleanSnippetText } from './actionParser';
 import { buildSystemPrompt } from './prompt';
 import { createLocalToolExecutor } from './tools';
 import { getCanonicalTools } from './toolDefinitions';
-import { runLocalFallbackAgent } from './localFallback';
+import { runLocalFallbackAgent } from './fallback';
 
 const aiLog = logger.scope('AI');
 

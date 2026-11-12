@@ -149,11 +149,6 @@ export function renameStoredDevice(deviceId: string, name: string): void {
   localStorage.setItem(`${DEVICE_KEY_PREFIX}${deviceId}`, JSON.stringify(stored));
 }
 
-export function getDevicePublicKey(deviceId: string): string | null {
-  const stored = readStoredDevice(deviceId);
-  return stored ? JSON.stringify(stored.publicKey) : null;
-}
-
 export async function getDevicePrivateKey(deviceId: string): Promise<CryptoKey> {
   const stored = readStoredDevice(deviceId);
   if (!stored) throw new Error('Device identity is not stored on this device');

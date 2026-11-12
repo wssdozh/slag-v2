@@ -29,7 +29,6 @@ import { VaultFiles } from './vaultFiles';
 import {
   initCurrentVault,
   getVaults,
-  saveVaultMeta,
   ensureVaultSyncId,
   switchVault,
   createVault,
@@ -49,11 +48,9 @@ import {
   readTrash,
   trashItem,
   recoverFromTrash,
-  purgeTrash,
 } from './trashStore';
 import {
   buildVaultExportJson,
-  exportObsidianBundle,
   importVaultPayload,
   parseVaultBackup,
   type VaultImportIo,
@@ -84,9 +81,6 @@ const fsLog = logger.scope('FS');
 const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
 const DRAFTS_STORAGE_PREFIX = STORAGE_KEYS.DRAFTS_PREFIX;
 const WORKSPACE_STATE_PREFIX = STORAGE_KEYS.WORKSPACE_STATE_PREFIX;
-
-// Initial demo & onboarding items
-export const DEFAULT_ITEMS: SlagItem[] = generateDemoItems();
 
 export class StorageService {
   public currentVault: VaultMeta;
@@ -166,10 +160,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public getVaultNotesPath(vault: VaultMeta = this.currentVault): string {
     return this.files.getVaultNotesPath(vault);
-  }
-
-  public getVaultTrashPath(vault: VaultMeta = this.currentVault): string {
-    return this.files.getVaultTrashPath(vault);
   }
 
   public getVaultStatePath(vault: VaultMeta = this.currentVault): string {
@@ -262,10 +252,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public ensureVaultSyncId(vaultId: string): string {
     return ensureVaultSyncId(this, vaultId);
-  }
-
-  public saveVaultMeta(vault: VaultMeta): void {
-    return saveVaultMeta(this, vault);
   }
 
   public switchVault(vaultId: string): VaultMeta {
@@ -445,10 +431,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public restoreFromTrash(id: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
     return recoverFromTrash(this, id, origin);
-  }
-
-  public emptyTrash(origin: 'local' | 'remote' = 'local'): void {
-    purgeTrash(this, origin);
   }
 
   public deleteItem(id: string, origin: 'local' | 'remote' = 'local'): void {
@@ -657,11 +639,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   public importVaultFromJson(jsonString: string): boolean {
     const payload = parseVaultBackup(jsonString);
     return payload ? this.importVaultData(payload) : false;
-  }
-
-  // Obsidian Markdown bundle: returns array of { path: string, content: string }
-  public exportObsidianBundle(): Array<{ path: string; content: string }> {
-    return exportObsidianBundle(this.getItems());
   }
 }
 
