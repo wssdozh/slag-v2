@@ -144,5 +144,16 @@ hooks/ui/       useLayerStack.ts, usePresence.ts, useGlobalHotkeys.ts
 
 ## параллельная работа
 
-три независимых шва гоняются одновременно в трёх `git worktree` (`git worktree add ../SLAG-wN -b wip/srp-N HEAD` + junction на `node_modules`), по одному субагенту на шов. каждый проверяет себя `npm run check` и `npm run build` в своей копии, родитель мержит копированием файлов и гоняет e2e один раз. правило: наборы файлов не пересекаются, спеки и сервер не запускает никто, кроме родителя.
+три независимых шва гоняются одновременно в трёх `git worktree` (`git worktree add ../SLAG-wN -b wip/srp-N HEAD` + junction на `node_modules`), по одному субагенту на шов. каждый проверяет себя `npm run check` и `npm run build` в своей копии, родитель мержит копированием файлов и гоняет e2e один раз. правило: наборы файлов не пересекаются.
+
+**грабли junction'а, стоившие нескольких ложных «регрессий»:**
+1. `node_modules` — junction, поэтому `node_modules/.vite` общий для всех worktree. два dev-сервера переписывают `.vite/deps` одновременно, проигравший получает `EPERM` на rename и отдаёт `504 Outdated Optimize Dep` — приложение не монтируется, и целые файлы спек «падают». лечится изолированным кэшем: `SLAG_VITE_CACHE_DIR` (в `playwright.config.ts` уже `node_modules/.vite-e2e`, агенту стоит давать свой, с портом в имени).
+2. Агент, удаливший `node_modules/.vite` «у себя», сносит кэш у всех.
+3. Поэтому «упало у родителя, зелено у агента» сначала проверяется на кэш и порт, и только потом на код.
+
+## что стоит сделать дальше (кандидаты, не начатые)
+
+- кит: `TaskStatusIcon` с четырьмя состояниями (канбану нужен dashed/circle/half/check, `TaskStatusMark` двоичный), `IconButton size="bare"`, `EmptyState variant="inline"`, `HoldButton` для hold-to-record.
+- `syncEngine` (898): начальный синк; `AppContext` (714): объект контекста; `FullscreenEditor` (638).
+- продуктовые дырки: ACK-retry без дедупа через init, замок подписки в открытой вкладке ИИ, схема `_virtual_`-id (теперь хотя бы в одном месте).
 
