@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **388**, строк: **78646**, зон: **40**.
+Модулей: **400**, строк: **79276**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -15,23 +15,23 @@
 | `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
 | `src/components/Feed/Composer.tsx` | 1094 | 4 |
-| `e2e/slag/views.spec.ts` | 1061 | 0 |
+| `e2e/slag/views.spec.ts` | 1070 | 0 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
 | `src/lib/sync/syncEngine.ts` | 874 | 17 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
 | `src/context/AppContext.tsx` | 720 | 59 |
-| `src/components/Audio/AudioPanel.tsx` | 715 | 2 |
-| `src/components/UI/ContextMenu.tsx` | 712 | 1 |
 | `src/lib/storage/index.ts` | 673 | 33 |
 | `src/components/Admin/AdminPanel.tsx` | 646 | 1 |
+| `src/components/Editor/FullscreenEditor.tsx` | 639 | 1 |
+| `src/components/Views/KanbanBoard.tsx` | 634 | 2 |
 
-## e2e (playwright) — 91 файлов, 16939 строк
+## e2e (playwright) — 91 файлов, 16948 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
 - `e2e/slag/editor.spec.ts` — 1576
-- `e2e/slag/views.spec.ts` — 1061
+- `e2e/slag/views.spec.ts` — 1070
 - `e2e/slag/workspace.spec.ts` — 885
 - `e2e/mobile.spec.ts` — 868
 - `e2e/slag/feed.spec.ts` — 802
@@ -74,14 +74,19 @@
 | `tabs/SecurityTab.tsx` | 71 | 1 | SecurityTab |  |
 | `useAdminData.ts` | 248 | 6 | AdminStats, AdminDevice, AdminVault, AdminAccount, BillingStats, +7 | Interfaces from AdminPanel.tsx |
 
-## src/components/Audio — 4 файлов, 1555 строк
+## src/components/Audio — 9 файлов, 1854 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AudioCoverArt.tsx` | 157 | 1 | AudioCoverArt |  |
-| `AudioPanel.tsx` | 715 | 2 | AudioPanel |  |
+| `AudioPanel.tsx` | 280 | 2 | AudioPanel |  |
 | `AudioPlaylistDrawer.tsx` | 265 | 1 | AudioPlaylistDrawer |  |
 | `liquidOrb.ts` | 418 | 1 | OrbFrame, createOrbRenderer |  |
+| `panel/AudioArtwork.tsx` | 73 | 1 | AudioArtwork |  |
+| `panel/AudioScrubber.tsx` | 82 | 1 | AudioScrubber |  |
+| `panel/AudioTransport.tsx` | 182 | 1 | AudioTransport |  |
+| `panel/PlaylistDrawer.tsx` | 63 | 1 | PlaylistDrawer |  |
+| `panel/useAudioPlayback.ts` | 334 | 1 | useAudioPlayback |  |
 
 ## src/components/Composer — 1 файлов, 102 строк
 
@@ -89,16 +94,19 @@
 |---|---:|---:|---|---|
 | `QuickComposerWindow.tsx` | 102 | 1 | QuickComposerWindow |  |
 
-## src/components/Editor — 8 файлов, 2593 строк
+## src/components/Editor — 11 файлов, 2689 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AttachmentStrip.tsx` | 219 | 1 | AttachmentStripProps, AttachmentStrip |  |
-| `EditorToolbar.tsx` | 576 | 1 | EditorToolbarProps, EditorToolbar |  |
+| `EditorToolbar.tsx` | 172 | 1 | EditorToolbar, EditorToolbarProps | Editor toolbar assembly: top row, markdown palette, save/zen actions. |
+| `editorToolbarParts.tsx` | 75 | 5 | ITEM_TYPE_OPTIONS, MarkdownDropdown, EditorToolbarProps, EditorTopBarProps, MarkdownPaletteProps | Shared props, options and dropdown state for the editor toolbar halves. |
+| `EditorTopBar.tsx` | 61 | 1 | EditorTopBar | Editor top row: back, folder selector, item type. |
 | `fullscreen/EditorTaskFields.tsx` | 292 | 1 | EditorTaskFieldsProps, EditorTaskFields |  |
 | `fullscreen/useEditorAiActions.ts` | 71 | 1 | EditorAiActionsOptions, useEditorAiActions |  |
 | `fullscreen/useEditorAttachments.ts` | 161 | 1 | EditorAttachmentsOptions, useEditorAttachments |  |
 | `FullscreenEditor.tsx` | 639 | 1 | FullscreenEditor |  |
+| `MarkdownPalette.tsx` | 364 | 1 | MarkdownPalette | Markdown utilities: history, styles, lists, inline formatting, links, attachm… |
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
 | `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
@@ -246,7 +254,7 @@
 | `FolderTree.tsx` | 257 | 1 | FolderTree |  |
 | `Sidebar.tsx` | 204 | 1 | Sidebar |  |
 
-## src/components/UI — 26 файлов, 4677 строк
+## src/components/UI — 30 файлов, 4886 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -254,18 +262,22 @@
 | `AudioRecorder.tsx` | 192 | 2 | AudioRecorder |  |
 | `Button.tsx` | 56 | 6 | ButtonProps, Button |  |
 | `Checkbox.tsx` | 75 | 2 | CheckboxProps, Checkbox |  |
-| `ContextMenu.tsx` | 712 | 1 | ContextMenu |  |
+| `ContextMenu.tsx` | 317 | 1 | ContextMenu |  |
 | `DatePickerPopover.tsx` | 233 | 2 | DatePickerPopoverProps, DatePickerPopover |  |
 | `EmptyState.tsx` | 31 | 2 | EmptyStateProps, EmptyState |  |
 | `IconButton.tsx` | 50 | 6 | IconButtonProps, IconButton |  |
 | `ImageLightbox.tsx` | 352 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage |  |
 | `LightboxTextPanel.tsx` | 150 | 1 | LightboxTextPanelProps, LightboxTextPanel |  |
 | `MarkdownRenderer.tsx` | 185 | 3 | MarkdownRenderer |  |
+| `menu/feedMenuSections.tsx` | 82 | 1 | FeedMenuSectionsProps, FeedMenuSections |  |
+| `menu/folderMenuSections.tsx` | 88 | 1 | FolderMenuSectionsProps, FolderMenuSections |  |
+| `menu/itemMenuSections.tsx` | 205 | 1 | ItemMenuSectionsProps, ItemMenuSections |  |
+| `menu/MenuSubmenus.tsx` | 229 | 4 | MenuSubmenuName, MenuSubmenusProps, MenuSubmenus |  |
 | `MenuDropdown.tsx` | 188 | 4 | MenuDropdownProps, MenuDropdown |  |
 | `MobileActionSheet.tsx` | 186 | 1 | MobileActionSheet |  |
 | `NumberInput.tsx` | 98 | 1 | NumberInputProps, NumberInput |  |
 | `PriorityBadge.tsx` | 75 | 5 | TaskPriority, LinearSignalBarsProps, LinearSignalBars |  |
-| `ResponsiveSegmented.tsx` | 186 | 4 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented |  |
+| `ResponsiveSegmented.tsx` | 186 | 5 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented |  |
 | `Select.tsx` | 352 | 10 | SelectOption, SelectProps, Select |  |
 | `SendButton.tsx` | 48 | 4 | SendButtonProps, SendButton |  |
 | `SheetPanel.tsx` | 353 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel |  |
@@ -324,7 +336,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AppContext.tsx` | 720 | 59 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
-| `appContext.types.ts` | 232 | 6 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
+| `appContext.types.ts` | 232 | 7 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/context/feed — 1 файлов, 89 строк
 
@@ -356,9 +368,9 @@
 | `useCalendarSchedule.ts` | 127 | 2 | CalendarTask, UseCalendarScheduleParams, CalendarScheduleResult, useCalendarSchedule |  |
 | `useComposerMedia.ts` | 203 | 1 | UseComposerMediaOptions, useComposerMedia |  |
 | `useGlobalHotkeys.ts` | 54 | 1 | useGlobalHotkeys |  |
-| `useItemActions.ts` | 280 | 3 | PRIORITY_LABELS, TYPE_LABELS, useItemActions |  |
+| `useItemActions.ts` | 280 | 4 | PRIORITY_LABELS, TYPE_LABELS, useItemActions |  |
 | `useLayerStack.ts` | 122 | 1 | AppLayer, useLayerStack |  |
-| `usePresence.ts` | 92 | 28 | usePresence | Keeps the existing DOM during exit. CSS owns the duration and destination. |
+| `usePresence.ts` | 92 | 29 | usePresence | Keeps the existing DOM during exit. CSS owns the duration and destination. |
 | `useSuggestedActions.ts` | 276 | 1 | ActionHistoryEntry, useSuggestedActions |  |
 
 ## src/hooks/gestures — 6 файлов, 1091 строк
@@ -382,7 +394,7 @@
 | `useIsMobile.ts` | 35 | 2 | useIsMobile | Hook to detect mobile screens (< 768px by default). |
 | `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight | Publishes the visual viewport height as `--vvh`. |
 
-## src/lib — 17 файлов, 3450 строк
+## src/lib — 17 файлов, 3467 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -398,7 +410,7 @@
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
-| `searchService.ts` | 175 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
+| `searchService.ts` | 192 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
 | `taskCompletion.ts` | 35 | 1 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
 | `taskUtils.ts` | 101 | 10 | parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, PRIORITY_LABELS | Extracts subtasks from markdown checkboxes: `- [ ] title` or `- [x] title`. |
 | `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
@@ -436,7 +448,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentEnrichment.ts` | 603 | 4 | resolveRelayMedia, canEnrichAttachments, buildImageInstruction, extractFocalContext, dataUrlToBlob, +3 | Subscription mode routes images and audio through the relay: the Groq key liv… |
-| `audioHelper.ts` | 186 | 6 | AudioTrack, AudioScopeMode, AudioTypeFilter, detectAudioFormat, splitAudioName, +6 |  |
+| `audioHelper.ts` | 186 | 10 | AudioTrack, AudioScopeMode, AudioTypeFilter, detectAudioFormat, splitAudioName, +6 |  |
 | `audioSpectrum.ts` | 439 | 3 | OrbFeatures, ORB_SILENCE, ORB_FFT_SIZE, createSpectrumReader | Features for the liquid orb. |
 | `byteCodec.ts` | 16 | 3 | bytesToBase64, base64ToBytes, toArrayBuffer |  |
 | `deviceGallery.ts` | 40 | 1 | isDeviceGalleryAvailable, getGalleryAccess, requestGalleryAccess, listDeviceMedia, DeviceMediaItem, +1 | The device gallery. Only Android has one: rows come from MediaStore through |
@@ -530,5 +542,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 131 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 137 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
