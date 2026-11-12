@@ -44,12 +44,15 @@
 `npm run check` — 0 ошибок и 0 предупреждений на каждом шаге, `npm run build` — зелёный.
 e2e за сессию: `feed` 20/20 (трижды), `workspace` 49/53/72 (после починки спек), `mobile` 21/21, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `sync_connection_lifecycle` + `sync_push_transport` + `sync_pending_pull` (7 зелёных после починки), `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout`, `backup_restore` 2/2.
 
+**проверено за сессию** (6 воркеров, если не сказано иное): `feed` 20/20 (трижды), `mobile` 21/21, `workspace` 10 passed + 1 skip, `sync_push_transport` + `sync_pending_pull` + `sync_connection_lifecycle` 10/10, `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout` 1/1, `backup_restore` 2/2, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4.
+
 ## что осталось
 
 1. `syncEngine` (871): начальный синк (`init` — сто строк), админ устройств, http-доставка и pull. шов «доставка» пробовали — тянет 17 членов, один `commitPush` связывает всё; режется только сокет.
 2. `storage` (672): CRUD записей, черновики и настройки в одном классе.
 3. `AppContext` (719): состояние хранилищ и папок, слои Escape, объект контекста на 150 полей.
-4. `components/Settings/DevicesSettingsTab.tsx` (536) — следующий кандидат: список устройств, карточка устройства и его права в одном файле.
+4. `components/Editor/FullscreenEditor.tsx` (990), `components/Audio/AudioPanel.tsx` (714), `components/UI/ContextMenu.tsx` (711) — последние крупные не-разметочные компоненты.
+5. **`e2e/slag/views.spec.ts` красный на 9 тестах из 22** — все ассистентские (24, 25.1–25.4, 26, 27, 5) плюс 28 (аудио). проверено на baseline `2d1c945`: те же падения, к рефакторингу отношения не имеют. это отдельная задача: спеки ждут текстов и ответов, которые офлайн-цепочка больше не выдаёт.
 
 ## заметки
 
