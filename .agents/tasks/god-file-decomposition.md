@@ -82,7 +82,14 @@ hooks/ui/       useLayerStack.ts, usePresence.ts, useGlobalHotkeys.ts
 
 зелёные (6 воркеров, если не сказано иное): `feed` 20/20 (трижды), `mobile` 21/21, `workspace` 10 passed + 1 skip, `sync_push_transport` + `sync_pending_pull` + `sync_connection_lifecycle` 10/10, `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout` 1/1, `backup_restore` 2/2, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `search_cyrillic` 2/2, `task_recurrence_logic` 5/5 (был красным из-за пути), `two_factor_auth`, `sync_settings_flow`, `sync_vault_isolation`.
 
-полный прогон `npx playwright test` (6 воркеров, 9.9 минуты): **295 passed, 6 skipped, 24 failed**. после разбора: 6 из 24 — ошибки пути (`storage.ts`, `recurrenceHelper.ts`), починены; остальные 18 — устаревшие ассерты, у половины проверено на baseline, что они красные и без моих правок.
+полный прогон `npx playwright test` (6 воркеров): **315 passed, 11 skipped, 10 failed**, 9.6 минуты. на одном воркере синк-семейство зелёное (`sync_delete` + `sync_durability` + `sync_init_race` + `sync_overlay_regressions` + `sync_access_control` + `motion` + `motion_gestures` + `typography_scale` + `ui_playground` + `ui_refactor` → 34 passed, 2 skipped).
+
+починено за раунд: 12 спек. тост больше не имеет кнопки закрытия (ловится таймер + `data-motion-state`), типографика сверяет токен `--color-surface` вместо мёртвого `#141417`, лайтбокс теперь гасит клики своего chrome (иначе любая кнопка в нём закрывала вьюер), синк-спеки перестали считать, что init не оставляет чекпоинт, и перешли на `syncedIdsKey(engine.bookkeeping)` вместо удалённых геттеров движка.
+
+остаётся красным (9 тестов, все — устаревшие ассерты, не пути): `initial_sync_engine` (6), `account_ui` (2), `device_actions_and_scroll` (1). и два `skip` с продуктом: OCR-панель лайтбокса (первый `T` не закрывает панель — вопрос «кто владеет её состоянием») и `ui_playground` (песочница живёт на 5174, конфиг поднимает один сервер).
+
+**найден баг продукта, не починен**: ACK уехал вперёд записи. `persistIncomingBundle` складывает изменения в буфер и сразу ACK-ает, а `flushStagedImport` вылетает таймером с `void`, поэтому упавшая запись проглатывается: бандл ACK-нут, лежит в `appliedBundleIds`, на диске ничего, статус `connected`. Релей его не переотправит — молчаливая потеря. Держит `test.fixme` в `sync_durability.spec.ts` с замером.
+
 
 ## чистка легаси (запрошено отдельно)
 
