@@ -33,6 +33,11 @@ export class AttachmentStore {
    */
   private dataUrlCache: Map<string, string> = new Map();
   private persistedIds: Set<string> = new Set();
+  /**
+   * IndexedDB writes, one at a time: two puts of the same id land in call order, and the queue
+   * gives a caller something to await (`flush`) when the page is about to go away.
+   */
+  private writeQueue: Promise<void> = Promise.resolve();
 
   private readonly attachmentsDir: () => string;
 
@@ -161,7 +166,7 @@ export class AttachmentStore {
   public async importSynced(attachment: SlagAttachment, dataUrl: string): Promise<void> {
     this.urlCache.delete(attachment.id);
     this.nameIndex = null;
-    await idbSaveAttachment({ ...attachment, dataUrl });
+    await this.enqueueWrite({ ...attachment, dataUrl });
     await this.persistOne({ ...attachment, dataUrl });
     mediaLog.info(
       `Imported synced attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB, ${attachment.mimeType})`,
@@ -172,19 +177,39 @@ export class AttachmentStore {
   public persistNew(items: SlagItem[]): void {
     for (const item of items) {
       for (const att of item.attachments || []) {
-        if (att.dataUrl && !this.dataUrlCache.has(att.id)) this.save(att);
+        if (att.dataUrl && !this.dataUrlCache.has(att.id)) void this.save(att);
       }
     }
   }
 
-  public save(attachment: SlagAttachment): void {
+  public save(attachment: SlagAttachment): Promise<void> {
     // Bytes go to IndexedDB; the note keeps only the id. `localStorage` would count every photo
     // against the same five megabytes the whole note index lives in.
     if (attachment.dataUrl) this.dataUrlCache.set(attachment.id, attachment.dataUrl);
-    void idbSaveAttachment(attachment);
+    const write = this.enqueueWrite(attachment);
     fsLog.info(
       `Saved attachment "${attachment.name}" (${attachment.type}, ${Math.round(attachment.size / 1024)} KB)`,
     );
+    return write;
+  }
+
+  /**
+   * A save is not something a caller has to await: it lands in the queue, one write after
+   * another, and a failure is logged instead of taking the rest of the queue down with it.
+   */
+  private enqueueWrite(attachment: SlagAttachment): Promise<void> {
+    const write = this.writeQueue
+      .then(() => idbSaveAttachment(attachment))
+      .catch((err) => {
+        fsLog.warn(`Failed to write attachment ${attachment.id} to IndexedDB`, err);
+      });
+    this.writeQueue = write;
+    return write;
+  }
+
+  /** Resolves once every write queued so far has reached IndexedDB. */
+  public flush(): Promise<void> {
+    return this.writeQueue;
   }
 
   /** Put back the bytes of the session's own attachments, so the UI sees them as it always has. */

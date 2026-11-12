@@ -529,8 +529,9 @@ export async function enrichAttachment(
       enrichmentError: undefined,
     };
 
-    // Cache updated attachment in local storage
-    storage.saveAttachment(enriched);
+    // The bytes are what makes the enrichment usable later, and this path is already async:
+    // waiting for the write here closes the window where a reload loses the cached copy.
+    await storage.saveAttachment(enriched);
     return enriched;
   } catch (err: any) {
     enrichLog.warn(`Enrichment failed for "${attachment.name}":`, err?.message || err);

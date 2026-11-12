@@ -119,8 +119,13 @@ export class StorageService {
     return this.attachments.importSynced(attachment, dataUrl);
   }
 
-  public saveAttachment(attachment: SlagAttachment): void {
-    this.attachments.save(attachment);
+  public saveAttachment(attachment: SlagAttachment): Promise<void> {
+    return this.attachments.save(attachment);
+  }
+
+  /** Resolves when the attachment bytes queued so far have reached IndexedDB. */
+  public flushAttachments(): Promise<void> {
+    return this.attachments.flush();
   }
 
   /**
