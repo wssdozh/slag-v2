@@ -301,10 +301,10 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     });
   });
 
-  // Skipped on a product bug, not on a stale selector: the offline chain feeds the raw
-  // message to `search_notes`, whose multi-token hits come back in vault order and are cut
-  // at five before any ranking, so a phrase query drops the very note it matched. The typo
-  // here ("прафилам" -> "правилами") is also two edits away, past the documented tolerance 1.
+  // Skipped on a product gap, not on a stale selector. Orama order is kept now (it used to be
+  // replaced by vault order), but the multi-token pass unions a hit per token, so filler words
+  // like «по» and «как» match the whole vault and drown the one note the typo actually caught.
+  // Ranking by rarity of the matched token is a separate job; until then this scenario is a lie.
   test.skip('24. Typo-Tolerant Note Search and Multi-step Agentic Tool Calling Verification', async ({ page }) => {
     // 1. Switch to Assistant tab
     const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
@@ -317,13 +317,17 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     await textarea.fill('поищи по заметкам по прафилам как жить вообще');
     await textarea.press('Enter');
 
-    // 3. Verify that typo "прафилам" matches "12 правил эффективности"
-    const matchedLink = page.locator('[role="button"], span', { hasText: '12 правил эффективности' }).first();
-    await expect(matchedLink).toBeVisible({ timeout: 5000 });
+    // 3. The typo still finds the note, and it is the top hit rather than the fifth.
+    // Results collapse past three, so open the list when the header is there.
+    const searchHeader = page.locator('button', { hasText: /Найдено \d+ в хранилище/ }).first();
+    if (await searchHeader.isVisible().catch(() => false)) await searchHeader.click();
+    const matchedResult = page.locator('button[title*="12 правил эффективности"]').first();
+    await expect(matchedResult).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('button[title^="Перейти к"]').first()).toHaveAttribute('title', /12 правил эффективности/);
     await expect(page.locator('text=записей не найдено')).not.toBeVisible();
 
-    // 4. Test clicking the wikilink inside the chat message
-    await matchedLink.click();
+    // 4. Clicking the result jumps to the note in the feed
+    await matchedResult.click();
 
     // 5. Test another conversational query with transformation intent
     await textarea.fill('сделай статью на этот счет');
