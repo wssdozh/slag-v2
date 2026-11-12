@@ -111,33 +111,58 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   expect(headerBox).not.toBeNull();
   expect(stripBox).not.toBeNull();
   expect(headerBox!.y + headerBox!.height).toBeLessThan(stripBox!.y + 4);
+  // `hover()` waits until the strip holds still at its current centre: a box measured
+  // earlier can be stale while the card reflows, and a stale point misses the strip —
+  // the drag then moves no playhead at all. The seek itself is read off the element,
+  // with a budget, because the browser may deliver the pointer events late under load.
+  await strip.hover();
   const box = await strip.boundingBox();
   expect(box).not.toBeNull();
-  await page.mouse.move(box!.x + box!.width * 0.5, box!.y + box!.height / 2);
   await page.mouse.down();
   await page.mouse.move(box!.x + box!.width * 0.75, box!.y + box!.height / 2, { steps: 6 });
   await page.mouse.up();
-  await page.waitForTimeout(200);
-
-  const time = await card.locator('audio').first().evaluate((el: HTMLAudioElement) => el.currentTime);
-  console.log('SEEK', time.toFixed(2));
-  expect(time).toBeGreaterThan(2.4);
+  await expect
+    .poll(() => card.locator('audio').first().evaluate((el: HTMLAudioElement) => el.currentTime), {
+      message: 'dragging the strip moves the real playhead',
+      timeout: 5000,
+    })
+    .toBeGreaterThan(2.4);
 
   // One player at a time: starting the second pauses the first, and the first says so.
   const players = card.locator('audio');
   const firstButton = card.locator('button[title*="Воспроизвести"], button[title*="Пауза"]').nth(0);
   const secondButton = card.locator('button[title*="Воспроизвести"], button[title*="Пауза"]').nth(1);
   await firstButton.click();
-  await page.waitForTimeout(300);
+  // `paused` on the element is the state the row is armed in; the title only follows it
+  // after the `play` event. The collision guard pauses the first row synchronously inside
+  // the second row's `play` event, so the invariant is polled instead of slept on.
+  await expect
+    .poll(() => players.nth(0).evaluate((el: HTMLAudioElement) => el.paused), {
+      message: 'the first row actually starts playing',
+      timeout: 5000,
+    })
+    .toBe(false);
   await secondButton.click();
-  await page.waitForTimeout(300);
+  await expect
+    .poll(() => players.evaluateAll((els: HTMLAudioElement[]) => els.map(el => el.paused)), {
+      message: 'starting the second row leaves exactly one playhead',
+      timeout: 5000,
+    })
+    .toEqual([true, false]);
   const pausedStates = await players.evaluateAll((els: HTMLAudioElement[]) => els.map(el => el.paused));
-  const titles = await card.locator('button[title*="Воспроизвести"], button[title*="Пауза"]').evaluateAll(
-    (els: HTMLButtonElement[]) => els.map(el => el.title),
-  );
-  console.log('PAUSED', JSON.stringify(pausedStates), 'TITLES', JSON.stringify(titles));
+  console.log('PAUSED', JSON.stringify(pausedStates));
   expect(pausedStates[0]).toBe(true);
   expect(pausedStates[1]).toBe(false);
+  // The paused row says so on its own button, not just in the media element.
+  await expect
+    .poll(
+      () =>
+        card
+          .locator('button[title*="Воспроизвести"], button[title*="Пауза"]')
+          .evaluateAll((els: HTMLButtonElement[]) => els.map(el => el.title)),
+      { message: 'buttons follow the playhead', timeout: 5000 },
+    )
+    .toEqual(['Воспроизвести', 'Пауза']);
 
   await card.screenshot({ path: 'test-results/screenshots/voice-card-names.png' });
 

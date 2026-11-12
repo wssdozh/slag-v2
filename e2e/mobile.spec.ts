@@ -636,7 +636,10 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // The player has no header anymore: the panel starts right under the safe area.
     await expect(page.locator('header h1', { hasText: 'Плеер' })).toHaveCount(0);
-    await expect(page.locator('main')).toBeVisible();
+    // The shell keeps its own <main> and the panel mounts a second one inside it, so a
+    // bare `main` resolves to two elements while the screen swaps and the strictness
+    // check fires depending on mount timing. Wait for the panel's main, not any main.
+    await expect(page.locator('main main')).toBeVisible();
 
     // Verify player transport or placeholder is visible
     const playerView = page.locator('text=В папке нет аудиозаписей').or(page.locator('button[aria-label="Воспроизведение"]')).first();
