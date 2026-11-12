@@ -18,6 +18,7 @@ export { accountClient };
 import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
 import { SyncTransport } from './transport';
+import { connectSocket, handleIncoming, acknowledgeBundle } from './syncSocket';
 import {
   addTrustedDeviceToConfig,
   setDeviceAllowedVaultsInConfig,
@@ -116,7 +117,7 @@ export class SyncEngine {
   /** Attachments with no bytes on this device, so every push does not re-stat the same files. */
   private unreadableAttachments = new Set<string>();
   public entityHashes = new Map<string, { sig: string; hash: string }>();
-  private transport: SyncTransport;
+  public transport: SyncTransport;
 
   constructor() {
     this.transport = new SyncTransport({
@@ -546,7 +547,7 @@ export class SyncEngine {
         }));
         this.notify();
       }
-      this.connectWebSocket();
+      connectSocket(this);
       this.startIntervals();
       await pushLocalChanges(this);
       this.scheduleAttachmentPass();
@@ -600,18 +601,12 @@ export class SyncEngine {
     this.transport.setWebSocket(val);
   }
 
-  private connectWebSocket(): void {
-    this.transport.connect({
-      serverUrl: this.config.serverUrl,
-      deviceId: this.config.deviceId,
-      vaultId: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
-      roomId: this.activeRoomId || '',
-      enabled: this.config.enabled,
-    });
+  public connectWebSocket(): void {
+    connectSocket(this);
   }
 
   public async handleIncomingMessage(data: string): Promise<void> {
-    await this.transport.handleIncomingMessage(data);
+    await handleIncoming(this, data);
   }
 
   private incomingQueue: Promise<void> = Promise.resolve();
@@ -632,14 +627,7 @@ export class SyncEngine {
   }
 
   public async sendAck(bundleId: string): Promise<void> {
-    await this.transport.sendAck({
-      bundleId,
-      roomId: this.activeRoomId,
-      serverUrl: this.config.serverUrl,
-      vaultId: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
-      deviceId: this.config.deviceId,
-      authHeaders: (includeJson) => authHeaders(this, includeJson),
-    });
+    await acknowledgeBundle(this, bundleId);
   }
 
   
