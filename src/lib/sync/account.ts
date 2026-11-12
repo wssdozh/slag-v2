@@ -242,7 +242,13 @@ class AccountClient {
       requireSecureAccountTransport(this.serverUrl);
       headers.set('Authorization', `Bearer ${token}`);
     }
-    const response = await fetch(`${this.serverUrl}${path}`, { ...init, headers });
+    // A relay that accepts the request and then says nothing used to hold the caller forever:
+    // the sync status stayed "syncing" and the sidebar spinner span all session.
+    const response = await fetch(`${this.serverUrl}${path}`, {
+      ...init,
+      headers,
+      signal: init.signal ?? AbortSignal.timeout(15_000),
+    });
     const text = await response.text();
     let data: unknown = null;
     if (text) {

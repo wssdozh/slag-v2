@@ -697,6 +697,9 @@ export class SyncEngine {
         method: 'POST',
         headers: authHeaders(this, true),
         body: JSON.stringify(pending.encrypted),
+        // Without a deadline a relay that accepts and stalls keeps `init` in its `syncing` phase
+        // forever, so the sidebar shows a spinner that never resolves.
+        signal: AbortSignal.timeout(30_000),
       });
       if (!response.ok) {
         if (response.status === 409) {
