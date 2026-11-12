@@ -1,3 +1,4 @@
+// Pure date math for the phone calendar: week strip, three-day window, month heading, shifts.
 /**
  * calendarRange.ts — чистые вычисления календарной сетки мобильного календаря:
  * недельный стрип, трёхдневное окно, заголовок месяца и переходы по датам.

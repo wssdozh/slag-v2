@@ -1,3 +1,4 @@
+// The +AI button: asks the model for folder and tags, spinning while the call runs.
 import React from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { ToolbarButton } from '../../UI/ToolbarButton';

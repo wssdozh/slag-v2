@@ -1,3 +1,4 @@
+// A checkbox with a label and hint, toggled by click or keyboard for settings rows.
 import React from 'react';
 import { Check } from 'lucide-react';
 

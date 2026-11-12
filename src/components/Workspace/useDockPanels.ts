@@ -1,3 +1,4 @@
+// Dockview wiring: default layout, panel creation, tab menus, and saving the layout.
 import { useCallback } from 'react';
 import type {
   DockviewApi,

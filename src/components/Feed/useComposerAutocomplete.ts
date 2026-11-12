@@ -1,3 +1,4 @@
+// The composer's suggestions: which trigger is open, what it matches, and applying a row.
 import { useState, useMemo } from 'react';
 import type { SlagItem, FolderMeta } from '../../types';
 import type { TagMeta } from './TagSuggestionMenu';

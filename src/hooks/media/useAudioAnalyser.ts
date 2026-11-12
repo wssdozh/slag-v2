@@ -1,3 +1,4 @@
+// Owns the one Web Audio graph per audio element, feeding the spectrum orb.
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { logger } from '../../lib/logger/logger';

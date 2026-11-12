@@ -1,3 +1,4 @@
+// First settings tab: who you are, plan limits, usage, and where to go next.
 import React, { useEffect, useState } from 'react';
 import { Laptop, UserRound } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

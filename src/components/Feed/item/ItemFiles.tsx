@@ -1,3 +1,4 @@
+// File attachments on a card: one download row each, with size and the summary.
 import React, { memo } from 'react';
 import { Download, FileText } from 'lucide-react';
 import { formatBytes } from '../../../lib/text/formatBytes';

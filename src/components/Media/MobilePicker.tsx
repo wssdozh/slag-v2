@@ -1,3 +1,4 @@
+// The phone picker: photo, video, audio and file tabs over one selection, plus fullscreen.
 import React, { useRef, useState } from 'react';
 import { Maximize2, Mic, Minimize2 } from 'lucide-react';
 import { ResponsiveSegmented, type SegmentedOption } from '../UI/ResponsiveSegmented';

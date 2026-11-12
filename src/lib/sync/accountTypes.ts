@@ -1,3 +1,4 @@
+// Shapes of the relay account API: plans, devices, vault grants and invitations.
 import type { DeviceSyncMode } from './types';
 
 export interface AccountInfo {

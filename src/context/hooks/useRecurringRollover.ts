@@ -1,3 +1,4 @@
+// Rolls recurring tasks over at midnight and after the tab wakes, with no user.
 import { useCallback, useEffect } from 'react';
 import { evaluateRecurringTasks, getISODateString } from '../../lib/time/recurrenceHelper';
 import { logger } from '../../lib/logger/logger';

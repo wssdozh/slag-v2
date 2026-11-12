@@ -1,3 +1,4 @@
+// Renders markdown with GFM and turns Obsidian [[wiki links]] into in-app jumps.
 import React, { useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';

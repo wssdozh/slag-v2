@@ -1,3 +1,4 @@
+// Runs the assistant loop: prompt, model turn, local tools, until the reply is final.
 import type { ChatToolCall, BatchUpdateItem, SuggestedAction } from '../../types';
 import type {
   AdapterTurnHistoryItem,

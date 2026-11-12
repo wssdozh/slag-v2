@@ -1,3 +1,4 @@
+// The shared blank slate: an icon, one line of why it is empty, an optional action.
 import React from 'react';
 
 export interface EmptyStateProps {

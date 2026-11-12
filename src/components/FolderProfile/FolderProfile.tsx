@@ -1,3 +1,4 @@
+// One folder profile in three containers: dock panel, modal and phone screen.
 import React, { useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { itemsInFolder } from '../../lib/vault/folderItems';

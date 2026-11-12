@@ -1,3 +1,4 @@
+// Formats a byte count for UI labels, and stays silent when the size is unknown.
 export function formatBytes(bytes?: number): string {
   if (!bytes || bytes <= 0) return '';
   if (bytes < 1024) return `${bytes} B`;

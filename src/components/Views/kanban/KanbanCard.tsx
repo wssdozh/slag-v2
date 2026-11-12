@@ -1,3 +1,4 @@
+// A task card on the board: status glyph, key, due date, tags, and its drag handle.
 import React from 'react';
 import { useApp } from '../../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../../types';

@@ -1,3 +1,4 @@
+// Cover tile plus the title parsed out of the file name, including the missing state.
 import React from 'react';
 import { FileX } from 'lucide-react';
 import type { AudioTrack } from '../../../lib/media/audioHelper';

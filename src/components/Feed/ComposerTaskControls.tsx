@@ -1,3 +1,4 @@
+// The task-only composer controls: due date, duration, recurrence and priority.
 import React, { useState } from 'react';
 import { Calendar, Clock, Repeat } from 'lucide-react';
 import type { RecurrenceRule, SlagItemPriority } from '../../types';

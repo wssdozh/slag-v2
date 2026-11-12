@@ -1,3 +1,4 @@
+// Edits the phone dock: which tabs appear, in what order, dragged into place.
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { MobileTabId } from '../../types';

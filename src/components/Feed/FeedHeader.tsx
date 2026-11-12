@@ -1,3 +1,4 @@
+// The feed's header: folder name and icon, filter badges, sort, materials toggle.
 import React, { useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';

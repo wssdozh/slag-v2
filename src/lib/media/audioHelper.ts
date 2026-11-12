@@ -1,3 +1,4 @@
+// Builds the playable audio library from note attachments: format, duration, cover, voice.
 import type { SlagItem, InboxMode } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 

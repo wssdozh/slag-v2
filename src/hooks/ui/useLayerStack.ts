@@ -1,3 +1,4 @@
+// LIFO dismiss stack shared by Escape and Android/browser back, synced to history.
 import { useCallback, useEffect, useRef } from 'react';
 
 export interface AppLayer {

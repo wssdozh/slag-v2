@@ -1,3 +1,4 @@
+// Vault switcher as a dropdown or phone sheet: pick, create, reveal, delete.
 import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isDesktopApp } from '../../lib/platform/windowControls';

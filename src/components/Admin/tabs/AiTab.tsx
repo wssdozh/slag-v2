@@ -1,3 +1,4 @@
+// Admin AI tab: gateway status, request/token totals, model split and the call log.
 import React from 'react';
 import { DistributionGauge } from '../Charts';
 import type { AiLog, AiStats, AnalyticsData } from '../useAdminData';

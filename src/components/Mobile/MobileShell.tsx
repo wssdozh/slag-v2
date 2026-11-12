@@ -1,3 +1,4 @@
+// The phone shell: which tab is on screen, and the edge swipe that goes back.
 import React, { useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MobileFoldersView } from './MobileFoldersView';

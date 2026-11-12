@@ -1,3 +1,4 @@
+// Feed right-click entries: the three create actions plus folder and search jumps.
 import React from 'react';
 import { FolderOpen, Search, CheckSquare, FileText, StickyNote } from 'lucide-react';
 import type { SlagItem, SlagItemType } from '../../../types';

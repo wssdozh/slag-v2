@@ -1,3 +1,4 @@
+// The per-folder view settings sheet: layout, sort, filters, and resetting them.
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FeedViewMode, SlagItemType, SortField, InboxMode } from '../../types';

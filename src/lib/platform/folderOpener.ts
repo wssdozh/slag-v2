@@ -1,3 +1,4 @@
+// Opens logs, notes or backups in the OS file manager, with a toast when no shell exists.
 import { isDesktopApp } from './windowControls';
 import { logger } from '../logger/logger';
 

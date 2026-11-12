@@ -1,3 +1,4 @@
+// Composer's record controls: hold or lock, audio/video switch, finish and send.
 import { useState, useRef, useEffect } from 'react';
 import { UI_DELAYS } from '../../config';
 

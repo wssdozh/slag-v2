@@ -1,3 +1,4 @@
+// The task row inside the editor: status, priority, due date, duration, recurrence.
 import React from 'react';
 import type { SlagItemStatus, RecurrenceRule } from '../../../types';
 import { LinearSignalBars } from '../../UI/PriorityBadge';

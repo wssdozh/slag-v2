@@ -1,3 +1,4 @@
+// Line and word diffs for the note history view, with both sides numbered.
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export interface WordChunk {

@@ -1,3 +1,4 @@
+// The assistant's input row: model picker, send, and a nudge to connect when no key.
 import React from 'react';
 import { Globe } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';

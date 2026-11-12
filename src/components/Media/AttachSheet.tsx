@@ -1,3 +1,4 @@
+// The one place that attaches things: device picker on a phone, system dialog on desktop.
 import React, { useCallback, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/ui/usePresence';

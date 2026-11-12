@@ -1,3 +1,4 @@
+// A separate playground entry for eyeballing modals and settings on an isolated origin.
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';

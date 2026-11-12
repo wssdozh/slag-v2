@@ -1,3 +1,4 @@
+// The two task shapes on the calendar: the all-day pill and the timed block with handles.
 import React from 'react';
 import type { SlagItem } from '../../types';
 import type { LayoutPositionedTask } from '../../lib/time/calendarLayout';

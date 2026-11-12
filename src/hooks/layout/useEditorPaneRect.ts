@@ -1,3 +1,4 @@
+// Measures the dockview pane a note opened from, before paint, and follows resizes.
 import { useLayoutEffect, useState } from 'react';
 
 export interface EditorPaneRect {

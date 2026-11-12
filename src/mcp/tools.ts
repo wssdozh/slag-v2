@@ -1,3 +1,4 @@
+// MCP tools that read and write notes, tasks and folders in a vault over JSON-RPC.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpVault } from './vault';
 import {

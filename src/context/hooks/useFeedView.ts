@@ -1,3 +1,4 @@
+// The feed's view state: folder, mode, filters, sorting, persisted per folder.
 import { useCallback, useMemo, useState } from 'react';
 import type {
   AiItemFilter,

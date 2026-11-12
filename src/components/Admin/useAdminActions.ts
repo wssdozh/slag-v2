@@ -1,3 +1,4 @@
+// Admin mutations: plan changes, blocks, device revoke, grants and refunds.
 import type { Dispatch, SetStateAction } from 'react';
 import type { AdminAccount } from './useAdminData';
 import { shortId } from '../../lib/text/shortId';

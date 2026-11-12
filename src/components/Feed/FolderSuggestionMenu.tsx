@@ -1,3 +1,4 @@
+// The `@folder` autocomplete: filtered folder rows, the selected one, and placement.
 import React from 'react';
 import { Folder } from 'lucide-react';
 import type { FolderMeta } from '../../types';

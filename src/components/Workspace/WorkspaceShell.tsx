@@ -1,3 +1,4 @@
+// The desktop workspace: the dockview shell holding feed, Kanban, calendar, audio, logs.
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FeedViewMode } from '../../types';

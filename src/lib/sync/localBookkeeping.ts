@@ -1,3 +1,4 @@
+// What this device sent, knows and deleted, so a push stays a diff instead of a resend.
 import { SYNC_STORAGE_KEYS } from '../../config';
 
 /**

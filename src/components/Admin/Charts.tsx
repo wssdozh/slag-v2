@@ -1,3 +1,4 @@
+// Dependency-free SVG charts — sparkline, bars, donut, funnel — for the admin tabs.
 import React, { useState } from 'react';
 
 export interface DataPoint {

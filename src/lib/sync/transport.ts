@@ -1,3 +1,4 @@
+// The websocket link to the relay: connect, heartbeat, reconnect, route incoming bundles.
 import { logger } from '../logger/logger';
 import { accountClient } from './account';
 import { SYNC_INTERVALS } from '../../config';

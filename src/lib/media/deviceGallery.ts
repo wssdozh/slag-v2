@@ -1,3 +1,4 @@
+// Lists photos and videos from the Android media store, which the webview cannot query.
 import { invoke } from '@tauri-apps/api/core';
 import type { DeviceMediaItem, DeviceMediaKind, DeviceMediaPage, GalleryAccess } from '../../types';
 

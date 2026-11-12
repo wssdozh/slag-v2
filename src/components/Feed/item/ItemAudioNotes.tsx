@@ -1,3 +1,4 @@
+// The card's voice notes, a player each: waveform, transcript and the enrichment summary.
 import React, { memo } from 'react';
 import { AudioPlayer } from '../../UI/AudioPlayer';
 import type { AttachmentSrcs } from '../../../hooks/media/useAttachmentSrc';

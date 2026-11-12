@@ -1,3 +1,4 @@
+// One-finger deck for the full-screen viewer: pager, pinch, pan, swipe to close.
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motionEase, motionMs } from '../../lib/motion';
 

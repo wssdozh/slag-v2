@@ -1,3 +1,4 @@
+// Reports the desktop OS, session type and hotkey backend so settings can adapt.
 import { isTauri } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
 

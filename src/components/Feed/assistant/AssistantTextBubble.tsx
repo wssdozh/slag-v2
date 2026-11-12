@@ -1,3 +1,4 @@
+// One chat bubble: markdown with embedded task blocks split out of the same text.
 import React from 'react';
 import { MarkdownRenderer } from '../../UI/MarkdownRenderer';
 import { ChatTaskBlock } from '../chat/ChatTaskBlock';

@@ -1,3 +1,4 @@
+// Shared placement and presence for the suggestion lists, plus keeping the row in view.
 import React, { useEffect, useRef } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 

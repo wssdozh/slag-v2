@@ -1,3 +1,4 @@
+// Admin console shell: server/token login and five tabs over the relay's API.
 import React, { useEffect, useState } from 'react';
 import {
   CreditCard,

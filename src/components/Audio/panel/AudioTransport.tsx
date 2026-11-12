@@ -1,3 +1,4 @@
+// The transport row: play, skip, speed, shuffle, loop, mute, and the queue toggle.
 import React from 'react';
 import {
   Play,

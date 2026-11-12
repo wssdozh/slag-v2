@@ -1,3 +1,4 @@
+// Folder media browser: images, audio, files, links and tags in one tab strip.
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import {
   Image as ImageIcon,

@@ -1,3 +1,4 @@
+// The kit's one button: four tones, three sizes, optional icon, ref-forwarded.
 import React from 'react';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

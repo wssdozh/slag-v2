@@ -1,3 +1,4 @@
+// Queues unsent sync operations per vault, compacting repeats of the same entity.
 import type { SyncOperation } from '../entities/types';
 
 function keyFor(vaultId: string): string {

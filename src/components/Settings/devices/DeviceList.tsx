@@ -1,3 +1,4 @@
+// Connected devices: this machine first, then each paired one with its status.
 import React from 'react';
 import { Laptop, Smartphone } from 'lucide-react';
 import type { AccountDevice } from '../../../lib/sync/accountTypes';

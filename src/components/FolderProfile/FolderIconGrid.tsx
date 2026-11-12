@@ -1,3 +1,4 @@
+// Icon picker grid shared by the desktop popover and the phone sheet.
 import React from 'react';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';
 

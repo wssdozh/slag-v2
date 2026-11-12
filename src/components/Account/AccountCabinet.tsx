@@ -1,3 +1,4 @@
+// Full-page account cabinet: sign in, seed phrase, devices and vault sharing.
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Database, KeyRound, Laptop, Loader2, LogOut, Shield, Smartphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

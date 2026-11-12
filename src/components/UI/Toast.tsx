@@ -1,3 +1,4 @@
+// The toast stack: pauses on hover, flicks away, carries one action or an undo.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { ToastMessage } from '../../context/AppContext';

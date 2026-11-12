@@ -1,3 +1,4 @@
+// Backups: scheduled and manual snapshots on disk, restore, and the zip round trip.
 import { useCallback, useEffect, useState } from 'react';
 import type { BackupSettings, BackupSnapshotMeta } from '../../types';
 import { backupService } from '../../lib/backupService';

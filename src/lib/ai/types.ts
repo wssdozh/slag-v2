@@ -1,3 +1,4 @@
+// The contract between the assistant loop and a protocol adapter: request, reply, history.
 import type { AiSettings, ChatToolCall, FolderMeta, SlagItem, SuggestedAction } from '../../types';
 
 export interface AssistantToolDefinition {

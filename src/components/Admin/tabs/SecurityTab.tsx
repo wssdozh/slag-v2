@@ -1,3 +1,4 @@
+// Admin security tab: blocked accounts, revoked devices, encryption note, audit log.
 import React from 'react';
 import type { AuditLog } from '../useAdminData';
 import { shortId } from '../../../lib/text/shortId';

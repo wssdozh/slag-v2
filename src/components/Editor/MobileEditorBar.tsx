@@ -1,3 +1,4 @@
+// The phone formatting bar: style, list and AI popovers above a single save button.
 import React from 'react';
 import {
   Heading1,

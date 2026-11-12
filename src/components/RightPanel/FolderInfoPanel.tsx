@@ -1,3 +1,4 @@
+// Dock-width container for the folder profile, bound to the current folder.
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';

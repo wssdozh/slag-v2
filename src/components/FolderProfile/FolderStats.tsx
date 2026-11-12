@@ -1,3 +1,4 @@
+// The folder's six counters, laid out as rows, an inline strip or a grid.
 import React from 'react';
 import type { FolderMediaData } from '../RightPanel/useFolderMedia';
 import { FOLDER_STATS } from './folderStatsConfig';

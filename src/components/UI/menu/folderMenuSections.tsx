@@ -1,3 +1,4 @@
+// Folder right-click entries: info, new subfolder, explorer and the guarded delete.
 import React from 'react';
 import { Trash2, FolderPlus, FolderOpen, Info, ChevronRight } from 'lucide-react';
 import type { FolderMeta } from '../../../types';

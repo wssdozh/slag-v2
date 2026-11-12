@@ -1,3 +1,4 @@
+// The audio panel: track scope and type filters, transport controls, and the queue.
 import React, { useMemo, useState } from 'react';
 import { Folder, Pin } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

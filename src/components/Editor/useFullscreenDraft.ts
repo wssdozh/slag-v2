@@ -1,3 +1,4 @@
+// The editor's draft: every editable field, dirty tracking, autosave and the save call.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { storage } from '../../lib/storage';
 import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, ComposerDraft } from '../../types';

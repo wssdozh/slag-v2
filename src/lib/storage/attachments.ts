@@ -1,3 +1,4 @@
+// Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs instead.
 import type { SlagAttachment, SlagItem } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';

@@ -1,3 +1,4 @@
+// Kanban columns config plus the small pure helpers the board and its cards share.
 import type { SlagItem, TaskStatus } from '../../../types';
 
 export type KanbanColumnIconType = 'dashed' | 'circle' | 'in_progress' | 'done';

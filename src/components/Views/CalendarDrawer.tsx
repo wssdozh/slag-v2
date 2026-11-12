@@ -1,3 +1,4 @@
+// The calendar's side drawer: overdue and unscheduled tasks, draggable onto the grid.
 import React from 'react';
 import type { SlagItem } from '../../types';
 import {

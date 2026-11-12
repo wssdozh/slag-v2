@@ -1,3 +1,4 @@
+// The context's public contract and the shapes passed around it, kept out of state.
 /**
  * The contract AppContext exposes to every consumer, plus the shapes the UI
  * passes around it. Kept apart from the provider so reading the API does not

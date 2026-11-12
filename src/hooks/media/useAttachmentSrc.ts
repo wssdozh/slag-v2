@@ -1,3 +1,4 @@
+// Resolves attachment ids to object URLs on demand, keeping media bytes out of notes.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { storage } from '../../lib/storage';
 import type { SlagAttachment } from '../../types';

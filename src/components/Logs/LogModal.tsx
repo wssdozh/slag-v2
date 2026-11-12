@@ -1,3 +1,4 @@
+// Modal shell for the log viewer: opens from the global hotkey and closes above the app.
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { LogViewer } from './LogViewer';

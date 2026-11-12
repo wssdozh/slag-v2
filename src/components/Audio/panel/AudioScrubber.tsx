@@ -1,3 +1,4 @@
+// The seek bar: click or drag anywhere on the track to scrub, time labels at both ends.
 import React, { useCallback, useRef } from 'react';
 import { formatAudioDuration } from '../../../lib/media/audioHelper';
 

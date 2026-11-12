@@ -1,3 +1,4 @@
+// One line of the agenda: status, time, title, folder, and the button for task actions.
 import React from 'react';
 import type { SlagItem } from '../../../types';
 import { getTaskTimeSlot } from '../../../lib/time/todoistTaskParser';

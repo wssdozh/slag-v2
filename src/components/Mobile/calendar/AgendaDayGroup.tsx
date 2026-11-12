@@ -1,3 +1,4 @@
+// One day of the agenda: its heading, the now line, task rows, and adding a task inline.
 import React from 'react';
 import type { SlagItem } from '../../../types';
 import { pluralRu, RUSSIAN_MONTHS } from '../../../lib/time/dateUtils';

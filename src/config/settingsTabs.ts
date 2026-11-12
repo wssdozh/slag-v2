@@ -1,3 +1,4 @@
+// Names and orders the settings sections once, so desktop and mobile cannot drift.
 import { Database, Keyboard, Laptop, RefreshCw, Sliders, Sparkles, Terminal, UserRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 

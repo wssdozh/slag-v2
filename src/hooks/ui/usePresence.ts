@@ -1,3 +1,4 @@
+// Keeps a surface in the DOM through its exit transition, so CSS can finish it.
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { TransitionEvent } from 'react';
 

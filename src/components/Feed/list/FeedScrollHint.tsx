@@ -1,3 +1,4 @@
+// Two floating tips at the feed edges: pull-to-search, and a jump to the newest note.
 import React, { memo } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 import { UI_GESTURES } from '../../../config';

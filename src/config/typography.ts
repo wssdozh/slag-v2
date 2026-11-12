@@ -1,3 +1,4 @@
+// Font families and size scales the interface offers, as CSS stacks and multipliers.
 import type { UiFontFamily, UiFontScale } from '../types';
 
 export interface FontFamilyOption {

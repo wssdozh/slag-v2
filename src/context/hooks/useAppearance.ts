@@ -1,3 +1,4 @@
+// Density, font and accent: presets to localStorage and then to CSS variables.
 import { useCallback, useEffect, useState } from 'react';
 import type { AppUiConfig, DeviceUiConfig } from '../../types';
 import { ACCENT_COLORS, STORAGE_KEYS } from '../../config';

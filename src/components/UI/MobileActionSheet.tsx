@@ -1,3 +1,4 @@
+// Phone action sheet for a feed item: drag to dismiss, the same actions as right-click.
 import React, { useCallback, useState } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';

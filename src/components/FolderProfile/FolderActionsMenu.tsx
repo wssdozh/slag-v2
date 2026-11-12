@@ -1,3 +1,4 @@
+// The one ⋯ menu for a folder: rename, move and delete in every container.
 import React from 'react';
 import { FolderInput, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { MenuDropdown } from '../UI/MenuDropdown';

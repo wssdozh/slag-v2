@@ -1,3 +1,4 @@
+// The card's corner: reply, and the way into the focus editor for an article.
 import React, { memo } from 'react';
 import { CornerUpLeft, Maximize2 } from 'lucide-react';
 

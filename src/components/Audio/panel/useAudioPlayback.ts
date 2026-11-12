@@ -1,3 +1,4 @@
+// Drives the one audio element: track index, play state, speed, loop, shuffle, scrubbing.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { storage } from '../../../lib/storage';

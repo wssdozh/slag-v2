@@ -1,3 +1,4 @@
+// The bottom-sheet shell: detents, drag-to-fold, velocity-aware release, scroll handoff.
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { prefersReducedMotion } from '../../lib/motion';
 

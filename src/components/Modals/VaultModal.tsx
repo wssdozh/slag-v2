@@ -1,3 +1,4 @@
+// The vault switcher: choose a store, create one on a backend, or delete one.
 import React, { useState } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';

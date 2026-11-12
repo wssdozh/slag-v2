@@ -1,3 +1,4 @@
+// Per-device vault access dialog: grant mode and a toggle for each vault.
 import React from 'react';
 import { Database } from 'lucide-react';
 import type { AccountDevice, AccountVault } from '../../../lib/sync/accountTypes';

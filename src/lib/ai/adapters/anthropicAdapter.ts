@@ -1,3 +1,4 @@
+// Speaks the Anthropic Messages protocol: tools, tool results and reasoning blocks.
 import type { LlmProtocolAdapter, LlmAdapterTurnRequest, LlmAdapterTurnResponse } from '../types';
 import { logger } from '../../logger/logger';
 import { extractErrorMessage } from './errorMessage';

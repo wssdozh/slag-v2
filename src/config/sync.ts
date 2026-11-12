@@ -1,3 +1,4 @@
+// Sync defaults: relay URL, storage keys, retry and debounce timings, bundle size cap.
 export const DEFAULT_SYNC_SERVER_URL = 'http://152.53.199.71:8320';
 
 export const OFFICIAL_SYNC_DOMAINS = ['152.53.199.71', 'slag.app'] as const;

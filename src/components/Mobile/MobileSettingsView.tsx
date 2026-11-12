@@ -1,3 +1,4 @@
+// The phone settings tab: grouped rows, live sync status, and the vault switcher.
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { syncEngine } from '../../lib/sync/syncEngine';

@@ -1,3 +1,4 @@
+// Phone frame for the audio panel: safe-area padding and nothing of its own.
 import React from 'react';
 import { AudioPanel } from '../Audio/AudioPanel';
 

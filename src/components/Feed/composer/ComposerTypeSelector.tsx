@@ -1,3 +1,4 @@
+// The note / task / article switch at the bottom of the composer.
 import React from 'react';
 import { CheckSquare, FileText, StickyNote } from 'lucide-react';
 import { ResponsiveSegmented, type SegmentedOption } from '../../UI/ResponsiveSegmented';

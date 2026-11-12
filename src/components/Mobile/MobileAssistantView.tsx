@@ -1,3 +1,4 @@
+// The phone's assistant tab: a chat under a screen header, scoped to the open folder.
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { AssistantChat } from '../Feed/AssistantChat';

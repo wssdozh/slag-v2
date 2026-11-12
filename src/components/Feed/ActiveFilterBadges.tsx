@@ -1,3 +1,4 @@
+// The removable chips for whatever narrows the feed: type, tag, folder, pinned.
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';

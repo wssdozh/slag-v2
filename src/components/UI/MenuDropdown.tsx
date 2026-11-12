@@ -1,3 +1,4 @@
+// Anchored popover menu that flips and clamps itself inside the viewport, portal-rendered.
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { usePresence } from '../../hooks/ui/usePresence';

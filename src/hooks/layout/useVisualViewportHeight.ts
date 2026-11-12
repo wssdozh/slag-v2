@@ -1,3 +1,4 @@
+// Writes the visual viewport height to --vvh, so the shell shrinks with the keyboard.
 import { useEffect } from 'react';
 
 /**

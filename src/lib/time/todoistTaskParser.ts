@@ -1,3 +1,4 @@
+// Parses Todoist-style quick input into title, due date, tags, priority, duration, repeat.
 import * as chronoRu from 'chrono-node/ru';
 import * as chronoEn from 'chrono-node/en';
 import type { RecurrenceRule } from '../../types';

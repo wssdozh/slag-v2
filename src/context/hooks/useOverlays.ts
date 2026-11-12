@@ -1,3 +1,4 @@
+// Everything above the app: modals, lightbox, context menu, toasts, confirm, attach sheet.
 import { useCallback, useRef, useState } from 'react';
 import type {
   ConfirmOptions,

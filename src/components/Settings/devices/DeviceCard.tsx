@@ -1,3 +1,4 @@
+// The modal shell that shows one device and the vaults it can reach.
 import React from 'react';
 import { Shield, X } from 'lucide-react';
 import type { AccountDevice } from '../../../lib/sync/accountTypes';

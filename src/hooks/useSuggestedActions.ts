@@ -1,3 +1,4 @@
+// Applies, rejects and undoes the actions the assistant proposes in chat.
 import { useCallback } from 'react';
 import type { SlagItem, SlagItemType, ChatMessage, SuggestedAction, ItemUpdates } from '../types';
 import { applyItemUpdates } from '../lib/vault/itemUpdates';

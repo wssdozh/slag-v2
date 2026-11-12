@@ -1,3 +1,4 @@
+// The mono trace of tool calls a reply made: name plus the query it ran, nothing else.
 import React from 'react';
 import { Terminal } from 'lucide-react';
 import type { ChatToolCall } from '../../../types';

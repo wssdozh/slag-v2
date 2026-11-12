@@ -1,3 +1,4 @@
+// Fullscreen photo and video viewer: paging, chrome that idles away, full bytes on demand.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Check } from 'lucide-react';

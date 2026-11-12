@@ -1,3 +1,4 @@
+// A folder's own writes: save, describe, rename, delete and the create modal.
 import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { FolderMeta } from '../../types';

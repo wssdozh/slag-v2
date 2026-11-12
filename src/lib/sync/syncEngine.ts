@@ -1,3 +1,4 @@
+// Owns sync: config, push of local changes, apply of incoming bundles, status reporting.
 import { storage } from '../storage';
 import { persistIncomingBundle } from './applyBundle';
 import { pushLocalChanges } from './pushBundle';

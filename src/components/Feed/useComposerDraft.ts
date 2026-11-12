@@ -1,3 +1,4 @@
+// The composer draft on disk: restore, autosave, reset, and repairing pre-reply stubs.
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type {
   SlagItemType,

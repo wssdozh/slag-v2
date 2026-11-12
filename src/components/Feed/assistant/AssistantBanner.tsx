@@ -1,3 +1,4 @@
+// Chat header strip: which folder the assistant is looking at, and clearing the thread.
 import React from 'react';
 import { Sparkles, Trash2 } from 'lucide-react';
 

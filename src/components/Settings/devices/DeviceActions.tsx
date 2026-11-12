@@ -1,3 +1,4 @@
+// Device row widgets: inline rename, revoke, and the local sync mode picker.
 import React, { useState } from 'react';
 import { Copy, Edit2, Loader2, Trash2, X } from 'lucide-react';
 import type { AccountDevice } from '../../../lib/sync/accountTypes';

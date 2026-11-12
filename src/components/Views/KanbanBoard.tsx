@@ -1,3 +1,4 @@
+// The Kanban board: columns by status, drag between them, and the materials dock.
 import React, { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';

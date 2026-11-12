@@ -1,3 +1,4 @@
+// Video circle notes on a card: plays in place, the corner opens the full viewer.
 import React, { memo } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { VideoCirclePlayer } from '../../UI/VideoCirclePlayer';

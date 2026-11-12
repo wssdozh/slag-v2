@@ -1,3 +1,4 @@
+// Priority as four Linear-style signal bars, plus the matching badge for task rows.
 import React from 'react';
 
 export type TaskPriority = 'none' | 'low' | 'medium' | 'high';

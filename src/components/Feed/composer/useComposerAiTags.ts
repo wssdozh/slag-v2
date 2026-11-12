@@ -1,3 +1,4 @@
+// +AI in the composer: writes the suggested folder and tags back as @ and # tokens.
 import { useState } from 'react';
 import type React from 'react';
 import type { AiSettings, FolderMeta } from '../../../types';

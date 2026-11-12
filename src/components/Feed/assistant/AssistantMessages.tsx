@@ -1,3 +1,4 @@
+// The thread: empty-state prompts, message bubbles, tool traces, and scroll to the newest.
 import React, { useEffect, useRef } from 'react';
 import {
   Sparkles,

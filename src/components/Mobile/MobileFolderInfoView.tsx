@@ -1,3 +1,4 @@
+// Phone folder page: the profile fills the screen and editing happens in place.
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';

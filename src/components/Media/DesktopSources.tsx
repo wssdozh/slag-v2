@@ -1,3 +1,4 @@
+// Desktop's attach shortcuts: images, files and voice, each behind a system dialog.
 import React, { useRef } from 'react';
 import { FileUp, Images, Mic } from 'lucide-react';
 

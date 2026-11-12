@@ -1,3 +1,4 @@
+// Turning the draft into a record on submit: reply link, files, AI tags, then reset.
 import { useRef } from 'react';
 import type React from 'react';
 import type {

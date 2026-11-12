@@ -1,3 +1,4 @@
+// The 24-hour three-day grid: day headers, all-day band, hour rail, and timed blocks.
 import React from 'react';
 import type { SlagItem } from '../../../types';
 import { RUSSIAN_WEEKDAYS } from '../../../lib/time/dateUtils';

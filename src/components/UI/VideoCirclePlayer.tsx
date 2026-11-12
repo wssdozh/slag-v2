@@ -1,3 +1,4 @@
+// Round Telegram-style video bubble: tap to play, mute toggle, progress ring.
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { bindMediaEvents } from '../../lib/media/mediaEvents';

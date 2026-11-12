@@ -1,3 +1,4 @@
+// The dashed frame over the feed while files hover: what dropping them will do.
 import React, { memo } from 'react';
 import { UploadCloud } from 'lucide-react';
 

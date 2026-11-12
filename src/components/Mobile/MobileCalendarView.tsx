@@ -1,3 +1,4 @@
+// The phone calendar: agenda and three-day modes, day swipes, and a month picker.
 import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';

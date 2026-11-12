@@ -1,3 +1,4 @@
+// Keeps deleted notes in a per-vault trash, so restore and purge happen before sync.
 import type { SlagItem, VaultMeta } from '../../types';
 import { STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';

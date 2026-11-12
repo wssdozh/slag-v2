@@ -1,3 +1,4 @@
+// Turns unresolved track sources into the drawer's missing-bytes list and renders it.
 import React from 'react';
 import type { AudioScopeMode, AudioTrack, AudioTypeFilter } from '../../../lib/media/audioHelper';
 import type { FolderMeta } from '../../../types';

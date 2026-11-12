@@ -1,3 +1,4 @@
+// The action set behind every item menu: open, reply, pin, move, decompose, delete.
 import { useApp } from '../context/AppContext';
 import { categorizeDraft, generateSmartTags } from '../lib/ai/aiService';
 import { storage, getSafeNoteFilename } from '../lib/storage';

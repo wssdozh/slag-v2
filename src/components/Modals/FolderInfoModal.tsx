@@ -1,3 +1,4 @@
+// The folder dialog: its profile, plus triage, a new note, and its tags as filters.
 import React, { useState } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';

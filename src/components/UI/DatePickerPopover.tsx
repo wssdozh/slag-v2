@@ -1,3 +1,4 @@
+// Picks a due date: month grid, quick today/tomorrow/next-week, and a clear action.
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   getMonthCalendarDays,

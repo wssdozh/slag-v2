@@ -1,3 +1,4 @@
+// Turns the flat folder list into the one tree of picker options every menu shares.
 import type { FolderMeta } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 

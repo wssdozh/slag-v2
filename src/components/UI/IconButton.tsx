@@ -1,3 +1,4 @@
+// Square icon-only button in three sizes and three tones, for dense toolbars.
 import React from 'react';
 
 export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

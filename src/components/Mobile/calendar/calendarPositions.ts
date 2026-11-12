@@ -1,3 +1,4 @@
+// Pure agenda and time-grid geometry: row order, now line, hour rail and pixels, no JSX.
 /**
  * calendarPositions.ts — чистая раскладка повестки: порядок строк, линия «сейчас»,
  * геометрия таймлайна. Минуты и пиксели вместо JSX, чтобы это можно было проверить

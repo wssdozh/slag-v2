@@ -1,3 +1,4 @@
+// The reply-to banner above the composer that collapses instead of vanishing.
 import React, { useState } from 'react';
 import { CornerUpLeft } from 'lucide-react';
 import type { ReplyTarget } from '../../../types';

@@ -1,3 +1,4 @@
+// Names a vault for the UI, adding a short id suffix only when two names collide.
 import type { VaultMeta } from '../../types';
 
 export function getVaultDisplayName(vault: VaultMeta, vaults: VaultMeta[]): string {

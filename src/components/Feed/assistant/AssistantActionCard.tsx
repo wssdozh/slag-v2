@@ -1,3 +1,4 @@
+// The confirmation card for an AI action: what it will do, a diff, apply or dismiss.
 import React from 'react';
 import {
   Calendar,

@@ -1,3 +1,4 @@
+// Files into the composer: picker, drop and paste, with no opinion on titles or tags.
 import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
 import type { SlagAttachment } from '../../../types';

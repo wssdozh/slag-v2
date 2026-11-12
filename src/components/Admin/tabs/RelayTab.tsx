@@ -1,3 +1,4 @@
+// Admin relay tab: uptime, rooms, storage and the purge/cleanup/vacuum controls.
 import React from 'react';
 import { BarChart } from '../Charts';
 import type { AdminRoom, AdminStats, AnalyticsData } from '../useAdminData';

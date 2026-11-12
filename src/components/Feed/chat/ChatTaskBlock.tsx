@@ -1,3 +1,4 @@
+// A task rendered inside a chat reply: title plus checkbox lines, read-only.
 import React from 'react';
 import { Check, CheckSquare } from 'lucide-react';
 import { MarkdownRenderer } from '../../UI/MarkdownRenderer';

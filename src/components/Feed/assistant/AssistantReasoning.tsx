@@ -1,3 +1,4 @@
+// Collapsible reasoning trace under a reply, with how long the model spent on it.
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
 

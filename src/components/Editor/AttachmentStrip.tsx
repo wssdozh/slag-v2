@@ -1,3 +1,4 @@
+// The editor's attachment rail: reorder, remove, insert into the text, inline players.
 import React from 'react';
 import type { LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';

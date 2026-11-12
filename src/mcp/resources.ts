@@ -1,3 +1,4 @@
+// MCP resources: folder map, pending tasks and notes a client can read without a tool.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpVault } from './vault';

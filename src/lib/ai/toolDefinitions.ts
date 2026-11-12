@@ -1,3 +1,4 @@
+// Declares the tool schemas once, so every protocol adapter sends the same set.
 import type { AssistantToolDefinition } from './types';
 import { APP_GUIDE_TOPICS } from './appGuide';
 import { ITEM_UPDATES_SCHEMA } from '../vault/itemSchema';

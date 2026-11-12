@@ -1,3 +1,4 @@
+// Mouse grab-to-scroll with a click threshold and Apple-style flick momentum.
 import { useEffect, useRef } from 'react';
 
 export interface DragToScrollOptions<T extends HTMLElement = HTMLElement> {

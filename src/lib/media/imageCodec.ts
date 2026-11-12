@@ -1,3 +1,4 @@
+// Shrinks and re-encodes images on a canvas before storage, sync or sending to the model.
 import { AI_LIMITS } from '../../config';
 
 export interface EncodedImage {

@@ -1,3 +1,4 @@
+// Translates a storage change into the sync operation the relay understands.
 import type { StorageChangeEvent } from '../../storage';
 import type { SyncOperation } from './types';
 

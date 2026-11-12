@@ -1,3 +1,4 @@
+// Admin data loader and its API types: stats, accounts, analytics, audit log.
 import { useCallback, useState } from 'react';
 
 // Interfaces from AdminPanel.tsx

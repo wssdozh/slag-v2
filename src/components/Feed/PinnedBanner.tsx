@@ -1,3 +1,4 @@
+// The pinned strip over the feed: cycles this folder's pinned notes and jumps to them.
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Pin, CheckSquare, FileText, StickyNote } from 'lucide-react';

@@ -1,3 +1,4 @@
+// The overdue block above the week: counted, tinted red, and absent when empty.
 import React from 'react';
 import type { SlagItem } from '../../../types';
 import { AlertCircle } from 'lucide-react';

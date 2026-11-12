@@ -1,3 +1,4 @@
+// Splits tasks into overdue, unscheduled and per-day buckets, expanding recurrences.
 import { useMemo } from 'react';
 import type { SlagItem } from '../types';
 import { getTodayString } from '../lib/time/dateUtils';

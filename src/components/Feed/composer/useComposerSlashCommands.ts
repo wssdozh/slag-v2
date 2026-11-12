@@ -1,3 +1,4 @@
+// What a `/command` does to the draft: swap the type, set a property, start a recorder.
 import type React from 'react';
 import type { SlagItemPriority, SlagItemType } from '../../../types';
 import type { SlashCommand } from '../../../types/slashCommands';

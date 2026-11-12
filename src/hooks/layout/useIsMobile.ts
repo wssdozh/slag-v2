@@ -1,3 +1,4 @@
+// Tracks whether the viewport sits below the mobile breakpoint, on load and resize.
 import { useState, useEffect } from 'react';
 import { UI_BREAKPOINTS } from '../../config';
 

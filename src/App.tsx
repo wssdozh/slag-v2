@@ -1,3 +1,4 @@
+// The app shell: routes, lazy-loaded screens, viewport height and global overlays.
 import React, { useCallback, useState, useEffect, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { navigatePage } from './lib/navigation';

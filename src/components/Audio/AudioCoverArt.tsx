@@ -1,3 +1,4 @@
+// The album art stand-in: a live spectrum orb that settles once playback pauses.
 import React, { useEffect, useRef } from 'react';
 import type { AudioTrack } from '../../lib/media/audioHelper';
 import { createSpectrumReader, ORB_SILENCE, type OrbFeatures } from '../../lib/media/audioSpectrum';

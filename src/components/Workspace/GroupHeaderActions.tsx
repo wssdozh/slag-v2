@@ -1,3 +1,4 @@
+// The `+` menu on a dock group: spawns another panel inside that same group.
 import React, { useState, useEffect, useRef } from 'react';
 import type {
   IDockviewHeaderActionsProps,

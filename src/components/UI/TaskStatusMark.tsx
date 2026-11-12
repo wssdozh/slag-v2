@@ -1,3 +1,4 @@
+// Round task status glyph whose check stroke draws itself when the task is completed.
 import React from 'react';
 
 export interface TaskStatusMarkProps {

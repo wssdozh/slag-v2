@@ -1,3 +1,4 @@
+// The assistant view: thread state, input, expanded traces, and the diff it opens.
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';

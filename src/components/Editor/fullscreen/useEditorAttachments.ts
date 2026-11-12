@@ -1,3 +1,4 @@
+// Getting files into the editor: picker, drop, paste, and the `![[file]]` link they leave.
 import { useCallback, useState } from 'react';
 import type React from 'react';
 import type { EditorView } from '@codemirror/view';

@@ -1,3 +1,4 @@
+// Pure windowing for the feed: how many cards stay mounted and when to grow the window.
 import type { SlagItem } from '../../../types';
 import { noteGapPx } from '../../../lib/time/dateUtils';
 

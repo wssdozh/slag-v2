@@ -1,3 +1,4 @@
+// Normalizes device records from the account and derives the subscription shown in settings.
 import type { DeviceProfile, DeviceSyncMode, SyncConfig, SyncStatus } from './types';
 import type { AccountState } from './account';
 import { generateDeviceId, generateMnemonic } from './crypto';

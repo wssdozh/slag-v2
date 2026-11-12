@@ -1,3 +1,4 @@
+// Plays a note's audio: waveform scrub, speed, transcript and on-demand enrichment.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { formatAudioDuration, audioTrackLabel } from '../../lib/media/audioHelper';

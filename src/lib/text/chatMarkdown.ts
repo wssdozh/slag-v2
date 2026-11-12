@@ -1,3 +1,4 @@
+// Splits an assistant reply into markdown and fenced task blocks the chat renders as cards.
 export type ChatSegment = 
   | { kind: "markdown"; text: string } 
   | { kind: "task"; title: string; lines: string[] };

@@ -1,3 +1,4 @@
+// The seven-day strip: weekday, number, and a dot when that day has tasks.
 import React from 'react';
 import { RUSSIAN_WEEKDAYS } from '../../../lib/time/dateUtils';
 import type { CalendarDay } from './calendarRange';

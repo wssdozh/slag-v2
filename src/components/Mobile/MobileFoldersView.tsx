@@ -1,3 +1,4 @@
+// The phone folder screen: header, feed/Kanban/calendar switch, and the pinned composer.
 import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FeedList } from '../Feed/FeedList';

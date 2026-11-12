@@ -1,3 +1,4 @@
+// Maps a priority to its one colour family; text, dot and chip classes hang off it.
 import type { SlagItemPriority } from '../../types';
 
 /**

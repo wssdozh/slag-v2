@@ -1,3 +1,4 @@
+// The `#tag` suggestions: matching vault tags with usage counts, keyboard selection.
 import React from 'react';
 import { Hash } from 'lucide-react';
 import { SuggestionMenuHeader } from './SuggestionMenuHeader';

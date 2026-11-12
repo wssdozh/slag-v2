@@ -1,3 +1,4 @@
+// IndexedDB blob store for attachment bytes and backup snapshots, keyed by id.
 import type { SlagAttachment, BackupSnapshotMeta } from '../../types';
 import { logger } from '../logger/logger';
 

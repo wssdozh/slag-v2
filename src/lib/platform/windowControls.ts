@@ -1,3 +1,4 @@
+// Window chrome and platform checks: main window, minimize, maximize, desktop or mobile.
 import { isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';

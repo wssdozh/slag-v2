@@ -1,3 +1,4 @@
+// FLIP motion for a list: moved cards glide, one new card lands, scroll stays still.
 import { useLayoutEffect, useRef } from 'react';
 import { motionEase, motionMs, prefersReducedMotion } from '../../lib/motion';
 

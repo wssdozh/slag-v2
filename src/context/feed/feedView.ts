@@ -1,3 +1,4 @@
+// Which records the feed shows and in what order — the inbox's three modes as a pure filter.
 import type { AiItemFilter, InboxMode, SlagItem, SlagItemType, SortField, SortOrder } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 

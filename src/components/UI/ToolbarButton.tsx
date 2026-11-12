@@ -1,3 +1,4 @@
+// Square toolbar button with an active glow, for editor, calendar and view chrome.
 import React from 'react';
 
 export interface ToolbarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

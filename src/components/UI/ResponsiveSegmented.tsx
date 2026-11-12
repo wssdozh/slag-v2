@@ -1,3 +1,4 @@
+// Segmented control that collapses into a dropdown once the row no longer fits.
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { MenuDropdown } from './MenuDropdown';
 import { ChevronDown, Check } from 'lucide-react';

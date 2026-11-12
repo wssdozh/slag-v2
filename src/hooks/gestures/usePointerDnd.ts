@@ -1,3 +1,4 @@
+// Pointer-based drag and drop: one live gesture, hover zones, payload on drop.
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { logger } from '../../lib/logger/logger';
 

@@ -1,3 +1,4 @@
+// A single day blown up: all of its tasks, with add, drag and complete right there.
 import React from 'react';
 import type { SlagItem } from '../../types';
 import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';

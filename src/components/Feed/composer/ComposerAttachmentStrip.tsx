@@ -1,3 +1,4 @@
+// The tray of what is about to be sent: attachment chips, each removable.
 import React from 'react';
 import { Paperclip, X } from 'lucide-react';
 import type { SlagAttachment } from '../../../types';

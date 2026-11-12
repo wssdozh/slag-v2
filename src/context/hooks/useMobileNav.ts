@@ -1,3 +1,4 @@
+// Which phone surface is showing and how we got there: tabs, push, pop, dock order.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { MobileTabId, SlagItem, WorkspaceState } from '../../types';

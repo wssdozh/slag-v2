@@ -1,3 +1,4 @@
+// The slash-command palette: trigger, aliases, icon and what each command inserts.
 import React from 'react';
 import {
   CheckSquare,

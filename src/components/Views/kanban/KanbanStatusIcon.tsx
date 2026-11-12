@@ -1,3 +1,4 @@
+// The Linear-style status glyph shared by a column header and the card's quick switcher.
 import React from 'react';
 import { CircleDashed, Circle, CheckCircle2 } from 'lucide-react';
 import type { KanbanColumnIconType } from './kanbanModel';

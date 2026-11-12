@@ -1,3 +1,4 @@
+// Bytes to base64 and back without a Buffer, for crypto and file payloads in the browser.
 export function bytesToBase64(buffer: ArrayBuffer | Uint8Array): string {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   let binary = '';

@@ -1,3 +1,4 @@
+// Speaks the OpenAI chat-completions protocol, including tool calls and hosted search.
 import type { LlmProtocolAdapter, LlmAdapterTurnRequest, LlmAdapterTurnResponse } from '../types';
 import { logger } from '../../logger/logger';
 import { extractErrorMessage } from './errorMessage';

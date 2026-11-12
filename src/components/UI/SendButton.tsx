@@ -1,3 +1,4 @@
+// The round accent arrow that confirms: send, attach or save, one plate for all forms.
 import React from 'react';
 import { ArrowUp } from 'lucide-react';
 

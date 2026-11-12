@@ -1,3 +1,4 @@
+// Folder header: name, icon, path, counters and the inline edit controls.
 import React, { useMemo } from 'react';
 import { Folder, Pencil, X } from 'lucide-react';
 import type { FolderMeta } from '../../types';

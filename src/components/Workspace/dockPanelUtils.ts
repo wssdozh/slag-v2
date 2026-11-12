@@ -1,3 +1,4 @@
+// The workspace panel registry: ids, icons, width limits, and layout persistence.
 import type { DockviewApi, IDockviewPanel } from 'dockview-react';
 import { logger } from '../../lib/logger/logger';
 import { isDesktopApp, openDetachedWindow } from '../../lib/platform/windowControls';

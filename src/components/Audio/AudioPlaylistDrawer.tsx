@@ -1,3 +1,4 @@
+// The play queue drawer: search, type filters, folder scope, and missing-bytes state.
 import React, { useState, useMemo } from 'react';
 import { X, Search, Mic, Music, Play, Pause, ExternalLink, FileX } from 'lucide-react';
 import type { AudioTrack, AudioTypeFilter } from '../../lib/media/audioHelper';

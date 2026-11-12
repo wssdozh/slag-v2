@@ -1,3 +1,4 @@
+// The vault interchange format: export, import and backup JSON, apart from persistence.
 import type {
   ChatMessage,
   ComposerDraft,

@@ -1,3 +1,4 @@
+// Derives account and device keys, and wraps one vault key for one specific device.
 import { p256 } from '@noble/curves/nist.js';
 import { validateMnemonic } from './crypto';
 import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../media/byteCodec';

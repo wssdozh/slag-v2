@@ -1,3 +1,4 @@
+// Admin billing tab: revenue, expiring plans, transactions and manual grants.
 import React, { useState } from 'react';
 import { SparklineChart, FunnelChart } from '../Charts';
 import type { AdminAccount, AnalyticsData, BillingStats, BillingTransaction } from '../useAdminData';

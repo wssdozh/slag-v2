@@ -1,3 +1,4 @@
+// Paged device gallery rows, with the permission state kept next to the items.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getGalleryAccess, listDeviceMedia, requestGalleryAccess } from '../../lib/media/deviceGallery';
 import type { DeviceMediaItem, DeviceMediaKind, GalleryAccess, GalleryPermission } from '../../types';

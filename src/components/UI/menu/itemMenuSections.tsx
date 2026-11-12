@@ -1,3 +1,4 @@
+// Item right-click entries: reply, pin, type switch, AI split, copy and delete.
 import React from 'react';
 import {
   Maximize2,

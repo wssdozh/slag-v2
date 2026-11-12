@@ -1,3 +1,4 @@
+// Composes the assistant system prompt: today's tasks, folder context and tone rules.
 import type { SlagItem, FolderMeta } from '../../types';
 
 interface BuildSystemPromptParams {

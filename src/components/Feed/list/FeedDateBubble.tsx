@@ -1,3 +1,4 @@
+// The day separator between feed groups: today, yesterday, or a plain date.
 import React, { memo } from 'react';
 
 export interface FeedDateBubbleProps {

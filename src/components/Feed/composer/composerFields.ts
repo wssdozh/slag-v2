@@ -1,3 +1,4 @@
+// Merges what the draft text says with what was picked, skipping dismissed chips.
 import type {
   FolderMeta,
   RecurrenceRule,

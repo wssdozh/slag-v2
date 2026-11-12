@@ -1,3 +1,4 @@
+// The shared header of composer suggestions, with key hints only for a precision pointer.
 import React from 'react';
 
 interface SuggestionMenuHeaderProps {

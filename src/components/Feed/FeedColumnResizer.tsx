@@ -1,3 +1,4 @@
+// Drag handles that set the feed's reading width and keep it as a CSS variable.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { UI_LAYOUT } from '../../config/ui';
 import { STORAGE_KEYS } from '../../config/storage';

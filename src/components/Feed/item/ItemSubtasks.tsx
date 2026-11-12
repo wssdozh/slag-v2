@@ -1,3 +1,4 @@
+// A task's subtasks: one counter, one toggleable line each, collapsible.
 import React, { memo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { MarkdownRenderer } from '../../UI/MarkdownRenderer';

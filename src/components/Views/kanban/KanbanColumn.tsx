@@ -1,3 +1,4 @@
+// One board column: header with counter, its cards, the drop highlight, an add button.
 import React from 'react';
 import { useApp } from '../../../context/AppContext';
 import type { SlagItem } from '../../../types';

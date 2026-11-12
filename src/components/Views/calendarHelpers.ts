@@ -1,3 +1,4 @@
+// Calendar-only lookups: the priority badge palette, duration label, title cleanup.
 import type { SlagItemPriority } from '../../types';
 import { priorityTone } from '../UI/priorityTone';
 

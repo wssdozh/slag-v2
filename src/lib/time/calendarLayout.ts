@@ -1,3 +1,4 @@
+// Day-calendar geometry: which column a timed task takes and how tall its block is.
 import type { SlagItem } from '../../types';
 import { getTaskTimeSlot, type TaskTimeSlot } from './todoistTaskParser';
 

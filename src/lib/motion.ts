@@ -1,3 +1,4 @@
+// Reads the CSS motion tokens as numbers, so JS animation timing matches theme.css.
 import { flushSync } from 'react-dom';
 
 /**

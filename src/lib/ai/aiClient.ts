@@ -1,3 +1,4 @@
+// Resolves provider, key, model and wire protocol, then sends one assistant turn.
 import type { AiSettings } from '../../types';
 import type { LlmProtocolAdapter } from './types';
 import { syncEngine } from '../sync/syncEngine';

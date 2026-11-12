@@ -1,3 +1,4 @@
+// The sync channel: status, server address, schedule; account and devices sit nearby.
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, PlugZap } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

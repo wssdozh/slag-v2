@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Stdio entry point of the MCP server that exposes one vault to external AI clients.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpVault } from './vault';

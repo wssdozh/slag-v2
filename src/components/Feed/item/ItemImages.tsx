@@ -1,3 +1,4 @@
+// Pictures on a card: one hero or a deck of thumbs, each with OCR text to unfold.
 import React, { memo, useMemo, useState } from 'react';
 import { ChevronDown, FileText, ImageOff, Loader2, Sparkles } from 'lucide-react';
 import type { AttachmentSrcs } from '../../../hooks/media/useAttachmentSrc';

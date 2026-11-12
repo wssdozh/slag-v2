@@ -1,3 +1,4 @@
+// The app's own yes/no for destructive actions, instead of the platform's confirm.
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { BaseModal } from './BaseModal';

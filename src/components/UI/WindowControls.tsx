@@ -1,3 +1,4 @@
+// Desktop-only minimize/maximize/close cluster pinned to the window's top-right corner.
 import React from 'react';
 import { Minus, Square, X } from 'lucide-react';
 import { isDesktopApp, minimizeWindow, toggleMaximizeWindow, closeWindow } from '../../lib/platform/windowControls';

@@ -1,3 +1,4 @@
+// The flyout panels of the context menu: more actions, type switch and explorer.
 import React from 'react';
 import { Copy, FileText, FolderOpen, Link2, CheckSquare, StickyNote, Check } from 'lucide-react';
 import type { FolderMeta, SlagItem, SlagItemType } from '../../../types';

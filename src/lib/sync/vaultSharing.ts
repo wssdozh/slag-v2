@@ -1,3 +1,4 @@
+// Hands a vault key to another device and accepts one, so the vault opens on both.
 import type { VaultMeta } from '../../types';
 import type { AccountDevice } from './accountTypes';
 import type { DeviceSyncMode } from './types';

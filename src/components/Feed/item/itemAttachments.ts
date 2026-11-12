@@ -1,3 +1,4 @@
+// How a card's files split by kind, how many slots they get, and where their bytes are.
 import type { AttachmentSrcs } from '../../../hooks/media/useAttachmentSrc';
 import type { LightboxImage, SlagAttachment, SlagItem } from '../../../types';
 

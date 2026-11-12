@@ -1,3 +1,4 @@
+// Default endpoints, models and size limits for every AI provider the app can reach.
 export const AI_ENDPOINTS = {
   DEFAULT_KIE_BASE_URL: 'https://api.kie.ai',
   DEFAULT_GROQ_BASE_URL: 'https://api.groq.com/openai/v1',

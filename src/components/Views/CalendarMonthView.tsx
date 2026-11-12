@@ -1,3 +1,4 @@
+// The month grid: six weeks of cells, the task pills in each, and drop zones while dragging.
 import React from 'react';
 import type { SlagItem } from '../../types';
 import type { MonthCalendarCell } from '../../lib/time/dateUtils';

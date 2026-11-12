@@ -1,3 +1,4 @@
+// The single state hub: vault, folders, items, overlays, sync and every action.
 /* oxlint-disable react/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type {

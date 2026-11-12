@@ -1,3 +1,4 @@
+// The device gallery grid: paged cells whose thumbnails decode only as they scroll in.
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Lock, Pause, Play, RefreshCw } from 'lucide-react';
 import { UI_DELAYS } from '../../config';

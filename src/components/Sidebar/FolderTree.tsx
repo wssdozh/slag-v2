@@ -1,3 +1,4 @@
+// Nested folder tree in the sidebar: expand, select, drag items between branches.
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';

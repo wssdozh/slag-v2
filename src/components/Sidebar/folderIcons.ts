@@ -1,3 +1,4 @@
+// The icon set a folder can pick from, keyed by the name stored in its meta.
 import React from 'react';
 import {
   Folder,

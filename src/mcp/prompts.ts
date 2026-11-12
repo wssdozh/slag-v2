@@ -1,3 +1,4 @@
+// MCP prompts that walk an agent through triage, daily planning and review.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpVault } from './vault';
 

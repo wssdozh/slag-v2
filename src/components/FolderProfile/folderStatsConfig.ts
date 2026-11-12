@@ -1,3 +1,4 @@
+// The single list of folder counters, labels and the Russian record count.
 import type { ComponentType } from 'react';
 import { CheckSquare, FileText, Image as ImageIcon, Link as LinkIcon, Mic, StickyNote } from 'lucide-react';
 import type { FolderMediaData } from '../RightPanel/useFolderMedia';

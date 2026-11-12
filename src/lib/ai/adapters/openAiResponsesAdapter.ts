@@ -1,3 +1,4 @@
+// Speaks the OpenAI Responses protocol that KIE and DeepSeek endpoints expect.
 import type { LlmProtocolAdapter, LlmAdapterTurnRequest, LlmAdapterTurnResponse } from '../types';
 import { logger } from '../../logger/logger';
 import { extractErrorMessage } from './errorMessage';

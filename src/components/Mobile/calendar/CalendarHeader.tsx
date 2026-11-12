@@ -1,3 +1,4 @@
+// The phone calendar's top row: month dropdown, today button, agenda / 3-day switch.
 import React from 'react';
 import { ChevronDown, ListTodo, Columns } from 'lucide-react';
 import type { MobileCalendarMode } from './calendarRange';

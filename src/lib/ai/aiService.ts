@@ -1,3 +1,4 @@
+// App-facing AI calls: categorize a note, triage a folder, send a chat turn.
 import type { SlagItem, FolderMeta, AiSettings } from '../../types';
 import { storage } from '../storage';
 import { logger } from '../logger/logger';

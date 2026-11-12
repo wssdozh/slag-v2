@@ -1,3 +1,4 @@
+// localStorage keys, the default inbox name and the workspace state a new vault starts in.
 import type { WorkspaceState, FolderMeta, VaultMeta, BackupSettings } from '../types';
 
 export const DEFAULT_INBOX_FOLDER = 'Входящие';

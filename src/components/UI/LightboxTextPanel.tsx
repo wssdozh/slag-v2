@@ -1,3 +1,4 @@
+// OCR results beside a photo in the lightbox, with copy and retry when the pass failed.
 import React, { useCallback, useState } from 'react';
 import { AlertCircle, Check, Copy, FileText, Loader2, RotateCcw, X } from 'lucide-react';
 import type { LightboxImage } from '../../types';

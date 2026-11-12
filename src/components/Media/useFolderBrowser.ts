@@ -1,3 +1,4 @@
+// Granted folders and the entries inside one, loaded only while the picker is open.
 import { useCallback, useEffect, useState } from 'react';
 import { listFolderEntries, listFolders, pickFolder, pickFilesFromSystem } from '../../lib/media/folderBrowser';
 import { logger } from '../../lib/logger/logger';

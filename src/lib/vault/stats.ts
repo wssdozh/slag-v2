@@ -1,3 +1,4 @@
+// Read-only counters and tag tallies, with the inbox treated as the whole vault.
 import type { SlagItem } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 

@@ -1,3 +1,4 @@
+// The dialog frame every modal wears: presence, backdrop, header, footer, Escape.
 import React, { useLayoutEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from '../UI/IconButton';

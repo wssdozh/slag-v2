@@ -1,3 +1,4 @@
+// Records a video memo with a live preview, then hands the clip to the composer.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUp } from 'lucide-react';

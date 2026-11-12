@@ -1,3 +1,4 @@
+// Stepper input: minus/plus buttons and a typed value, clamped to min/max on blur.
 import React from 'react';
 import { Minus, Plus } from 'lucide-react';
 

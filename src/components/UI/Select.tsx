@@ -1,3 +1,4 @@
+// The app's own select: grouped options, icons, colours, a portal list and placement.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';

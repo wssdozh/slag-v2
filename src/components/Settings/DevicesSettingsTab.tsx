@@ -1,3 +1,4 @@
+// Devices tab: paired machines, per-device vault access, and the pairing flow.
 import React, { useEffect, useState } from 'react';
 import { Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';

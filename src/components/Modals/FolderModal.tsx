@@ -1,3 +1,4 @@
+// Creating a folder: name, parent and icon; editing that lives in the folder profile.
 import React, { useMemo, useState } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';

@@ -1,3 +1,4 @@
+// The transparent quick-capture window: hosts the composer and resets between invocations.
 import React, { useState, useEffect, useCallback } from 'react';
 import { Composer } from '../Feed/Composer';
 import { Sparkles, X } from 'lucide-react';

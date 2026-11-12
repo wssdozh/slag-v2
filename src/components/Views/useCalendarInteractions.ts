@@ -1,3 +1,4 @@
+// Timeline state: zooming the hour ruler by dragging it, and stretching a task's duration.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { SlagItem } from '../../types';
 import { formatDurationBadge } from './calendarHelpers';

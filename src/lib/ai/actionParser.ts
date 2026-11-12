@@ -1,3 +1,4 @@
+// Turns the model's reply into typed actions, tolerating fences, chatter and broken JSON.
 import type { SlagItem, SlagItemType, SuggestedAction, BatchUpdateItem, ItemUpdates } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 export function cleanSnippetText(text: string, maxLen = 140): string {

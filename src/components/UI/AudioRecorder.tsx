@@ -1,3 +1,4 @@
+// Records a voice memo in a bottom bar, previews its length, then hands the clip over.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUp } from 'lucide-react';

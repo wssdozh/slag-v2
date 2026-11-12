@@ -1,3 +1,4 @@
+// The composer in a dialog: keeps its last options and folder through the exit.
 import React, { useState } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';

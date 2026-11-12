@@ -1,3 +1,4 @@
+// Pull a list past either end to open search, with rubber-band damping.
 import { useRef, useState } from 'react';
 import { UI_GESTURES } from '../../config';
 

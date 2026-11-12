@@ -1,3 +1,4 @@
+// The search block of a reply: count, expand into the list, open a note or show it inline.
 import React from 'react';
 import {
   ChevronRight,

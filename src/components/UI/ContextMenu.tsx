@@ -1,3 +1,4 @@
+// Right-click menu for items, folders and feed rows: sections, submenus and hover bridge.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';

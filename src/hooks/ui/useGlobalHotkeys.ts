@@ -1,3 +1,4 @@
+// Routes keydown through the APP_COMMANDS catalogue and the top-layer Escape.
 import { useEffect, useRef } from 'react';
 import { APP_COMMANDS, type AppCommandContext, matchesShortcut, isTypingTarget } from '../../lib/commands';
 

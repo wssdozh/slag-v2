@@ -1,3 +1,4 @@
+// Left rail: vault switcher, folder tree, inbox, sync state and settings shortcuts.
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';

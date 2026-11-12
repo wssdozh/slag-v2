@@ -1,3 +1,4 @@
+// The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side panel.
 import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, CornerUpLeft, FileText, MoreVertical, RotateCcw, X, ZoomIn } from 'lucide-react';
 import type { LightboxImage } from '../../types';

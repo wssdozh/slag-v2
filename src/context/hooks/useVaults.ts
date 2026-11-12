@@ -1,3 +1,4 @@
+// A vault's own writes: switch, create, delete, pick its folder and reveal it on disk.
 import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type {

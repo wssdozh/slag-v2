@@ -1,3 +1,4 @@
+// The shared composer shell: growing textarea, slot layout, and the send plate.
 import React, { useRef, useLayoutEffect } from 'react';
 import { UploadCloud } from 'lucide-react';
 import { SendButton } from '../UI/SendButton';

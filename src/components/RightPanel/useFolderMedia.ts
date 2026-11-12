@@ -1,3 +1,4 @@
+// Collects a folder's attachments, links and tags and resolves their bytes once.
 import { useMemo } from 'react';
 import type { SlagItem } from '../../types';
 import type { LightboxImage } from '../UI/ImageLightbox';

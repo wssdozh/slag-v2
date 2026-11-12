@@ -1,3 +1,4 @@
+// The phone screen's top bar: back, title slots, and the status-bar inset.
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 

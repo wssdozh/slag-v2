@@ -1,3 +1,4 @@
+// The `/` command list: filtered by the typed query, grouped by category.
 import React from 'react';
 import { Command } from 'lucide-react';
 import { SLASH_COMMANDS, CATEGORY_LABELS, type SlashCommand } from '../../types/slashCommands';

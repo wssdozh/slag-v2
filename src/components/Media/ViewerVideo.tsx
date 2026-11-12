@@ -1,3 +1,4 @@
+// A clip in the viewer: custom transport that hides with the chrome, and play may be refused.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
 

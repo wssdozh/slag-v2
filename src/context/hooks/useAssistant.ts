@@ -1,3 +1,4 @@
+// The assistant session: transcript, model choice and one send that never writes a note.
 import { useCallback, useEffect, useState } from 'react';
 import type { AiSettings, ChatMessage, FolderMeta, SlagItem } from '../../types';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, STORAGE_KEYS } from '../../config';

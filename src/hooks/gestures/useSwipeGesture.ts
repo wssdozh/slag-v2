@@ -1,3 +1,4 @@
+// Left/right swipe detection with a threshold and axis lock, for phone rows.
 import { useRef, useCallback } from 'react';
 
 export interface SwipeGestureOptions {

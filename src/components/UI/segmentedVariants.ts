@@ -1,3 +1,4 @@
+// Class presets for the segmented strip, so mobile headers share one geometry.
 /**
  * Пресеты классов для `ResponsiveSegmented`. Геометрия сегментных полос живёт
  * здесь, чтобы мобильные шапки не собирали её руками по второму разу.

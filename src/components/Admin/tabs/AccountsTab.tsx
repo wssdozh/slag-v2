@@ -1,3 +1,4 @@
+// Admin accounts tab: search, plan/status filters, per-account actions, devices.
 import React from 'react';
 import { SparklineChart, BarChart } from '../Charts';
 import type { AdminAccount, AnalyticsData } from '../useAdminData';

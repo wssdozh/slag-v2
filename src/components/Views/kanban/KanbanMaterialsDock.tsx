@@ -1,3 +1,4 @@
+// The materials dock: the folder's notes and articles, searchable, draggable onto the board.
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
 import type { SlagItem } from '../../../types';

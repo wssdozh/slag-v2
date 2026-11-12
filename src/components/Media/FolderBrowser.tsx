@@ -1,3 +1,4 @@
+// The files tab: folders already granted, their contents, and the system dialog escape.
 import React from 'react';
 import { ArrowLeft, ChevronRight, FileText, Folder, FolderPlus, Image as ImageIcon, Lock } from 'lucide-react';
 import { formatBytes } from '../../lib/text/formatBytes';

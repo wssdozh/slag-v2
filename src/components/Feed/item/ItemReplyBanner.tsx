@@ -1,3 +1,4 @@
+// The quoted line above a reply: jump to what it answers, or say it is gone.
 import React, { memo } from 'react';
 import { CornerUpLeft } from 'lucide-react';
 import type { SlagItem } from '../../../types';

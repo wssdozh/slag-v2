@@ -1,3 +1,4 @@
+// Zod schemas and vault shapes the MCP tools accept, with their user-facing descriptions.
 import { z } from 'zod';
 import { DEFAULT_INBOX_FOLDER } from '../config';
 import type { SlagItem, FolderMeta } from '../types';

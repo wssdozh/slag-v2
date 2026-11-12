@@ -1,3 +1,4 @@
+// The recorder plate that stands in for send on an empty draft: hold, tap to switch.
 import React from 'react';
 import { Mic, Video } from 'lucide-react';
 

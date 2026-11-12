@@ -1,3 +1,4 @@
+// The floating tab dock at the bottom of the phone shell, with its capture button.
 import React, { useRef, useState, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';

@@ -1,3 +1,4 @@
+// Recurrence rules: parse, describe and advance a repeating task to its next occurrence.
 import type { RecurrenceRule, SlagItem } from '../../types';
 import { getISODateString } from './dateUtils';
 import { setAllCheckboxesInContent, parseSubtasksFromContent } from '../tasks/taskUtils';

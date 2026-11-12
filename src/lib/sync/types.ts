@@ -1,3 +1,4 @@
+// Shared sync types: device profile, connection state, subscription and status snapshot.
 export type DeviceSyncMode = 'read-write' | 'receive-only';
 
 export interface DeviceProfile {

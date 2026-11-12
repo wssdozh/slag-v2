@@ -1,3 +1,4 @@
+// A tag as a chip: clickable to filter, removable while editing, flat or pill.
 import React from 'react';
 import { X } from 'lucide-react';
 

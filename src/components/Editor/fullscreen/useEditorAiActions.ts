@@ -1,3 +1,4 @@
+// The editor's two AI actions: file the draft into a folder plus tags, or pick tags only.
 import { useCallback } from 'react';
 import type React from 'react';
 import type { AiSettings, FolderMeta } from '../../../types';

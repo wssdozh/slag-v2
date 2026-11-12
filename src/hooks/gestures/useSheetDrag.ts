@@ -1,3 +1,4 @@
+// Drag-to-dismiss for a one-detent sheet, transforms written straight to the compositor.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { UI_GESTURES } from '../../config';
 

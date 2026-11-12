@@ -1,3 +1,4 @@
+// The month sheet: a month grid with a dot on days that have tasks, and a today shortcut.
 import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePresence } from '../../../hooks/ui/usePresence';

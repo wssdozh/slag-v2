@@ -1,3 +1,4 @@
+// Publishes the composer dock's live height as --composer-inset for the feed.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**

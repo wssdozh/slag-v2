@@ -1,3 +1,4 @@
+// The phone tasks tab: status tabs you swipe between, plus the calendar mode.
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';

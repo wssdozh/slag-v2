@@ -1,3 +1,4 @@
+// Pairing controller: host PIN, guest claim, SAS approval and the polling loop.
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { storage } from '../../../lib/storage';

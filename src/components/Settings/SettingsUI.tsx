@@ -1,3 +1,4 @@
+// Settings' shared building blocks: group cards, rows, dividers, switches, selects.
 import React from 'react';
 import { ChevronRight, ArrowUpRight } from 'lucide-react';
 import { Select, type SelectOption } from '../UI/Select';

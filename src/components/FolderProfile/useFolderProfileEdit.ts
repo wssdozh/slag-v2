@@ -1,3 +1,4 @@
+// Inline folder editing: one field at a time, committed through the storage action.
 import { useCallback, useState } from 'react';
 import type { FolderMeta } from '../../types';
 import {
