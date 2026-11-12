@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **403**, строк: **79769**, зон: **45**.
+Модулей: **429**, строк: **80960**, зон: **45**.
 
 ## Самые длинные файлы
 
@@ -12,19 +12,19 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1588 | 0 |
-| `src/components/Feed/ItemCard.tsx` | 1151 | 1 |
-| `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
-| `src/components/Feed/Composer.tsx` | 1094 | 4 |
 | `e2e/slag/views.spec.ts` | 1076 | 0 |
 | `src/lib/sync/syncEngine.ts` | 899 | 17 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
 | `e2e/mobile.spec.ts` | 871 | 0 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
+| `src/components/Feed/ItemCard.tsx` | 789 | 1 |
 | `src/context/AppContext.tsx` | 715 | 59 |
-| `src/lib/storage/index.ts` | 665 | 33 |
+| `src/components/Feed/Composer.tsx` | 699 | 4 |
+| `src/lib/storage/index.ts` | 665 | 34 |
 | `src/components/Editor/FullscreenEditor.tsx` | 639 | 1 |
 | `src/components/Views/KanbanBoard.tsx` | 634 | 2 |
 | `src/components/Feed/FeedList.tsx` | 633 | 2 |
+| `src/components/Workspace/useCrossWindowDnd.ts` | 612 | 1 |
 
 ## e2e (playwright) — 91 файлов, 17564 строк
 
@@ -111,7 +111,7 @@
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
 | `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
-## src/components/Feed — 27 файлов, 6721 строк
+## src/components/Feed — 44 файлов, 7450 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -127,14 +127,31 @@
 | `AssistantChat.tsx` | 234 | 2 | AssistantChat |  |
 | `BaseComposer.tsx` | 272 | 2 | BaseComposerProps, BaseComposer |  |
 | `chat/ChatTaskBlock.tsx` | 52 | 1 | ChatTaskBlock |  |
-| `Composer.tsx` | 1094 | 4 | ComposerProps, Composer |  |
+| `Composer.tsx` | 699 | 4 | ComposerProps, Composer |  |
+| `composer/ComposerAiButton.tsx` | 30 | 1 | ComposerAiButtonProps, ComposerAiButton |  |
+| `composer/ComposerAttachmentStrip.tsx` | 89 | 1 | ComposerAttachmentStripProps, ComposerAttachmentStrip |  |
+| `composer/composerFields.ts` | 124 | 2 | ComposerDismissals, ComposerFieldSources, ComposerFields, resolveComposerFields | What the user waved away in the ghost chips. A dismissed value is still in the |
+| `composer/ComposerRecordButton.tsx` | 45 | 1 | ComposerRecordButtonProps, ComposerRecordButton |  |
+| `composer/ComposerReplyBanner.tsx` | 38 | 1 | ComposerReplyBannerProps, ComposerReplyBanner |  |
+| `composer/ComposerTypeSelector.tsx` | 52 | 1 | ComposerTypeSelectorProps, ComposerTypeSelector |  |
+| `composer/useComposerAiTags.ts` | 69 | 1 | UseComposerAiTagsOptions, useComposerAiTags |  |
 | `composer/useComposerFiles.ts` | 155 | 1 | useComposerFiles | Getting files into the composer: picker, drop, paste. |
+| `composer/useComposerSlashCommands.ts` | 143 | 1 | UseComposerSlashCommandsOptions, useComposerSlashCommands |  |
+| `composer/useComposerSubmit.ts` | 203 | 1 | UseComposerSubmitOptions, useComposerSubmit |  |
 | `ComposerTaskControls.tsx` | 257 | 1 | ComposerTaskControlsProps, ComposerTaskControls |  |
 | `FeedColumnResizer.tsx` | 90 | 1 | FeedColumnResizer | Grab strips on both sides of the reading column. The width is published as |
 | `FeedHeader.tsx` | 162 | 1 | FeedHeaderProps, FeedHeader |  |
 | `FeedList.tsx` | 633 | 2 | FeedList |  |
 | `FolderSuggestionMenu.tsx` | 101 | 1 | FolderSuggestionMenu |  |
-| `ItemCard.tsx` | 1151 | 1 | ItemCardProps, ItemCard |  |
+| `item/itemAttachments.ts` | 141 | 5 | THUMB_MAX_HEIGHT, THUMB_MAX_WIDTH, CardShape, AttachmentGroups, AttachmentCounts, +11 | One picture never eats the column: 320 tall, and never wider than 416 even as… |
+| `item/ItemAudioNotes.tsx` | 45 | 1 | ItemAudioNotesProps, ItemAudioNotes |  |
+| `item/ItemCardActions.tsx` | 55 | 1 | ItemCardActionsProps, ItemCardActions |  |
+| `item/ItemFiles.tsx` | 84 | 1 | ItemFilesProps, ItemFiles |  |
+| `item/ItemImages.tsx` | 198 | 1 | ItemImagesProps, ItemImages |  |
+| `item/ItemReplyBanner.tsx` | 47 | 1 | ItemReplyBannerProps, ItemReplyBanner |  |
+| `item/ItemSubtasks.tsx` | 82 | 1 | ItemSubtasksProps, ItemSubtasks |  |
+| `item/ItemVideoNotes.tsx` | 41 | 1 | ItemVideoNotesProps, ItemVideoNotes |  |
+| `ItemCard.tsx` | 789 | 1 | ItemCardProps, ItemCard |  |
 | `PinnedBanner.tsx` | 217 | 1 | PinnedBanner |  |
 | `SlashCommandMenu.tsx` | 101 | 1 | SlashCommandMenu |  |
 | `SuggestionMenuHeader.tsx` | 28 | 4 | SuggestionMenuHeader | Общая шапка подсказок композера (@ папки, # теги, / команды). |
@@ -182,13 +199,22 @@
 | `useFolderBrowser.ts` | 90 | 1 | useFolderBrowser | The folders tab: granted folders, the files inside one of them, and the syste… |
 | `ViewerVideo.tsx` | 127 | 2 | ViewerVideoProps, ViewerVideo |  |
 
-## src/components/Mobile — 10 файлов, 2463 строк
+## src/components/Mobile — 19 файлов, 2925 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
+| `calendar/AgendaDayGroup.tsx` | 155 | 1 | AgendaDayGroupProps, AgendaDayGroup |  |
+| `calendar/AgendaOverdueSection.tsx` | 44 | 1 | AgendaOverdueSectionProps, AgendaOverdueSection |  |
+| `calendar/CalendarHeader.tsx` | 103 | 1 | CalendarHeaderProps, CalendarHeader |  |
+| `calendar/calendarPositions.ts` | 140 | 5 | HOURS_24, HOUR_HEIGHT, CalendarSlotTarget, AgendaDayLayout, realTaskId, +10 | calendarPositions.ts — чистая раскладка повестки: порядок строк, линия «сейча… |
+| `calendar/calendarRange.ts` | 124 | 5 | MobileCalendarMode, CalendarDay, parseISODate, buildWeekDays, buildThreeDayWindow, +7 | calendarRange.ts — чистые вычисления календарной сетки мобильного календаря: |
+| `calendar/CalendarTaskRow.tsx` | 98 | 2 | CalendarTaskRowProps, CalendarTaskRow |  |
+| `calendar/MonthPickerSheet.tsx` | 146 | 1 | MonthPickerSheetProps, MonthPickerSheet |  |
+| `calendar/ThreeDayGrid.tsx` | 251 | 1 | ThreeDayGridProps, ThreeDayGrid |  |
+| `calendar/WeekStrip.tsx` | 73 | 1 | WeekStripProps, WeekStrip |  |
 | `MobileAssistantView.tsx` | 71 | 1 | MobileAssistantView |  |
 | `MobileAudioView.tsx` | 12 | 1 | MobileAudioView |  |
-| `MobileCalendarView.tsx` | 1105 | 3 | MobileCalendarView |  |
+| `MobileCalendarView.tsx` | 433 | 3 | MobileCalendarView |  |
 | `MobileFloatingDock.tsx` | 159 | 1 | MobileFloatingDockProps, MobileFloatingDock |  |
 | `MobileFolderInfoView.tsx` | 70 | 1 | MobileFolderInfoView | Phone container: the profile fills the screen, editing happens in place. |
 | `MobileFoldersView.tsx` | 390 | 1 | MobileFoldersView |  |
@@ -269,7 +295,7 @@
 | `IconButton.tsx` | 50 | 6 | IconButtonProps, IconButton |  |
 | `ImageLightbox.tsx` | 359 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage |  |
 | `LightboxTextPanel.tsx` | 150 | 1 | LightboxTextPanelProps, LightboxTextPanel |  |
-| `MarkdownRenderer.tsx` | 185 | 3 | MarkdownRenderer |  |
+| `MarkdownRenderer.tsx` | 185 | 4 | MarkdownRenderer |  |
 | `menu/feedMenuSections.tsx` | 82 | 1 | FeedMenuSectionsProps, FeedMenuSections |  |
 | `menu/folderMenuSections.tsx` | 88 | 1 | FolderMenuSectionsProps, FolderMenuSections |  |
 | `menu/itemMenuSections.tsx` | 205 | 1 | ItemMenuSectionsProps, ItemMenuSections |  |
@@ -283,9 +309,9 @@
 | `SendButton.tsx` | 48 | 4 | SendButtonProps, SendButton |  |
 | `SheetPanel.tsx` | 353 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel |  |
 | `TagChip.tsx` | 81 | 4 | TagChipProps, TagChip |  |
-| `TaskStatusMark.tsx` | 49 | 3 | TaskStatusMarkProps, TaskStatusMark |  |
+| `TaskStatusMark.tsx` | 49 | 4 | TaskStatusMarkProps, TaskStatusMark |  |
 | `Toast.tsx` | 172 | 2 | ToastContainer |  |
-| `ToolbarButton.tsx` | 58 | 2 | ToolbarButtonProps, ToolbarButton |  |
+| `ToolbarButton.tsx` | 58 | 3 | ToolbarButtonProps, ToolbarButton |  |
 | `VideoCirclePlayer.tsx` | 142 | 3 | VideoCirclePlayer |  |
 | `VideoRecorder.tsx` | 212 | 1 | VideoRecorder |  |
 | `WindowControls.tsx` | 50 | 1 | WindowControls | ponytail: fixed top-right 34px controls matching dockview tab row. ceiling: w… |
@@ -337,7 +363,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AppContext.tsx` | 715 | 59 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
-| `appContext.types.ts` | 228 | 7 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
+| `appContext.types.ts` | 228 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/context/feed — 1 файлов, 89 строк
 
@@ -364,7 +390,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useCalendarSchedule.ts` | 127 | 2 | CalendarTask, UseCalendarScheduleParams, CalendarScheduleResult, useCalendarSchedule |  |
+| `useCalendarSchedule.ts` | 127 | 3 | CalendarTask, UseCalendarScheduleParams, CalendarScheduleResult, useCalendarSchedule |  |
 | `useItemActions.ts` | 280 | 4 | PRIORITY_LABELS, TYPE_LABELS, useItemActions |  |
 | `useSuggestedActions.ts` | 276 | 1 | ActionHistoryEntry, useSuggestedActions |  |
 
@@ -393,7 +419,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useAttachmentSrc.ts` | 50 | 6 | AttachmentSrcs, useAttachmentSrcs, useAttachmentSrc |  |
+| `useAttachmentSrc.ts` | 50 | 11 | AttachmentSrcs, useAttachmentSrcs, useAttachmentSrc |  |
 | `useAudioAnalyser.ts` | 88 | 1 | useAudioAnalyser | Owns the Web Audio graph for one `<audio>` element. |
 | `useComposerMedia.ts` | 203 | 1 | UseComposerMediaOptions, useComposerMedia |  |
 
@@ -425,7 +451,7 @@
 | `adapters/openAiAdapter.ts` | 209 | 1 | OpenAiChatAdapter |  |
 | `adapters/openAiResponsesAdapter.ts` | 210 | 1 | OpenAiResponsesAdapter |  |
 | `aiClient.ts` | 231 | 2 | AiResolvedTarget, PromptRequest, PromptResult, resolveKieEndpoint, resolveAiTarget, +4 |  |
-| `aiService.ts` | 428 | 6 | CategorizeResult, TriageSuggestion, TriageProgress, TriageProgressCallback, categorizeDraft, +4 |  |
+| `aiService.ts` | 428 | 7 | CategorizeResult, TriageSuggestion, TriageProgress, TriageProgressCallback, categorizeDraft, +4 |  |
 | `appGuide.ts` | 243 | 2 | APP_GUIDE_TOPICS, AppGuideTopic, getAppGuideContent | ponytail: curated topic catalog for in-app assistant UI navigation & feature … |
 | `fallback/agenda.ts` | 82 | 1 | calendarAgenda | Agenda intent: what is scheduled and overdue for a given day. |
 | `fallback/decomposition.ts` | 183 | 1 | splitNote, decomposeTask | Decomposition intents: split a note into tasks and break a task into subtasks. |
@@ -480,7 +506,7 @@
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData | Attachments as they belong in the localStorage index: metadata only. |
 | `attachments.ts` | 230 | 3 | AttachmentStore |  |
 | `folderStore.ts` | 171 | 1 | FolderStoreHost, folderStorageKey, readFolders, writeFolder, renameFolderTree, +2 | Writing folders: save, rename with the note cascade, describe, delete and re-… |
-| `index.ts` | 665 | 33 | StorageChangeEvent, StorageChangeListener, StorageService, storage, VaultStats, +4 |  |
+| `index.ts` | 665 | 34 | StorageChangeEvent, StorageChangeListener, StorageService, storage, VaultStats, +4 |  |
 | `indexedDb.ts` | 146 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
 | `settingsStore.ts` | 267 | 1 | SettingsStoreHost, draftsStorageKey, workspaceStateStorageKey, readComposerDrafts, readComposerDraft, +14 | Small settings and drafts: which localStorage keys are kept and how they are … |
 | `trashStore.ts` | 80 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash |  |
@@ -535,10 +561,10 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `calendarLayout.ts` | 120 | 3 | LayoutPositionedTask, computeAntiOverlapLayout |  |
-| `dateUtils.ts` | 126 | 15 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, getTodayIso, getTomorrowIso, +11 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
+| `calendarLayout.ts` | 120 | 4 | LayoutPositionedTask, computeAntiOverlapLayout |  |
+| `dateUtils.ts` | 126 | 22 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, getTodayIso, getTomorrowIso, +11 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
 | `recurrenceHelper.ts` | 305 | 5 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 |  |
-| `todoistTaskParser.ts` | 389 | 9 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +1 |  |
+| `todoistTaskParser.ts` | 389 | 11 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +1 |  |
 
 ## src/lib/vault — 10 файлов, 830 строк
 
@@ -570,5 +596,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 137 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 155 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |

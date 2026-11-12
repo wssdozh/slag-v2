@@ -39,7 +39,8 @@
 ```text
 src/
   components/   UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
-                (+ подпапки зон: Feed/assistant, Editor/fullscreen, Settings/devices,
+                (+ подпапки зон: Feed/assistant, Feed/item, Feed/composer,
+                 Editor/fullscreen, Settings/devices, Mobile/calendar,
                  Audio/panel, UI/menu, Admin/tabs)
   context/      AppContext — единственный стейт-хаб; hooks/ — записи, папки, хранилища, лента
   hooks/        gestures/ (drag, swipe), layout/ (размеры), media/ (вложения, аудио, композер),

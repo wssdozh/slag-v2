@@ -19,9 +19,9 @@
 | `components/Settings/DevicesSettingsTab.tsx` | 535 | **195** | сборка: инвайты, режим доступа, раскладка по частям |
 | `components/Editor/EditorToolbar.tsx` | 575 | **171** | каркас, backdrop дропдаунов, правый блок сохранения |
 | `lib/ai/localFallback.ts` | 1046 | **1** | реэкспорт; сама цепочка в `lib/ai/fallback/` |
-| `components/Feed/Composer.tsx` | 1211 | 1093 | **осознанно**: одна форма |
-| `components/Feed/ItemCard.tsx` | 1151 | 1151 | **осознанно**: 1048 строк разметки |
-| `components/Mobile/MobileCalendarView.tsx` | 1105 | 1105 | **осознанно**: 1071 строка разметки |
+| `components/Feed/Composer.tsx` | 1211 | **698** | обвязка формы, автокомплит-оверлей, сборка частей |
+| `components/Feed/ItemCard.tsx` | 1151 | **788** | композиция слотов, свайп, ширина, состояние OCR/тегов |
+| `components/Mobile/MobileCalendarView.tsx` | 1105 | **432** | стейт, навигация, композиция трёх режимов |
 | `lib/sync/bip39Words.ts` | 2052 | 2052 | данные |
 
 ## вынесенные ответственности
@@ -39,6 +39,12 @@
 **components/Audio/panel/** — `AudioArtwork` (72), `AudioScrubber` (79: таймлайн и drag), `AudioTransport` (186), `PlaylistDrawer` (60, адаптер над существующим drawer), `useAudioPlayback` (400: весь `<audio>` и медиа-события).
 
 **components/UI/menu/** — наборы пунктов: `itemMenuSections` (204), `folderMenuSections` (87), `feedMenuSections` (81) и `MenuSubmenus` (228: три боковые панели, flyout и мост).
+
+**components/Feed/item/** — `itemAttachments.ts` (140: чистая модель «что в hero, что в сетку, что в счётчик»), `ItemImages` (197), `ItemFiles` (83), `ItemSubtasks` (81), `ItemCardActions` (54), `ItemReplyBanner` (46), `ItemAudioNotes` (44), `ItemVideoNotes` (40).
+
+**components/Feed/composer/** — `composerFields.ts` (123: один резолвер «текст + свойства → поля»), `useComposerSubmit` (202), `useComposerSlashCommands` (142), `ComposerAttachmentStrip` (88), `useComposerAiTags` (68), `ComposerTypeSelector` (51), `ComposerRecordButton` (44), `ComposerReplyBanner` (37), `ComposerAiButton` (29).
+
+**components/Mobile/calendar/** — `calendarRange.ts` (123: даты и сетка), `calendarPositions.ts` (139: порядок строк, линия «сейчас», геометрия блоков), `ThreeDayGrid` (250), `AgendaDayGroup` (154), `MonthPickerSheet` (145), `CalendarHeader` (102), `CalendarTaskRow` (97), `WeekStrip` (72), `AgendaOverdueSection` (43).
 
 **storage/** — `vaultFiles` (диск: 497 строк, контекст из 9 вопросов), `vaultRegistry` (какое хранилище открыто: реестр в localStorage, переключение, создание, удаление, выбор папки), `folderStore` (запись папок: сохранить, переименовать с каскадом, описать, удалить с переносом заметок), `trashStore` (что значит удалить и как отменить), `vaultTransfer` (формат обмена), `attachments` (байты медиа), `lib/vault/stats` (отчёты).
 
