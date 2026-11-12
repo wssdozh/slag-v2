@@ -1,3 +1,4 @@
+// The create-a-note form: wiring, the autocomplete overlay, and composition of `composer/`.
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemType, SlagItemStatus } from '../../types';

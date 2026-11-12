@@ -1,3 +1,4 @@
+// Vault snapshots: pack a zip, list what is there, restore one, drop old ones.
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import type {
   SlagItem,

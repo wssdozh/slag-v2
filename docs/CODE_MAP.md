@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **440**, строк: **81314**, зон: **45**.
+Модулей: **440**, строк: **81718**, зон: **45**.
 
 ## Самые длинные файлы
 
@@ -16,14 +16,14 @@
 | `src/lib/sync/syncEngine.ts` | 899 | 17 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
 | `e2e/mobile.spec.ts` | 874 | 0 |
+| `src/components/Feed/ItemCard.tsx` | 807 | 1 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
-| `src/components/Feed/ItemCard.tsx` | 789 | 1 |
 | `src/context/AppContext.tsx` | 715 | 62 |
-| `src/components/Feed/Composer.tsx` | 699 | 4 |
-| `src/lib/storage/index.ts` | 665 | 34 |
-| `src/components/Editor/FullscreenEditor.tsx` | 639 | 1 |
+| `src/lib/storage/index.ts` | 701 | 34 |
+| `src/components/Feed/Composer.tsx` | 700 | 4 |
+| `src/components/Editor/FullscreenEditor.tsx` | 640 | 1 |
 | `src/components/Workspace/useCrossWindowDnd.ts` | 612 | 1 |
-| `src/lib/backupService.ts` | 605 | 1 |
+| `src/lib/backupService.ts` | 606 | 1 |
 | `src/lib/media/attachmentEnrichment.ts` | 600 | 4 |
 
 ## e2e (playwright) — 91 файлов, 17569 строк
@@ -41,11 +41,11 @@
 - `e2e/slag/feed_thumbs.spec.ts` — 351
 - `e2e/mcp_server.spec.ts` — 337
 
-## src — 3 файлов, 397 строк
+## src — 3 файлов, 505 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `App.tsx` | 318 | 1 | App |  |
+| `App.tsx` | 426 | 1 | App |  |
 | `demo.tsx` | 68 | 0 | Playground |  |
 | `main.tsx` | 11 | 0 |  |  |
 
@@ -95,7 +95,7 @@
 |---|---:|---:|---|---|
 | `QuickComposerWindow.tsx` | 102 | 1 | QuickComposerWindow |  |
 
-## src/components/Editor — 11 файлов, 2689 строк
+## src/components/Editor — 11 файлов, 2694 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -106,12 +106,12 @@
 | `fullscreen/EditorTaskFields.tsx` | 292 | 1 | EditorTaskFieldsProps, EditorTaskFields |  |
 | `fullscreen/useEditorAiActions.ts` | 71 | 1 | EditorAiActionsOptions, useEditorAiActions |  |
 | `fullscreen/useEditorAttachments.ts` | 161 | 1 | EditorAttachmentsOptions, useEditorAttachments |  |
-| `FullscreenEditor.tsx` | 639 | 1 | FullscreenEditor |  |
+| `FullscreenEditor.tsx` | 640 | 1 | FullscreenEditor | The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome. |
 | `MarkdownPalette.tsx` | 364 | 1 | MarkdownPalette | Markdown utilities: history, styles, lists, inline formatting, links, attachm… |
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
-| `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
+| `useFullscreenDraft.ts` | 314 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
-## src/components/Feed — 48 файлов, 7579 строк
+## src/components/Feed — 48 файлов, 7603 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -127,7 +127,7 @@
 | `AssistantChat.tsx` | 234 | 2 | AssistantChat |  |
 | `BaseComposer.tsx` | 272 | 2 | BaseComposerProps, BaseComposer |  |
 | `chat/ChatTaskBlock.tsx` | 52 | 1 | ChatTaskBlock |  |
-| `Composer.tsx` | 699 | 4 | ComposerProps, Composer |  |
+| `Composer.tsx` | 700 | 4 | ComposerProps, Composer | The create-a-note form: wiring, the autocomplete overlay, and composition of … |
 | `composer/ComposerAiButton.tsx` | 30 | 1 | ComposerAiButtonProps, ComposerAiButton |  |
 | `composer/ComposerAttachmentStrip.tsx` | 89 | 1 | ComposerAttachmentStripProps, ComposerAttachmentStrip |  |
 | `composer/composerFields.ts` | 124 | 2 | ComposerDismissals, ComposerFieldSources, ComposerFields, resolveComposerFields | What the user waved away in the ghost chips. A dismissed value is still in the |
@@ -141,7 +141,7 @@
 | `ComposerTaskControls.tsx` | 257 | 1 | ComposerTaskControlsProps, ComposerTaskControls |  |
 | `FeedColumnResizer.tsx` | 90 | 1 | FeedColumnResizer | Grab strips on both sides of the reading column. The width is published as |
 | `FeedHeader.tsx` | 162 | 1 | FeedHeaderProps, FeedHeader |  |
-| `FeedList.tsx` | 554 | 2 | FeedList |  |
+| `FeedList.tsx` | 555 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
 | `FolderSuggestionMenu.tsx` | 101 | 1 | FolderSuggestionMenu |  |
 | `item/itemAttachments.ts` | 141 | 5 | THUMB_MAX_HEIGHT, THUMB_MAX_WIDTH, CardShape, AttachmentGroups, AttachmentCounts, +11 | One picture never eats the column: 320 tall, and never wider than 416 even as… |
 | `item/ItemAudioNotes.tsx` | 45 | 1 | ItemAudioNotesProps, ItemAudioNotes |  |
@@ -151,7 +151,7 @@
 | `item/ItemReplyBanner.tsx` | 47 | 1 | ItemReplyBannerProps, ItemReplyBanner |  |
 | `item/ItemSubtasks.tsx` | 82 | 1 | ItemSubtasksProps, ItemSubtasks |  |
 | `item/ItemVideoNotes.tsx` | 41 | 1 | ItemVideoNotesProps, ItemVideoNotes |  |
-| `ItemCard.tsx` | 789 | 1 | ItemCardProps, ItemCard |  |
+| `ItemCard.tsx` | 807 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
 | `list/FeedDateBubble.tsx` | 21 | 1 | FeedDateBubbleProps, FeedDateBubble |  |
 | `list/FeedDropOverlay.tsx` | 30 | 1 | FeedDropOverlayProps, FeedDropOverlay |  |
 | `list/FeedScrollHint.tsx` | 72 | 1 | FeedScrollHintProps, FeedScrollHint |  |
@@ -162,7 +162,7 @@
 | `SuggestionMenuShell.tsx` | 61 | 4 | SuggestionMenuShell |  |
 | `TagSuggestionMenu.tsx` | 75 | 2 | TagMeta, TagSuggestionMenu |  |
 | `useComposerAutocomplete.ts` | 395 | 1 | UseComposerAutocompleteOptions, useComposerAutocomplete |  |
-| `useComposerDraft.ts` | 416 | 1 | ComposerDraftState, UseComposerDraftOptions, reviveReplyTarget, useComposerDraft |  |
+| `useComposerDraft.ts` | 420 | 1 | ComposerDraftState, UseComposerDraftOptions, reviveReplyTarget, useComposerDraft |  |
 
 ## src/components/FolderProfile — 7 файлов, 693 строк
 
@@ -250,11 +250,11 @@
 | `FolderMediaTabs.tsx` | 311 | 1 | FolderMediaTabsProps, FolderMediaTabs |  |
 | `useFolderMedia.ts` | 117 | 4 | FolderMediaData, useFolderMedia |  |
 
-## src/components/Search — 1 файлов, 444 строк
+## src/components/Search — 1 файлов, 459 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `SearchModal.tsx` | 444 | 3 | SearchModal |  |
+| `SearchModal.tsx` | 459 | 3 | SearchModal |  |
 
 ## src/components/Settings — 16 файлов, 2266 строк
 
@@ -442,17 +442,17 @@
 | `useLayerStack.ts` | 122 | 1 | AppLayer, useLayerStack |  |
 | `usePresence.ts` | 92 | 29 | usePresence | Keeps the existing DOM during exit. CSS owns the duration and destination. |
 
-## src/lib — 5 файлов, 1356 строк
+## src/lib — 5 файлов, 1386 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `backupService.ts` | 605 | 1 | SlagManifest, BackupService, backupService, DEFAULT_BACKUP_SETTINGS |  |
+| `backupService.ts` | 606 | 1 | SlagManifest, BackupService, backupService, DEFAULT_BACKUP_SETTINGS | Vault snapshots: pack a zip, list what is there, restore one, drop old ones. |
 | `commands.ts` | 279 | 3 | CommandCategory, AppCommandContext, AppCommand, isMac, formatShortcut, +3 | ponytail: central command & hotkey engine for SLAG v2 without external depend… |
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
-| `searchService.ts` | 264 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
+| `searchService.ts` | 293 | 3 | preloadSearchEngine, getSearchableAttachmentText, initSearchIndex, querySearch | Orama lives in its own lazy chunk (~76 kB, 25 kB gzip). On the 1000-note prob… |
 
-## src/lib/ai — 23 файлов, 4422 строк
+## src/lib/ai — 23 файлов, 4423 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -477,14 +477,14 @@
 | `orchestrator.ts` | 405 | 1 | AssistantOrchestrator, assistantOrchestrator, resolveKieEndpoint, resolveAiTarget, extractActionBlock, +3 |  |
 | `prompt.ts` | 156 | 1 | buildSystemPrompt |  |
 | `toolDefinitions.ts` | 171 | 1 | getCanonicalTools |  |
-| `tools.ts` | 441 | 1 | createLocalToolExecutor |  |
+| `tools.ts` | 442 | 1 | createLocalToolExecutor | The tools the assistant may call: search notes, read one, and report on the v… |
 | `types.ts` | 74 | 15 | AssistantToolDefinition, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, LlmProtocolAdapter, +2 |  |
 
-## src/lib/logger — 2 файлов, 651 строк
+## src/lib/logger — 2 файлов, 653 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `logger.ts` | 586 | 44 | LogListener, logger |  |
+| `logger.ts` | 588 | 44 | LogListener, logger | The log: levels, scopes, listeners, the buffer, retention and persistence. Wh… |
 | `logRedaction.ts` | 65 | 1 | maskSensitiveString, sanitizeForLog | Masking secrets in log messages and payloads; the one place that knows what a… |
 
 ## src/lib/media — 10 файлов, 1657 строк
@@ -510,26 +510,26 @@
 | `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
 | `windowControls.ts` | 393 | 13 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 |  |
 
-## src/lib/storage — 10 файлов, 2379 строк
+## src/lib/storage — 10 файлов, 2597 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData | Attachments as they belong in the localStorage index: metadata only. |
 | `attachments.ts` | 230 | 3 | AttachmentStore |  |
 | `folderStore.ts` | 171 | 1 | FolderStoreHost, folderStorageKey, readFolders, writeFolder, renameFolderTree, +2 | Writing folders: save, rename with the note cascade, describe, delete and re-… |
-| `index.ts` | 665 | 34 | StorageChangeEvent, StorageChangeListener, StorageService, storage, VaultStats, +4 |  |
+| `index.ts` | 701 | 34 | StorageChangeEvent, StorageChangeListener, StorageService, storage, VaultStats, +4 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 146 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 |  |
-| `settingsStore.ts` | 267 | 1 | SettingsStoreHost, draftsStorageKey, workspaceStateStorageKey, readComposerDrafts, readComposerDraft, +14 | Small settings and drafts: which localStorage keys are kept and how they are … |
+| `settingsStore.ts` | 449 | 1 | SettingsStoreHost, draftsStorageKey, workspaceStateStorageKey, flushDraftWrites, installDraftFlushGuards, +16 | Small settings and drafts: which localStorage keys are kept and how they are … |
 | `trashStore.ts` | 80 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash |  |
 | `vaultFiles.ts` | 498 | 1 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 199 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 | Which vault the app is looking at: the registry kept in localStorage, and the… |
 | `vaultTransfer.ts` | 102 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 |  |
 
-## src/lib/sync — 22 файлов, 6049 строк
+## src/lib/sync — 22 файлов, 6050 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `account.ts` | 569 | 18 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 |  |
+| `account.ts` | 570 | 18 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 | The sync account: session and sign-in, what the plan is, and the device ident… |
 | `accountCrypto.ts` | 257 | 5 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 |  |
 | `accountTypes.ts` | 90 | 11 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +5 |  |
 | `applyBundle.ts` | 327 | 1 | persistIncomingBundle | What a bundle from the relay actually does to the vault: tombstones, staged |

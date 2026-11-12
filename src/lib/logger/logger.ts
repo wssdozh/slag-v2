@@ -1,3 +1,5 @@
+// The log: levels, scopes, listeners, the buffer, retention and persistence. What must never be
+// written is decided in `logRedaction`.
 import type { LogEntry, LogLevel, LogScope } from '../../types';
 import { STORAGE_KEYS, UI_DELAYS } from '../../config';
 import { maskSensitiveString, sanitizeForLog } from './logRedaction';

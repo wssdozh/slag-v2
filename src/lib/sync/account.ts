@@ -1,3 +1,4 @@
+// The sync account: session and sign-in, what the plan is, and the device identity it is bound to.
 import { generateAccountIdentity, renameStoredDevice, signDeviceChallenge } from './accountCrypto';
 import type {
   AccountDevice,

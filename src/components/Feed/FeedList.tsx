@@ -1,3 +1,4 @@
+// The feed: render window, sentinels and the composition of cards; the edges live in `list/`.
 import React, {
   useEffect,
   useLayoutEffect,

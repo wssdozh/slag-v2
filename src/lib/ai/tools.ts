@@ -1,3 +1,4 @@
+// The tools the assistant may call: search notes, read one, and report on the vault.
 import type { SlagItem, SuggestedAction, BatchUpdateItem, ItemUpdates } from '../../types';
 import { querySearch, getSearchableAttachmentText } from '../searchService';
 import { serializeItemToMarkdown } from '../vault/markdownSerializer';

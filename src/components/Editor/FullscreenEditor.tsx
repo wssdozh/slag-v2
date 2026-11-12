@@ -1,3 +1,4 @@
+// The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome.
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemStatus } from '../../types';

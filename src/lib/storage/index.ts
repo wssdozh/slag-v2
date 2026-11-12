@@ -1,3 +1,5 @@
+// The one door to the vault: notes, cache and change events, and delegation to disk, folders,
+// trash, settings and attachments. Everything that touches the disk goes through here.
 import type {
   SlagItem,
   FolderMeta,

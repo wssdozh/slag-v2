@@ -1,3 +1,4 @@
+// One note in the feed: reply swipe, width, OCR/expansion state, and the slots it composes.
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagAttachment } from '../../types';
