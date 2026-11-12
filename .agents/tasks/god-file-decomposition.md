@@ -2,13 +2,14 @@
 
 ## где мы сейчас
 
-все три сервиса-«бога» ушли под тысячу строк. в топе самых длинных файлов остались только данные и виды.
+все три сервиса-«бога» ушли под тысячу строк, модалка настроек — под триста. в топе самых длинных файлов остались только данные, виды и один длинный класс логгера.
 
 | файл | было | стало | что осталось |
 |---|---:|---:|---|
-| `lib/sync/syncEngine.ts` | 1594 | **871** | соединение, начальный синк, админ устройств, http-доставка и pull |
+| `lib/sync/syncEngine.ts` | 1594 | **871** | начальный синк, админ устройств, http-доставка и pull |
 | `context/AppContext.tsx` | 1740 | **719** | состояние хранилищ и папок, объект контекста, слои Escape |
-| `lib/storage/index.ts` | 1591 | **727** | CRUD записей и папок, корзина, кэш и события, делегирование диску и медиа |
+| `lib/storage/index.ts` | 1591 | **672** | CRUD записей, кэш и события, делегирование диску, медиа, папкам, корзине |
+| `components/Modals/SettingsModal.tsx` | 873 | **208** | рельса вкладок, мобильный и десктопный каркас, подвал |
 | `components/Feed/Composer.tsx` | 1211 | 1093 | **осознанно**: одна форма |
 | `components/Feed/ItemCard.tsx` | 1151 | 1151 | **осознанно**: 1048 строк разметки |
 | `components/Mobile/MobileCalendarView.tsx` | 1105 | 1105 | **осознанно**: 1071 строка разметки |
@@ -16,7 +17,9 @@
 
 ## вынесенные ответственности
 
-**context/** — `useOverlays` (поверхности), `useMobileNav`, `useFeedView` + `feedView` (правила ленты как чистая функция), `useAssistant`, `useBackup`, `useAppearance`, `useRecurringRollover`, `useItemActions` (запись, удаление, восстановление, перемещение), `useFolderAdmin` (папка: сохранить, описать, переименовать, удалить), `useVaults` (переключить, создать, удалить хранилище, выбрать папку, показать в проводнике), `appContext.types`.
+**context/** — `useOverlays` (поверхности), `useMobileNav`, `useFeedView` + `feedView` (правила ленты как чистая функция), `useAssistant`, `useBackup`, `useAppearance`, `useRecurringRollover`, `useItemWrites` (запись, удаление, восстановление, перемещение), `useFolderAdmin` (папка: сохранить, описать, переименовать, удалить), `useVaults` (переключить, создать, удалить хранилище, выбрать папку, показать в проводнике), `appContext.types`.
+
+**components/Settings/** — по вкладке на файл: `AiSettingsTab` (301, своя форма и сабмит), `VaultSettingsTab` (218, снимки и импорт), `UiSettingsTab` (113), `ShortcutsSettingsTab` (99), `LogsSettingsTab` (10).
 
 **storage/** — `vaultFiles` (диск: 497 строк, контекст из 9 вопросов), `vaultRegistry` (какое хранилище открыто: реестр в localStorage, переключение, создание, удаление, выбор папки), `folderStore` (запись папок: сохранить, переименовать с каскадом, описать, удалить с переносом заметок), `vaultTransfer` (формат обмена), `attachments` (байты медиа), `lib/vault/stats` (отчёты).
 
@@ -32,15 +35,15 @@
 
 ## проверки
 
-`npm run check` — 0, `npm run build` — зелёный.
-e2e за сессию: `feed` 20/20 (шесть раз), `mobile` 21/21, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `assistant_layout`, `backup_restore`.
+`npm run check` — 0 ошибок и 0 предупреждений на каждом шаге, `npm run build` — зелёный.
+e2e за сессию: `feed` 20/20 (трижды), `workspace` 49/53/72 (после починки спек), `mobile` 21/21, `attach_sheet` 26/26, `recurring_streak` 23/23, `sync_drafts` + `sync_attachment_transfer` 4/4, `sync_connection_lifecycle` + `sync_push_transport` + `sync_pending_pull` (7 зелёных после починки), `settings_consistency` 2/2 (все восемь вкладок на 1280 и 375), `assistant_layout`, `backup_restore` 2/2.
 
 ## что осталось
 
 1. `syncEngine` (871): начальный синк (`init` — сто строк), админ устройств, http-доставка и pull. шов «доставка» пробовали — тянет 17 членов, один `commitPush` связывает всё; режется только сокет.
-2. `storage` (727): CRUD записей, корзина, черновики и настройки в одном классе.
+2. `storage` (672): CRUD записей, черновики и настройки в одном классе.
 3. `AppContext` (719): состояние хранилищ и папок, слои Escape, объект контекста на 150 полей.
-4. `components/Modals/SettingsModal.tsx` (873): восемь вкладок в одном файле, каждая — своя причина измениться. следующая цель, режется по вкладкам в `src/components/Settings/`.
+4. `components/Settings/DevicesSettingsTab.tsx` (536) — следующий кандидат: список устройств, карточка устройства и его права в одном файле.
 
 ## заметки
 
