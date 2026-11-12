@@ -112,6 +112,12 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
         deviceId: 'device-test',
         serverUrl: 'http://152.53.199.71:8320',
       };
+      // Settle the engine first: saveConfig() recomputes the subscription from the real account
+      // and would wipe the fake below. The modal mounts on open now, so it reads the plan later
+      // than it used to and a stale recompute became visible.
+      const { syncEngine } = await import(pick('/src/lib/sync/syncEngine.ts'));
+      (syncEngine as unknown as { saveConfig: (config: Record<string, unknown>) => void }).saveConfig({});
+
       client.state = {
         ...client.getState(),
         account: {
@@ -119,9 +125,6 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
           maxCacheMb: 10240, usedCacheMb: 0, allowAttachments: true, hasAiLease: true, isExpiringSoon: false,
         },
       };
-
-      const { syncEngine } = await import(pick('/src/lib/sync/syncEngine.ts'));
-      (syncEngine as unknown as { saveConfig: (config: Record<string, unknown>) => void }).saveConfig({});
     });
 
     await page.locator('[data-testid="sidebar-settings-btn"]').click();
