@@ -1,4 +1,7 @@
 import type { SlagAttachment, BackupSnapshotMeta } from '../../types';
+import { logger } from '../logger/logger';
+
+const dbLog = logger.scope('FS');
 
 const DB_NAME = 'slag_v2_blobs';
 const ATTACHMENTS_STORE = 'attachments';
@@ -36,7 +39,7 @@ export async function idbSaveAttachment(attachment: SlagAttachment): Promise<voi
       tx.onerror = rej;
     });
   } catch (err) {
-    console.warn('[IDB] Failed to save attachment to IndexedDB:', err);
+    dbLog.warn('[IDB] Failed to save attachment to IndexedDB:', err);
   }
 }
 
@@ -87,7 +90,7 @@ export async function idbSaveSnapshot(meta: BackupSnapshotMeta, data: Uint8Array
       tx.onerror = rej;
     });
   } catch (err) {
-    console.warn('[IDB] Failed to save snapshot:', err);
+    dbLog.warn('[IDB] Failed to save snapshot:', err);
   }
 }
 
@@ -136,7 +139,7 @@ export async function idbDeleteSnapshot(id: string): Promise<void> {
       tx.onerror = rej;
     });
   } catch (err) {
-    console.warn('[IDB] Failed to delete snapshot:', err);
+    dbLog.warn('[IDB] Failed to delete snapshot:', err);
   }
 }
 
