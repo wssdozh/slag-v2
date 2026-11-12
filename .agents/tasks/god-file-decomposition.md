@@ -21,6 +21,8 @@
 | `lib/ai/localFallback.ts` | 1046 | **1** | реэкспорт; сама цепочка в `lib/ai/fallback/` |
 | `components/Feed/Composer.tsx` | 1211 | **698** | обвязка формы, автокомплит-оверлей, сборка частей |
 | `components/Feed/ItemCard.tsx` | 1151 | **788** | композиция слотов, свайп, ширина, состояние OCR/тегов |
+| `components/Feed/FeedList.tsx` | 632 | **553** | окно рендера, сентинелы, композиция карточек |
+| `components/Views/KanbanBoard.tsx` | 633 | **167** | конфиг колонок, drag-стейт, раскладка |
 | `components/Mobile/MobileCalendarView.tsx` | 1105 | **432** | стейт, навигация, композиция трёх режимов |
 | `lib/sync/bip39Words.ts` | 2052 | 2052 | данные |
 
@@ -45,6 +47,12 @@
 **components/Feed/composer/** — `composerFields.ts` (123: один резолвер «текст + свойства → поля»), `useComposerSubmit` (202), `useComposerSlashCommands` (142), `ComposerAttachmentStrip` (88), `useComposerAiTags` (68), `ComposerTypeSelector` (51), `ComposerRecordButton` (44), `ComposerReplyBanner` (37), `ComposerAiButton` (29).
 
 **components/Mobile/calendar/** — `calendarRange.ts` (123: даты и сетка), `calendarPositions.ts` (139: порядок строк, линия «сейчас», геометрия блоков), `ThreeDayGrid` (250), `AgendaDayGroup` (154), `MonthPickerSheet` (145), `CalendarHeader` (102), `CalendarTaskRow` (97), `WeekStrip` (72), `AgendaOverdueSection` (43).
+
+**components/Views/kanban/** — `KanbanMaterialsDock` (191: скрим и док материалов), `KanbanCard` (217), `KanbanColumn` (115), `kanbanModel` (31), `KanbanStatusIcon` (32).
+
+**components/Feed/list/** — `feedWindow.ts` (90: что рендерить и как группировать по дням), `FeedScrollHint` (71), `FeedDropOverlay` (29), `FeedDateBubble` (20).
+
+**кит после третьего прохода** — [`UI/priorityTone.ts`](src/components/UI/priorityTone.ts) (цвет приоритета: текст/точка/чип, 6 потребителей вместо ручных карт в четырёх файлах), [`UI/segmentedVariants.ts`](src/components/UI/segmentedVariants.ts) (пресеты `xs`/`plain`/`tabs` для `ResponsiveSegmented`, три мобильных места перестали рисовать его руками), `timedBlockBox` в [`lib/time/calendarLayout.ts`](src/lib/time/calendarLayout.ts) (геометрия timed-блока рядом с anti-overlap, звали два места).
 
 **storage/** — `vaultFiles` (диск: 497 строк, контекст из 9 вопросов), `vaultRegistry` (какое хранилище открыто: реестр в localStorage, переключение, создание, удаление, выбор папки), `folderStore` (запись папок: сохранить, переименовать с каскадом, описать, удалить с переносом заметок), `trashStore` (что значит удалить и как отменить), `vaultTransfer` (формат обмена), `attachments` (байты медиа), `lib/vault/stats` (отчёты).
 
@@ -129,7 +137,7 @@ hooks/ui/       useLayerStack.ts, usePresence.ts, useGlobalHotkeys.ts
 2. `storage` (664): CRUD записей, кэш и события, делегирование диску, медиа, папкам, корзине и настройкам.
 3. `AppContext` (719): состояние хранилищ и папок, слои Escape, объект контекста на 150 полей.
 4. `components/Admin/AdminPanel.tsx` (410) — рельса, каркас и логин-гейт; вкладки, данные и действия уже разъехались по своим модулям.
-5. **красных не осталось.** полный прогон на шести воркерах: **328 passed / 8 skipped / 2 failed**, оба падения — спеки, которым не хватало бюджета на холодный старт (`admin_panel` ждал 60 с на lazy-ветку `?page=admin`, `mobile` 3 — 5 с на спринг-шит). бюджеты подняты, оба проверены отдельно: 1/1 и 3/3.
+5. **сетка зелёная целиком: 330 passed / 8 skipped / 0 failed** на шести воркерах, 6.9 минуты. это первый полностью зелёный прогон за сессию — и он стал возможен только после того, как у каждого dev-сервера появился свой кэш оптимизации (см. грабли ниже).
 
 ## заметки
 

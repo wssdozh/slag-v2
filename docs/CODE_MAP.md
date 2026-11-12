@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **434**, строк: **81090**, зон: **45**.
+Модулей: **440**, строк: **81314**, зон: **45**.
 
 ## Самые длинные файлы
 
@@ -22,9 +22,9 @@
 | `src/components/Feed/Composer.tsx` | 699 | 4 |
 | `src/lib/storage/index.ts` | 665 | 34 |
 | `src/components/Editor/FullscreenEditor.tsx` | 639 | 1 |
-| `src/components/Feed/FeedList.tsx` | 633 | 2 |
 | `src/components/Workspace/useCrossWindowDnd.ts` | 612 | 1 |
 | `src/lib/backupService.ts` | 605 | 1 |
+| `src/lib/media/attachmentEnrichment.ts` | 600 | 4 |
 
 ## e2e (playwright) — 91 файлов, 17569 строк
 
@@ -111,12 +111,12 @@
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
 | `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
-## src/components/Feed — 44 файлов, 7450 строк
+## src/components/Feed — 48 файлов, 7579 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ActiveFilterBadges.tsx` | 198 | 2 | ActiveFilterBadgesProps, ActiveFilterBadges |  |
-| `assistant/AssistantActionCard.tsx` | 403 | 1 | AssistantActionCard |  |
+| `assistant/AssistantActionCard.tsx` | 397 | 1 | AssistantActionCard |  |
 | `assistant/AssistantBanner.tsx` | 45 | 1 | AssistantBanner |  |
 | `assistant/AssistantComposer.tsx` | 132 | 1 | AssistantComposer |  |
 | `assistant/AssistantMessages.tsx` | 226 | 1 | AssistantMessages |  |
@@ -141,7 +141,7 @@
 | `ComposerTaskControls.tsx` | 257 | 1 | ComposerTaskControlsProps, ComposerTaskControls |  |
 | `FeedColumnResizer.tsx` | 90 | 1 | FeedColumnResizer | Grab strips on both sides of the reading column. The width is published as |
 | `FeedHeader.tsx` | 162 | 1 | FeedHeaderProps, FeedHeader |  |
-| `FeedList.tsx` | 633 | 2 | FeedList |  |
+| `FeedList.tsx` | 554 | 2 | FeedList |  |
 | `FolderSuggestionMenu.tsx` | 101 | 1 | FolderSuggestionMenu |  |
 | `item/itemAttachments.ts` | 141 | 5 | THUMB_MAX_HEIGHT, THUMB_MAX_WIDTH, CardShape, AttachmentGroups, AttachmentCounts, +11 | One picture never eats the column: 320 tall, and never wider than 416 even as… |
 | `item/ItemAudioNotes.tsx` | 45 | 1 | ItemAudioNotesProps, ItemAudioNotes |  |
@@ -152,6 +152,10 @@
 | `item/ItemSubtasks.tsx` | 82 | 1 | ItemSubtasksProps, ItemSubtasks |  |
 | `item/ItemVideoNotes.tsx` | 41 | 1 | ItemVideoNotesProps, ItemVideoNotes |  |
 | `ItemCard.tsx` | 789 | 1 | ItemCardProps, ItemCard |  |
+| `list/FeedDateBubble.tsx` | 21 | 1 | FeedDateBubbleProps, FeedDateBubble |  |
+| `list/FeedDropOverlay.tsx` | 30 | 1 | FeedDropOverlayProps, FeedDropOverlay |  |
+| `list/FeedScrollHint.tsx` | 72 | 1 | FeedScrollHintProps, FeedScrollHint |  |
+| `list/feedWindow.ts` | 91 | 1 | WINDOW_CHUNK, takeWindow, hasOlderItems, nextWindowSize, windowSizeAroundTarget, +3 | Карточек в окне; столько же добавляет один шаг догрузки старого. |
 | `PinnedBanner.tsx` | 217 | 1 | PinnedBanner |  |
 | `SlashCommandMenu.tsx` | 101 | 1 | SlashCommandMenu |  |
 | `SuggestionMenuHeader.tsx` | 28 | 4 | SuggestionMenuHeader | Общая шапка подсказок композера (@ папки, # теги, / команды). |
@@ -199,18 +203,18 @@
 | `useFolderBrowser.ts` | 90 | 1 | useFolderBrowser | The folders tab: granted folders, the files inside one of them, and the syste… |
 | `ViewerVideo.tsx` | 127 | 2 | ViewerVideoProps, ViewerVideo |  |
 
-## src/components/Mobile — 19 файлов, 2925 строк
+## src/components/Mobile — 19 файлов, 2837 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `calendar/AgendaDayGroup.tsx` | 155 | 1 | AgendaDayGroupProps, AgendaDayGroup |  |
 | `calendar/AgendaOverdueSection.tsx` | 44 | 1 | AgendaOverdueSectionProps, AgendaOverdueSection |  |
-| `calendar/CalendarHeader.tsx` | 103 | 1 | CalendarHeaderProps, CalendarHeader |  |
-| `calendar/calendarPositions.ts` | 140 | 5 | HOURS_24, HOUR_HEIGHT, CalendarSlotTarget, AgendaDayLayout, realTaskId, +10 | calendarPositions.ts — чистая раскладка повестки: порядок строк, линия «сейча… |
+| `calendar/CalendarHeader.tsx` | 97 | 1 | CalendarHeaderProps, CalendarHeader |  |
+| `calendar/calendarPositions.ts` | 126 | 5 | HOURS_24, HOUR_HEIGHT, CalendarSlotTarget, AgendaDayLayout, realTaskId, +8 | calendarPositions.ts — чистая раскладка повестки: порядок строк, линия «сейча… |
 | `calendar/calendarRange.ts` | 124 | 5 | MobileCalendarMode, CalendarDay, parseISODate, buildWeekDays, buildThreeDayWindow, +7 | calendarRange.ts — чистые вычисления календарной сетки мобильного календаря: |
-| `calendar/CalendarTaskRow.tsx` | 98 | 2 | CalendarTaskRowProps, CalendarTaskRow |  |
+| `calendar/CalendarTaskRow.tsx` | 89 | 2 | CalendarTaskRowProps, CalendarTaskRow |  |
 | `calendar/MonthPickerSheet.tsx` | 146 | 1 | MonthPickerSheetProps, MonthPickerSheet |  |
-| `calendar/ThreeDayGrid.tsx` | 251 | 1 | ThreeDayGridProps, ThreeDayGrid |  |
+| `calendar/ThreeDayGrid.tsx` | 241 | 1 | ThreeDayGridProps, ThreeDayGrid |  |
 | `calendar/WeekStrip.tsx` | 73 | 1 | WeekStripProps, WeekStrip |  |
 | `MobileAssistantView.tsx` | 71 | 1 | MobileAssistantView |  |
 | `MobileAudioView.tsx` | 12 | 1 | MobileAudioView |  |
@@ -221,7 +225,7 @@
 | `MobileScreenHeader.tsx` | 86 | 5 | MobileScreenHeaderProps, MobileScreenHeader |  |
 | `MobileSettingsView.tsx` | 133 | 1 | MobileSettingsView |  |
 | `MobileShell.tsx` | 112 | 1 | MobileShell |  |
-| `MobileTasksView.tsx` | 325 | 1 | MobileTasksView |  |
+| `MobileTasksView.tsx` | 276 | 1 | MobileTasksView |  |
 
 ## src/components/Modals — 10 файлов, 2357 строк
 
@@ -281,7 +285,7 @@
 | `FolderTree.tsx` | 257 | 1 | FolderTree |  |
 | `Sidebar.tsx` | 204 | 1 | Sidebar |  |
 
-## src/components/UI — 30 файлов, 4884 строк
+## src/components/UI — 32 файлов, 5047 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -304,7 +308,9 @@
 | `MobileActionSheet.tsx` | 186 | 1 | MobileActionSheet |  |
 | `NumberInput.tsx` | 98 | 1 | NumberInputProps, NumberInput |  |
 | `PriorityBadge.tsx` | 75 | 5 | TaskPriority, LinearSignalBarsProps, LinearSignalBars |  |
-| `ResponsiveSegmented.tsx` | 186 | 5 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented |  |
+| `priorityTone.ts` | 46 | 4 | PriorityTone, priorityTone, PRIORITY_TONE_TEXT, PRIORITY_TONE_DOT, PRIORITY_TONE_CHIP | Цветовая семья приоритета: high — rose, medium — amber, low — blue, none — zi… |
+| `ResponsiveSegmented.tsx` | 248 | 7 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented |  |
+| `segmentedVariants.ts` | 55 | 2 | SegmentedVariant, SegmentedStripClasses, SEGMENTED_STRIP_CLASSES | Пресеты классов для `ResponsiveSegmented`. Геометрия сегментных полос живёт |
 | `Select.tsx` | 352 | 10 | SelectOption, SelectProps, Select |  |
 | `SendButton.tsx` | 48 | 4 | SendButtonProps, SendButton |  |
 | `SheetPanel.tsx` | 353 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel |  |
@@ -322,15 +328,15 @@
 |---|---:|---:|---|---|
 | `VaultSwitcherMenu.tsx` | 228 | 3 | VaultSwitcherMenuProps, VaultSwitcherMenu |  |
 
-## src/components/Views — 13 файлов, 2650 строк
+## src/components/Views — 13 файлов, 2652 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `CalendarDrawer.tsx` | 271 | 1 | CalendarDrawerProps, CalendarDrawer |  |
 | `CalendarExpandedDayModal.tsx` | 184 | 1 | CalendarExpandedDayModalProps, CalendarExpandedDayModal |  |
-| `calendarHelpers.ts` | 63 | 4 | getPriorityBadge, cleanTimeFromTitle, formatDurationBadge |  |
+| `calendarHelpers.ts` | 66 | 4 | getPriorityBadge, cleanTimeFromTitle, formatDurationBadge |  |
 | `CalendarMonthView.tsx` | 210 | 1 | CalendarMonthViewProps, CalendarMonthView |  |
-| `CalendarTaskBlock.tsx` | 340 | 1 | AllDayTaskPillProps, AllDayTaskPill, TimedTaskBlockProps, TimedTaskBlock |  |
+| `CalendarTaskBlock.tsx` | 339 | 1 | AllDayTaskPillProps, AllDayTaskPill, TimedTaskBlockProps, TimedTaskBlock |  |
 | `CalendarView.tsx` | 547 | 1 | CalendarView |  |
 | `kanban/KanbanCard.tsx` | 218 | 1 | KanbanCardProps, KanbanCard |  |
 | `kanban/KanbanColumn.tsx` | 116 | 1 | KanbanColumnProps, KanbanColumn |  |
@@ -562,11 +568,11 @@
 | `formatBytes.ts` | 7 | 5 | formatBytes |  |
 | `shortId.ts` | 7 | 6 | shortId | An id cut down for reading: the head, an ellipsis, the tail. |
 
-## src/lib/time — 4 файлов, 940 строк
+## src/lib/time — 4 файлов, 958 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `calendarLayout.ts` | 120 | 4 | LayoutPositionedTask, computeAntiOverlapLayout |  |
+| `calendarLayout.ts` | 138 | 6 | LayoutPositionedTask, TimedBlockBox, timedBlockBox, computeAntiOverlapLayout |  |
 | `dateUtils.ts` | 126 | 22 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, getTodayIso, getTomorrowIso, +11 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
 | `recurrenceHelper.ts` | 305 | 5 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 |  |
 | `todoistTaskParser.ts` | 389 | 11 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +1 |  |
@@ -601,5 +607,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 159 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 162 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |
