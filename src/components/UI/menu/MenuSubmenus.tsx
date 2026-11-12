@@ -1,0 +1,228 @@
+import React from 'react';
+import { Copy, FileText, FolderOpen, Link2, CheckSquare, StickyNote, Check } from 'lucide-react';
+import type { FolderMeta, SlagItem, SlagItemType } from '../../../types';
+import type { ContextMenuTarget } from '../../../context/appContext.types';
+import { usePresence } from '../../../hooks/usePresence';
+
+export type MenuSubmenuName = 'more' | 'type' | 'explorer';
+
+/**
+ * A side panel of the menu. The menu itself already outlives its own exit; a
+ * flyout that unmounts the moment the pointer leaves pulls the frame out from
+ * under the cursor, so it keeps the same window as everything else.
+ */
+const Flyout: React.FC<React.HTMLAttributes<HTMLDivElement> & { open: boolean }> = ({ open, children, ...rest }) => {
+  const { ref, phase, isPresent, onTransitionEnd } = usePresence(open);
+  if (!isPresent) return null;
+  return (
+    <div ref={ref} data-motion-state={phase} onTransitionEnd={onTransitionEnd} {...rest}>
+      {children}
+    </div>
+  );
+};
+
+export interface MenuSubmenusProps {
+  type: ContextMenuTarget['type'];
+  item?: SlagItem;
+  folder?: FolderMeta;
+  triggerRect: DOMRect | null;
+  activeSubmenu: MenuSubmenuName | null;
+  submenuX: number;
+  submenuY: number;
+  submenuDirection: 'right' | 'left';
+  onChangeType: (type: SlagItemType) => void;
+  onOpenInExplorer: () => void;
+  onCopyFullPath: () => void;
+  onCopyRelativePath: () => void;
+  onCopyLink: () => void;
+  onOpenFolder: (path: string) => void;
+  onCopyFolderFullPath: (path: string) => Promise<void>;
+  onCopyFolderPath: (path: string) => void;
+  onSubmenuMouseEnter: () => void;
+  onSubmenuMouseLeave: () => void;
+}
+
+export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
+  type,
+  item,
+  folder,
+  triggerRect,
+  activeSubmenu,
+  submenuX,
+  submenuY,
+  submenuDirection,
+  onChangeType,
+  onOpenInExplorer,
+  onCopyFullPath,
+  onCopyRelativePath,
+  onCopyLink,
+  onOpenFolder,
+  onCopyFolderFullPath,
+  onCopyFolderPath,
+  onSubmenuMouseEnter,
+  onSubmenuMouseLeave,
+}) => (
+  <>
+    {/* Side Submenu Panel: Quick Type Change */}
+    {type === 'item' && item && triggerRect && (
+      <Flyout
+        open={activeSubmenu === 'type'}
+        style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        onMouseEnter={onSubmenuMouseEnter}
+        onMouseLeave={onSubmenuMouseLeave}
+        className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+      >
+        {/* Bridge hit-area */}
+        <div
+          className={`absolute top-0 bottom-0 w-3 pointer-events-auto ${
+            submenuDirection === 'right' ? '-left-2' : '-right-2'
+          }`}
+        />
+
+        <button
+          onClick={() => onChangeType('note')}
+          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
+            item.type === 'note' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <StickyNote className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Заметка</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-zinc-500 font-mono">1</span>
+            {item.type === 'note' && <Check className="w-3.5 h-3.5 text-accent" />}
+          </div>
+        </button>
+
+        <button
+          onClick={() => onChangeType('task')}
+          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
+            item.type === 'task' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Таска</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-zinc-500 font-mono">2</span>
+            {item.type === 'task' && <Check className="w-3.5 h-3.5 text-accent" />}
+          </div>
+        </button>
+
+        <button
+          onClick={() => onChangeType('article')}
+          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
+            item.type === 'article' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Статья</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-zinc-500 font-mono">3</span>
+            {item.type === 'article' && <Check className="w-3.5 h-3.5 text-accent" />}
+          </div>
+        </button>
+      </Flyout>
+    )}
+
+    {/* Side Submenu Panel: Explorer / File System */}
+    {((type === 'item' && item) || (type === 'folder' && folder)) && triggerRect && (
+      <Flyout
+        open={activeSubmenu === 'explorer'}
+        style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        onMouseEnter={onSubmenuMouseEnter}
+        onMouseLeave={onSubmenuMouseLeave}
+        className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+      >
+        {/* Bridge hit-area */}
+        <div
+          className={`absolute top-0 bottom-0 w-3 pointer-events-auto ${
+            submenuDirection === 'right' ? '-left-2' : '-right-2'
+          }`}
+        />
+
+        <button
+          onClick={() => {
+            if (type === 'item') {
+              onOpenInExplorer();
+            } else if (folder) {
+              onOpenFolder(folder.path);
+            }
+          }}
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="whitespace-nowrap">Открыть в проводнике</span>
+          </div>
+          <span className="text-[10px] text-zinc-500 font-mono">⌘O</span>
+        </button>
+
+        <button
+          onClick={async () => {
+            if (type === 'item') {
+              onCopyFullPath();
+            } else if (folder) {
+              await onCopyFolderFullPath(folder.path);
+            }
+          }}
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="whitespace-nowrap">Скопировать полный путь</span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => {
+            if (type === 'item') {
+              onCopyRelativePath();
+            } else if (folder) {
+              onCopyFolderPath(folder.path);
+            }
+          }}
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <Copy className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="whitespace-nowrap">Относительный путь</span>
+          </div>
+        </button>
+      </Flyout>
+    )}
+
+    {/* Side Submenu Panel: Additional Utilities */}
+    {type === 'item' && item && triggerRect && (
+      <Flyout
+        open={activeSubmenu === 'more'}
+        style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        onMouseEnter={onSubmenuMouseEnter}
+        onMouseLeave={onSubmenuMouseLeave}
+        className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+      >
+        {/* Bridge hit-area */}
+        <div
+          className={`absolute top-0 bottom-0 w-3 pointer-events-auto ${
+            submenuDirection === 'right' ? '-left-2' : '-right-2'
+          }`}
+        />
+
+        <button
+          onClick={onCopyLink}
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <Link2 className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Копировать [[линк]]</span>
+          </div>
+          <span className="text-[10px] text-zinc-500 font-mono">⌘L</span>
+        </button>
+      </Flyout>
+    )}
+  </>
+);
