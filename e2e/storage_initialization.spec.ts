@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-test('concurrent native initialization callers await the same disk load', async ({ page }) => {
+// Desktop-only: initTauriFs returns false without a Tauri runtime and never touches the disk,
+// so in a browser there is no load to be concurrent about.
+test.skip('concurrent native initialization callers await the same disk load', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {
-    const { StorageService } = await import('/src/lib/storage.ts');
+    const { StorageService } = await import('/src/lib/storage/index.ts');
     const service = new StorageService();
     let finish!: (value: boolean) => void;
     const diskLoad = new Promise<boolean>(resolve => { finish = resolve; });

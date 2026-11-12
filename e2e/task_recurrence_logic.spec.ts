@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 
 test('weekly intervals keep selected days in active ISO weeks; leap years clamp', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { computeNextStrictOccurrenceDate: next } = await import(/* @vite-ignore */ '/src/lib/recurrenceHelper.ts');
+    const { computeNextStrictOccurrenceDate: next } = await import(/* @vite-ignore */ '/src/lib/time/recurrenceHelper.ts');
     const weekly = { freq: 'weekly', interval: 2, weekdays: [1, 3] };
     return {
       sameWeek: next('2026-11-02', weekly),
@@ -28,7 +28,7 @@ test('weekly intervals keep selected days in active ISO weeks; leap years clamp'
 
 test('range projection ignores wall clock and counts only results inside the range', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { getRecurringOccurrencesInRange: range } = await import(/* @vite-ignore */ '/src/lib/recurrenceHelper.ts');
+    const { getRecurringOccurrencesInRange: range } = await import(/* @vite-ignore */ '/src/lib/time/recurrenceHelper.ts');
     const task = { dueDate: '2020-01-01', recurrence: { freq: 'daily', interval: 1 } };
     return {
       historical: range(task, '2020-05-01', '2020-05-05', 3),
@@ -47,7 +47,7 @@ test('range projection ignores wall clock and counts only results inside the ran
 
 test('rollover preserves done until next cycle, resets missed streak and follows schedule', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { evaluateRecurringTasks: evaluate, getISODateString } = await import(/* @vite-ignore */ '/src/lib/recurrenceHelper.ts');
+    const { evaluateRecurringTasks: evaluate, getISODateString } = await import(/* @vite-ignore */ '/src/lib/time/recurrenceHelper.ts');
     const base = {
       id: 'routine', type: 'task', title: 'routine', folder: 'Входящие', tags: [], attachments: [],
       content: '- [x] step', subtasks: [{ id: 'st_0', title: 'step', completed: true }],
@@ -90,7 +90,7 @@ test('rollover preserves done until next cycle, resets missed streak and follows
 test('overdue next occurrence stays on schedule and reminder keeps local offset across DST', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium');
   const result = await page.evaluate(async () => {
-    const { computeNextOccurrence: next } = await import(/* @vite-ignore */ '/src/lib/recurrenceHelper.ts');
+    const { computeNextOccurrence: next } = await import(/* @vite-ignore */ '/src/lib/time/recurrenceHelper.ts');
     const reminder = new Date(2026, 9, 24, 8, 30, 15).toISOString();
     const moved = next('2026-10-25', { freq: 'weekly', interval: 2 }, reminder, new Date(2026, 9, 30, 12));
     const date = new Date(moved.nextReminder);
@@ -104,7 +104,7 @@ test('overdue next occurrence stays on schedule and reminder keeps local offset 
 
 test('invalid dates and intervals cannot overflow or create non-advancing loops', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { computeNextStrictOccurrenceDate: next, evaluateRecurringTasks: evaluate, getRecurringOccurrencesInRange: range } = await import(/* @vite-ignore */ '/src/lib/recurrenceHelper.ts');
+    const { computeNextStrictOccurrenceDate: next, evaluateRecurringTasks: evaluate, getRecurringOccurrencesInRange: range } = await import(/* @vite-ignore */ '/src/lib/time/recurrenceHelper.ts');
     const invalid = { type: 'task', dueDate: '2026-02-30', status: 'done', recurrence: { freq: 'daily', interval: 1 } };
     return {
       dates: ['bad', '2026-02-30', '2026-13-01'].map(date => next(date, { freq: 'daily', interval: 1 })),
