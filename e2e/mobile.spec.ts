@@ -728,7 +728,10 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
 
     const sheet = page.locator('[data-testid="editor-sheet"]');
     const handle = page.locator('[data-sheet-handle]').first();
-    await expect(handle).toBeVisible();
+    // The sheet mounts with a spring, and on a loaded machine the tap lands before React has
+    // committed the sheet — wait for the container instead of the 5 s default on the handle.
+    await expect(sheet).toBeVisible({ timeout: 15000 });
+    await expect(handle).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(320);
 
     const drag = async (deltaY: number) => {

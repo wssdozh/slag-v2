@@ -11,7 +11,9 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
   });
 
   test('admin authentication and all 5 commercial tabs verification', async ({ page }) => {
-    test.setTimeout(60_000);
+    // The admin route is a lazy branch of App.tsx, and the first load in a cold run pays Vite's
+    // transform of the whole module graph on top of the mocked fetch dance below.
+    test.setTimeout(180_000);
 
     let currentPlan = 'free';
     let deviceStatus = 'active';
