@@ -55,18 +55,23 @@ docs/project-map/  база знаний проекта, 15 документов
 
 | задача | начинать с |
 |---|---|
-| синхронизация: очередь, транспорт, конфликты | `src/lib/sync/syncEngine.ts`, `transport.ts`, `crypto.ts` |
+| синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `syncSocket.ts`, `applyBundle.ts`, `pushBundle.ts` |
+| конфиг синка, авторизация, сид-фраза | `src/lib/sync/syncConfig.ts` |
 | экран синка, аккаунт, устройства | `src/components/Settings/`, `src/lib/sync/account.ts` |
 | лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx` |
 | композер, создание и сохранение записи | `src/components/Feed/Composer.tsx`, `src/lib/vault/markdownSerializer.ts` |
+| запись: создать, изменить, удалить, восстановить, переместить | `src/context/hooks/useItemWrites.ts` |
+| папка: создать, переименовать, описать, удалить | `src/context/hooks/useFolderAdmin.ts`, `src/lib/storage/folderStore.ts` |
+| хранилище: переключить, создать, удалить | `src/context/hooks/useVaults.ts`, `src/lib/storage/vaultRegistry.ts` |
+| корзина | `src/lib/storage/trashStore.ts` |
 | полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
 | мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
 | ИИ-ассистент, инструменты, действия | `src/lib/ai/orchestrator.ts`, `tools.ts`, `actionParser.ts` |
 | поиск | `src/lib/searchService.ts` |
-| состояние приложения | `src/context/AppContext.tsx` |
+| состояние приложения | `src/context/AppContext.tsx` + `src/context/hooks/` |
 | вложения, аудио, вставка файлов | `src/lib/media/`, `src/lib/storage/index.ts` |
-| настройки, тема, типографика | `src/components/Modals/SettingsModal.tsx`, `src/styles/theme.css` |
+| настройки, тема, типографика | `src/components/Modals/SettingsModal.tsx`, `src/components/Settings/`, `src/styles/theme.css` |
 | MCP-сервер | `src/mcp/`, `vite.mcp.config.ts` |
 | e2e | `e2e/slag/` |
 

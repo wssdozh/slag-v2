@@ -21,14 +21,14 @@ tags:
 ```text
 src/
   components/       UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
-  context/          AppContext — единственный стейт-хаб
+  context/          AppContext — единственный стейт-хаб; hooks/ — записи, папки, хранилища, поверхности, лента
   hooks/
     gestures/       drag, pointer dnd, sheet drag, swipe
     layout/         container width, flip layout, is mobile, visual viewport
   lib/
     ai/             оркестратор, tools, prompt, action parser, адаптеры
-    storage/        StorageService, draft store, IndexedDB attachments
-    sync/           syncEngine, transport, devices, outbox, crypto
+    storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
+    sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
     vault/          модель записи: schema, updates, markdown serializer, filename, demo
     time/           даты, recurrence, Todoist-парсер, раскладка календаря
     media/          attachments enrichment, audio, bytecode, file drop
