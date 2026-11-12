@@ -144,26 +144,34 @@ export async function querySearch(
       tolerance,
       limit: SEARCH_LIMITS.ORAMA_PHRASE_LIMIT,
     });
+    const byId = new Map(allItems.map(item => [item.id, item] as const));
+    const inHitOrder = (ids: string[]): SlagItem[] =>
+      ids.map(id => byId.get(id)).filter((item): item is SlagItem => item !== undefined);
+
     const phraseHits = filterByType(
-      allItems.filter(item => phrase.hits.some(hit => (hit.document as { id: string }).id === item.id)),
+      inHitOrder(phrase.hits.map(hit => (hit.document as { id: string }).id)),
       typeFilter
     );
     if (phraseHits.length > 0) return done(phraseHits, 'orama phrase');
 
     if (tokens.length > 1) {
-      const ids = new Set<string>();
+      // First appearance wins: Orama ranks every token's hits, and the union keeps that order.
+      const ids: string[] = [];
+      const seen = new Set<string>();
       for (const token of tokens) {
         const result = await search(dbInstance, {
           term: token,
           tolerance: SEARCH_LIMITS.TYPO_TOLERANCE,
           limit: SEARCH_LIMITS.ORAMA_KEYWORD_LIMIT,
         });
-        result.hits.forEach(hit => ids.add((hit.document as { id: string }).id));
+        for (const hit of result.hits) {
+          const id = (hit.document as { id: string }).id;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          ids.push(id);
+        }
       }
-      const keywordHits = filterByType(
-        allItems.filter(item => ids.has(item.id)),
-        typeFilter
-      );
+      const keywordHits = filterByType(inHitOrder(ids), typeFilter);
       if (keywordHits.length > 0) return done(keywordHits, 'orama keywords');
     }
   } catch (err) {
