@@ -22,20 +22,20 @@ test.describe('Visual Comparison Suite', () => {
       await settingsBtn.click();
       await page.waitForTimeout(200);
       await page.screenshot({ path: 'test-results/screenshots/after_modal_settings.png' });
-      const closeBtn = page.locator('button:has(.lucide-x)').first();
-      await closeBtn.click();
+      // Escape closes the top layer by contract; a blind `.lucide-x` first match can land on a
+      // different surface now that overlays mount on first open and stay mounted after.
+      await page.keyboard.press('Escape');
       await page.waitForTimeout(200);
     }
 
     // 3. Search Modal
+    // The palette is a lazy overlay now, so it arrives a chunk after the keypress - gating on
+    // isVisible() right away skipped the close and left it covering the page.
     await page.keyboard.press('Control+k');
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: 'test-results/screenshots/after_modal_search.png' });
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
-    const searchInput = page.locator('input[placeholder*="Поиск"]').first();
-    if (await searchInput.isVisible()) {
-      await page.screenshot({ path: 'test-results/screenshots/after_modal_search.png' });
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(200);
-    }
 
     // 4. Folder Info Right Panel (Desktop)
     await page.screenshot({ path: 'test-results/screenshots/after_folder_info_desktop.png' });
@@ -46,8 +46,7 @@ test.describe('Visual Comparison Suite', () => {
       await triageBtn.click();
       await page.waitForTimeout(200);
       await page.screenshot({ path: 'test-results/screenshots/after_modal_triage.png' });
-      const closeTriage = page.locator('button:has(.lucide-x)').first();
-      await closeTriage.click();
+      await page.keyboard.press('Escape');
       await page.waitForTimeout(200);
     }
 
