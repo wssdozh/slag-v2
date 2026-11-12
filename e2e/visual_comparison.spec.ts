@@ -7,8 +7,16 @@ test.describe('Visual Comparison Suite', () => {
     await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
 
     // 1. Folder Modal
+    // Every surface below mounts on demand, so a bare isVisible() a frame after the previous
+    // step answers "not yet" and the capture silently shows the wrong screen. Give each control
+    // a short window to appear before deciding to skip it.
+    const appear = async (locator: ReturnType<typeof page.locator>) => {
+      await locator.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+      return locator.isVisible();
+    };
+
     const newFolderBtn = page.locator('button[title*="Создать папку"]').first();
-    if (await newFolderBtn.isVisible()) {
+    if (await appear(newFolderBtn)) {
       await newFolderBtn.click();
       await page.waitForTimeout(200);
       await page.screenshot({ path: 'test-results/screenshots/after_modal_folder.png' });
@@ -18,7 +26,7 @@ test.describe('Visual Comparison Suite', () => {
 
     // 2. Settings Modal
     const settingsBtn = page.locator('button[title*="Настройки"]').first();
-    if (await settingsBtn.isVisible()) {
+    if (await appear(settingsBtn)) {
       await settingsBtn.click();
       await page.waitForTimeout(200);
       await page.screenshot({ path: 'test-results/screenshots/after_modal_settings.png' });
@@ -42,7 +50,7 @@ test.describe('Visual Comparison Suite', () => {
 
     // 5. Triage Modal
     const triageBtn = page.locator('button:has-text("Запустить")').first();
-    if (await triageBtn.isVisible()) {
+    if (await appear(triageBtn)) {
       await triageBtn.click();
       await page.waitForTimeout(200);
       await page.screenshot({ path: 'test-results/screenshots/after_modal_triage.png' });
@@ -52,7 +60,7 @@ test.describe('Visual Comparison Suite', () => {
 
     // 6. Kanban Board & Priority Badges
     const kanbanBtn = page.locator('button[title*="Канбан-доска задач"]').first();
-    if (await kanbanBtn.isVisible()) {
+    if (await appear(kanbanBtn)) {
       await kanbanBtn.click();
       await page.waitForTimeout(300);
       await page.screenshot({ path: 'test-results/screenshots/after_priority_badges.png' });
