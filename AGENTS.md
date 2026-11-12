@@ -17,6 +17,7 @@
 
 - Всегда: `npm run check` (tsc + 0 warnings линтера, две строки вывода). Перед сдачей — `npm run build`.
 - Трогал `src/components/**` или `src/*.css`: `npx playwright test`, скриншот в `test-results/screenshots/`, показать в ответе `![Результат](<test-results/screenshots/…>)`.
+- Синк-спеки (`sync_*.spec.ts`) чувствительны к нагрузке: в них 120-мс буфер импорта и замеры «сколько пушей успело». На шести воркерах они флакуют, на одном — зелёные. Гоняй их `PLAYWRIGHT_WORKERS=1`; остальную пачку можно параллельно.
 - Трогал `src-tauri/`: `npm run build:android`. Есть устройство в `adb devices` — поставить, запустить, снять `adb exec-out screencap -p`, проверить `read_image`.
 - Коммит — Conventional Commits на английском, по одной задаче.
 
