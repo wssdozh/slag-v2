@@ -1,22 +1,13 @@
-import { formatBytes } from '../../lib/text/formatBytes';
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, LightboxImage, SlagAttachment } from '../../types';
-import { AudioPlayer } from '../UI/AudioPlayer';
-import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
+import type { SlagItem, SlagAttachment } from '../../types';
 import { TaskStatusMark } from '../UI/TaskStatusMark';
 import {
-  Maximize2,
   Calendar,
-  ChevronDown,
   FileText,
   CornerUpLeft,
   Pin,
-  Sparkles,
-  Loader2,
   Flame,
-  Download,
-  ImageOff
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
@@ -24,49 +15,24 @@ import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
+import { ItemCardActions } from './item/ItemCardActions';
+import { ItemReplyBanner } from './item/ItemReplyBanner';
+import { ItemSubtasks } from './item/ItemSubtasks';
+import { ItemVideoNotes } from './item/ItemVideoNotes';
+import { ItemAudioNotes } from './item/ItemAudioNotes';
+import { ItemImages } from './item/ItemImages';
+import { ItemFiles } from './item/ItemFiles';
+import {
+  attachmentCounts,
+  buildItemLightboxImages,
+  groupItemAttachments,
+  itemCardShape,
+} from './item/itemAttachments';
 
 const CARD_TRANSITION =
   'transform var(--slag-motion-base) var(--ease-standard), ' +
   'background-color var(--slag-motion-base) var(--ease-standard), ' +
   'border-color var(--slag-motion-base) var(--ease-standard)';
-
-/** One picture never eats the column: 320 tall, and never wider than 416 even as a panorama. */
-const THUMB_MAX_HEIGHT = 320;
-const THUMB_MAX_WIDTH = 416;
-
-type CardShape = 'voice' | 'file' | 'video' | 'image' | 'mixed';
-
-/**
- * A card that is nothing but its attachment becomes a bubble; one kind of picture does it even
- * as a pile. Text, chips, tasks and mixed attachments keep the full row: they need the width.
- */
-const cardShape = (
-  item: SlagItem,
-  counts: { audio: number; video: number; image: number; file: number },
-): CardShape => {
-  const bare =
-    item.type === 'note' &&
-    !item.content.trim() &&
-    (!item.subtasks || item.subtasks.length === 0) &&
-    (!item.tags || item.tags.length === 0) &&
-    !item.replyToId &&
-    !item.isPinned &&
-    (!item.priority || item.priority === 'none');
-  if (!bare) return 'mixed';
-  if (counts.image > 0) return counts.audio + counts.video + counts.file > 0 ? 'mixed' : 'image';
-  if (counts.audio > 0) return counts.audio + counts.video + counts.file > 1 ? 'mixed' : 'voice';
-  if (counts.video > 0) return counts.video + counts.file > 1 ? 'mixed' : 'video';
-  return counts.file === 1 ? 'file' : 'mixed';
-};
-
-/** A pile of pictures fills one canvas: the first frame gets a row of its own. */
-const albumRowSizes = (count: number): number[] => {
-  if (count === 2) return [2];
-  if (count === 3) return [1, 2];
-  if (count === 4) return [2, 2];
-  if (count === 5) return [2, 3];
-  return [3, 3];
-};
 
 export interface ItemCardProps {
   item: SlagItem;
@@ -142,7 +108,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     addToast
   } = useApp();
 
-  const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
   const [expandedOcrIds, setExpandedOcrIds] = useState<Set<string>>(new Set());
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -150,16 +115,16 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const [tagsRowWidth, setTagsRowWidth] = useState(0);
   const tagsRowRef = useRef<HTMLDivElement | null>(null);
 
-  const toggleOcr = (id: string) => {
+  const handleToggleOcr = useCallback((id: string) => {
     setExpandedOcrIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const handleEnrichAttachment = React.useCallback(async (targetAtt: SlagAttachment) => {
+  const handleEnrichAttachment = useCallback(async (targetAtt: SlagAttachment) => {
     if (!canEnrichAttachments(aiSettings)) {
       addToast('Подписка неактивна, а свой ключ Groq не указан — распознавание недоступно', 'info');
       return;
@@ -324,75 +289,32 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     minute: '2-digit',
   });
 
-  // A picture sizes itself from its own proportions: height has a ceiling, width follows the
-  // ratio. Without the loaded ratio the browser inflates the box to the unclamped width.
-  const [firstImageRatio, setFirstImageRatio] = useState<number | null>(null);
-
   const isTask = item.type === 'task';
   const isArticle = item.type === 'article';
 
-  const audioAttachments = item.attachments.filter(a => a.type === 'audio');
-  const videoAttachments = item.attachments.filter(a => a.type === 'video');
-  const imageAttachments = item.attachments.filter(a => a.type === 'image');
-  const fileAttachments = item.attachments.filter(a => a.type === 'file');
+  // One bucket per kind, so each slot of the card gets its own list and the shape counts once.
+  const attachmentGroups = useMemo(() => groupItemAttachments(item.attachments), [item.attachments]);
   // Bytes are not in the note any more: they are resolved from IndexedDB or `.attachments/`.
   const attachmentSrcs = useAttachmentSrcs(item.attachments);
 
-  const completedSubtasksCount = item.subtasks?.filter(s => s.completed).length || 0;
-  const totalSubtasksCount = item.subtasks?.length || 0;
-
-  const shape = cardShape(item, {
-    audio: audioAttachments.length,
-    video: videoAttachments.length,
-    image: imageAttachments.length,
-    file: fileAttachments.length,
-  });
+  const shape = itemCardShape(item, attachmentCounts(attachmentGroups));
   const isVoiceBubble = shape === 'voice';
   const isFileBubble = shape === 'file';
 
   // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
   // exception is the open OCR panel: prose needs a column, not a 200px strip.
   const isPictureBubble = shape === 'image' && expandedOcrIds.size === 0;
+  const hasFloatingActions = isVoiceBubble || isFileBubble || isPictureBubble || shape === 'video';
 
-  // A note can point at a file that is not on disk (an id that moved, an upload that never
-  // landed). The card says so quietly instead of drawing the browser's broken-image icon.
-  const heroSrc = attachmentSrcs[imageAttachments[0]?.id ?? ''] ?? imageAttachments[0]?.dataUrl;
-  const albumSrc = (image: SlagAttachment) => attachmentSrcs[image.id] ?? image.dataUrl;
-
-  // A pile of pictures fills one canvas: the first frame is the biggest, the rest catch up in
-  // rows. Six is the ceiling — the sixth slot counts what did not fit.
-  const albumShown = imageAttachments.length > 6 ? 5 : imageAttachments.length;
-  const albumHidden = imageAttachments.length - albumShown;
-  const albumRows = albumRowSizes(imageAttachments.length);
-  const albumTiles = imageAttachments.slice(0, albumShown).map((image) => ({ image, hidden: 0 }));
-  if (albumHidden > 0) albumTiles.push({ image: imageAttachments[albumShown], hidden: albumHidden });
-  const albumRowStarts = albumRows.map((_, rowIndex) =>
-    albumRows.slice(0, rowIndex).reduce((sum, perRow) => sum + perRow, 0),
-  );
-
-  const handleImageClick = (img: SlagAttachment) => {
+  const handleImageClick = useCallback((img: SlagAttachment) => {
     if (onImageClick) {
       onImageClick(img, item);
       return;
     }
-    // One deck for the whole note: a photo and a clip page next to each other, as they do
-    // in every messenger. `kind` is what the viewer reads to pick a slide.
-    const itemImages: LightboxImage[] = (item.attachments || [])
-      .filter(att => att.type === 'image' || att.type === 'video')
-      .map(att => ({
-        id: att.id,
-        name: att.name,
-        url: attachmentSrcs[att.id] ?? att.dataUrl ?? '',
-        kind: att.type === 'video' ? 'video' : 'image',
-        extractedText: att.extractedText,
-        summary: att.summary,
-        enrichmentStatus: att.enrichmentStatus,
-        enrichmentError: att.enrichmentError,
-        sourceItem: item,
-      }));
+    const itemImages = buildItemLightboxImages(item, attachmentSrcs);
     const clickedIdx = itemImages.findIndex(i => i.id === img.id);
     openLightbox(itemImages, clickedIdx >= 0 ? clickedIdx : 0);
-  };
+  }, [onImageClick, item, attachmentSrcs, openLightbox]);
 
   const folderDisplayName =
     item.folder !== DEFAULT_INBOX_FOLDER
@@ -513,10 +435,17 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
   const shouldRenderBottomBar = (shape !== 'voice' && shape !== 'file') || hasBottomMeta;
 
-  const handleOpenArticle = () => {
+  const handleOpenArticle = useCallback(() => {
     setSelectedItem(item);
     setIsFullscreenEditorOpen(true);
-  };
+  }, [item, setSelectedItem, setIsFullscreenEditorOpen]);
+
+  const handleReply = useCallback(() => setReplyTarget(item), [item, setReplyTarget]);
+
+  const handleToggleSubtask = useCallback(
+    (subtaskId: string) => toggleTaskComplete(item.id, subtaskId),
+    [item.id, toggleTaskComplete],
+  );
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -602,58 +531,19 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         }`}
       >
         {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
-        <div
-          className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 ${
-            isVoiceBubble || isFileBubble || isPictureBubble || shape === 'video'
-              ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
-              : 'flex items-center'
-          } gap-1 sm:gap-0 sm:group-hover:gap-1 z-20 pointer-events-auto`}
-        >
-          <button
-            onClick={() => setReplyTarget(item)}
-            className="w-7 h-7 sm:w-0 sm:h-6 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-[color,background-color,opacity,width] duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0"
-            title="Ответить (R)"
-          >
-            <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
-          </button>
-
-          {/* Действия с карточкой живут на ПКМ: кнопка в углу дублировала меню и шумела. */}
-
-          {/* Article Focus Editor Button in top-right corner - kept in place on the far right */}
-          {isArticle && (
-            <button
-              type="button"
-              onClick={handleOpenArticle}
-              className="w-7 h-7 sm:w-6 sm:h-6 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08] transition-colors cursor-pointer flex items-center justify-center shrink-0"
-              title="Открыть в фокус-редакторе (⌘E)"
-              aria-label="Открыть в фокус-редакторе"
-            >
-              <Maximize2 className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          )}
-        </div>
+        <ItemCardActions
+          isFloating={hasFloatingActions}
+          isArticle={isArticle}
+          onReply={handleReply}
+          onOpenArticle={handleOpenArticle}
+        />
 
       {/* Reply Parent Quote Banner */}
-      {item.replyToId && (
-        <div
-          onClick={() => replyParent && scrollToItem(replyParent.id)}
-          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors select-none group/quote pt-0.5"
-        >
-          <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 group-hover/quote:text-zinc-300 shrink-0" />
-          {replyParent ? (
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="font-mono text-2xs text-zinc-500 shrink-0">
-                {replyParent.type === 'task' ? 'Таска' : replyParent.type === 'article' ? 'Статья' : 'Заметка'}:
-              </span>
-              <span className="text-zinc-400 group-hover/quote:text-zinc-200 truncate font-medium text-xs">
-                {replyParent.title || replyParent.content.slice(0, 45)}
-              </span>
-            </div>
-          ) : (
-            <span className="text-2xs text-zinc-600 italic">Исходная запись удалена</span>
-          )}
-        </div>
-      )}
+      <ItemReplyBanner
+        replyToId={item.replyToId}
+        replyParent={replyParent}
+        onScrollToParent={scrollToItem}
+      />
 
       {/* Main Content Area */}
       {isTask ? (
@@ -694,58 +584,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           </div>
 
           {/* Subtasks Section - Flat Linear layout */}
-          {item.subtasks && item.subtasks.length > 0 && (
-            <div className="mt-1 pl-[26px] flex flex-col gap-1.5">
-              <button
-                type="button"
-                onClick={() => setIsSubtasksExpanded(!isSubtasksExpanded)}
-                aria-expanded={isSubtasksExpanded}
-                aria-label={`Подзадачи: ${completedSubtasksCount} из ${totalSubtasksCount}`}
-                className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500 cursor-pointer hover:text-zinc-300 select-none py-0.5 w-fit"
-              >
-                <span>
-                  Подзадачи: {completedSubtasksCount} из {totalSubtasksCount}
-                </span>
-                <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform duration-200 ease-out ${isSubtasksExpanded ? 'rotate-180' : ''}`} />
-              </button>
-
-              <div
-                className="motion-accordion"
-                data-expanded={isSubtasksExpanded}
-                aria-hidden={!isSubtasksExpanded}
-              >
-                <div className="motion-accordion-inner flex flex-col gap-1.5 pt-0.5">
-                  {item.subtasks.map(st => (
-                    <div
-                      key={st.id}
-                      onClick={() => toggleTaskComplete(item.id, st.id)}
-                      className="flex items-center gap-2 cursor-pointer text-xs sm:text-ui group/sub select-none"
-                    >
-                      <button
-                        type="button"
-                        aria-label={`Отметить подзадачу ${st.title}`}
-                        className="text-zinc-500 group-hover/sub:text-zinc-300 transition-colors shrink-0"
-                      >
-                        <TaskStatusMark done={st.completed} className="w-3.5 h-3.5" />
-                      </button>
-                      <span
-                        className={`text-xs sm:text-ui flex-1 min-w-0 ${
-                          st.completed ? 'line-through text-zinc-500' : 'text-zinc-300'
-                        }`}
-                      >
-                        <MarkdownRenderer
-                          content={st.title}
-                          inline
-                          onWikiLinkClick={scrollToItem}
-                          className={st.completed ? 'line-through text-zinc-500' : 'text-zinc-300'}
-                        />
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <ItemSubtasks
+            subtasks={item.subtasks}
+            onToggle={handleToggleSubtask}
+            onWikiLinkClick={scrollToItem}
+          />
         </div>
       ) : isArticle ? (
         /* Article Variant - Clean Teaser, opens Focus Editor on click */
@@ -787,231 +630,39 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       )}
 
       {/* Video Circle Notes (Telegram style) */}
-      {videoAttachments.map(att => (
-        <div key={att.id} className="flex items-center gap-1 pt-1">
-          <VideoCirclePlayer src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''} />
-          {/* The circle plays in place; this is the way out of the card and into the viewer. */}
-          <button
-            type="button"
-            onClick={() => handleImageClick(att)}
-            aria-label="Открыть видео"
-            title="Открыть видео"
-            className="cursor-pointer rounded-md p-1.5 text-fg-dim transition-colors hover:bg-surface-hover hover:text-fg-primary"
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ))}
+      <ItemVideoNotes
+        attachments={attachmentGroups.video}
+        srcs={attachmentSrcs}
+        onOpen={handleImageClick}
+      />
 
       {/* Audio Notes Player */}
-      {audioAttachments.map(att => (
-        <div key={att.id} className={isVoiceBubble ? 'w-full' : 'w-full pt-1'}>
-          <AudioPlayer
-            src={attachmentSrcs[att.id] ?? att.dataUrl ?? ''}
-            name={att.name}
-            duration={att.duration}
-            waveform={att.waveform}
-            timeContext={isVoiceBubble ? formattedTime : undefined}
-            transcript={att.extractedText}
-            summary={att.summary}
-            enrichmentStatus={att.enrichmentStatus}
-            onEnrich={() => handleEnrichAttachment(att)}
-          />
-        </div>
-      ))}
+      <ItemAudioNotes
+        attachments={attachmentGroups.audio}
+        srcs={attachmentSrcs}
+        isVoiceBubble={isVoiceBubble}
+        formattedTime={formattedTime}
+        onEnrich={handleEnrichAttachment}
+      />
 
       {/* Pictures: one keeps its own shape, a pile fills one canvas */}
-      {imageAttachments.length > 0 && (
-        <div className={`pt-1 flex flex-col gap-1.5 ${isPictureBubble ? 'w-fit max-w-full' : 'w-full items-start'}`}>
-          {imageAttachments.length === 1 ? (
-            <>
-              <div
-                className="relative min-w-[9rem] min-h-[4.5rem] rounded-lg overflow-hidden group/img flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
-                style={
-                  firstImageRatio
-                    ? {
-                        width: Math.min(THUMB_MAX_WIDTH, THUMB_MAX_HEIGHT * firstImageRatio),
-                        aspectRatio: String(firstImageRatio),
-                        maxWidth: '100%',
-                      }
-                    : undefined
-                }
-                onClick={heroSrc ? () => handleImageClick(imageAttachments[0]) : undefined}
-              >
-                {heroSrc ? (
-                  <img
-                    src={heroSrc}
-                    alt={imageAttachments[0].name}
-                    loading="lazy"
-                    decoding="async"
-                    className={
-                      firstImageRatio
-                        ? 'block h-full w-full object-contain'
-                        : 'block h-auto w-auto max-h-[20rem] max-w-full object-contain'
-                    }
-                    onLoad={(event) => {
-                      const picture = event.currentTarget;
-                      if (picture.naturalWidth && picture.naturalHeight) {
-                        setFirstImageRatio(picture.naturalWidth / picture.naturalHeight);
-                      }
-                    }}
-                  />
-                ) : (
-                  <MissingMedia name={imageAttachments[0].name} />
-                )}
-
-                {/* Text action badge anchored in the bottom-right corner of the image */}
-                {imageAttachments[0].extractedText ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleOcr(imageAttachments[0].id);
-                    }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 hover:bg-black/90 border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
-                    title={expandedOcrIds.has(imageAttachments[0].id) ? 'Скрыть текст' : 'Показать текст с фото'}
-                  >
-                    <FileText className="w-3.5 h-3.5 text-zinc-300" />
-                    <span>Текст</span>
-                    <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${expandedOcrIds.has(imageAttachments[0].id) ? 'rotate-180' : ''}`} />
-                  </button>
-                ) : imageAttachments[0].enrichmentStatus === 'processing' ? (
-                  <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 border border-white/15 text-zinc-300 text-2xs font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
-                    <span>Анализ...</span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleEnrichAttachment(imageAttachments[0]);
-                    }}
-                    className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 hover:bg-black/90 border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
-                    title="Распознать текст на изображении"
-                  >
-                    <Sparkles className="w-3 h-3 text-zinc-400" />
-                    <span>{imageAttachments[0].enrichmentStatus === 'error' ? 'Повторить' : 'Текст'}</span>
-                  </button>
-                )}
-              </div>
-
-            {/* Extracted text accordion directly under the hero picture */}
-            {imageAttachments[0].extractedText && (
-              <div
-                className="motion-accordion w-full"
-                data-expanded={expandedOcrIds.has(imageAttachments[0].id)}
-                aria-hidden={!expandedOcrIds.has(imageAttachments[0].id)}
-              >
-                <div className="motion-accordion-inner w-full mt-1.5 pt-1.5 border-t border-white/[0.08] text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
-                  {imageAttachments[0].extractedText}
-                </div>
-              </div>
-            )}
-            </>
-          ) : (
-            <div className="flex w-[20rem] max-w-full flex-col gap-0.5 overflow-hidden rounded-lg" data-testid="media-album">
-              {albumRows.map((perRow, rowIndex) => (
-                <div key={rowIndex} className="flex gap-0.5">
-                  {albumTiles.slice(albumRowStarts[rowIndex], albumRowStarts[rowIndex] + perRow).map(tile => (
-                    <button
-                      key={tile.hidden > 0 ? 'more' : tile.image.id}
-                      type="button"
-                      onClick={tile.hidden > 0 || albumSrc(tile.image) ? () => handleImageClick(tile.image) : undefined}
-                      title={tile.hidden > 0 ? `Ещё ${tile.hidden}` : tile.image.name}
-                      className={`relative min-w-0 flex-1 overflow-hidden cursor-pointer transition-opacity hover:opacity-90 ${
-                        perRow === 1 ? 'aspect-[3/2]' : 'aspect-square'
-                      } ${tile.hidden > 0 ? 'bg-white/[0.06]' : ''}`}
-                    >
-                      {tile.hidden === 0 && (
-                        albumSrc(tile.image) ? (
-                          <img
-                            src={albumSrc(tile.image)}
-                            alt={tile.image.name}
-                            loading="lazy"
-                            decoding="async"
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
-                        ) : (
-                          <MissingMedia name={tile.image.name} />
-                        )
-                      )}
-                      {tile.hidden > 0 ? (
-                        <span className="absolute inset-0 flex items-center justify-center text-sm font-mono text-zinc-200">
-                          +{tile.hidden}
-                        </span>
-                      ) : (
-                        tile.image.extractedText && (
-                          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-accent-strong" />
-                        )
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <ItemImages
+        images={attachmentGroups.image}
+        srcs={attachmentSrcs}
+        isPictureBubble={isPictureBubble}
+        expandedOcrIds={expandedOcrIds}
+        onToggleOcr={handleToggleOcr}
+        onImageClick={handleImageClick}
+        onEnrich={handleEnrichAttachment}
+      />
 
       {/* File Attachments */}
-      {fileAttachments.length > 0 && (
-        <div className={`flex flex-col gap-1.5 ${isFileBubble ? 'w-full' : 'pt-1 w-full'}`}>
-          {fileAttachments.map(file => (
-            <a
-              key={file.id}
-              href={attachmentSrcs[file.id] ?? file.dataUrl}
-              download={file.name}
-              className={
-                isFileBubble
-                  ? 'flex items-center gap-2.5 sm:gap-3 w-full select-none group/file cursor-pointer'
-                  : 'flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-colors group/file select-none cursor-pointer w-full'
-              }
-            >
-              {/* Pure File Icon without podlozhka */}
-              <FileText className="w-5 h-5 text-zinc-400 group-hover/file:text-zinc-200 transition-colors shrink-0" />
-
-              {/* Filename & Info */}
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-                  <span
-                    className="text-sm font-medium text-zinc-200 group-hover/file:text-white truncate font-sans"
-                    title={file.name}
-                  >
-                    {file.name}
-                  </span>
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-sans truncate">
-                    <span className="font-mono text-zinc-400">{formatBytes(file.size)}</span>
-                    {file.summary && (
-                      <>
-                        <span className="w-1 h-1 rounded-full bg-zinc-600 shrink-0" />
-                        <span className="truncate text-zinc-400" title={file.summary}>
-                          {file.summary}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Action: Timestamp + Download for pure file, or Download icon */}
-                <div className="flex items-center gap-2 shrink-0 ml-1">
-                  {isFileBubble && (
-                    <span className="text-2xs font-mono text-zinc-500 select-none leading-none">
-                      {formattedTime}
-                    </span>
-                  )}
-                  <div
-                    className="w-7 h-7 rounded-lg text-zinc-400 group-hover/file:text-white group-hover/file:bg-white/[0.08] flex items-center justify-center transition-colors"
-                    title="Скачать файл"
-                  >
-                    <Download className="w-4 h-4" />
-                  </div>
-                </div>
-              </a>
-            ))}
-        </div>
-      )}
+      <ItemFiles
+        attachments={attachmentGroups.file}
+        srcs={attachmentSrcs}
+        isFileBubble={isFileBubble}
+        formattedTime={formattedTime}
+      />
 
       {/* Bottom Bar: Metadata & Tags on left + Timestamp on right */}
       {shouldRenderBottomBar && (
@@ -1134,17 +785,4 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   );
 };
 
-/** A media slot with no bytes behind it. Says so once, instead of a broken-image icon. */
-const MissingMedia: React.FC<{ name: string }> = ({ name }) => (
-  <span
-    data-testid="media-missing"
-    title={`Файл не найден: ${name}`}
-    className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/[0.04] text-fg-dim"
-  >
-    <ImageOff className="h-4 w-4" />
-    <span className="font-mono text-[10px]">нет файла</span>
-  </span>
-);
-
 export const ItemCard = React.memo(ItemCardComponent);
-
