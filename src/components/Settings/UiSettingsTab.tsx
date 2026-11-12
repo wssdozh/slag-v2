@@ -8,7 +8,6 @@ import { MobileDockSettings } from './MobileDockSettings';
 import {
   SettingsDivider,
   SettingsGroup,
-  SettingsRow,
   SettingsSelect,
 } from './SettingsUI';
 
@@ -23,17 +22,8 @@ export const UiSettingsTab: React.FC = () => {
     uiConfig,
     updateUiConfig,
     isMobile,
-    setSidebarWidth,
-    setRightPanelWidth,
-    addToast,
   } = useApp();
   const [selectedDevice, setSelectedDevice] = useState<'desktop' | 'mobile'>(isMobile ? 'mobile' : 'desktop');
-
-  const resetPanelSizes = () => {
-    setSidebarWidth(256);
-    setRightPanelWidth(288);
-    addToast('Размеры панелей сброшены', 'info');
-  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -103,9 +93,6 @@ export const UiSettingsTab: React.FC = () => {
               <p className="text-sm leading-relaxed text-fg-secondary">Основной текст заметки с комфортным размером и межстрочным интервалом для чтения.</p>
               <span className="text-2xs text-fg-muted">Входящие · #дизайн #типографика</span>
             </div>
-          </SettingsGroup>
-          <SettingsGroup title="Панели">
-            <SettingsRow label="Сбросить размеры" onClick={resetPanelSizes} />
           </SettingsGroup>
         </>
       )}

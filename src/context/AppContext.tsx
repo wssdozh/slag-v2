@@ -136,7 +136,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   } = useMobileNav(initialWorkspace, setCurrentFolder);
 
   const {
-    sidebarWidth, rightPanelWidth, setSidebarWidth, setRightPanelWidth,
     uiConfig, updateUiConfig,
   } = useAppearance(isMobile);
 
@@ -597,10 +596,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeLightbox,
         navigateLightbox,
         updateLightboxImage,
-        sidebarWidth,
-        rightPanelWidth,
-        setSidebarWidth,
-        setRightPanelWidth,
         contextMenu,
         openContextMenu,
         closeContextMenu,

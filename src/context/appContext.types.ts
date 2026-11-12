@@ -104,10 +104,6 @@ export interface AppContextType {
   updateLightboxImage: (id: string, updates: Partial<LightboxImage>) => void;
 
   // Layout & Resizing
-  sidebarWidth: number;
-  rightPanelWidth: number;
-  setSidebarWidth: (w: number) => void;
-  setRightPanelWidth: (w: number) => void;
 
   // Context Menu
   contextMenu: ContextMenuTarget | null;

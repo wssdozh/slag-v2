@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppUiConfig, DeviceUiConfig } from '../../types';
-import { ACCENT_COLORS, STORAGE_KEYS, UI_LAYOUT } from '../../config';
+import { ACCENT_COLORS, STORAGE_KEYS } from '../../config';
 import { getFontFamilyConfig, getFontScaleMultiplier } from '../../config/typography';
 
-const SIDEBAR_WIDTH_KEY = STORAGE_KEYS.SIDEBAR_WIDTH;
-const RIGHT_PANEL_WIDTH_KEY = STORAGE_KEYS.RIGHT_PANEL_WIDTH;
 const UI_CONFIG_KEY = STORAGE_KEYS.UI_CONFIG;
 
 const DEFAULT_UI_CONFIG: AppUiConfig = {
@@ -23,36 +21,17 @@ const DEFAULT_UI_CONFIG: AppUiConfig = {
 };
 
 /**
- * How the app looks: panel widths, density, font, accent.
+ * How the app looks: density, font, accent.
  *
- * One reason to change — appearance. The widths are a preference the user drags,
- * the rest is a preset; both land in localStorage and then on the document root as
- * CSS variables, which is why the theme lives in one place instead of per component.
+ * One reason to change — appearance. The presets land in localStorage and then on the
+ * document root as CSS variables, which is why the theme lives in one place instead of
+ * per component.
+ *
+ * Panel widths used to live here as well, with a "reset sizes" button in settings. Nothing
+ * ever read those values — dockview owns panel geometry and the splitter does the dragging —
+ * so the state, the button and its two storage keys are gone rather than half-wired.
  */
 export function useAppearance(isMobile: boolean) {
-  // Resizable panel widths
-  const [sidebarWidth, setSidebarWidthState] = useState<number>(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? Number(saved) : 256;
-  });
-
-  const [rightPanelWidth, setRightPanelWidthState] = useState<number>(() => {
-    const saved = localStorage.getItem(RIGHT_PANEL_WIDTH_KEY);
-    return saved ? Number(saved) : 288;
-  });
-
-  const setSidebarWidth = (w: number) => {
-    const clamped = Math.max(UI_LAYOUT.SIDEBAR_MIN_WIDTH, Math.min(UI_LAYOUT.SIDEBAR_MAX_WIDTH, w));
-    setSidebarWidthState(clamped);
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clamped));
-  };
-
-  const setRightPanelWidth = (w: number) => {
-    const clamped = Math.max(UI_LAYOUT.RIGHT_PANEL_MIN_WIDTH, Math.min(UI_LAYOUT.RIGHT_PANEL_MAX_WIDTH, w));
-    setRightPanelWidthState(clamped);
-    localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(clamped));
-  };
-
   const [uiConfig, setUiConfig] = useState<AppUiConfig>(() => {
     try {
       const saved = localStorage.getItem(UI_CONFIG_KEY);
@@ -108,10 +87,6 @@ export function useAppearance(isMobile: boolean) {
   }, [isMobile, uiConfig]);
 
   return {
-    sidebarWidth,
-    rightPanelWidth,
-    setSidebarWidth,
-    setRightPanelWidth,
     uiConfig,
     updateUiConfig,
   };
