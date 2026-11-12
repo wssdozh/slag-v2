@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **361**, строк: **77694**, зон: **40**.
+Модулей: **384**, строк: **78470**, зон: **40**.
 
 ## Самые длинные файлы
 
@@ -16,15 +16,15 @@
 | `src/components/Mobile/MobileCalendarView.tsx` | 1105 | 3 |
 | `src/components/Feed/Composer.tsx` | 1094 | 4 |
 | `e2e/slag/views.spec.ts` | 1061 | 0 |
-| `src/lib/ai/localFallback.ts` | 1047 | 1 |
-| `src/components/Feed/AssistantChat.tsx` | 995 | 2 |
 | `src/components/Editor/FullscreenEditor.tsx` | 990 | 1 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
-| `src/lib/sync/syncEngine.ts` | 874 | 16 |
+| `src/lib/sync/syncEngine.ts` | 874 | 17 |
 | `e2e/mobile.spec.ts` | 868 | 0 |
 | `e2e/slag/feed.spec.ts` | 802 | 0 |
-| `src/context/AppContext.tsx` | 720 | 56 |
+| `src/context/AppContext.tsx` | 720 | 59 |
 | `src/components/Audio/AudioPanel.tsx` | 715 | 2 |
+| `src/components/UI/ContextMenu.tsx` | 712 | 1 |
+| `src/lib/storage/index.ts` | 673 | 33 |
 
 ## e2e (playwright) — 91 файлов, 16939 строк
 
@@ -99,12 +99,20 @@
 | `MobileEditorBar.tsx` | 325 | 1 | MobileEditorBarProps, MobileEditorBar |  |
 | `useFullscreenDraft.ts` | 310 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft |  |
 
-## src/components/Feed — 19 файлов, 6457 строк
+## src/components/Feed — 27 файлов, 6725 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ActiveFilterBadges.tsx` | 198 | 2 | ActiveFilterBadgesProps, ActiveFilterBadges |  |
-| `AssistantChat.tsx` | 995 | 2 | AssistantChat |  |
+| `assistant/AssistantActionCard.tsx` | 403 | 1 | AssistantActionCard |  |
+| `assistant/AssistantBanner.tsx` | 45 | 1 | AssistantBanner |  |
+| `assistant/AssistantComposer.tsx` | 132 | 1 | AssistantComposer |  |
+| `assistant/AssistantMessages.tsx` | 226 | 1 | AssistantMessages |  |
+| `assistant/AssistantReasoning.tsx` | 39 | 1 | AssistantReasoning |  |
+| `assistant/AssistantSearchResults.tsx` | 110 | 1 | AssistantSearchResult, AssistantSearchResults |  |
+| `assistant/AssistantTextBubble.tsx` | 47 | 1 | AssistantTextBubble |  |
+| `assistant/AssistantToolCalls.tsx` | 27 | 1 | AssistantToolCalls |  |
+| `AssistantChat.tsx` | 234 | 2 | AssistantChat |  |
 | `BaseComposer.tsx` | 272 | 2 | BaseComposerProps, BaseComposer |  |
 | `chat/ChatTaskBlock.tsx` | 52 | 1 | ChatTaskBlock |  |
 | `Composer.tsx` | 1094 | 4 | ComposerProps, Composer |  |
@@ -206,17 +214,22 @@
 |---|---:|---:|---|---|
 | `SearchModal.tsx` | 444 | 3 | SearchModal |  |
 
-## src/components/Settings — 11 файлов, 2008 строк
+## src/components/Settings — 16 файлов, 2276 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AccountSettingsTab.tsx` | 66 | 1 | AccountSettingsTab | Первый раздел настроек: кто я, сколько места и куда идти за остальным. |
 | `AiSettingsTab.tsx` | 300 | 1 | AiSettingsTab | Where the model comes from: the SLAG subscription or your own key, and what i… |
-| `DevicesSettingsTab.tsx` | 536 | 1 | DevicesSettingsTab |  |
+| `devices/DeviceActions.tsx` | 147 | 2 | DeviceName, DeviceRevokeButton, LocalSyncModeGroup, PairDeviceButton, PairDeviceModal |  |
+| `devices/DeviceCard.tsx` | 24 | 1 | DeviceCard |  |
+| `devices/DeviceList.tsx` | 60 | 1 | DeviceList |  |
+| `devices/DevicePermissions.tsx` | 58 | 1 | DevicePermissions |  |
+| `devices/useDevicePairing.ts` | 319 | 2 | DevicePairingController, useDevicePairing |  |
+| `DevicesSettingsTab.tsx` | 196 | 1 | DevicesSettingsTab |  |
 | `LogsSettingsTab.tsx` | 12 | 1 | LogsSettingsTab | The log viewer, docked inside settings instead of floating over the feed. |
 | `MobileDockSettings.tsx` | 230 | 1 | MobileDockSettings |  |
 | `SecretKeyField.tsx` | 49 | 1 | SecretKeyField | A secret, rendered as one settings row: the input is the row. |
-| `SettingsUI.tsx` | 296 | 10 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 |  |
+| `SettingsUI.tsx` | 296 | 13 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 |  |
 | `ShortcutsSettingsTab.tsx` | 101 | 1 | ShortcutsSettingsTab | The hotkey catalogue, rendered from the same table the keydown handler reads. |
 | `SyncSettingsTab.tsx` | 83 | 1 | SyncSettingsTab | Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседни… |
 | `UiSettingsTab.tsx` | 115 | 1 | UiSettingsTab | How it looks: accent, fonts, density, panel widths and the mobile dock. |
@@ -295,7 +308,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 86 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 |  |
-| `index.ts` | 7 | 84 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
+| `index.ts` | 7 | 85 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 |  |
 | `search.ts` | 9 | 1 | SEARCH_LIMITS |  |
 | `settingsTabs.ts` | 33 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel |  |
 | `storage.ts` | 102 | 2 | DEFAULT_INBOX_FOLDER, SPECIAL_DIRS, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, +2 |  |
@@ -307,7 +320,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 720 | 56 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
+| `AppContext.tsx` | 720 | 59 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | oxlint-disable react/only-export-components |
 | `appContext.types.ts` | 232 | 6 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The contract AppContext exposes to every consumer, plus the shapes the UI |
 
 ## src/context/feed — 1 файлов, 89 строк
@@ -387,7 +400,7 @@
 | `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
 | `windowControls.ts` | 444 | 14 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +17 |  |
 
-## src/lib/ai — 12 файлов, 3777 строк
+## src/lib/ai — 22 файлов, 4017 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -397,12 +410,22 @@
 | `adapters/openAiResponsesAdapter.ts` | 219 | 1 | OpenAiResponsesAdapter |  |
 | `aiClient.ts` | 231 | 2 | AiResolvedTarget, PromptRequest, PromptResult, resolveKieEndpoint, resolveAiTarget, +4 |  |
 | `appGuide.ts` | 243 | 2 | APP_GUIDE_TOPICS, AppGuideTopic, getAppGuideContent | ponytail: curated topic catalog for in-app assistant UI navigation & feature … |
-| `localFallback.ts` | 1047 | 1 | LocalFallbackParams, runLocalFallbackAgent | Offline intent chain: what the assistant does without an API key. |
+| `fallback/agenda.ts` | 82 | 1 | calendarAgenda | Agenda intent: what is scheduled and overdue for a given day. |
+| `fallback/decomposition.ts` | 183 | 1 | splitNote, decomposeTask | Decomposition intents: split a note into tasks and break a task into subtasks. |
+| `fallback/dialog.ts` | 131 | 1 | contextualLink, refuseDelete, metaTalk, greetingHelp, shortNoise | Conversational intents: a link from context, deletion refusal, meta talk, gre… |
+| `fallback/history.ts` | 35 | 3 | WikiLinkMatch, findItemsByWikiLinks, findItemByWikiLinks, findRecentMessage | Lookups over the chat history: wiki links and recent assistant messages. |
+| `fallback/index.ts` | 41 | 1 | runLocalFallbackAgent | Offline intent chain: handlers run in priority order, the first non-null resu… |
+| `fallback/intentContext.ts` | 58 | 6 | IntentText, readIntentText, hasPriorityIntent, hasStatusIntent, hasCreateIntent, +1 | Message normalization and intent flags shared by the fallback handlers. |
+| `fallback/notes.ts` | 222 | 1 | appendToNote, refineDraft, createRecord | Notes and drafts: appending to a note, refining a draft, creating a record. |
+| `fallback/search.ts` | 116 | 1 | filterFeed, vaultStats, searchNotes | Search, feed filtering and vault stats intents. |
+| `fallback/tasks.ts` | 400 | 1 | changeTaskParams, rescheduleTasks | Task intents: priority/status changes and rescheduling, single and batch. |
+| `fallback/types.ts` | 17 | 9 | LocalFallbackParams, FallbackIntentHandler | Types shared by the offline fallback intent handlers. |
+| `localFallback.ts` | 2 | 1 | runLocalFallbackAgent |  |
 | `orchestrator.ts` | 405 | 1 | AssistantOrchestrator, assistantOrchestrator, resolveKieEndpoint, resolveAiTarget, extractActionBlock, +3 |  |
 | `prompt.ts` | 156 | 1 | buildSystemPrompt |  |
 | `toolDefinitions.ts` | 171 | 1 | getCanonicalTools |  |
 | `tools.ts` | 441 | 1 | createLocalToolExecutor |  |
-| `types.ts` | 81 | 8 | AssistantToolDefinition, ExecutedToolCall, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, +3 |  |
+| `types.ts` | 81 | 15 | AssistantToolDefinition, ExecutedToolCall, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, +3 |  |
 
 ## src/lib/media — 8 файлов, 1621 строк
 
@@ -436,9 +459,9 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `account.ts` | 569 | 17 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 |  |
+| `account.ts` | 569 | 18 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 |  |
 | `accountCrypto.ts` | 262 | 5 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +4 |  |
-| `accountTypes.ts` | 90 | 6 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +5 |  |
+| `accountTypes.ts` | 90 | 11 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +5 |  |
 | `applyBundle.ts` | 318 | 1 | persistIncomingBundle | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 6 | 2 | attachmentSignature |  |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
@@ -452,12 +475,12 @@
 | `pairing.ts` | 180 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +3 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `pushBundle.ts` | 292 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 140 | 2 | SyncConfigHost, computeSubscription, loadConfig, saveConfig, authHeaders, +3 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 874 | 16 | PendingPush, SyncEngine, syncEngine, storage, accountClient |  |
+| `syncEngine.ts` | 874 | 17 | PendingPush, SyncEngine, syncEngine, storage, accountClient |  |
 | `syncSocket.ts` | 41 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `transport.ts` | 212 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport |  |
 | `twoFactorAuth.ts` | 295 | 1 | TotpConfig, WebAuthnConfig, TwoFactorState, base32Encode, base32Decode, +8 | Two-Factor Authentication (2FA) for Zero-Knowledge Vaults |
-| `types.ts` | 123 | 17 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
-| `vaultSharing.ts` | 84 | 3 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault |  |
+| `types.ts` | 123 | 22 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
+| `vaultSharing.ts` | 84 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault |  |
 
 ## src/lib/time — 4 файлов, 940 строк
 
@@ -503,5 +526,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 429 | 117 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
+| `index.ts` | 429 | 128 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +55 |  |
 | `slashCommands.ts` | 179 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS |  |

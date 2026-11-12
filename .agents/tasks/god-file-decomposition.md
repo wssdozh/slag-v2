@@ -9,13 +9,19 @@
 | `lib/sync/syncEngine.ts` | 1594 | **871** | начальный синк, админ устройств, http-доставка и pull |
 | `context/AppContext.tsx` | 1740 | **719** | состояние хранилищ и папок, объект контекста, слои Escape |
 | `lib/storage/index.ts` | 1591 | **672** | CRUD записей, кэш и события, делегирование диску, медиа, папкам, корзине |
+| `components/Feed/AssistantChat.tsx` | 994 | **233** | состояние, подписки, отправка, diff-модалка |
 | `components/Modals/SettingsModal.tsx` | 873 | **208** | рельса вкладок, мобильный и десктопный каркас, подвал |
+| `lib/ai/localFallback.ts` | 1046 | **1** | реэкспорт; сама цепочка в `lib/ai/fallback/` |
 | `components/Feed/Composer.tsx` | 1211 | 1093 | **осознанно**: одна форма |
 | `components/Feed/ItemCard.tsx` | 1151 | 1151 | **осознанно**: 1048 строк разметки |
 | `components/Mobile/MobileCalendarView.tsx` | 1105 | 1105 | **осознанно**: 1071 строка разметки |
 | `lib/sync/bip39Words.ts` | 2052 | 2052 | данные |
 
 ## вынесенные ответственности
+
+**lib/ai/fallback/** — по файлу на группу интентов офлайн-ассистента: `notes` (221), `decomposition` (182), `tasks` (399), `agenda` (81), `search` (115), `dialog` (130), плюс `intentContext` (флаги и нормализация текста) и `history` (поиск по `[[ссылкам]]`). `index.ts` — только порядок проверок, потому что порядок и есть поведение.
+
+**components/Feed/assistant/** — по компоненту на вид сообщения: пузырь, вызовы инструментов, рассуждения, карточка действия, результаты поиска, баннер, композер; `AssistantMessages` держит прокрутку и заголовки.
 
 **context/** — `useOverlays` (поверхности), `useMobileNav`, `useFeedView` + `feedView` (правила ленты как чистая функция), `useAssistant`, `useBackup`, `useAppearance`, `useRecurringRollover`, `useItemWrites` (запись, удаление, восстановление, перемещение), `useFolderAdmin` (папка: сохранить, описать, переименовать, удалить), `useVaults` (переключить, создать, удалить хранилище, выбрать папку, показать в проводнике), `appContext.types`.
 
