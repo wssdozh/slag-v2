@@ -1,134 +1,50 @@
-import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
-import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
-import { computeAntiOverlapLayout } from '../../lib/time/calendarLayout';
-import { useSwipeGesture } from '../../hooks/gestures/useSwipeGesture';
-import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
 import {
   getISODateString,
+  getMondayOfWeek,
   getTodayString,
   getTomorrowString,
-  getMondayOfWeek,
-  getMonthCalendarDays,
-  RUSSIAN_MONTHS,
-  RUSSIAN_WEEKDAYS,
-  pluralRu,
 } from '../../lib/time/dateUtils';
+import { useSwipeGesture } from '../../hooks/gestures/useSwipeGesture';
+import { useCalendarSchedule, type CalendarTask } from '../../hooks/useCalendarSchedule';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { TaskStatusMark } from '../UI/TaskStatusMark';
-import { usePresence } from '../../hooks/ui/usePresence';
+import { CalendarHeader } from './calendar/CalendarHeader';
+import { WeekStrip } from './calendar/WeekStrip';
+import { AgendaOverdueSection } from './calendar/AgendaOverdueSection';
+import { AgendaDayGroup } from './calendar/AgendaDayGroup';
+import { ThreeDayGrid } from './calendar/ThreeDayGrid';
+import { MonthPickerSheet } from './calendar/MonthPickerSheet';
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  X,
-  MoreVertical,
-  AlertCircle,
-  ListTodo,
-  Columns,
-  Repeat
-} from 'lucide-react';
+  buildThreeDayWindow,
+  buildWeekDays,
+  formatMonthHeading,
+  isCurrentWeekMonday,
+  parseISODate,
+  pickerAnchorDate,
+  shiftDateStr,
+  shiftWeek,
+  todayAnchor,
+  type MobileCalendarMode,
+} from './calendar/calendarRange';
+import {
+  buildAgendaDay,
+  buildThreeDayColumns,
+  formatClockLabel,
+  realTaskId,
+  scrollTopForHour,
+  type CalendarSlotTarget,
+} from './calendar/calendarPositions';
 
 function subscribeToNow() {
   return () => {};
 }
 
-const HOURS_24 = Array.from({ length: 24 }, (_, i) => i);
-const HOUR_HEIGHT = 54; // px per hour
-
 interface MobileCalendarViewProps {
   headerRightExtra?: React.ReactNode;
   embedded?: boolean;
 }
-
-interface MobileCalendarTaskRowProps {
-  task: SlagItem;
-  onSelect: () => void;
-  onToggleComplete: () => void;
-  onOpenActionSheet: () => void;
-}
-
-const MobileCalendarTaskRow: React.FC<MobileCalendarTaskRowProps> = ({
-  task,
-  onSelect,
-  onToggleComplete,
-  onOpenActionSheet
-}) => {
-  const isDone = task.status === 'done';
-  const slot = getTaskTimeSlot(task);
-
-  return (
-    <div
-      onClick={onSelect}
-      className="w-full flex items-center justify-between p-2.5 sm:p-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors cursor-pointer gap-2"
-    >
-      {/* Checkbox column (fixed 24px width for exact vertical alignment) */}
-      <div className="w-6 flex items-center justify-center shrink-0">
-        <button
-          type="button"
-          onClick={e => {
-            e.stopPropagation();
-            onToggleComplete();
-          }}
-          className="p-1 rounded text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          aria-label="Изменить статус таски"
-        >
-          <TaskStatusMark
-            done={isDone}
-            className={`w-4 h-4 ${
-              isDone
-                ? ''
-                : task.priority === 'high'
-                ? 'text-rose-400'
-                : task.priority === 'medium'
-                ? 'text-amber-400'
-                : task.priority === 'low'
-                ? 'text-blue-400'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          />
-        </button>
-      </div>
-
-      {/* Title & Time */}
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        {!slot.isAllDay && slot.hasTime && (
-          <span className="text-[11px] font-mono text-zinc-400 shrink-0 select-none">
-            {String(slot.startHour).padStart(2, '0')}:{String(slot.startMinute).padStart(2, '0')}
-          </span>
-        )}
-        <div
-          className={`text-xs font-medium leading-snug truncate ${
-            isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
-          }`}
-        >
-          {task.title || 'Без названия'}
-        </div>
-      </div>
-
-      {/* Folder tag & More button */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        {task.folder && (
-          <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[90px]">
-            {task.folder}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={e => {
-            e.stopPropagation();
-            onOpenActionSheet();
-          }}
-          className="p-1 text-zinc-600 hover:text-zinc-300 cursor-pointer rounded"
-        >
-          <MoreVertical className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-};
 
 export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
   headerRightExtra,
@@ -148,7 +64,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
   const tomorrowStr = useMemo(() => getTomorrowString(), []);
 
   // Calendar Mode: 'agenda' (Week Strip + List) vs '3day' (3-Day 24h Time Grid)
-  const [calendarLayout, setCalendarLayout] = useState<'agenda' | '3day'>('agenda');
+  const [calendarLayout, setCalendarLayout] = useState<MobileCalendarMode>('agenda');
 
   // Selected date and week state for Agenda
   const [selectedDate, setSelectedDate] = useState<string>(() => todayStr || getISODateString(new Date()));
@@ -159,12 +75,6 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
 
   // Sheets
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const {
-    ref: monthPickerRef,
-    phase: monthPickerPhase,
-    isPresent: isMonthPickerPresent,
-    onTransitionEnd: onMonthPickerTransitionEnd,
-  } = usePresence(isMonthPickerOpen);
 
   // Picker Month offset
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
@@ -175,7 +85,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
   const [inlineTitle, setInlineTitle] = useState('');
 
   // 1-Click Add slot on 3-day grid: { dateStr, hour }
-  const [addingTimeSlot, setAddingTimeSlot] = useState<{ dateStr: string; hour: number } | null>(null);
+  const [addingTimeSlot, setAddingTimeSlot] = useState<CalendarSlotTarget | null>(null);
   const [slotTaskTitle, setSlotTaskTitle] = useState('');
 
   // Time grid scroll ref
@@ -201,8 +111,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
   useEffect(() => {
     if (calendarLayout === '3day' && timeGridScrollRef.current && !hasInitialScrolledRef.current) {
       const currentHour = Math.floor(nowMinute / 60);
-      const scrollHour = Math.max(0, currentHour - 1);
-      timeGridScrollRef.current.scrollTop = scrollHour * HOUR_HEIGHT;
+      timeGridScrollRef.current.scrollTop = scrollTopForHour(currentHour);
       hasInitialScrolledRef.current = true;
     }
     if (calendarLayout !== '3day') {
@@ -211,20 +120,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
   }, [calendarLayout, nowMinute]);
 
   // Generate 7 days for the current week strip
-  const weekDays = useMemo(() => {
-    const days: { date: Date; dateStr: string; dayNum: number; weekdayIndex: number }[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(currentWeekMonday);
-      d.setDate(currentWeekMonday.getDate() + i);
-      days.push({
-        date: d,
-        dateStr: getISODateString(d),
-        dayNum: d.getDate(),
-        weekdayIndex: i
-      });
-    }
-    return days;
-  }, [currentWeekMonday]);
+  const weekDays = useMemo(() => buildWeekDays(currentWeekMonday), [currentWeekMonday]);
 
   // Tasks grouped by dueDate using unified schedule hook
   const rangeStart = weekDays[0]?.dateStr || todayStr;
@@ -239,105 +135,95 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
     rangeEnd,
   });
 
-  const tasksByDate = useMemo(() => {
-    const obj: Record<string, (SlagItem & { isVirtual?: boolean })[]> = {};
+  const { tasksByDate, datesWithTasks } = useMemo(() => {
+    const byDate: Record<string, CalendarTask[]> = {};
+    const withTasks = new Set<string>();
     tasksByDateMap.forEach((tasks, dateStr) => {
-      obj[dateStr] = tasks;
+      byDate[dateStr] = tasks;
+      if (tasks.length > 0) withTasks.add(dateStr);
     });
-    return obj;
+    return { tasksByDate: byDate, datesWithTasks: withTasks };
   }, [tasksByDateMap]);
 
   // Generate 3 consecutive days for 3-Day View
-  const threeDays = useMemo(() => {
-    const parts = threeDayStartDate.split('-');
-    const base = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    const list: { date: Date; dateStr: string; dayNum: number; weekdayIndex: number }[] = [];
-
-    for (let i = 0; i < 3; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
-      list.push({
-        date: d,
-        dateStr: getISODateString(d),
-        dayNum: d.getDate(),
-        weekdayIndex: (d.getDay() + 6) % 7 // 0 = ПН
-      });
-    }
-    return list;
-  }, [threeDayStartDate]);
-
-  // Month Calendar Days for Picker
-  const monthCalendarDays = useMemo(
-    () => getMonthCalendarDays(pickerYear, pickerMonth),
-    [pickerYear, pickerMonth]
-  );
+  const threeDays = useMemo(() => buildThreeDayWindow(threeDayStartDate), [threeDayStartDate]);
 
   // Month & Year title for Header
-  const currentMonthLabel = useMemo(() => {
-    if (calendarLayout === '3day') {
-      const parts = threeDayStartDate.split('-');
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      return `${RUSSIAN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    }
-    const d = new Date(currentWeekMonday);
-    d.setDate(currentWeekMonday.getDate() + 3);
-    return `${RUSSIAN_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-  }, [calendarLayout, currentWeekMonday, threeDayStartDate]);
+  const currentMonthLabel = useMemo(
+    () => formatMonthHeading(calendarLayout, currentWeekMonday, threeDayStartDate),
+    [calendarLayout, currentWeekMonday, threeDayStartDate]
+  );
 
-  const isCurrentWeek = useMemo(() => {
-    if (!todayStr) return false;
-    const parts = todayStr.split('-');
-    const todayDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    const todayMonday = getMondayOfWeek(todayDate);
-    return getISODateString(todayMonday) === getISODateString(currentWeekMonday);
-  }, [currentWeekMonday, todayStr]);
+  const isCurrentWeek = useMemo(
+    () => isCurrentWeekMonday(currentWeekMonday, todayStr),
+    [currentWeekMonday, todayStr]
+  );
 
-  const isThreeDayToday = useMemo(() => {
-    return threeDayStartDate === todayStr;
-  }, [threeDayStartDate, todayStr]);
+  // Кнопка «Сегодня» гаснет, когда мы и так смотрим текущий период
+  const isViewingToday = calendarLayout === 'agenda'
+    ? isCurrentWeek && selectedDate === todayStr
+    : threeDayStartDate === todayStr;
+
+  const nowLabel = formatClockLabel(Math.floor(nowMinute / 60), nowMinute % 60);
+
+  // Раскладка повестки: заголовки дней, порядок строк, место линии «сейчас»
+  const agendaDays = useMemo(
+    () => weekDays.map(day => buildAgendaDay(day, tasksByDate[day.dateStr] ?? [], {
+      todayStr,
+      tomorrowStr,
+      nowMinute,
+    })),
+    [weekDays, tasksByDate, todayStr, tomorrowStr, nowMinute]
+  );
+
+  // Раскладка трёхдневки: чипы «весь день», блоки по времени, красная линия
+  const threeDayColumns = useMemo(
+    () => buildThreeDayColumns(threeDays, tasksByDate, todayStr, nowMinute),
+    [threeDays, tasksByDate, todayStr, nowMinute]
+  );
+
+  const handleSelectTask = useCallback((task: SlagItem) => {
+    setSelectedItem(task);
+    setIsFullscreenEditorOpen(true);
+  }, [setSelectedItem, setIsFullscreenEditorOpen]);
+
+  const handleToggleTask = useCallback((task: SlagItem) => {
+    toggleTaskComplete(realTaskId(task.id));
+  }, [toggleTaskComplete]);
+
+  const handleOpenTaskActions = useCallback((task: SlagItem) => {
+    setMobileActionSheetItem(task);
+  }, [setMobileActionSheetItem]);
 
   // Navigation handlers
   const handlePrev = () => {
     if (calendarLayout === '3day') {
-      const parts = threeDayStartDate.split('-');
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      d.setDate(d.getDate() - 3);
-      setThreeDayStartDate(getISODateString(d));
+      setThreeDayStartDate(prev => shiftDateStr(prev, -3));
     } else {
-      const prev = new Date(currentWeekMonday);
-      prev.setDate(prev.getDate() - 7);
-      setCurrentWeekMonday(prev);
+      setCurrentWeekMonday(prev => shiftWeek(prev, -1));
     }
   };
 
   const handleNext = () => {
     if (calendarLayout === '3day') {
-      const parts = threeDayStartDate.split('-');
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      d.setDate(d.getDate() + 3);
-      setThreeDayStartDate(getISODateString(d));
+      setThreeDayStartDate(prev => shiftDateStr(prev, 3));
     } else {
-      const next = new Date(currentWeekMonday);
-      next.setDate(next.getDate() + 7);
-      setCurrentWeekMonday(next);
+      setCurrentWeekMonday(prev => shiftWeek(prev, 1));
     }
   };
 
   const handleGoToToday = () => {
-    const parts = (todayStr || getTodayString()).split('-');
-    const today = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    const todayMonday = getMondayOfWeek(today);
-    const todayDateStr = getISODateString(today);
+    const { monday, dateStr } = todayAnchor(todayStr);
 
-    setCurrentWeekMonday(todayMonday);
-    setSelectedDate(todayDateStr);
-    setThreeDayStartDate(todayDateStr);
+    setCurrentWeekMonday(monday);
+    setSelectedDate(dateStr);
+    setThreeDayStartDate(dateStr);
 
     if (calendarLayout === 'agenda') {
-      scrollToDate(todayDateStr);
+      scrollToDate(dateStr);
     } else if (timeGridScrollRef.current) {
       const currentHour = Math.floor(nowMinute / 60);
-      timeGridScrollRef.current.scrollTop = Math.max(0, currentHour - 1) * HOUR_HEIGHT;
+      timeGridScrollRef.current.scrollTop = scrollTopForHour(currentHour);
     }
   };
 
@@ -353,11 +239,34 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
     scrollToDate(dateStr);
   };
 
+  const handleOpenMonthPicker = () => {
+    const anchor = pickerAnchorDate(calendarLayout, currentWeekMonday, threeDayStartDate);
+    setPickerYear(anchor.getFullYear());
+    setPickerMonth(anchor.getMonth());
+    setIsMonthPickerOpen(true);
+  };
+
+  const handleShiftPickerMonth = (delta: -1 | 1) => {
+    if (delta < 0) {
+      if (pickerMonth === 0) {
+        setPickerMonth(11);
+        setPickerYear(y => y - 1);
+      } else {
+        setPickerMonth(m => m - 1);
+      }
+      return;
+    }
+    if (pickerMonth === 11) {
+      setPickerMonth(0);
+      setPickerYear(y => y + 1);
+    } else {
+      setPickerMonth(m => m + 1);
+    }
+  };
+
   // Month Picker Select
   const handleSelectDateFromPicker = (dateStr: string) => {
-    const parts = dateStr.split('-');
-    const picked = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    setCurrentWeekMonday(getMondayOfWeek(picked));
+    setCurrentWeekMonday(getMondayOfWeek(parseISODate(dateStr)));
     setSelectedDate(dateStr);
     setThreeDayStartDate(dateStr);
     setIsMonthPickerOpen(false);
@@ -412,6 +321,11 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
     setAddingTimeSlot(null);
   };
 
+  const handleStartAddingSlot = (slot: CalendarSlotTarget) => {
+    setAddingTimeSlot(slot);
+    setSlotTaskTitle('');
+  };
+
   // Swipe gesture handling
   const { onTouchStart: handleTouchStart, onTouchEnd: handleTouchEnd } = useSwipeGesture({
     onSwipeLeft: handleNext,
@@ -421,83 +335,16 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
   return (
     <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative">
       {/* 1. Unified Mobile Calendar Header (Single Bar, 44px) */}
-      <header
-        className="border-b border-white/[0.06] bg-panel px-2 flex items-center justify-between shrink-0 z-20 gap-1 overflow-x-auto scrollbar-none"
-        style={{
-          height: embedded ? '2.75rem' : 'calc(2.75rem + max(var(--sat), 0px))',
-          paddingTop: embedded ? '0px' : 'max(var(--sat), 0px)',
-        }}
-      >
-        {/* Left: Month Dropdown Button & Today shortcut */}
-        <div className="flex items-center gap-1 min-w-0 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              const parts = (calendarLayout === '3day' ? threeDayStartDate : getISODateString(currentWeekMonday)).split('-');
-              setPickerYear(Number(parts[0]));
-              setPickerMonth(Number(parts[1]) - 1);
-              setIsMonthPickerOpen(true);
-            }}
-            className="flex items-center gap-1 py-1 px-1.5 rounded-lg hover:bg-white/[0.06] motion-press cursor-pointer text-left shrink-0"
-          >
-            <span className="text-xs font-bold text-white tracking-tight truncate max-w-[105px]">
-              {currentMonthLabel}
-            </span>
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleGoToToday}
-            className={`h-6 px-1.5 rounded-md text-[10px] font-medium cursor-pointer motion-press flex items-center gap-0.5 shrink-0 ${
-              (calendarLayout === 'agenda' && isCurrentWeek && selectedDate === todayStr) ||
-              (calendarLayout === '3day' && isThreeDayToday)
-                ? 'text-zinc-500 hover:text-zinc-300'
-                : 'bg-white/10 text-white font-semibold'
-            }`}
-            title="Перейти к сегодняшнему дню"
-          >
-            <span>Сегодня</span>
-          </button>
-        </div>
-
-        {/* Center: Layout toggle [Список | 3 дня] */}
-        <div className="flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.08] shrink-0">
-          <button
-            type="button"
-            onClick={() => setCalendarLayout('agenda')}
-            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-              calendarLayout === 'agenda'
-                ? 'bg-white/10 text-white shadow-xs font-semibold'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-            title="Режим списка (Повестка)"
-          >
-            <ListTodo className="w-3 h-3" />
-            <span>Список</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCalendarLayout('3day')}
-            className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-              calendarLayout === '3day'
-                ? 'bg-white/10 text-white shadow-xs font-semibold'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-            title="Режим 3 дня (24 часа)"
-          >
-            <Columns className="w-3 h-3" />
-            <span>3 дня</span>
-          </button>
-        </div>
-
-        {/* Right: ViewModeSwitcher / Extra slot */}
-        {headerRightExtra && (
-          <div className="flex items-center shrink-0">
-            {headerRightExtra}
-          </div>
-        )}
-      </header>
+      <CalendarHeader
+        embedded={embedded}
+        mode={calendarLayout}
+        monthLabel={currentMonthLabel}
+        isViewingToday={isViewingToday}
+        rightSlot={headerRightExtra}
+        onOpenMonthPicker={handleOpenMonthPicker}
+        onGoToToday={handleGoToToday}
+        onChangeMode={setCalendarLayout}
+      />
 
       {/* ========================================================================= */}
       {/* 3. MODE A: AGENDA VIEW (Week Strip + Grouped Days Timeline)                */}
@@ -505,600 +352,81 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
       {calendarLayout === 'agenda' ? (
         <>
           {/* Week Strip (7 Days) */}
-          <div
+          <WeekStrip
+            days={weekDays}
+            todayStr={todayStr}
+            selectedDate={selectedDate}
+            datesWithTasks={datesWithTasks}
+            onSelectDay={handleSelectDay}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="px-3 py-2 border-b border-white/[0.06] bg-panel/80 shrink-0"
-          >
-            <div className="grid grid-cols-7 gap-1">
-              {weekDays.map(day => {
-                const isToday = day.dateStr === todayStr;
-                const isSelected = day.dateStr === selectedDate;
-                const hasTasks = (tasksByDate[day.dateStr] || []).length > 0;
-
-                return (
-                  <button
-                    key={day.dateStr}
-                    type="button"
-                    onClick={() => handleSelectDay(day.dateStr)}
-                    className={`flex flex-col items-center justify-center py-1.5 rounded-xl cursor-pointer relative motion-press ${
-                      isSelected
-                        ? 'bg-white text-black font-bold shadow-sm'
-                        : isToday
-                        ? 'bg-white/[0.08] text-white'
-                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
-                    }`}
-                  >
-                    <span className={`text-[10px] font-mono uppercase ${isSelected ? 'text-black/70' : 'text-zinc-500'}`}>
-                      {RUSSIAN_WEEKDAYS[day.weekdayIndex]}
-                    </span>
-                    <span className="text-xs font-semibold mt-0.5">
-                      {day.dayNum}
-                    </span>
-
-                    {/* Event Dot Indicator */}
-                    <div className="h-1 flex items-center justify-center mt-0.5">
-                      {hasTasks ? (
-                        <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-black' : 'bg-zinc-400'}`} />
-                      ) : isToday && !isSelected ? (
-                        <span className="w-1 h-1 rounded-full bg-zinc-600" />
-                      ) : null}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          />
 
           {/* Agenda Feed */}
           <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4 pb-28">
             {/* Overdue Section */}
-            {overdueTasks.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 px-1">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>Просрочено</span>
-                  <span className="text-[10px] font-mono opacity-80">({overdueTasks.length})</span>
-                </div>
-
-                <div className="rounded-2xl bg-surface/80 border border-rose-500/20 overflow-hidden divide-y divide-white/[0.04]">
-                  {overdueTasks.map(task => (
-                    <MobileCalendarTaskRow
-                      key={task.id}
-                      task={task}
-                      onSelect={() => {
-                        setSelectedItem(task);
-                        setIsFullscreenEditorOpen(true);
-                      }}
-                      onToggleComplete={() => toggleTaskComplete(task.id.replace(/_virtual_.*$/, ''))}
-                      onOpenActionSheet={() => setMobileActionSheetItem(task)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            <AgendaOverdueSection
+              tasks={overdueTasks}
+              onSelectTask={handleSelectTask}
+              onToggleTask={handleToggleTask}
+              onOpenTaskActions={handleOpenTaskActions}
+            />
 
             {/* Days in the week */}
-            {weekDays.map(day => {
-              const dayTasks = tasksByDate[day.dateStr] || [];
-              const isToday = day.dateStr === todayStr;
-              const isTomorrow = day.dateStr === tomorrowStr;
-
-              const dayTitle = isToday
-                ? `Сегодня · ${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3).toLowerCase()}., ${RUSSIAN_WEEKDAYS[day.weekdayIndex]}`
-                : isTomorrow
-                ? `Завтра · ${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3).toLowerCase()}., ${RUSSIAN_WEEKDAYS[day.weekdayIndex]}`
-                : `${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3).toLowerCase()}., ${RUSSIAN_WEEKDAYS[day.weekdayIndex]}`;
-
-              // Chronological sorting: all-day tasks first, then timed tasks by startMinutes ASC
-              const sortedDayTasks = [...dayTasks].sort((a, b) => {
-                const slotA = getTaskTimeSlot(a);
-                const slotB = getTaskTimeSlot(b);
-                if (slotA.isAllDay && !slotB.isAllDay) return -1;
-                if (!slotA.isAllDay && slotB.isAllDay) return 1;
-                if (!slotA.isAllDay && !slotB.isAllDay) {
-                  const minA = slotA.startHour * 60 + slotA.startMinute;
-                  const minB = slotB.startHour * 60 + slotB.startMinute;
-                  return minA - minB;
-                }
-                return 0;
-              });
-
-              const nowHour = Math.floor(nowMinute / 60);
-              const nowMin = nowMinute % 60;
-              const nowTimeLabel = `${String(nowHour).padStart(2, '0')}:${String(nowMin).padStart(2, '0')}`;
-
-              return (
-                <div
-                  key={day.dateStr}
-                  ref={el => { dateSectionRefs.current[day.dateStr] = el; }}
-                  className="flex flex-col gap-1.5 scroll-mt-2"
-                >
-                  <div className="flex items-center justify-between px-1">
-                    <span className={`text-xs font-semibold tracking-tight ${isToday ? 'text-white' : 'text-zinc-400'}`}>
-                      {dayTitle}
-                    </span>
-                    {dayTasks.length > 0 && (
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        {dayTasks.length} {pluralRu(dayTasks.length, ['таска', 'таски', 'тасок'])}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden">
-                    {sortedDayTasks.length > 0 ? (
-                      <div className="divide-y divide-white/[0.04]">
-                        {(() => {
-                          const elements: React.ReactNode[] = [];
-                          let nowLineInserted = false;
-
-                          const renderNowLine = () => (
-                            <div
-                              key="now-timeline-indicator"
-                              className="w-full flex items-center gap-2 p-2.5 sm:p-3 select-none"
-                            >
-                              <div className="w-6 flex items-center justify-center shrink-0">
-                                <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs shadow-rose-500/80" />
-                              </div>
-                              <span className="text-[11px] font-mono font-semibold text-rose-400 shrink-0">
-                                {nowTimeLabel}
-                              </span>
-                              <div className="h-px flex-1 bg-rose-500/40" />
-                            </div>
-                          );
-
-                          sortedDayTasks.forEach((task) => {
-                            if (isToday && !nowLineInserted) {
-                              const slot = getTaskTimeSlot(task);
-                              const taskMinutes = slot.isAllDay ? -1 : slot.startHour * 60 + slot.startMinute;
-                              if (taskMinutes > nowMinute) {
-                                elements.push(renderNowLine());
-                                nowLineInserted = true;
-                              }
-                            }
-
-                            elements.push(
-                              <MobileCalendarTaskRow
-                                key={task.id}
-                                task={task}
-                                onSelect={() => {
-                                  setSelectedItem(task);
-                                  setIsFullscreenEditorOpen(true);
-                                }}
-                                onToggleComplete={() => toggleTaskComplete(task.id.replace(/_virtual_.*$/, ''))}
-                                onOpenActionSheet={() => setMobileActionSheetItem(task)}
-                              />
-                            );
-                          });
-
-                          if (isToday && !nowLineInserted) {
-                            elements.push(renderNowLine());
-                          }
-
-                          return elements;
-                        })()}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col">
-                        {isToday && (
-                          <div className="w-full flex items-center gap-2 p-2.5 sm:p-3 select-none border-b border-white/[0.04]">
-                            <div className="w-6 flex items-center justify-center shrink-0">
-                              <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs shadow-rose-500/80" />
-                            </div>
-                            <span className="text-[11px] font-mono font-semibold text-rose-400 shrink-0">
-                              {nowTimeLabel}
-                            </span>
-                            <div className="h-px flex-1 bg-rose-500/40" />
-                          </div>
-                        )}
-                        <div className="p-3 text-xs text-zinc-500 flex items-center justify-between">
-                          <span>— нет тасок</span>
-                          <button
-                            type="button"
-                            onClick={() => setAddingDate(day.dateStr)}
-                            className="text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer text-xs"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Добавить</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {addingDate === day.dateStr ? (
-                      <form
-                        onSubmit={e => handleCreateTaskOnDate(day.dateStr, e)}
-                        className="p-2.5 bg-black/40 border-t border-white/[0.06] flex items-center gap-2 motion-fade"
-                      >
-                        <input
-                          type="text"
-                          value={inlineTitle}
-                          onChange={e => setInlineTitle(e.target.value)}
-                          placeholder={`Новая задача на ${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3)}...`}
-                          autoFocus
-                          className="flex-1 bg-black/50 border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none"
-                        />
-                        <button
-                          type="submit"
-                          className="px-3 py-1.5 rounded-xl bg-white text-black text-xs font-semibold cursor-pointer motion-press shrink-0"
-                        >
-                          OK
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAddingDate(null)}
-                          className="p-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </form>
-                    ) : sortedDayTasks.length > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => setAddingDate(day.dateStr)}
-                        className="w-full py-2 px-3 flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] border-t border-white/[0.04] transition-colors cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Добавить таску</span>
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
+            {agendaDays.map(layout => (
+              <AgendaDayGroup
+                key={layout.day.dateStr}
+                layout={layout}
+                nowLabel={nowLabel}
+                isAdding={addingDate === layout.day.dateStr}
+                addTitle={inlineTitle}
+                onChangeAddTitle={setInlineTitle}
+                onStartAdding={() => setAddingDate(layout.day.dateStr)}
+                onCancelAdding={() => setAddingDate(null)}
+                onSubmitAdd={e => handleCreateTaskOnDate(layout.day.dateStr, e)}
+                onSelectTask={handleSelectTask}
+                onToggleTask={handleToggleTask}
+                onOpenTaskActions={handleOpenTaskActions}
+                sectionRef={el => { dateSectionRefs.current[layout.day.dateStr] = el; }}
+              />
+            ))}
           </div>
         </>
       ) : (
         /* ========================================================================= */
         /* 4. MODE B: 3-DAY 24-HOUR TIME GRID (Todoist Multi-Day View)               */
         /* ========================================================================= */
-        <div
+        <ThreeDayGrid
+          columns={threeDayColumns}
+          items={items}
+          addingSlot={addingTimeSlot}
+          slotTitle={slotTaskTitle}
+          onChangeSlotTitle={setSlotTaskTitle}
+          onStartAddingSlot={handleStartAddingSlot}
+          onCancelAddingSlot={() => setAddingTimeSlot(null)}
+          onSubmitSlot={handleCreateTaskInTimeSlot}
+          onSelectTask={handleSelectTask}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="flex-1 flex flex-col overflow-hidden select-none bg-canvas"
-        >
-          {/* 3-Day Column Headers (Sticky Top) */}
-          <div className="flex border-b border-white/[0.06] bg-panel shrink-0">
-            {/* Time label left spacer */}
-            <div className="w-11 shrink-0 border-r border-white/[0.04]" />
-
-            {/* 3 Days columns */}
-            <div className="flex-1 grid grid-cols-3 divide-x divide-white/[0.04]">
-              {threeDays.map(day => {
-                const isToday = day.dateStr === todayStr;
-
-                return (
-                  <div
-                    key={day.dateStr}
-                    className="py-2 px-1 flex flex-col items-center justify-center text-center"
-                  >
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase">
-                      {RUSSIAN_WEEKDAYS[day.weekdayIndex]}
-                    </span>
-                    <span
-                      className={`text-xs font-bold mt-0.5 px-2 py-0.5 rounded-full ${
-                        isToday ? 'bg-white text-black shadow-xs' : 'text-zinc-200'
-                      }`}
-                    >
-                      {day.dayNum}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* All Day Row (Chips for tasks without specific time slot) */}
-          <div className="flex border-b border-white/[0.06] bg-panel/50 shrink-0 min-h-[36px]">
-            <div className="w-11 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-2xs font-mono text-zinc-500 uppercase p-1">
-              Весь день
-            </div>
-            <div className="flex-1 grid grid-cols-3 divide-x divide-white/[0.04] p-1 gap-1">
-              {threeDays.map(day => {
-                const dayTasks = tasksByDate[day.dateStr] || [];
-                const allDayTasks = dayTasks.filter(t => getTaskTimeSlot(t).isAllDay);
-
-                return (
-                  <div key={day.dateStr} className="flex flex-col gap-1 min-w-0">
-                    {allDayTasks.map(task => (
-                      <div
-                        key={task.id}
-                        onClick={() => {
-                          const realId = task.id.replace(/_virtual_.*$/, '');
-                          const target = items.find(i => i.id === realId) || task;
-                          setSelectedItem(target);
-                          setIsFullscreenEditorOpen(true);
-                        }}
-                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-[10px] text-zinc-300 truncate cursor-pointer motion-press ${
-                          task.isVirtual ? 'border-dashed opacity-85' : ''
-                        }`}
-                        title={task.title}
-                      >
-                        <span className="truncate flex-1">{task.title || 'Без названия'}</span>
-                        {task.recurrence && (
-                          <Repeat className="w-2.5 h-2.5 text-amber-400 shrink-0" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 24-Hour Scrollable Grid (00:00 - 23:00) */}
-          <div
-            ref={timeGridScrollRef}
-            className="flex-1 overflow-y-auto scrollbar-thin relative bg-canvas flex pb-24"
-          >
-            {/* Time rail left column */}
-            <div className="w-11 shrink-0 border-r border-white/[0.04] bg-panel/30 select-none">
-              {HOURS_24.map(h => (
-                <div
-                  key={h}
-                  style={{ height: `${HOUR_HEIGHT}px` }}
-                  className="border-b border-white/[0.04] pr-1.5 text-right text-[10px] font-mono text-zinc-500 pt-1"
-                >
-                  {String(h).padStart(2, '0')}:00
-                </div>
-              ))}
-            </div>
-
-            {/* 3 Day Columns Grid */}
-            <div className="flex-1 grid grid-cols-3 relative divide-x divide-white/[0.04]">
-              {threeDays.map(day => {
-                const isToday = day.dateStr === todayStr;
-                const dayTasks = tasksByDate[day.dateStr] || [];
-                const timedTasks = dayTasks.filter(t => !getTaskTimeSlot(t).isAllDay);
-
-                // Red time line position
-                const redRibbonTopPx = (nowMinute / 60) * HOUR_HEIGHT;
-
-                return (
-                  <div key={day.dateStr} className="relative h-full">
-                    {/* Hour slots with tap to add */}
-                    {HOURS_24.map(hour => {
-                      const isAddingThis = addingTimeSlot?.dateStr === day.dateStr && addingTimeSlot?.hour === hour;
-
-                      return (
-                        <div
-                          key={hour}
-                          onClick={() => {
-                            setAddingTimeSlot({ dateStr: day.dateStr, hour });
-                            setSlotTaskTitle('');
-                          }}
-                          style={{ height: `${HOUR_HEIGHT}px` }}
-                          className="border-b border-white/[0.04] hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors relative cursor-pointer group"
-                        >
-                          {/* Inline Add Modal in Grid Slot */}
-                          {isAddingThis && (
-                            <div
-                              onClick={e => e.stopPropagation()}
-                              className="absolute inset-x-1 top-1 z-30 bg-surface-elevated border border-white/20 rounded-xl p-1.5 shadow-2xl flex flex-col gap-1.5 motion-popover"
-                            >
-                              <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                                <span>{String(hour).padStart(2, '0')}:00</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setAddingTimeSlot(null)}
-                                  className="text-zinc-500 hover:text-white"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                              <form onSubmit={handleCreateTaskInTimeSlot} className="flex flex-col gap-1">
-                                <input
-                                  type="text"
-                                  value={slotTaskTitle}
-                                  onChange={e => setSlotTaskTitle(e.target.value)}
-                                  placeholder="Название..."
-                                  autoFocus
-                                  className="bg-black/50 border border-white/10 rounded px-1.5 py-1 text-xs text-white placeholder-zinc-500 outline-none"
-                                />
-                                <button
-                                  type="submit"
-                                  className="py-1 rounded bg-white text-black text-[10px] font-semibold cursor-pointer motion-press"
-                                >
-                                  Добавить
-                                </button>
-                              </form>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Red Ribbon Line on Today's column */}
-                    {isToday && (
-                      <div
-                        style={{ top: `${redRibbonTopPx}px` }}
-                        className="absolute inset-x-0 h-[2px] bg-rose-500 z-20 pointer-events-none"
-                      >
-                        <div className="w-2 h-2 rounded-full bg-rose-500 -mt-[3px] -ml-1 shadow-sm shadow-rose-500/80" />
-                      </div>
-                    )}
-
-                    {/* Timed Task Blocks with Anti-Overlap and Clean Monochrome Styling */}
-                    {computeAntiOverlapLayout(timedTasks, HOUR_HEIGHT).map(positioned => {
-                      const { task, slot, topPx, heightPx, colIndex, totalCols } = positioned;
-                      const isDone = task.status === 'done';
-                      const colWidth = 94 / totalCols;
-                      const left = 3 + colIndex * colWidth;
-                      const width = totalCols > 1 ? colWidth - 1 : 94;
-
-                      return (
-                        <div
-                          key={task.id}
-                          onClick={() => {
-                            setSelectedItem(task);
-                            setIsFullscreenEditorOpen(true);
-                          }}
-                          style={{
-                            top: `${topPx}px`,
-                            height: `${heightPx}px`,
-                            left: `${left}%`,
-                            width: `${width}%`
-                          }}
-                          className="absolute rounded-lg p-1.5 border border-white/[0.08] bg-surface/95 hover:bg-surface-elevated flex flex-col justify-between select-none cursor-pointer transition-colors z-10 shadow-sm"
-                        >
-                          <div className="flex items-start gap-1 min-w-0">
-                            {task.priority && task.priority !== 'none' && (
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${
-                                  task.priority === 'high'
-                                    ? 'bg-rose-500'
-                                    : task.priority === 'medium'
-                                    ? 'bg-amber-400'
-                                    : 'bg-blue-400'
-                                }`}
-                              />
-                            )}
-                            <span
-                              className={`text-[11px] font-medium leading-tight truncate flex-1 ${
-                                isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
-                              }`}
-                            >
-                              {task.title || 'Без названия'}
-                            </span>
-                            {task.recurrence && (
-                              <Repeat className="w-2.5 h-2.5 text-amber-400 shrink-0 mt-0.5" />
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between text-2xs font-mono text-zinc-500 mt-0.5">
-                            <span>{slot.timeLabel.split('-')[0].trim()}</span>
-                            {task.folder && (
-                              <span className="truncate max-w-[50px] opacity-75">{task.folder}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+          gridRef={timeGridScrollRef}
+        />
       )}
 
       {/* ========================================================================= */}
       {/* 5. SHEET: Month Date Picker (Select a Date)                              */}
       {/* ========================================================================= */}
-      {isMonthPickerPresent && (
-        <div
-          ref={monthPickerRef}
-          data-motion-state={monthPickerPhase}
-          onTransitionEnd={onMonthPickerTransitionEnd}
-          onClick={() => setIsMonthPickerOpen(false)}
-          data-testid="month-picker-sheet"
-          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 motion-fade motion-scrim-hold select-none"
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            data-motion-state={monthPickerPhase}
-            className="w-full max-h-[85vh] bg-surface border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl motion-sheet"
-            style={{ paddingBottom: 'max(var(--sab), 1rem)' }}
-          >
-            {/* Handle & Header */}
-            <div className="flex flex-col items-center pt-2 px-4 border-b border-white/[0.06] shrink-0">
-              <div className="w-10 h-1 rounded-full bg-white/20 mb-3" />
-              <div className="w-full flex items-center justify-between pb-3">
-                <button
-                  type="button"
-                  onClick={() => setIsMonthPickerOpen(false)}
-                  className="text-xs text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  Отмена
-                </button>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (pickerMonth === 0) {
-                        setPickerMonth(11);
-                        setPickerYear(y => y - 1);
-                      } else {
-                        setPickerMonth(m => m - 1);
-                      }
-                    }}
-                    className="p-1 rounded text-zinc-400 hover:text-white cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-sm font-semibold text-white">
-                    {RUSSIAN_MONTHS[pickerMonth]} {pickerYear}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (pickerMonth === 11) {
-                        setPickerMonth(0);
-                        setPickerYear(y => y + 1);
-                      } else {
-                        setPickerMonth(m => m + 1);
-                      }
-                    }}
-                    className="p-1 rounded text-zinc-400 hover:text-white cursor-pointer"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSelectDateFromPicker(todayStr);
-                  }}
-                  className="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer"
-                >
-                  Сегодня
-                </button>
-              </div>
-            </div>
-
-            {/* Month Calendar Grid */}
-            <div className="p-4 flex flex-col gap-2">
-              <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-mono text-zinc-500 uppercase">
-                {RUSSIAN_WEEKDAYS.map(w => (
-                  <div key={w} className="py-1">{w}</div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-1">
-                {monthCalendarDays.map(cell => {
-                  const isToday = cell.dateStr === todayStr;
-                  const isSelected = cell.dateStr === selectedDate;
-                  const hasTasks = (tasksByDate[cell.dateStr] || []).length > 0;
-
-                  return (
-                    <button
-                      key={cell.dateStr}
-                      type="button"
-                      onClick={() => handleSelectDateFromPicker(cell.dateStr)}
-                      className={`h-10 rounded-xl flex flex-col items-center justify-center cursor-pointer relative motion-press ${
-                        isSelected
-                          ? 'bg-white text-black font-bold shadow-sm'
-                          : isToday
-                          ? 'border border-white/30 text-white font-semibold'
-                          : cell.isCurrentMonth
-                          ? 'text-zinc-200 hover:bg-white/[0.04]'
-                          : 'text-zinc-600 hover:bg-white/[0.02]'
-                      }`}
-                    >
-                      <span className="text-xs">{cell.date.getDate()}</span>
-                      <div className="h-1 flex items-center justify-center">
-                        {hasTasks && (
-                          <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-black' : 'bg-zinc-400'}`} />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <MonthPickerSheet
+        isOpen={isMonthPickerOpen}
+        pickerYear={pickerYear}
+        pickerMonth={pickerMonth}
+        todayStr={todayStr}
+        selectedDate={selectedDate}
+        datesWithTasks={datesWithTasks}
+        onClose={() => setIsMonthPickerOpen(false)}
+        onShiftMonth={handleShiftPickerMonth}
+        onSelectDate={handleSelectDateFromPicker}
+        onSelectToday={() => handleSelectDateFromPicker(todayStr)}
+      />
     </div>
   );
 };
