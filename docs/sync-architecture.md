@@ -62,6 +62,10 @@ export class Outbox {
 
 ## Единая точка входа
 
+> **Статус: цель, в коде этого ещё нет.** Сейчас очередь живёт в `SyncEngine.getOutbox()`,
+> пуш дебаунсится `scheduleDebouncedPush()`, а бандл остаётся полным снапшотом, не delta.
+> `commit()` и `outbox.enqueue()` — из плана ниже, не ищите их в `src/`.
+
 `SyncEngine.commit(kind, id, action, payload?)` → `outbox.enqueue(...)` + debounce(300ms) push.
 Все мутации в `AppContext` (save/update/delete/move/restore/folder/workspace) идут через `commit`,
 не напрямую через `pushLocalChanges`.
