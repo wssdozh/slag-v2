@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { SlagItem } from '../../types';
 import type { LightboxImage } from '../UI/ImageLightbox';
-import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
+import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 
 export interface FolderMediaData {
   allImages: LightboxImage[];

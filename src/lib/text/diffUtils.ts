@@ -1,4 +1,4 @@
-import { DEFAULT_INBOX_FOLDER } from '../config';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export interface WordChunk {
   text: string;

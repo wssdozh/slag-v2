@@ -1,5 +1,5 @@
 import type { LlmProtocolAdapter, LlmAdapterTurnRequest, LlmAdapterTurnResponse } from '../types';
-import { logger } from '../../logger';
+import { logger } from '../../logger/logger';
 import { extractErrorMessage } from './errorMessage';
 
 const aiLog = logger.scope('AI');

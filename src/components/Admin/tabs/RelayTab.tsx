@@ -1,7 +1,7 @@
 import React from 'react';
 import { BarChart } from '../Charts';
 import type { AdminRoom, AdminStats, AnalyticsData } from '../useAdminData';
-import { formatBytes } from '../../../lib/formatBytes';
+import { formatBytes } from '../../../lib/text/formatBytes';
 import { Activity, AlertTriangle, Database, Loader2, Radio, Wrench } from 'lucide-react';
 
 interface RelayTabProps {

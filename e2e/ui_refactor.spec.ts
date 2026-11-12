@@ -15,7 +15,7 @@ test('shared menus preserve positioning, selection and formatting', async ({ pag
     const { ResponsiveSegmented } = await import(/* @vite-ignore */ '/src/components/UI/ResponsiveSegmented.tsx');
     const { FolderSuggestionMenu } = await import(/* @vite-ignore */ '/src/components/Feed/FolderSuggestionMenu.tsx');
     const { TagSuggestionMenu } = await import(/* @vite-ignore */ '/src/components/Feed/TagSuggestionMenu.tsx');
-    const { formatBytes } = await import(/* @vite-ignore */ '/src/lib/formatBytes.ts');
+    const { formatBytes } = await import(/* @vite-ignore */ '/src/lib/text/formatBytes.ts');
     const outputs = [undefined, 0, -1, 1023, 1024, 1048576].map(formatBytes);
     if (JSON.stringify(outputs) !== JSON.stringify(['', '', '', '1023 B', '1.0 KB', '1.0 MB'])) {
       throw new Error(`formatBytes changed: ${JSON.stringify(outputs)}`);

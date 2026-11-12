@@ -6,7 +6,7 @@ import {
   setupSystemHotkey,
   removeSystemHotkey,
   type PlatformInfo,
-} from '../../lib/platform';
+} from '../../lib/platform/platform';
 import { APP_COMMANDS, formatShortcut } from '../../lib/commands';
 import { SettingsDivider, SettingsGroup, SettingsRow } from './SettingsUI';
 

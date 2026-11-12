@@ -2,7 +2,7 @@ import React from 'react';
 import type { LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
-import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
+import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import {
   ChevronRight,
   ChevronDown,

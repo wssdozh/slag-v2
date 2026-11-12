@@ -10,7 +10,7 @@ import type {
   AccountVault,
 } from './accountTypes';
 import type { DeviceSyncMode } from './types';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import {
   DEFAULT_SYNC_SERVER_URL,
   SYNC_STORAGE_KEYS,

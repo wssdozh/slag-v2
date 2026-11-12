@@ -1,4 +1,4 @@
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { accountClient } from './account';
 import { SYNC_INTERVALS } from '../../config';
 import type { SyncConnectionState } from './types';

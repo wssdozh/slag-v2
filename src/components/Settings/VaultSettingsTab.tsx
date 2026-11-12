@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Archive, Download, History, Plus, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
-import { openAppFolder } from '../../lib/folderOpener';
+import { openAppFolder } from '../../lib/platform/folderOpener';
 import { IconButton } from '../UI/IconButton';
 import {
   SettingsDivider,

@@ -6,7 +6,7 @@ import type {
   VaultMeta,
   WorkspaceState,
 } from '../../types';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 
 /**
  * Moving a vault in and out. This is the interchange format — a backup file, a

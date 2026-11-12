@@ -10,7 +10,7 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
-import { isTauriEnvironment } from '../../lib/platform';
+import { isTauriEnvironment } from '../../lib/platform/platform';
 import { navigatePage } from '../../lib/navigation';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { useAdminData } from './useAdminData';

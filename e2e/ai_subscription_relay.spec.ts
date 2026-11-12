@@ -104,8 +104,8 @@ test.describe('Subscription AI relay', () => {
     // Touch aiService once so its module URL is in the resource timeline.
     await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
-      if (!loaded.some((name) => name.includes('/src/lib/aiService.ts'))) {
-        await import('/src/lib/aiService.ts');
+      if (!loaded.some((name) => name.includes('/src/lib/ai/aiService.ts'))) {
+        await import('/src/lib/ai/aiService.ts');
       }
     });
   });
@@ -117,7 +117,7 @@ test.describe('Subscription AI relay', () => {
     const result = await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
       const aiServiceUrl =
-        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/aiService.ts')) || '/src/lib/aiService.ts';
+        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/ai/aiService.ts')) || '/src/lib/ai/aiService.ts';
       const { categorizeDraft } = await import(aiServiceUrl);
 
       const folders = [
@@ -158,7 +158,7 @@ test.describe('Subscription AI relay', () => {
     await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
       const aiServiceUrl =
-        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/aiService.ts')) || '/src/lib/aiService.ts';
+        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/ai/aiService.ts')) || '/src/lib/ai/aiService.ts';
       const { categorizeDraft } = await import(aiServiceUrl);
       await categorizeDraft('заметка про react', 'Входящие', [], {
         sourceMode: 'subscription',
@@ -181,7 +181,7 @@ test.describe('Subscription AI relay', () => {
     const result = await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
       const aiServiceUrl =
-        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/aiService.ts')) || '/src/lib/aiService.ts';
+        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/ai/aiService.ts')) || '/src/lib/ai/aiService.ts';
       const { categorizeDraft } = await import(aiServiceUrl);
       return categorizeDraft('новое кино в кинотеатре', 'Входящие', [], {
         sourceMode: 'subscription',

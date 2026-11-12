@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AiSettings, ChatMessage, FolderMeta, SlagItem } from '../../types';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, STORAGE_KEYS } from '../../config';
 import { storage } from '../../lib/storage';
-import { sendAssistantChat } from '../../lib/aiService';
+import { sendAssistantChat } from '../../lib/ai/aiService';
 
 const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Composer } from '../Feed/Composer';
 import { Sparkles, X } from 'lucide-react';
-import { hideQuickComposer, listenQuickComposerFocus, notifyDataChanged } from '../../lib/windowControls';
+import { hideQuickComposer, listenQuickComposerFocus, notifyDataChanged } from '../../lib/platform/windowControls';
 
 export const QuickComposerWindow: React.FC = () => {
   const [sessionKey, setSessionKey] = useState<number>(() => Date.now());

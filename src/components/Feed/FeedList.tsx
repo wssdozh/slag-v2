@@ -16,7 +16,7 @@ import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
 import { PinnedBanner } from './PinnedBanner';
-import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
+import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
 import { usePullToSearch } from '../../hooks/gestures/usePullToSearch';

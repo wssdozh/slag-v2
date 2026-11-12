@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import {
   FolderCheck,
   Inbox,

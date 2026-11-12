@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **400**, строк: **78929**, зон: **39**.
+Модулей: **400**, строк: **78929**, зон: **45**.
 
 ## Самые длинные файлы
 
@@ -359,18 +359,12 @@
 | `useRecurringRollover.ts` | 63 | 1 | useRecurringRollover | Recurring tasks roll over on their own schedule: at midnight, and when the tab |
 | `useVaults.ts` | 145 | 1 | useVaults | What a vault can do: switch to it, create it, delete it, pick its folder on d… |
 
-## src/hooks — 9 файлов, 1292 строк
+## src/hooks — 3 файлов, 683 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useAttachmentSrc.ts` | 50 | 6 | AttachmentSrcs, useAttachmentSrcs, useAttachmentSrc |  |
-| `useAudioAnalyser.ts` | 88 | 1 | useAudioAnalyser | Owns the Web Audio graph for one `<audio>` element. |
 | `useCalendarSchedule.ts` | 127 | 2 | CalendarTask, UseCalendarScheduleParams, CalendarScheduleResult, useCalendarSchedule |  |
-| `useComposerMedia.ts` | 203 | 1 | UseComposerMediaOptions, useComposerMedia |  |
-| `useGlobalHotkeys.ts` | 54 | 1 | useGlobalHotkeys |  |
 | `useItemActions.ts` | 280 | 4 | PRIORITY_LABELS, TYPE_LABELS, useItemActions |  |
-| `useLayerStack.ts` | 122 | 1 | AppLayer, useLayerStack |  |
-| `usePresence.ts` | 92 | 29 | usePresence | Keeps the existing DOM during exit. CSS owns the duration and destination. |
 | `useSuggestedActions.ts` | 276 | 1 | ActionHistoryEntry, useSuggestedActions |  |
 
 ## src/hooks/gestures — 6 файлов, 1091 строк
@@ -394,30 +388,33 @@
 | `useIsMobile.ts` | 35 | 2 | useIsMobile | Hook to detect mobile screens (< 768px by default). |
 | `useVisualViewportHeight.ts` | 55 | 1 | useVisualViewportHeight | Publishes the visual viewport height as `--vvh`. |
 
-## src/lib — 18 файлов, 3432 строк
+## src/hooks/media — 3 файлов, 341 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `aiService.ts` | 428 | 6 | CategorizeResult, TriageSuggestion, TriageProgress, TriageProgressCallback, categorizeDraft, +4 |  |
+| `useAttachmentSrc.ts` | 50 | 6 | AttachmentSrcs, useAttachmentSrcs, useAttachmentSrc |  |
+| `useAudioAnalyser.ts` | 88 | 1 | useAudioAnalyser | Owns the Web Audio graph for one `<audio>` element. |
+| `useComposerMedia.ts` | 203 | 1 | UseComposerMediaOptions, useComposerMedia |  |
+
+## src/hooks/ui — 3 файлов, 268 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `useGlobalHotkeys.ts` | 54 | 1 | useGlobalHotkeys |  |
+| `useLayerStack.ts` | 122 | 1 | AppLayer, useLayerStack |  |
+| `usePresence.ts` | 92 | 29 | usePresence | Keeps the existing DOM during exit. CSS owns the duration and destination. |
+
+## src/lib — 5 файлов, 1284 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
 | `backupService.ts` | 605 | 1 | SlagManifest, BackupService, backupService, DEFAULT_BACKUP_SETTINGS |  |
-| `blobToDataUrl.ts` | 16 | 3 | blobToDataUrl | A blob as a `data:` URL. |
-| `chatMarkdown.ts` | 71 | 1 | ChatSegment, splitTaskBlocks |  |
 | `commands.ts` | 279 | 3 | CommandCategory, AppCommandContext, AppCommand, isMac, formatShortcut, +3 | ponytail: central command & hotkey engine for SLAG v2 without external depend… |
-| `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
-| `folderOpener.ts` | 72 | 5 | OpenFolderResult, openAppFolder |  |
-| `formatBytes.ts` | 7 | 5 | formatBytes |  |
-| `logger.ts` | 586 | 43 | LogListener, logger |  |
-| `logRedaction.ts` | 65 | 1 | maskSensitiveString, sanitizeForLog | Masking secrets in log messages and payloads; the one place that knows what a… |
 | `motion.ts` | 195 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 |  |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
-| `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
 | `searchService.ts` | 192 | 3 | getSearchableAttachmentText, initSearchIndex, querySearch |  |
-| `taskCompletion.ts` | 35 | 1 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
-| `taskUtils.ts` | 101 | 10 | parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, PRIORITY_LABELS | Extracts subtasks from markdown checkboxes: `- [ ] title` or `- [x] title`. |
-| `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
-| `windowControls.ts` | 393 | 13 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 |  |
 
-## src/lib/ai — 22 файлов, 3991 строк
+## src/lib/ai — 23 файлов, 4419 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -427,6 +424,7 @@
 | `adapters/openAiAdapter.ts` | 209 | 1 | OpenAiChatAdapter |  |
 | `adapters/openAiResponsesAdapter.ts` | 207 | 1 | OpenAiResponsesAdapter |  |
 | `aiClient.ts` | 231 | 2 | AiResolvedTarget, PromptRequest, PromptResult, resolveKieEndpoint, resolveAiTarget, +4 |  |
+| `aiService.ts` | 428 | 6 | CategorizeResult, TriageSuggestion, TriageProgress, TriageProgressCallback, categorizeDraft, +4 |  |
 | `appGuide.ts` | 243 | 2 | APP_GUIDE_TOPICS, AppGuideTopic, getAppGuideContent | ponytail: curated topic catalog for in-app assistant UI navigation & feature … |
 | `fallback/agenda.ts` | 82 | 1 | calendarAgenda | Agenda intent: what is scheduled and overdue for a given day. |
 | `fallback/decomposition.ts` | 183 | 1 | splitNote, decomposeTask | Decomposition intents: split a note into tasks and break a task into subtasks. |
@@ -444,18 +442,34 @@
 | `tools.ts` | 441 | 1 | createLocalToolExecutor |  |
 | `types.ts` | 74 | 15 | AssistantToolDefinition, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, LlmProtocolAdapter, +2 |  |
 
-## src/lib/media — 8 файлов, 1611 строк
+## src/lib/logger — 2 файлов, 651 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `logger.ts` | 586 | 43 | LogListener, logger |  |
+| `logRedaction.ts` | 65 | 1 | maskSensitiveString, sanitizeForLog | Masking secrets in log messages and payloads; the one place that knows what a… |
+
+## src/lib/media — 9 файлов, 1627 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentEnrichment.ts` | 599 | 4 | resolveRelayMedia, canEnrichAttachments, buildImageInstruction, extractFocalContext, dataUrlToBlob, +3 | Subscription mode routes images and audio through the relay: the Groq key liv… |
 | `audioHelper.ts` | 186 | 10 | AudioTrack, AudioScopeMode, AudioTypeFilter, detectAudioFormat, splitAudioName, +6 |  |
 | `audioSpectrum.ts` | 439 | 3 | OrbFeatures, ORB_SILENCE, ORB_FFT_SIZE, createSpectrumReader | Features for the liquid orb. |
+| `blobToDataUrl.ts` | 16 | 3 | blobToDataUrl | A blob as a `data:` URL. |
 | `byteCodec.ts` | 16 | 3 | bytesToBase64, base64ToBytes, toArrayBuffer |  |
 | `deviceGallery.ts` | 38 | 1 | getGalleryAccess, requestGalleryAccess, listDeviceMedia, DeviceMediaItem, DeviceMediaKind |  |
 | `fileDropHelper.ts` | 115 | 4 | MAX_ATTACHMENT_BYTES, attachmentType, attachmentFromDataUrl, processFileListToAttachments | What the storage layer takes inline without turning into a memory problem. |
 | `folderBrowser.ts` | 128 | 4 | listFolders, pickFolder, listFolderEntries, pickFilesFromSystem, readEntryBytes, +3 | Folders the person already granted; the grant survives restarts and app updat… |
 | `imageCodec.ts` | 90 | 2 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 |  |
+
+## src/lib/platform — 3 файлов, 551 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `folderOpener.ts` | 72 | 5 | OpenFolderResult, openAppFolder |  |
+| `platform.ts` | 86 | 2 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey |  |
+| `windowControls.ts` | 393 | 13 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 |  |
 
 ## src/lib/storage — 10 файлов, 2317 строк
 
@@ -499,6 +513,21 @@
 | `types.ts` | 123 | 22 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +8 |  |
 | `vaultSharing.ts` | 84 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault |  |
 
+## src/lib/tasks — 2 файлов, 136 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `taskCompletion.ts` | 35 | 1 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
+| `taskUtils.ts` | 101 | 10 | parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, PRIORITY_LABELS | Extracts subtasks from markdown checkboxes: `- [ ] title` or `- [x] title`. |
+
+## src/lib/text — 3 файлов, 343 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `chatMarkdown.ts` | 71 | 1 | ChatSegment, splitTaskBlocks |  |
+| `diffUtils.ts` | 265 | 1 | WordChunk, SideBySideDiffRow, DiffResult, MetadataDiffItem, computeLineWordDiff, +2 |  |
+| `formatBytes.ts` | 7 | 5 | formatBytes |  |
+
 ## src/lib/time — 4 файлов, 940 строк
 
 | файл | строк | импортят | экспортирует | что это |
@@ -508,7 +537,7 @@
 | `recurrenceHelper.ts` | 305 | 5 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 |  |
 | `todoistTaskParser.ts` | 389 | 9 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +1 |  |
 
-## src/lib/vault — 9 файлов, 807 строк
+## src/lib/vault — 10 файлов, 830 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -521,6 +550,7 @@
 | `markdownSerializer.ts` | 198 | 4 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |
 | `noteFilename.ts` | 20 | 5 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
 | `stats.ts` | 66 | 2 | VaultStats, collectExistingTags, computeVaultStats |  |
+| `vaultDisplay.ts` | 23 | 5 | getVaultDisplayName |  |
 
 ## src/mcp — 6 файлов, 1296 строк
 

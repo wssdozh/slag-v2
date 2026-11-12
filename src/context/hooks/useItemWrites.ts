@@ -3,9 +3,9 @@ import { useCallback } from 'react';
 import type { SlagItem, SlagItemType } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
-import { applyTaskCompletion } from '../../lib/taskCompletion';
-import { parseSubtasksFromContent, setAllCheckboxesInContent, toggleCheckboxInContent } from '../../lib/taskUtils';
-import { logger } from '../../lib/logger';
+import { applyTaskCompletion } from '../../lib/tasks/taskCompletion';
+import { parseSubtasksFromContent, setAllCheckboxesInContent, toggleCheckboxInContent } from '../../lib/tasks/taskUtils';
+import { logger } from '../../lib/logger/logger';
 import type { ToastMessage } from '../appContext.types';
 
 const uiLog = logger.scope('UI');

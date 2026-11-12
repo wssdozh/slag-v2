@@ -1,6 +1,6 @@
 import type { DockviewApi, IDockviewPanel } from 'dockview-react';
-import { logger } from '../../lib/logger';
-import { isDesktopApp, openDetachedWindow } from '../../lib/windowControls';
+import { logger } from '../../lib/logger/logger';
+import { isDesktopApp, openDetachedWindow } from '../../lib/platform/windowControls';
 import {
   Layers,
   Kanban,

@@ -8,13 +8,13 @@ import type {
   AiSettings,
 } from '../types';
 import { storage } from '../lib/storage';
-import { logger } from '../lib/logger';
-import { openAppFolder } from '../lib/folderOpener';
-import { listenDesktopEvents } from '../lib/windowControls';
+import { logger } from '../lib/logger/logger';
+import { openAppFolder } from '../lib/platform/folderOpener';
+import { listenDesktopEvents } from '../lib/platform/windowControls';
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
-import { useGlobalHotkeys } from '../hooks/useGlobalHotkeys';
-import { useLayerStack, type AppLayer } from '../hooks/useLayerStack';
+import { useGlobalHotkeys } from '../hooks/ui/useGlobalHotkeys';
+import { useLayerStack, type AppLayer } from '../hooks/ui/useLayerStack';
 import { useSuggestedActions, type ActionHistoryEntry } from '../hooks/useSuggestedActions';
 import { useOverlays } from './hooks/useOverlays';
 import { useMobileNav } from './hooks/useMobileNav';

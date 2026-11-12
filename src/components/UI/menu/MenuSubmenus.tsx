@@ -2,7 +2,7 @@ import React from 'react';
 import { Copy, FileText, FolderOpen, Link2, CheckSquare, StickyNote, Check } from 'lucide-react';
 import type { FolderMeta, SlagItem, SlagItemType } from '../../../types';
 import type { ContextMenuTarget } from '../../../context/appContext.types';
-import { usePresence } from '../../../hooks/usePresence';
+import { usePresence } from '../../../hooks/ui/usePresence';
 
 export type MenuSubmenuName = 'more' | 'type' | 'explorer';
 

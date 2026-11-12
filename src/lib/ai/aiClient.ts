@@ -2,7 +2,7 @@ import type { AiSettings } from '../../types';
 import type { LlmProtocolAdapter } from './types';
 import { syncEngine } from '../sync/syncEngine';
 import { accountClient } from '../sync/account';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { OpenAiChatAdapter } from './adapters/openAiAdapter';
 import { OpenAiResponsesAdapter } from './adapters/openAiResponsesAdapter';
 import { AnthropicMessagesAdapter } from './adapters/anthropicAdapter';

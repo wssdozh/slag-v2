@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { FOLDER_ICONS } from './folderIcons';
-import { logger } from '../../lib/logger';
+import { logger } from '../../lib/logger/logger';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import {
   ChevronRight,

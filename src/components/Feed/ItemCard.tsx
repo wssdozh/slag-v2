@@ -1,4 +1,4 @@
-import { formatBytes } from '../../lib/formatBytes';
+import { formatBytes } from '../../lib/text/formatBytes';
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, LightboxImage, SlagAttachment } from '../../types';
@@ -21,7 +21,7 @@ import {
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
-import { useAttachmentSrcs } from '../../hooks/useAttachmentSrc';
+import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
 

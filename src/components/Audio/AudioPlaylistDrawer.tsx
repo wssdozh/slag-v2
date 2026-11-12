@@ -7,7 +7,7 @@ import { IconButton } from '../UI/IconButton';
 import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
 import { Select } from '../UI/Select';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 /** The queue lists one of three states of the panel's type filter. */
 type QueueFilter = 'all' | 'voice' | 'file';

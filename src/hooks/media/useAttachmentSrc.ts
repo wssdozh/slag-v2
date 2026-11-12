@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { storage } from '../lib/storage';
-import type { SlagAttachment } from '../types';
+import { storage } from '../../lib/storage';
+import type { SlagAttachment } from '../../types';
 
 /**
  * Attachments keep their bytes in IndexedDB and `.attachments/`, while the note carries only

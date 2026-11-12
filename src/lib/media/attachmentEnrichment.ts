@@ -1,9 +1,9 @@
 import type { SlagAttachment, SlagItem, AiSettings } from '../../types';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { storage } from '../storage';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, AI_LIMITS } from '../../config';
 import { downscaleImageDataUrl } from './imageCodec';
-import { blobToDataUrl } from '../blobToDataUrl';
+import { blobToDataUrl } from './blobToDataUrl';
 import { syncEngine } from '../sync/syncEngine';
 import { accountClient } from '../sync/account';
 

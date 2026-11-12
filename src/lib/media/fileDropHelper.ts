@@ -5,7 +5,7 @@ import {
   STORED_IMAGE_QUALITY,
   UNCOMPRESSIBLE_IMAGE_TYPES,
 } from './imageCodec';
-import { blobToDataUrl } from '../blobToDataUrl';
+import { blobToDataUrl } from './blobToDataUrl';
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif', 'bmp', 'svg'];
 const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'];

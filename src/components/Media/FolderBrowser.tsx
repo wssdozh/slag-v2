@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ChevronRight, FileText, Folder, FolderPlus, Image as ImageIcon, Lock } from 'lucide-react';
-import { formatBytes } from '../../lib/formatBytes';
+import { formatBytes } from '../../lib/text/formatBytes';
 import { useFolderBrowser } from './useFolderBrowser';
 import type { DevicePick, FolderEntry } from '../../types';
 

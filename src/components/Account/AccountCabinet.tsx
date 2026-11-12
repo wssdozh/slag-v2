@@ -6,7 +6,7 @@ import type { AccountDevice } from '../../lib/sync/accountTypes';
 import { getOrCreateDeviceIdentity } from '../../lib/sync/accountCrypto';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { acceptSharedVault, shareVaultWithDevice } from '../../lib/sync/vaultSharing';
-import { getVaultDisplayName } from '../../lib/vaultDisplay';
+import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
 import { navigatePage } from '../../lib/navigation';
 import { SettingsDivider, SettingsGroup, SettingsRow } from '../Settings/SettingsUI';
 

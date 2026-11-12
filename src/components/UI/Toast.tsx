@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { ToastMessage } from '../../context/AppContext';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { UI_DELAYS, UI_GESTURES } from '../../config';
 import { CheckCircle2, AlertCircle, Info, Undo2, ArchiveRestore } from 'lucide-react';
 

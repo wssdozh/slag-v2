@@ -704,7 +704,7 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
 
     // 6. Verify client endpoint resolver behavior in browser context
     const endpoints = await page.evaluate(async () => {
-      const module = await import('/src/lib/aiService.ts');
+      const module = await import('/src/lib/ai/aiService.ts');
       return {
         deepseekUrl: module.resolveKieEndpoint('https://api.kie.ai', 'deepseek-v4-1-flash'),
         gptUrl: module.resolveKieEndpoint('https://api.kie.ai', 'gpt-5-2'),

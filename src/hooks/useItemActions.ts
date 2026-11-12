@@ -1,7 +1,7 @@
 import { useApp } from '../context/AppContext';
-import { categorizeDraft, generateSmartTags } from '../lib/aiService';
+import { categorizeDraft, generateSmartTags } from '../lib/ai/aiService';
 import { storage, getSafeNoteFilename } from '../lib/storage';
-import { openAppFolder } from '../lib/folderOpener';
+import { openAppFolder } from '../lib/platform/folderOpener';
 import type { SlagItem, SlagItemType } from '../types';
 import { DEFAULT_INBOX_FOLDER } from '../config';
 

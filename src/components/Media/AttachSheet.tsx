@@ -1,14 +1,14 @@
 import React, { useCallback, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import {
   attachmentFromDataUrl,
   MAX_ATTACHMENT_BYTES,
   processFileListToAttachments,
 } from '../../lib/media/fileDropHelper';
 import { readEntryBytes } from '../../lib/media/folderBrowser';
-import { formatBytes } from '../../lib/formatBytes';
-import { logger } from '../../lib/logger';
+import { formatBytes } from '../../lib/text/formatBytes';
+import { logger } from '../../lib/logger/logger';
 import { AudioRecorder } from '../UI/AudioRecorder';
 import { Checkbox } from '../UI/Checkbox';
 import { SendButton } from '../UI/SendButton';

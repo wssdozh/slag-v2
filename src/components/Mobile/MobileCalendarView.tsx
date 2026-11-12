@@ -17,7 +17,7 @@ import {
 } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { TaskStatusMark } from '../UI/TaskStatusMark';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import {
   ChevronDown,
   ChevronLeft,

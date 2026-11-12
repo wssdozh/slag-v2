@@ -12,7 +12,7 @@ import {
   type SyncScope,
 } from './localBookkeeping';
 export { storage };
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { accountClient } from './account';
 export { accountClient };
 import { Outbox } from './outbox/outbox';
@@ -56,7 +56,7 @@ import {
   SYNC_STORAGE_KEYS,
   SYNC_INTERVALS,
 } from '../../config';
-import { isPrimaryWindow } from '../windowControls';
+import { isPrimaryWindow } from '../platform/windowControls';
 
 const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
 

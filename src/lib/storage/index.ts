@@ -15,7 +15,7 @@ export type { VaultStats } from '../vault/stats';
 import { generateDemoItems } from '../vault/demoVault';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 export { getSafeNoteFilename } from '../vault/noteFilename';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
   writeTextFile,

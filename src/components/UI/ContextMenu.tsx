@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 import { useItemActions } from '../../hooks/useItemActions';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { ItemMenuSections } from './menu/itemMenuSections';
 import { FolderMenuSections } from './menu/folderMenuSections';
 import { FeedMenuSections } from './menu/feedMenuSections';

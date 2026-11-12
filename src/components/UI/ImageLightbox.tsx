@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, CornerUpLeft, FileText, MoreVertical, RotateCcw, X, ZoomIn } from 'lucide-react';
 import type { LightboxImage } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { usePhotoPager } from '../../hooks/gestures/usePhotoPager';
 import { useItemActions } from '../../hooks/useItemActions';
 import { ViewerVideo } from '../Media/ViewerVideo';

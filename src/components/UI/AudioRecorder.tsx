@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUp } from 'lucide-react';
 import type { SlagAttachment } from '../../types';
-import { logger } from '../../lib/logger';
+import { logger } from '../../lib/logger/logger';
 
 const mediaLog = logger.scope('MEDIA');
 

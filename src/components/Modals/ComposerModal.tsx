@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import { BaseModal } from './BaseModal';
 import { Composer } from '../Feed/Composer';

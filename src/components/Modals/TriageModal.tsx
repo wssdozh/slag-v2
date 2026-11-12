@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
-import { triageInboxItems } from '../../lib/aiService';
-import type { TriageSuggestion } from '../../lib/aiService';
+import { triageInboxItems } from '../../lib/ai/aiService';
+import type { TriageSuggestion } from '../../lib/ai/aiService';
 import {
   Sparkles,
   ArrowRight,

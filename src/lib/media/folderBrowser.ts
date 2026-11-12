@@ -1,5 +1,5 @@
 import * as androidFs from 'tauri-plugin-android-fs-api';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import type { DeviceFolder, DeviceUri, FolderEntry } from '../../types';
 
 const pickerLog = logger.scope('MEDIA');

@@ -11,7 +11,7 @@ import type {
 } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
-import { isMobilePlatform } from '../../lib/windowControls';
+import { isMobilePlatform } from '../../lib/platform/windowControls';
 import { UI_BREAKPOINTS } from '../../config';
 import { selectVisibleItems } from '../feed/feedView';
 

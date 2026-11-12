@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useLayoutEffect, useEffect, useCallba
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { formatDueDateLabel } from '../../lib/time/dateUtils';
-import { PRIORITY_LABELS } from '../../lib/taskUtils';
+import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 import {
   CheckSquare,
   Plus,

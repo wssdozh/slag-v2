@@ -1,5 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
-import { logger } from './logger';
+import { logger } from '../logger/logger';
 
 const platformLog = logger.scope('APP');
 

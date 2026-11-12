@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listFolderEntries, listFolders, pickFolder, pickFilesFromSystem } from '../../lib/media/folderBrowser';
-import { logger } from '../../lib/logger';
+import { logger } from '../../lib/logger/logger';
 import type { DeviceFolder, FolderEntry } from '../../types';
 
 const pickerLog = logger.scope('MEDIA');

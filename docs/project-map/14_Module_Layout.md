@@ -31,20 +31,26 @@ src/
   hooks/
     gestures/       drag, pointer dnd, sheet drag, swipe
     layout/         container width, flip layout, is mobile, visual viewport
+    media/          useAttachmentSrc, useAudioAnalyser, useComposerMedia
+    ui/             useLayerStack, usePresence, useGlobalHotkeys
   lib/
-    ai/             оркестратор, tools, prompt, action parser, адаптеры; fallback/ — по файлу на группу интентов
+    ai/             оркестратор, tools, prompt, action parser, адаптеры, aiService; fallback/ — по файлу на группу интентов
+    logger/         logger (уровни, скоупы, буфер, ретеншн) и logRedaction (что не попадёт в лог)
+    platform/       platform, windowControls, folderOpener — всё, что говорит с ОС и Tauri
+    text/           chatMarkdown, diffUtils, formatBytes
+    tasks/          taskUtils (чекбоксы в markdown), taskCompletion (переходы статусов)
     storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
     sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
-    vault/          модель записи: schema, updates, markdown serializer, filename, demo
+    vault/          модель записи: schema, updates, markdown serializer, filename, vaultDisplay, demo
     time/           даты, recurrence, Todoist-парсер, раскладка календаря
-    media/          attachments enrichment, audio, bytecode, file drop
+    media/          attachments enrichment, audio, bytecode, file drop, blobToDataUrl
   mcp/              MCP-сервер, отдельная сборка
   styles/           theme.css — токены
   types/            доменные типы
 scripts/            инструменты репозитория: gen-code-map.mjs (карта и `where`), build-android-icons.py
 ```
 
-`src/lib/*` остаётся плоским для одиночных модулей: `logger`, `logRedaction`, `commands`, `motion`, `platform`, `windowControls`, `searchService`, `backupService`, `aiService`, `navigation`, `folderOpener`, `diffUtils`, `formatBytes`, `vaultDisplay`, `taskUtils`, `taskCompletion`.
+`src/lib/*` остаётся плоским для одиночек без родственников: `searchService`, `backupService`, `navigation`, `motion`, `commands`. В `src/hooks/` так же плоско лежат `useItemActions`, `useSuggestedActions`, `useCalendarSchedule`.
 
 ---
 
@@ -58,8 +64,14 @@ scripts/            инструменты репозитория: gen-code-map.
 | сериализация записи, frontmatter, имя файла | `lib/vault/` |
 | даты, повторения, разбор срока, сетка календаря | `lib/time/` |
 | вложения, аудио, file drop | `lib/media/` |
+| логи и редактирование секретов | `lib/logger/` |
+| окна, Tauri, проводник, платформа | `lib/platform/` |
+| markdown-текст, дифф, размеры | `lib/text/` |
+| чекбоксы и статусы задач | `lib/tasks/` |
 | жест, drag, свайп | `hooks/gestures/` |
 | размеры окна, мобильность, flip | `hooks/layout/` |
+| вложения, аудио, медиа композера | `hooks/media/` |
+| оверлеи, presence, хоткеи | `hooks/ui/` |
 | состояние фичи | `hooks/` (плоско, если файл один) |
 | визуал фичи | рядом с компонентом, в его зоне |
 

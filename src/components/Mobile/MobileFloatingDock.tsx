@@ -1,7 +1,7 @@
 import React, { useRef, useState, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import type { MobileTabId } from '../../types';
 import {
   Folder,

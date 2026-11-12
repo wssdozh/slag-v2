@@ -1,6 +1,6 @@
 import type { Orama } from '@orama/orama';
 import type { SlagItem } from '../types';
-import { logger } from './logger';
+import { logger } from './logger/logger';
 import { SEARCH_LIMITS } from '../config';
 
 const searchLog = logger.scope('SEARCH');

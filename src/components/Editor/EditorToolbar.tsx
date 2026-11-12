@@ -1,7 +1,7 @@
 // Editor toolbar assembly: top row, markdown palette, save/zen actions.
 import React from 'react';
 import { ArrowUp, Eye, Maximize, Minimize, Maximize2, Minimize2 } from 'lucide-react';
-import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/windowControls';
+import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/platform/windowControls';
 import { EditorTopBar } from './EditorTopBar';
 import { MarkdownPalette } from './MarkdownPalette';
 import type { EditorToolbarProps, MarkdownDropdown } from './editorToolbarParts';

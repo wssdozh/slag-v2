@@ -1,6 +1,6 @@
 import YAML from 'yaml';
 import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
-import { parseSubtasksFromContent } from '../taskUtils';
+import { parseSubtasksFromContent } from '../tasks/taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 /**

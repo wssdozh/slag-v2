@@ -4,7 +4,7 @@ import { decryptBundle } from './crypto';
 import { touchDeviceLastSeen } from './devices';
 import { loadSentHashes, loadTombstones, saveSentHashes, tombstonesKey } from './localBookkeeping';
 import { attachmentSignature } from './attachmentSignature';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { storage } from '../storage';
 import type { ComposerDraft, FolderMeta, FullscreenDraft, SlagAttachment, SlagItem, WorkspaceState } from '../../types';
 import { DEFAULT_INBOX_FOLDER, SYNC_STORAGE_KEYS } from '../../config';

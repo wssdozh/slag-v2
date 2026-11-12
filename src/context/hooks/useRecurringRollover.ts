@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { evaluateRecurringTasks, getISODateString } from '../../lib/time/recurrenceHelper';
-import { logger } from '../../lib/logger';
+import { logger } from '../../lib/logger/logger';
 import { storage } from '../../lib/storage';
 
 const appLog = logger.scope('APP');

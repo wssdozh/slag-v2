@@ -1,6 +1,6 @@
 import type { SlagItem, VaultMeta } from '../../types';
 import { STORAGE_KEYS } from '../../config';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import type { AttachmentStore } from './attachments';
 import type { StorageChangeEvent } from '.';

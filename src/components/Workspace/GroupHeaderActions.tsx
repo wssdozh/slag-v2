@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type {
   IDockviewHeaderActionsProps,
 } from 'dockview-react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import {
   PANELS_TO_ADD,
   getPanelMinWidth,

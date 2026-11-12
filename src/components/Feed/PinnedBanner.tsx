@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Pin, CheckSquare, FileText, StickyNote } from 'lucide-react';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { usePresence } from '../../hooks/usePresence';
-import { useAttachmentSrc } from '../../hooks/useAttachmentSrc';
+import { usePresence } from '../../hooks/ui/usePresence';
+import { useAttachmentSrc } from '../../hooks/media/useAttachmentSrc';
 
 export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' }) => {
   const {

@@ -5,7 +5,7 @@ import { computeAntiOverlapLayout } from '../../lib/time/calendarLayout';
 import { useDragToScroll } from '../../hooks/gestures/useDragToScroll';
 import { useCalendarSchedule } from '../../hooks/useCalendarSchedule';
 import { usePointerDnd, type DragItemPayload } from '../../hooks/gestures/usePointerDnd';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import {
   getISODateString,
   getMondayOfWeek,

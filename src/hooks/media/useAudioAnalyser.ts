@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { logger } from '../lib/logger';
-import { ORB_FFT_SIZE } from '../lib/media/audioSpectrum';
+import { logger } from '../../lib/logger/logger';
+import { ORB_FFT_SIZE } from '../../lib/media/audioSpectrum';
 
 const log = logger.scope('MEDIA');
 

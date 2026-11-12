@@ -12,7 +12,7 @@ import {
 import { SheetPanel } from '../UI/SheetPanel';
 import { TagChip } from '../UI/TagChip';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';

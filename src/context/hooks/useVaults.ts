@@ -18,7 +18,7 @@ import { storage } from '../../lib/storage';
 import { syncEngine } from '../../lib/sync';
 import { accountClient } from '../../lib/sync/account';
 import { crossFade } from '../../lib/motion';
-import { openAppFolder } from '../../lib/folderOpener';
+import { openAppFolder } from '../../lib/platform/folderOpener';
 import type { ToastMessage } from '../appContext.types';
 
 /**

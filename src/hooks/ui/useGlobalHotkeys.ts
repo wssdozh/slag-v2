@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { APP_COMMANDS, type AppCommandContext, matchesShortcut, isTypingTarget } from '../lib/commands';
+import { APP_COMMANDS, type AppCommandContext, matchesShortcut, isTypingTarget } from '../../lib/commands';
 
 export function useGlobalHotkeys(
   context: AppCommandContext & { dismissTopLayer: () => boolean }

@@ -1,5 +1,5 @@
 import type { SlagAttachment, SlagItem } from '../../types';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
   readDir,
@@ -10,7 +10,7 @@ import {
   BaseDirectory,
 } from '@tauri-apps/plugin-fs';
 import { idbSaveAttachment, idbGetAttachment } from './indexedDb';
-import { blobToDataUrl } from '../blobToDataUrl';
+import { blobToDataUrl } from '../media/blobToDataUrl';
 
 /**
  * The bytes of attachments, and only them.

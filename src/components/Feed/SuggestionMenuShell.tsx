@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 interface SuggestionMenuShellProps {
   isOpen?: boolean;

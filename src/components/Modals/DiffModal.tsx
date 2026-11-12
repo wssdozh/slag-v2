@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import type { SlagItem, ItemUpdates } from '../../types';
 import { applyItemUpdates } from '../../lib/vault/itemUpdates';
-import { computeSideBySideDiff, computeMetadataDiff } from '../../lib/diffUtils';
-import { usePresence } from '../../hooks/usePresence';
+import { computeSideBySideDiff, computeMetadataDiff } from '../../lib/text/diffUtils';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 export interface DiffModalItemEntry {
   title: string;

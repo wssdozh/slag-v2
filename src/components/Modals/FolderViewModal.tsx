@@ -10,7 +10,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 export const FolderViewModal: React.FC = () => {
   const {

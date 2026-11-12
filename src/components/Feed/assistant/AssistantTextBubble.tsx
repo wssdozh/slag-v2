@@ -1,7 +1,7 @@
 import React from 'react';
 import { MarkdownRenderer } from '../../UI/MarkdownRenderer';
 import { ChatTaskBlock } from '../chat/ChatTaskBlock';
-import { splitTaskBlocks } from '../../../lib/chatMarkdown';
+import { splitTaskBlocks } from '../../../lib/text/chatMarkdown';
 
 interface AssistantTextBubbleProps {
   role: 'user' | 'assistant' | 'system';

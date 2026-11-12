@@ -19,7 +19,7 @@ import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { isDesktopApp } from '../../lib/windowControls';
+import { isDesktopApp } from '../../lib/platform/windowControls';
 import { useDockPanels } from './useDockPanels';
 import { syncAllGroupConstraints } from './dockPanelUtils';
 import { useCrossWindowDnd } from './useCrossWindowDnd';

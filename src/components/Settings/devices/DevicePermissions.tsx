@@ -3,7 +3,7 @@ import { Database } from 'lucide-react';
 import type { AccountDevice, AccountVault } from '../../../lib/sync/accountTypes';
 import type { DeviceProfile, DeviceSyncMode } from '../../../lib/sync/types';
 import type { VaultMeta } from '../../../types';
-import { getVaultDisplayName } from '../../../lib/vaultDisplay';
+import { getVaultDisplayName } from '../../../lib/vault/vaultDisplay';
 import { DeviceCard } from './DeviceCard';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from '../SettingsUI';
 

@@ -10,7 +10,7 @@ import type {
 import type { AttachSheetRequest, ContextMenuTarget, ToastMessage } from '../appContext.types';
 import type { SettingsTabId } from '../../config/settingsTabs';
 import { storage } from '../../lib/storage';
-import { logger } from '../../lib/logger';
+import { logger } from '../../lib/logger/logger';
 
 /**
  * Everything that lives on top of the app: modals, lightbox, context menu, toasts,

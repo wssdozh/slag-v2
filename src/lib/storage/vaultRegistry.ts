@@ -1,7 +1,7 @@
 // Which vault the app is looking at: the registry kept in localStorage, and the switch between them.
 import type { VaultMeta } from '../../types';
 import { STORAGE_KEYS, DEFAULT_VAULT_META } from '../../config';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import { remove, BaseDirectory } from '@tauri-apps/plugin-fs';
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { useSheetDrag } from '../../hooks/gestures/useSheetDrag';
 import { useApp } from '../../context/AppContext';
 import {

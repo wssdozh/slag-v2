@@ -20,7 +20,7 @@ import {
   idbGetSnapshotData,
   idbDeleteSnapshot,
 } from './storage/indexedDb';
-import { logger } from './logger';
+import { logger } from './logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
   writeFile,

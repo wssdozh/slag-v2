@@ -86,7 +86,7 @@ test.describe('Unified AI Client & Russian Tag Heuristics', () => {
     });
 
     const result = await page.evaluate(async () => {
-      const { categorizeDraft } = await import('/src/lib/aiService.ts');
+      const { categorizeDraft } = await import('/src/lib/ai/aiService.ts');
       const folders = [
         { id: 'f_inbox', name: 'Входящие', path: 'Входящие' },
         { id: 'f_leisure', name: 'Отдых', path: 'Отдых', description: 'Фильмы, сериалы, досуг' },
@@ -112,7 +112,7 @@ test.describe('Unified AI Client & Russian Tag Heuristics', () => {
 
   test('3. Tagging new categories without existing tags detects common media keywords', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { categorizeDraft } = await import('/src/lib/aiService.ts');
+      const { categorizeDraft } = await import('/src/lib/ai/aiService.ts');
       const folders = [
         { id: 'f_inbox', name: 'Входящие', path: 'Входящие' },
       ];

@@ -1,7 +1,7 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { logger } from './logger';
+import { logger } from '../logger/logger';
 
 const wsLog = logger.scope('WORKSPACE');
 

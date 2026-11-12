@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('completion transition is the single gate for status, streak and checklist sync', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {
-    const { applyTaskCompletion } = await import(/* @vite-ignore */ '/src/lib/taskCompletion.ts');
+    const { applyTaskCompletion } = await import(/* @vite-ignore */ '/src/lib/tasks/taskCompletion.ts');
     const today = new Date(2026, 10, 5, 12);
     const base = {
       id: 't', type: 'task' as const, title: 't', folder: 'Входящие', tags: [], attachments: [],

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Minus, Square, X } from 'lucide-react';
-import { isDesktopApp, minimizeWindow, toggleMaximizeWindow, closeWindow } from '../../lib/windowControls';
+import { isDesktopApp, minimizeWindow, toggleMaximizeWindow, closeWindow } from '../../lib/platform/windowControls';
 
 // ponytail: fixed top-right 34px controls matching dockview tab row. ceiling: windows 11 snap layout preview. upgrade: tauri-plugin-frame if native snap menu hover required
 export const WindowControls: React.FC = () => {

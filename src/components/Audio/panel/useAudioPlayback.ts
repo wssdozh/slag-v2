@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { storage } from '../../../lib/storage';
-import { logger } from '../../../lib/logger';
-import { useAudioAnalyser } from '../../../hooks/useAudioAnalyser';
+import { logger } from '../../../lib/logger/logger';
+import { useAudioAnalyser } from '../../../hooks/media/useAudioAnalyser';
 import type { AudioTrack } from '../../../lib/media/audioHelper';
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;

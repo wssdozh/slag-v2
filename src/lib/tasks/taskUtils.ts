@@ -1,4 +1,4 @@
-import type { SlagSubtask } from '../types';
+import type { SlagSubtask } from '../../types';
 
 /**
  * Extracts subtasks from markdown checkboxes: `- [ ] title` or `- [x] title`.

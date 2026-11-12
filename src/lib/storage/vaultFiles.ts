@@ -1,5 +1,5 @@
 import type { FolderMeta, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
   readTextFile,

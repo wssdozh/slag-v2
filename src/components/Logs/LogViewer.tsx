@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { logger } from '../../lib/logger';
-import { openAppFolder } from '../../lib/folderOpener';
+import { logger } from '../../lib/logger/logger';
+import { openAppFolder } from '../../lib/platform/folderOpener';
 import type { LogEntry, LogLevel, LogScope } from '../../types';
 import { useApp } from '../../context/AppContext';
 import {

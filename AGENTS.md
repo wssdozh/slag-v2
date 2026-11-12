@@ -41,10 +41,13 @@ src/
                 (+ подпапки зон: Feed/assistant, Editor/fullscreen, Settings/devices,
                  Audio/panel, UI/menu, Admin/tabs)
   context/      AppContext — единственный стейт-хаб; hooks/ — записи, папки, хранилища, лента
-  hooks/        gestures/ (drag, swipe), layout/ (размеры, мобильность), остальное плоско
-  lib/          ai/ (LLM + fallback/ по интентам), storage/ (диск, реестр, папки, корзина),
+  hooks/        gestures/ (drag, swipe), layout/ (размеры), media/ (вложения, аудио, композер),
+                ui/ (оверлеи, presence, хоткеи), остальное плоско
+  lib/          ai/ (LLM + fallback/ по интентам), logger/ (логи и редактирование секретов),
+                platform/ (tauri, окна, проводник), text/ (markdown, дифф, размеры),
+                tasks/ (чекбоксы, завершение), storage/ (диск, реестр, папки, корзина),
                 sync/ (relay: движок, конфиг, сокет), vault/ (модель), time/ (даты),
-                media/ (вложения и аудио), плоские утилиты
+                media/ (вложения и аудио), остальное плоско
   types/        доменные типы
   mcp/          MCP-сервер, собирается отдельным конфигом
   styles/       theme.css — токены

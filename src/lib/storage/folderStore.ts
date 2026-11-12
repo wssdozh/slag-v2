@@ -1,7 +1,7 @@
 // Writing folders: save, rename with the note cascade, describe, delete and re-route to Inbox.
 import type { ComposerDraft, FolderMeta, SlagItem, VaultMeta } from '../../types';
 import { DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import type { StorageChangeEvent } from '.';
 

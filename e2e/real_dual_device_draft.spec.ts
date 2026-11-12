@@ -102,7 +102,7 @@ test('real-life e2e: live AI categorization of draft with latency and tags verif
 
   // Test AI draft categorization on a real dev note
   const aiResult = await page.evaluate(async () => {
-    const { categorizeDraft } = await import(/* @vite-ignore */ '/src/lib/aiService.ts');
+    const { categorizeDraft } = await import(/* @vite-ignore */ '/src/lib/ai/aiService.ts');
     const { storage } = (window as any);
     const folders = storage.getFolders();
     const settings = {

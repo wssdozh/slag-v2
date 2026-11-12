@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { isDesktopApp } from '../../lib/windowControls';
-import { getVaultDisplayName } from '../../lib/vaultDisplay';
-import { usePresence } from '../../hooks/usePresence';
+import { isDesktopApp } from '../../lib/platform/windowControls';
+import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
+import { usePresence } from '../../hooks/ui/usePresence';
 import {
   Check,
   Trash2,

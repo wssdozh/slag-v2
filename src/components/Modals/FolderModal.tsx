@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
 import { FOLDER_ICONS } from '../Sidebar/folderIcons';

@@ -5,7 +5,7 @@ import os from 'node:os';
 import type { SlagItem, FolderMeta } from '../types';
 import type { McpVaultConfig, VaultStateData, NoteMatch } from './types';
 import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markdownSerializer';
-import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/taskUtils';
+import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/tasks/taskUtils';
 
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { DEFAULT_INBOX_FOLDER } from '../config';

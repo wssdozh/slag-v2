@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
 import { syncEngine } from '../../lib/sync/syncEngine';
-import { getVaultDisplayName } from '../../lib/vaultDisplay';
+import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import type { SyncStatus } from '../../lib/sync/types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';

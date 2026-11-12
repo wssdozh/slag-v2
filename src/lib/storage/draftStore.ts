@@ -2,7 +2,7 @@ import type { ComposerDraft, FullscreenDraft, ChatMessage, WorkspaceState, Folde
 import { DEFAULT_FOLDER_VIEW_SETTINGS } from '../../types';
 import { DEFAULT_WORKSPACE_STATE } from '../../config';
 import { STORAGE_KEYS } from '../../config';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { stripAttachmentList } from './attachmentData';
 import type { StorageChangeEvent } from '.';
 

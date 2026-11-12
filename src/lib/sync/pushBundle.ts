@@ -6,7 +6,7 @@ import { accountClient } from './account';
 import { storage } from '../storage';
 import { stripAttachmentData } from '../storage/attachmentData';
 import { SYNC_INTERVALS, SYNC_STORAGE_KEYS } from '../../config';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 
 const syncLog = logger.scope('SYNC');
 const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;

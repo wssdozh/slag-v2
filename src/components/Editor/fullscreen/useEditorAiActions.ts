@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type React from 'react';
 import type { AiSettings, FolderMeta } from '../../../types';
-import { categorizeDraft, generateSmartTags } from '../../../lib/aiService';
+import { categorizeDraft, generateSmartTags } from '../../../lib/ai/aiService';
 import { DEFAULT_INBOX_FOLDER } from '../../../config';
 
 type Toast = (text: string, type?: 'info' | 'success' | 'error') => void;

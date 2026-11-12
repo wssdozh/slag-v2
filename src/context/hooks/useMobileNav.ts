@@ -5,7 +5,7 @@ import { STORAGE_KEYS, UI_BREAKPOINTS } from '../../config';
 
 export const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
-import { isDesktopApp, isMobilePlatform } from '../../lib/windowControls';
+import { isDesktopApp, isMobilePlatform } from '../../lib/platform/windowControls';
 import { swapScreen, type ScreenSwap } from '../../lib/motion';
 
 const MOBILE_DOCK_TABS_KEY = STORAGE_KEYS.MOBILE_DOCK_TABS;

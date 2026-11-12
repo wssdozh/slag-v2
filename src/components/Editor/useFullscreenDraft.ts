@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { storage } from '../../lib/storage';
 import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, ComposerDraft } from '../../types';
-import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/taskUtils';
+import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/tasks/taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 export interface UseFullscreenDraftOptions {

@@ -1,18 +1,18 @@
-import type { SlagItem, FolderMeta, AiSettings } from '../types';
-import { storage } from './storage';
-import { logger } from './logger';
-import { aiClient } from './ai/aiClient';
+import type { SlagItem, FolderMeta, AiSettings } from '../../types';
+import { storage } from '../storage';
+import { logger } from '../logger/logger';
+import { aiClient } from './aiClient';
 import {
   assistantOrchestrator,
   resolveKieEndpoint,
   type SendAssistantChatParams,
   type SendAssistantChatResult,
-} from './ai/orchestrator';
+} from './orchestrator';
 import {
   DEFAULT_INBOX_FOLDER,
   AI_STOP_TAGS,
   AI_CATEGORY_KEYWORDS,
-} from '../config';
+} from '../../config';
 
 export {
   resolveKieEndpoint,

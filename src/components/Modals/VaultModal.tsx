@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
 import { Database, FolderSync, HardDrive, Check, Trash2, Sparkles } from 'lucide-react';
-import { getVaultDisplayName } from '../../lib/vaultDisplay';
+import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
 
 export const VaultModal: React.FC = () => {
   const {

@@ -1,5 +1,5 @@
-import type { LogEntry, LogLevel, LogScope } from '../types';
-import { STORAGE_KEYS, UI_DELAYS } from '../config';
+import type { LogEntry, LogLevel, LogScope } from '../../types';
+import { STORAGE_KEYS, UI_DELAYS } from '../../config';
 import { maskSensitiveString, sanitizeForLog } from './logRedaction';
 
 export type LogListener = (entry: LogEntry) => void;

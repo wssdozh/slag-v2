@@ -5,7 +5,7 @@ import {
   sendCrossWindowTab,
   listenCrossWindowTab,
   type CrossWindowTabMessage,
-} from '../../lib/windowControls';
+} from '../../lib/platform/windowControls';
 import {
   wsLog,
   getPanelMinWidth,

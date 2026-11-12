@@ -1,5 +1,5 @@
 import { isDesktopApp } from './windowControls';
-import { logger } from './logger';
+import { logger } from '../logger/logger';
 
 const fsLog = logger.scope('FS');
 

@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from '../UI/IconButton';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 export interface BaseModalProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 // Where the sync config lives per vault, how requests are authorized, how a seed phrase is stored.
 import { storage } from '../storage';
-import { logger } from '../logger';
+import { logger } from '../logger/logger';
 import { accountClient } from './account';
 import {
   computeSubscription as computeSubscriptionFromAccount,

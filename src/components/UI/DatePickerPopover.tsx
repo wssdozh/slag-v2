@@ -8,7 +8,7 @@ import {
   getNextWeekIso,
 } from '../../lib/time/dateUtils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { usePresence } from '../../hooks/usePresence';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 export interface DatePickerPopoverProps {
   isOpen?: boolean;

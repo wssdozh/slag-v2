@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Check, Lock, Pause, Play, RefreshCw } from 'lucide-react';
 import { UI_DELAYS } from '../../config';
-import { formatBytes } from '../../lib/formatBytes';
+import { formatBytes } from '../../lib/text/formatBytes';
 import { entryStreamSrc, readEntryThumbnail } from '../../lib/media/folderBrowser';
 import { MediaPreview } from './MediaPreview';
 import { useDeviceGallery } from './useDeviceGallery';

@@ -1,4 +1,4 @@
-import type { VaultMeta } from '../types';
+import type { VaultMeta } from '../../types';
 
 export function getVaultDisplayName(vault: VaultMeta, vaults: VaultMeta[]): string {
   const hasDuplicateName = vaults.some(

@@ -5,7 +5,7 @@ import type {
   GetTabContextMenuItemsParams,
 } from 'dockview-react';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { sendCrossWindowTab } from '../../lib/windowControls';
+import { sendCrossWindowTab } from '../../lib/platform/windowControls';
 import {
   WORKSPACE_LAYOUT_KEY,
   wsLog,
