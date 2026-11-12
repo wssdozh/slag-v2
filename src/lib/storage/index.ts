@@ -55,6 +55,8 @@ import {
   readComposerDraft,
   writeComposerDraft,
   eraseComposerDraft,
+  flushDraftWrites,
+  installDraftFlushGuards,
   readFullscreenDraft,
   writeFullscreenDraft,
   eraseFullscreenDraft,
@@ -240,9 +242,18 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     this.currentVault = initCurrentVault(this);
     this.initDefaultsIfNeeded();
     this.initCrossWindowDraftSync();
+    installDraftFlushGuards(this);
     if (isTauri()) {
       void this.files.initTauriFs();
     }
+  }
+
+  /**
+   * Every queued draft write lands now. Draft writes are throttled, so a close, a blur, a
+   * hidden tab or an unmount has to say "this text is about to leave the screen" explicitly.
+   */
+  public flushDrafts(): void {
+    flushDraftWrites(this);
   }
 
   public getDraftChannel(): BroadcastChannel | null {

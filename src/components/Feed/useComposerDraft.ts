@@ -249,6 +249,8 @@ export const useComposerDraft = ({
           updatedAt: Date.now(),
         });
       }
+      // Unmount or a folder switch: the text leaves the screen before the throttle window ends.
+      storage.flushDrafts();
     };
   }, [activeFolder, isModal, isActive]);
 
@@ -310,6 +312,8 @@ export const useComposerDraft = ({
           updatedAt: Date.now(),
         });
       }
+      // `pagehide` follows, but the tab can die between the two; the write must already be on disk.
+      storage.flushDrafts();
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);

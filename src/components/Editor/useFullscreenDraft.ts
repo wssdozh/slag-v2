@@ -206,6 +206,8 @@ export function useFullscreenDraft({
       if (didSaveRef.current) return;
       if (itemIdRef.current.startsWith('draft_')) syncRef.current();
       else flushRef.current();
+      // The editor is gone; anything still queued for the throttled draft write must land now.
+      storage.flushDrafts();
     };
   }, []);
 
@@ -270,6 +272,8 @@ export function useFullscreenDraft({
     } else {
       syncDraftBackToComposer();
     }
+    // Closing is the moment the text stops being visible; a pending write cannot wait out its window.
+    storage.flushDrafts();
     onClose();
   }, [item.id, flushAutosave, syncDraftBackToComposer, onClose]);
 
