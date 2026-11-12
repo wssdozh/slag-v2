@@ -47,6 +47,29 @@
 
 **composer/** — `useComposerFiles` (подбор, drop, paste).
 
+## раскладка по доменам (запрошено отдельно)
+
+плоские модули в `src/lib` и `src/hooks` группируются по смыслу, **без фанатизма**: папка появляется там, где рядом лежит два-три родственника, одиночки остаются плоско.
+
+```
+lib/logger/     logger.ts, logRedaction.ts
+lib/platform/   platform.ts, windowControls.ts, folderOpener.ts, navigation.ts
+lib/text/       chatMarkdown.ts, diffUtils.ts, formatBytes.ts
+lib/tasks/      taskCompletion.ts, taskUtils.ts
+lib/ui/         motion.ts, commands.ts
+lib/vault/      + vaultDisplay.ts
+lib/ai/         + aiService.ts
+lib/media/      + blobToDataUrl.ts (появился после дедупа)
+плоско:         searchService.ts, backupService.ts
+
+hooks/media/    useAttachmentSrc.ts, useAudioAnalyser.ts, useComposerMedia.ts
+hooks/ui/       useLayerStack.ts, usePresence.ts, useGlobalHotkeys.ts
+hooks/items/    useItemActions.ts, useSuggestedActions.ts
+плоско:         useCalendarSchedule.ts
+```
+
+импорты правит `tsc`: любой пропущенный путь — красная сборка, а не тихая ошибка. после переезда `npm run map:code` и обновление дерева в `AGENTS.md` / `docs/project-map/14_Module_Layout.md`.
+
 ## метод
 
 границы методов ищутся **парсером TypeScript** (`ts.createSourceFile` → `node.getStart()/getEnd()`), а не счётчиком скобок: ручной токенизатор обрывался на шаблонных строках и срезал лишнее. это стоило трёх сломанных попыток на одном методе.
