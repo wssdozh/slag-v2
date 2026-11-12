@@ -23,6 +23,7 @@ import { useBackup } from './hooks/useBackup';
 import { useAssistant } from './hooks/useAssistant';
 import { useAppearance } from './hooks/useAppearance';
 import { useItemActions } from './hooks/useItemActions';
+import { useFolderAdmin } from './hooks/useFolderAdmin';
 import { useRecurringRollover } from './hooks/useRecurringRollover';
 import { crossFade } from '../lib/motion';
 import {
@@ -504,49 +505,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     actionHistoryRef,
   });
 
-  const saveFolder = (folder: FolderMeta) => {
-    storage.saveFolder(folder);
-    refreshData();
-    setIsFolderModalOpen(false);
-    setFolderModalParent(null);
-    addToast(`Папка «${folder.name}» сохранена`, 'success');
-  };
-
-  const updateFolderDescription = useCallback((path: string, description: string) => {
-    storage.updateFolderDescription(path, description);
-    refreshData();
-    addToast('Описание папки обновлено', 'success');
-  }, [refreshData, addToast]);
-
-  const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
-    storage.renameFolder(oldPath, updatedFolder);
-    const remap = (value: string | null): string | null =>
-      value && (value === oldPath || value.startsWith(oldPath + '/'))
-        ? updatedFolder.path + value.slice(oldPath.length)
-        : value;
-    if (currentFolder === oldPath || currentFolder.startsWith(oldPath + '/')) {
-      const newCurrent = updatedFolder.path + currentFolder.slice(oldPath.length);
-      setCurrentFolder(newCurrent);
-    }
-    // The profile modal and the phone screen point at the old path; follow the move.
-    setFolderInfoTarget(previous => remap(previous));
-    remapMobileFolder(remap);
-    refreshData();
-    addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
-  }, [currentFolder, refreshData, addToast, setFolderInfoTarget, remapMobileFolder]);
-
-  const deleteFolder = (path: string) => {
-    if (path === DEFAULT_INBOX_FOLDER) {
-      addToast(`Папку «${DEFAULT_INBOX_FOLDER}» нельзя удалить`, 'error');
-      return;
-    }
-    storage.deleteFolder(path);
-    if (currentFolder === path || currentFolder.startsWith(path + '/')) {
-      setCurrentFolder(DEFAULT_INBOX_FOLDER);
-    }
-    refreshData();
-    addToast('Папка удалена, заметки перемещены во Входящие', 'info');
-  };
+  const {
+    saveFolder, updateFolderDescription, renameFolder, deleteFolder,
+    openCreateFolderModal, closeFolderModal,
+  } = useFolderAdmin({
+    currentFolder, setCurrentFolder, setFolderInfoTarget,
+    remapMobileFolder, refreshData, addToast,
+    setIsFolderModalOpen, setFolderModalParent,
+  });
 
   const switchVault = (vaultId: string) => {
     // One cross-fade over the whole swap, so the feed does not blink between vaults.
@@ -629,16 +595,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
     addToast('Созданы стартовые демо-заметки и папки', 'success');
   }, [refreshData, addToast]);
-
-  const openCreateFolderModal = (parentPath?: string) => {
-    setFolderModalParent(parentPath ?? null);
-    setIsFolderModalOpen(true);
-  };
-
-  const closeFolderModal = () => {
-    setIsFolderModalOpen(false);
-    setFolderModalParent(null);
-  };
 
   const openFolderViewModal = useCallback(() => {
     setIsFolderViewModalOpen(true);
