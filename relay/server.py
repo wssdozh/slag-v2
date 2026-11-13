@@ -81,6 +81,12 @@ ASSISTANT_TYPING_INTERVAL_SECONDS = 4
 ASSISTANT_PROBE_TIMEOUT_SECONDS = 0.25
 ASSISTANT_MAX_QUESTION = 1000
 ASSISTANT_MAX_ANSWER = 4000
+# One bubble per question: these are its texts, in the order the person sees them.
+ASSISTANT_STAGE_SEARCHING = "🔎 ищу устройство…"
+ASSISTANT_STAGE_HANDED = "⌛ передал на"
+ASSISTANT_STAGE_THINKING = "✍️ печатает ответ…"
+# How a device names itself in that bubble when the relay knows nothing better.
+ASSISTANT_DEVICE_FALLBACK = "устройство"
 RATE_LIMIT_TG_ASK = 10
 # Delivery telemetry: outcomes and latencies, never the text of a question or an answer.
 DELIVERY_EVENT_KEEP_SECONDS = 7 * 86400
@@ -3010,6 +3016,9 @@ class SlagRelayServer:
             if len(probe["results"]) >= len(probe["sent"]):
                 probe["event"].set()
             return
+        if msg_type == "assistant_stage":
+            await self._handle_assistant_stage(conn, msg)
+            return
         if msg_type == "ack":
             bundle_ids = msg.get("bundleIds") or ([msg.get("bundleId")] if msg.get("bundleId") else [])
             if bundle_ids:
@@ -3311,33 +3320,35 @@ class SlagRelayServer:
         mode = link["mode"] or "minimal"
         route_row = self.notify.get(linked[0]["route_token"])
         route_tag = route_row["vault_tag"] if route_row else ""
+        # The bubble exists before anything is chosen: it is the only message this question will
+        # ever own, and every stage below rewrites its text instead of sending a new one.
+        request_id = self.db.create_assistant_request(vault_id, linked[0]["route_token"], question,
+                                                      mode=mode,
+                                                      question_message_id=question_message_id)
+        reply_params = {"allow_sending_without_reply": True}
+        if question_message_id:
+            reply_params["message_id"] = question_message_id
+        ok, body = await self.bot.call("sendMessage", {
+            "chat_id": chat_id, "text": tg_escape(ASSISTANT_STAGE_SEARCHING),
+            "parse_mode": "HTML", "reply_parameters": reply_params}, timeout=10)
+        if ok:
+            self.db.set_assistant_placeholder(request_id, (body.get("result") or {}).get("message_id"))
         # One device answers, chosen before the question is asked: a fan-out spends a model call
         # per device and hands the chat whichever answer happened to be faster to produce.
         candidates = self._live_sockets_for_vault(vault_id)
         chosen = await self._pick_device(candidates)
         if chosen is None:
-            # Waiting the full TTL for a device that is not there is the worst thing this bot did.
             self.db.log_delivery_event("assistant.question", "no_device", route_tag=route_tag,
                                        device_count=len(candidates))
-            if mode == "minimal":
-                await self._bot_reply(chat_id, self._armed_digest(vault_id))
-            else:
-                await self._bot_reply(chat_id, "ни одно устройство не в сети — прочитать хранилище некому. "
-                                               "открой приложение и спроси ещё раз.")
+            await self._edit_assistant_progress(
+                request_id,
+                self._armed_digest(vault_id) if mode == "minimal"
+                else "ни одно устройство не в сети — прочитать хранилище некому. открой приложение и спроси ещё раз.")
+            # Only after the bubble is rewritten: a finished request is not editable any more.
+            self.db.finish_assistant_request(request_id)
             return
-        request_id = self.db.create_assistant_request(vault_id, linked[0]["route_token"], question,
-                                                      mode=mode,
-                                                      question_message_id=question_message_id)
-        # The bubble exists before the question leaves: the answer may land while this coroutine
-        # is still awaiting the fan-out, and it can only edit a message it already knows.
-        reply_params = {"allow_sending_without_reply": True}
-        if question_message_id:
-            reply_params["message_id"] = question_message_id
-        ok, body = await self.bot.call("sendMessage", {
-            "chat_id": chat_id, "text": tg_escape("⌛ передал на устройство"),
-            "parse_mode": "HTML", "reply_parameters": reply_params}, timeout=10)
-        if ok:
-            self.db.set_assistant_placeholder(request_id, (body.get("result") or {}).get("message_id"))
+        await self._edit_assistant_progress(
+            request_id, f"{ASSISTANT_STAGE_HANDED} {self._device_label(chosen.device_id)}")
         message = json.dumps({"type": "assistant_question", "id": request_id, "question": question,
                               "mode": mode})
         await chosen.send_text(message)
@@ -3350,6 +3361,33 @@ class SlagRelayServer:
         task = self.typing_tasks.pop(request_id, None)
         if task is not None:
             task.cancel()
+
+    def _device_label(self, device_id: str) -> str:
+        """How the person named this device in settings, quoted; a nameless one stays generic."""
+        row = self.db.conn.execute("SELECT name FROM devices WHERE id = ?", (device_id,)).fetchone()
+        name = (row["name"] or "").strip() if row else ""
+        return f"«{name}»" if name else ASSISTANT_DEVICE_FALLBACK
+
+    async def _edit_assistant_progress(self, request_id: str, text: str) -> None:
+        """Rewrites the one bubble this question owns, and only while it is still unanswered."""
+        request = self.db.get_assistant_request(request_id)
+        if not request or request["answered_at"] is not None:
+            return
+        message_id = request["placeholder_message_id"]
+        route = self.notify.get(request["route_token"])
+        if not message_id or not route:
+            return
+        await self._edit_telegram(route["chat_id"], int(message_id), tg_escape(text), text, timeout=10)
+
+    async def _handle_assistant_stage(self, conn: WebSocketConnection, msg: dict) -> None:
+        """A device started working on a question: the person sees it on the same bubble."""
+        request_id = msg.get("id")
+        if not isinstance(request_id, str) or msg.get("stage") != "thinking":
+            return
+        request = self.db.get_assistant_request(request_id)
+        if not request or request["vault_id"] != conn.vault_id or request["answered_at"] is not None:
+            return
+        await self._edit_assistant_progress(request_id, ASSISTANT_STAGE_THINKING)
 
     async def _answer_assistant(self, vault_id: str, request_id: str, answer: str) -> dict:
         request = self.db.get_assistant_request(request_id)

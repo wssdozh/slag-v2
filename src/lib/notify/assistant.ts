@@ -77,13 +77,17 @@ export async function answerAssistantQuestion(
   vaultId: string,
   requestId: string,
   question: string,
-  mode: AssistantMode
+  mode: AssistantMode,
+  reportStage: (stage: 'thinking') => void = () => {}
 ): Promise<void> {
   const items = storage.getItems();
   let answer = '';
   try {
     const settings = loadAiSettings();
     if (isChatConfigured(settings)) {
+      // The relay keeps one bubble for the whole exchange: this is the moment it stops saying
+      // "handed to a device" and starts saying "writing".
+      reportStage('thinking');
       const result = await assistantOrchestrator.runChat({
         messages: [{ role: 'user', content: question.trim() || 'что по задачам?' }],
         // The whole vault, not a folder: the bot has no idea which folder the person meant.

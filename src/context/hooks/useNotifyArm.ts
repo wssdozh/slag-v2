@@ -44,12 +44,19 @@ export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
   // relay what is still waiting — one question must not die to a dropped connection.
   useEffect(() => {
     const handled = new Set<string>();
-    const answer = (requestId: string, question: string, mode: AssistantMode): void => {
+    const answer = (
+      requestId: string,
+      question: string,
+      mode: AssistantMode,
+      // Absent on the catch-up path: that question came over HTTP, not over the socket that
+      // could report a stage back to the relay.
+      reportStage: (stage: 'thinking') => void = () => {},
+    ): void => {
       if (handled.has(requestId)) return;
       handled.add(requestId);
       const id = syncVaultId();
       if (!id) return;
-      void answerAssistantQuestion(id, requestId, question, mode);
+      void answerAssistantQuestion(id, requestId, question, mode, reportStage);
     };
     syncEngine.setAssistantHandler(answer);
     // The relay elects one device per question; this is the half of the answer only the app knows.

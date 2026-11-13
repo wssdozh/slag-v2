@@ -14,8 +14,14 @@ export interface TransportCallbacks {
   onPing?: (pingMs: number) => void;
   onServerAck?: (bundleId: string) => void;
   onBundle: (bundlePayload: unknown) => Promise<void> | void;
-  /** The bot got a question: answer it from this device, or nobody will. */
-  onAssistantQuestion?: (requestId: string, question: string, mode: AssistantMode) => Promise<void> | void;
+  /** The bot got a question: answer it from this device, or nobody will. The reporter lets the
+   * relay rewrite the status bubble when the model actually starts working. */
+  onAssistantQuestion?: (
+    requestId: string,
+    question: string,
+    mode: AssistantMode,
+    reportStage: (stage: 'thinking') => void
+  ) => Promise<void> | void;
   onCatchUpPull?: () => void;
   onAuthRejected?: () => void;
 }
@@ -198,7 +204,9 @@ export class SyncTransport {
         await this.callbacks.onAssistantQuestion?.(
           msg.id,
           typeof msg.question === 'string' ? msg.question : '',
-          msg.mode === 'risky' ? 'risky' : 'minimal'
+          msg.mode === 'risky' ? 'risky' : 'minimal',
+          // One bubble for the whole exchange: the relay only changes its text.
+          (stage) => this.send(JSON.stringify({ type: 'assistant_stage', id: msg.id, stage })),
         );
       } else if (msg.type === 'error') {
         syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);

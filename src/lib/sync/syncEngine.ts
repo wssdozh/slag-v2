@@ -117,10 +117,20 @@ export class SyncEngine {
    * Answers a question the bot forwarded; registered by the app, absent in the node build.
    * The question itself is passed through because only the app can hand it to a model.
    */
-  private assistantHandler: ((requestId: string, question: string, mode: AssistantMode) => void) | null = null;
+  private assistantHandler: ((
+    requestId: string,
+    question: string,
+    mode: AssistantMode,
+    reportStage: (stage: 'thinking') => void
+  ) => void) | null = null;
 
   public setAssistantHandler(
-    handler: ((requestId: string, question: string, mode: AssistantMode) => void) | null
+    handler: ((
+      requestId: string,
+      question: string,
+      mode: AssistantMode,
+      reportStage: (stage: 'thinking') => void
+    ) => void) | null
   ): void {
     this.assistantHandler = handler;
   }
@@ -193,8 +203,8 @@ export class SyncEngine {
       },
       // The relay forwards the bot's question; whoever registered a handler answers it.
       // Wired from the app, not imported here: the headless node build has no notifier.
-      onAssistantQuestion: (requestId, question, mode) => {
-        this.assistantHandler?.(requestId, question, mode);
+      onAssistantQuestion: (requestId, question, mode, reportStage) => {
+        this.assistantHandler?.(requestId, question, mode, reportStage);
       },
       onCatchUpPull: () => {
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));

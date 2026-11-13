@@ -381,9 +381,9 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertIn("включить", self.bot.sent[-1][1])
         self.db.set_assistant_link("tok-a", "vault-1", True)
         await self.server._bot_question("chat-a", "что по задачам?")
-        # No device is on the line: the relay answers from the reminders it already holds and
-        # does not leave a request waiting for nobody.
-        self.assertIn("не в сети", self.bot.sent[-1][1])
+        # No device is on the line: the bubble that asked for one is rewritten with that answer,
+        # and no request is left waiting for nobody.
+        self.assertIn("не в сети", self.bot.edits[-1][2])
         self.assertEqual(self.db.pending_assistant_requests("vault-1", time.time()), [])
 
     async def test_answer_reaches_the_chat_exactly_once(self):
@@ -410,7 +410,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         device = FakeDevice("dev-1", "vault-1", server=self.server)
         self.server.rooms["room-1"] = {device}
         await self.server._bot_question("chat-a", "что по задачам?", 501)
-        self.assertIn("передал", self.bot.sent[-1][1])
+        self.assertIn("ищу устройство", self.bot.sent[-1][1])
+        self.assertIn("передал", self.bot.edits[-1][2])
         self.assertEqual(len(device.questions()), 1)
         request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
         self.assertEqual(request["mode"], "minimal")
@@ -420,6 +421,27 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         await self.server._answer_assistant("vault-1", request["id"], "на связи")
         self.assertEqual(self.bot.edits[-1][1], request["placeholder_message_id"])
         self.assertEqual(len(self.bot.sent), sends_before)
+
+    async def test_device_reports_when_the_model_starts_and_the_bubble_says_so(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        device = FakeDevice("dev-1", "vault-1", server=self.server)
+        self.server.rooms["room-1"] = {device}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        await self.server._handle_assistant_stage(device, {"id": request["id"], "stage": "thinking"})
+        self.assertIn("печатает", self.bot.edits[-1][2])
+        # The same bubble, from the first status to the answer: one message, no second one.
+        self.assertEqual(self.bot.edits[-1][1], request["placeholder_message_id"])
+        await self.server._answer_assistant("vault-1", request["id"], "ответ")
+        edits_before = len(self.bot.edits)
+        # A late stage from a slow device must not overwrite an answer already delivered.
+        await self.server._handle_assistant_stage(device, {"id": request["id"], "stage": "thinking"})
+        self.assertEqual(len(self.bot.edits), edits_before)
+        # And a device from another vault cannot rewrite somebody else's bubble either.
+        stranger = FakeDevice("dev-2", "vault-2", server=self.server)
+        await self.server._handle_assistant_stage(stranger, {"id": request["id"], "stage": "thinking"})
+        self.assertEqual(len(self.bot.edits), edits_before)
 
     async def test_probe_gives_the_question_to_the_fastest_device(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
@@ -477,7 +499,7 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.server.rooms["room-1"] = {asleep_a, asleep_b}
         await self.server._bot_question("chat-a", "что по задачам?")
         self.assertEqual(self.db.pending_assistant_requests("vault-1", time.time()), [])
-        self.assertIn("не в сети", self.bot.sent[-1][1])
+        self.assertIn("не в сети", self.bot.edits[-1][2])
 
     async def test_question_falls_back_to_a_fresh_message_when_the_placeholder_dies(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
