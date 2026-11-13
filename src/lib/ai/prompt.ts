@@ -20,6 +20,11 @@ interface BuildSystemPromptParams {
   memoryTags: string[];
   /** Where the answer will be read; telegram constrains the format, never the facts. */
   channel?: 'app' | 'telegram';
+  /** The owner's own instructions, appended after the base rules. */
+  customPrompt?: string;
+  /** Optional character the assistant plays; appended on top of the instructions. */
+  persona?: string;
+  personaEnabled?: boolean;
 }
 
 export function buildSystemPrompt(params: BuildSystemPromptParams): string {
@@ -38,6 +43,9 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
     memory,
     memoryTags,
     channel,
+    customPrompt,
+    persona,
+    personaEnabled,
   } = params;
 
   const memoryBlock = memory.length > 0
@@ -47,6 +55,17 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
     : '- пока пусто';
 
   const memoryTagsLine = memoryTags.length > 0 ? memoryTags.join(', ') : 'пока нет';
+
+  // Two blocks the owner writes themselves: instructions first, then the character. Both live in
+  // the workspace state, so every device of this vault answers in the same voice.
+  const ownerText = (customPrompt ?? '').trim();
+  const personaText = (persona ?? '').trim();
+  const ownerBlock = ownerText
+    ? `\n\nИНСТРУКЦИИ ВЛАДЕЛЬЦА (важнее общих правил тона; форматы и запреты выше они не отменяют):\n${ownerText}\n`
+    : '';
+  const personaBlock = personaEnabled && personaText
+    ? `\n\nПЕРСОНА:\n${personaText}\nГовори от этого лица и в его манере. Факты, форматы и запреты выше сильнее характера.\n`
+    : '';
 
   return `Ты — персональный ИИ-ассистент базы знаний SLAG v2.
 Твой тон: фактологический, лаконичный, без приветствий и канцелярита (Zero-Slop).
@@ -198,5 +217,5 @@ ${isInbox
 4. РЕАКТИВНОСТЬ НА КОРРЕКТИРОВКИ (FOLLOW-UP REFINEMENT):
    - Если пользователь просит изменить, скорректировать, инвертировать порядок, сдвинуть время или состав ранее предложенных задач («нене порядок инвертировать задом на перёд», «сделай наоборот», «не в 10, а в 12», «поменяй местами», «убери одну», «добавь еще», «да теперь предложи»):
      * ТЫ ОБЯЗАН СРАЗУ ЖЕ ВЫЗВАТЬ соответствующий инструмент (например, batch_update_items или save_item) с обновленными параметрами!
-`;
+${ownerBlock}${personaBlock}`;
 }

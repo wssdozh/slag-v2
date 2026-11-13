@@ -82,6 +82,7 @@ export class AssistantOrchestrator {
     memoryService.touch(memory.map((item) => item.id));
     const memoryTags = memoryService.tagsForPrompt();
 
+    const workspace = storage.getWorkspaceState();
     const systemPrompt = buildSystemPrompt({
       todayStr,
       tomorrowStr,
@@ -97,6 +98,11 @@ export class AssistantOrchestrator {
       memory,
       memoryTags,
       channel,
+      // Written by the owner in settings and carried in the vault, so the assistant keeps one
+      // voice across devices and the telegram bot answers like the app does.
+      customPrompt: workspace.aiPrompt,
+      persona: workspace.aiPersona,
+      personaEnabled: workspace.aiPersonaEnabled,
     });
     // Protocol Adapter & Endpoint Resolution
     const target = resolveAiTarget(settings);

@@ -441,6 +441,13 @@ export interface WorkspaceState {
   profile?: ProfileInfo;
   notifyRoutes?: NotifyRoute[];
   notifyPrefs?: NotifyPrefs;
+  /**
+   * The assistant's own instructions, written by the owner and synced with the vault: the same
+   * answer on every device instead of one voice per install. `aiPersona` is appended on top.
+   */
+  aiPrompt?: string;
+  aiPersona?: string;
+  aiPersonaEnabled?: boolean;
 }
 
 export interface BackupSnapshotMeta {
