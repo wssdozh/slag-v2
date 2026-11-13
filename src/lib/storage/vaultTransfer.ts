@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   ComposerDraft,
   FolderMeta,
+  MemoryItem,
   SlagItem,
   VaultMeta,
   WorkspaceState,
@@ -23,6 +24,7 @@ export interface VaultSnapshot {
   folders: FolderMeta[];
   items: SlagItem[];
   assistantHistory: ChatMessage[];
+  memory: MemoryItem[];
   workspaceState: WorkspaceState;
   composerDrafts: Record<string, ComposerDraft>;
 }
@@ -34,6 +36,7 @@ export function buildVaultExportJson(snapshot: VaultSnapshot): string {
       folders: snapshot.folders,
       items: snapshot.items,
       assistantHistory: snapshot.assistantHistory,
+      memory: snapshot.memory,
       workspaceState: snapshot.workspaceState,
       composerDrafts: snapshot.composerDrafts,
       exportedAt: new Date().toISOString(),
@@ -50,6 +53,7 @@ export interface VaultImportIo {
   draftsKey(): string;
   cacheItems(key: string, items: SlagItem[]): void;
   saveAssistantHistory(messages: ChatMessage[]): void;
+  saveMemory(items: MemoryItem[]): void;
   saveWorkspaceState(state: Partial<WorkspaceState>, origin: 'local' | 'remote'): void;
 }
 
@@ -57,6 +61,7 @@ export interface VaultImportPayload {
   folders?: FolderMeta[];
   items?: SlagItem[];
   assistantHistory?: ChatMessage[];
+  memory?: MemoryItem[];
   workspaceState?: WorkspaceState;
   composerDrafts?: Record<string, ComposerDraft>;
 }
@@ -71,6 +76,9 @@ export function importVaultPayload(data: VaultImportPayload, io: VaultImportIo):
     }
     if (Array.isArray(data.assistantHistory)) {
       io.saveAssistantHistory(data.assistantHistory);
+    }
+    if (Array.isArray(data.memory)) {
+      io.saveMemory(data.memory);
     }
     if (data.workspaceState && typeof data.workspaceState === 'object') {
       io.saveWorkspaceState(data.workspaceState, 'remote');

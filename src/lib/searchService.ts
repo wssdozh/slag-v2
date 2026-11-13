@@ -71,7 +71,8 @@ function filterByType(items: SlagItem[], typeFilter?: string): SlagItem[] {
 // («прафилам») is then two edits away from every form the note actually holds, so
 // tolerance 1 can never bridge it. Trimming the inflectional tail puts the comparison back
 // on the stem — «прафил» vs «правил» is one edit — which is the pass that finds the note.
-const RU_ENDINGS = [
+// The assistant's memory reuses this list: one ending table, two consumers.
+export const RU_ENDINGS = [
   'ами', 'ями', 'ыми', 'ими', 'ого', 'его', 'ому', 'ему',
   'ах', 'ях', 'ам', 'ям', 'ов', 'ев', 'ей', 'ой', 'ий', 'ый',
   'ая', 'яя', 'ое', 'ее', 'ые', 'ие', 'ом', 'ем', 'ую', 'юю',
@@ -93,7 +94,7 @@ function stemToken(token: string): string | null {
 // while «как» matched exactly one unrelated note and scored a full 1/1 — enough to outrank
 // the note the rare token actually pointed at. Filler never carries the intent, so it is
 // dropped before either pass.
-const RU_STOPWORDS = new Set([
+export const RU_STOPWORDS = new Set([
   'а', 'без', 'более', 'больше', 'бы', 'был', 'была', 'были', 'было', 'быть',
   'в', 'вам', 'вас', 'ведь', 'весь', 'во', 'вот', 'все', 'всё', 'всего', 'всегда',
   'всю', 'вы', 'где', 'да', 'даже', 'для', 'до', 'его', 'ее', 'её', 'ей', 'ему',

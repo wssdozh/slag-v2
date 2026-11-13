@@ -5,8 +5,8 @@ import { touchDeviceLastSeen } from './devices';
 import { loadSentHashes, loadTombstones, saveSentHashes, tombstonesKey } from './localBookkeeping';
 import { attachmentSignature } from './attachmentSignature';
 import { logger } from '../logger/logger';
-import { storage } from '../storage';
-import type { ComposerDraft, FolderMeta, FullscreenDraft, SlagAttachment, SlagItem, WorkspaceState } from '../../types';
+import { vault } from '../storage/port';
+import type { ComposerDraft, FolderMeta, FullscreenDraft, MemoryItem, SlagAttachment, SlagItem, WorkspaceState } from '../../types';
 import { DEFAULT_INBOX_FOLDER, SYNC_STORAGE_KEYS } from '../../config';
 
 const syncLog = logger.scope('SYNC');
@@ -105,10 +105,11 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       let hasFoldersChanged = false;
       let hasWorkspaceChanged = false;
       let hasDraftsChanged = false;
+      let hasMemoryChanged = false;
       let workspaceState: WorkspaceState | undefined;
 
-      const currentItems: SlagItem[] = engine.importBuffer ? [...engine.importBuffer.items] : [...storage.getItems()];
-      const currentFolders: FolderMeta[] = engine.importBuffer ? [...engine.importBuffer.folders] : [...storage.getFolders()];
+      const currentItems: SlagItem[] = engine.importBuffer ? [...engine.importBuffer.items] : [...vault().getItems()];
+      const currentFolders: FolderMeta[] = engine.importBuffer ? [...engine.importBuffer.folders] : [...vault().getFolders()];
       const tombstones = loadTombstones(engine.bookkeeping);
       let tombstonesDirty = false;
 
@@ -218,7 +219,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             syncLog.info(
               `Received attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB, ${attachment.mimeType}) from ${bundle.fromDeviceId}`
             );
-            await storage.importSyncedAttachment(attachment, payload.dataUrl);
+            await vault().importSyncedAttachment(attachment, payload.dataUrl);
             // This device now holds the same bytes. Without the mark it would send them right
             // back to the device it just got them from: a five-megabyte ping-pong, both ways.
             const sentHashes = loadSentHashes(engine.bookkeeping);
@@ -233,6 +234,36 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         } else if (ch.type === 'workspace' && ch.payload) {
           workspaceState = ch.payload as WorkspaceState;
           hasWorkspaceChanged = true;
+        } else if (ch.type === 'memory') {
+          if (ch.action === 'upsert' && ch.payload) {
+            const incoming = ch.payload as MemoryItem;
+            if (incoming.id) {
+              const current = vault().getMemory();
+              const existing = current.find((fact) => fact.id === incoming.id);
+              // Wall-clock LWW, like a note, plus one extra rule: a fact this device already
+              // forgot must not come back on a stale copy, so its tombstone outranks it.
+              const staleAgainstTombstone =
+                existing?.deletedAt !== undefined && (incoming.updatedAt ?? 0) <= existing.deletedAt;
+              if (!staleAgainstTombstone && (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0))) {
+                const next = existing
+                  ? current.map((fact) => (fact.id === incoming.id ? incoming : fact))
+                  : [...current, incoming];
+                vault().saveMemory(next, 'remote');
+                hasMemoryChanged = true;
+              }
+            }
+          } else if (ch.action === 'delete') {
+            const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
+            const current = vault().getMemory();
+            const existing = current.find((fact) => fact.id === ch.id);
+            if (existing && (existing.deletedAt ?? 0) < deletedAt) {
+              vault().saveMemory(
+                current.map((fact) => (fact.id === ch.id ? { ...fact, deletedAt } : fact)),
+                'remote'
+              );
+              hasMemoryChanged = true;
+            }
+          }
         } else if (ch.type === 'draft') {
           const draftTombKey = `${SYNC_STORAGE_KEYS.DRAFT_TOMB_PREFIX}${engine.currentVaultId}_${ch.id}`;
           const lastDeletedAt = Number(localStorage.getItem(draftTombKey) || 0);
@@ -245,16 +276,16 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
                 syncLog.info(`Ignored stale composer draft for "${folder}" (updatedAt <= deletedAt)`);
                 continue;
               }
-              const existing = storage.getComposerDraft(folder);
+              const existing = vault().getComposerDraft(folder);
               if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
-                storage.saveComposerDraft(folder, incoming, 'remote');
+                vault().saveComposerDraft(folder, incoming, 'remote');
                 hasDraftsChanged = true;
                 syncLog.info(`Applied remote composer draft for folder "${folder}" (${incoming.content.length} chars)`);
               }
             } else if (ch.action === 'delete') {
               const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
               localStorage.setItem(draftTombKey, String(deletedAt));
-              storage.deleteComposerDraft(folder, 'remote');
+              vault().deleteComposerDraft(folder, 'remote');
               hasDraftsChanged = true;
               syncLog.info(`Deleted remote composer draft for folder "${folder}"`);
             }
@@ -266,16 +297,16 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
                 syncLog.info(`Ignored stale fullscreen draft for "${itemId}" (updatedAt <= deletedAt)`);
                 continue;
               }
-              const existing = storage.getFullscreenDraft(itemId);
+              const existing = vault().getFullscreenDraft(itemId);
               if (!existing || (incoming.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
-                storage.saveFullscreenDraft(itemId, incoming, 'remote');
+                vault().saveFullscreenDraft(itemId, incoming, 'remote');
                 hasDraftsChanged = true;
                 syncLog.info(`Applied remote fullscreen draft for item "${itemId}" ("${incoming.title}")`);
               }
             } else if (ch.action === 'delete') {
               const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
               localStorage.setItem(draftTombKey, String(deletedAt));
-              storage.clearFullscreenDraft(itemId, 'remote');
+              vault().clearFullscreenDraft(itemId, 'remote');
               hasDraftsChanged = true;
               syncLog.info(`Cleared remote fullscreen draft for item "${itemId}"`);
             }
@@ -287,7 +318,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         localStorage.setItem(tombstonesKey(engine.bookkeeping), JSON.stringify(tombstones));
       }
 
-      const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged;
+      const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged || hasMemoryChanged;
       if (generation !== engine.initGeneration) return;
 
       engine.appliedBundleIds.add(bundle.bundleId);
@@ -300,6 +331,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
           folders: hasFoldersChanged,
           workspace: hasWorkspaceChanged,
           drafts: hasDraftsChanged,
+          memory: hasMemoryChanged,
         }, bundle.bundleId);
       } else {
         // Nothing to persist: no write exists for the ACK to outrun.

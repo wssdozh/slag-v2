@@ -4,6 +4,7 @@ import type {
   ComposerDraft,
   FolderViewSettings,
   FullscreenDraft,
+  MemoryItem,
   VaultMeta,
   WorkspaceState,
 } from '../../types';
@@ -88,6 +89,10 @@ export function workspaceStateStorageKey(store: SettingsStoreHost): string {
 
 function assistantStorageKey(store: SettingsStoreHost): string {
   return `${STORAGE_KEYS.ASSISTANT_PREFIX}${store.currentVault.id}`;
+}
+
+function memoryStorageKey(store: SettingsStoreHost): string {
+  return `${STORAGE_KEYS.MEMORY_PREFIX}${store.currentVault.id}`;
 }
 
 function readComposerDraftsAt(key: string): Record<string, ComposerDraft> {
@@ -391,6 +396,30 @@ export function writeAssistantHistory(store: SettingsStoreHost, messages: ChatMe
 export function eraseAssistantHistory(store: SettingsStoreHost): void {
   localStorage.removeItem(assistantStorageKey(store));
   fsLog.info('Cleared assistant chat history');
+}
+
+// Assistant memory: the facts the model wrote about this person, per vault
+export function readMemory(store: SettingsStoreHost): MemoryItem[] {
+  const raw = localStorage.getItem(memoryStorageKey(store));
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as MemoryItem[]) : [];
+  } catch (err) {
+    fsLog.warn('Failed to read assistant memory from localStorage', { err });
+    return [];
+  }
+}
+
+/** A quota miss is a warning and a false: memory that does not fit must not take the app down. */
+export function writeMemory(store: SettingsStoreHost, items: MemoryItem[]): boolean {
+  try {
+    localStorage.setItem(memoryStorageKey(store), JSON.stringify(items));
+    return true;
+  } catch (err) {
+    fsLog.error('Failed to save assistant memory to localStorage', { count: items.length, err });
+    return false;
+  }
 }
 
 // Workspace State

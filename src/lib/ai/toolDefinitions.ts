@@ -2,6 +2,7 @@
 import type { AssistantToolDefinition } from './types';
 import { APP_GUIDE_TOPICS } from './appGuide';
 import { ITEM_UPDATES_SCHEMA } from '../vault/itemSchema';
+import { MEMORY_KINDS } from '../memory';
 
 export function getCanonicalTools(webSearchEnabled: boolean): AssistantToolDefinition[] {
   const canonicalTools: AssistantToolDefinition[] = [
@@ -131,6 +132,34 @@ export function getCanonicalTools(webSearchEnabled: boolean): AssistantToolDefin
         itemIds: { type: 'array', items: { type: 'string' }, description: 'ID заметок для фильтра' },
         queryLabel: { type: 'string', description: 'Текстовая метка фильтра (например "Просроченные задачи" или "Чай")' },
       },
+    },
+  },
+  {
+    name: 'memory',
+    description: 'Собственная память ассистента о человеке: запомнить устойчивый факт о нём, забыть его или вспомнить, что уже известно. Не для содержимого заметок и не для задач — те живут в хранилище.',
+    parameters: {
+      type: 'object',
+      properties: {
+        op: {
+          type: 'string',
+          enum: ['remember', 'forget', 'recall'],
+          description: 'remember — записать факт, forget — удалить, recall — найти по слову, типу или теме.',
+        },
+        text: {
+          type: 'string',
+          description: 'Одна короткая фраза от третьего лица, до 200 символов: «не любит созвоны до полудня». Для forget можно передать текст вместо id.',
+        },
+        id: { type: 'string', description: 'ID записи из блока памяти (для forget).' },
+        kind: {
+          type: 'string',
+          enum: MEMORY_KINDS as unknown as string[],
+          description: 'rule — как с ним работать, pref — что любит и не любит, fact — устойчивая правда о нём, event — что было, note — остальное.',
+        },
+        tag: { type: 'string', description: 'Тема одним словом из словаря хранилища (например «работа»).' },
+        importance: { type: 'number', description: 'Насколько это важно для него, 1–5. Не ставь 5 ради вежливости.' },
+        replaces: { type: 'string', description: 'ID факта из блока памяти, который это утверждение отменяет (он перестал быть правдой).' },
+      },
+      required: ['op'],
     },
   },
   {

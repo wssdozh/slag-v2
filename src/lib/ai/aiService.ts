@@ -11,9 +11,9 @@ import {
 } from './orchestrator';
 import {
   DEFAULT_INBOX_FOLDER,
-  AI_STOP_TAGS,
   AI_CATEGORY_KEYWORDS,
 } from '../../config';
+import { formatTag, isStopTag } from './tags';
 
 export {
   resolveKieEndpoint,
@@ -44,21 +44,6 @@ export type TriageProgressCallback = (
   chunkSuggestions: TriageSuggestion[],
   progress: TriageProgress
 ) => void;
-
-const STOP_TAGS = AI_STOP_TAGS;
-
-function isStopTag(tag: string): boolean {
-  const normalized = tag.toLowerCase().replace(/^#/, '').trim();
-  return STOP_TAGS.has(normalized);
-}
-
-function formatTag(tag: string, style: 'lowercase' | 'kebab-case'): string {
-  let clean = tag.toLowerCase().replace(/^#/, '').trim();
-  if (style === 'kebab-case') {
-    clean = clean.replace(/\s+/g, '-');
-  }
-  return clean;
-}
 
 function extractExplicitHashtags(content: string, style: 'lowercase' | 'kebab-case'): string[] {
   const inlineHashtagRegex = /#([\p{L}\p{N}_-]+)/gu;

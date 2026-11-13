@@ -1,5 +1,5 @@
 // Owns sync: config, push of local changes, apply of incoming bundles, status reporting.
-import { storage } from '../storage';
+import { vault } from '../storage/port';
 import { persistIncomingBundle } from './applyBundle';
 import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
@@ -12,7 +12,6 @@ import {
   tombstonesKey,
   type SyncScope,
 } from './localBookkeeping';
-export { storage };
 import { logger } from '../logger/logger';
 import { accountClient } from './account';
 export { accountClient };
@@ -104,7 +103,7 @@ export class SyncEngine {
     items: SlagItem[];
     folders: FolderMeta[];
     workspace?: WorkspaceState;
-    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean };
+    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean; memory: boolean };
     /** Bundles in this burst. They are ACKed only once the write below lands. */
     bundles: string[];
   } | null = null;
@@ -157,10 +156,7 @@ export class SyncEngine {
         this.disconnect();
       },
     });
-    this.currentVaultId =
-      (typeof storage !== 'undefined' && storage.getCurrentVault
-        ? storage.getCurrentVault()?.id
-        : 'default_vault') || 'default_vault';
+    this.currentVaultId = vault().getCurrentVault()?.id || 'default_vault';
     this.status = {
       initialSync: {
         vaultId: this.currentVaultId,
@@ -196,24 +192,22 @@ export class SyncEngine {
       applyAccountDevices(this, accountState);
     });
 
-    if (typeof storage !== 'undefined' && typeof storage.subscribeChanges === 'function') {
-      storage.subscribeChanges((event) => {
-        // Remote-origin writes are already applied state; echoing them re-queues a push and
-        // two devices ping-pong the same bundle forever.
-        if (event.origin === 'remote') return;
-        const op = createSyncOpFromStorageEvent(event);
-        if (op) {
-          syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
-          this.getOutbox().enqueue(op);
-          // A draft changes on every keystroke; only notes/folders/workspace drive the fast path.
-          const isDraft = op.kind === 'draft';
-          this.scheduleDebouncedPush(
-            isDraft ? SYNC_INTERVALS.DRAFT_PUSH_DEBOUNCE_MS : SYNC_INTERVALS.PUSH_DEBOUNCE_MS,
-            isDraft
-          );
-        }
-      });
-    }
+    vault().subscribeChanges((event) => {
+      // Remote-origin writes are already applied state; echoing them re-queues a push and
+      // two devices ping-pong the same bundle forever.
+      if (event.origin === 'remote') return;
+      const op = createSyncOpFromStorageEvent(event);
+      if (op) {
+        syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
+        this.getOutbox().enqueue(op);
+        // A draft changes on every keystroke; only notes/folders/workspace drive the fast path.
+        const isDraft = op.kind === 'draft';
+        this.scheduleDebouncedPush(
+          isDraft ? SYNC_INTERVALS.DRAFT_PUSH_DEBOUNCE_MS : SYNC_INTERVALS.PUSH_DEBOUNCE_MS,
+          isDraft
+        );
+      }
+    });
   }
 
   public getConfig(): SyncConfig {
@@ -288,7 +282,7 @@ export class SyncEngine {
   private countPendingAttachments(): number {
     const sent = loadSentHashes(this.bookkeeping);
     let pending = 0;
-    for (const item of storage.getItems()) {
+    for (const item of vault().getItems()) {
       for (const att of item.attachments ?? []) {
         if (this.unreadableAttachments.has(att.id)) continue;
         const seen = sent[`att:${att.id}`];
@@ -316,7 +310,7 @@ export class SyncEngine {
       }
 
       syncLog.debug(`Reading attachment bytes: "${att.name}" (${Math.round(att.size / 1024)} KB, ${att.mimeType})`);
-      const dataUrl = await storage.getAttachmentDataUrl(att);
+      const dataUrl = await vault().getAttachmentDataUrl(att);
       if (!dataUrl) {
         // Bytes can appear later (a download, a re-import), so this rests for the session only.
         this.unreadableAttachments.add(att.id);
@@ -359,7 +353,7 @@ export class SyncEngine {
     items: SlagItem[],
     folders: FolderMeta[],
     workspace: WorkspaceState | undefined,
-    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean },
+    detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean; memory: boolean },
     bundleId: string
   ): void {
     const previous = this.importBuffer?.detail;
@@ -374,6 +368,7 @@ export class SyncEngine {
         folders: detail.folders || Boolean(previous?.folders),
         workspace: detail.workspace || Boolean(previous?.workspace),
         drafts: detail.drafts || Boolean(previous?.drafts),
+        memory: detail.memory || Boolean(previous?.memory),
       },
       bundles,
     };
@@ -394,7 +389,7 @@ export class SyncEngine {
     this.importBuffer = null;
     const generation = this.initGeneration;
     try {
-      await storage.importSyncedVaultData(buffered);
+      await vault().importSyncedVaultData(buffered);
     } catch (error) {
       // Nothing reached the disk, so the relay must not be told this burst is done: dropping
       // the ids makes a re-delivery apply again instead of being skipped as "already applied".
@@ -418,6 +413,7 @@ export class SyncEngine {
           hasFoldersChanged: buffered.detail.folders,
           hasWorkspaceChanged: buffered.detail.workspace,
           hasDraftsChanged: buffered.detail.drafts,
+          hasMemoryChanged: buffered.detail.memory,
         },
       })
     );
@@ -447,7 +443,7 @@ export class SyncEngine {
   }
 
   public getSyncVaultId(): string {
-    return storage.ensureVaultSyncId(this.currentVaultId);
+    return vault().ensureVaultSyncId(this.currentVaultId);
   }
 
   public usesAccountSync(): boolean {
@@ -507,6 +503,13 @@ export class SyncEngine {
       this.notify();
       return;
     }
+    if (!seedPhrase) {
+      this.status.state = 'idle';
+      this.status.error = 'Ключ хранилища недоступен. Восстановите seed-фразу на этом устройстве.';
+      if (initial) this.status.initialSync.state = 'error';
+      this.notify();
+      return;
+    }
 
     try {
       this.status.state = 'syncing';
@@ -555,7 +558,7 @@ export class SyncEngine {
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
 
-      seedSyncedIds(this.bookkeeping, storage.getItems().map((it) => it.id));
+      seedSyncedIds(this.bookkeeping, vault().getItems().map((it) => it.id));
       this.batchUpdating = initial;
       await this.fetchPendingBundlesHttp();
       if (generation !== this.initGeneration) return;
@@ -595,8 +598,8 @@ export class SyncEngine {
     return getVaultSeedPhrase(this, vaultId);
   }
 
-  public setVaultSeedPhrase(vaultId: string, seedPhrase: string): void {
-    setVaultSeedPhrase(this, vaultId, seedPhrase);
+  public async setVaultSeedPhrase(vaultId: string, seedPhrase: string): Promise<void> {
+    await setVaultSeedPhrase(this, vaultId, seedPhrase);
   }
 
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
@@ -607,7 +610,7 @@ export class SyncEngine {
       this.getOutbox().clear();
       if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
     }
-    this.saveConfig({ seedPhrase: newPhrase });
+    await setVaultSeedPhrase(this, this.currentVaultId, newPhrase);
     this.disconnect();
     await this.init();
   }
@@ -867,8 +870,8 @@ export class SyncEngine {
     }
     const newSeed = generateMnemonic(12);
     syncLog.warn('Rotating vault key: resetting trusted devices and migrating to new room');
+    await setVaultSeedPhrase(this, this.currentVaultId, newSeed);
     this.saveConfig({
-      seedPhrase: newSeed,
       trustedDevices: [],
     });
     this.disconnect();

@@ -242,6 +242,49 @@ export interface ChatToolCall {
   result?: any;
 }
 
+/**
+ * The assistant's own memory: one short fact per row.
+ * The model writes `text`; normalized form, counters, dates and validity are the system's.
+ */
+export type MemoryKind = 'rule' | 'pref' | 'fact' | 'event' | 'note';
+
+export interface MemoryItem {
+  id: string;
+  text: string;
+  /** Stems of `text`, lowercased: what duplicate detection and matching compare. */
+  normalized: string;
+  kind: MemoryKind;
+  tag: string | null;
+  /** 1..5. The model proposes, the system clamps and floors by kind. */
+  importance: number;
+  mentions: number;
+  /** Retrievals so far: the reinforcement half of the score. */
+  usedCount: number;
+  createdAt: number;
+  updatedAt: number;
+  usedAt: number;
+  isPinned: boolean;
+  /** Set when a newer fact replaced this one; the old row stays for the history. */
+  validTo?: number;
+  supersededBy?: string;
+  /** Tombstone: keeps a stale upsert from resurrecting the fact. Pruned after 30 days. */
+  deletedAt?: number;
+}
+
+export type MemoryOp = 'remember' | 'forget' | 'recall';
+
+/** One tool, three operations: writing, forgetting and digging. */
+export interface MemoryCommand {
+  op: MemoryOp;
+  text?: string;
+  id?: string;
+  kind?: MemoryKind;
+  tag?: string;
+  importance?: number;
+  /** Id of the fact this one supersedes, if the model spotted a contradiction. */
+  replaces?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -255,7 +298,7 @@ export interface ChatMessage {
 }
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
-export type LogScope = 'AI' | 'FS' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA' | 'WORKSPACE';
+export type LogScope = 'AI' | 'FS' | 'NODE' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA' | 'WORKSPACE';
 
 export interface LogEntry {
   id: string;

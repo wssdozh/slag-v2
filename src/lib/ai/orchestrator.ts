@@ -17,6 +17,7 @@ import { buildSystemPrompt } from './prompt';
 import { createLocalToolExecutor } from './tools';
 import { getCanonicalTools } from './toolDefinitions';
 import { runLocalFallbackAgent } from './fallback';
+import { memoryService } from '../memory';
 
 const aiLog = logger.scope('AI');
 
@@ -67,6 +68,16 @@ export class AssistantOrchestrator {
     // System Prompt with Scope rules
     const canonicalTools = getCanonicalTools(settings.webSearchEnabled);
 
+    // What the assistant already knows, best matches for this turn. The counters are touched
+    // here and persisted at most every ten minutes: rehearsal is what lifts a fact that keeps
+    // mattering above one that was merely written once.
+    const lastUserText = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+    const memory = memoryService.forPrompt(
+      `${lastUserText} ${currentFolder} ${folderMeta?.description ?? ''}`.trim()
+    );
+    memoryService.touch(memory.map((item) => item.id));
+    const memoryTags = memoryService.tagsForPrompt();
+
     const systemPrompt = buildSystemPrompt({
       todayStr,
       tomorrowStr,
@@ -79,6 +90,8 @@ export class AssistantOrchestrator {
       isInbox,
       currentFolder,
       folderMeta,
+      memory,
+      memoryTags,
     });
     // Protocol Adapter & Endpoint Resolution
     const target = resolveAiTarget(settings);

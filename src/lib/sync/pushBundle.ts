@@ -3,7 +3,7 @@ import type { SyncBundle, SyncChangeItem } from './types';
 import { computeHash, computeStateRootHash, encodeBundleFrame, encryptBundle } from './crypto';
 import { loadSentHashes, loadSyncedIds, loadTombstones, saveSentHashes, stateHashKey } from './localBookkeeping';
 import { accountClient } from './account';
-import { storage } from '../storage';
+import { vault } from '../storage/port';
 import { stripAttachmentData } from '../storage/attachmentData';
 import { SYNC_INTERVALS, SYNC_STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';
@@ -43,9 +43,9 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
     try {
       // `getItems` re-hydrates `dataUrl` from the session cache, so a photo pasted a minute ago
       // would ride inside the note's own payload. Metadata only; bytes travel as their own change.
-      const items = stripAttachmentData(storage.getItems());
-      const folders = storage.getFolders();
-      const workspaceState = storage.getWorkspaceState();
+      const items = stripAttachmentData(vault().getItems());
+      const folders = vault().getFolders();
+      const workspaceState = vault().getWorkspaceState();
       const pendingOps = engine.getOutbox().pending();
 
       const stateHash = await computeStateRootHash(items, folders);
@@ -129,6 +129,21 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         hash: workspaceHash,
         payload: workspaceState,
       });
+
+      // The assistant's memory is a short list, so it packs whole and dedupes per fact. It is
+      // not in the state root hash: the outbox op a memory write leaves behind opens the push
+      // gate, and the hash of each fact settles what actually left.
+      for (const fact of vault().getMemory()) {
+        const factHash = await computeHash(JSON.stringify(fact));
+        pack(`memory:${fact.id}`, factHash, {
+          id: fact.id,
+          type: 'memory',
+          action: fact.deletedAt ? 'delete' : 'upsert',
+          version: 1,
+          hash: factHash,
+          payload: fact.deletedAt ? { deletedAt: fact.deletedAt } : fact,
+        });
+      }
 
       // One attachment per bundle, and only when the previous bundle is confirmed. A slow uplink
       // then blocks one file instead of every note edit behind it.

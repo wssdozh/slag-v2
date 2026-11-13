@@ -7,6 +7,7 @@ import { parseTodoistInput } from '../time/todoistTaskParser';
 import { DEFAULT_INBOX_FOLDER, AI_LIMITS } from '../../config';
 import { cleanSnippetText } from './actionParser';
 import { getAppGuideContent } from './appGuide';
+import { memoryService } from '../memory';
 
 interface ToolExecutorParams {
   allItems: SlagItem[];
@@ -171,6 +172,62 @@ export function createLocalToolExecutor(params: ToolExecutorParams) {
         })),
         unscheduledCount: unscheduled.length,
       };
+    }
+
+    if (name === 'memory') {
+      const op = String(args.op ?? '').toLowerCase();
+
+      if (op === 'remember') {
+        const result = memoryService.remember({
+          text: String(args.text ?? ''),
+          kind: args.kind,
+          tag: typeof args.tag === 'string' ? args.tag : undefined,
+          importance: args.importance === undefined ? undefined : Number(args.importance),
+          replaces: typeof args.replaces === 'string' ? args.replaces : undefined,
+        });
+        if (!result) {
+          return { error: 'Пустой факт. Передайте text — одну короткую фразу от третьего лица.' };
+        }
+        return {
+          status: result.status,
+          id: result.item.id,
+          kind: result.item.kind,
+          tag: result.item.tag,
+          replacedId: result.superseded?.id,
+          message:
+            result.status === 'merged'
+              ? 'Этот факт уже был в памяти, отметил повтор.'
+              : 'Запомнил.',
+        };
+      }
+
+      if (op === 'forget') {
+        const removed = memoryService.forget(String(args.id || args.text || ''));
+        return removed
+          ? { status: 'forgotten', message: 'Убрал из памяти.' }
+          : { error: 'Такой записи в памяти нет. Уточните id или текст факта.' };
+      }
+
+      if (op === 'recall') {
+        const items = memoryService.recall({
+          query: String(args.text ?? ''),
+          kind: args.kind,
+          tag: typeof args.tag === 'string' ? args.tag : undefined,
+          limit: 8,
+        });
+        return {
+          count: items.length,
+          items: items.map((item) => ({
+            id: item.id,
+            text: item.text,
+            kind: item.kind,
+            tag: item.tag,
+            importance: item.importance,
+          })),
+        };
+      }
+
+      return { error: 'op должен быть remember, forget или recall.' };
     }
 
     if (name === 'save_item' || name === 'create_note' || name === 'schedule_task' || name === 'update_item') {

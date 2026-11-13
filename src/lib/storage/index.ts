@@ -9,12 +9,14 @@ import type {
   FullscreenDraft,
   WorkspaceState,
   ChatMessage,
+  MemoryItem,
   FolderViewSettings,
 } from '../../types';
 import { collectExistingTags, computeVaultStats, type VaultStats } from '../vault/stats';
 export type { VaultStats } from '../vault/stats';
 import { generateDemoItems } from '../vault/demoVault';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
+import { safeVaultRelativePath } from '../vault/safePath';
 export { getSafeNoteFilename } from '../vault/noteFilename';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
@@ -67,6 +69,8 @@ import {
   readAssistantHistory,
   writeAssistantHistory,
   eraseAssistantHistory,
+  readMemory,
+  writeMemory,
   readWorkspaceState,
   writeWorkspaceState,
   readFolderViewSettings,
@@ -94,7 +98,9 @@ export type StorageChangeEvent =
   | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: 'local' | 'remote' }
   | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: 'local' | 'remote' }
   | { kind: 'trash'; action: 'restore' | 'purge'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' }
-  | { kind: 'draft'; action: 'upsert' | 'delete'; id: string; payload?: ComposerDraft | FullscreenDraft; origin?: 'local' | 'remote' };
+  | { kind: 'draft'; action: 'upsert' | 'delete'; id: string; payload?: ComposerDraft | FullscreenDraft; origin?: 'local' | 'remote' }
+  // One event per memory write, not per fact: the sync packer reads the list from storage.
+  | { kind: 'memory'; action: 'upsert'; id: string; payload?: undefined; origin?: 'local' | 'remote' };
 
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
 
@@ -556,6 +562,19 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     eraseAssistantHistory(this);
   }
 
+  public getMemory(): MemoryItem[] {
+    return readMemory(this);
+  }
+
+  /** Persists the list and wakes sync. Returns false when the quota refuses the write. */
+  public saveMemory(items: MemoryItem[], origin: 'local' | 'remote' = 'local'): boolean {
+    const saved = writeMemory(this, items);
+    if (saved && origin === 'local') {
+      this.emitChange({ kind: 'memory', action: 'upsert', id: 'memory', origin });
+    }
+    return saved;
+  }
+
   public getWorkspaceState(): WorkspaceState {
     return readWorkspaceState(this);
   }
@@ -579,6 +598,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       folders: this.getFolders(),
       items: this.getItems(),
       assistantHistory: this.getAssistantHistory(),
+      memory: this.getMemory(),
       workspaceState: this.getWorkspaceState(),
       composerDrafts: this.getAllComposerDrafts(),
     });
@@ -597,15 +617,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     const previousWorkspace = JSON.stringify(this.getWorkspaceState());
     const folders = data.folders ?? this.getFolders();
     const workspace = { ...this.getWorkspaceState(), ...data.workspaceState };
-    const safeRelativePath = (path: string) => path.length > 0 && !path.startsWith('/') && !path.includes('\\') && !path.includes(':') && path.split('/').every(part => part !== '..' && part !== '.' && part !== '');
     for (const folder of folders) {
-      if (!safeRelativePath(folder.path)) throw new Error('Invalid synced folder path');
+      safeVaultRelativePath(folder.path);
     }
     for (const item of data.items ?? []) {
       const filename = item.filename || getSafeNoteFilename(item.title, item.id);
-      if (!safeRelativePath(item.folder || DEFAULT_INBOX_FOLDER) || !safeRelativePath(filename) || filename.includes('/') || !safeRelativePath(item.id) || item.id.includes('/')) {
-        throw new Error('Invalid synced note path');
-      }
+      if (filename.includes('/')) throw new Error('Invalid synced note path');
+      safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER);
+      safeVaultRelativePath(filename);
+      safeVaultRelativePath(item.id);
     }
     if (isTauri()) {
       if (data.items) {
@@ -679,11 +699,31 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       draftsKey: () => this.getDraftsKey(),
       cacheItems: (key, items) => this.cacheItems(key, items),
       saveAssistantHistory: (messages) => this.saveAssistantHistory(messages),
+      saveMemory: (items) => {
+        this.saveMemory(items, 'remote');
+      },
       saveWorkspaceState: (state, origin) => this.saveWorkspaceState(state, origin),
     };
   }
 
   public importVaultData(data: VaultImportPayload): boolean {
+    try {
+      for (const folder of data.folders ?? []) {
+        safeVaultRelativePath(folder.path);
+      }
+      for (const item of data.items ?? []) {
+        const filename = typeof item.filename === 'string' && item.filename
+          ? item.filename
+          : getSafeNoteFilename(typeof item.title === 'string' ? item.title : '', String(item.id || 'untitled'));
+        if (filename.includes('/')) throw new Error('Invalid note filename');
+        safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER);
+        safeVaultRelativePath(filename);
+        safeVaultRelativePath(item.id);
+      }
+    } catch (err) {
+      fsLog.warn('Rejected vault import with unsafe path', err);
+      return false;
+    }
     return importVaultPayload(data, this.transferIo());
   }
 

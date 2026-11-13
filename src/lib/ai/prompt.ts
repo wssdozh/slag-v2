@@ -1,5 +1,6 @@
 // Composes the assistant system prompt: today's tasks, folder context and tone rules.
-import type { SlagItem, FolderMeta } from '../../types';
+import type { SlagItem, FolderMeta, MemoryItem } from '../../types';
+import { MEMORY_KIND_LABEL } from '../memory';
 
 interface BuildSystemPromptParams {
   todayStr: string;
@@ -13,6 +14,10 @@ interface BuildSystemPromptParams {
   isInbox: boolean;
   currentFolder: string;
   folderMeta?: FolderMeta;
+  /** What the assistant already knows about this person, best matches for this turn. */
+  memory: MemoryItem[];
+  /** Topics the memory already uses, so new facts reuse a word instead of inventing one. */
+  memoryTags: string[];
 }
 
 export function buildSystemPrompt(params: BuildSystemPromptParams): string {
@@ -28,7 +33,17 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
     isInbox,
     currentFolder,
     folderMeta,
+    memory,
+    memoryTags,
   } = params;
+
+  const memoryBlock = memory.length > 0
+    ? memory
+        .map((item) => `- [${MEMORY_KIND_LABEL[item.kind]}] ${item.text} (id ${item.id}${item.tag ? `, тема ${item.tag}` : ''})`)
+        .join('\n')
+    : '- пока пусто';
+
+  const memoryTagsLine = memoryTags.length > 0 ? memoryTags.join(', ') : 'пока нет';
 
   return `Ты — персональный ИИ-ассистент базы знаний SLAG v2.
 Твой тон: фактологический, лаконичный, без приветствий и канцелярита (Zero-Slop).
@@ -62,6 +77,18 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
 - Задачи на завтра (${tasksTomorrow.length}): ${tasksTomorrow.length > 0 ? tasksTomorrow.map((t) => `«${t.title}» [статус: ${t.status}, приоритет: ${t.priority || 'обычный'}]`).join(', ') : 'нет'}
 - Просроченные задачи (${overdueTasks.length}): ${overdueTasks.length > 0 ? overdueTasks.map((t) => `«${t.title}» [срок: ${t.dueDate}]`).join(', ') : 'нет'}
 - Задачи без даты (${unscheduledTasks.length}): ${unscheduledTasks.length > 0 ? unscheduledTasks.slice(0, 5).map((t) => `«${t.title}»`).join(', ') : 'нет'}
+
+ТВОЯ ПАМЯТЬ ОБ ЭТОМ ЧЕЛОВЕКЕ:
+${memoryBlock}
+
+КАК ПОЛЬЗОВАТЬСЯ ПАМЯТЬЮ (инструмент memory):
+- Опирайся на блок выше и не переспрашивай то, что уже помнишь.
+- memory({op:'remember'}) — только устойчивое: обращение, чего не любит, как с ним работать, важные обстоятельства. Не записывай содержимое заметок, разовые просьбы и то, что уже живёт в задачах.
+- Если новый факт отменяет строку из блока — передай её id в replaces: старая версия останется в истории, но перестанет считаться правдой.
+- Тему (tag) бери из словаря памяти: ${memoryTagsLine}. Новую придумывай только если ни одна не подходит.
+- importance — целое 1..5, по важности для него, а не по удобству ответа.
+- memory({op:'recall'}) — когда нужного факта в блоке нет, а он может быть в памяти.
+- memory({op:'forget'}) — когда человек просит забыть.
 
 КАТЕГОРИЧЕСКИЙ ЗАПРЕТ ВНЕШНИХ СЕРВИСОВ И GOOGLE CALENDAR:
 Ты работаешь ИСКЛЮЧИТЕЛЬНО с локальной базой заметок и задач SLAG v2 (Local-First).

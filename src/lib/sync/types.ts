@@ -59,7 +59,7 @@ export interface SyncConfig {
 
 export interface SyncChangeItem {
   id: string;
-  type: 'item' | 'folder' | 'workspace' | 'attachment' | 'trash' | 'draft';
+  type: 'item' | 'folder' | 'workspace' | 'attachment' | 'trash' | 'draft' | 'memory';
   action: 'upsert' | 'delete' | 'rename' | 'restore' | 'purge';
   version: number;
   hash: string;

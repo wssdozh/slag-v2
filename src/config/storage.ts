@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
   TRASH_PREFIX: 'slag_trash_',
   DRAFTS_PREFIX: 'slag_drafts_',
   ASSISTANT_PREFIX: 'slag_assistant_',
+  MEMORY_PREFIX: 'slag_memory_',
   WORKSPACE_STATE_PREFIX: 'slag_workspace_state_',
   FULLSCREEN_DRAFTS_PREFIX: 'slag_fullscreen_draft_',
   FULLSCREEN_WIDTH: 'slag_fullscreen_is_full_width',
