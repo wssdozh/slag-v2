@@ -30,7 +30,7 @@ export type { SendAssistantChatParams, SendAssistantChatResult } from './types';
  */
 export class AssistantOrchestrator {
   async runChat(params: SendAssistantChatParams): Promise<SendAssistantChatResult> {
-    const { messages, currentFolder, settings, folders, allItems } = params;
+    const { messages, currentFolder, settings, folders, allItems, toolAllowlist } = params;
     const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
     const folderMeta = folders.find((f) => f.path === currentFolder);
 
@@ -66,7 +66,11 @@ export class AssistantOrchestrator {
       setCapturedFeedFilter: (filter) => { capturedFeedFilter = filter; },
     });
     // System Prompt with Scope rules
-    const canonicalTools = getCanonicalTools(settings.webSearchEnabled);
+    // A telegram question is answered by a narrower set: whatever the relay forwarded must not be
+    // able to pull a note body out of a tool the person did not opt into.
+    const canonicalTools = toolAllowlist
+      ? getCanonicalTools(settings.webSearchEnabled).filter((tool) => toolAllowlist.includes(tool.name))
+      : getCanonicalTools(settings.webSearchEnabled);
 
     // What the assistant already knows, best matches for this turn. The counters are touched
     // here and persisted at most every ten minutes: rehearsal is what lifts a fact that keeps

@@ -1,11 +1,12 @@
 // Delayed reminders: arm them on the relay, toast them locally when nothing else would.
-import type { NotifyPrefs, NotifyRoute, SlagItem } from '../types';
+import type { NotifyPrefs, NotifyRoute, SlagItem } from '../../types';
 import { isTauri } from '@tauri-apps/api/core';
-import { logger } from './logger/logger';
-import { storage } from './storage';
-import { accountClient } from './sync/account';
-import { computeHash } from './sync/crypto';
-import { formatDueDateLabel } from './time/dateUtils';
+import { logger } from '../logger/logger';
+import { accountClient } from '../sync/account';
+import { computeHash } from '../sync/crypto';
+import { formatDueDateLabel, getISODateString } from '../time/dateUtils';
+import { describeError, getNotifyRoutes, saveNotifyRoutes } from './prefs';
+import { DAY_MS, shiftOutOfQuiet } from './quiet';
 
 const notifyLog = logger.scope('NOTIFY');
 
@@ -13,44 +14,31 @@ const notifyLog = logger.scope('NOTIFY');
 const STALE_AFTER_MS = 5 * 60_000;
 /** Overdue tasks get their morning ping at this local hour. */
 const OVERDUE_HOUR = 10;
-const DAY_MS = 24 * 60 * 60 * 1000;
 /** Reminder text that carries only a time of day, e.g. "10:00" or "10:00:00". */
 const BARE_TIME = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
-const CLOCK = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 /** A reminder that names its own offset is the one case where the instant, not the clock, is fixed. */
 const ABSOLUTE_REMINDER = /(?:Z|[+-]\d{2}:?\d{2})$/i;
-
-export const DEFAULT_NOTIFY_PREFS: NotifyPrefs = {
-  tasks: true,
-  overdue: true,
-  quietFrom: '23:00',
-  quietTo: '08:00',
-  assistant: false,
-  spoiler: false,
-};
 
 /** What this session already pushed, so a re-render is not another arm call. */
 const armedKeys = new Map<string, string>();
 let armedVaultId = '';
-const shownLocally = new Set<string>();
+/** Local toasts already shown, with the moment they were shown: the set is pruned, not grown. */
+const shownLocally = new Map<string, number>();
+/** Dedup keys are hashed once per (item, moment): a 30s tick must not re-run SubtleCrypto. */
+const eventKeyCache = new Map<string, string>();
+const EVENT_KEY_CACHE_LIMIT = 2000;
 
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+async function eventKeyFor(input: string): Promise<string> {
+  const cached = eventKeyCache.get(input);
+  if (cached) return cached;
+  const hash = await computeHash(input);
+  if (eventKeyCache.size > EVENT_KEY_CACHE_LIMIT) eventKeyCache.clear();
+  eventKeyCache.set(input, hash);
+  return hash;
 }
 
-function minutesOfDay(timestamp: number): number {
-  const at = new Date(timestamp);
-  return at.getHours() * 60 + at.getMinutes();
-}
-
-function clockMinutes(value: string): number | null {
-  const match = CLOCK.exec(value.trim());
-  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
-}
-
-function localDateKey(timestamp: number): string {
-  const at = new Date(timestamp);
-  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+export function localDateKey(timestamp: number): string {
+  return getISODateString(new Date(timestamp));
 }
 
 function clockOf(timestamp: number): string {
@@ -103,51 +91,6 @@ export function resolveReminder(item: Pick<SlagItem, 'reminder' | 'dueDate'>): n
   return Number.isFinite(parsed.getTime()) ? parsed.getTime() : null;
 }
 
-export function getNotifyRoutes(): NotifyRoute[] {
-  return storage.getWorkspaceState().notifyRoutes ?? [];
-}
-
-export function saveNotifyRoutes(routes: NotifyRoute[]): void {
-  storage.saveWorkspaceState({ notifyRoutes: routes });
-}
-
-export function getNotifyPrefs(): NotifyPrefs {
-  return { ...DEFAULT_NOTIFY_PREFS, ...(storage.getWorkspaceState().notifyPrefs ?? {}) };
-}
-
-export function saveNotifyPrefs(prefs: NotifyPrefs): void {
-  storage.saveWorkspaceState({ notifyPrefs: prefs });
-}
-
-/** Relay error codes, in words the user can act on. */
-export function notifyErrorText(error: unknown): string {
-  const raw = describeError(error);
-  if (raw.includes('notifications_plan_required')) return 'нужна платная подписка';
-  if (raw.includes('notify_bot_not_configured')) return 'бот не настроен на сервере';
-  if (raw.includes('route_not_found')) return 'сначала подтверди канал в боте';
-  return raw;
-}
-
-/** True when this moment falls inside the quiet window, which may wrap past midnight. */
-export function inQuietHours(timestamp: number, prefs: NotifyPrefs): boolean {
-  const from = clockMinutes(prefs.quietFrom);
-  const to = clockMinutes(prefs.quietTo);
-  if (from === null || to === null || from === to) return false;
-  const minute = minutesOfDay(timestamp);
-  return from < to ? minute >= from && minute < to : minute >= from || minute < to;
-}
-
-/** Moves a moment out of the quiet window instead of dropping the reminder. */
-export function shiftOutOfQuiet(timestamp: number, prefs: NotifyPrefs): number {
-  if (!inQuietHours(timestamp, prefs)) return timestamp;
-  const to = clockMinutes(prefs.quietTo);
-  if (to === null) return timestamp;
-  const target = new Date(timestamp);
-  target.setHours(Math.floor(to / 60), to % 60, 0, 0);
-  if (target.getTime() <= timestamp) target.setTime(target.getTime() + DAY_MS);
-  return target.getTime();
-}
-
 function isOverdueTask(item: SlagItem, todayKey: string): boolean {
   return item.type === 'task' && item.status !== 'done' && !!item.dueDate && item.dueDate < todayKey;
 }
@@ -187,7 +130,7 @@ async function planFor(item: SlagItem, prefs: NotifyPrefs, now: number): Promise
         : localMinute(reminder);
       return {
         itemKey: item.id,
-        eventKey: await computeHash(`${item.id}|task|${moment}`),
+        eventKey: await eventKeyFor(`${item.id}|task|${moment}`),
         fireAt,
         kind: 'task',
       };
@@ -199,7 +142,7 @@ async function planFor(item: SlagItem, prefs: NotifyPrefs, now: number): Promise
       const fireAt = shiftOutOfQuiet(moment, prefs);
       return {
         itemKey: item.id,
-        eventKey: await computeHash(`${item.id}|overdue|${item.dueDate}|${localDateKey(fireAt)}`),
+        eventKey: await eventKeyFor(`${item.id}|overdue|${item.dueDate}|${localDateKey(fireAt)}`),
         fireAt,
         kind: 'overdue',
       };
@@ -322,14 +265,22 @@ export async function reconcileNotifications(
 /** Toasts every reminder that just came due and has no working telegram channel behind it. */
 export async function runLocalReminders(items: SlagItem[], prefs: NotifyPrefs): Promise<void> {
   const now = Date.now();
+  // The map is bounded by the same stale window the scheduler uses: an entry that can no longer
+  // fire is dead weight, and a session can run for days.
+  for (const [key, shownAt] of shownLocally) {
+    if (now - shownAt > STALE_AFTER_MS) shownLocally.delete(key);
+  }
   for (const item of items) {
     if (!prefs.tasks) continue;
-    const fireAt = resolveReminder(item);
-    if (fireAt === null || fireAt > now || now - fireAt > STALE_AFTER_MS) continue;
-    if (inQuietHours(fireAt, prefs)) continue;
+    const reminder = resolveReminder(item);
+    if (reminder === null) continue;
+    // Quiet hours move a reminder to the end of the window, exactly like the relay does: a
+    // desktop toast that silently drops what telegram would deliver is two products, not one.
+    const fireAt = shiftOutOfQuiet(reminder, prefs);
+    if (fireAt > now || now - fireAt > STALE_AFTER_MS) continue;
     const key = `${item.id}|${fireAt}`;
     if (shownLocally.has(key)) continue;
-    shownLocally.add(key);
+    shownLocally.set(key, now);
     await showLocalReminder(item);
   }
 }
@@ -350,55 +301,5 @@ export async function showLocalReminder(item: SlagItem): Promise<void> {
     sendNotification({ title: item.title, body: 'напоминание' });
   } catch (error) {
     notifyLog.warn('Local reminder failed', { itemId: item.id, error: describeError(error) });
-  }
-}
-
-/** Points the bot at every live channel, or takes all of them out of the assistant path. */
-export async function setAssistantForRoutes(
-  vaultId: string,
-  routes: NotifyRoute[],
-  enabled: boolean
-): Promise<void> {
-  for (const route of routes.filter((entry) => entry.state === 'active')) {
-    await accountClient.setAssistantLink({ vaultId, routeToken: route.token, enabled });
-  }
-}
-
-/**
- * The one place a question from Telegram is answered.
- *
- * The relay has no model and never speaks for the vault: it forwards the text to a live
- * device and waits. Today the device answers from its own state, which is honest and useful;
- * wiring the full assistant orchestrator here is the next step, and nothing else has to move.
- */
-export function buildAssistantAnswer(items: SlagItem[], now = Date.now()): string {
-  const todayKey = localDateKey(now);
-  const open = items.filter((item) => item.type === 'task' && item.status !== 'done');
-  const dueToday = open.filter((item) => item.dueDate === todayKey).length;
-  const overdue = open.filter((item) => !!item.dueDate && item.dueDate < todayKey).length;
-  const upcoming = open
-    .map((item) => ({ item, at: resolveReminder(item) }))
-    .filter((entry): entry is { item: SlagItem; at: number } => entry.at !== null && entry.at > now)
-    .sort((left, right) => left.at - right.at)[0];
-  const parts = [`на связи · задач на сегодня: ${dueToday}`];
-  if (overdue) parts.push(`просрочено: ${overdue}`);
-  if (upcoming) {
-    const time = new Date(upcoming.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    parts.push(`ближайшее: «${upcoming.item.title}» в ${time}`);
-  }
-  parts.push('подробнее — в приложении');
-  return parts.join(' · ');
-}
-
-/** Answers a question the relay forwarded from the bot, so the person waiting gets a reply. */
-export async function answerAssistantQuestion(vaultId: string, requestId: string): Promise<void> {
-  try {
-    await accountClient.answerAssistant({
-      vaultId,
-      requestId,
-      answer: buildAssistantAnswer(storage.getItems()),
-    });
-  } catch (error) {
-    notifyLog.warn('Answering a telegram question failed', { error: describeError(error) });
   }
 }

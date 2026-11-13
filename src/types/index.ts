@@ -385,6 +385,15 @@ export interface FullscreenEditorWorkspaceState {
   isFullWidth?: boolean;
 }
 
+/**
+ * What a question from the bot is allowed to touch. `minimal` answers from a task-scoped tool set,
+ * `risky` lets the full assistant read the vault. Chosen by a human, never inferred.
+ */
+export type AssistantMode = 'minimal' | 'risky';
+
+/** The stored setting: a mode, or off entirely. Off keeps reminders and drops the question path. */
+export type AssistantSetting = 'off' | AssistantMode;
+
 /** A telegram channel the relay may deliver reminders to; it never learns who is behind it. */
 export interface NotifyRoute {
   token: string;
@@ -403,7 +412,7 @@ export interface NotifyPrefs {
   /** Exclusive end of the quiet window, `HH:MM` local. */
   quietTo: string;
   /** Let this vault's telegram channel ask a question of the devices. */
-  assistant: boolean;
+  assistantMode: AssistantSetting;
   /** Hide the body behind a telegram spoiler: the chat shows a tap-to-reveal line. */
   spoiler: boolean;
 }

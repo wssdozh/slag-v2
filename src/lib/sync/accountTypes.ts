@@ -1,4 +1,5 @@
 // Shapes of the relay account API: plans, devices, vault grants and invitations.
+import type { AssistantMode } from '../../types';
 import type { DeviceSyncMode } from './types';
 
 export interface AccountInfo {
@@ -110,17 +111,34 @@ export interface NotifyInvite {
   expiresIn: number;
 }
 
-/** Opts one telegram channel into the question/answer path. */
+/** Opts one telegram channel into the question/answer path at a chosen depth. */
 export interface AssistantLinkPayload {
   vaultId: string;
   routeToken: string;
   enabled: boolean;
+  /** Ignored when `enabled` is false; defaults to `minimal` on the relay. */
+  mode?: AssistantMode;
 }
 
 export interface AssistantAnswerPayload {
   vaultId: string;
   requestId: string;
   answer: string;
+}
+
+/** What the relay holds while a question waits: the text a reconnecting device needs. */
+export interface AssistantPendingRequest {
+  requestId: string;
+  question: string;
+  mode: AssistantMode;
+  /** UNIX seconds; the device must answer before this or say nothing. */
+  expiresAt: number;
+}
+
+export interface AssistantAnswerResult {
+  delivered: boolean;
+  /** `already` when another device won the race; the answer is dropped, not retried. */
+  reason?: 'already' | 'gone';
 }
 
 export interface AccountState {

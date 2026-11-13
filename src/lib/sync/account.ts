@@ -10,7 +10,9 @@ import type {
   AccountState,
   AccountVault,
   AssistantAnswerPayload,
+  AssistantAnswerResult,
   AssistantLinkPayload,
+  AssistantPendingRequest,
   NotifyArmPayload,
   NotifyArmResult,
   NotifyChannelState,
@@ -587,24 +589,34 @@ class AccountClient {
 
   /** Has the recipient opened the bot yet? The invite dialog asks until the answer is `active`. */
   notifyStatus(vaultId: string, routeToken: string): Promise<NotifyChannelState> {
-    const query = new URLSearchParams({ vaultId, routeToken });
-    return this.request<NotifyChannelState>(`/api/notify/status?${query.toString()}`);
+    // A delivery token is a capability: it goes in the body, where proxies and access logs do
+    // not keep it, instead of a query string.
+    return this.request<NotifyChannelState>('/api/notify/status', {
+      method: 'POST',
+      body: JSON.stringify({ vaultId, routeToken }),
+    });
   }
 
-  /** Opts a bound channel into the question/answer path, or out of it. */
-  setAssistantLink(payload: AssistantLinkPayload): Promise<{ enabled: boolean }> {
-    return this.request<{ enabled: boolean }>('/api/assistant/enable', {
+  /** Opts a bound channel into the question/answer path at the chosen depth. */
+  setAssistantLink(payload: AssistantLinkPayload): Promise<{ enabled: boolean; mode: string }> {
+    return this.request<{ enabled: boolean; mode: string }>('/api/assistant/enable', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   }
 
   /** Hands the answer back to the relay, which forwards it to the chat that asked. */
-  answerAssistant(payload: AssistantAnswerPayload): Promise<{ delivered: boolean }> {
-    return this.request<{ delivered: boolean }>('/api/assistant/answer', {
+  answerAssistant(payload: AssistantAnswerPayload): Promise<AssistantAnswerResult> {
+    return this.request<AssistantAnswerResult>('/api/assistant/answer', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  /** Questions the relay is still holding: what a device missed while its socket was down. */
+  pendingAssistant(vaultId: string): Promise<{ requests: AssistantPendingRequest[] }> {
+    const query = new URLSearchParams({ vaultId });
+    return this.request<{ requests: AssistantPendingRequest[] }>(`/api/assistant/pending?${query.toString()}`);
   }
 }
 
@@ -627,5 +639,7 @@ export type {
   NotifyInvite,
   NotifyChannelState,
   AssistantAnswerPayload,
+  AssistantAnswerResult,
   AssistantLinkPayload,
+  AssistantPendingRequest,
 } from './accountTypes';

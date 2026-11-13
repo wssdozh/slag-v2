@@ -61,6 +61,11 @@ export interface SendAssistantChatParams {
   settings: AiSettings;
   folders: FolderMeta[];
   allItems: SlagItem[];
+  /**
+   * Narrower than the full catalogue on purpose: a question that arrives from telegram is not
+   * the same trust boundary as one typed in the app. Undefined means every tool is allowed.
+   */
+  toolAllowlist?: string[];
 }
 
 export interface SendAssistantChatResult {
