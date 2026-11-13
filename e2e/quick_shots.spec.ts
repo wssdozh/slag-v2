@@ -14,7 +14,7 @@ test.describe('Quick Shots Suite', () => {
     await btn.click();
     await page.waitForTimeout(200);
 
-    const tabs = ['account', 'ai', 'vault', 'devices', 'sync', 'ui', 'shortcuts', 'logs'];
+    const tabs = ['account', 'ai', 'vault', 'devices', 'sync', 'notifications', 'ui', 'shortcuts', 'logs'];
     for (const tab of tabs) {
       await page.locator(`button[data-tab="${tab}"]`).first().click();
       await page.waitForTimeout(150);
@@ -38,6 +38,7 @@ test.describe('Quick Shots Suite', () => {
       { id: 'vault', text: 'Хранилище & Бэкап' },
       { id: 'devices', text: 'Устройства' },
       { id: 'sync', text: 'Синхронизация' },
+      { id: 'notifications', text: 'Уведомления' },
       { id: 'ui', text: 'Интерфейс & Панели' },
       { id: 'shortcuts', text: 'Горячие клавиши' },
     ];

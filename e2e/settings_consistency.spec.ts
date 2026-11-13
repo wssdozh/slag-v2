@@ -15,7 +15,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     const dialog = page.getByRole('dialog', { name: 'Настройки', exact: true });
     // Desktop modal has no accessible name; use the tab container as a stable scope.
     const scope = viewport.width < 768 ? dialog : page.locator('.fixed.z-50').filter({ has: page.locator('[data-tab="ai"]') });
-    for (const tab of ['account', 'ai', 'vault', 'ui', 'shortcuts', 'sync', 'devices', 'logs']) {
+    for (const tab of ['account', 'ai', 'vault', 'notifications', 'ui', 'shortcuts', 'sync', 'devices', 'logs']) {
       await scope.locator(`[data-tab="${tab}"]`).click();
       if (tab === 'ai') await expect(scope.getByRole('button', { name: 'Сохранить', exact: true })).toBeVisible();
       else await expect(scope.getByRole('button', { name: 'Сохранить', exact: true })).toHaveCount(0);
