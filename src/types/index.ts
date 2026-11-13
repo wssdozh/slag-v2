@@ -406,6 +406,13 @@ export interface NotifyPrefs {
   assistant: boolean;
 }
 
+/** Who this vault belongs to. Synced inside the encrypted bundle, so the relay never sees it. */
+export interface ProfileInfo {
+  name: string;
+  /** Downscaled data URL, small on purpose: it rides every bundle with the workspace state. */
+  avatar?: string;
+}
+
 export interface WorkspaceState {
   currentFolder: string;
   feedViewMode: FeedViewMode;
@@ -420,6 +427,7 @@ export interface WorkspaceState {
   sortOrder?: SortOrder;
   hideCompletedTasks?: boolean;
   folderSettings?: Record<string, FolderViewSettings>;
+  profile?: ProfileInfo;
   notifyRoutes?: NotifyRoute[];
   notifyPrefs?: NotifyPrefs;
 }
