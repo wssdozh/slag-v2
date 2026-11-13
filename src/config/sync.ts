@@ -15,7 +15,9 @@ export const SYNC_INTERVALS = {
   POLL_INTERVAL_MS: 5000,
   HEALTH_TIMEOUT_MS: 5000,
   RECONNECT_BASE_MS: 5000,
-  RECONNECT_MAX_MS: 60000,
+  // Capped at 15s: a question from the bot dies after 25s, and a socket that is dark for a
+  // minute turns a live conversation into "устройство не ответило".
+  RECONNECT_MAX_MS: 15000,
   RECONNECT_MAX_EXPONENT: 4,
   PAIRING_POLL_INTERVAL_MS: 2000,
   PAIRING_TIMEOUT_MS: 120000,

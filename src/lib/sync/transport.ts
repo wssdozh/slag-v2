@@ -2,6 +2,7 @@
 import { logger } from '../logger/logger';
 import { accountClient } from './account';
 import { SYNC_INTERVALS } from '../../config';
+import type { AssistantMode } from '../../types';
 import type { SyncConnectionState } from './types';
 
 const syncLog = logger.scope('SYNC');
@@ -14,7 +15,7 @@ export interface TransportCallbacks {
   onServerAck?: (bundleId: string) => void;
   onBundle: (bundlePayload: unknown) => Promise<void> | void;
   /** The bot got a question: answer it from this device, or nobody will. */
-  onAssistantQuestion?: (requestId: string, question: string) => Promise<void> | void;
+  onAssistantQuestion?: (requestId: string, question: string, mode: AssistantMode) => Promise<void> | void;
   onCatchUpPull?: () => void;
   onAuthRejected?: () => void;
 }
@@ -42,6 +43,11 @@ export class SyncTransport {
   private reconnectAttempts = 0;
   private currentOptions: TransportOptions | null = null;
   private callbacks: TransportCallbacks;
+  /**
+   * Set by the app: can this device actually answer with a model? The relay asks before it asks
+   * a question, so a device without a key never steals the turn from one with it.
+   */
+  public assistantReadyProvider: () => boolean = () => false;
 
   constructor(callbacks: TransportCallbacks) {
     this.callbacks = callbacks;
@@ -180,8 +186,20 @@ export class SyncTransport {
         }
       } else if (msg.type === 'bundle') {
         await this.callbacks.onBundle(msg.bundle);
+      } else if (msg.type === 'assistant_probe' && typeof msg.id === 'string') {
+        // The relay is electing one device to answer. Two facts decide it: how fast this socket
+        // replies, and whether this device could run a model at all.
+        this.send(JSON.stringify({
+          type: 'assistant_probe_ack',
+          id: msg.id,
+          aiReady: this.assistantReadyProvider(),
+        }));
       } else if (msg.type === 'assistant_question' && typeof msg.id === 'string') {
-        await this.callbacks.onAssistantQuestion?.(msg.id, typeof msg.question === 'string' ? msg.question : '');
+        await this.callbacks.onAssistantQuestion?.(
+          msg.id,
+          typeof msg.question === 'string' ? msg.question : '',
+          msg.mode === 'risky' ? 'risky' : 'minimal'
+        );
       } else if (msg.type === 'error') {
         syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
       }
