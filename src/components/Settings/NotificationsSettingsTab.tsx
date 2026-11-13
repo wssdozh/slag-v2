@@ -13,13 +13,8 @@ import {
   setAssistantForRoutes,
 } from '../../lib/notify';
 import type { NotifyPrefs, NotifyRoute } from '../../types';
+import { NotifyInviteModal } from './NotifyInviteModal';
 import { SettingsDivider, SettingsGroup, SettingsInput, SettingsRow, SettingsSwitch } from './SettingsUI';
-
-const ROUTE_STATE_LABEL: Record<NotifyRoute['state'], string> = {
-  pending: 'ждёт подтверждения',
-  active: 'активен',
-  blocked: 'заблокирован',
-};
 
 function currentVaultId(): string {
   try {
@@ -35,12 +30,16 @@ export const NotificationsSettingsTab: React.FC = () => {
   const [routes, setRoutes] = useState<NotifyRoute[]>(() => getNotifyRoutes());
   const [prefs, setPrefs] = useState<NotifyPrefs>(() => getNotifyPrefs());
   const [invite, setInvite] = useState<NotifyInvite | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
   const [isSavingAssistant, setIsSavingAssistant] = useState(false);
 
   const vaultId = currentVaultId();
   const locked = !vaultId || !accountClient.isAuthenticated();
   const activeRoutes = routes.filter((route) => route.state === 'active');
+  const blockedRoutes = routes.filter((route) => route.state === 'blocked');
+  const pendingRoutes = routes.filter((route) => route.state === 'pending');
+  const channel = activeRoutes[0] ?? pendingRoutes[0] ?? blockedRoutes[0] ?? null;
 
   const patchPrefs = (next: Partial<NotifyPrefs>) => {
     const merged = { ...prefs, ...next };
@@ -52,13 +51,15 @@ export const NotificationsSettingsTab: React.FC = () => {
     setIsRequesting(true);
     try {
       const created = await accountClient.requestNotifyInvite(vaultId);
-      setInvite(created);
+      // One live code: the relay revoked the previous one, so the list keeps a single pending row.
       const updated = [
-        ...routes.filter((route) => route.token !== created.routeToken),
+        ...routes.filter((route) => route.state !== 'pending'),
         { token: created.routeToken, label: '', state: 'pending' as const },
       ];
       setRoutes(updated);
       saveNotifyRoutes(updated);
+      setInvite(created);
+      setIsModalOpen(true);
     } catch (error) {
       addToast(notifyErrorText(error), 'error');
     } finally {
@@ -66,11 +67,22 @@ export const NotificationsSettingsTab: React.FC = () => {
     }
   };
 
-  const handleRemoveRoute = (token: string) => {
-    const updated = routes.filter((route) => route.token !== token);
+  const handleLinked = (routeToken: string) => {
+    const updated = routes.map((route) =>
+      route.token === routeToken ? { ...route, state: 'active' as const } : route
+    );
     setRoutes(updated);
     saveNotifyRoutes(updated);
-    if (invite?.routeToken === token) setInvite(null);
+    setInvite(null);
+    setIsModalOpen(false);
+    addToast('telegram подключён', 'success');
+  };
+
+  const handleDisconnect = () => {
+    setRoutes([]);
+    saveNotifyRoutes([]);
+    setInvite(null);
+    setIsModalOpen(false);
   };
 
   const handleAssistant = async (enabled: boolean) => {
@@ -85,65 +97,83 @@ export const NotificationsSettingsTab: React.FC = () => {
     }
   };
 
+  const channelAction = () => {
+    if (channel?.state === 'active' || channel?.state === 'blocked') {
+      return (
+        <button
+          type="button"
+          onClick={handleDisconnect}
+          className="px-2 py-1.5 text-2xs text-fg-muted rounded-md hover:bg-surface-hover hover:text-danger cursor-pointer"
+        >
+          отключить
+        </button>
+      );
+    }
+    if (channel?.state === 'pending') {
+      return (
+        <button
+          type="button"
+          disabled={isRequesting || locked}
+          onClick={() => (invite ? setIsModalOpen(true) : void handleRequestInvite())}
+          className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
+        >
+          {invite ? 'показать код' : 'новый код'}
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        disabled={isRequesting || locked}
+        onClick={() => void handleRequestInvite()}
+        className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
+      >
+        {isRequesting ? 'Код…' : 'Получить код'}
+      </button>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <SettingsGroup
         title="Канал в telegram"
         action={
           <span className="text-2xs font-mono text-fg-dim">
-            {activeRoutes.length ? `${activeRoutes.length} активн.` : 'не подключён'}
+            {activeRoutes.length ? 'подключён' : channel?.state === 'pending' ? 'ждёт подтверждения' : 'не подключён'}
           </span>
         }
       >
         <SettingsRow
-          label="Добавить получателя"
-          right={
-            <button
-              type="button"
-              disabled={isRequesting || locked}
-              onClick={() => void handleRequestInvite()}
-              className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
-            >
-              {isRequesting ? 'Код…' : 'Получить код'}
-            </button>
+          label={
+            channel?.state === 'active'
+              ? 'Канал подключён'
+              : channel?.state === 'blocked'
+                ? 'Канал заблокирован'
+                : channel?.state === 'pending'
+                  ? 'Ждём подтверждения'
+                  : 'Добавить получателя'
           }
+          description={
+            channel?.state === 'active'
+              ? 'напоминания приходят в telegram'
+              : channel?.state === 'blocked'
+                ? 'человек отключил бота'
+                : channel?.state === 'pending'
+                  ? 'код живёт 10 минут'
+                  : undefined
+          }
+          right={channelAction()}
         />
-        {invite && (
-          <>
-            <SettingsDivider />
-            <SettingsRow
-              label={<span className="font-mono text-xs text-fg-primary select-all break-all">{invite.code}</span>}
-              description="Одноразовый, 10 минут"
-              right={
-                invite.link ? (
-                  <a href={invite.link} target="_blank" rel="noreferrer" className="text-2xs text-accent hover:underline">
-                    открыть
-                  </a>
-                ) : undefined
-              }
-            />
-          </>
-        )}
-        {routes.map((route) => (
-          <React.Fragment key={route.token}>
-            <SettingsDivider />
-            <SettingsRow
-              label={<span className="font-mono text-2xs text-fg-secondary break-all">{route.label || route.token.slice(0, 8)}</span>}
-              description={ROUTE_STATE_LABEL[route.state]}
-              right={
-                <button
-                  type="button"
-                  aria-label="Удалить получателя"
-                  onClick={() => handleRemoveRoute(route.token)}
-                  className="px-2 py-1.5 text-2xs text-fg-muted rounded-md hover:bg-surface-hover hover:text-danger cursor-pointer"
-                >
-                  удалить
-                </button>
-              }
-            />
-          </React.Fragment>
-        ))}
       </SettingsGroup>
+
+      {invite && isModalOpen && (
+        <NotifyInviteModal
+          invite={invite}
+          vaultId={vaultId}
+          onClose={() => setIsModalOpen(false)}
+          onLinked={handleLinked}
+        />
+      )}
 
       <SettingsGroup title="Что приходит">
         <SettingsRow

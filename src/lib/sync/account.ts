@@ -13,6 +13,7 @@ import type {
   AssistantLinkPayload,
   NotifyArmPayload,
   NotifyArmResult,
+  NotifyChannelState,
   NotifyInvite,
 } from './accountTypes';
 import type { DeviceSyncMode } from './types';
@@ -584,6 +585,12 @@ class AccountClient {
     });
   }
 
+  /** Has the recipient opened the bot yet? The invite dialog asks until the answer is `active`. */
+  notifyStatus(vaultId: string, routeToken: string): Promise<NotifyChannelState> {
+    const query = new URLSearchParams({ vaultId, routeToken });
+    return this.request<NotifyChannelState>(`/api/notify/status?${query.toString()}`);
+  }
+
   /** Opts a bound channel into the question/answer path, or out of it. */
   setAssistantLink(payload: AssistantLinkPayload): Promise<{ enabled: boolean }> {
     return this.request<{ enabled: boolean }>('/api/assistant/enable', {
@@ -618,6 +625,7 @@ export type {
   NotifyArmRoute,
   NotifyDropReason,
   NotifyInvite,
+  NotifyChannelState,
   AssistantAnswerPayload,
   AssistantLinkPayload,
 } from './accountTypes';

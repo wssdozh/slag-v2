@@ -89,6 +89,11 @@ export interface NotifyArmPayload {
 
 export type NotifyDropReason = 'not_linked' | 'blocked';
 
+/** What the relay knows about one channel. Unknown and foreign both answer `pending`. */
+export interface NotifyChannelState {
+  state: 'pending' | 'active' | 'blocked';
+}
+
 export interface NotifyArmResult {
   armed: number;
   dropped: { token: string; reason: NotifyDropReason }[];

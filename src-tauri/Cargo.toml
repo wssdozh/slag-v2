@@ -32,6 +32,7 @@ tauri-plugin-autostart = "2"
 tauri-plugin-android-fs = { version = "=30.2.0", features = ["protocol-content"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tauri-plugin-opener = "2.7"
 
 # Desktop-only: seed/account secrets live in the OS credential store. Android keeps the
 # encrypted IndexedDB fallback until a Keystore-backed store is wired up.
