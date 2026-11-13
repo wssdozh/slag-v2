@@ -1,5 +1,5 @@
 // "Занятое место": the whole store's footprint — local keys, media, snapshots and assistant memory.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { File, Image, Music, RefreshCw, Video } from 'lucide-react';
 import type { SlagAttachment, SlagItem } from '../../types';
 import { MEMORY_LIMIT } from '../../lib/memory';
@@ -57,14 +57,14 @@ const shareOf = (part: number, whole: number): string =>
 
 /** The composition of everything the store holds: total in the middle, one arc per sector. */
 const UsageRing: React.FC<{ segments: UsageSegment[]; total: number }> = ({ segments, total }) => {
-  const size = 148;
-  const stroke = 12;
+  const size = 168;
+  const stroke = 22;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const lengths = segments.map((segment) => (total > 0 ? (segment.bytes / total) * circumference : 0));
 
   return (
-    <div className="relative h-[148px] w-[148px] shrink-0">
+    <div className="relative h-[168px] w-[168px] shrink-0">
       <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90" aria-hidden>
         <circle
           cx={size / 2}
@@ -97,7 +97,7 @@ const UsageRing: React.FC<{ segments: UsageSegment[]; total: number }> = ({ segm
         data-testid="storage-total"
         className="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
       >
-        <span className="font-mono text-[15px] text-fg-primary">{formatUsageBytes(total)}</span>
+        <span className="font-mono text-base text-fg-primary">{formatUsageBytes(total)}</span>
         <span className="text-2xs text-fg-dim">всего</span>
       </div>
     </div>
@@ -140,19 +140,26 @@ const EmptyLine: React.FC = () => <div className="px-3.5 py-3 text-2xs text-fg-m
  * instead of a re-render of numbers that were collected minutes ago.
  */
 export const StorageUsageSection: React.FC = () => {
-  const { items, backupSnapshots, setSelectedItem, setIsFullscreenEditorOpen } = useApp();
+  const { vault, items, backupSnapshots, setSelectedItem, setIsFullscreenEditorOpen } = useApp();
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [stamp, setStamp] = useState(0);
 
+  // The collector walks the whole localStorage index, so a save must not start it: the live
+  // inputs sit in a ref, and only the button's stamp — or another vault — asks for a new count.
+  const sourceRef = useRef({ items, snapshots: backupSnapshots });
+  useEffect(() => {
+    sourceRef.current = { items, snapshots: backupSnapshots };
+  }, [items, backupSnapshots]);
+
   useEffect(() => {
     let isCancelled = false;
-    void collectStorageUsage({ items, snapshots: backupSnapshots }).then((next) => {
+    void collectStorageUsage(sourceRef.current).then((next) => {
       if (!isCancelled) setUsage(next);
     });
     return () => {
       isCancelled = true;
     };
-  }, [items, backupSnapshots, stamp]);
+  }, [stamp, vault.id]);
 
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
