@@ -437,4 +437,118 @@ test.describe('assistant memory', () => {
     expect(result.likesTop).toBe('люблю рыбу');
     expect(result.dislikesTop).toBe('не люблю рыбу');
   });
+
+  test('9. событие стареет от даты события, а не от последнего упоминания', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const result = await page.evaluate(async () => {
+      const memory = await import(/* @vite-ignore */ '/src/lib/memory.ts');
+      const DAY = 86_400_000;
+      const happenedAt = Date.now() - 100 * DAY;
+
+      const created = memory.applyRemember([], { text: 'ездил в отпуск', kind: 'event' }, [], happenedAt);
+      // событие пересказали через десять дней: mentions растёт, но возраст не обнуляется
+      const repeated = created && memory.applyRemember(
+        created.items,
+        { text: 'ездил в отпуск', kind: 'event' },
+        [],
+        happenedAt + 10 * DAY
+      );
+      const item = repeated?.items[0];
+      const checkAt = happenedAt + 125 * DAY;
+
+      return {
+        mentions: item?.mentions ?? 0,
+        createdAt: item?.createdAt ?? 0,
+        updatedAt: item?.updatedAt ?? 0,
+        liveWhenRepeated: memory.isLiveMemory(item, happenedAt + 11 * DAY),
+        // если бы TTL считался от updatedAt, на 125-й день событие было бы живо (115 < 120)
+        liveAfterTtl: memory.isLiveMemory(item, checkAt),
+        inRecall: memory.selectMemory(repeated?.items ?? [], { query: 'отпуск' }, checkAt).length,
+      };
+    });
+
+    expect(result.mentions).toBe(2);
+    expect(result.updatedAt).toBeGreaterThan(result.createdAt);
+    expect(result.liveWhenRepeated).toBe(true);
+    expect(result.liveAfterTtl).toBe(false);
+    expect(result.inRecall).toBe(0);
+  });
+
+  test('10. порядок слов не плодит второй факт', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const result = await page.evaluate(async () => {
+      const memory = await import(/* @vite-ignore */ '/src/lib/memory.ts');
+      const first = memory.applyRemember([], { text: 'люблю желе', kind: 'pref' }, []);
+      const second = first && memory.applyRemember(first.items, { text: 'желе люблю', kind: 'pref' }, []);
+      return {
+        status: second?.status,
+        count: second?.items.length,
+        mentions: second?.items[0]?.mentions,
+        orderKept: second?.items[0]?.text,
+      };
+    });
+
+    expect(result.status).toBe('merged');
+    expect(result.count).toBe(1);
+    expect(result.mentions).toBe(2);
+    // порядок слов в записи не переписывается: как сказали в первый раз, так и лежит
+    expect(result.orderKept).toBe('люблю желе');
+  });
+
+  test('11. тул подсказывает id похожего факта, чтобы модель могла вытеснить', async ({ page }) => {
+    const requests: any[] = [];
+    await page.route('**/api.groq.com/**', async (route) => {
+      const payload = JSON.parse(route.request().postData() || '{}');
+      requests.push(payload);
+      const isSecondRound = payload.messages.some((m: any) => m.role === 'tool');
+      const body = isSecondRound
+        ? { choices: [{ message: { role: 'assistant', content: 'Записал.' } }] }
+        : {
+            choices: [
+              {
+                message: {
+                  role: 'assistant',
+                  content: '',
+                  tool_calls: [
+                    {
+                      id: 'call_memory_similar',
+                      type: 'function',
+                      function: {
+                        name: 'memory',
+                        arguments: JSON.stringify({ op: 'remember', text: 'встреча отменилась', kind: 'event' }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const seededId = await page.evaluate(async () => {
+      const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
+      return memoryService.remember({ text: 'завтра встреча', kind: 'event' })?.item.id ?? null;
+    });
+    expect(seededId).toBeTruthy();
+
+    await page.evaluate(async (settings) => {
+      const { assistantOrchestrator } = await import(/* @vite-ignore */ '/src/lib/ai/orchestrator.ts');
+      await assistantOrchestrator.runChat({
+        messages: [{ role: 'user', content: 'встреча отменилась' }],
+        currentFolder: 'Входящие',
+        folders: [],
+        allItems: [],
+        settings,
+      } as any);
+    }, groqSettings as any);
+
+    const toolMessage = requests[1].messages.find((m: any) => m.role === 'tool');
+    expect(toolMessage.content).toContain(seededId);
+    expect(toolMessage.content).toContain('replaces');
+  });
 });

@@ -72,6 +72,14 @@ export function normalizedOf(text: string): string {
   return normalizeWords(text).join(' ');
 }
 
+/**
+ * Duplicate detection ignores word order: «люблю желе» and «желе люблю» are one fact.
+ * Matching keeps the order, because there the phrasing is part of the question.
+ */
+export function dedupeKeyOf(text: string): string {
+  return normalizeWords(text).sort().join(' ');
+}
+
 function overlapOf(terms: string[], normalized: string): number {
   if (terms.length === 0) return 0;
   const words = new Set(normalized.split(' '));
@@ -108,7 +116,10 @@ export function scoreMemory(item: MemoryItem, overlap: number, now = Date.now())
 export function isLiveMemory(item: MemoryItem, now = Date.now()): boolean {
   if (item.deletedAt || item.validTo) return false;
   const ttlDays = KIND_TTL_DAYS[item.kind];
-  if (!item.isPinned && ttlDays > 0 && now - item.updatedAt > ttlDays * DAY_MS) return false;
+  // An event ages from when it happened, not from when it was last repeated: mentioning last
+  // year's trip again should not make it young. Preferences and rules have no clock at all.
+  const anchor = item.kind === 'event' || item.kind === 'note' ? item.createdAt : item.updatedAt;
+  if (!item.isPinned && ttlDays > 0 && now - anchor > ttlDays * DAY_MS) return false;
   return true;
 }
 
@@ -209,7 +220,8 @@ export function applyRemember(
   const importance = clampImportance(input.importance, kind);
   const tag = input.tag ? resolveMemoryTag(input.tag, vocabulary) : null;
 
-  const same = items.find((item) => item.normalized === normalized && isLiveMemory(item, now));
+  const same = items.find((item) => item.normalized === normalized && isLiveMemory(item, now))
+    ?? items.find((item) => isLiveMemory(item, now) && dedupeKeyOf(item.text) === dedupeKeyOf(text));
   if (same) {
     const merged: MemoryItem = {
       ...same,

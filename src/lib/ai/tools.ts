@@ -188,16 +188,29 @@ export function createLocalToolExecutor(params: ToolExecutorParams) {
         if (!result) {
           return { error: 'Пустой факт. Передайте text — одну короткую фразу от третьего лица.' };
         }
+        // A contradicting fact usually shares words with the one it replaces, but that id is
+        // only in the prompt when it was injected this turn. Handing the ids back lets the
+        // model supersede in the next round instead of leaving two live facts.
+        const similar = result.status === 'created'
+          ? memoryService
+              .recall({ query: result.item.text, limit: 4 })
+              .filter((item) => item.id !== result.item.id)
+              .slice(0, 2)
+              .map((item) => ({ id: item.id, text: item.text }))
+          : [];
         return {
           status: result.status,
           id: result.item.id,
           kind: result.item.kind,
           tag: result.item.tag,
           replacedId: result.superseded?.id,
+          similar: similar.length > 0 ? similar : undefined,
           message:
             result.status === 'merged'
               ? 'Этот факт уже был в памяти, отметил повтор.'
-              : 'Запомнил.',
+              : similar.length > 0
+                ? 'Запомнил. Похожие факты уже есть в памяти: если один из них устарел, вызови memory с replaces.'
+                : 'Запомнил.',
         };
       }
 
