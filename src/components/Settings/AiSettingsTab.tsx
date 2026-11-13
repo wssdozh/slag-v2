@@ -3,7 +3,7 @@ import React from 'react';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { AiSettings, AiSourceMode, SubscriptionAiTier } from '../../types';
 import { useAiSettingsForm } from './ai/useAiSettingsForm';
-import { useAiPromptOverrides } from '../../hooks/useAiPromptOverrides';
+import { AiPromptModal } from './AiPromptModal';
 import { ConnectionsSection } from './ai/ConnectionsSection';
 import { RolesSection } from './ai/RolesSection';
 import { MemoryList } from './MemoryList';
@@ -19,7 +19,7 @@ import {
 export const AiSettingsTab: React.FC = () => {
   const form = useAiSettingsForm();
   const { draft } = form;
-  const prompt = useAiPromptOverrides();
+  const [promptOpen, setPromptOpen] = React.useState(false);
 
   // Read once: the plan arrives from the relay's health check, and subscribing here made the
   // lock re-render mid-interaction. A stale lock while the tab is open is a known gap, not a
@@ -37,6 +37,7 @@ export const AiSettingsTab: React.FC = () => {
   };
 
   return (
+    <>
     <form id="ai-settings-form" onSubmit={handleSubmit} className="flex flex-col gap-3">
       <SettingsGroup title="Источник моделей">
         <SettingsSelect
@@ -186,46 +187,29 @@ export const AiSettingsTab: React.FC = () => {
 
       {/* слова владельца: свой промпт и персона, синхронизируются с хранилищем */}
       <SettingsGroup title="Промпт">
-        <div className="px-3 py-3 sm:px-4">
-          <textarea
-            rows={4}
-            value={prompt.prompt}
-            onChange={(event) => prompt.setPrompt(event.target.value)}
-            aria-label="Дополнительные инструкции к промпту"
-            placeholder="Что ассистент должен помнить о тебе: тон, привычки, чего не делать, как отвечать"
-            className="w-full bg-transparent text-xs text-fg-primary placeholder:text-fg-dim resize-none outline-none ring-0 leading-relaxed"
-          />
-        </div>
-        <SettingsDivider />
         <SettingsRow
-          label="Своя персона"
+          label="Промпт и персона"
           right={
-            <SettingsSwitch
-              checked={prompt.personaEnabled}
-              onChange={prompt.setPersonaEnabled}
-              label="Своя персона"
-            />
+            <button
+              type="button"
+              onClick={() => setPromptOpen(true)}
+              className="px-2.5 py-1 rounded-md text-xs text-fg-secondary hover:text-fg-primary hover:bg-surface-hover transition-colors cursor-pointer"
+            >
+              Изменить
+            </button>
           }
         />
-        <div className={`px-3 pb-3 sm:px-4 ${prompt.personaEnabled ? '' : 'opacity-50'}`}>
-          <textarea
-            rows={3}
-            value={prompt.persona}
-            onChange={(event) => prompt.setPersona(event.target.value)}
-            disabled={!prompt.personaEnabled}
-            aria-label="Персона ассистента"
-            placeholder="Кем представляется: имя, характер, манера речи. Дописывается к основному промпту"
-            className="w-full bg-transparent text-xs text-fg-primary placeholder:text-fg-dim resize-none outline-none ring-0 leading-relaxed"
-          />
-        </div>
         <p className="px-3 pb-3 text-2xs leading-relaxed text-fg-muted sm:px-4">
-          Оба поля едут вместе с хранилищем: бот в телеграме и приложение на всех устройствах
-          отвечают одинаково. Персона добавляется к промпту, а не заменяет его.
+          Едет вместе с хранилищем: бот в телеграме и приложение на всех устройствах отвечают
+          одинаково. Персона добавляется к промпту, а не заменяет его.
         </p>
       </SettingsGroup>
 
       {/* что ассистент запомнил о человеке */}
       <MemoryList />
     </form>
+    {/* The dialog lives outside the settings form: a form inside a form is not a form at all. */}
+    <AiPromptModal isOpen={promptOpen} onClose={() => setPromptOpen(false)} />
+    </>
   );
 };

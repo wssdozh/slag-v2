@@ -1,72 +1,68 @@
 // The owner's own words for the assistant: a prompt and an optional persona, kept in the vault
 // so every device answers the same way instead of each install having its own voice.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { WorkspaceState } from '../types';
 import { storage } from '../lib/storage';
 
-const SAVE_DELAY_MS = 400;
-
-type PromptState = Pick<WorkspaceState, 'aiPrompt' | 'aiPersona' | 'aiPersonaEnabled'>;
-
-export interface AiPromptOverrides {
+export interface AiPromptDraft {
   prompt: string;
   persona: string;
   personaEnabled: boolean;
+}
+
+export interface AiPromptOverrides {
+  draft: AiPromptDraft;
+  isDirty: boolean;
+  /** Re-reads the vault: a sync may have changed the prompt while the dialog was closed. */
+  reload: () => void;
   setPrompt: (value: string) => void;
   setPersona: (value: string) => void;
   setPersonaEnabled: (value: boolean) => void;
+  save: () => void;
 }
 
-function readState(): PromptState {
+function readDraft(): AiPromptDraft {
   const workspace = storage.getWorkspaceState();
   return {
-    aiPrompt: workspace.aiPrompt ?? '',
-    aiPersona: workspace.aiPersona ?? '',
-    aiPersonaEnabled: workspace.aiPersonaEnabled === true,
+    prompt: workspace.aiPrompt ?? '',
+    persona: workspace.aiPersona ?? '',
+    personaEnabled: workspace.aiPersonaEnabled === true,
   };
 }
 
-export function useAiPromptOverrides(): AiPromptOverrides {
-  const [state, setState] = useState<PromptState>(readState);
-  // One write per pause, not per keystroke: every save also queues a sync change, and a prompt
-  // is typed, not pasted in one go.
-  const timer = useRef<number | null>(null);
-  const pending = useRef<PromptState | null>(null);
+function sameDraft(left: AiPromptDraft, right: AiPromptDraft): boolean {
+  return left.prompt === right.prompt
+    && left.persona === right.persona
+    && left.personaEnabled === right.personaEnabled;
+}
 
-  const flush = useCallback(() => {
-    if (timer.current !== null) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-    const patch = pending.current;
-    pending.current = null;
-    if (patch) storage.saveWorkspaceState(patch);
+export function useAiPromptOverrides(): AiPromptOverrides {
+  const [draft, setDraft] = useState<AiPromptDraft>(readDraft);
+  const [saved, setSaved] = useState<AiPromptDraft>(readDraft);
+
+  const reload = useCallback(() => {
+    const fresh = readDraft();
+    setDraft(fresh);
+    setSaved(fresh);
   }, []);
 
-  const queue = useCallback((patch: PromptState) => {
-    pending.current = patch;
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = window.setTimeout(flush, SAVE_DELAY_MS);
-  }, [flush]);
-
-  // A settings tab closed mid-typing keeps what was typed: nothing is more annoying than a
-  // prompt that reverts because the last keystroke was 200 ms before the click.
-  useEffect(() => () => flush(), [flush]);
-
-  const update = useCallback((patch: Partial<PromptState>) => {
-    setState((current) => {
-      const next = { ...current, ...patch };
-      queue(next);
-      return next;
-    });
-  }, [queue]);
+  const save = useCallback(() => {
+    const patch: Pick<WorkspaceState, 'aiPrompt' | 'aiPersona' | 'aiPersonaEnabled'> = {
+      aiPrompt: draft.prompt.trim(),
+      aiPersona: draft.persona.trim(),
+      aiPersonaEnabled: draft.personaEnabled,
+    };
+    storage.saveWorkspaceState(patch);
+    setSaved(draft);
+  }, [draft]);
 
   return {
-    prompt: state.aiPrompt ?? '',
-    persona: state.aiPersona ?? '',
-    personaEnabled: state.aiPersonaEnabled === true,
-    setPrompt: (value) => update({ aiPrompt: value }),
-    setPersona: (value) => update({ aiPersona: value }),
-    setPersonaEnabled: (value) => update({ aiPersonaEnabled: value }),
+    draft,
+    isDirty: !sameDraft(draft, saved),
+    reload,
+    setPrompt: (prompt) => setDraft((current) => ({ ...current, prompt })),
+    setPersona: (persona) => setDraft((current) => ({ ...current, persona })),
+    setPersonaEnabled: (personaEnabled) => setDraft((current) => ({ ...current, personaEnabled })),
+    save,
   };
 }
