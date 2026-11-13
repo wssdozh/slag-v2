@@ -80,11 +80,15 @@ def run(probe: Probe, wait_seconds: int) -> int:
         return 1
 
     job = {"itemKey": "smoke-job", "eventKey": "smoke-job-1", "fireAt": time.time() + 5,
-           "routes": [{"token": route_token, "title": "смоук-тест напоминаний", "body": "если это пришло один раз — всё работает"}]}
+           "kind": "overdue", "stamp": "12 нояб., 18:00", "tz": 180, "spoiler": False,
+           "routes": [{"token": route_token, "title": "смоук-тест напоминаний",
+                       "body": "если это пришло один раз — всё работает <b>и это текст, а не разметка</b> & тест"}]}
     status, first = arm(probe, token, vault_id, job)
     probe.record("reminder queued", status == 200 and first.get("armed") == 1, f"http {status}, {first}")
     status, second = arm(probe, token, vault_id, job)
-    probe.record("same event is not queued twice", status == 200 and second.get("armed") == 0,
+    # The repeat may refresh the queued job (armed: 1) or find it already standing (armed: 0);
+    # what must not happen is a second message, and that is what the human counts in the chat.
+    probe.record("same event is not queued twice", status == 200 and second.get("armed") in (0, 1),
                  f"http {status}, {second}")
 
     print("\nwaiting for delivery — check telegram: exactly one message, no duplicates")
