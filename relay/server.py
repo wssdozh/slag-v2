@@ -14,6 +14,7 @@ import mimetypes
 import os
 from pathlib import Path
 import secrets
+import socket
 import sqlite3
 import struct
 import time
@@ -2459,7 +2460,13 @@ class SlagRelayServer:
                 logger.error("Cleanup error: %s", exc)
 
     async def run(self) -> None:
-        server = await asyncio.start_server(self.handle_connection, self.host, self.port)
+        if ":" in self.host:
+            # A plain `::` bind is v6-only in asyncio, and every IPv4 client then gets "connection
+            # refused". dualstack_ipv6 keeps both families on one socket and one event loop.
+            sock = socket.create_server((self.host, self.port), family=socket.AF_INET6, dualstack_ipv6=True)
+            server = await asyncio.start_server(self.handle_connection, sock=sock)
+        else:
+            server = await asyncio.start_server(self.handle_connection, self.host, self.port)
         addrs = ", ".join(str(sock.getsockname()) for sock in server.sockets)
         logger.info("SLAG Relay Server running on %s (DB: %s, account auth: %s)", addrs, self.db.db_path, self.require_account_auth)
         asyncio.create_task(self.background_cleanup_loop())
