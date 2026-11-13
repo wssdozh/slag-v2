@@ -140,8 +140,12 @@ export class StorageService {
     return this.attachments.getDataUrl(att);
   }
 
-  public async importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<void> {
+  public async importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<boolean> {
     return this.attachments.importSynced(attachment, dataUrl);
+  }
+
+  public async hasAttachmentBytes(id: string, relativePath: string): Promise<boolean> {
+    return this.attachments.hasBytes(id, relativePath);
   }
 
   public saveAttachment(attachment: SlagAttachment): Promise<void> {

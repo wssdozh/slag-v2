@@ -44,6 +44,13 @@ export function cursorKey(scope: SyncScope, vaultId?: string): string {
   return `slag_sync_cursor_${vaultId || scope.vaultId}_${scope.roomId || 'local'}`;
 }
 
+/** When this device last asked the room for a file: one request per id per day, not per push. */
+export function attachmentRequestsKey(scope: SyncScope, vaultId?: string): string {
+  return `slag_sync_attachment_requests_${vaultId || scope.vaultId}_${scope.roomId || 'local'}`;
+}
+
+export const ATTACHMENT_REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 export function loadCursor(scope: SyncScope): number {
   const raw = localStorage.getItem(cursorKey(scope));
   const value = raw ? Number(raw) : 0;
@@ -63,6 +70,27 @@ export function saveSentHashes(scope: SyncScope, hashes: Record<string, string>)
     localStorage.setItem(sentHashesKey(scope), JSON.stringify(hashes));
   } catch {
     // Quota exceeded: the next push simply resends a few unchanged entities.
+  }
+}
+
+export function loadAttachmentRequests(scope: SyncScope): Record<string, number> {
+  return readStoredJson<Record<string, number>>(attachmentRequestsKey(scope), {});
+}
+
+/**
+ * Stamped when a request actually leaves in a bundle, not when it is queued: a push that fails
+ * before the relay sees it must not buy the file another day of silence.
+ */
+export function markAttachmentRequestSent(scope: SyncScope, attachmentId: string, at = Date.now()): void {
+  const requests = loadAttachmentRequests(scope);
+  for (const [key, sentAt] of Object.entries(requests)) {
+    if (at - sentAt > ATTACHMENT_REQUEST_COOLDOWN_MS) delete requests[key];
+  }
+  requests[`att:${attachmentId}`] = at;
+  try {
+    localStorage.setItem(attachmentRequestsKey(scope), JSON.stringify(requests));
+  } catch {
+    // Quota exceeded: the next scan asks again, which costs one small bundle.
   }
 }
 

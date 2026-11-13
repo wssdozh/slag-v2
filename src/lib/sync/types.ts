@@ -57,9 +57,17 @@ export interface SyncConfig {
   trustedDevices: DeviceProfile[];
 }
 
+/** A device asking the room for a file whose metadata it holds but whose bytes never landed. */
+export interface AttachmentRequestPayload {
+  attachmentId: string;
+  name: string;
+  size: number;
+  relativePath: string;
+}
+
 export interface SyncChangeItem {
   id: string;
-  type: 'item' | 'folder' | 'workspace' | 'attachment' | 'trash' | 'draft' | 'memory';
+  type: 'item' | 'folder' | 'workspace' | 'attachment' | 'attachment_request' | 'trash' | 'draft' | 'memory';
   action: 'upsert' | 'delete' | 'rename' | 'restore' | 'purge';
   version: number;
   hash: string;

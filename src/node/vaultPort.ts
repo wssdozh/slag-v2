@@ -130,12 +130,23 @@ export class NodeVault implements VaultPort {
     }
   }
 
-  public async importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<void> {
+  public async importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<boolean> {
     const bytes = dataUrlToBytes(dataUrl);
     if (!bytes) throw new Error(`Attachment ${attachment.id} arrived without usable bytes`);
     const target = path.join(this.attachmentsDir, safeAttachmentName(attachment));
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, bytes);
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, bytes);
+      return true;
+    } catch {
+      // The caller must not mark these bytes delivered; it asks for them again later.
+      return false;
+    }
+  }
+
+  public async hasBytes(_id: string, relativePath: string): Promise<boolean> {
+    const attachment = { relativePath, id: _id, name: path.basename(relativePath) } as SlagAttachment;
+    return fs.existsSync(path.join(this.attachmentsDir, safeAttachmentName(attachment)));
   }
 
   public async getAttachmentDataUrl(attachment: SlagAttachment): Promise<string | undefined> {

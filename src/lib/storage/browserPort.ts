@@ -17,6 +17,7 @@ export const browserVaultPort: VaultPort = {
   importSyncedVaultData: (data) => storage.importSyncedVaultData(data),
   importSyncedAttachment: (attachment, dataUrl) => storage.importSyncedAttachment(attachment, dataUrl),
   getAttachmentDataUrl: (attachment) => storage.getAttachmentDataUrl(attachment),
+  hasBytes: (id, relativePath) => storage.hasAttachmentBytes(id, relativePath),
 
   getComposerDraft: (folderPath) => storage.getComposerDraft(folderPath),
   saveComposerDraft: (folderPath, draft, origin = 'local') => storage.saveComposerDraft(folderPath, draft, origin),

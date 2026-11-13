@@ -1,5 +1,5 @@
 import type { SyncEngine } from './syncEngine';
-import type { SyncBundle, EncryptedBundle } from './types';
+import type { SyncBundle, EncryptedBundle, AttachmentRequestPayload } from './types';
 import { decryptBundle } from './crypto';
 import { touchDeviceLastSeen } from './devices';
 import { loadSentHashes, loadTombstones, saveSentHashes, tombstonesKey } from './localBookkeeping';
@@ -106,6 +106,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       let hasWorkspaceChanged = false;
       let hasDraftsChanged = false;
       let hasMemoryChanged = false;
+      let missingAttachmentData = false;
       let workspaceState: WorkspaceState | undefined;
 
       const currentItems: SlagItem[] = engine.importBuffer ? [...engine.importBuffer.items] : [...vault().getItems()];
@@ -219,17 +220,40 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             syncLog.info(
               `Received attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB, ${attachment.mimeType}) from ${bundle.fromDeviceId}`
             );
-            await vault().importSyncedAttachment(attachment, payload.dataUrl);
-            // This device now holds the same bytes. Without the mark it would send them right
-            // back to the device it just got them from: a five-megabyte ping-pong, both ways.
-            const sentHashes = loadSentHashes(engine.bookkeeping);
-            sentHashes[`att:${attachment.id}`] = attachmentSignature(attachment);
-            saveSentHashes(engine.bookkeeping, sentHashes);
-            // The note did not change, but the UI resolves attachment urls per item: reuse the
-            // single sync event instead of inventing a second one for bytes.
-            hasItemsChanged = true;
+            const imported = await vault().importSyncedAttachment(attachment, payload.dataUrl);
+            if (imported) {
+              engine.missingAttachments.delete(attachment.id);
+              engine.cancelAttachmentRequest(attachment.id);
+              // This device now holds the same bytes. Without the mark it would send them right
+              // back to the device it just got them from: a five-megabyte ping-pong, both ways.
+              const sentHashes = loadSentHashes(engine.bookkeeping);
+              sentHashes[`att:${attachment.id}`] = attachmentSignature(attachment);
+              saveSentHashes(engine.bookkeeping, sentHashes);
+              // The note did not change, but the UI resolves attachment urls per item: reuse the
+              // single sync event instead of inventing a second one for bytes.
+              hasItemsChanged = true;
+            } else {
+              // The relay hands a bundle out once and its sender already counts these bytes as
+              // delivered, so replaying eight megabytes until they land proves nothing and burns
+              // the quota. Keep the metadata, ACK the bundle, and ask the room for the file instead.
+              syncLog.warn(`Attachment "${attachment.name}" did not reach the disk; asking the room for the bytes again`);
+              engine.missingAttachments.add(attachment.id);
+              // The staged import has not reached `getItems` yet, so ask for this file directly.
+              engine.requestAttachmentBytes(attachment);
+              hasItemsChanged = true;
+              missingAttachmentData = true;
+            }
           } else {
             syncLog.warn(`Ignored attachment change without usable bytes: ${ch.id}`);
+          }
+        } else if (ch.type === 'attachment_request' && ch.action === 'upsert') {
+          const request = ch.payload as Partial<AttachmentRequestPayload> | undefined;
+          if (request?.attachmentId) {
+            // Only a device that still holds the file answers; for everyone else this is noise,
+            // so missing bytes are ignored instead of logged on every peer.
+            if (await vault().hasBytes(request.attachmentId, request.relativePath ?? '')) {
+              engine.forceAttachmentSend(request.attachmentId);
+            }
           }
         } else if (ch.type === 'workspace' && ch.payload) {
           workspaceState = ch.payload as WorkspaceState;
@@ -312,6 +336,11 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             }
           }
         }
+      }
+
+      if (missingAttachmentData) {
+        // One full-vault pass per session; the per-file cooldown keeps it from asking daily.
+        void engine.requestMissingAttachments();
       }
 
       if (tombstonesDirty) {

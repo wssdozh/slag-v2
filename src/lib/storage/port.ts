@@ -34,8 +34,11 @@ export interface VaultPort {
   saveMemory(items: MemoryItem[], origin?: ChangeOrigin): boolean;
 
   importSyncedVaultData(data: SyncedVaultData): Promise<void>;
-  importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<void>;
+  /** `false` means the bytes did not reach the disk; the caller must not treat them as delivered. */
+  importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<boolean>;
   getAttachmentDataUrl(attachment: SlagAttachment): Promise<string | undefined>;
+  /** Whether this device can actually read the bytes, without base64-ing them. */
+  hasBytes(id: string, relativePath: string): Promise<boolean>;
 
   // Drafts are per-device and never leave the device that wrote them, so the node returns null.
   getComposerDraft(folderPath: string): ComposerDraft | null;

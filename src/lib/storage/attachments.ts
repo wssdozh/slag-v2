@@ -11,7 +11,7 @@ import {
   BaseDirectory,
 } from '@tauri-apps/plugin-fs';
 import { idbSaveAttachment, idbGetAttachment } from './indexedDb';
-import { blobToDataUrl } from '../media/blobToDataUrl';
+import { bytesToBase64, dataUrlToBytes } from '../media/byteCodec';
 import { isSafeVaultRelativePath } from '../vault/safePath';
 
 /**
@@ -80,24 +80,18 @@ export class AttachmentStore {
   }
 
   /**
-   * Playable url for an attachment. Lives only in memory: a blob: URL inside
-   * the item would be dead after restart and would leak into localStorage/sync.
+   * The bytes of one attachment, wherever this build keeps them: `.attachments/` on desktop,
+   * IndexedDB in the browser. Decoded in place — asking the webview for a blob: URL is a CSP
+   * error in WebKitGTK, so nothing here goes back through the network stack.
    */
-  public async getUrl(id: string, relativePath: string, mimeType?: string): Promise<string | undefined> {
-    const cached = this.urlCache.get(id);
-    if (cached) return cached;
-
-    // Disk first: a blob URL streams and keeps five megabytes out of a JS string. A file that
-    // only lives in IndexedDB still plays, as the base64 it was stored as.
+  private async loadBytes(id: string, relativePath: string): Promise<{ bytes: Uint8Array; mimeType: string } | undefined> {
     if (isTauri()) {
       try {
         const path = await this.pathFor(id, relativePath);
         if (path) {
           const bytes = await readFile(path, { baseDir: BaseDirectory.AppData });
-          const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mimeType || 'application/octet-stream' }));
-          this.urlCache.set(id, url);
-          mediaLog.debug(`Attachment url from disk: ${path.split('/').pop()} (${Math.round(bytes.length / 1024)} KB)`);
-          return url;
+          mediaLog.debug(`Attachment bytes from disk: ${path.split('/').pop()} (${Math.round(bytes.length / 1024)} KB)`);
+          return { bytes, mimeType: '' };
         }
       } catch (err) {
         mediaLog.warn(`Failed to read attachment ${id} from disk`, err);
@@ -106,10 +100,45 @@ export class AttachmentStore {
 
     const stored = await idbGetAttachment(id);
     if (stored?.dataUrl) {
-      this.urlCache.set(id, stored.dataUrl);
-      mediaLog.debug(`Attachment url from IndexedDB: ${id} (${Math.round(stored.dataUrl.length / 1024)} KB base64)`);
-      return stored.dataUrl;
+      const decoded = dataUrlToBytes(stored.dataUrl);
+      if (decoded) {
+        mediaLog.debug(`Attachment bytes from IndexedDB: ${id} (${Math.round(decoded.bytes.length / 1024)} KB)`);
+        return decoded;
+      }
     }
+    return undefined;
+  }
+
+  /**
+   * Playable url for an attachment. Lives only in memory: a blob: URL inside
+   * the item would be dead after restart and would leak into localStorage/sync.
+   */
+  public async getUrl(id: string, relativePath: string, mimeType?: string): Promise<string | undefined> {
+    const cached = this.urlCache.get(id);
+    if (cached) return cached;
+
+    // The browser has no filesystem: IndexedDB's data URL is already a usable source, so it is
+    // returned as is instead of being decoded and turned back into a blob.
+    if (!isTauri()) {
+      const stored = await idbGetAttachment(id);
+      if (stored?.dataUrl) {
+        this.urlCache.set(id, stored.dataUrl);
+        return stored.dataUrl;
+      }
+      mediaLog.warn(`Attachment bytes are not on this device: ${relativePath} (${mimeType || 'unknown mime'})`);
+      return undefined;
+    }
+
+    // Disk first: a blob URL streams and keeps five megabytes out of a JS string.
+    const loaded = await this.loadBytes(id, relativePath);
+    if (loaded) {
+      const type = mimeType || loaded.mimeType || 'application/octet-stream';
+      const url = URL.createObjectURL(new Blob([new Uint8Array(loaded.bytes)], { type }));
+      this.urlCache.set(id, url);
+      mediaLog.debug(`Attachment url from bytes: ${id} (${Math.round(loaded.bytes.length / 1024)} KB, ${type})`);
+      return url;
+    }
+
     // The answer that used to be silent: nothing on this device can play this attachment.
     mediaLog.warn(`Attachment bytes are not on this device: ${relativePath} (${mimeType || 'unknown mime'})`);
     return undefined;
@@ -120,21 +149,15 @@ export class AttachmentStore {
    * there is one answer to "where are this attachment's bytes" instead of two.
    */
   public async getDataUrl(att: SlagAttachment): Promise<string | undefined> {
-    const url = await this.getUrl(att.id, att.relativePath, att.mimeType);
-    if (!url) return undefined;
-    if (url.startsWith('data:')) {
-      mediaLog.debug(`Attachment ready to sync as base64: ${att.name}`);
-      return url;
-    }
-    try {
-      const blob = await (await fetch(url)).blob();
-      const dataUrl = await blobToDataUrl(blob);
-      mediaLog.debug(`Attachment ready to sync: ${att.name} (${Math.round(dataUrl.length / 1024)} KB base64)`);
-      return dataUrl;
-    } catch (err) {
-      mediaLog.warn(`Failed to read attachment bytes ${att.id}`, err);
+    const loaded = await this.loadBytes(att.id, att.relativePath);
+    if (!loaded) {
+      mediaLog.warn(`Failed to read attachment bytes ${att.id}: nothing on this device`);
       return undefined;
     }
+    const type = att.mimeType || loaded.mimeType || 'application/octet-stream';
+    const dataUrl = `data:${type};base64,${bytesToBase64(loaded.bytes)}`;
+    mediaLog.debug(`Attachment ready to sync: ${att.name} (${Math.round(dataUrl.length / 1024)} KB base64)`);
+    return dataUrl;
   }
 
   /** Persist base64 bytes to .attachments/ once; markdown keeps only metadata. */
@@ -142,10 +165,11 @@ export class AttachmentStore {
     for (const att of item.attachments || []) await this.persistOne(att);
   }
 
-  private async persistOne(att: SlagAttachment): Promise<void> {
-    if (!isTauri()) return;
-    if (!att.dataUrl?.startsWith('data:')) return;
-    if (this.persistedIds.has(att.id)) return;
+  private async persistOne(att: SlagAttachment): Promise<boolean> {
+    if (!att.dataUrl?.startsWith('data:')) return false;
+    if (this.persistedIds.has(att.id)) return true;
+    // The browser keeps bytes in IndexedDB, which the write queue already owns.
+    if (!isTauri()) return true;
 
     try {
       const dir = this.attachmentsDir();
@@ -153,30 +177,48 @@ export class AttachmentStore {
       const path = `${dir}/${this.basename(att)}`;
       if (await exists(path, { baseDir: BaseDirectory.AppData })) {
         this.persistedIds.add(att.id);
-        return;
+        return true;
       }
 
-      const response = await fetch(att.dataUrl);
-      const buffer = await response.arrayBuffer();
-      await writeFile(path, new Uint8Array(buffer), { baseDir: BaseDirectory.AppData });
+      const decoded = dataUrlToBytes(att.dataUrl);
+      if (!decoded) {
+        fsLog.warn(`Attachment ${att.id} has a non-base64 data URL; bytes were not written`);
+        return false;
+      }
+      await writeFile(path, decoded.bytes, { baseDir: BaseDirectory.AppData });
       this.persistedIds.add(att.id);
+      return true;
     } catch (err) {
       fsLog.warn(`Failed to persist attachment ${att.id}`, err);
+      return false;
     }
+  }
+
+  /** Whether the bytes are readable here, without base64-ing them first. */
+  public async hasBytes(id: string, relativePath: string): Promise<boolean> {
+    if (isTauri()) {
+      return (await this.pathFor(id, relativePath)) !== undefined;
+    }
+    return (await idbGetAttachment(id)) !== null;
   }
 
   /**
    * Bytes that arrived through sync. Not `save`: its session cache would hold every
    * received file as base64, and on a phone that is a hundred megabytes of string per album.
    */
-  public async importSynced(attachment: SlagAttachment, dataUrl: string): Promise<void> {
+  public async importSynced(attachment: SlagAttachment, dataUrl: string): Promise<boolean> {
     this.urlCache.delete(attachment.id);
     this.nameIndex = null;
     await this.enqueueWrite({ ...attachment, dataUrl });
-    await this.persistOne({ ...attachment, dataUrl });
+    const persisted = await this.persistOne({ ...attachment, dataUrl });
+    if (!persisted) {
+      mediaLog.warn(`Synced attachment "${attachment.name}" did not reach the disk; bytes stay missing`);
+      return false;
+    }
     mediaLog.info(
       `Imported synced attachment "${attachment.name}" (${Math.round(attachment.size / 1024)} KB, ${attachment.mimeType})`,
     );
+    return true;
   }
 
   /** A note keeps attachment ids; the bytes belong in IndexedDB, once per attachment. */

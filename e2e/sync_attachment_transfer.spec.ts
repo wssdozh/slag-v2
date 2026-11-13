@@ -6,6 +6,10 @@ test.setTimeout(180_000);
  * Bytes ride one change of type `attachment` inside the same encrypted bundle. Three things must
  * hold: the note itself stays metadata-only, the bytes leave in their own change, and a device
  * that receives that change can actually resolve a url afterwards.
+ *
+ * Packing them must not go back through the network stack either: the bytes come straight out of
+ * IndexedDB, so no `fetch` of a `blob:`/`data:` url happens while a bundle is built. A counter on
+ * `window.fetch` proves that — the only fetch calls left are the relay's own, and those are mocked.
  */
 test('attachment bytes travel as their own change and become playable on the receiver', async ({ page }) => {
   await page.goto('/');
@@ -23,7 +27,9 @@ test('attachment bytes travel as their own change and become playable on the rec
       };
       await init('synthetic attachment seed');
 
-      const bytes = 'data:audio/mp4;base64,//uQxAAAANgAAABL2';
+      // A base64 body whose length is a multiple of four: `atob` refuses a remainder of one, and
+      // the whole point of the pass is that these bytes come back out of the codec.
+      const bytes = 'data:audio/mp4;base64,AAECAwQFBgcICQoL';
       const root = {
         type: 'note' as const,
         folder: 'Входящие',
@@ -42,7 +48,9 @@ test('attachment bytes travel as their own change and become playable on the rec
         dataUrl: bytes,
       };
       storage.saveItem({ ...root, id: 'att-live', title: 'Трек', attachments: [liveAttachment] });
-      storage.saveAttachment(liveAttachment);
+      // Bytes must already be in IndexedDB when the pass reads them; otherwise the frame would
+      // legitimately contain no attachment change and the check below would prove nothing.
+      await storage.saveAttachment(liveAttachment);
 
       // The same note on a device that never received the bytes: metadata only, nothing to send.
       storage.saveItem({
@@ -60,11 +68,38 @@ test('attachment bytes travel as their own change and become playable on the rec
       };
       engine.wsSupportsBinary = false;
 
-      engine.attachmentPass = true;
-      await push();
-      if (frames.length !== 1) return { error: `expected one pushed frame, got ${frames.length}` };
+      // Saving a note queues a push of its own. Let it leave first, so the frame checked below
+      // belongs to the attachment pass and not to the save that preceded it.
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      await sleep(150);
+      for (let i = 0; i < 100 && engine.isProcessingSync; i++) await sleep(20);
+      // Forget what that push delivered: the pass below has to pack the note and the bytes again.
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('slag_sync_sent_hashes_'))
+        .forEach((key) => localStorage.removeItem(key));
 
-      const envelope = JSON.parse(frames[0]).bundle;
+      // Bytes must never be read through a `blob:`/`data:` fetch: a five-megabyte file would be
+      // pulled through the network stack twice, and a data: url is not a stable source in WebKit.
+      const relayFetch = window.fetch;
+      const byteUrlFetches: string[] = [];
+      window.fetch = (input, init) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        if (url.startsWith('blob:') || url.startsWith('data:')) byteUrlFetches.push(url);
+        return relayFetch(input, init);
+      };
+      const framesBeforePush = frames.length;
+      engine.attachmentPass = true;
+      try {
+        await push();
+      } finally {
+        window.fetch = relayFetch;
+      }
+      const pushedFrames = frames.slice(framesBeforePush);
+      if (pushedFrames.length !== 1) {
+        return { error: `expected one pushed frame, got ${pushedFrames.length}`, byteUrlFetches: byteUrlFetches.length };
+      }
+
+      const envelope = JSON.parse(pushedFrames[0]).bundle;
       await engine.handleIncomingMessage(JSON.stringify({ type: 'server_ack', bundleId: envelope.bundleId }));
       const bundle = await decryptBundle(envelope, await deriveVaultKey('synthetic attachment seed'));
 
@@ -124,6 +159,7 @@ test('attachment bytes travel as their own change and become playable on the rec
           (attachmentChanges[0]?.payload as { attachment?: { dataUrl?: string } } | undefined)?.attachment?.dataUrl === undefined,
         absentBytesNotSent: !bundle.changes.some((ch: { id: string }) => ch.id === 'att-gone-1'),
         importedIsPlayable: Boolean(imported && imported.startsWith('data:')),
+        bytesNeverFetched: byteUrlFetches.length === 0,
         echoedBack: frames.length !== framesBeforeEcho,
       };
     });
@@ -136,6 +172,7 @@ test('attachment bytes travel as their own change and become playable on the rec
     attachmentMetadataHasNoBytes: true,
     absentBytesNotSent: true,
     importedIsPlayable: true,
+    bytesNeverFetched: true,
     echoedBack: false,
   });
 });

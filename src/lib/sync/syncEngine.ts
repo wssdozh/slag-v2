@@ -14,6 +14,9 @@ import {
   stateHashKey,
   syncedIdsKey,
   tombstonesKey,
+  loadAttachmentRequests,
+  markAttachmentRequestSent as stampAttachmentRequest,
+  ATTACHMENT_REQUEST_COOLDOWN_MS,
   type SyncScope,
 } from './localBookkeeping';
 import { logger } from '../logger/logger';
@@ -56,8 +59,9 @@ import type {
   EncryptedBundle,
   DeviceProfile,
   DeviceSyncMode,
+  AttachmentRequestPayload,
 } from './types';
-import type { SlagItem, FolderMeta, WorkspaceState } from '../../types';
+import type { SlagItem, SlagAttachment, FolderMeta, WorkspaceState, AssistantMode } from '../../types';
 import {
   SYNC_ATTACHMENT_MAX_BYTES,
   SYNC_STORAGE_KEYS,
@@ -109,11 +113,21 @@ export class SyncEngine {
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   public currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Answers a question the bot forwarded; registered by the app, absent in the node build. */
-  private assistantHandler: ((requestId: string) => void) | null = null;
+  /**
+   * Answers a question the bot forwarded; registered by the app, absent in the node build.
+   * The question itself is passed through because only the app can hand it to a model.
+   */
+  private assistantHandler: ((requestId: string, question: string, mode: AssistantMode) => void) | null = null;
 
-  public setAssistantHandler(handler: ((requestId: string) => void) | null): void {
+  public setAssistantHandler(
+    handler: ((requestId: string, question: string, mode: AssistantMode) => void) | null
+  ): void {
     this.assistantHandler = handler;
+  }
+
+  /** Tells the relay whether this device could answer with a model at all. */
+  public setAssistantReadyProvider(provider: (() => boolean) | null): void {
+    this.transport.assistantReadyProvider = provider ?? (() => false);
   }
 
   private pushDebounceDeadline = 0;
@@ -137,6 +151,14 @@ export class SyncEngine {
   private attachmentSyncBlocked = false;
   /** Attachments with no bytes on this device, so every push does not re-stat the same files. */
   private unreadableAttachments = new Set<string>();
+  /** Attachment ids a bundle claimed to deliver but this disk never got. */
+  public missingAttachments = new Set<string>();
+  /** Files a paired device asked for again: packed even when `sentHashes` calls them delivered. */
+  private forcedAttachmentIds = new Set<string>();
+  /** Files this device wants from the room, keyed by attachment id; one leaves per bundle. */
+  private pendingRequests = new Map<string, AttachmentRequestPayload>();
+  /** The one full-vault "do I have every byte" scan per session. */
+  private missingScanGeneration = -1;
   public entityHashes = new Map<string, { sig: string; hash: string }>();
   public transport: SyncTransport;
 
@@ -171,8 +193,8 @@ export class SyncEngine {
       },
       // The relay forwards the bot's question; whoever registered a handler answers it.
       // Wired from the app, not imported here: the headless node build has no notifier.
-      onAssistantQuestion: (requestId) => {
-        this.assistantHandler?.(requestId);
+      onAssistantQuestion: (requestId, question, mode) => {
+        this.assistantHandler?.(requestId, question, mode);
       },
       onCatchUpPull: () => {
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));
@@ -324,49 +346,146 @@ export class SyncEngine {
     sentHashes: Record<string, string>,
     packedHashes: Record<string, string>
   ): Promise<boolean> {
-    for (const att of item.attachments ?? []) {
-      const key = `att:${att.id}`;
-      const sig = attachmentSignature(att);
-      const seen = sentHashes[key];
-      if (seen === sig) continue;
-      if (seen === `skip:${sig}`) {
-        syncLog.debug(`Attachment already marked unsyncable: "${att.name}" (${att.size} B)`);
-        continue;
+    const attachments = item.attachments ?? [];
+    const attempted = new Set<string>();
+    // A device asked for these bytes after a bundle it ACKed failed to write them: they leave
+    // again even though `sentHashes` calls them delivered.
+    for (const att of attachments) {
+      if (!this.forcedAttachmentIds.has(att.id)) continue;
+      attempted.add(att.id);
+      const outcome = await this.packAttachmentBytes(att, changes, sentHashes, packedHashes, true);
+      if (outcome === 'packed') {
+        this.forcedAttachmentIds.delete(att.id);
+        return true;
       }
-
-      syncLog.debug(`Reading attachment bytes: "${att.name}" (${Math.round(att.size / 1024)} KB, ${att.mimeType})`);
-      const dataUrl = await vault().getAttachmentDataUrl(att);
-      if (!dataUrl) {
-        // Bytes can appear later (a download, a re-import), so this rests for the session only.
-        this.unreadableAttachments.add(att.id);
-        syncLog.warn(`Attachment has no local bytes, nothing to send: "${att.name}" (${att.relativePath})`);
-        continue;
-      }
-      if (dataUrl.length > SYNC_ATTACHMENT_MAX_BYTES * 1.4) {
-        // No new state for "give up": a marker in the sent-hashes map is already understood by
-        // every reader of it, while a second set would have to be loaded, cleared and migrated.
-        sentHashes[key] = `skip:${sig}`;
-        saveSentHashes(this.bookkeeping, sentHashes);
-        syncLog.warn(
-          `Attachment too big to sync: "${att.name}" (${Math.round(att.size / 1024)} KB > ${SYNC_ATTACHMENT_MAX_BYTES / 1024 / 1024} MB)`
-        );
-        continue;
-      }
-      changes.push({
-        id: att.id,
-        type: 'attachment',
-        action: 'upsert',
-        version: 1,
-        hash: sig,
-        payload: { attachment: { ...att, dataUrl: undefined }, dataUrl },
-      });
-      packedHashes[key] = sig;
-      syncLog.info(
-        `Attachment packed: "${att.name}" (${Math.round(att.size / 1024)} KB, ${Math.round(dataUrl.length / 1024)} KB as base64)`
-      );
-      return true;
+    }
+    for (const att of attachments) {
+      if (attempted.has(att.id)) continue;
+      if (await this.packAttachmentBytes(att, changes, sentHashes, packedHashes, false) === 'packed') return true;
     }
     return false;
+  }
+
+  /**
+   * One attachment's bytes as a change, or why it stayed home. Forced packing ignores the
+   * "already delivered" mark but not the "too big to sync" one: that is a refusal, not a receipt.
+   */
+  private async packAttachmentBytes(
+    att: SlagAttachment,
+    changes: SyncChangeItem[],
+    sentHashes: Record<string, string>,
+    packedHashes: Record<string, string>,
+    forced: boolean
+  ): Promise<'packed' | 'skipped'> {
+    const key = `att:${att.id}`;
+    const sig = attachmentSignature(att);
+    const seen = sentHashes[key];
+    if (seen === `skip:${sig}`) {
+      syncLog.debug(`Attachment already marked unsyncable: "${att.name}" (${att.size} B)`);
+      return 'skipped';
+    }
+    if (!forced && seen === sig) return 'skipped';
+
+    syncLog.debug(`Reading attachment bytes: "${att.name}" (${Math.round(att.size / 1024)} KB, ${att.mimeType})`);
+    const dataUrl = await vault().getAttachmentDataUrl(att);
+    if (!dataUrl) {
+      // Bytes can appear later (a download, a re-import), so this rests for the session only.
+      this.unreadableAttachments.add(att.id);
+      syncLog.warn(`Attachment has no local bytes, nothing to send: "${att.name}" (${att.relativePath})`);
+      return 'skipped';
+    }
+    if (dataUrl.length > SYNC_ATTACHMENT_MAX_BYTES * 1.4) {
+      // No new state for "give up": a marker in the sent-hashes map is already understood by
+      // every reader of it, while a second set would have to be loaded, cleared and migrated.
+      sentHashes[key] = `skip:${sig}`;
+      saveSentHashes(this.bookkeeping, sentHashes);
+      syncLog.warn(
+        `Attachment too big to sync: "${att.name}" (${Math.round(att.size / 1024)} KB > ${SYNC_ATTACHMENT_MAX_BYTES / 1024 / 1024} MB)`
+      );
+      return 'skipped';
+    }
+    changes.push({
+      id: att.id,
+      type: 'attachment',
+      action: 'upsert',
+      version: 1,
+      hash: sig,
+      payload: { attachment: { ...att, dataUrl: undefined }, dataUrl },
+    });
+    packedHashes[key] = sig;
+    syncLog.info(
+      `Attachment packed: "${att.name}" (${Math.round(att.size / 1024)} KB, ${Math.round(dataUrl.length / 1024)} KB as base64)`
+    );
+    return 'packed';
+  }
+
+  /** A paired device lost these bytes: send them again despite the delivered mark. */
+  public forceAttachmentSend(attachmentId: string): void {
+    if (this.forcedAttachmentIds.has(attachmentId)) return;
+    if (this.attachmentSyncBlocked) {
+      syncLog.debug('Forced attachment skipped: relay refused the plan quota for this session');
+      return;
+    }
+    this.forcedAttachmentIds.add(attachmentId);
+    this.attachmentPass = true;
+    this.scheduleDebouncedPush(0);
+  }
+
+  /**
+   * Ask the room for a file this device knows only as metadata. One ask per file per day: a vault
+   * with a dozen broken photos would otherwise ask on every reconnect.
+   */
+  public requestAttachmentBytes(att: SlagAttachment): void {
+    if (this.pendingRequests.has(att.id)) return;
+    const lastRequestedAt = loadAttachmentRequests(this.bookkeeping)[`att:${att.id}`] ?? 0;
+    if (Date.now() - lastRequestedAt < ATTACHMENT_REQUEST_COOLDOWN_MS) return;
+    this.pendingRequests.set(att.id, {
+      attachmentId: att.id,
+      name: att.name,
+      size: att.size,
+      relativePath: att.relativePath,
+    });
+    syncLog.info(`Asking the room for attachment bytes: "${att.name}" (${Math.round(att.size / 1024)} KB)`);
+    this.scheduleDebouncedPush(0);
+  }
+
+  /** At most one request per bundle: the answer is a whole file, not a diff. */
+  public nextAttachmentRequest(): AttachmentRequestPayload | null {
+    const next = this.pendingRequests.values().next();
+    return next.done ? null : next.value;
+  }
+
+  /** Bytes arrived from whichever device answered first: drop the ask that has not left yet. */
+  public cancelAttachmentRequest(attachmentId: string): void {
+    this.pendingRequests.delete(attachmentId);
+  }
+
+  public hasPendingAttachmentRequests(): boolean {
+    return this.pendingRequests.size > 0;
+  }
+
+  public markAttachmentRequestSent(attachmentId: string): void {
+    this.pendingRequests.delete(attachmentId);
+    stampAttachmentRequest(this.bookkeeping, attachmentId);
+  }
+
+  /**
+   * One full-vault pass per session over files this device holds only as metadata. `hasBytes`
+   * stats the disk, so this is not a per-bundle loop; the per-file cooldown does the rest.
+   */
+  public async requestMissingAttachments(): Promise<void> {
+    if (this.missingScanGeneration === this.initGeneration) return;
+    this.missingScanGeneration = this.initGeneration;
+    try {
+      for (const item of vault().getItems()) {
+        for (const att of item.attachments ?? []) {
+          if (await vault().hasBytes(att.id, att.relativePath)) continue;
+          this.requestAttachmentBytes(att);
+        }
+      }
+    } catch (error) {
+      syncLog.warn('Attachment byte scan failed:', error);
+    }
   }
 
   /**
@@ -607,6 +726,10 @@ export class SyncEngine {
         }));
         this.notify();
       }
+      // Bytes a bundle promised but never wrote are gone from the relay once it is ACKed, so the
+      // whole vault is checked here — after the backlog is on disk, not mid-pull. A device that
+      // missed those bundles entirely (an older build ACKed them) still asks on start.
+      void this.requestMissingAttachments();
       // Through the public method on purpose: the e2e harness replaces it to keep a synthetic
       // socket, and init used to call it that way before the socket moved to its own module.
       this.connectWebSocket();
@@ -874,6 +997,9 @@ export class SyncEngine {
     this.importTimer = null;
     this.importBuffer = null;
     this.appliedBundleIds.clear();
+    this.pendingRequests.clear();
+    this.forcedAttachmentIds.clear();
+    this.missingAttachments.clear();
     this.entityHashes.clear();
     this.wsSupportsBinary = false;
     this.pushDirty = false;

@@ -56,7 +56,13 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
 
       // An attachment pass has nothing to do with the note state hash: it must get past the
       // "nothing changed" gate, or unsent bytes on an otherwise untouched vault never leave.
-      if (!engine.attachmentPass && lastSyncedHash === stateHash && pendingOps.length === 0) {
+      // A request for missing bytes changes no note either, so it opens the gate the same way.
+      if (
+        !engine.attachmentPass &&
+        !engine.hasPendingAttachmentRequests() &&
+        lastSyncedHash === stateHash &&
+        pendingOps.length === 0
+      ) {
         // Nothing changed
         engine.status.state = engine.ws && engine.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
         engine.isProcessingSync = false;
@@ -160,6 +166,20 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
           }
         }
         if (!packedOne) syncLog.warn('Attachment pass found nothing it could read; files stay local');
+      }
+
+      // A device that ACKed a bundle but never wrote its bytes asks for them here. One request
+      // per bundle: the answer is a whole file, and one relay pass is enough to carry it.
+      const attachmentRequest = engine.nextAttachmentRequest();
+      if (attachmentRequest) {
+        changes.push({
+          id: attachmentRequest.attachmentId,
+          type: 'attachment_request',
+          action: 'upsert',
+          version: 1,
+          hash: `${attachmentRequest.size}:${attachmentRequest.name}`,
+          payload: attachmentRequest,
+        });
       }
 
       // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
@@ -269,6 +289,14 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
 
       if (generation !== engine.initGeneration) return;
       engine.pendingPushes.set(pending.bundleId, pending);
+      if (attachmentRequest) {
+        // Stamped at the send, not at the enqueue: a request that never left must retry freely.
+        engine.markAttachmentRequestSent(attachmentRequest.attachmentId);
+      }
+      if (engine.hasPendingAttachmentRequests()) {
+        // One request per bundle: every further file waits for its own small push.
+        engine.scheduleDebouncedPush(0);
+      }
       const ws = engine.ws;
       if (ws && ws.readyState === WebSocket.OPEN) {
         // Fast path: the socket is already open, so the bundle leaves on it without waiting
