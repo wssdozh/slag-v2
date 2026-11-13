@@ -1,5 +1,4 @@
-import { SyncEngine, accountClient } from '../../src/lib/sync/syncEngine';
-import { storage } from '../../src/lib/storage';
+import { SyncEngine, storage, accountClient } from '../../src/lib/sync/syncEngine';
 
 // Browser-only: import this module inside page.evaluate so every stub stays in the page.
 export async function withSyncHarness<T>(run: (harness: {

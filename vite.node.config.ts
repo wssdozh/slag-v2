@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 
 const tauriStub = fileURLToPath(new URL('./src/node/stubs/tauri.ts', import.meta.url));
 const tauriFsStub = fileURLToPath(new URL('./src/node/stubs/tauriFs.ts', import.meta.url));
+const storageStub = fileURLToPath(new URL('./src/node/stubs/storageSingleton.ts', import.meta.url));
 const browserPortStub = fileURLToPath(new URL('./src/node/stubs/browserPort.ts', import.meta.url));
 
 /**
@@ -16,10 +17,12 @@ export default defineConfig({
     {
       name: 'slag-node-stubs',
       enforce: 'pre',
-      resolveId(source: string) {
+      resolveId(source: string, importer?: string) {
         if (/^@tauri-apps\/api\//.test(source)) return tauriStub;
         if (source === '@tauri-apps/plugin-fs') return tauriFsStub;
         if (source === './browserPort' || source.endsWith('/lib/storage/browserPort')) return browserPortStub;
+        // `syncEngine` re-exports the browser store for the e2e specs; the node has a port instead.
+        if (source === '../storage' && importer?.includes('/lib/sync/')) return storageStub;
         return null;
       },
     },
