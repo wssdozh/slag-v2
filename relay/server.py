@@ -47,7 +47,6 @@ NOTIFY_INVITE_KEEP_SECONDS = 3600
 # A reminder older than this is dropped instead of delivered: a laptop that wakes up
 # after a week must not dump a pile of stale pings.
 NOTIFY_STALE_SECONDS = 3600
-NOTIFY_MAX_PENDING_INVITES = 5
 NOTIFY_MAX_JOBS_PER_VAULT = 500
 # A route token is a capability, so it is scoped: one token belongs to exactly one vault and
 # cannot be armed from another. The cap on the receiving side is the anti-spam backstop.
@@ -943,9 +942,15 @@ class RelayDatabase:
             self.conn.execute("DELETE FROM notify_jobs WHERE sent_at IS NOT NULL AND sent_at <= ?", (now - 86400,))
 
     def create_notify_invite(self, vault_id: str, code: str, route_token: str) -> float:
+        """One live code per vault: asking again revokes the previous one.
+
+        A pile of valid codes is a pile of open doors, and the app shows a single channel
+        anyway — so the new code replaces the old instead of queueing beside it.
+        """
         now = time.time()
         expires_at = now + NOTIFY_INVITE_TTL_SECONDS
         with self.conn:
+            self.conn.execute("DELETE FROM notify_invites WHERE vault_id = ? AND redeemed_at IS NULL", (vault_id,))
             self.conn.execute(
                 "INSERT INTO notify_invites (code, route_token, vault_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
                 (code, route_token, vault_id, now, expires_at))
@@ -1651,6 +1656,18 @@ class SlagRelayServer:
         if not self.notify_pepper:
             return ""
         return hmac.new(self.notify_pepper, vault_id.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+
+    def _notify_channel_state(self, vault_id: str, route_token: str) -> str:
+        """`pending | active | blocked`, with one answer for every channel that is not ours.
+
+        Unknown, someone else's and never-linked must read the same, otherwise this endpoint
+        turns into an oracle for which channels exist.
+        """
+        tag = self._notify_tag(vault_id)
+        route = self.notify.get(route_token)
+        if not route or not tag or not hmac.compare_digest(route["vault_tag"], tag):
+            return "pending"
+        return "blocked" if route["blocked_at"] is not None else "active"
 
     def _arm_notifications(self, body: dict, vault_id: str) -> tuple[int, list[dict]]:
         """Validate an arm payload and queue it. Caller has already authorized the vault."""
@@ -2401,8 +2418,6 @@ class SlagRelayServer:
                 raise ApiError(400, "invalid_vault")
             # A receive-only device has no business queueing messages for the vault.
             self._authorize_vault(auth, vault_id, write=True)
-            if self.db.pending_notify_invites(vault_id) >= NOTIFY_MAX_PENDING_INVITES:
-                raise ApiError(429, "too_many_invites")
             for _ in range(3):
                 code = secrets.token_hex(6)
                 route_token = secrets.token_hex(16)
@@ -2416,6 +2431,16 @@ class SlagRelayServer:
             link = f"https://t.me/{self.bot.username}?start={code}" if self.bot.username else None
             return {"code": code, "routeToken": route_token, "link": link,
                     "expiresAt": iso_time(expires_at), "expiresIn": NOTIFY_INVITE_TTL_SECONDS}, 200
+
+        if method == "GET" and path == "/api/notify/status":
+            auth = self._auth(headers)
+            self._require_notify_plan(auth)
+            vault_id = query.get("vaultId", "")
+            route_token = query.get("routeToken", "")
+            if not vault_id or not route_token:
+                raise ApiError(400, "invalid_notification")
+            self._authorize_vault(auth, vault_id)
+            return {"state": self._notify_channel_state(vault_id, route_token)}, 200
 
         if method == "POST" and path == "/api/notify/arm":
             auth = self._auth(headers)

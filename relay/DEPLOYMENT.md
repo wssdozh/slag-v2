@@ -208,10 +208,15 @@ gate behaviour: `POST /api/notify/invite` and `POST /api/notify/arm` need a paid
 receive-only device cannot queue messages for the vault; a token that was never linked through
 `/start` **or belongs to another vault** comes back in `dropped` with `not_linked` — the same
 answer on purpose, so the endpoint cannot be used to probe which channels exist. a blocked one
-comes back with `blocked`. more than 5 unredeemed invites per vault → `429 too_many_invites`,
-more than 500 queued jobs per vault or 1000 per account → `429 notify_queue_full`, more than 60
-arm calls per minute per account or 10 invites → `429 too_many_requests`. `fireAt` must land in
-`[now - 5 min, now + 400 days]`, otherwise `400`: a job that fires in 2100 is a queue squat.
+comes back with `blocked`. **one live code per vault**: `POST /api/notify/invite` deletes the
+vault's unredeemed invites before inserting, so asking again revokes the previous code instead
+of stacking a second valid door. `GET /api/notify/status?vaultId=…&routeToken=…` answers
+`pending | active | blocked` for the app's invite dialog — unknown, never-linked and someone
+else's all read `pending`, the same uniform answer as `arm`, so this endpoint is no oracle
+either. more than 500 queued jobs per vault or 1000 per account → `429 notify_queue_full`, more
+than 60 arm calls per minute per account or 10 invites → `429 too_many_requests`. `fireAt` must
+land in `[now - 5 min, now + 400 days]`, otherwise `400`: a job that fires in 2100 is a queue
+squat.
 
 delivery behaviour: a job older than an hour is closed unsent (a laptop waking up after a
 week must not dump a backlog), `429` is obeyed via `retry_after`, `403` blocks the route for

@@ -135,6 +135,27 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.db.redeem_notify_invite("abc123def456")
         self.assertEqual(self.db.pending_notify_invites("vault-1"), 0)
 
+    async def test_one_live_code_per_vault(self):
+        self.db.create_notify_invite("vault-1", "firstcode123", "token-1")
+        self.db.create_notify_invite("vault-1", "secondcode45", "token-2")
+        # The app shows one channel and one code: asking again must revoke the old one.
+        self.assertEqual(self.db.pending_notify_invites("vault-1"), 1)
+        self.assertIsNone(self.db.get_notify_invite("firstcode123"))
+        self.assertIsNotNone(self.db.get_notify_invite("secondcode45"))
+
+        # A redeemed code is history, not a pending one: it must not be swept by the next request.
+        self.db.redeem_notify_invite("secondcode45")
+        self.db.create_notify_invite("vault-1", "thirdcode678", "token-3")
+        self.assertIsNotNone(self.db.get_notify_invite("secondcode45"))
+
+    async def test_channel_state_answers_the_same_for_unknown_and_foreign(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.assertEqual(self.server._notify_channel_state("vault-1", "tok-a"), "active")
+        self.assertEqual(self.server._notify_channel_state("vault-1", "tok-unknown"), "pending")
+        self.assertEqual(self.server._notify_channel_state("vault-2", "tok-a"), "pending")
+        self.notify.block_route("tok-a")
+        self.assertEqual(self.server._notify_channel_state("vault-1", "tok-a"), "blocked")
+
     async def test_same_event_is_delivered_once_per_route(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
         self.notify.link("tok-b", "chat-b", "B", self.tag)
