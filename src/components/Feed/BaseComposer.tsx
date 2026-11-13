@@ -1,8 +1,9 @@
 // The shared composer shell: growing textarea, slot layout, and the send plate.
-import React, { useRef, useLayoutEffect } from 'react';
+import React, { useRef, useLayoutEffect, useMemo } from 'react';
 import { UploadCloud } from 'lucide-react';
 import { SendButton } from '../UI/SendButton';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
+import { segmentText, type ComposerHighlight } from './composer/composerHighlights';
 
 export interface BaseComposerProps {
   /** Текстовое значение поля ввода */
@@ -57,8 +58,8 @@ export interface BaseComposerProps {
   onDragLeave?: React.DragEventHandler<HTMLDivElement>;
   /** Обработчик сброса файлов */
   onDrop?: React.DragEventHandler<HTMLDivElement>;
-  /** Диапазон в тексте для подсветки (например, @папка); красный цвет — от тона mention */
-  highlightRange?: { start: number; end: number } | null;
+  /** Диапазоны распознанного текста (дата, теги, приоритет, @папка) для подсветки */
+  highlights?: ComposerHighlight[];
   /** Дополнительные классы для контейнера-каркаса */
   className?: string;
 }
@@ -91,7 +92,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   variant = 'card',
   hideTextarea = false,
   isDraggingOver = false,
-  highlightRange = null,
+  highlights = [],
   onDragEnter,
   onDragOver,
   onDragLeave,
@@ -120,7 +121,12 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
     if (mirrorRef.current && effectiveRef.current) {
       mirrorRef.current.scrollTop = effectiveRef.current.scrollTop;
     }
-  }, [value, highlightRange, effectiveRef]);
+  }, [value, highlights, effectiveRef]);
+
+  const mirrorSegments = useMemo(
+    () => (highlights.length > 0 ? segmentText(value, highlights) : []),
+    [value, highlights],
+  );
 
   // Desktop keeps Enter-to-send. On a phone the on-screen Enter is the only
   // newline key, so sending stays on the composer button.
@@ -183,7 +189,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {!hideTextarea && (
           <div className="flex min-w-0 items-center gap-1.5">
             <div className="relative flex min-w-0 flex-1">
-            {highlightRange && (
+            {mirrorSegments.length > 0 && (
               /* A textarea cannot colour a substring, so the same text is mirrored
                  underneath it and the field renders its own glyphs transparent. */
               <div
@@ -191,9 +197,18 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 aria-hidden="true"
                 className="composer-mirror pointer-events-none absolute inset-0 z-0 select-none overflow-hidden whitespace-pre-wrap break-words py-0 text-base md:text-sm leading-normal text-fg-primary"
               >
-                {value.slice(0, highlightRange.start)}
-                <span className="text-mention">{value.slice(highlightRange.start, highlightRange.end)}</span>
-                {value.slice(highlightRange.end)}
+                {mirrorSegments.map((segment, index) =>
+                  segment.kind ? (
+                    <span
+                      key={index}
+                      className={segment.kind === 'priority' ? 'text-rose-400' : 'text-mention'}
+                    >
+                      {segment.text}
+                    </span>
+                  ) : (
+                    <React.Fragment key={index}>{segment.text}</React.Fragment>
+                  ),
+                )}
               </div>
             )}
             <textarea
@@ -216,7 +231,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 maxHeight: `${maxHeight}px`,
                 // The mirror paints the glyphs; the field keeps the caret, the
                 // selection and the hit area only.
-                ...(highlightRange ? { color: 'transparent', caretColor: 'var(--color-fg-primary)' } : {}),
+                ...(highlights.length > 0 ? { color: 'transparent', caretColor: 'var(--color-fg-primary)' } : {}),
               }}
             />
             </div>

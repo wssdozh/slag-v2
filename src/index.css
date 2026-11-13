@@ -391,6 +391,12 @@
   padding-inline: calc((var(--slag-ctrl-sm) - 16px) / 2);
 }
 
+/* With a highlight in play the field's own glyphs go transparent (the mirror paints
+   them), and a native selection of transparent text is unreadable. */
+.composer-surface [data-composer-panel] textarea::selection {
+  color: var(--color-fg-primary);
+}
+
 /* Corner actions and toolbar controls share one size, so the text row and the
    button row have the same height and read as one inset. */
 .composer-surface .composer-top-actions button {

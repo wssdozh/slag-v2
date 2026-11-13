@@ -1,5 +1,5 @@
 // The create-a-note form: wiring, the autocomplete overlay, and composition of `composer/`.
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemType, SlagItemStatus } from '../../types';
 import { AudioRecorder } from '../UI/AudioRecorder';
@@ -37,6 +37,7 @@ import { useComposerAiTags } from './composer/useComposerAiTags';
 import { useComposerSlashCommands } from './composer/useComposerSlashCommands';
 import { useComposerSubmit } from './composer/useComposerSubmit';
 import { resolveComposerFields, type ComposerDismissals } from './composer/composerFields';
+import { buildComposerHighlights, type ComposerHighlight } from './composer/composerHighlights';
 
 export interface ComposerProps {
   isModal?: boolean;
@@ -315,6 +316,14 @@ export const Composer: React.FC<ComposerProps> = ({
         ? parsedTask.recurrence
         : recurrence)
     : undefined;
+
+  // What the parser understood, painted right in the field: the date and tags in the
+  // mention tone, the priority in the one the priority bars already use.
+  const inlineHighlights = useMemo<ComposerHighlight[]>(() => {
+    const parsed = buildComposerHighlights(content, parsedTask, { isDateDismissed, isPriorityDismissed });
+    if (!folderTokenRange) return parsed;
+    return [...parsed, { ...folderTokenRange, kind: 'tag' as const }];
+  }, [content, parsedTask, isDateDismissed, isPriorityDismissed, folderTokenRange]);
 
   const {
     isDraggingOver, handleDragOver, handleDragLeave, handleDrop, handlePaste,
@@ -653,7 +662,7 @@ export const Composer: React.FC<ComposerProps> = ({
           : 'Мысль, заметка или код... (@ папка, # тег, / команды, [[ ссылки)'
       }
       textareaRef={textareaRef}
-      highlightRange={folderTokenRange}
+      highlights={inlineHighlights}
       hideTextarea={isRecordingAudio && !content.trim()}
       isSubmitDisabled={!content.trim() && attachments.length === 0}
       submitTitle="Отправить (Enter)"
