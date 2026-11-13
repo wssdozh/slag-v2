@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { AiProvider, AiSourceMode, SubscriptionAiTier } from '../../types';
 import { SecretKeyField } from './SecretKeyField';
+import { MemoryList } from './MemoryList';
 import {
   SettingsDivider,
   SettingsGroup,
@@ -297,6 +298,9 @@ export const AiSettingsTab: React.FC = () => {
           />
         </div>
       </SettingsGroup>
+
+      {/* Section 5: что ассистент запомнил о человеке */}
+      <MemoryList />
     </form>
   );
 };
