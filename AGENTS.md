@@ -77,6 +77,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
 | мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
 | ИИ-ассистент, инструменты, действия | `src/lib/ai/orchestrator.ts`, `tools.ts`, `actionParser.ts` |
+| память ассистента: факты, типы, темы, скоринг | `src/lib/memory.ts`, `src/lib/ai/prompt.ts`, `src/lib/sync/applyBundle.ts` |
 | поиск | `src/lib/searchService.ts` |
 | состояние приложения | `src/context/AppContext.tsx` + `src/context/hooks/` |
 | вложения, аудио, вставка файлов | `src/lib/media/`, `src/lib/storage/index.ts` |
@@ -91,7 +92,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | раскладка модулей и куда класть новое | `docs/project-map/14_Module_Layout.md` |
 | UX, ЛКМ/ПКМ, горячие клавиши | `docs/project-map/01_UI_UX_Interactions_Matrix.md` |
 | модель данных и frontmatter | `docs/project-map/02_Data_Model_Obsidian_Vault.md` |
-| ИИ, теги, триаж | `docs/project-map/03_AI_Engine_Zero_Slop_Gemini.md` |
+| ИИ, теги, триаж | `docs/project-map/03_AI_Engine_Zero_Slop_Gemini.md`, раздел 6 — память ассистента |
 | поиск Orama | `docs/project-map/05_Search_Orama_Local_First.md` |
 | синхронизация | `docs/sync-architecture.md` |
 | сборки | `BUILD.md` |
