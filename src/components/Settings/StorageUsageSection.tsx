@@ -6,16 +6,17 @@ import { MEMORY_LIMIT } from '../../lib/memory';
 import { pluralRu } from '../../lib/time/dateUtils';
 import { useApp } from '../../context/AppContext';
 import {
-  MEDIA_TYPE_LABEL,
-  MEDIA_TYPE_NAME,
+  collectSegments,
   collectStorageUsage,
   formatUsageBytes,
   formatUsageShare,
-  usageShare,
-  type MediaTypeUsage,
+  sharePercent,
+  usageTotalBytes,
   type StorageUsage,
+  type UsageSegment,
+  type UsageUnit,
 } from '../../lib/storage/usage';
-import { SettingsDivider, SettingsGroup, SettingsRow } from './SettingsUI';
+import { SettingsGroup } from './SettingsUI';
 
 const MEDIA_ICON: Record<SlagAttachment['type'], React.ReactNode> = {
   image: <Image className="w-3.5 h-3.5" />,
@@ -25,33 +26,45 @@ const MEDIA_ICON: Record<SlagAttachment['type'], React.ReactNode> = {
 };
 
 /**
- * Four kinds, four existing tokens: the ring reads at a glance, and no colour is invented here.
- * Zinc for "just a file" keeps the loudest hues on the media people actually look for.
+ * Six kinds, six existing tokens: the ring reads at a glance, and no colour is invented here.
+ * Media gets the loud hues, plain data and snapshots stay in the grey/amber register.
  */
-const MEDIA_TONE: Record<SlagAttachment['type'], { stroke: string; dot: string }> = {
+const SEGMENT_TONE: Record<string, { stroke: string; dot: string }> = {
   video: { stroke: 'stroke-accent', dot: 'bg-accent' },
-  image: { stroke: 'stroke-mention', dot: 'bg-mention' },
-  audio: { stroke: 'stroke-success', dot: 'bg-success' },
+  image: { stroke: 'stroke-success', dot: 'bg-success' },
+  audio: { stroke: 'stroke-mention', dot: 'bg-mention' },
   file: { stroke: 'stroke-fg-muted', dot: 'bg-fg-muted' },
+  data: { stroke: 'stroke-fg-secondary', dot: 'bg-fg-secondary' },
+  snapshots: { stroke: 'stroke-warning', dot: 'bg-warning' },
 };
 
-const shareOf = (part: number, whole: number): string =>
-  whole > 0 ? formatUsageShare(usageShare(part, whole)) : '';
+const toneOf = (id: string) => SEGMENT_TONE[id] ?? SEGMENT_TONE.data;
 
-/** Composition of the media store as a ring: the biggest kind takes the full accent. */
-const UsageRing: React.FC<{ kinds: MediaTypeUsage[]; total: number; count: number }> = ({
-  kinds,
-  total,
-  count,
-}) => {
-  const size = 104;
-  const stroke = 10;
+/** Only the media sectors carry a test hook; data and snapshots are not files. */
+const MEDIA_SEGMENT_IDS = new Set(['image', 'audio', 'video', 'file']);
+
+const UNIT_FORMS: Record<UsageUnit, [string, string, string]> = {
+  'файл': ['файл', 'файла', 'файлов'],
+  'ключ': ['ключ', 'ключа', 'ключей'],
+  'снимок': ['снимок', 'снимка', 'снимков'],
+};
+
+const countOf = (count: number, unit: UsageUnit): string =>
+  `${count} ${pluralRu(count, UNIT_FORMS[unit])}`;
+
+const shareOf = (part: number, whole: number): string =>
+  formatUsageShare(sharePercent(part, whole));
+
+/** The composition of everything the store holds: total in the middle, one arc per sector. */
+const UsageRing: React.FC<{ segments: UsageSegment[]; total: number }> = ({ segments, total }) => {
+  const size = 148;
+  const stroke = 12;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const lengths = kinds.map((kind) => (total > 0 ? (kind.bytes / total) * circumference : 0));
+  const lengths = segments.map((segment) => (total > 0 ? (segment.bytes / total) * circumference : 0));
 
   return (
-    <div className="relative h-[104px] w-[104px] shrink-0">
+    <div className="relative h-[148px] w-[148px] shrink-0">
       <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90" aria-hidden>
         <circle
           cx={size / 2}
@@ -61,34 +74,66 @@ const UsageRing: React.FC<{ kinds: MediaTypeUsage[]; total: number; count: numbe
           strokeWidth={stroke}
           className="stroke-white/[0.06]"
         />
-        {kinds.map((kind, index) => {
+        {segments.map((segment, index) => {
           // A 2px gap keeps two neighbouring arcs from reading as one.
           const dash = Math.max(lengths[index] - 2, 0.5);
           const dashOffset = -lengths.slice(0, index).reduce((sum, value) => sum + value, 0);
           return (
             <circle
-              key={kind.type}
+              key={segment.id}
               cx={size / 2}
               cy={size / 2}
               r={radius}
               fill="none"
               strokeWidth={stroke}
-              className={MEDIA_TONE[kind.type].stroke}
+              className={toneOf(segment.id).stroke}
               strokeDasharray={`${dash} ${circumference - dash}`}
               strokeDashoffset={dashOffset}
             />
           );
         })}
       </svg>
-      <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-        <span className="font-mono text-[13px] text-fg-primary">{formatUsageBytes(total)}</span>
-        <span className="text-2xs text-fg-dim">
-          {count} {pluralRu(count, ['файл', 'файла', 'файлов'])}
-        </span>
-      </span>
+      <div
+        data-testid="storage-total"
+        className="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
+      >
+        <span className="font-mono text-[15px] text-fg-primary">{formatUsageBytes(total)}</span>
+        <span className="text-2xs text-fg-dim">всего</span>
+      </div>
     </div>
   );
 };
+
+interface UsageLineProps {
+  testId?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}
+
+/** One line per entry, 32px tall: a second line of description is what made the old list tall. */
+const UsageLine: React.FC<UsageLineProps> = ({ testId, onClick, disabled = false, children }) => {
+  const interactive = Boolean(onClick);
+  const Element = interactive ? 'button' : 'div';
+
+  return (
+    <Element
+      {...(interactive
+        ? { type: 'button' as const, onClick, disabled, 'aria-disabled': disabled }
+        : {})}
+      data-testid={testId}
+      className={`flex h-8 w-full items-center gap-2 px-3.5 text-left ${
+        interactive
+          ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-white/[0.1] active:duration-0'
+          : ''
+      } ${disabled ? 'opacity-40' : ''}`}
+    >
+      {children}
+    </Element>
+  );
+};
+
+const EmptyLine: React.FC = () => <div className="px-3.5 py-3 text-2xs text-fg-muted">пока пусто</div>;
 
 /**
  * Read once on mount, then on demand: the stamp is what makes the button a real recount
@@ -129,163 +174,137 @@ export const StorageUsageSection: React.FC = () => {
     </button>
   );
 
+  const header = (
+    <div className="flex items-center justify-between gap-2 px-1">
+      <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+        Занятое место
+      </span>
+      {refreshButton}
+    </div>
+  );
+
   if (!usage) {
     return (
       <div data-testid="storage-usage" className="flex flex-col gap-3">
-        <SettingsGroup title="Занятое место" action={refreshButton}>
-          <div className="px-3.5 py-3 text-2xs text-fg-muted">Считаю…</div>
-        </SettingsGroup>
+        {header}
+        <div className="py-6 text-center text-2xs text-fg-muted">Считаю…</div>
       </div>
     );
   }
 
-  const { local, media, snapshots, memory, quota } = usage;
-  const quotaBytes = quota.quotaBytes;
-  // The platform estimate can lag or miss bytes kept outside the origin (desktop and FSA vaults),
-  // so the total never reads lower than the rows above it add up to. Snapshots are copies, not
-  // part of the live store, and keep their own row.
-  const measuredBytes = local.totalBytes + media.totalBytes;
-  const usedBytes =
-    quota.usageBytes === undefined ? measuredBytes : Math.max(quota.usageBytes, measuredBytes);
-  const share = usageShare(usedBytes, quotaBytes);
-  const totalText =
-    quotaBytes === undefined
-      ? `занято ${formatUsageBytes(usedBytes)}`
-      : `занято ${formatUsageBytes(usedBytes)} из ${formatUsageBytes(quotaBytes)} (${formatUsageShare(share)})`;
-  const isEmpty =
-    local.totalBytes === 0 && media.count === 0 && snapshots.count === 0 && memory.count === 0;
+  const { local, media, snapshots, memory } = usage;
+  const total = usageTotalBytes({ media, local, snapshots });
+  // The ring is the total: media sectors, local data and snapshots, biggest first.
+  const segments = collectSegments({ media, local, snapshots });
   const filledGroups = local.groups.filter((group) => group.keys > 0);
-  const mediaKinds = [...media.byType.filter((kind) => kind.bytes > 0)].sort(
-    (left, right) => right.bytes - left.bytes,
-  );
 
   return (
     <div data-testid="storage-usage" className="flex flex-col gap-3">
-      <SettingsGroup title="Занятое место" action={refreshButton}>
-        <SettingsRow
-          testId="storage-total"
-          label="Хранилище"
-          description={
-            <span className="flex flex-col gap-2">
-              <span className="font-mono">{totalText}</span>
-              {share !== null && (
-                <span className="block h-1 w-full overflow-hidden rounded-full bg-white/[0.08]">
-                  <span
-                    className="block h-full rounded-full bg-accent-strong"
-                    style={{ width: `${share}%` }}
-                  />
-                </span>
-              )}
-              {isEmpty && <span>пока пусто</span>}
-            </span>
-          }
-        />
-      </SettingsGroup>
+      {header}
 
-      <SettingsGroup title="Медиа">
-        {mediaKinds.length === 0 ? (
-          <div className="px-3.5 py-3 text-2xs text-fg-muted">пока пусто</div>
+      <div className="flex justify-center py-1">
+        <UsageRing segments={segments} total={total} />
+      </div>
+
+      <SettingsGroup title="Состав">
+        {segments.length === 0 ? (
+          <EmptyLine />
         ) : (
-          <div className="flex items-center gap-4 px-3.5 py-4">
-            <UsageRing kinds={mediaKinds} total={media.totalBytes} count={media.count} />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              {mediaKinds.map((kind) => (
-                <div key={kind.type} data-testid={`media-kind-${kind.type}`} className="flex items-baseline gap-2 text-xs">
-                  <span
-                    className={`h-2 w-2 shrink-0 translate-y-[-1px] rounded-full ${MEDIA_TONE[kind.type].dot}`}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-fg-secondary">
-                    {MEDIA_TYPE_LABEL[kind.type]}
-                  </span>
-                  <span className="shrink-0 font-mono text-2xs text-fg-dim">
-                    {shareOf(kind.bytes, media.totalBytes)}
-                  </span>
-                  <span className="w-16 shrink-0 text-right font-mono text-2xs text-fg-secondary">
-                    {formatUsageBytes(kind.bytes)}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="flex flex-col divide-y divide-border-subtle">
+            {segments.map((segment) => (
+              <UsageLine
+                key={segment.id}
+                testId={MEDIA_SEGMENT_IDS.has(segment.id) ? `media-kind-${segment.id}` : undefined}
+              >
+                <span className={`h-2 w-2 shrink-0 rounded-full ${toneOf(segment.id).dot}`} />
+                <span className="min-w-0 flex-1 truncate text-xs text-fg-secondary">
+                  {segment.label}
+                </span>
+                <span className="shrink-0 font-mono text-2xs text-fg-dim">
+                  {countOf(segment.count, segment.unit)}
+                </span>
+                <span className="w-9 shrink-0 text-right font-mono text-2xs text-fg-dim">
+                  {shareOf(segment.bytes, total)}
+                </span>
+                <span className="w-16 shrink-0 text-right font-mono text-2xs text-fg-secondary">
+                  {formatUsageBytes(segment.bytes)}
+                </span>
+              </UsageLine>
+            ))}
           </div>
         )}
       </SettingsGroup>
 
-      <SettingsGroup
-        title="Локальные данные"
-        action={
-          <span className="text-2xs font-mono text-fg-dim">
-            {formatUsageBytes(local.totalBytes)} · {local.totalKeys}{' '}
-            {pluralRu(local.totalKeys, ['ключ', 'ключа', 'ключей'])}
-          </span>
-        }
-      >
+      <SettingsGroup title="Локальные данные">
         {filledGroups.length === 0 ? (
-          <div className="px-3.5 py-3 text-2xs text-fg-muted">пока пусто</div>
+          <EmptyLine />
         ) : (
           <div className="flex flex-col divide-y divide-border-subtle">
             {filledGroups.map((group) => (
-              <SettingsRow
-                key={group.id}
-                label={group.label}
-                description={`${group.keys} ${pluralRu(group.keys, ['ключ', 'ключа', 'ключей'])}`}
-                value={
-                  <span className="font-mono">
-                    {shareOf(group.bytes, local.totalBytes)} · {formatUsageBytes(group.bytes)}
-                  </span>
-                }
-              />
+              <UsageLine key={group.id}>
+                <span className="min-w-0 flex-1 truncate text-xs text-fg-secondary">
+                  {group.label}
+                </span>
+                <span className="shrink-0 font-mono text-2xs text-fg-dim">
+                  {countOf(group.keys, 'ключ')}
+                </span>
+                <span className="w-9 shrink-0 text-right font-mono text-2xs text-fg-dim">
+                  {shareOf(group.bytes, total)}
+                </span>
+                <span className="w-16 shrink-0 text-right font-mono text-2xs text-fg-secondary">
+                  {formatUsageBytes(group.bytes)}
+                </span>
+              </UsageLine>
             ))}
           </div>
         )}
       </SettingsGroup>
 
       <SettingsGroup title="Снимки и память">
-        <SettingsRow
-          label="Точки восстановления"
-          description="Снимки хранилища"
-          value={
-            <span className="font-mono">
+        <div className="flex flex-col divide-y divide-border-subtle">
+          <UsageLine>
+            <span className="min-w-0 flex-1 truncate text-xs text-fg-secondary">Снимки</span>
+            <span className="shrink-0 font-mono text-2xs text-fg-dim">
               {snapshots.count} · {formatUsageBytes(snapshots.bytes)}
             </span>
-          }
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="Память ассистента"
-          description={`${memory.count} ${pluralRu(memory.count, ['факт', 'факта', 'фактов'])} из ${MEMORY_LIMIT}`}
-          value={<span className="font-mono">{formatUsageBytes(memory.bytes)}</span>}
-        />
+          </UsageLine>
+          <UsageLine>
+            <span className="min-w-0 flex-1 truncate text-xs text-fg-secondary">
+              Память ассистента
+            </span>
+            <span className="shrink-0 font-mono text-2xs text-fg-dim">
+              {memory.count} из {MEMORY_LIMIT} · {formatUsageBytes(memory.bytes)}
+            </span>
+          </UsageLine>
+        </div>
       </SettingsGroup>
 
-      <SettingsGroup
-        title="Самые тяжёлые файлы"
-        action={
-          media.heaviest.length > 0 ? (
-            <span className="text-2xs font-mono text-fg-dim">топ {media.heaviest.length}</span>
-          ) : undefined
-        }
-      >
+      <SettingsGroup title="Самые тяжёлые файлы">
         {media.heaviest.length === 0 ? (
-          <div className="px-3.5 py-3 text-2xs text-fg-muted">пока пусто</div>
+          <EmptyLine />
         ) : (
           <div className="flex flex-col divide-y divide-border-subtle">
             {media.heaviest.map((file) => {
               const item = itemsById.get(file.itemId);
               return (
-                <SettingsRow
+                <UsageLine
                   key={file.attachmentId}
                   testId={`heavy-file-${file.attachmentId}`}
-                  icon={MEDIA_ICON[file.type]}
-                  label={<span className="block truncate">{file.name}</span>}
-                  description={<span className="block truncate">{file.itemTitle}</span>}
-                  value={
-                    <span className="font-mono">
-                      {MEDIA_TYPE_NAME[file.type]} · {formatUsageBytes(file.size)}
-                    </span>
-                  }
                   onClick={item ? () => openItem(item) : undefined}
                   disabled={!item}
-                />
+                >
+                  <span className="flex w-4 shrink-0 items-center justify-center text-fg-muted">
+                    {MEDIA_ICON[file.type]}
+                  </span>
+                  <span className="flex min-w-0 flex-1 items-baseline gap-1">
+                    <span className="truncate text-xs text-fg-secondary">{file.name}</span>
+                    <span className="shrink-0 text-2xs text-fg-dim">·</span>
+                    <span className="truncate text-2xs text-fg-dim">{file.itemTitle}</span>
+                  </span>
+                  <span className="w-16 shrink-0 text-right font-mono text-2xs text-fg-secondary">
+                    {formatUsageBytes(file.size)}
+                  </span>
+                </UsageLine>
               );
             })}
           </div>

@@ -4,6 +4,9 @@ import { test, expect } from '@playwright/test';
  * Settings → «Хранилище & Бэкап» answers the one question a heavy vault asks: what is eating
  * the space? Sizes come from attachment metadata, so the list is exact without reading a single
  * blob — the numbers below are seeded with known weights and checked against `formatBytes`.
+ *
+ * The ring totals the whole vault (media + local data + snapshots), so its centre is larger than
+ * the 5.5 MB of media. Shares are rounded integers, so 4 / 5.5 and 1.5 / 5.5 read as 73% and 27%.
  */
 
 const MB = 1024 * 1024;
@@ -80,7 +83,7 @@ async function seedVault(page: import('@playwright/test').Page) {
 }
 
 test('settings show what occupies the vault and the heaviest files first', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await seedVault(page);
 
@@ -97,8 +100,8 @@ test('settings show what occupies the vault and the heaviest files first', async
   const photo = usage.getByTestId('heavy-file-photo');
   await expect(heavy).toContainText('4.0 MB');
   await expect(photo).toContainText('1.5 MB');
-  await expect(usage).toContainText('lecture.mp4');
-  await expect(usage).toContainText('poster.webp');
+  await expect(heavy).toContainText('lecture.mp4');
+  await expect(photo).toContainText('poster.webp');
 
   // Heaviest first, and the copy is text, not NaN.
   const heavyBox = await heavy.boundingBox();
@@ -110,14 +113,14 @@ test('settings show what occupies the vault and the heaviest files first', async
   await expect(usage.getByTestId('media-kind-video')).toContainText('73%');
   await expect(usage.getByTestId('media-kind-video')).toContainText('4.0 MB');
   await expect(usage.getByTestId('media-kind-image')).toContainText('27%');
+  await expect(usage.getByTestId('media-kind-image')).toContainText('1.5 MB');
 
   // The settings surface scrolls its tab, so one picture cannot hold the whole section: the
   // totals and the heavy-file list are two screenshots of the same run.
-  await page.setViewportSize({ width: 1440, height: 1000 });
   await usage.scrollIntoViewIfNeeded();
   await page.waitForTimeout(250);
   await page.screenshot({ path: 'test-results/screenshots/storage-usage-desktop.png' });
-  await usage.getByText('Самые тяжёлые файлы').scrollIntoViewIfNeeded();
+  await usage.getByText('Самые тяжёлые файлы').first().scrollIntoViewIfNeeded();
   await page.waitForTimeout(250);
   await page.screenshot({ path: 'test-results/screenshots/storage-usage-heavy.png' });
 

@@ -57,18 +57,11 @@ export interface MemoryUsage {
   bytes: number;
 }
 
-/** Missing fields mean the browser refused to tell, never zero. */
-export interface QuotaUsage {
-  usageBytes?: number;
-  quotaBytes?: number;
-}
-
 export interface StorageUsage {
   local: LocalUsage;
   media: MediaUsage;
   snapshots: SnapshotUsage;
   memory: MemoryUsage;
-  quota: QuotaUsage;
 }
 
 export const MEDIA_TYPES: readonly MediaKind[] = ['image', 'audio', 'video', 'file'];
@@ -255,25 +248,6 @@ function collectMemory(): MemoryUsage {
   return { count: items.length, bytes };
 }
 
-/** No API and no estimate is not an error: the fields stay absent and the UI drops the quota line. */
-async function collectQuota(): Promise<QuotaUsage> {
-  if (typeof navigator === 'undefined') return {};
-  const manager = navigator.storage;
-  if (!manager || typeof manager.estimate !== 'function') return {};
-  try {
-    const estimate = await manager.estimate();
-    const usageBytes = asBytes(estimate.usage);
-    const quotaBytes = asBytes(estimate.quota);
-    return {
-      ...(usageBytes === undefined ? {} : { usageBytes }),
-      ...(quotaBytes === undefined || quotaBytes <= 0 ? {} : { quotaBytes }),
-    };
-  } catch (err) {
-    usageLog.warn('Storage usage: navigator.storage.estimate failed', { err });
-    return {};
-  }
-}
-
 export async function collectStorageUsage(input: {
   items: SlagItem[];
   snapshots: BackupSnapshotMeta[];
@@ -283,8 +257,54 @@ export async function collectStorageUsage(input: {
     media: collectMedia(input.items),
     snapshots: collectSnapshots(input.snapshots),
     memory: collectMemory(),
-    quota: await collectQuota(),
   };
+}
+
+export type UsageUnit = 'файл' | 'ключ' | 'снимок';
+
+/** Один сектор кольца: медиа по видам, все локальные данные и снимки. */
+export interface UsageSegment {
+  id: string;            // тип медиа ('image'|'audio'|'video'|'file') либо 'data' либо 'snapshots'
+  label: string;
+  bytes: number;
+  count: number;
+  unit: UsageUnit;
+}
+
+export const DATA_SEGMENT_ID = 'data';
+export const SNAPSHOT_SEGMENT_ID = 'snapshots';
+
+/** Состав занятого места: медиа по видам + локальные данные одной группой + снимки. Пустые сектора не отдаём, порядок — по убыванию. */
+export function collectSegments(usage: Pick<StorageUsage, 'media' | 'local' | 'snapshots'>): UsageSegment[] {
+  const segments: UsageSegment[] = usage.media.byType.map((entry) => ({
+    id: entry.type,
+    label: MEDIA_TYPE_LABEL[entry.type],
+    bytes: entry.bytes,
+    count: entry.count,
+    unit: 'файл',
+  }));
+
+  segments.push({
+    id: DATA_SEGMENT_ID,
+    label: 'Заметки и данные',
+    bytes: usage.local.totalBytes,
+    count: usage.local.totalKeys,
+    unit: 'ключ',
+  });
+  segments.push({
+    id: SNAPSHOT_SEGMENT_ID,
+    label: 'Снимки',
+    bytes: usage.snapshots.bytes,
+    count: usage.snapshots.count,
+    unit: 'снимок',
+  });
+
+  return segments.filter((segment) => segment.bytes > 0).sort((left, right) => right.bytes - left.bytes);
+}
+
+/** Всё, что реально занимает место: медиа + локальные данные + снимки. Память ассистента уже внутри локальных данных, второй раз её не считаем. */
+export function usageTotalBytes(usage: Pick<StorageUsage, 'media' | 'local' | 'snapshots'>): number {
+  return usage.media.totalBytes + usage.local.totalBytes + usage.snapshots.bytes;
 }
 
 /** `formatBytes` stays silent for zero; a usage row must still read as a number. */
@@ -292,10 +312,10 @@ export function formatUsageBytes(bytes: number): string {
   return formatBytes(Math.max(0, Math.round(bytes))) || '0 B';
 }
 
-/** Share of the quota in percent, clamped to the bar it drives. */
-export function usageShare(usageBytes: number, quotaBytes?: number): number | null {
-  if (!quotaBytes || quotaBytes <= 0) return null;
-  const share = (usageBytes / quotaBytes) * 100;
+/** Share of the whole in percent, clamped to the bar it drives. */
+export function sharePercent(part: number, whole: number): number | null {
+  if (!Number.isFinite(whole) || whole <= 0) return null;
+  const share = (part / whole) * 100;
   if (!Number.isFinite(share)) return null;
   return Math.min(100, Math.max(0, share));
 }
