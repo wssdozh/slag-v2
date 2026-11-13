@@ -38,6 +38,21 @@ export function sentHashesKey(scope: SyncScope, vaultId?: string): string {
   return `slag_sync_sent_hashes_${vaultId || scope.vaultId}_${scope.roomId || 'local'}`;
 }
 
+/** How far this device has pulled. A dropped pull resumes instead of re-reading the room. */
+export function cursorKey(scope: SyncScope, vaultId?: string): string {
+  return `slag_sync_cursor_${vaultId || scope.vaultId}_${scope.roomId || 'local'}`;
+}
+
+export function loadCursor(scope: SyncScope): number {
+  const raw = localStorage.getItem(cursorKey(scope));
+  const value = raw ? Number(raw) : 0;
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+export function saveCursor(scope: SyncScope, cursor: number): void {
+  localStorage.setItem(cursorKey(scope), String(cursor));
+}
+
 export function loadSentHashes(scope: SyncScope): Record<string, string> {
   try {
     const raw = localStorage.getItem(sentHashesKey(scope));

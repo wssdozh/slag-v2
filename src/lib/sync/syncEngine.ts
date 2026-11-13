@@ -5,6 +5,9 @@ import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
 import {
   loadSentHashes,
+  loadCursor,
+  saveCursor,
+  cursorKey,
   saveSentHashes,
   seedSyncedIds,
   stateHashKey,
@@ -95,6 +98,12 @@ export class SyncEngine {
   public appliedBundleIds = new Set<string>();
   public batchUpdating = false;
   public forceFullPush = false;
+  /** Set by the headless node: it holds a copy and never sends its own state back. */
+  public forceReceiveOnly = false;
+  /** A first pull over a tunnel can take minutes; the app on a LAN never needs more than 30s. */
+  public pullTimeoutMs = 30_000;
+  /** Bundles per pull request. A page of attachment-carrying bundles is megabytes. */
+  public pullPageSize = 100;
   public initGeneration = 0;
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   public currentVaultId: string = 'default_vault';
@@ -545,6 +554,12 @@ export class SyncEngine {
           return;
         }
         this.config.localSyncMode = grant.mode;
+        if (this.forceReceiveOnly && grant.mode !== 'receive-only') {
+          // A backup node never writes back, whatever the owner granted it. Without this the
+          // first push would replay the whole vault to every device with equal timestamps.
+          syncLog.info('Device runs as a backup node: local writes stay local');
+          this.config.localSyncMode = 'receive-only';
+        }
       }
 
       const [vaultKey, legacyRoomId] = await Promise.all([
@@ -610,6 +625,7 @@ export class SyncEngine {
       localStorage.removeItem(stateHashKey(this.bookkeeping));
       localStorage.removeItem(syncedIdsKey(this.bookkeeping));
       localStorage.removeItem(tombstonesKey(this.bookkeeping));
+  localStorage.removeItem(cursorKey(this.bookkeeping));
       this.getOutbox().clear();
       if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
     }
@@ -622,6 +638,7 @@ export class SyncEngine {
     this.saveConfig({ serverUrl: url });
     localStorage.removeItem(syncedIdsKey(this.bookkeeping));
     localStorage.removeItem(tombstonesKey(this.bookkeeping));
+  localStorage.removeItem(cursorKey(this.bookkeeping));
     this.getOutbox().clear();
     this.disconnect();
     await this.init();
@@ -781,14 +798,19 @@ export class SyncEngine {
   private async pullPendingBundles(generation: number): Promise<void> {
     try {
       const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
-      const params = new URLSearchParams({ device: this.config.deviceId, vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId });
-      let cursor = 0;
+      const params = new URLSearchParams({
+        device: this.config.deviceId,
+        vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
+        limit: String(this.pullPageSize),
+      });
+      // A full first sync is tens of megabytes; a pull that dies halfway must not start over.
+      let cursor = loadCursor(this.bookkeeping);
       while (generation === this.initGeneration) {
         const previousCursor = cursor;
         if (cursor > 0) params.set('since', String(cursor));
         const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
           headers: authHeaders(this),
-          signal: AbortSignal.timeout(30_000),
+          signal: AbortSignal.timeout(this.pullTimeoutMs),
         });
         if (generation !== this.initGeneration) return;
         if (!res.ok) throw new Error(`Sync pull failed: HTTP ${res.status}`);
@@ -807,7 +829,11 @@ export class SyncEngine {
           await this.applyIncomingBundle(item.payload);
           if (typeof item.syncId === 'number' && item.syncId > cursor) cursor = item.syncId;
         }
-        if (data.bundles.length < 100) break;
+        if (data.bundles.length < this.pullPageSize) {
+          saveCursor(this.bookkeeping, cursor);
+          break;
+        }
+        saveCursor(this.bookkeeping, cursor);
         if (cursor <= previousCursor) throw new Error('Sync pagination cursor did not advance');
       }
     } catch (e) {
