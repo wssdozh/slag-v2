@@ -1,0 +1,23 @@
+[Unit]
+Description=slag headless node - vault storage and relay sync
+Documentation=https://github.com/slag
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# %h because the node runs as a user unit: no root, no system-wide paths.
+ExecStart=%h/.local/bin/node %h/slag-node/index.js run
+WorkingDirectory=%h/slag-node
+Environment=SLAG_VAULT_DIR=%h/vaults/slag
+Environment=NODE_OPTIONS=--max-old-space-size=384
+Restart=always
+RestartSec=5
+# The ledgers are debounced; SIGTERM flushes them.
+KillSignal=SIGTERM
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
