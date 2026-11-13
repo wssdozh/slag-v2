@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **453**, строк: **84562**, зон: **45**.
+Модулей: **482**, строк: **88006**, зон: **47**.
 
 ## Самые длинные файлы
 
@@ -12,40 +12,46 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1588 | 0 |
-| `e2e/slag/views.spec.ts` | 1076 | 0 |
-| `src/lib/sync/syncEngine.ts` | 894 | 17 |
+| `e2e/slag/views.spec.ts` | 1078 | 0 |
+| `src/lib/sync/syncEngine.ts` | 891 | 16 |
 | `e2e/mobile.spec.ts` | 886 | 0 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
-| `src/components/Feed/ItemCard.tsx` | 807 | 1 |
-| `e2e/slag/feed.spec.ts` | 802 | 0 |
+| `src/components/Feed/ItemCard.tsx` | 808 | 1 |
+| `e2e/slag/feed.spec.ts` | 799 | 0 |
 | `src/lib/storage/index.ts` | 741 | 35 |
-| `src/context/AppContext.tsx` | 716 | 63 |
+| `src/context/AppContext.tsx` | 717 | 63 |
 | `src/components/Feed/Composer.tsx` | 700 | 4 |
 | `src/components/Editor/FullscreenEditor.tsx` | 640 | 1 |
 | `src/components/Workspace/useCrossWindowDnd.ts` | 614 | 1 |
 | `src/lib/backupService.ts` | 606 | 1 |
-| `src/lib/media/attachmentEnrichment.ts` | 600 | 4 |
+| `src/lib/logger/logger.ts` | 589 | 49 |
 
-## e2e (playwright) — 97 файлов, 18492 строк
+## Кандидаты в мёртвый код
+
+Никто не импортирует и сами ничего не экспортируют. Проверить и, скорее всего, выпилить.
+
+- `src/node/index.ts` (25 строк)
+
+## e2e (playwright) — 101 файлов, 20224 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
 - `e2e/slag/editor.spec.ts` — 1588
-- `e2e/slag/views.spec.ts` — 1076
+- `e2e/slag/views.spec.ts` — 1078
 - `e2e/mobile.spec.ts` — 886
 - `e2e/slag/workspace.spec.ts` — 885
-- `e2e/slag/feed.spec.ts` — 802
+- `e2e/slag/feed.spec.ts` — 799
+- `e2e/adversarial_memory_time.spec.ts` — 567
+- `e2e/assistant_memory.spec.ts` — 555
 - `e2e/admin_panel.spec.ts` — 493
 - `e2e/motion.spec.ts` — 451
-- `e2e/initial_sync_engine.spec.ts` — 359
-- `e2e/slag/feed_thumbs.spec.ts` — 351
-- `e2e/assistant_memory.spec.ts` — 341
+- `e2e/adversarial_memory_contradictions.spec.ts` — 429
 
-## src — 3 файлов, 580 строк
+## src — 3 файлов, 581 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `App.tsx` | 449 | 1 | App | The app shell: routes, lazy-loaded screens, viewport height and global overla… |
+| `App.tsx` | 450 | 1 | App | The app shell: routes, lazy-loaded screens, viewport height and global overla… |
 | `demo.tsx` | 69 | 0 | Playground | A separate playground entry for eyeballing modals and settings on an isolated… |
 | `main.tsx` | 62 | 0 |  | Boots the React root into #root, in StrictMode, after the secret store and gl… |
 
@@ -111,14 +117,14 @@
 | `MobileEditorBar.tsx` | 326 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 315 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 48 файлов, 7648 строк
+## src/components/Feed — 48 файлов, 7660 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ActiveFilterBadges.tsx` | 199 | 2 | ActiveFilterBadgesProps, ActiveFilterBadges | The removable chips for whatever narrows the feed: type, tag, folder, pinned. |
 | `assistant/AssistantActionCard.tsx` | 398 | 1 | AssistantActionCard | The confirmation card for an AI action: what it will do, a diff, apply or dis… |
 | `assistant/AssistantBanner.tsx` | 46 | 1 | AssistantBanner | Chat header strip: which folder the assistant is looking at, and clearing the… |
-| `assistant/AssistantComposer.tsx` | 133 | 1 | AssistantComposer | The assistant's input row: model picker, send, and a nudge to connect when no… |
+| `assistant/AssistantComposer.tsx` | 144 | 1 | AssistantComposer | The assistant's input row: model picker, send, and a nudge to connect when no… |
 | `assistant/AssistantMessages.tsx` | 227 | 1 | AssistantMessages | The thread: empty-state prompts, message bubbles, tool traces, and scroll to … |
 | `assistant/AssistantReasoning.tsx` | 40 | 1 | AssistantReasoning | Collapsible reasoning trace under a reply, with how long the model spent on i… |
 | `assistant/AssistantSearchResults.tsx` | 111 | 1 | AssistantSearchResult, AssistantSearchResults | The search block of a reply: count, expand into the list, open a note or show… |
@@ -151,7 +157,7 @@
 | `item/ItemReplyBanner.tsx` | 48 | 1 | ItemReplyBannerProps, ItemReplyBanner | The quoted line above a reply: jump to what it answers, or say it is gone. |
 | `item/ItemSubtasks.tsx` | 83 | 1 | ItemSubtasksProps, ItemSubtasks | A task's subtasks: one counter, one toggleable line each, collapsible. |
 | `item/ItemVideoNotes.tsx` | 42 | 1 | ItemVideoNotesProps, ItemVideoNotes | Video circle notes on a card: plays in place, the corner opens the full viewe… |
-| `ItemCard.tsx` | 807 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
+| `ItemCard.tsx` | 808 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
 | `list/FeedDateBubble.tsx` | 22 | 1 | FeedDateBubbleProps, FeedDateBubble | The day separator between feed groups: today, yesterday, or a plain date. |
 | `list/FeedDropOverlay.tsx` | 31 | 1 | FeedDropOverlayProps, FeedDropOverlay | The dashed frame over the feed while files hover: what dropping them will do. |
 | `list/FeedScrollHint.tsx` | 73 | 1 | FeedScrollHintProps, FeedScrollHint | Two floating tips at the feed edges: pull-to-search, and a jump to the newest… |
@@ -256,12 +262,16 @@
 |---|---:|---:|---|---|
 | `SearchModal.tsx` | 460 | 3 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
 
-## src/components/Settings — 17 файлов, 2375 строк
+## src/components/Settings — 21 файлов, 2630 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AccountSettingsTab.tsx` | 67 | 1 | AccountSettingsTab | First settings tab: who you are, plan limits, usage, and where to go next. |
-| `AiSettingsTab.tsx` | 307 | 1 | AiSettingsTab | Where the model comes from: the SLAG subscription or your own key, and what i… |
+| `ai/ConnectionEditor.tsx` | 95 | 1 | ConnectionEditor | One connection's fields: label, endpoint, key, protocol and the per-role mode… |
+| `ai/ConnectionsSection.tsx` | 93 | 1 | ConnectionsSection | The list of connections: a row per provider, expanding into its editor. |
+| `ai/RolesSection.tsx` | 55 | 1 | RolesSection | Who does what: answer, vision and speech, each picking one connection. |
+| `ai/useAiSettingsForm.ts` | 129 | 1 | AiSettingsForm, useAiSettingsForm | The AI settings form's one state: connections, roles and the flags, with thei… |
+| `AiSettingsTab.tsx` | 190 | 1 | AiSettingsTab | Where the model comes from — subscription or your own connections — and what … |
 | `devices/DeviceActions.tsx` | 148 | 2 | DeviceName, DeviceRevokeButton, LocalSyncModeGroup, PairDeviceButton, PairDeviceModal | Device row widgets: inline rename, revoke, and the local sync mode picker. |
 | `devices/DeviceCard.tsx` | 25 | 1 | DeviceCard | The modal shell that shows one device and the vaults it can reach. |
 | `devices/DeviceList.tsx` | 61 | 1 | DeviceList | Connected devices: this machine first, then each paired one with its status. |
@@ -272,7 +282,7 @@
 | `MemoryList.tsx` | 94 | 1 | MemoryList | The assistant's memory in settings: what it thinks it knows, and the way to c… |
 | `MobileDockSettings.tsx` | 231 | 1 | MobileDockSettings | Edits the phone dock: which tabs appear, in what order, dragged into place. |
 | `SecretKeyField.tsx` | 50 | 1 | SecretKeyField | One-line secret input with a per-field reveal toggle and no autocorrect. |
-| `SettingsUI.tsx` | 297 | 14 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 | Settings' shared building blocks: group cards, rows, dividers, switches, sele… |
+| `SettingsUI.tsx` | 297 | 17 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 | Settings' shared building blocks: group cards, rows, dividers, switches, sele… |
 | `ShortcutsSettingsTab.tsx` | 101 | 1 | ShortcutsSettingsTab | The hotkey catalogue, rendered from the same table the keydown handler reads. |
 | `SyncSettingsTab.tsx` | 84 | 1 | SyncSettingsTab | The sync channel: status, server address, schedule; account and devices sit n… |
 | `UiSettingsTab.tsx` | 102 | 1 | UiSettingsTab | How it looks: accent, fonts, density, panel widths and the mobile dock. |
@@ -312,7 +322,7 @@
 | `priorityTone.ts` | 47 | 4 | PriorityTone, priorityTone, PRIORITY_TONE_TEXT, PRIORITY_TONE_DOT, PRIORITY_TONE_CHIP | Maps a priority to its one colour family; text, dot and chip classes hang off… |
 | `ResponsiveSegmented.tsx` | 249 | 7 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented | Segmented control that collapses into a dropdown once the row no longer fits. |
 | `segmentedVariants.ts` | 56 | 2 | SegmentedVariant, SegmentedStripClasses, SEGMENTED_STRIP_CLASSES | Class presets for the segmented strip, so mobile headers share one geometry. |
-| `Select.tsx` | 353 | 10 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
+| `Select.tsx` | 353 | 11 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
 | `SendButton.tsx` | 49 | 4 | SendButtonProps, SendButton | The round accent arrow that confirms: send, attach or save, one plate for all… |
 | `SheetPanel.tsx` | 440 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel | The bottom-sheet shell: detents, drag-to-fold, velocity-aware release, scroll… |
 | `TagChip.tsx` | 82 | 5 | TagChipProps, TagChip | A tag as a chip: clickable to filter, removable while editing, flat or pill. |
@@ -362,7 +372,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 87 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 | Default endpoints, models and size limits for every AI provider the app can r… |
-| `index.ts` | 8 | 86 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
+| `index.ts` | 8 | 91 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
 | `search.ts` | 10 | 1 | SEARCH_LIMITS | Tuning for the Orama index and the palette: result counts, typo tolerance, te… |
 | `settingsTabs.ts` | 34 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel | Names and orders the settings sections once, so desktop and mobile cannot dri… |
 | `storage.ts` | 97 | 2 | DEFAULT_INBOX_FOLDER, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_VAULT_META, +1 | localStorage keys, the default inbox name and the workspace state a new vault… |
@@ -370,11 +380,11 @@
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
 | `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
-## src/context — 2 файлов, 945 строк
+## src/context — 2 файлов, 946 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 716 | 63 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
+| `AppContext.tsx` | 717 | 63 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
 | `appContext.types.ts` | 229 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The context's public contract and the shapes passed around it, kept out of st… |
 
 ## src/context/feed — 1 файлов, 90 строк
@@ -383,12 +393,12 @@
 |---|---:|---:|---|---|
 | `feedView.ts` | 90 | 1 | FeedViewQuery, selectVisibleItems | Which records the feed shows and in what order — the inbox's three modes as a… |
 
-## src/context/hooks — 10 файлов, 1499 строк
+## src/context/hooks — 10 файлов, 1472 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useAppearance.ts` | 95 | 1 | useAppearance | Density, font and accent: presets to localStorage and then to CSS variables. |
-| `useAssistant.ts` | 140 | 1 | useAssistant | The assistant session: transcript, model choice and one send that never write… |
+| `useAssistant.ts` | 113 | 1 | useAssistant | The assistant session: transcript, model choice and one send that never write… |
 | `useBackup.ts` | 146 | 1 | useBackup | Backups: scheduled and manual snapshots on disk, restore, and the zip round t… |
 | `useFeedView.ts` | 216 | 1 | useFeedView | The feed's view state: folder, mode, filters, sorting, persisted per folder. |
 | `useFolderAdmin.ts` | 102 | 1 | useFolderAdmin | A folder's own writes: save, describe, rename, delete and the create modal. |
@@ -443,18 +453,18 @@
 | `useLayerStack.ts` | 123 | 1 | AppLayer, useLayerStack | LIFO dismiss stack shared by Escape and Android/browser back, synced to histo… |
 | `usePresence.ts` | 93 | 29 | usePresence | Keeps a surface in the DOM through its exit transition, so CSS can finish it. |
 
-## src/lib — 6 файлов, 1729 строк
+## src/lib — 6 файлов, 1756 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `backupService.ts` | 606 | 1 | SlagManifest, BackupService, backupService, DEFAULT_BACKUP_SETTINGS | Vault snapshots: pack a zip, list what is there, restore one, drop old ones. |
 | `commands.ts` | 279 | 3 | CommandCategory, AppCommandContext, AppCommand, isMac, formatShortcut, +3 | ponytail: central command & hotkey engine for SLAG v2 without external depend… |
-| `memory.ts` | 341 | 5 | MEMORY_LIMIT, MEMORY_PROMPT_LIMIT, MEMORY_TAG_PROMPT_LIMIT, MEMORY_KINDS, MEMORY_KIND_LABEL, +13 | The assistant's own memory: what it knows about the person, how it ages, how … |
+| `memory.ts` | 368 | 5 | MEMORY_LIMIT, MEMORY_PROMPT_LIMIT, MEMORY_TAG_PROMPT_LIMIT, MEMORY_KINDS, MEMORY_KIND_LABEL, +14 | The assistant's own memory: what it knows about the person, how it ages, how … |
 | `motion.ts` | 196 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 | Reads the CSS motion tokens as numbers, so JS animation timing matches theme.… |
 | `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `searchService.ts` | 294 | 4 | preloadSearchEngine, getSearchableAttachmentText, RU_ENDINGS, RU_STOPWORDS, initSearchIndex, +1 | Orama lives in its own lazy chunk (~76 kB, 25 kB gzip). On the 1000-note prob… |
 
-## src/lib/ai — 24 файлов, 4564 строк
+## src/lib/ai — 28 файлов, 5049 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -462,10 +472,14 @@
 | `adapters/anthropicAdapter.ts` | 176 | 1 | AnthropicMessagesAdapter | Speaks the Anthropic Messages protocol: tools, tool results and reasoning blo… |
 | `adapters/errorMessage.ts` | 19 | 3 | extractErrorMessage | One answer to "what did the provider actually say". |
 | `adapters/openAiAdapter.ts` | 210 | 1 | OpenAiChatAdapter | Speaks the OpenAI chat-completions protocol, including tool calls and hosted … |
-| `adapters/openAiResponsesAdapter.ts` | 211 | 1 | OpenAiResponsesAdapter | Speaks the OpenAI Responses protocol that KIE and DeepSeek endpoints expect. |
-| `aiClient.ts` | 232 | 2 | AiResolvedTarget, PromptRequest, PromptResult, resolveKieEndpoint, resolveAiTarget, +4 | Resolves provider, key, model and wire protocol, then sends one assistant tur… |
+| `adapters/openAiResponsesAdapter.ts` | 211 | 2 | OpenAiResponsesAdapter | Speaks the OpenAI Responses protocol that KIE and DeepSeek endpoints expect. |
+| `aiClient.ts` | 106 | 2 | AiResolvedTarget, PromptRequest, PromptResult, resolveAiTarget, parseJsonContent, +5 | Sends one assistant turn through whichever connection the chat role resolves … |
 | `aiService.ts` | 414 | 7 | CategorizeResult, TriageSuggestion, TriageProgress, TriageProgressCallback, categorizeDraft, +4 | App-facing AI calls: categorize a note, triage a folder, send a chat turn. |
 | `appGuide.ts` | 243 | 2 | APP_GUIDE_TOPICS, AppGuideTopic, getAppGuideContent | ponytail: curated topic catalog for in-app assistant UI navigation & feature … |
+| `connections/endpoints.ts` | 87 | 4 | WireTarget, resolveKieEndpoint, resolveWire, resolveTranscriptionEndpoint, resolveGeminiGenerateEndpoint | Endpoint and adapter for one connection + model. The only place that knows a … |
+| `connections/presets.ts` | 129 | 8 | ProviderPreset, PROVIDER_PRESETS, connectionCapabilities, connectionSupports, presetFor, +3 | The provider catalogue: one table saying what each kind of connection can do. |
+| `connections/resolve.ts` | 142 | 5 | ResolvedAiTarget, RelayAccess, isSubscriptionMode, resolveRelayAccess, resolveRoleConnection, +9 | Who serves each role: the subscription relay, or a ready BYOK connection. |
+| `connections/settings.ts` | 240 | 6 | DEFAULT_AI_SETTINGS, isConnectionReady, isConnectionReadyFor, normalizeAiSettings, loadAiSettings | Default settings, readiness rules and the one legacy → connections migration. |
 | `fallback/agenda.ts` | 82 | 1 | calendarAgenda | Agenda intent: what is scheduled and overdue for a given day. |
 | `fallback/decomposition.ts` | 183 | 1 | splitNote, decomposeTask | Decomposition intents: split a note into tasks and break a task into subtasks. |
 | `fallback/dialog.ts` | 131 | 1 | contextualLink, refuseDelete, metaTalk, greetingHelp, shortNoise | Conversational intents: a link from context, deletion refusal, meta talk, gre… |
@@ -480,78 +494,86 @@
 | `prompt.ts` | 184 | 1 | buildSystemPrompt | Composes the assistant system prompt: today's tasks, folder context and tone … |
 | `tags.ts` | 20 | 2 | TagStyle, isStopTag, formatTag | Tag spelling rules shared by note triage and assistant memory: one dictionary… |
 | `toolDefinitions.ts` | 201 | 1 | getCanonicalTools | Declares the tool schemas once, so every protocol adapter sends the same set. |
-| `tools.ts` | 499 | 1 | createLocalToolExecutor | The tools the assistant may call: search notes, read one, and report on the v… |
-| `types.ts` | 75 | 15 | AssistantToolDefinition, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, LlmProtocolAdapter, +2 | The contract between the assistant loop and a protocol adapter: request, repl… |
+| `tools.ts` | 512 | 1 | createLocalToolExecutor | The tools the assistant may call: search notes, read one, and report on the v… |
+| `types.ts` | 75 | 16 | AssistantToolDefinition, AdapterTurnHistoryItem, LlmAdapterTurnRequest, LlmAdapterTurnResponse, LlmProtocolAdapter, +2 | The contract between the assistant loop and a protocol adapter: request, repl… |
 
-## src/lib/logger — 2 файлов, 653 строк
+## src/lib/logger — 2 файлов, 654 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `logger.ts` | 588 | 48 | LogListener, logger | The log: levels, scopes, listeners, the buffer, retention and persistence. Wh… |
+| `logger.ts` | 589 | 49 | LogListener, logger | The log: levels, scopes, listeners, the buffer, retention and persistence. Wh… |
 | `logRedaction.ts` | 65 | 1 | maskSensitiveString, sanitizeForLog | Masking secrets in log messages and payloads; the one place that knows what a… |
 
-## src/lib/media — 10 файлов, 1661 строк
+## src/lib/media — 16 файлов, 1652 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `attachmentEnrichment.ts` | 600 | 4 | resolveRelayMedia, canEnrichAttachments, buildImageInstruction, extractFocalContext, dataUrlToBlob, +3 | Subscription mode routes images and audio through the relay: the Groq key liv… |
 | `audioHelper.ts` | 187 | 10 | AudioTrack, AudioScopeMode, AudioTypeFilter, detectAudioFormat, splitAudioName, +6 | Builds the playable audio library from note attachments: format, duration, co… |
 | `audioSpectrum.ts` | 439 | 3 | OrbFeatures, ORB_SILENCE, ORB_FFT_SIZE, createSpectrumReader | Features for the liquid orb. |
 | `blobToDataUrl.ts` | 16 | 3 | blobToDataUrl | A blob as a `data:` URL. |
 | `byteCodec.ts` | 17 | 4 | bytesToBase64, base64ToBytes, toArrayBuffer | Bytes to base64 and back without a Buffer, for crypto and file payloads in th… |
 | `deviceGallery.ts` | 39 | 1 | getGalleryAccess, requestGalleryAccess, listDeviceMedia, DeviceMediaItem, DeviceMediaKind | Lists photos and videos from the Android media store, which the webview canno… |
+| `enrichment/dispatch.ts` | 299 | 4 | canEnrichAttachments, enrichAttachment, enrichItemAttachments | Picks a transport per attachment type, tries the role's connection first, the… |
+| `enrichment/gemini.ts` | 60 | 1 | analyzeImageGemini, transcribeAudioGemini | Native Gemini generateContent: the only transport that reads audio inline ins… |
+| `enrichment/http.ts` | 27 | 4 | ENRICH_TIMEOUT_MS, enrichFetch, dataUrlToBlob, dataUrlToText | One deadline for every provider call and the data-URL plumbing they all need. |
+| `enrichment/openAi.ts` | 98 | 1 | analyzeImageOpenAi, transcribeAudioOpenAi | OpenAI-compatible transports: chat-completions for images, multipart for spee… |
+| `enrichment/relay.ts` | 30 | 1 | callRelayMedia | Subscription media: the relay owns the provider keys, the client only carries… |
+| `enrichment/text.ts` | 71 | 5 | extractFocalContext, buildImageInstruction, buildFileInstruction, parseEnrichmentReply, summarizeTranscript | Instructions sent to vision/audio/file models, and the parsing of their repli… |
+| `enrichment/types.ts` | 6 | 5 | EnrichmentResult | What every enrichment transport returns, regardless of protocol. |
 | `fileDropHelper.ts` | 115 | 4 | MAX_ATTACHMENT_BYTES, attachmentType, attachmentFromDataUrl, processFileListToAttachments | What the storage layer takes inline without turning into a memory problem. |
 | `folderBrowser.ts` | 128 | 4 | listFolders, pickFolder, listFolderEntries, pickFilesFromSystem, readEntryBytes, +3 | Folders the person already granted; the grant survives restarts and app updat… |
-| `imageCodec.ts` | 91 | 2 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 | Shrinks and re-encodes images on a canvas before storage, sync or sending to … |
+| `imageCodec.ts` | 91 | 3 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 | Shrinks and re-encodes images on a canvas before storage, sync or sending to … |
 | `mediaEvents.ts` | 29 | 3 | bindMediaEvents | One list of media-element events, bound and unbound in one move. A player that |
 
-## src/lib/platform — 5 файлов, 1069 строк
+## src/lib/platform — 5 файлов, 1085 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `encryptedLocalStore.ts` | 137 | 1 | ENCRYPTED_SECRET_PREFIX, getLocalSecret, setLocalSecret, deleteLocalSecret | Web/Android secret store: AES-GCM ciphertext in localStorage, non-extractable… |
 | `folderOpener.ts` | 73 | 5 | OpenFolderResult, openAppFolder | Opens logs, notes or backups in the OS file manager, with a toast when no she… |
 | `platform.ts` | 87 | 3 | isTauriEnvironment, PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey | Reports the desktop OS, session type and hotkey backend so settings can adapt. |
-| `secretStore.ts` | 378 | 4 | SECRET_KEYS, SecretStoreMode, SecretStoreUnavailableError, SecretMigrationError, initSecretStore, +5 | One place for sync secrets at rest. Desktop uses the OS keychain, web/Android… |
+| `secretStore.ts` | 394 | 5 | SECRET_KEYS, SecretStoreMode, SecretBackend, SecretStoreUnavailableError, SecretMigrationError, +7 | One place for sync secrets at rest. Desktop uses the OS keychain, web/Android… |
 | `windowControls.ts` | 394 | 13 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 
-## src/lib/storage — 10 файлов, 2692 строк
+## src/lib/storage — 12 файлов, 2784 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData | Attachments as they belong in the localStorage index: metadata only. |
 | `attachments.ts` | 235 | 3 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
+| `browserPort.ts` | 30 | 1 | browserVaultPort | The app's implementation of the vault port: one adapter over StorageService, … |
 | `folderStore.ts` | 171 | 1 | FolderStoreHost, folderStorageKey, readFolders, writeFolder, renameFolderTree, +2 | Writing folders: save, rename with the note cascade, describe, delete and re-… |
 | `index.ts` | 741 | 35 | StorageChangeEvent, StorageChangeListener, StorageService, storage, VaultStats, +4 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 147 | 3 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
+| `port.ts` | 62 | 8 | ChangeOrigin, SyncedVaultData, VaultPort, setVaultPort, vault | The slice of the vault that sync may touch. The app backs it with StorageServ… |
 | `settingsStore.ts` | 478 | 1 | SettingsStoreHost, draftsStorageKey, workspaceStateStorageKey, flushDraftWrites, installDraftFlushGuards, +18 | Small settings and drafts: which localStorage keys are kept and how they are … |
 | `trashStore.ts` | 81 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore and purge happen before … |
 | `vaultFiles.ts` | 508 | 1 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 199 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 | Which vault the app is looking at: the registry kept in localStorage, and the… |
 | `vaultTransfer.ts` | 111 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
 
-## src/lib/sync — 23 файлов, 6207 строк
+## src/lib/sync — 23 файлов, 6204 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `account.ts` | 575 | 19 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +6 | The sync account: session and sign-in, what the plan is, and the device ident… |
-| `accountCrypto.ts` | 266 | 5 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 | Derives account and device keys, and wraps one vault key for one specific dev… |
+| `accountCrypto.ts` | 266 | 6 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 | Derives account and device keys, and wraps one vault key for one specific dev… |
 | `accountTypes.ts` | 91 | 11 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +5 | Shapes of the relay account API: plans, devices, vault grants and invitations. |
 | `applyBundle.ts` | 359 | 1 | persistIncomingBundle | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 7 | 2 | attachmentSignature | Cheap identity for an attachment: name plus size, enough to spot a stale copy. |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
-| `crypto.ts` | 181 | 11 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 | Generates a cryptographically secure 12-word recovery seed phrase |
+| `crypto.ts` | 181 | 12 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 | Generates a cryptographically secure 12-word recovery seed phrase |
 | `deviceAdmin.ts` | 61 | 1 | DeviceAdminHost, applyAccountDevices, addTrustedDevice, setDeviceAllowedVaults, removeTrustedDevice, +2 | Who may read this vault: the trusted-device list mirrored into the sync confi… |
 | `devices.ts` | 221 | 3 | normalizeTrustedDevice, touchDeviceLastSeen, normalizeTrustedDevicesFromAccount, computeSubscription, createDefaultDeviceName, +7 | Normalizes device records from the account and derives the subscription shown… |
 | `entities/registry.ts` | 36 | 1 | createSyncOpFromStorageEvent | Translates a storage change into the sync operation the relay understands. |
 | `entities/types.ts` | 17 | 2 | SyncEntityKind, SyncAction, SyncOperation | The sync vocabulary: which entities travel, which actions exist, what one op … |
-| `index.ts` | 6 | 2 | * from ./types, * from ./crypto, * from ./pairing, * from ./syncEngine | Barrel: re-exports the sync protocol, crypto, pairing and engine for lib/sync… |
+| `index.ts` | 6 | 3 | * from ./types, * from ./crypto, * from ./pairing, * from ./syncEngine | Barrel: re-exports the sync protocol, crypto, pairing and engine for lib/sync… |
 | `localBookkeeping.ts` | 81 | 3 | SyncScope, stateHashKey, syncedIdsKey, tombstonesKey, sentHashesKey, +5 | What this device sent, knows and deleted, so a push stays a diff instead of a… |
 | `outbox/outbox.ts` | 59 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
 | `pairing.ts` | 170 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `pushBundle.ts` | 307 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 167 | 2 | SyncConfigHost, computeSubscription, loadConfig, saveConfig, authHeaders, +3 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 894 | 17 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `syncEngine.ts` | 891 | 16 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
 | `syncSocket.ts` | 41 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `transport.ts` | 209 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport | The websocket link to the relay: connect, heartbeat, reconnect, route incomin… |
 | `twoFactorAuth.ts` | 198 | 1 | TotpConfig, WebAuthnConfig, TwoFactorState, base32Encode, base32Decode, +6 | Two-Factor Authentication (2FA) for Zero-Knowledge Vaults |
@@ -593,9 +615,9 @@
 | `folderPaths.ts` | 38 | 3 | sanitizeFolderName, parentPathOf, folderPathForName, folderPathUnder, isFolderPathFree, +2 | Folder names are file names on disk, so the OS-forbidden characters become da… |
 | `itemSchema.ts` | 46 | 1 | PropertySchemaItem, ITEM_MUTABLE_PROPERTIES, ITEM_UPDATES_SCHEMA | Single Source of Truth (SSOT) metadata registry for SlagItem mutable fields. |
 | `itemUpdates.ts` | 70 | 2 | applyItemUpdates | Applies a partial update to an item without touching storage. |
-| `markdownSerializer.ts` | 205 | 4 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |
-| `noteFilename.ts` | 35 | 5 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
-| `safePath.ts` | 69 | 5 | SafeVaultPathOptions, safeVaultRelativePath, isSafeVaultRelativePath | One answer to "is this path allowed inside the vault": normalizes separators … |
+| `markdownSerializer.ts` | 205 | 5 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |
+| `noteFilename.ts` | 35 | 6 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
+| `safePath.ts` | 69 | 6 | SafeVaultPathOptions, safeVaultRelativePath, isSafeVaultRelativePath | One answer to "is this path allowed inside the vault": normalizes separators … |
 | `stats.ts` | 67 | 2 | VaultStats, collectExistingTags, computeVaultStats | Read-only counters and tag tallies, with the inbox treated as the whole vault. |
 | `vaultDisplay.ts` | 24 | 5 | getVaultDisplayName | Names a vault for the UI, adding a short id suffix only when two names collid… |
 
@@ -610,9 +632,28 @@
 | `types.ts` | 83 | 2 | McpVaultConfig, VaultStateData, NoteMatch, SaveNoteSchema, GetNoteSchema, +6 | Zod schemas and vault shapes the MCP tools accept, with their user-facing des… |
 | `vault.ts` | 582 | 6 | resolveVaultConfig, McpVault, getSafeNoteFilename | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
 
-## src/types — 2 файлов, 653 строк
+## src/node — 5 файлов, 781 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 473 | 164 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +59 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `cli.ts` | 270 | 1 | CliOptions, parseFlags, runCli | The commands the node answers to. Loaded only after the environment and the s… |
+| `env.ts` | 109 | 2 | slagHome, installNodeEnvironment | The browser surfaces the sync core still leans on, backed by files. Installed… |
+| `index.ts` | 25 | 0 |  | Entry for the headless node. Everything below it is imported dynamically on p… |
+| `secrets.ts` | 53 | 1 | initNodeSecretStore | Secrets at rest for the headless node: one 0600 file. A server has no keychai… |
+| `vaultPort.ts` | 324 | 1 | NodeVault | The vault as the headless node sees it: notes are files under `notes/`, every… |
+
+## src/node/stubs — 4 файлов, 62 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `browserPort.ts` | 10 | 0 | browserVaultPort | The headless build never has a browser store: it registers its own VaultPort … |
+| `storageSingleton.ts` | 8 | 0 | storage | `syncEngine` re-exports the browser store for the e2e specs. The headless bui… |
+| `tauri.ts` | 24 | 0 | isTauri, getCurrentWindow, getCurrentWebviewWindow, listen, invoke | Stubs for the tauri API, swapped in by the headless build. `isTauri()` must a… |
+| `tauriFs.ts` | 20 | 0 | BaseDirectory, mkdir, writeTextFile, readDir, remove | Logs on disk go through plugin-fs in the browser build. A server writes them … |
+
+## src/types — 2 файлов, 671 строк
+
+| файл | строк | импортят | экспортирует | что это |
+|---|---:|---:|---|---|
+| `index.ts` | 491 | 176 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +62 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 180 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

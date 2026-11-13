@@ -548,32 +548,29 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     await settingsModal.locator('[data-testid="ai-source-mode"]').click();
     await page.locator('[data-testid="ai-source-byok"]').click();
 
-    // Provider is a dropdown row: Groq is the default, KIE.AI is reachable.
-    const providerRow = settingsModal.locator('[data-testid="ai-provider-select"]');
-    await expect(providerRow).toContainText('Groq');
+    // Connections are a list now; Groq ships as the default one.
+    await expect(settingsModal.getByText('Подключения')).toBeVisible();
+    const groqRow = settingsModal.locator('[data-testid="ai-connection-groq"]');
+    await expect(groqRow).toContainText('Groq');
+    await expect(groqRow).toContainText('gpt-oss-120b');
 
-    // Verify Gemini provider tab is cut out / removed from top tabs
-    await expect(settingsModal.locator('button', { hasText: '✨ Gemini' })).not.toBeVisible();
-
-    await providerRow.click();
-    await page.getByRole('option', { name: /^KIE\.AI/ }).click();
+    // Add KIE.AI as a second connection and expand it.
+    await settingsModal.locator('[data-testid="ai-connection-add"]').click();
+    await page.getByRole('option', { name: 'KIE.AI', exact: true }).click();
+    const kieRow = settingsModal.locator('[data-testid="ai-connection-kie"]');
+    await expect(kieRow).toBeVisible();
+    await kieRow.click();
     await expect(settingsModal.locator('input[placeholder*="sk-kie"]')).toBeVisible();
 
-    // Verify DeepSeek V4.1 Flash model option is visible in KIE.AI
-    const kieModelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /DeepSeek V4\.1 Flash/ });
-    await expect(kieModelSelect).toBeVisible();
+    // The model is plain text now, prefilled from the KIE preset.
+    await expect(settingsModal.getByLabel('Модель · ответы')).toHaveValue('deepseek-v4-1-flash');
 
-    // Take screenshot of KIE.AI settings with Argon for visual audit
     await page.screenshot({
-      path: 'test-results/screenshots/settings-modal-kie-argon.png',
+      path: 'test-results/screenshots/settings-modal-kie-connection.png',
     });
 
-    await providerRow.click();
-    await page.getByRole('option', { name: /^Groq/ }).click();
-
-    // Verify gpt-oss-120b model option exists
-    const modelSelect = settingsModal.locator('button[aria-haspopup="listbox"]', { hasText: /GPT-OSS 120B/ });
-    await expect(modelSelect).toBeVisible();
+    // Roles pick one connection each; Groq stays on answers.
+    await expect(settingsModal.locator('[data-testid="ai-role-chat"]')).toContainText('Groq');
 
     // Verify Tag Taxonomy controls exist
     await expect(settingsModal.locator('text=Правила тегов')).toBeVisible();

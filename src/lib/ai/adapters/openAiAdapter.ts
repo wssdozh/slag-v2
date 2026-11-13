@@ -102,7 +102,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(30000),
     });
 
     // Rate limit backoff: retry on HTTP 429 (up to 2 retries with Groq error parsing)
@@ -129,7 +129,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(30000),
       });
     }
 

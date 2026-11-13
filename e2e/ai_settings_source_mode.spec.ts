@@ -84,11 +84,17 @@ test.describe('AI Source Mode & Subscription Gateway Verification', () => {
       fullPage: false,
     });
 
-    // 5. BYOK is available and reveals key fields.
+    // 5. BYOK is available and reveals the connection list.
     await page.locator('[data-testid="ai-source-byok"]').click();
 
+    await expect(settingsModal.getByText('Подключения')).toBeVisible();
+    const groqRow = settingsModal.locator('[data-testid="ai-connection-groq"]');
+    await expect(groqRow).toBeVisible();
+    await expect(groqRow).toContainText('Groq');
+
+    // The key lives inside the connection editor, one click away.
+    await groqRow.click();
     await expect(settingsModal.locator('input[placeholder*="gsk_"]')).toBeVisible();
-    await expect(settingsModal.getByText('Groq Cloud API')).toBeVisible();
   });
 
   test('subscription mode still exposes the Groq key for images and audio', async ({ page }) => {

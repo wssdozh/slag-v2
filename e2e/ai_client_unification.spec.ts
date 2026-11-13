@@ -3,54 +3,56 @@ import { test, expect } from '@playwright/test';
 test.describe('Unified AI Client & Russian Tag Heuristics', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 45_000 });
   });
 
-  test('1. resolveAiTarget pairs model, adapter, and endpoint accurately across all providers', async ({ page }) => {
+  test('1. resolveAiTarget pairs model, adapter, and endpoint across connections and roles', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const { resolveAiTarget } = await import('/src/lib/ai/aiClient.ts');
 
-      // Test KIE DeepSeek
-      const kieDeepSeek = resolveAiTarget({
+      const settings = (connections: unknown[], chatId: string | null) => ({
         sourceMode: 'byok',
-        provider: 'kie',
-        kieApiKey: 'kie_test_key_123',
-        kieBaseUrl: 'https://api.kie.ai',
-        model: 'deepseek-v4-1-flash',
-      } as any);
+        connections,
+        roles: { chat: chatId, vision: null, stt: null },
+      });
 
-      // Test KIE Claude
-      const kieClaude = resolveAiTarget({
-        sourceMode: 'byok',
-        provider: 'kie',
-        kieApiKey: 'kie_test_key_123',
-        kieBaseUrl: 'https://api.kie.ai',
-        model: 'claude-3-5-haiku-20241022',
-      } as any);
+      const kie = (model: string) => ({
+        id: 'kie',
+        kind: 'kie',
+        label: 'KIE.AI',
+        apiKey: 'kie_test_key_123',
+        baseUrl: 'https://api.kie.ai',
+        protocol: 'chat',
+        models: { chat: model },
+      });
 
-      // Test Groq
-      const groq = resolveAiTarget({
-        sourceMode: 'byok',
-        provider: 'groq',
-        groqApiKey: 'gsk_test_key_123',
-        model: 'openai/gpt-oss-120b',
-      } as any);
+      const kieDeepSeek = resolveAiTarget(settings([kie('deepseek-v4-1-flash')], 'kie') as never);
+      const kieClaude = resolveAiTarget(settings([kie('claude-3-5-haiku-20241022')], 'kie') as never);
+      const groq = resolveAiTarget(settings([{
+        id: 'groq', kind: 'groq', label: 'Groq', apiKey: 'gsk_test_key_123',
+        baseUrl: 'https://api.groq.com/openai/v1', protocol: 'chat', models: { chat: 'openai/gpt-oss-120b' },
+      }], 'groq') as never);
+      const cpa = resolveAiTarget(settings([{
+        id: 'cpa', kind: 'custom', label: 'CPA', apiKey: 'cpa-key',
+        baseUrl: 'http://127.0.0.1:8317/v1', protocol: 'chat', models: { chat: 'gpt-5.2' },
+      }], 'cpa') as never);
+      const cpaResponses = resolveAiTarget(settings([{
+        id: 'cpa-r', kind: 'custom', label: 'CPA', apiKey: 'cpa-key',
+        baseUrl: 'http://127.0.0.1:8317/v1', protocol: 'responses', models: { chat: 'gpt-5.2' },
+      }], 'cpa-r') as never);
+
+      const read = (target: any) => ({
+        endpoint: target?.endpointUrl,
+        adapterName: target?.adapter.constructor.name,
+        model: target?.model,
+      });
 
       return {
-        kieDeepSeek: {
-          endpoint: kieDeepSeek?.endpointUrl,
-          adapterName: kieDeepSeek?.adapter.constructor.name,
-          model: kieDeepSeek?.model,
-        },
-        kieClaude: {
-          endpoint: kieClaude?.endpointUrl,
-          adapterName: kieClaude?.adapter.constructor.name,
-          model: kieClaude?.model,
-        },
-        groq: {
-          endpoint: groq?.endpointUrl,
-          adapterName: groq?.adapter.constructor.name,
-        },
+        kieDeepSeek: read(kieDeepSeek),
+        kieClaude: read(kieClaude),
+        groq: read(groq),
+        cpa: read(cpa),
+        cpaResponses: read(cpaResponses),
       };
     });
 
@@ -63,6 +65,11 @@ test.describe('Unified AI Client & Russian Tag Heuristics', () => {
 
     expect(result.groq.endpoint).toBe('https://api.groq.com/openai/v1/chat/completions');
     expect(result.groq.adapterName).toBe('OpenAiChatAdapter');
+
+    expect(result.cpa.endpoint).toBe('http://127.0.0.1:8317/v1/chat/completions');
+    expect(result.cpa.adapterName).toBe('OpenAiChatAdapter');
+    expect(result.cpaResponses.endpoint).toBe('http://127.0.0.1:8317/v1/responses');
+    expect(result.cpaResponses.adapterName).toBe('OpenAiResponsesAdapter');
   });
 
   test('2. Russian Cyrillic existing tags match properly even in offline heuristic mode', async ({ page }) => {

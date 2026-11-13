@@ -13,7 +13,7 @@ import type {
 } from '../../../types';
 import type { AppContextType } from '../../../context/appContext.types';
 import { storage } from '../../../lib/storage';
-import { canEnrichAttachments, enrichItemAttachments } from '../../../lib/media/attachmentEnrichment';
+import { canEnrichAttachments, enrichItemAttachments } from '../../../lib/media/enrichment/dispatch';
 import { categorizeDraft } from '../../../lib/ai/aiService';
 import { resolveComposerFields, type ComposerDismissals } from './composerFields';
 

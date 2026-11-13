@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import { storage } from '../lib/storage';
 import { logger } from '../lib/logger/logger';
+import { normalizeAiSettings } from '../lib/ai/connections/settings';
 import { openAppFolder } from '../lib/platform/folderOpener';
 import { listenDesktopEvents } from '../lib/platform/windowControls';
 import { syncEngine } from '../lib/sync';
@@ -478,10 +479,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [contextMenu, closeContextMenu]);
 
   const saveAiSettings = (newSettings: Partial<AiSettings>) => {
-    const updated = { ...aiSettings, ...newSettings };
+    const updated = normalizeAiSettings({ ...aiSettings, ...newSettings });
     setAiSettings(updated);
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
-    uiLog.info(`AI settings updated: provider=${updated.provider}, model=${updated.model || 'default'}`);
+    uiLog.info(`AI settings updated: connections=${updated.connections.length}, chat=${updated.roles.chat ?? 'off'}, vision=${updated.roles.vision ?? 'off'}`);
     addToast('Настройки сохранены', 'success');
   };
 

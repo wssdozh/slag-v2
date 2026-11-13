@@ -5,6 +5,12 @@ import { useApp } from '../../../context/AppContext';
 import { BaseComposer } from '../BaseComposer';
 import { Select } from '../../UI/Select';
 import type { AiSettings } from '../../../types';
+import { connectionModel } from '../../../lib/ai/connections/presets';
+import {
+  isChatConfigured,
+  isSubscriptionMode,
+  resolveRoleConnection,
+} from '../../../lib/ai/connections/resolve';
 
 interface AssistantComposerProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -31,10 +37,15 @@ export const AssistantComposer: React.FC<AssistantComposerProps> = ({
 }) => {
   const { aiSettings, saveAiSettings, setIsSettingsOpen } = useApp();
 
-  const isConnected =
-    (aiSettings.provider === 'groq' && Boolean(aiSettings.groqApiKey)) ||
-    (aiSettings.provider === 'kie' && Boolean(aiSettings.kieApiKey)) ||
-    (aiSettings.provider === 'gemini' && Boolean(aiSettings.geminiApiKey));
+  const isConnected = isChatConfigured(aiSettings);
+  const isRelay = isSubscriptionMode(aiSettings);
+  const chatConnection = resolveRoleConnection(aiSettings, 'chat');
+  const providerLabel = isRelay ? 'SLAG Relay' : chatConnection?.label ?? 'Локальный';
+  const providerModel = isRelay
+    ? aiSettings.subscriptionModel || 'fast'
+    : chatConnection
+      ? connectionModel(chatConnection, 'chat')
+      : '';
 
   return (
     <div className="p-2.5 shrink-0 flex justify-center">
@@ -65,10 +76,10 @@ export const AssistantComposer: React.FC<AssistantComposerProps> = ({
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
                   className="composer-toolbar-control inline-flex h-ctrl-md min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 text-xs font-mono text-fg-secondary outline-none ring-0 transition-colors hover:bg-surface-hover hover:text-fg-primary cursor-pointer"
-                  title={`Провайдер ${aiSettings.provider}: ${aiSettings.model} (нажмите для настроек)`}
+                  title={`${providerLabel}${providerModel ? ` · ${providerModel}` : ''} — настройки (⌘,)`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                  <span className="min-w-0 truncate">{aiSettings.provider === 'groq' ? 'Groq' : aiSettings.provider === 'kie' ? 'KIE.AI' : 'Gemini'}</span>
+                  <span className="min-w-0 truncate">{providerLabel}</span>
                 </button>
               ) : (
                 <button

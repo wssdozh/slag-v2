@@ -1,29 +1,9 @@
 // The assistant session: transcript, model choice and one send that never writes a note.
 import { useCallback, useEffect, useState } from 'react';
 import type { AiSettings, ChatMessage, FolderMeta, SlagItem } from '../../types';
-import { AI_ENDPOINTS, DEFAULT_AI_MODELS, STORAGE_KEYS } from '../../config';
 import { storage } from '../../lib/storage';
 import { sendAssistantChat } from '../../lib/ai/aiService';
-
-const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
-
-const DEFAULT_AI_SETTINGS: AiSettings = {
-  sourceMode: 'subscription',
-  subscriptionModel: 'fast',
-  provider: 'groq',
-  groqApiKey: '',
-  kieApiKey: '',
-  kieBaseUrl: AI_ENDPOINTS.DEFAULT_KIE_BASE_URL,
-  geminiApiKey: '',
-  model: DEFAULT_AI_MODELS.GROQ_DEFAULT,
-  reasoningEffort: 'low',
-  autoTagging: true,
-  autoTriage: true,
-  webSearchEnabled: false,
-  maxTagsPerNote: 3,
-  allowNewTags: true,
-  tagCaseStyle: 'lowercase',
-};
+import { loadAiSettings } from '../../lib/ai/connections/settings';
 
 /**
  * The assistant session: the transcript, the model it talks to, and one send.
@@ -41,14 +21,7 @@ export function useAssistant(
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => storage.getAssistantHistory());
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  const [aiSettings, setAiSettings] = useState<AiSettings>(() => {
-    try {
-      const saved = localStorage.getItem(AI_SETTINGS_KEY);
-      return saved ? { ...DEFAULT_AI_SETTINGS, ...JSON.parse(saved) } : DEFAULT_AI_SETTINGS;
-    } catch {
-      return DEFAULT_AI_SETTINGS;
-    }
-  });
+  const [aiSettings, setAiSettings] = useState<AiSettings>(loadAiSettings);
 
   // The transcript is vault state, not component state: it survives a reload.
   useEffect(() => {

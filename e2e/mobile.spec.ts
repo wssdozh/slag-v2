@@ -374,12 +374,12 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const modalHeader = page.locator('h3', { hasText: 'Настройки' });
     await expect(modalHeader).toBeVisible();
 
-    // Verify content inside modal (Groq button is visible without horizontal tabs clutter)
+    // Verify content inside modal (the connection list is visible without horizontal tabs clutter)
     const sourceSelect = page.getByRole('button', { name: 'Использовать', exact: true });
     await expect(sourceSelect).toBeVisible();
     await sourceSelect.click();
     await page.getByRole('option', { name: 'Свой API-ключ', exact: true }).click();
-    await expect(page.locator('button', { hasText: 'Groq' }).first()).toBeVisible();
+    await expect(page.locator('[data-testid="ai-connection-groq"]')).toBeVisible();
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_settings_modal.png' });
 

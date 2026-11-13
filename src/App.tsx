@@ -8,7 +8,8 @@ import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { ConfirmDialog } from './components/Modals/ConfirmDialog';
 import { ToastContainer } from './components/UI/Toast';
 import { Monitor } from 'lucide-react';
-import { enrichAttachment, extractFocalContext } from './lib/media/attachmentEnrichment';
+import { enrichAttachment } from './lib/media/enrichment/dispatch';
+import { extractFocalContext } from './lib/media/enrichment/text';
 import { setupAudioCollisionGuard } from './lib/media/audioHelper';
 import type { LightboxImage } from './components/UI/ImageLightbox';
 

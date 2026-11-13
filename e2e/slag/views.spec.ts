@@ -689,24 +689,26 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     await settingsModal.locator('[data-testid="ai-source-mode"]').click();
     await page.locator('[data-testid="ai-source-byok"]').click();
 
-    // 2. Select KIE.AI from the provider row
-    await settingsModal.locator('[data-testid="ai-provider-select"]').click();
-    await page.getByRole('option', { name: /^KIE\.AI/ }).click();
+    // 2. Add KIE.AI as a connection and open its editor
+    await settingsModal.locator('[data-testid="ai-connection-add"]').click();
+    await page.getByRole('option', { name: 'KIE.AI', exact: true }).click();
+    const kieRow = settingsModal.locator('[data-testid="ai-connection-kie"]');
+    await kieRow.click();
 
-    // 3. Verify KIE model is selected and visible
-    const select = settingsModal.locator('button[aria-haspopup="listbox"]').filter({ hasText: /DeepSeek V4\.1 Flash|Gemini 4 Argon/ });
-    await expect(select).toBeVisible();
+    // 3. The KIE chat model is prefilled from the preset
+    await expect(settingsModal.getByLabel('Модель · ответы')).toHaveValue('deepseek-v4-1-flash');
 
-    // 4. Fill in token and save
-    const keyInput = settingsModal.locator('input[placeholder*="sk-kie"]');
-    await keyInput.fill('sk-kie-test-argon-token');
+    // 4. Fill in the token, put KIE on the answers role, and save
+    await settingsModal.locator('input[placeholder*="sk-kie"]').fill('sk-kie-test-argon-token');
+    await settingsModal.locator('[data-testid="ai-role-chat"]').click();
+    await page.getByRole('option', { name: 'KIE.AI', exact: true }).click();
     await settingsModal.locator('button', { hasText: 'Сохранить' }).click();
     await expect(settingsModal).not.toBeVisible();
 
-    // 5. Verify Assistant Chat shows KIE provider badge in bottom composer
+    // 5. The composer badge names the connection that answers
     const assistantTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Ассистент' }).first();
     await assistantTab.click();
-    await expect(page.locator('button', { hasText: 'KIE' }).or(page.locator('text=KIE')).first()).toBeVisible();
+    await expect(page.locator('button', { hasText: 'KIE.AI' }).first()).toBeVisible();
 
     // 6. Verify client endpoint resolver behavior in browser context
     const endpoints = await page.evaluate(async () => {

@@ -100,19 +100,37 @@ export interface VaultMeta {
   isCurrent?: boolean;
 }
 
-export type AiProvider = 'groq' | 'kie' | 'gemini';
 export type AiSourceMode = 'subscription' | 'byok';
 export type SubscriptionAiTier = 'fast' | 'smart' | 'deep';
+
+/** Where a connection speaks on the wire: OpenAI chat, OpenAI responses or Anthropic messages. */
+export type AiWireProtocol = 'chat' | 'responses' | 'anthropic';
+
+/** What the app asks a connection to do. One connection can serve several roles. */
+export type AiRole = 'chat' | 'vision' | 'stt';
+
+/** The provider a connection was created from. */
+export type AiConnectionKind = 'groq' | 'kie' | 'gemini' | 'custom';
+
+export interface AiConnection {
+  /** Stable across edits: roles point at this id, so renaming a label never breaks them. */
+  id: string;
+  kind: AiConnectionKind;
+  label: string;
+  apiKey: string;
+  /** Always filled: the preset default is copied in when the connection is created. */
+  baseUrl: string;
+  protocol: AiWireProtocol;
+  /** Per-role model names; a missing entry falls back to the preset default. */
+  models: Partial<Record<AiRole, string>>;
+}
 
 export interface AiSettings {
   sourceMode?: AiSourceMode;
   subscriptionModel?: SubscriptionAiTier;
-  provider: AiProvider;
-  groqApiKey: string;
-  kieApiKey: string;
-  kieBaseUrl?: string;
-  geminiApiKey: string;
-  model: string; // e.g. 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'gpt-5-2', 'claude-sonnet-4-5'
+  connections: AiConnection[];
+  /** Connection id per role; null means the role is deliberately off. */
+  roles: Record<AiRole, string | null>;
   reasoningEffort: 'none' | 'low' | 'medium' | 'high';
   autoTagging: boolean;
   autoTriage: boolean;

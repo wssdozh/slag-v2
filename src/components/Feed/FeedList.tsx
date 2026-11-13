@@ -15,7 +15,7 @@ import { Inbox, Sparkles, Pin } from 'lucide-react';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
-import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/attachmentEnrichment';
+import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/enrichment/dispatch';
 import { PinnedBanner } from './PinnedBanner';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { FeedColumnResizer } from './FeedColumnResizer';

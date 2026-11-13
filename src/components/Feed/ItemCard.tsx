@@ -11,7 +11,8 @@ import {
   Flame,
 } from 'lucide-react';
 import { LinearSignalBars } from '../UI/PriorityBadge';
-import { canEnrichAttachments, enrichAttachment, extractFocalContext } from '../../lib/media/attachmentEnrichment';
+import { canEnrichAttachments, enrichAttachment } from '../../lib/media/enrichment/dispatch';
+import { extractFocalContext } from '../../lib/media/enrichment/text';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';

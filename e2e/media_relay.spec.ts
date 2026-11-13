@@ -54,8 +54,8 @@ test.describe('Media enrichment through the relay', () => {
     await expect(page.locator('main').first()).toBeVisible({ timeout: 20000 });
     await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
-      if (!loaded.some((name) => name.includes('/src/lib/media/attachmentEnrichment.ts'))) {
-        await import('/src/lib/media/attachmentEnrichment.ts');
+      if (!loaded.some((name) => name.includes('/src/lib/media/enrichment/dispatch.ts'))) {
+        await import('/src/lib/media/enrichment/dispatch.ts');
       }
     });
   });
@@ -67,8 +67,8 @@ test.describe('Media enrichment through the relay', () => {
     const result = await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
       const url =
-        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/media/attachmentEnrichment.ts')) ||
-        '/src/lib/media/attachmentEnrichment.ts';
+        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/media/enrichment/dispatch.ts')) ||
+        '/src/lib/media/enrichment/dispatch.ts';
       const { enrichAttachment } = await import(url);
       return enrichAttachment(
         {
@@ -98,8 +98,8 @@ test.describe('Media enrichment through the relay', () => {
     const result = await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
       const url =
-        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/media/attachmentEnrichment.ts')) ||
-        '/src/lib/media/attachmentEnrichment.ts';
+        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/media/enrichment/dispatch.ts')) ||
+        '/src/lib/media/enrichment/dispatch.ts';
       const { enrichAttachment } = await import(url);
       return enrichAttachment(
         {
@@ -138,8 +138,8 @@ test.describe('Media enrichment through the relay', () => {
     const result = await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
       const url =
-        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/media/attachmentEnrichment.ts')) ||
-        '/src/lib/media/attachmentEnrichment.ts';
+        loaded.find((name) => name.split('?')[0].endsWith('/src/lib/media/enrichment/dispatch.ts')) ||
+        '/src/lib/media/enrichment/dispatch.ts';
       const { enrichAttachment } = await import(url);
       return enrichAttachment(
         {

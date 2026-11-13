@@ -107,7 +107,7 @@ export async function searchNotes(params: LocalFallbackParams): Promise<SendAssi
   }
 
   return {
-    content: `В контексте "${isInbox ? 'Все хранилище' : currentFolder}" по запросу "${lastUserMsg}" записей не найдено.\n\n💡 Попробуйте другие ключевые слова или тег. Для свободного общения подключите ключ Groq или KIE.AI в Настройках (⌘,).`,
+    content: `В контексте "${isInbox ? 'Все хранилище' : currentFolder}" по запросу "${lastUserMsg}" записей не найдено.\n\n💡 Попробуйте другие ключевые слова или тег. Для свободного общения подключите провайдера в Настройках (⌘,).`,
     reasoning: 'Поиск Orama завершен с 0 результатов',
     reasoningTimeMs: Date.now() - startTime,
     toolCalls: executedToolCalls,
