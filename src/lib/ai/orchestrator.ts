@@ -103,6 +103,9 @@ export class AssistantOrchestrator {
       customPrompt: workspace.aiPrompt,
       persona: workspace.aiPersona,
       personaEnabled: workspace.aiPersonaEnabled,
+      // A telegram question in "minimal" mode has no search tool at all: the model is told to
+      // say that instead of dressing a vault-stats count up as an answer.
+      notesRestricted: Boolean(toolAllowlist) && !toolAllowlist?.includes('search_notes'),
     });
     // Protocol Adapter & Endpoint Resolution
     const target = resolveAiTarget(settings);
@@ -265,6 +268,11 @@ export class AssistantOrchestrator {
 
         // Safeguard: If finalContent is empty but tools were executed or actions captured, synthesize friendly response
         if (!finalContent.trim() && (executedToolCalls.length > 0 || capturedActions.length > 0)) {
+          // In telegram these templates read as a robot reading a database dump: the person asked
+          // a question and got a stats line. Say honestly that the answer did not come out.
+          if (channel === 'telegram') {
+            finalContent = 'Не смог ответить на этот вопрос — сформулируй иначе.';
+          } else {
           const foundNotesSearch = executedToolCalls.find(
             (tc) => tc.name === 'search_notes' && Array.isArray(tc.result) && tc.result.length > 0
           );
@@ -302,6 +310,7 @@ export class AssistantOrchestrator {
             } else {
               finalContent = 'В базе знаний не найдено подходящих записей по вашему запросу. Попробуйте уточнить ключевые слова.';
             }
+          }
           }
         }
 

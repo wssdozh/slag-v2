@@ -65,6 +65,46 @@ export function buildAssistantAnswer(items: SlagItem[], now = Date.now()): strin
   return lines.join('\n');
 }
 
+/** A short thread, device-local on purpose: the relay never stores what was asked or answered. */
+const HISTORY_LIMIT = 8;
+const HISTORY_ENTRY_CHARS = 600;
+
+interface HistoryEntry {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+function historyKey(vaultId: string): string {
+  return `slag_tg_history_${vaultId}`;
+}
+
+function loadHistory(vaultId: string): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(historyKey(vaultId));
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((entry): entry is HistoryEntry => (
+        Boolean(entry) && typeof entry === 'object'
+        && (entry as HistoryEntry).role !== undefined
+        && ((entry as HistoryEntry).role === 'user' || (entry as HistoryEntry).role === 'assistant')
+        && typeof (entry as HistoryEntry).content === 'string'
+      ))
+      .slice(-HISTORY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(vaultId: string, entries: HistoryEntry[]): void {
+  try {
+    localStorage.setItem(historyKey(vaultId), JSON.stringify(entries.slice(-HISTORY_LIMIT)));
+  } catch {
+    // Quota or a locked storage: losing the thread is better than losing the answer.
+  }
+}
+
 /**
  * Answers a question the relay forwarded from the bot.
  *
@@ -81,6 +121,8 @@ export async function answerAssistantQuestion(
   reportStage: (stage: 'thinking') => void = () => {}
 ): Promise<void> {
   const items = storage.getItems();
+  const history = loadHistory(vaultId);
+  const asked: HistoryEntry = { role: 'user', content: (question.trim() || 'что по задачам?').slice(0, HISTORY_ENTRY_CHARS) };
   let answer = '';
   try {
     const settings = loadAiSettings();
@@ -89,7 +131,9 @@ export async function answerAssistantQuestion(
       // "handed to a device" and starts saying "writing".
       reportStage('thinking');
       const result = await assistantOrchestrator.runChat({
-        messages: [{ role: 'user', content: question.trim() || 'что по задачам?' }],
+        // The thread from this chat, so "а конкретной записи нет?" means what it meant a minute
+        // ago. Only the device that answers holds it; the relay stays oblivious.
+        messages: [...history, asked],
         // The whole vault, not a folder: the bot has no idea which folder the person meant.
         currentFolder: DEFAULT_INBOX_FOLDER,
         settings,
@@ -107,8 +151,11 @@ export async function answerAssistantQuestion(
     notifyLog.warn('The assistant could not answer a telegram question', { error: describeError(error) });
   }
   if (!answer) answer = buildAssistantAnswer(items);
+  // The thread grows only with what the person saw: a failed delivery would otherwise leave a
+  // question in the history that was never answered.
   try {
     await accountClient.answerAssistant({ vaultId, requestId, answer });
+    saveHistory(vaultId, [...history, asked, { role: 'assistant', content: answer.slice(0, HISTORY_ENTRY_CHARS) }]);
   } catch (error) {
     notifyLog.warn('Answering a telegram question failed', { error: describeError(error) });
   }

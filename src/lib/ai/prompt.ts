@@ -25,6 +25,8 @@ interface BuildSystemPromptParams {
   /** Optional character the assistant plays; appended on top of the instructions. */
   persona?: string;
   personaEnabled?: boolean;
+  /** The bot runs with a narrow tool set: say so instead of answering with a stats dump. */
+  notesRestricted?: boolean;
 }
 
 export function buildSystemPrompt(params: BuildSystemPromptParams): string {
@@ -46,6 +48,7 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
     customPrompt,
     persona,
     personaEnabled,
+    notesRestricted,
   } = params;
 
   const memoryBlock = memory.length > 0
@@ -79,6 +82,11 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
 - Три предмета и больше — только списком, по одному на строку. Не сваливай перечисление в предложение через запятую: его не читают.
 - Лёгкая ирония или сочувствие уместны, если человек явно устал или шутит. Факты не выдумывай.
 - Не здоровайся заново и не заканчивай предложением помощи.
+${notesRestricted ? `
+РЕЖИМ ДОСТУПА:
+- Тебе доступны только задачи, календарь и общая статистика. Содержимое заметок читать нельзя.
+- Вопрос про заметку, статью или папку не подменяй статистикой или повесткой: скажи одной строкой, что в этом режиме видно только задачи, и предложи включить «всё хранилище» в настройках уведомлений.
+` : ''}
 ${channel === 'telegram' ? `
 ФОРМАТ ДЛЯ TELEGRAM:
 - Текст уходит в телеграм простым сообщением: разметка экранируется, поэтому **жирный**, # заголовки, \`код\`, таблицы и цитаты придут символами. Их не используй.
