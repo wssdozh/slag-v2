@@ -13,6 +13,7 @@ import {
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment } from '../../lib/media/enrichment/dispatch';
 import { extractFocalContext } from '../../lib/media/enrichment/text';
+import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
@@ -383,8 +384,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   }
 
   if (isTask && item.priority && item.priority !== 'none') {
-    const priorityLabel =
-      item.priority === 'high' ? 'Высокий' : item.priority === 'medium' ? 'Средний' : 'Низкий';
+    const priorityLabel = PRIORITY_LABELS[item.priority];
     metaElements.push(
       <span
         key="priority"

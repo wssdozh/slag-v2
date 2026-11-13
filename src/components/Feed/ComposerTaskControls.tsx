@@ -8,6 +8,7 @@ import { DatePickerPopover } from '../UI/DatePickerPopover';
 import { Select } from '../UI/Select';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../lib/time/recurrenceHelper';
+import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 
 export interface ComposerTaskControlsProps {
   effectiveDueDate: string;
@@ -214,13 +215,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
           showLabel={false}
           showArrow={false}
           title={`Приоритет: ${
-            effectivePriority === 'high'
-              ? 'Высокий'
-              : effectivePriority === 'medium'
-              ? 'Средний'
-              : effectivePriority === 'low'
-              ? 'Низкий'
-              : 'Обычный'
+            effectivePriority === 'none' ? 'Обычный' : PRIORITY_LABELS[effectivePriority]
           } (клик для изменения)`}
           onChange={(val) => onPriorityChange(val as SlagItemPriority)}
           className={effectivePriority !== 'none' ? 'rounded-md' : ''}
@@ -233,19 +228,19 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
             },
             {
               value: 'low',
-              label: 'Низкий',
+              label: PRIORITY_LABELS.low,
               icon: <LinearSignalBars size="md" priority="low" />,
               color: 'text-zinc-300',
             },
             {
               value: 'medium',
-              label: 'Средний',
+              label: PRIORITY_LABELS.medium,
               icon: <LinearSignalBars size="md" priority="medium" />,
               color: 'text-amber-400',
             },
             {
               value: 'high',
-              label: 'Высокий',
+              label: PRIORITY_LABELS.high,
               icon: <LinearSignalBars size="md" priority="high" />,
               color: 'text-rose-400',
             },

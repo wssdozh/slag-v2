@@ -3,15 +3,9 @@ import { useApp } from '../context/AppContext';
 import { categorizeDraft, generateSmartTags } from '../lib/ai/aiService';
 import { storage, getSafeNoteFilename } from '../lib/storage';
 import { openAppFolder } from '../lib/platform/folderOpener';
+import { PRIORITY_LABELS } from '../lib/tasks/taskUtils';
 import type { SlagItem, SlagItemType } from '../types';
 import { DEFAULT_INBOX_FOLDER } from '../config';
-
-export const PRIORITY_LABELS: Record<'none' | 'low' | 'medium' | 'high', string> = {
-  high: 'Срочный',
-  medium: 'Высокий',
-  low: 'Средний',
-  none: 'Без приоритета',
-};
 
 export const TYPE_LABELS: Record<SlagItemType, string> = {
   note: 'Заметка',

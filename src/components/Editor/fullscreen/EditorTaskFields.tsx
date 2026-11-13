@@ -7,6 +7,7 @@ import { CheckCircle2, Circle, Clock, X, Calendar, Repeat } from 'lucide-react';
 import { Select } from '../../UI/Select';
 import { DatePickerPopover } from '../../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../../lib/time/dateUtils';
+import { PRIORITY_LABELS } from '../../../lib/tasks/taskUtils';
 
 export interface EditorTaskFieldsProps {
   status: SlagItemStatus;
@@ -103,19 +104,19 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
             },
             {
               value: 'low',
-              label: 'Низкий',
+              label: PRIORITY_LABELS.low,
               icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
               color: 'text-zinc-300',
             },
             {
               value: 'medium',
-              label: 'Средний',
+              label: PRIORITY_LABELS.medium,
               icon: <LinearSignalBars priority="medium" className="w-3.5 h-3.5" />,
               color: 'text-amber-400',
             },
             {
               value: 'high',
-              label: 'Высокий',
+              label: PRIORITY_LABELS.high,
               icon: <LinearSignalBars priority="high" className="w-3.5 h-3.5" />,
               color: 'text-rose-400',
             },
