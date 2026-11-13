@@ -373,7 +373,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isOverlayOpen: () => Boolean(isFullscreenEditorOpen || isComposerModalOpen || isSearchOpen || isSettingsOpen || contextMenu),
   });
 
+  // scrollToItem rides down into every card, so a new identity on each save kept the markdown
+  // tree below it re-rendering. The live list and folder are read from a ref instead of the deps.
+  const scrollLookupRef = useRef({ items, currentFolder });
+  useEffect(() => {
+    scrollLookupRef.current = { items, currentFolder };
+  }, [items, currentFolder]);
+
   const scrollToItem = useCallback((idOrTitle: string) => {
+    const { items: liveItems, currentFolder: liveFolder } = scrollLookupRef.current;
     // Strip [[...]] brackets and optional #anchor or .md extension
     let cleanQuery = idOrTitle.trim().replace(/^\[\[/, '').replace(/\]\]$/, '').trim();
     if (cleanQuery.includes('#')) {
@@ -391,25 +399,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Matching cascade: exact ID -> exact title -> exact filename -> prefix/substring match
     const found =
-      items.find(i => i.id === cleanQuery) ||
-      items.find(i => i.title.toLowerCase() === queryLower || i.title.toLowerCase() === nameLower) ||
-      items.find(i => {
+      liveItems.find(i => i.id === cleanQuery) ||
+      liveItems.find(i => i.title.toLowerCase() === queryLower || i.title.toLowerCase() === nameLower) ||
+      liveItems.find(i => {
         const baseFilename = (i.filename || '').replace(/\.md$/i, '').toLowerCase();
         return baseFilename === queryLower || baseFilename === nameLower;
       }) ||
-      items.find(i => i.title.toLowerCase().startsWith(queryLower) || i.title.toLowerCase().startsWith(nameLower)) ||
-      items.find(i => {
+      liveItems.find(i => i.title.toLowerCase().startsWith(queryLower) || i.title.toLowerCase().startsWith(nameLower)) ||
+      liveItems.find(i => {
         const baseFilename = (i.filename || '').replace(/\.md$/i, '').toLowerCase();
         return baseFilename.startsWith(queryLower) || baseFilename.startsWith(nameLower);
       }) ||
-      items.find(i => i.title.toLowerCase().includes(nameLower));
+      liveItems.find(i => i.title.toLowerCase().includes(nameLower));
 
     if (!found) {
       addToast(`Запись «${cleanQuery}» не найдена`, 'info');
       return;
     }
 
-    if (currentFolder !== DEFAULT_INBOX_FOLDER && currentFolder !== found.folder && !found.folder.startsWith(currentFolder + '/')) {
+    if (liveFolder !== DEFAULT_INBOX_FOLDER && liveFolder !== found.folder && !found.folder.startsWith(liveFolder + '/')) {
       setCurrentFolder(found.folder);
     }
 
@@ -420,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTimeout(() => {
       setHighlightedItemId(prev => (prev === found.id ? null : prev));
     }, 2400);
-  }, [items, currentFolder, addToast]);
+  }, [addToast]);
 
   const navigateToFolder = useCallback((folder: string, itemId?: string) => {
     if (currentFolder !== folder) {
