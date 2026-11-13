@@ -28,6 +28,18 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     const prioBtn = page.locator('button[title*="Приоритет: Высокий"]').first();
     await expect(prioBtn).toBeVisible();
 
+    // 4b. The parsed syntax is painted in the mirror: date and tag in the mention tone,
+    // priority in the priority tone.
+    const mirrorMentions = page.locator('.composer-mirror .text-mention');
+    await expect(mirrorMentions.filter({ hasText: 'завтра в 18:00' })).toHaveCount(1);
+    await expect(mirrorMentions.filter({ hasText: '#groceries' })).toHaveCount(1);
+    await expect(page.locator('.composer-mirror .text-rose-400')).toHaveText('p1');
+
+    await page.screenshot({
+      path: 'test-results/screenshots/todoist-inline-highlights.png',
+      fullPage: false,
+    });
+
     // 5. Take screenshot of unified toolbar controls
     await page.screenshot({
       path: 'test-results/screenshots/todoist-toolbar-controls.png',
@@ -66,6 +78,16 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     // Verify title does NOT contain raw syntax (p2, #culture, tomorrow)
     const cardText = await createdCard.innerText();
     expect(cardText).not.toContain('#culture завтра');
+
+    // 9. The parsed date is gone from the body, and the card keeps the time in its meta.
+    await composerTextarea.fill('Позвонить маме завтра в 09:30');
+    await page.waitForTimeout(250);
+    await composerTextarea.press('Enter');
+
+    const timedCard = page.locator('.group', { hasText: 'Позвонить маме' }).first();
+    await expect(timedCard).toBeVisible();
+    await expect(timedCard).toContainText('09:30');
+    expect(await timedCard.innerText()).not.toContain('завтра в 09:30');
   });
 
   test('20. Dockview Composite Workspace, Sleek Rounded Tabs, and [+] Group Header Actions', async ({ page }) => {
