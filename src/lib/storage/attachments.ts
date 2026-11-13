@@ -106,6 +106,7 @@ export class AttachmentStore {
 
     const stored = await idbGetAttachment(id);
     if (stored?.dataUrl) {
+      this.urlCache.set(id, stored.dataUrl);
       mediaLog.debug(`Attachment url from IndexedDB: ${id} (${Math.round(stored.dataUrl.length / 1024)} KB base64)`);
       return stored.dataUrl;
     }

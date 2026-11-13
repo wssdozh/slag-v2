@@ -9,24 +9,35 @@ const ATTACHMENTS_STORE = 'attachments';
 const SNAPSHOTS_STORE = 'snapshots';
 const DB_VERSION = 2;
 
+/** One connection for the whole session: hundreds of `open` calls on a big folder is the cost. */
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !window.indexedDB) {
-      return reject(new Error('IndexedDB not supported'));
-    }
-    const req = window.indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(ATTACHMENTS_STORE)) {
-        db.createObjectStore(ATTACHMENTS_STORE, { keyPath: 'id' });
+  if (!dbPromise) {
+    const opened = new Promise<IDBDatabase>((resolve, reject) => {
+      if (typeof window === 'undefined' || !window.indexedDB) {
+        return reject(new Error('IndexedDB not supported'));
       }
-      if (!db.objectStoreNames.contains(SNAPSHOTS_STORE)) {
-        db.createObjectStore(SNAPSHOTS_STORE, { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+      const req = window.indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(ATTACHMENTS_STORE)) {
+          db.createObjectStore(ATTACHMENTS_STORE, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(SNAPSHOTS_STORE)) {
+          db.createObjectStore(SNAPSHOTS_STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    // A failure must not stick: the next call retries the open instead of reusing a dead promise.
+    opened.catch(() => {
+      dbPromise = null;
+    });
+    dbPromise = opened;
+  }
+  return dbPromise;
 }
 
 export async function idbSaveAttachment(attachment: SlagAttachment): Promise<void> {

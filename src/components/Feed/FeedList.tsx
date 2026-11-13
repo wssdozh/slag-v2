@@ -95,7 +95,13 @@ export const FeedList: React.FC = () => {
     return { countMap, firstReplyMap };
   }, [items]);
 
-  // The note keeps attachment metadata; the bytes are resolved once for the whole feed.
+  // Windowed items: последние `windowSize` записей, новее всегда в кадре
+  const windowedItems = useMemo(() => takeWindow(filteredItems, windowSize), [filteredItems, windowSize]);
+
+  // The note keeps attachment metadata; the bytes are resolved once for the feed.
+  // ponytail: this preloads the whole folder even though the window renders 15 cards, because the
+  // lightbox pages through the folder deck and expects ready urls. Window it only together with a
+  // lazy resolve inside the lightbox, not before.
   const feedAttachments = useMemo(
     () => filteredItems.flatMap(it => it.attachments || []),
     [filteredItems],
@@ -150,9 +156,6 @@ export const FeedList: React.FC = () => {
   const prevItemsLengthRef = useRef<number>(filteredItems.length);
 
   const todayMidnight = useSyncExternalStore(subscribeToNow, getTodayMidnight, () => 0);
-
-  // Windowed items: последние `windowSize` записей, новее всегда в кадре
-  const windowedItems = useMemo(() => takeWindow(filteredItems, windowSize), [filteredItems, windowSize]);
 
   const hasMoreOlder = hasOlderItems(filteredItems.length, windowSize);
 
