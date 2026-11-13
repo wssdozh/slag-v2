@@ -4,7 +4,8 @@ for (const width of [1280, 390]) {
   test(`initial sync blocks editing and retries at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/');
-    await expect(page.locator('main').first()).toBeVisible();
+    // The first spec of a run pays the cold Vite transform; wait for the shell, not a 5s default.
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
     const setStatus = async (state: string, vaultId = 'default_vault', rejected = 0) => {
       await page.evaluate(async ({ state, vaultId, rejected }) => {
         // Reuse the UI's module URL, including Vite's HMR timestamp, to avoid a second singleton.
