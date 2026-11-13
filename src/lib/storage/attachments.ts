@@ -56,8 +56,9 @@ export class AttachmentStore {
   /**
    * File name inside `.attachments/`. The id in front of it is bookkeeping; when it does not
    * match a note (a re-saved attachment gets a fresh id) the picture is still in there by name.
-   * ponytail: trailing-name match, so two different pictures sharing a name can swap. Upgrade:
-   * write `relativePath` from the id at persist time and never regenerate an id after that.
+   * A name alone is not identity though: pasted photos are all `image.webp`, so a guess is only
+   * taken when it is the single candidate. Two same-named files and no id match means the bytes
+   * are simply not here yet — showing a stranger's photo is worse than showing nothing.
    */
   private async pathFor(id: string, relativePath: string): Promise<string | undefined> {
     const parts = relativePath.split(/[\\/]/);
@@ -72,8 +73,10 @@ export class AttachmentStore {
         this.nameIndex = entries.filter((entry) => entry.isFile).map((entry) => entry.name);
       }
       const name = basename.replace(/^att_[a-z0-9]+_/i, '');
-      const match = this.nameIndex.find((file) => file === name || file.endsWith(`_${name}`));
-      return match ? `${dir}/${match}` : undefined;
+      const candidates = this.nameIndex.filter((file) => file === name || file.endsWith(`_${name}`));
+      const sameId = candidates.find((file) => file.startsWith(`att_${id}_`) || file === id);
+      if (sameId) return `${dir}/${sameId}`;
+      return candidates.length === 1 ? `${dir}/${candidates[0]}` : undefined;
     } catch {
       return undefined;
     }

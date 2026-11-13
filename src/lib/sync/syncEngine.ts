@@ -198,6 +198,9 @@ export class SyncEngine {
       },
       onCatchUpPull: () => {
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));
+        // A dropped socket takes the debounce timer with it; asks that survived the reconnect
+        // must leave again instead of waiting for the next unrelated edit.
+        if (this.pendingRequests.size > 0) this.scheduleDebouncedPush(0);
       },
       onAuthRejected: () => {
         this.disconnect();
@@ -309,6 +312,8 @@ export class SyncEngine {
    * photo never rides inside a keystroke bundle. The pass is a one-shot flag the push consumes.
    */
   private scheduleAttachmentPass(): void {
+    // A queued ask for missing bytes drains one bundle at a time, on the same one-shot push.
+    if (this.pendingRequests.size > 0) this.scheduleDebouncedPush(0);
     // init and every confirmed push both call this: one queued pass is enough for both.
     if (this.attachmentPass) return;
     if (this.attachmentSyncBlocked) {
@@ -997,8 +1002,8 @@ export class SyncEngine {
     this.importTimer = null;
     this.importBuffer = null;
     this.appliedBundleIds.clear();
-    this.pendingRequests.clear();
-    this.forcedAttachmentIds.clear();
+    // A reconnect is not a reason to forget what was asked for: the queue belongs to the vault,
+    // not to this socket, and a dropped request only comes back twenty-four hours later.
     this.missingAttachments.clear();
     this.entityHashes.clear();
     this.wsSupportsBinary = false;
