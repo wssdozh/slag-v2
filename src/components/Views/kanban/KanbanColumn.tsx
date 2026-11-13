@@ -23,7 +23,7 @@ export interface KanbanColumnProps {
 }
 
 /** Kanban column: own header with counter, card list and the inline "new task" button. */
-export const KanbanColumn: React.FC<KanbanColumnProps> = ({
+const KanbanColumnComponent: React.FC<KanbanColumnProps> = ({
   column,
   tasks,
   isDropTarget,
@@ -114,3 +114,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     </div>
   );
 };
+
+/** A save re-renders the board; without memo every column below it drops its whole card list. */
+export const KanbanColumn = React.memo(KanbanColumnComponent);

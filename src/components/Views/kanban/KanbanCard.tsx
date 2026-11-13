@@ -21,7 +21,7 @@ export interface KanbanCardProps {
 }
 
 /** Task card inside a Kanban column. */
-export const KanbanCard: React.FC<KanbanCardProps> = ({
+const KanbanCardComponent: React.FC<KanbanCardProps> = ({
   task,
   column,
   isMenuOpen,
@@ -216,3 +216,6 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     </div>
   );
 };
+
+/** A folder can hold hundreds of tasks: a toast must not re-render every card's props subtree. */
+export const KanbanCard = React.memo(KanbanCardComponent);
