@@ -14,6 +14,8 @@ export interface ItemImagesProps {
   /** Every picture of the note, in its own order: one is a hero, two and up are a canvas. */
   images: SlagAttachment[];
   srcs: AttachmentSrcs;
+  /** Ids whose bytes are gone for good: only those may say "нет файла". */
+  missing: ReadonlySet<string>;
   /** A card with no prose hugs its picture; the open OCR panel claims the column back. */
   isPictureBubble: boolean;
   /** Which pictures have their recognised text unfolded right now. */
@@ -35,10 +37,20 @@ const MissingMedia: React.FC<{ name: string }> = ({ name }) => (
   </span>
 );
 
+/** A media slot whose bytes are still being resolved: a quiet slab instead of a verdict. */
+const LoadingMedia: React.FC = () => (
+  <span
+    data-testid="media-skeleton"
+    aria-hidden
+    className="absolute inset-0 bg-white/[0.04] motion-safe:animate-pulse"
+  />
+);
+
 /** Pictures of a note: a lone frame keeps its own shape, a pile fills one canvas. */
 const ItemImagesComponent: React.FC<ItemImagesProps> = ({
   images,
   srcs,
+  missing,
   isPictureBubble,
   expandedOcrIds,
   onToggleOcr,
@@ -47,7 +59,11 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
 }) => {
   // A picture sizes itself from its own proportions: height has a ceiling, width follows the
   // ratio. Without the loaded ratio the browser inflates the box to the unclamped width.
+  // ponytail: the ratio is only known after `onLoad`, so the hero box settles on load. Storing
+  // the intrinsics at attach time (width/height in the attachment) would remove the jump.
   const [firstImageRatio, setFirstImageRatio] = useState<number | null>(null);
+  // Decoded frames fade in: until `onLoad` the picture is transparent over its skeleton.
+  const [loadedIds, setLoadedIds] = useState<ReadonlySet<string>>(() => new Set());
   const deck = useMemo(() => buildImageDeck(images), [images]);
   const hero = deck.hero;
   const album = deck.album;
@@ -55,6 +71,9 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
   if (!hero && !album) return null;
 
   const heroSrc = attachmentSrc(srcs, hero);
+  const markLoaded = (id: string) => {
+    setLoadedIds((current) => (current.has(id) ? current : new Set(current).add(id)));
+  };
 
   return (
     <div className={`pt-1 flex flex-col gap-1.5 ${isPictureBubble ? 'w-fit max-w-full' : 'w-full items-start'}`}>
@@ -79,21 +98,28 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
                 alt={hero.name}
                 loading="lazy"
                 decoding="async"
-                className={
+                data-loaded={loadedIds.has(hero.id) ? 'true' : 'false'}
+                className={`${
                   firstImageRatio
                     ? 'block h-full w-full object-contain'
                     : 'block h-auto w-auto max-h-[20rem] max-w-full object-contain'
-                }
+                } transition-opacity duration-200 motion-reduce:transition-none ${
+                  loadedIds.has(hero.id) ? 'opacity-100' : 'opacity-0'
+                }`}
                 onLoad={(event) => {
                   const picture = event.currentTarget;
                   if (picture.naturalWidth && picture.naturalHeight) {
                     setFirstImageRatio(picture.naturalWidth / picture.naturalHeight);
                   }
+                  markLoaded(hero.id);
                 }}
               />
-            ) : (
+            ) : missing.has(hero.id) ? (
               <MissingMedia name={hero.name} />
+            ) : (
+              <LoadingMedia />
             )}
+            {heroSrc && !loadedIds.has(hero.id) && <LoadingMedia />}
 
             {/* Text action badge anchored in the bottom-right corner of the image */}
             {hero.extractedText ? (
@@ -164,15 +190,24 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
                   >
                     {tile.hidden === 0 && (
                       tileSrc ? (
-                        <img
-                          src={tileSrc}
-                          alt={tile.image.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="absolute inset-0 h-full w-full object-cover"
-                        />
-                      ) : (
+                        <>
+                          <img
+                            src={tileSrc}
+                            alt={tile.image.name}
+                            loading="lazy"
+                            decoding="async"
+                            data-loaded={loadedIds.has(tile.image.id) ? 'true' : 'false'}
+                            onLoad={() => markLoaded(tile.image.id)}
+                            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 motion-reduce:transition-none ${
+                              loadedIds.has(tile.image.id) ? 'opacity-100' : 'opacity-0'
+                            }`}
+                          />
+                          {!loadedIds.has(tile.image.id) && <LoadingMedia />}
+                        </>
+                      ) : missing.has(tile.image.id) ? (
                         <MissingMedia name={tile.image.name} />
+                      ) : (
+                        <LoadingMedia />
                       )
                     )}
                     {tile.hidden > 0 ? (

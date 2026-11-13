@@ -100,7 +100,7 @@ export const FeedList: React.FC = () => {
     () => filteredItems.flatMap(it => it.attachments || []),
     [filteredItems],
   );
-  const attachmentSrcs = useAttachmentSrcs(feedAttachments);
+  const { srcs: attachmentSrcs } = useAttachmentSrcs(feedAttachments);
 
   // Stable handler for image lightbox in feed
   const handleImageClick = useCallback((img: SlagAttachment) => {

@@ -308,7 +308,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   // One bucket per kind, so each slot of the card gets its own list and the shape counts once.
   const attachmentGroups = useMemo(() => groupItemAttachments(item.attachments), [item.attachments]);
   // Bytes are not in the note any more: they are resolved from IndexedDB or `.attachments/`.
-  const attachmentSrcs = useAttachmentSrcs(item.attachments);
+  // `missing` tells pictures apart from bytes still on their way.
+  const { srcs: attachmentSrcs, missing: missingAttachmentSrcs } = useAttachmentSrcs(item.attachments);
 
   const shape = itemCardShape(item, attachmentCounts(attachmentGroups));
   const isVoiceBubble = shape === 'voice';
@@ -668,6 +669,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       <ItemImages
         images={attachmentGroups.image}
         srcs={attachmentSrcs}
+        missing={missingAttachmentSrcs}
         isPictureBubble={isPictureBubble}
         expandedOcrIds={expandedOcrIds}
         onToggleOcr={handleToggleOcr}

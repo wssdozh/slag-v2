@@ -34,7 +34,7 @@ export interface FolderMediaData {
 export function useFolderMedia(items: SlagItem[]): FolderMediaData {
   // Bytes live outside the note now, so the panel resolves them once for the whole folder.
   const attachments = useMemo(() => items.flatMap(i => i.attachments || []), [items]);
-  const srcs = useAttachmentSrcs(attachments);
+  const { srcs } = useAttachmentSrcs(attachments);
 
   return useMemo(() => {
     const allImages: LightboxImage[] = [];

@@ -1,5 +1,5 @@
 // The editor's attachment rail: reorder, remove, insert into the text, inline players.
-import React from 'react';
+import React, { useState } from 'react';
 import type { LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
@@ -41,7 +41,12 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
   onAddClick,
   onOpenLightbox,
 }) => {
-  const srcs = useAttachmentSrcs(attachments);
+  const { srcs } = useAttachmentSrcs(attachments);
+  // A preview fades in once its own bytes are decoded; until then the slot stays a skeleton.
+  const [loadedImageIds, setLoadedImageIds] = useState<ReadonlySet<string>>(() => new Set());
+  const markImageLoaded = (id: string) => {
+    setLoadedImageIds((current) => (current.has(id) ? current : new Set(current).add(id)));
+  };
   if (attachments.length === 0) return null;
 
   return (
@@ -142,9 +147,26 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                           }], 0);
                         }
                       }}
-                      className="w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"
+                      className="relative w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"
                     >
-                      <img src={srcs[att.id] ?? att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+                      {(srcs[att.id] ?? att.dataUrl) && (
+                        <img
+                          src={srcs[att.id] ?? att.dataUrl}
+                          alt={att.name}
+                          data-loaded={loadedImageIds.has(att.id) ? 'true' : 'false'}
+                          onLoad={() => markImageLoaded(att.id)}
+                          className={`w-full h-full object-cover transition-opacity duration-200 motion-reduce:transition-none ${
+                            loadedImageIds.has(att.id) ? 'opacity-100' : 'opacity-0'
+                          }`}
+                        />
+                      )}
+                      {!loadedImageIds.has(att.id) && (
+                        <span
+                          data-testid="media-skeleton"
+                          aria-hidden
+                          className="absolute inset-0 bg-white/[0.04] motion-safe:animate-pulse"
+                        />
+                      )}
                     </div>
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <span className="text-xs font-mono text-zinc-300 font-medium truncate">

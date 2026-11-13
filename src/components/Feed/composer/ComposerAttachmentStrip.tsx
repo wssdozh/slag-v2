@@ -1,5 +1,5 @@
 // The tray of what is about to be sent: attachment chips, each removable.
-import React from 'react';
+import React, { useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import type { SlagAttachment } from '../../../types';
 import { AudioPlayer } from '../../UI/AudioPlayer';
@@ -19,7 +19,13 @@ export const ComposerAttachmentStrip: React.FC<ComposerAttachmentStripProps> = (
   attachments,
   onRemove,
 }) => {
-  const attachmentSrcs = useAttachmentSrcs(attachments);
+  const { srcs: attachmentSrcs } = useAttachmentSrcs(attachments);
+  // A fresh paste usually carries its `dataUrl`, so this fade is quiet — but it keeps the tray
+  // honest when the bytes still have to come back from the disk.
+  const [loadedImageIds, setLoadedImageIds] = useState<ReadonlySet<string>>(() => new Set());
+  const markImageLoaded = (id: string) => {
+    setLoadedImageIds((current) => (current.has(id) ? current : new Set(current).add(id)));
+  };
 
   if (attachments.length === 0) return null;
 
@@ -58,7 +64,24 @@ export const ComposerAttachmentStrip: React.FC<ComposerAttachmentStripProps> = (
             </div>
           ) : att.type === 'image' ? (
             <div className="relative group rounded-lg overflow-hidden border border-white/[0.08] bg-black/40">
-              <img src={attachmentSrcs[att.id] ?? att.dataUrl} alt={att.name} className="w-11 h-11 object-cover" />
+              {(attachmentSrcs[att.id] ?? att.dataUrl) && (
+                <img
+                  src={attachmentSrcs[att.id] ?? att.dataUrl}
+                  alt={att.name}
+                  data-loaded={loadedImageIds.has(att.id) ? 'true' : 'false'}
+                  onLoad={() => markImageLoaded(att.id)}
+                  className={`w-11 h-11 object-cover transition-opacity duration-200 motion-reduce:transition-none ${
+                    loadedImageIds.has(att.id) ? 'opacity-100' : 'opacity-0'
+                  }`}
+                />
+              )}
+              {!loadedImageIds.has(att.id) && (
+                <span
+                  data-testid="media-skeleton"
+                  aria-hidden
+                  className="absolute inset-0 bg-white/[0.04] motion-safe:animate-pulse"
+                />
+              )}
               <button
                 type="button"
                 onClick={() => onRemove(att.id)}
