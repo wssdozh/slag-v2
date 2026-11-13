@@ -316,7 +316,7 @@ export interface ChatMessage {
 }
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
-export type LogScope = 'AI' | 'FS' | 'NODE' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA' | 'WORKSPACE';
+export type LogScope = 'AI' | 'FS' | 'NODE' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA' | 'WORKSPACE' | 'NOTIFY';
 
 export interface LogEntry {
   id: string;
@@ -385,6 +385,13 @@ export interface FullscreenEditorWorkspaceState {
   isFullWidth?: boolean;
 }
 
+/** A telegram channel the relay may deliver reminders to; it never learns who is behind it. */
+export interface NotifyRoute {
+  token: string;
+  label: string;
+  state: 'pending' | 'active' | 'blocked';
+}
+
 export interface WorkspaceState {
   currentFolder: string;
   feedViewMode: FeedViewMode;
@@ -399,6 +406,7 @@ export interface WorkspaceState {
   sortOrder?: SortOrder;
   hideCompletedTasks?: boolean;
   folderSettings?: Record<string, FolderViewSettings>;
+  notifyRoutes?: NotifyRoute[];
 }
 
 export interface BackupSnapshotMeta {

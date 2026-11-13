@@ -30,7 +30,7 @@ const LEVEL_COLORS: Record<LogLevel, { text: string; labelColor: string }> = {
   error: { text: 'text-danger', labelColor: 'text-danger' },
 };
 
-const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC', 'MEDIA', 'WORKSPACE'];
+const ALL_SCOPES: LogScope[] = ['AI', 'FS', 'SEARCH', 'UI', 'APP', 'SYNC', 'MEDIA', 'WORKSPACE', 'NOTIFY'];
 const ALL_LEVELS: LogLevel[] = ['error', 'warn', 'info', 'debug'];
 
 export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose }) => {
