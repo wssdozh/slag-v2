@@ -1,21 +1,12 @@
 // The sync channel: status, server address, schedule; account and devices sit nearby.
-import React, { Fragment, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RefreshCw, PlugZap } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
-import type { NotifyInvite } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
-import { getNotifyRoutes, notifyErrorText, saveNotifyRoutes } from '../../lib/notify';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
-import type { NotifyRoute } from '../../types';
 import { IconButton } from '../UI/IconButton';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
-
-const ROUTE_STATE_LABEL: Record<NotifyRoute['state'], string> = {
-  pending: 'ждёт подтверждения',
-  active: 'активен',
-  blocked: 'заблокирован',
-};
 
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
@@ -24,9 +15,6 @@ export const SyncSettingsTab: React.FC = () => {
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isTestingServer, setIsTestingServer] = useState(false);
-  const [notifyRoutes, setNotifyRoutes] = useState<NotifyRoute[]>(() => getNotifyRoutes());
-  const [notifyInvite, setNotifyInvite] = useState<NotifyInvite | null>(null);
-  const [isRequestingInvite, setIsRequestingInvite] = useState(false);
 
   const locked = status.authRequired && !accountClient.isAuthenticated();
 
@@ -56,31 +44,6 @@ export const SyncSettingsTab: React.FC = () => {
     }
   };
 
-  const handleRequestInvite = async () => {
-    setIsRequestingInvite(true);
-    try {
-      const invite = await accountClient.requestNotifyInvite(syncEngine.getSyncVaultId());
-      setNotifyInvite(invite);
-      const updated = [
-        ...notifyRoutes.filter((route) => route.token !== invite.routeToken),
-        { token: invite.routeToken, label: '', state: 'pending' as const },
-      ];
-      setNotifyRoutes(updated);
-      saveNotifyRoutes(updated);
-    } catch (error) {
-      addToast(notifyErrorText(error), 'error');
-    } finally {
-      setIsRequestingInvite(false);
-    }
-  };
-
-  const handleRemoveRoute = (token: string) => {
-    const updated = notifyRoutes.filter((route) => route.token !== token);
-    setNotifyRoutes(updated);
-    saveNotifyRoutes(updated);
-    if (notifyInvite?.routeToken === token) setNotifyInvite(null);
-  };
-
   return (
     <div className="flex flex-col gap-3">
       <SettingsGroup title="Синхронизация" action={<span className="text-2xs font-mono text-fg-dim">E2EE</span>}>
@@ -105,30 +68,6 @@ export const SyncSettingsTab: React.FC = () => {
           { value: '10', label: '10 мин', testId: 'sync-interval-10' },
           { value: '30', label: '30 мин (эко)', testId: 'sync-interval-30' },
         ]} />
-      </SettingsGroup>
-
-      <SettingsGroup title="Уведомления в telegram" action={<span className="text-2xs font-mono text-fg-dim">{notifyRoutes.length || 'офф'}</span>}>
-        <SettingsRow label="Добавить получателя" description="Человек сам подтверждает канал в боте: без этого напоминания никому не уходят." right={
-          <button type="button" disabled={isRequestingInvite || locked} onClick={() => void handleRequestInvite()} className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer">
-            {isRequestingInvite ? 'Код…' : 'Получить код'}
-          </button>
-        } />
-        {notifyInvite && (
-          <>
-            <SettingsDivider />
-            <SettingsRow label={<span className="font-mono text-xs text-fg-primary select-all break-all">{notifyInvite.code}</span>} description={notifyInvite.link ? 'Отправь код боту или открой ссылку.' : 'Отправь код боту.'} right={
-              notifyInvite.link ? <a href={notifyInvite.link} target="_blank" rel="noreferrer" className="text-2xs text-accent hover:underline">открыть</a> : undefined
-            } />
-          </>
-        )}
-        {notifyRoutes.map((route) => (
-          <Fragment key={route.token}>
-            <SettingsDivider />
-            <SettingsRow label={<span className="font-mono text-2xs text-fg-secondary break-all">{route.label || route.token.slice(0, 8)}</span>} description={ROUTE_STATE_LABEL[route.state]} right={
-              <button type="button" aria-label="Удалить получателя" onClick={() => handleRemoveRoute(route.token)} className="px-2 py-1.5 text-2xs text-fg-muted rounded-md hover:bg-surface-hover hover:text-danger cursor-pointer">удалить</button>
-            } />
-          </Fragment>
-        ))}
       </SettingsGroup>
 
       <SettingsGroup title="Безопасность">

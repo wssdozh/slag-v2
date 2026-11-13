@@ -7,6 +7,7 @@ import { BaseModal } from './BaseModal';
 import { AccountSettingsTab } from '../Settings/AccountSettingsTab';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
+import { NotificationsSettingsTab } from '../Settings/NotificationsSettingsTab';
 import { AiSettingsTab } from '../Settings/AiSettingsTab';
 import { VaultSettingsTab } from '../Settings/VaultSettingsTab';
 import { UiSettingsTab } from '../Settings/UiSettingsTab';
@@ -91,6 +92,10 @@ export const SettingsModal: React.FC = () => {
 
           {activeTab === 'sync' && (
             <SyncSettingsTab />
+          )}
+
+          {activeTab === 'notifications' && (
+            <NotificationsSettingsTab />
           )}
 
           {activeTab === 'ui' && (
