@@ -392,6 +392,20 @@ export interface NotifyRoute {
   state: 'pending' | 'active' | 'blocked';
 }
 
+/** What this vault wants to hear about, and when it is willing to hear it. */
+export interface NotifyPrefs {
+  /** Reminders that carry an exact time. */
+  tasks: boolean;
+  /** A morning ping for tasks whose due date has passed. */
+  overdue: boolean;
+  /** Inclusive start of the quiet window, `HH:MM` local. */
+  quietFrom: string;
+  /** Exclusive end of the quiet window, `HH:MM` local. */
+  quietTo: string;
+  /** Let this vault's telegram channel ask a question of the devices. */
+  assistant: boolean;
+}
+
 export interface WorkspaceState {
   currentFolder: string;
   feedViewMode: FeedViewMode;
@@ -407,6 +421,7 @@ export interface WorkspaceState {
   hideCompletedTasks?: boolean;
   folderSettings?: Record<string, FolderViewSettings>;
   notifyRoutes?: NotifyRoute[];
+  notifyPrefs?: NotifyPrefs;
 }
 
 export interface BackupSnapshotMeta {

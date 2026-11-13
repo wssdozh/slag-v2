@@ -13,6 +13,8 @@ export interface TransportCallbacks {
   onPing?: (pingMs: number) => void;
   onServerAck?: (bundleId: string) => void;
   onBundle: (bundlePayload: unknown) => Promise<void> | void;
+  /** The bot got a question: answer it from this device, or nobody will. */
+  onAssistantQuestion?: (requestId: string, question: string) => Promise<void> | void;
   onCatchUpPull?: () => void;
   onAuthRejected?: () => void;
 }
@@ -178,6 +180,8 @@ export class SyncTransport {
         }
       } else if (msg.type === 'bundle') {
         await this.callbacks.onBundle(msg.bundle);
+      } else if (msg.type === 'assistant_question' && typeof msg.id === 'string') {
+        await this.callbacks.onAssistantQuestion?.(msg.id, typeof msg.question === 'string' ? msg.question : '');
       } else if (msg.type === 'error') {
         syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
       }

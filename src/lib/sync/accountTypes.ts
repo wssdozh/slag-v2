@@ -97,6 +97,19 @@ export interface NotifyInvite {
   expiresIn: number;
 }
 
+/** Opts one telegram channel into the question/answer path. */
+export interface AssistantLinkPayload {
+  vaultId: string;
+  routeToken: string;
+  enabled: boolean;
+}
+
+export interface AssistantAnswerPayload {
+  vaultId: string;
+  requestId: string;
+  answer: string;
+}
+
 export interface AccountState {
   session: AccountSession | null;
   account: AccountInfo | null;

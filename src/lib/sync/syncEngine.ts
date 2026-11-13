@@ -108,6 +108,13 @@ export class SyncEngine {
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   public currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Answers a question the bot forwarded; registered by the app, absent in the node build. */
+  private assistantHandler: ((requestId: string) => void) | null = null;
+
+  public setAssistantHandler(handler: ((requestId: string) => void) | null): void {
+    this.assistantHandler = handler;
+  }
+
   private pushDebounceDeadline = 0;
   private pushDebounceTrailing = false;
   /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
@@ -160,6 +167,11 @@ export class SyncEngine {
       },
       onBundle: async (bundle) => {
         await this.applyIncomingBundle(bundle);
+      },
+      // The relay forwards the bot's question; whoever registered a handler answers it.
+      // Wired from the app, not imported here: the headless node build has no notifier.
+      onAssistantQuestion: (requestId) => {
+        this.assistantHandler?.(requestId);
       },
       onCatchUpPull: () => {
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));

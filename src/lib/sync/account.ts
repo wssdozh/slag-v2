@@ -9,6 +9,8 @@ import type {
   AccountSession,
   AccountState,
   AccountVault,
+  AssistantAnswerPayload,
+  AssistantLinkPayload,
   NotifyArmPayload,
   NotifyArmResult,
   NotifyInvite,
@@ -581,6 +583,22 @@ class AccountClient {
       body: JSON.stringify(payload),
     });
   }
+
+  /** Opts a bound channel into the question/answer path, or out of it. */
+  setAssistantLink(payload: AssistantLinkPayload): Promise<{ enabled: boolean }> {
+    return this.request<{ enabled: boolean }>('/api/assistant/enable', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** Hands the answer back to the relay, which forwards it to the chat that asked. */
+  answerAssistant(payload: AssistantAnswerPayload): Promise<{ delivered: boolean }> {
+    return this.request<{ delivered: boolean }>('/api/assistant/answer', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 export const accountClient = new AccountClient();
@@ -600,4 +618,6 @@ export type {
   NotifyArmRoute,
   NotifyDropReason,
   NotifyInvite,
+  AssistantAnswerPayload,
+  AssistantLinkPayload,
 } from './accountTypes';
