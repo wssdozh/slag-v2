@@ -10,6 +10,7 @@ export type LogListener = (entry: LogEntry) => void;
 const SCOPE_STYLES: Record<LogScope, { bg: string; fg: string }> = {
   AI: { bg: '#312e81', fg: '#c7d2fe' },
   FS: { bg: '#064e3b', fg: '#6ee7b7' },
+  NODE: { bg: '#3f3f46', fg: '#e4e4e7' },
   SEARCH: { bg: '#451a03', fg: '#fcd34d' },
   UI: { bg: '#27272a', fg: '#d4d4d8' },
   APP: { bg: '#4c1d95', fg: '#ddd6fe' },

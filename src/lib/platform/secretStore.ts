@@ -64,7 +64,7 @@ let initPromise: Promise<void> | null = null;
  * A runtime that brings its own secret storage (the headless node keeps a 0600 file) uses this
  * instead of the keychain/IndexedDB probe. Must be called before `initSecretStore()`.
  */
-export function useSecretBackend(custom: SecretBackend): void {
+export function installSecretBackend(custom: SecretBackend): void {
   override = custom;
 }
 
