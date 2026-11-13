@@ -35,6 +35,15 @@
                 <!-- AndroidTV support -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <!-- A note link from telegram lands on the relay's hand-off page, and that page opens
+                 `slag://note?title=…`. Telegram itself refuses the scheme, so this filter is the
+                 only way the last hop exists on Android. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="slag" />
+            </intent-filter>
         </activity>
 
         <provider
@@ -46,5 +55,11 @@
             android:name="android.support.FILE_PROVIDER_PATHS"
             android:resource="@xml/file_paths" />
         </provider>
+        <!-- PROVIDERS FOR ANDROID FS PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+        
+        <!-- PROVIDERS FOR ANDROID FS PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
     </application>
+    <!-- ANDROID FS PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+    
+    <!-- ANDROID FS PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
 </manifest>

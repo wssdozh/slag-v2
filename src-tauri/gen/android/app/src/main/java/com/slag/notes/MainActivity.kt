@@ -1,5 +1,6 @@
 package com.slag.notes
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.Display
@@ -15,10 +16,23 @@ class MainActivity : TauriActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
+    // The link is read before the webview exists, so the frontend can ask for it on its first
+    // frame instead of waiting for an event that would arrive while it is still loading.
+    LinkInbox.pending = deepLinkIn(intent)
     super.onCreate(savedInstanceState)
     trackImeInsets()
     requestMaxRefreshRate()
   }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    // singleTask: tapping a link with the app already open lands here, not in onCreate.
+    setIntent(intent)
+    LinkInbox.pending = deepLinkIn(intent)
+  }
+
+  private fun deepLinkIn(intent: Intent?): String? =
+    intent?.dataString?.takeIf { it.startsWith("slag://") }
 
   override fun onResume() {
     super.onResume()

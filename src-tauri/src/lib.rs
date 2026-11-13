@@ -171,6 +171,7 @@ fn configure_window_border(window: &tauri::Window) {
 fn configure_window_border(_window: &tauri::Window) {}
 
 mod platform;
+mod deeplink;
 #[cfg(desktop)]
 mod secure_store;
 #[cfg(target_os = "android")]
@@ -397,6 +398,7 @@ pub fn run() {
             get_platform_info,
             setup_system_hotkey,
             remove_system_hotkey,
+            deeplink::take_deep_link,
             secure_store::secret_get,
             secure_store::secret_set,
             secure_store::secret_delete
@@ -408,7 +410,8 @@ pub fn run() {
         builder = builder.invoke_handler(tauri::generate_handler![
             media_plugin::gallery_access,
             media_plugin::gallery_request_access,
-            media_plugin::gallery_list
+            media_plugin::gallery_list,
+            deeplink::take_deep_link
         ]);
     }
 
@@ -429,6 +432,11 @@ pub fn run() {
                     }
                 }
                 reveal_main_window(app);
+                // A second launch is also how the OS delivers a `slag://` link: the argument is
+                // the URL, and the window that just came up is where the note has to appear.
+                if let Some(url) = deeplink::link_in_args(&args) {
+                    deeplink::deliver(app, &url);
+                }
             }))
             .plugin(
                 tauri_plugin_window_state::Builder::default()
@@ -476,7 +484,7 @@ pub fn run() {
     // MediaStore listing only exists on Android; the module is compiled there and nowhere else.
     #[cfg(target_os = "android")]
     {
-        builder = builder.plugin(media_plugin::init());
+        builder = builder.plugin(media_plugin::init()).plugin(deeplink::init());
     }
 
     #[cfg(desktop)]
@@ -499,6 +507,14 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 platform::auto_adapt_system();
+                // Owned before anything can deliver into it: the cold start below, or a second
+                // launch once the app is up.
+                app.manage(deeplink::PendingLink::default());
+                deeplink::register_scheme();
+                let launch_args: Vec<String> = std::env::args().collect();
+                if let Some(url) = deeplink::link_in_args(&launch_args) {
+                    deeplink::deliver(app.handle(), &url);
+                }
 
                 if let Some(main_window) = app.get_webview_window("main") {
                     #[cfg(target_os = "windows")]
