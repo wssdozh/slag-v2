@@ -19,7 +19,7 @@ import {
 export const AiSettingsTab: React.FC = () => {
   const form = useAiSettingsForm();
   const { draft } = form;
-  const [promptOpen, setPromptOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<null | 'prompt' | 'persona'>(null);
 
   // Read once: the plan arrives from the relay's health check, and subscribing here made the
   // lock re-render mid-interaction. A stale lock while the tab is open is a known gap, not a
@@ -185,31 +185,44 @@ export const AiSettingsTab: React.FC = () => {
         </div>
       </SettingsGroup>
 
-      {/* слова владельца: свой промпт и персона, синхронизируются с хранилищем */}
+      {/* слова владельца: два поля, две модалки, оба едут с хранилищем */}
       <SettingsGroup title="Промпт">
         <SettingsRow
-          label="Промпт и персона"
+          label="Инструкции"
           right={
             <button
               type="button"
-              onClick={() => setPromptOpen(true)}
+              onClick={() => setEditing('prompt')}
+              data-testid="ai-prompt-open"
               className="px-2.5 py-1 rounded-md text-xs text-fg-secondary hover:text-fg-primary hover:bg-surface-hover transition-colors cursor-pointer"
             >
               Изменить
             </button>
           }
         />
-        <p className="px-3 pb-3 text-2xs leading-relaxed text-fg-muted sm:px-4">
-          Едет вместе с хранилищем: бот в телеграме и приложение на всех устройствах отвечают
-          одинаково. Персона добавляется к промпту, а не заменяет его.
-        </p>
+        <SettingsDivider />
+        <SettingsRow
+          label="Персона"
+          right={
+            <button
+              type="button"
+              onClick={() => setEditing('persona')}
+              data-testid="ai-persona-open"
+              className="px-2.5 py-1 rounded-md text-xs text-fg-secondary hover:text-fg-primary hover:bg-surface-hover transition-colors cursor-pointer"
+            >
+              Изменить
+            </button>
+          }
+        />
       </SettingsGroup>
 
       {/* что ассистент запомнил о человеке */}
       <MemoryList />
     </form>
-    {/* The dialog lives outside the settings form: a form inside a form is not a form at all. */}
-    <AiPromptModal isOpen={promptOpen} onClose={() => setPromptOpen(false)} />
+    {/* The dialogs live outside the settings form: a form inside a form is not a form at all. */}
+    {editing && (
+      <AiPromptModal key={editing} field={editing} isOpen onClose={() => setEditing(null)} />
+    )}
     </>
   );
 };
