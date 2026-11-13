@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "dev:desktop": "tauri dev",
-    "build": "tsc -b && vite build && vite build --config vite.mcp.config.ts",
+    "build": "tsc -b && vite build && vite build --config vite.mcp.config.ts && vite build --config vite.node.config.ts",
     "build:mcp": "vite build --config vite.mcp.config.ts",
+    "build:node": "vite build --config vite.node.config.ts",
     "mcp": "node dist/mcp/index.js",
+    "node": "node dist/node/index.js",
     "build:desktop": "tauri build",
     "build:desktop:fast": "cargo build --profile fast --manifest-path src-tauri/Cargo.toml",
     "build:android": "tauri android build --debug --apk --target aarch64",
