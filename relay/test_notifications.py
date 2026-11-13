@@ -669,12 +669,13 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         # An empty keyboard is not "no button": it is an edit that strips a keyboard that exists.
         self.assertNotIn("reply_markup", self.bot.calls[-1])
 
-    async def test_action_tap_hands_the_stored_action_to_every_live_device(self):
+    async def test_action_tap_goes_to_the_device_that_wrote_the_answer(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
         self.db.set_assistant_link("tok-a", "vault-1", True)
         request_id = self.db.create_assistant_request("vault-1", "tok-a", "что на 14-е?")
         action = sample_action()
-        await self.server._answer_assistant("vault-1", request_id, "предлагаю", action=action)
+        await self.server._answer_assistant("vault-1", request_id, "предлагаю", action=action,
+                                            answered_by="dev-1")
         first = FakeDevice("dev-1", "vault-1", server=self.server)
         second = FakeDevice("dev-2", "vault-1", server=self.server)
         stranger = FakeDevice("dev-3", "vault-2", server=self.server)
@@ -683,7 +684,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         await self.tap("chat-a", f"act:{request_id}")
         frames = [json.loads(frame) for frame in first.frames if '"assistant_action"' in frame]
         self.assertEqual(frames, [{"type": "assistant_action", "id": request_id, "action": action}])
-        self.assertEqual(len([f for f in second.frames if '"assistant_action"' in f]), 1)
+        # One tap must not become one note per machine: the second device never hears about it.
+        self.assertEqual([f for f in second.frames if '"assistant_action"' in f], [])
         # Another vault's device is not the one that offered the action.
         self.assertEqual(stranger.frames, [])
         self.assertEqual(self.bot.callbacks[-1]["callback_query_id"], "cb-1")
@@ -691,6 +693,18 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         outcomes = [row["outcome"] for row in self.db.conn.execute(
             "SELECT outcome FROM delivery_events WHERE kind = 'assistant.action' ORDER BY id")]
         self.assertEqual(outcomes, ["requested", "dispatched"])
+
+    async def test_a_tap_falls_back_when_the_answering_device_is_gone(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "что на 14-е?")
+        await self.server._answer_assistant("vault-1", request_id, "предлагаю",
+                                           action=sample_action(), answered_by="dev-gone")
+        other = FakeDevice("dev-2", "vault-1", server=self.server)
+        self.server.rooms["room-1"] = {other}
+        await self.tap("chat-a", f"act:{request_id}")
+        # A button that silently does nothing is worse than one a sibling device picks up.
+        self.assertEqual(len([f for f in other.frames if '"assistant_action"' in f]), 1)
 
     async def test_a_tap_from_another_chat_or_an_old_request_sends_nothing(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)

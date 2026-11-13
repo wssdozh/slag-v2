@@ -541,6 +541,9 @@ class RelayDatabase:
             self._ensure_column("assistant_requests", "action_label", "TEXT")
             self._ensure_column("assistant_requests", "answer_text", "TEXT")
             self._ensure_column("assistant_requests", "applied_at", "REAL")
+            # Which device wrote the answer: it is the only one asked to apply the action, so one
+            # tap cannot become one note per machine that happens to be online.
+            self._ensure_column("assistant_requests", "answered_by", "TEXT")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_assistant_pending ON assistant_requests(expires_at) WHERE answered_at IS NULL")
             # Delivery telemetry without content: an outcome, a duration and a salted route tag are
             # enough to answer "why was it slow" — the question itself never lands here.
@@ -1199,18 +1202,21 @@ class RelayDatabase:
                               " WHERE id = ? AND answered_at IS NULL",
                               (time.time(), request_id))
 
-    def set_assistant_answer(self, request_id: str, text: str, action: Optional[dict]) -> None:
+    def set_assistant_answer(self, request_id: str, text: str, action: Optional[dict],
+                             answered_by: str = "") -> None:
         """What was actually sent, kept next to the request while its bubble is still editable.
 
         `/applied` has to append to that exact message, so the relay stores the text it rendered
-        and the action it offered — the chat is the only place the answer exists otherwise.
+        and the action it offered — the chat is the only place the answer exists otherwise. The
+        device that wrote the answer is stored too: it is the one that will apply the action, and
+        asking every socket would apply one tap as many times as there are machines online.
         """
         label = assistant_action_label(action)
         encoded = json.dumps(action) if label else None
         with self.conn:
             self.conn.execute(
-                "UPDATE assistant_requests SET answer_text = ?, action_json = ?, action_label = ?"
-                " WHERE id = ?", (text, encoded, label, request_id))
+                "UPDATE assistant_requests SET answer_text = ?, action_json = ?, action_label = ?,"
+                " answered_by = ? WHERE id = ?", (text, encoded, label, answered_by or None, request_id))
     def mark_assistant_applied(self, request_id: str) -> bool:
         """True for the call that won the race, False for every retry: the edit happens once."""
         with self.conn:
@@ -2618,7 +2624,8 @@ class SlagRelayServer:
                 action = self._validate_assistant_action(action)
             self._authorize_vault(auth, vault_id, write=True)
             result = await self._answer_assistant(vault_id, request_id, answer,
-                                                  base_url=self._public_base(headers), action=action)
+                                                  base_url=self._public_base(headers), action=action,
+                                                  answered_by=str(auth.get("device_id") or ""))
             return result, 200
 
         # The device that ran the action closes the loop: the bubble under the answer says what
@@ -3673,7 +3680,8 @@ class SlagRelayServer:
         self._spawn_stage_edit(request_id, ASSISTANT_STAGE_THINKING)
 
     async def _answer_assistant(self, vault_id: str, request_id: str, answer: str,
-                                base_url: str = "", action: Optional[dict] = None) -> dict:
+                                base_url: str = "", action: Optional[dict] = None,
+                                answered_by: str = "") -> dict:
         request = self.db.get_assistant_request(request_id)
         if not request or request["vault_id"] != vault_id:
             raise ApiError(404, "request_not_found")
@@ -3690,7 +3698,7 @@ class SlagRelayServer:
         text = tg_truncate(answer.strip(), ASSISTANT_MAX_ANSWER)
         # The text and the action are stored before delivery: `/applied` appends to this very
         # message, and the chat is the only other place the answer ever exists.
-        self.db.set_assistant_answer(request_id, text, action)
+        self.db.set_assistant_answer(request_id, text, action, answered_by)
         # Notebook links are the one markup an answer may carry: the model writes [[Title]] and
         # this turns it into a real entity. Everything else stays escaped plain text.
         html = render_answer_links(text, base_url)
@@ -3773,7 +3781,12 @@ class SlagRelayServer:
                                        request_id=request_id, error_code="expired")
             await self._answer_callback(callback_id, ASSISTANT_ACTION_STALE)
             return
-        candidates = self._live_sockets_for_vault(request["vault_id"])
+        # The device that wrote the answer applies the action, and only it: the same tap reaching
+        # two machines creates the note twice. If it is gone, one of the others gets the chance —
+        # better a duplicate-free attempt than a button that silently does nothing.
+        live = self._live_sockets_for_vault(request["vault_id"])
+        answered_by = request["answered_by"]
+        candidates = [c for c in live if answered_by and c.device_id == answered_by] or live
         frame = json.dumps({"type": "assistant_action", "id": request_id, "action": action})
         dispatched = 0
         for client in candidates:
