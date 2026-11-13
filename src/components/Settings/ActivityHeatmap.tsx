@@ -21,9 +21,10 @@ function levelFor(day: ActivityDay | null, best: number): number {
   return Math.min(LEVEL_CLASS.length - 1, Math.max(1, Math.ceil((day.total / best) * (LEVEL_CLASS.length - 1))));
 }
 
-function humanDate(date: string): string {
-  const [, month, day] = date.split('-').map(Number);
-  return `${day} ${MONTHS[(month ?? 1) - 1]}`;
+function humanDate(date: string, withYear = false): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const base = `${day} ${MONTHS[(month ?? 1) - 1]}`;
+  return withYear ? `${base} ${year}` : base;
 }
 
 function describeDay(day: ActivityDay): string {
@@ -56,7 +57,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ summary }) => 
     <div className="flex flex-col gap-2 p-3.5">
       <div className="grid grid-cols-4 gap-2">
         {[
-          { value: summary.totalCreated, label: pluralRu(summary.totalCreated, ['заметка', 'заметки', 'заметок']) },
+          { value: summary.totalCreated, label: pluralRu(summary.totalCreated, ['заметка за год', 'заметки за год', 'заметок за год']) },
           { value: summary.totalCompleted, label: 'задач закрыто' },
           { value: summary.streak, label: pluralRu(summary.streak, ['день подряд', 'дня подряд', 'дней подряд']) },
           { value: summary.characters, label: pluralRu(summary.characters, ['символ', 'символа', 'символов']) },
@@ -106,7 +107,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ summary }) => 
         <span className="text-[10px] text-fg-dim">
           {summary.bestDay === 0
             ? 'пока ни одной записи'
-            : `${summary.activeDays} ${pluralRu(summary.activeDays, ['активный день', 'активных дня', 'активных дней'])} за год · ${humanDate(summary.firstDate)} — ${humanDate(summary.lastDate)}`}
+            : `${summary.activeDays} ${pluralRu(summary.activeDays, ['активный день', 'активных дня', 'активных дней'])} за год · ${humanDate(summary.firstDate, true)} — ${humanDate(summary.lastDate)}`}
         </span>
         <span className="flex items-center gap-1">
           <span className="text-[10px] text-fg-dim">меньше</span>

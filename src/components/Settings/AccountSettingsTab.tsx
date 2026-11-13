@@ -34,14 +34,13 @@ async function readAvatar(file: File): Promise<string> {
   }
 }
 
-function initialsFor(profile: ProfileInfo, fallback: string): string {
-  const source = profile.name.trim() || fallback;
-  const letters = source
-    .split(/\s+/)
+function initialsFor(profile: ProfileInfo): string {
+  const words = profile.name.trim().split(/\s+/).filter(Boolean);
+  const letters = words
     .slice(0, 2)
     .map((word) => word[0] ?? '')
     .join('');
-  return letters.toUpperCase() || 'SLAG';
+  return letters.toUpperCase() || 'SL';
 }
 
 /**
@@ -117,7 +116,7 @@ export const AccountSettingsTab: React.FC = () => {
               <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
             ) : (
               <span className="w-full h-full flex items-center justify-center font-mono text-sm text-fg-muted">
-                {initialsFor(profile, account?.id ?? '')}
+                {initialsFor(profile)}
               </span>
             )}
           </button>
