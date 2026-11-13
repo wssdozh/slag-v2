@@ -3,6 +3,7 @@ import type { ComposerDraft, FolderMeta, SlagItem, VaultMeta } from '../../types
 import { DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
+import { readStoredJson } from './readJson';
 import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
@@ -29,10 +30,9 @@ export function folderStorageKey(store: FolderStoreHost): string {
 }
 
 export function readFolders(store: FolderStoreHost): FolderMeta[] {
-  const raw = localStorage.getItem(folderStorageKey(store));
-  if (!raw) return DEFAULT_FOLDERS;
-  try {
-    const parsed: FolderMeta[] = JSON.parse(raw);
+  return readStoredJson<FolderMeta[]>(folderStorageKey(store), DEFAULT_FOLDERS, value => {
+    if (!Array.isArray(value)) return undefined;
+    const parsed = value as FolderMeta[];
     let changed = false;
     // Ensure inbox always exists
     if (!parsed.some(f => f.path === DEFAULT_INBOX_FOLDER)) {
@@ -40,12 +40,14 @@ export function readFolders(store: FolderStoreHost): FolderMeta[] {
       changed = true;
     }
     if (changed) {
-      localStorage.setItem(folderStorageKey(store), JSON.stringify(parsed));
+      try {
+        localStorage.setItem(folderStorageKey(store), JSON.stringify(parsed));
+      } catch {
+        return undefined;
+      }
     }
     return parsed;
-  } catch {
-    return DEFAULT_FOLDERS;
-  }
+  });
 }
 
 export function writeFolder(store: FolderStoreHost, folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {

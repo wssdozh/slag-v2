@@ -1,17 +1,13 @@
 // Queues unsent sync operations per vault, compacting repeats of the same entity.
 import type { SyncOperation } from '../entities/types';
+import { readStoredJson } from '../../storage/readJson';
 
 function keyFor(vaultId: string): string {
   return `slag_sync_outbox_${vaultId}`;
 }
 
 function load(vaultId: string): SyncOperation[] {
-  try {
-    const raw = localStorage.getItem(keyFor(vaultId));
-    return raw ? (JSON.parse(raw) as SyncOperation[]) : [];
-  } catch {
-    return [];
-  }
+  return readStoredJson<SyncOperation[]>(keyFor(vaultId), []);
 }
 
 function save(vaultId: string, ops: SyncOperation[]): void {

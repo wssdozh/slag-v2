@@ -4,6 +4,7 @@ import { STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import type { AttachmentStore } from './attachments';
+import { readStoredJson } from './readJson';
 import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
@@ -29,13 +30,9 @@ export function trashStorageKey(store: TrashStoreHost): string {
 }
 
 export function readTrash(store: TrashStoreHost): SlagItem[] {
-  const raw = localStorage.getItem(trashStorageKey(store));
-  if (!raw) return [];
-  try {
-    return store.attachments.hydrate(JSON.parse(raw));
-  } catch {
-    return [];
-  }
+  return readStoredJson<SlagItem[]>(trashStorageKey(store), [], value => (
+    Array.isArray(value) ? store.attachments.hydrate(value as SlagItem[]) : undefined
+  ));
 }
 
 export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | 'remote' = 'local'): void {

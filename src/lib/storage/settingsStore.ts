@@ -12,6 +12,7 @@ import { DEFAULT_FOLDER_VIEW_SETTINGS } from '../../types';
 import { DEFAULT_WORKSPACE_STATE, STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';
 import { stripAttachmentList } from './attachmentData';
+import { readStoredJson } from './readJson';
 import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
@@ -96,14 +97,9 @@ function memoryStorageKey(store: SettingsStoreHost): string {
 }
 
 function readComposerDraftsAt(key: string): Record<string, ComposerDraft> {
-  const raw = localStorage.getItem(key);
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, ComposerDraft> : {};
-  } catch {
-    return {};
-  }
+  return readStoredJson<Record<string, ComposerDraft>>(key, {}, value => (
+    value && typeof value === 'object' ? value as Record<string, ComposerDraft> : undefined
+  ));
 }
 
 function postComposerDraft(store: SettingsStoreHost, folderPath: string, draft: ComposerDraft | null, action: 'upsert' | 'delete'): void {
@@ -312,12 +308,7 @@ export function eraseComposerDraft(
 export function readFullscreenDraft(store: SettingsStoreHost, itemId: string): FullscreenDraft | null {
   const queued = draftQueues.get(store)?.fullscreen.get(slotKey(store.currentVault.id, itemId));
   if (queued) return queued.draft;
-  try {
-    const raw = localStorage.getItem(`${fullscreenDraftsKey(store.currentVault.id)}_${itemId}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readStoredJson<FullscreenDraft | null>(`${fullscreenDraftsKey(store.currentVault.id)}_${itemId}`, null);
 }
 
 export function writeFullscreenDraft(
@@ -375,14 +366,9 @@ export function writeFullscreenWidth(_store: SettingsStoreHost, isFullWidth: boo
 
 // Assistant History
 export function readAssistantHistory(store: SettingsStoreHost): ChatMessage[] {
-  const raw = localStorage.getItem(assistantStorageKey(store));
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed as ChatMessage[] : [];
-  } catch {
-    return [];
-  }
+  return readStoredJson<ChatMessage[]>(assistantStorageKey(store), [], value => (
+    Array.isArray(value) ? value as ChatMessage[] : undefined
+  ));
 }
 
 export function writeAssistantHistory(store: SettingsStoreHost, messages: ChatMessage[]): void {
@@ -424,17 +410,10 @@ export function writeMemory(store: SettingsStoreHost, items: MemoryItem[]): bool
 
 // Workspace State
 export function readWorkspaceState(store: SettingsStoreHost): WorkspaceState {
-  const raw = localStorage.getItem(workspaceStateStorageKey(store));
-  if (!raw) return { ...DEFAULT_WORKSPACE_STATE };
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return {
-      ...DEFAULT_WORKSPACE_STATE,
-      ...(parsed && typeof parsed === 'object' ? parsed as Partial<WorkspaceState> : {}),
-    };
-  } catch {
-    return { ...DEFAULT_WORKSPACE_STATE };
-  }
+  return readStoredJson<WorkspaceState>(workspaceStateStorageKey(store), { ...DEFAULT_WORKSPACE_STATE }, value => ({
+    ...DEFAULT_WORKSPACE_STATE,
+    ...(value && typeof value === 'object' ? value as Partial<WorkspaceState> : {}),
+  }));
 }
 
 export function writeWorkspaceState(
@@ -450,18 +429,6 @@ export function writeWorkspaceState(
   } catch (err) {
     fsLog.warn('Failed to save workspace state to localStorage', err);
   }
-}
-
-export function readFolderViewSettings(store: SettingsStoreHost, folderPath: string): FolderViewSettings {
-  const ws = readWorkspaceState(store);
-  return ws.folderSettings?.[folderPath] || {
-    ...DEFAULT_FOLDER_VIEW_SETTINGS,
-    viewMode: ws.feedViewMode || DEFAULT_FOLDER_VIEW_SETTINGS.viewMode,
-    typeFilter: ws.activeTypeFilter || DEFAULT_FOLDER_VIEW_SETTINGS.typeFilter,
-    sortBy: ws.sortBy || DEFAULT_FOLDER_VIEW_SETTINGS.sortBy,
-    sortOrder: ws.sortOrder || DEFAULT_FOLDER_VIEW_SETTINGS.sortOrder,
-    hideCompletedTasks: ws.hideCompletedTasks ?? DEFAULT_FOLDER_VIEW_SETTINGS.hideCompletedTasks,
-  };
 }
 
 export function writeFolderViewSettings(

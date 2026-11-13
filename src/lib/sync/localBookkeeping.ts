@@ -1,5 +1,6 @@
 // What this device sent, knows and deleted, so a push stays a diff instead of a resend.
 import { SYNC_STORAGE_KEYS } from '../../config';
+import { readStoredJson } from '../storage/readJson';
 
 /**
  * What this device already sent, already knows and already deleted.
@@ -54,12 +55,7 @@ export function saveCursor(scope: SyncScope, cursor: number): void {
 }
 
 export function loadSentHashes(scope: SyncScope): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(sentHashesKey(scope));
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
+  return readStoredJson<Record<string, string>>(sentHashesKey(scope), {});
 }
 
 export function saveSentHashes(scope: SyncScope, hashes: Record<string, string>): void {
@@ -71,21 +67,13 @@ export function saveSentHashes(scope: SyncScope, hashes: Record<string, string>)
 }
 
 export function loadSyncedIds(scope: SyncScope): Set<string> {
-  try {
-    const raw = localStorage.getItem(syncedIdsKey(scope));
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
-  } catch {
-    return new Set();
-  }
+  return readStoredJson<Set<string>>(syncedIdsKey(scope), new Set(), value => (
+    Array.isArray(value) ? new Set(value as string[]) : undefined
+  ));
 }
 
 export function loadTombstones(scope: SyncScope): Record<string, number> {
-  try {
-    const raw = localStorage.getItem(tombstonesKey(scope));
-    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
-  } catch {
-    return {};
-  }
+  return readStoredJson<Record<string, number>>(tombstonesKey(scope), {});
 }
 
 /** First run against a vault that already has notes: treat all of them as known. */
