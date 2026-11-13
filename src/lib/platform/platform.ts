@@ -4,10 +4,6 @@ import { logger } from '../logger/logger';
 
 const platformLog = logger.scope('APP');
 
-export function isTauriEnvironment(): boolean {
-  return isTauri();
-}
-
 export interface PlatformInfo {
   os: 'linux' | 'windows' | 'macos' | 'unknown' | string;
   sessionType: 'wayland' | 'x11' | 'native' | 'unknown' | string;

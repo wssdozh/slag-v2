@@ -1,7 +1,7 @@
 // One place for sync secrets at rest. Desktop uses the OS keychain, web/Android uses an
 // AES-GCM store whose key never leaves IndexedDB. Consumers read the synchronous cache.
 import { logger } from '../logger/logger';
-import { isTauriEnvironment } from './platform';
+import { isTauri } from '@tauri-apps/api/core';
 import {
   deleteLocalSecret,
   ENCRYPTED_SECRET_PREFIX,
@@ -94,7 +94,7 @@ function localBackend(): SecretBackend {
 }
 
 async function probeOsBackend(): Promise<SecretBackend | null> {
-  if (!isTauriEnvironment()) return null;
+  if (!isTauri()) return null;
   // Android keeps the encrypted IndexedDB fallback: the desktop `keyring` commands are not
   // registered there, and a copied `os` marker must not lock the app out.
   if (/Android/i.test(navigator.userAgent)) return null;
@@ -335,10 +335,6 @@ export function initSecretStore(): Promise<void> {
     });
   }
   return initPromise;
-}
-
-export function getSecretStoreMode(): SecretStoreMode | null {
-  return backend?.mode ?? null;
 }
 
 function readLegacySecret(key: string): string | null {

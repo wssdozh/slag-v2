@@ -21,8 +21,6 @@ export interface VaultRegistryHost {
   syncCurrentVaultFs(): Promise<boolean>;
 }
 
-// Which vault the app is looking at: the registry kept in localStorage, and the switch between them.
-// Which vault the app is looking at: the registry kept in localStorage, and the switch between them.
 export function initCurrentVault(store: VaultRegistryHost): VaultMeta {
   const saved = localStorage.getItem(CURRENT_VAULT_KEY);
   if (saved) {

@@ -73,7 +73,6 @@ import {
   writeMemory,
   readWorkspaceState,
   writeWorkspaceState,
-  readFolderViewSettings,
   writeFolderViewSettings,
 } from './settingsStore';
 import {
@@ -147,11 +146,6 @@ export class StorageService {
 
   public saveAttachment(attachment: SlagAttachment): Promise<void> {
     return this.attachments.save(attachment);
-  }
-
-  /** Resolves when the attachment bytes queued so far have reached IndexedDB. */
-  public flushAttachments(): Promise<void> {
-    return this.attachments.flush();
   }
 
   /**
@@ -232,10 +226,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public getFolderAbsolutePath(folderPath: string): Promise<string> {
     return this.files.getFolderAbsolutePath(folderPath);
-  }
-
-  public migrateLegacyNotesToVaults(): Promise<void> {
-    return this.files.migrateLegacyNotesToVaults();
   }
 
   public syncCurrentVaultFs(): Promise<boolean> {
@@ -581,10 +571,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public saveWorkspaceState(partialState: Partial<WorkspaceState>, origin: 'local' | 'remote' = 'local'): void {
     writeWorkspaceState(this, partialState, origin);
-  }
-
-  public getFolderViewSettings(folderPath: string): FolderViewSettings {
-    return readFolderViewSettings(this, folderPath);
   }
 
   public saveFolderViewSettings(folderPath: string, settings: Partial<FolderViewSettings>): void {

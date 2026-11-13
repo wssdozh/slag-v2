@@ -74,14 +74,6 @@ export const MEDIA_TYPE_LABEL: Record<MediaKind, string> = {
   file: 'Файлы',
 };
 
-/** A single file names its kind in the singular: `фото · 2.4 MB`. */
-export const MEDIA_TYPE_NAME: Record<MediaKind, string> = {
-  image: 'фото',
-  audio: 'аудио',
-  video: 'видео',
-  file: 'файл',
-};
-
 interface LocalGroupSpec {
   id: string;
   label: string;

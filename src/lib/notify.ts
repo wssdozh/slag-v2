@@ -1,7 +1,7 @@
 // Delayed reminders: arm them on the relay, toast them locally when nothing else would.
 import type { NotifyPrefs, NotifyRoute, SlagItem } from '../types';
+import { isTauri } from '@tauri-apps/api/core';
 import { logger } from './logger/logger';
-import { isTauriEnvironment } from './platform/platform';
 import { storage } from './storage';
 import { accountClient } from './sync/account';
 import { computeHash } from './sync/crypto';
@@ -339,7 +339,7 @@ export async function runLocalReminders(items: SlagItem[], prefs: NotifyPrefs): 
  * already sent it, and a second ping for one reminder is noise.
  */
 export async function showLocalReminder(item: SlagItem): Promise<void> {
-  if (!isTauriEnvironment()) return;
+  if (!isTauri()) return;
   if (getNotifyRoutes().some((route) => route.state === 'active')) return;
   try {
     const { isPermissionGranted, requestPermission, sendNotification } = await import(

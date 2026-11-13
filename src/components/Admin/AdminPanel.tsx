@@ -11,7 +11,7 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
-import { isTauriEnvironment } from '../../lib/platform/platform';
+import { isDesktopApp } from '../../lib/platform/windowControls';
 import { navigatePage } from '../../lib/navigation';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { useAdminData } from './useAdminData';
@@ -28,7 +28,7 @@ const TOKEN_STORAGE_KEY = 'slag_admin_token';
 const SERVER_STORAGE_KEY = 'slag_admin_server_url';
 
 export const AdminPanel: React.FC = () => {
-  const isTauri = isTauriEnvironment();
+  const isDesktopShell = isDesktopApp();
   const [serverUrl, setServerUrl] = useState(() => {
     if (sessionStorage.getItem(SERVER_STORAGE_KEY)) {
       return sessionStorage.getItem(SERVER_STORAGE_KEY)!;
@@ -150,7 +150,7 @@ export const AdminPanel: React.FC = () => {
     setStatusMessage(null);
   };
 
-  if (isTauri) {
+  if (isDesktopShell) {
     return (
       <div className="min-h-screen bg-canvas-subtle text-zinc-100 flex flex-col items-center justify-center p-6 text-center">
         <Shield className="w-10 h-10 text-amber-400 mb-4" />

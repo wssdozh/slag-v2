@@ -2,7 +2,7 @@
 import type { SlagItem, FolderMeta, AiSettings } from '../../types';
 import { storage } from '../storage';
 import { logger } from '../logger/logger';
-import { aiClient } from './aiClient';
+import { completeJson } from './aiClient';
 import {
   assistantOrchestrator,
   resolveKieEndpoint,
@@ -138,7 +138,7 @@ function localMatchFolder(
 
 /**
  * Shared low-level JSON LLM dispatcher across providers (Groq, KIE, Gemini, Relay).
- * Delegates to unified aiClient.
+ * Delegates to {@link completeJson}.
  */
 async function callJsonLlm<T>(
   systemPrompt: string,
@@ -146,7 +146,7 @@ async function callJsonLlm<T>(
   settings: AiSettings,
   temperature = 0.1
 ): Promise<T | null> {
-  return aiClient.completeJson<T>(settings, { systemPrompt, userPrompt, temperature });
+  return completeJson<T>(settings, { systemPrompt, userPrompt, temperature });
 }
 
 /**

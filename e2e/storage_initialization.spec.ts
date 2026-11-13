@@ -11,10 +11,8 @@ test.skip('concurrent native initialization callers await the same disk load', a
     const diskLoad = new Promise<boolean>(resolve => { finish = resolve; });
     let scans = 0;
     const native = service as unknown as {
-      migrateLegacyNotesToVaults: () => Promise<void>;
       syncCurrentVaultFs: () => Promise<boolean>;
     };
-    native.migrateLegacyNotesToVaults = async () => {};
     native.syncCurrentVaultFs = () => { scans++; return diskLoad; };
     Object.defineProperty(window, 'isTauri', { value: {}, configurable: true });
     try {

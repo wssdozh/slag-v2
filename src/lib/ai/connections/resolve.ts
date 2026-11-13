@@ -94,8 +94,6 @@ export function resolveChatTarget(settings: AiSettings): ResolvedAiTarget | null
   return connection ? chatTargetForConnection(connection) : null;
 }
 
-export type MediaTransport = 'relay' | 'openai' | 'gemini';
-
 export type MediaTarget =
   | { transport: 'relay'; label: string; serverUrl: string; token: string; model: string }
   | { transport: 'openai'; label: string; connection: AiConnection; model: string }

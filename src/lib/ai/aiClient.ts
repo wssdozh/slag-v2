@@ -95,11 +95,3 @@ export async function completeJson<T>(
   if (!res || !res.text) return null;
   return parseJsonContent<T>(res.text);
 }
-
-export const aiClient = {
-  resolveTarget: resolveAiTarget,
-  resolveKieEndpoint,
-  completePrompt,
-  completeJson,
-  parseJsonContent,
-};
