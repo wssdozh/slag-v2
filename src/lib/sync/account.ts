@@ -9,6 +9,9 @@ import type {
   AccountSession,
   AccountState,
   AccountVault,
+  NotifyArmPayload,
+  NotifyArmResult,
+  NotifyInvite,
 } from './accountTypes';
 import type { DeviceSyncMode } from './types';
 import { logger } from '../logger/logger';
@@ -78,6 +81,9 @@ function requireSecureAccountTransport(serverUrl: string): void {
   if (url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) return;
   // ponytail: temporary public HTTP acceptance testing; remove before release and require HTTPS.
   if (url.origin === 'http://152.53.199.71:8320') return;
+  // The headless node can sit behind a plain-TCP tunnel (bore) where TLS is not ours to add.
+  // The app never sets this, so a browser still refuses plain HTTP.
+  if (typeof process !== 'undefined' && process.env?.SLAG_ALLOW_INSECURE_RELAY === '1') return;
   throw new Error('Для входа в аккаунт нужен HTTPS. HTTP временно разрешён только для тестового сервера SLAG.');
 }
 
@@ -557,6 +563,24 @@ class AccountClient {
       { method: 'DELETE' }
     );
   }
+
+  /**
+   * A one-time code the recipient redeems in the bot. Binding starts on their
+   * side, so a paying account cannot push messages to a stranger.
+   */
+  requestNotifyInvite(vaultId: string): Promise<NotifyInvite> {
+    return this.request<NotifyInvite>('/api/notify/invite', {
+      method: 'POST',
+      body: JSON.stringify({ vaultId }),
+    });
+  }
+
+  armNotifications(payload: NotifyArmPayload): Promise<NotifyArmResult> {
+    return this.request<NotifyArmResult>('/api/notify/arm', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 export const accountClient = new AccountClient();
@@ -571,4 +595,9 @@ export type {
   AccountState,
   AccountVault,
   VaultInvitation,
+  NotifyArmPayload,
+  NotifyArmResult,
+  NotifyArmRoute,
+  NotifyDropReason,
+  NotifyInvite,
 } from './accountTypes';
