@@ -3,8 +3,14 @@ import React from 'react';
 import { Laptop, Smartphone } from 'lucide-react';
 import type { AccountDevice } from '../../../lib/sync/accountTypes';
 import type { DeviceProfile } from '../../../lib/sync/types';
+import { devicePresence } from '../../../lib/sync/presence';
 import { DeviceName, DeviceRevokeButton } from './DeviceActions';
 import { SettingsDivider, SettingsGroup, SettingsRow } from '../SettingsUI';
+
+/** A dot plus the word: one glance answers "is anyone else with me right now". */
+const Presence: React.FC<{ online: boolean }> = ({ online }) => (
+  <span className={`inline-block h-1.5 w-1.5 rounded-full ${online ? 'bg-success' : 'bg-zinc-600'}`} aria-hidden />
+);
 
 interface DeviceListProps {
   isMobile: boolean;
@@ -32,20 +38,24 @@ export const DeviceList: React.FC<DeviceListProps> = ({
   onManage,
   onRevoke,
   onApprove,
-}) => (
-  <SettingsGroup title="Подключённые устройства" action={<span className="text-2xs font-mono text-fg-muted" title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}>{limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices}</span>}>
-    <SettingsRow icon={isMobile ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />} label={currentDeviceName} description={<span className="font-mono">{currentDeviceId} · это устройство</span>} />
+}) => {
+  const onlineCount = 1 + devices.filter((device) => devicePresence(device.lastSeenAt).online).length;
+  return (
+  <SettingsGroup title="Подключённые устройства" action={<span className="text-2xs font-mono text-fg-muted" title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}>{limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices} · онлайн {onlineCount}</span>}>
+    <SettingsRow icon={isMobile ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />} label={<span className="flex items-center gap-1.5"><Presence online />{currentDeviceName}</span>} description={<span className="font-mono">{currentDeviceId} · это устройство · онлайн</span>} />
     {devices.map((device) => {
       const isAccountDevice = 'status' in device;
+      const pending = isAccountDevice && device.status === 'pending';
+      const presence = pending ? { online: false, label: '' } : devicePresence(device.lastSeenAt);
       return (
         <React.Fragment key={device.id}>
           <SettingsDivider />
           <SettingsRow
             icon={device.platform === 'mobile' ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />}
-            label={<DeviceName deviceId={device.id} name={device.name} onRename={onRename} />}
-            description={<span className="font-mono break-all">{device.id}{isAccountDevice && device.status === 'pending' ? ' · ожидает подтверждения' : ''}</span>}
+            label={<span className="flex items-center gap-1.5"><Presence online={presence.online} /><DeviceName deviceId={device.id} name={device.name} onRename={onRename} /></span>}
+            description={<span className="font-mono break-all">{device.id}{pending ? ' · ожидает подтверждения' : presence.label ? ` · ${presence.label}` : ''}</span>}
             right={<span className="flex items-center gap-2">
-              {isAccountDevice && device.status === 'pending' ? (
+              {pending ? (
                 <button type="button" onClick={() => void onApprove(device.id)} className="text-2xs text-fg-secondary cursor-pointer">Подтвердить</button>
               ) : (
                 <button type="button" onClick={() => onManage(device)} title="Доступ к хранилищам" aria-label={`Доступ ${device.name} к хранилищам`} className="px-2 py-1 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover cursor-pointer">Доступ к базам</button>
@@ -57,4 +67,5 @@ export const DeviceList: React.FC<DeviceListProps> = ({
       );
     })}
   </SettingsGroup>
-);
+  );
+};
