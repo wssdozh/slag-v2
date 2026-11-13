@@ -40,6 +40,8 @@ from tg import (  # noqa: E402  (import order is deliberate: constants below dep
     TG_TEXT_BUDGET,
     TG_TEXT_LIMIT,
     TelegramBot,
+    render_answer_links,
+    render_note_page,
     render_notification,
     tg_escape,
     tg_truncate,
@@ -71,9 +73,10 @@ NOTIFY_LEEWAY_SECONDS = 300
 RATE_LIMIT_NOTIFY_ARM = 60
 RATE_LIMIT_NOTIFY_INVITE = 10
 # Asking the assistant from Telegram: the question travels to a device, never to the relay's
-# language model — the relay has none. The wait is short on purpose: a person staring at "передал"
-# reads anything past half a minute as a dead bot, and the placeholder is already on screen.
-ASSISTANT_REQUEST_TTL_SECONDS = 25
+# language model — the relay has none. The window is the whole life of the bubble: it has to be
+# long enough for a person to read the answer and tap its button, and short enough that a dead
+# bot says so instead of spinning. A stage edit inside it is detached, so this is the only wait.
+ASSISTANT_REQUEST_TTL_SECONDS = 90
 # Telegram drops a typing indicator after ~5s, so it is re-armed inside that window.
 ASSISTANT_TYPING_INTERVAL_SECONDS = 4
 # How long the relay waits for devices to answer "I am here and I can run a model". A healthy
@@ -87,6 +90,22 @@ ASSISTANT_STAGE_HANDED = "⌛ передал на"
 ASSISTANT_STAGE_THINKING = "✍️ печатает ответ…"
 # How a device names itself in that bubble when the relay knows nothing better.
 ASSISTANT_DEVICE_FALLBACK = "устройство"
+# An answer may offer one action. The button carries only `act:<requestId>`: the action itself
+# stays in the database, so the callback data never has to fit Telegram's 64-byte cap and a
+# replay of the tap cannot smuggle in a different payload.
+ASSISTANT_ACTION_PREFIX = "act:"
+ASSISTANT_ACTION_BUTTON_MAX = 64
+# Every tap answers the callback — a silent one is a spinner on the person's screen.
+ASSISTANT_ACTION_DONE = "передал устройству"
+ASSISTANT_ACTION_ALREADY = "уже применено"
+ASSISTANT_ACTION_STALE = "устарело — спроси ещё раз"
+ASSISTANT_ACTION_NO_DEVICE = "устройство не в сети — открой приложение"
+# The device words the outcome itself; this is only the ceiling on how much of it fits back
+# into the bubble that already holds the answer.
+ASSISTANT_MAX_APPLY_TEXT = 300
+# The relay never reads an action, but it does store and re-send it: a runaway one would turn
+# a request row into a blob and a websocket frame into a stall.
+ASSISTANT_MAX_ACTION_JSON = 8192
 RATE_LIMIT_TG_ASK = 10
 # Delivery telemetry: outcomes and latencies, never the text of a question or an answer.
 DELIVERY_EVENT_KEEP_SECONDS = 7 * 86400
@@ -116,6 +135,44 @@ def iso_time(value: Optional[float]) -> Optional[str]:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def assistant_action_label(action: Optional[dict]) -> Optional[str]:
+    """The button's caption, or None when this action cannot be offered as a button at all.
+
+    The label is the one field the relay interprets: without it there is nothing to put on the
+    button, and an answer that silently lost its button is worse than a visible refusal.
+    """
+    if not isinstance(action, dict):
+        return None
+    label = action.get("label")
+    if not isinstance(label, str) or not label.strip():
+        return None
+    return tg_truncate(label.strip(), ASSISTANT_ACTION_BUTTON_MAX)
+
+
+def assistant_action_markup(action: Optional[dict], request_id: str) -> Optional[dict]:
+    """`reply_markup` for an answer that offers an action, or None — never an empty keyboard.
+
+    An empty inline keyboard is not "no button" to Telegram: it is an edit that strips whatever
+    keyboard the message already has, so absence has to be spelled as the key being absent.
+    """
+    label = assistant_action_label(action)
+    if label is None:
+        return None
+    return {"inline_keyboard": [[{"text": label,
+                                  "callback_data": f"{ASSISTANT_ACTION_PREFIX}{request_id}"}]]}
+
+
+def parse_assistant_action(encoded: Optional[str]) -> Optional[dict]:
+    """The stored action, parsed. A row that never had one, or a corrupt one, offers nothing."""
+    if not encoded:
+        return None
+    try:
+        action = json.loads(encoded)
+    except (TypeError, ValueError):
+        return None
+    return action if isinstance(action, dict) else None
 
 
 def decode_bundle_frame(data: bytes, device_id: str) -> dict:
@@ -477,6 +534,13 @@ class RelayDatabase:
             self._ensure_column("assistant_requests", "placeholder_message_id", "INTEGER")
             self._ensure_column("assistant_requests", "mode", "TEXT NOT NULL DEFAULT 'minimal'")
             self._ensure_column("assistant_requests", "attempts", "INTEGER NOT NULL DEFAULT 1")
+            # The action an answer offered and the text it was written with. The answer text has
+            # to outlive the delivery: `/applied` appends the outcome to the very message, and a
+            # message cannot be rebuilt from a text that was only ever sent to Telegram.
+            self._ensure_column("assistant_requests", "action_json", "TEXT")
+            self._ensure_column("assistant_requests", "action_label", "TEXT")
+            self._ensure_column("assistant_requests", "answer_text", "TEXT")
+            self._ensure_column("assistant_requests", "applied_at", "REAL")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_assistant_pending ON assistant_requests(expires_at) WHERE answered_at IS NULL")
             # Delivery telemetry without content: an outcome, a duration and a salted route tag are
             # enough to answer "why was it slow" — the question itself never lands here.
@@ -1135,6 +1199,26 @@ class RelayDatabase:
                               " WHERE id = ? AND answered_at IS NULL",
                               (time.time(), request_id))
 
+    def set_assistant_answer(self, request_id: str, text: str, action: Optional[dict]) -> None:
+        """What was actually sent, kept next to the request while its bubble is still editable.
+
+        `/applied` has to append to that exact message, so the relay stores the text it rendered
+        and the action it offered — the chat is the only place the answer exists otherwise.
+        """
+        label = assistant_action_label(action)
+        encoded = json.dumps(action) if label else None
+        with self.conn:
+            self.conn.execute(
+                "UPDATE assistant_requests SET answer_text = ?, action_json = ?, action_label = ?"
+                " WHERE id = ?", (text, encoded, label, request_id))
+    def mark_assistant_applied(self, request_id: str) -> bool:
+        """True for the call that won the race, False for every retry: the edit happens once."""
+        with self.conn:
+            res = self.conn.execute(
+                "UPDATE assistant_requests SET applied_at = ? WHERE id = ? AND applied_at IS NULL",
+                (time.time(), request_id))
+        return res.rowcount == 1
+
     def expired_assistant_requests(self, now: float, limit: int = 20) -> list[sqlite3.Row]:
         return self.conn.execute(
             "SELECT * FROM assistant_requests WHERE answered_at IS NULL AND expires_at <= ? LIMIT ?",
@@ -1268,6 +1352,12 @@ class SlagRelayServer:
         self.rooms: Dict[str, Set[WebSocketConnection]] = {}
         # Typing loops keyed by request: cancelled the moment the question stops being asked.
         self.typing_tasks: Dict[str, "asyncio.Task[None]"] = {}
+        # One bubble per request, one writer at a time. A stage edit that lost its race used to
+        # land on top of a delivered answer and freeze the chat on "⌛ handed over" forever.
+        self.bubble_locks: Dict[str, asyncio.Lock] = {}
+        # Stage edits run detached from the question flow: a slow Telegram edit must not delay
+        # handing the question to the device (or the answer, which is the thing a person waits for).
+        self.stage_tasks: Set["asyncio.Task[None]"] = set()
         # Open device probes: the relay asks who is willing to answer before it asks a question.
         self.assistant_probes: Dict[str, dict] = {}
         self.failed_claim_attempts: Dict[str, list[float]] = {}
@@ -1644,6 +1734,24 @@ class SlagRelayServer:
         if auth.get("plan") not in ("smile", "angry"):
             raise ApiError(402, "notifications_plan_required")
 
+    @staticmethod
+    def _validate_assistant_action(action: object) -> dict:
+        """Opaque to the relay, but it has to survive sqlite and a websocket frame unchanged.
+
+        The label is required because it is the only part the relay renders: accepting an action
+        without one would deliver an answer whose button silently never appears, and chasing that
+        from the chat side is guesswork.
+        """
+        if not isinstance(action, dict) or assistant_action_label(action) is None:
+            raise ApiError(400, "invalid_action")
+        try:
+            encoded = json.dumps(action)
+        except (TypeError, ValueError):
+            raise ApiError(400, "invalid_action")
+        if len(encoded) > ASSISTANT_MAX_ACTION_JSON:
+            raise ApiError(400, "invalid_action")
+        return action
+
     def _notify_tag(self, vault_id: str) -> str:
         """Vault fingerprint stored next to the chat id, never the vault id itself."""
         if not self.notify_pepper:
@@ -1782,6 +1890,15 @@ class SlagRelayServer:
             return {"status": "ok", "service": "slag-relay", "version": "0.2.0",
                     "uptime": int(time.time() - self.start_time), "activeRooms": len(self.rooms),
                     "timestamp": int(time.time()), "authRequired": self.require_account_auth}, 200
+
+        if method == "GET" and path == "/n":
+            # Where a telegram answer's note link lands. Not a note viewer: Telegram refuses the
+            # `slag://` scheme, so this page is the one allowed hop that can hand it to the device.
+            title = query.get("title", "") or query.get("id", "")
+            html = render_note_page(str(title)[:200])
+            await self._send_response(
+                writer, self._http_response(200, "OK", "text/html; charset=utf-8", html.encode("utf-8")))
+            return None
 
         if method == "GET" and path == "/api/admin/stats":
             self._admin_auth(headers)
@@ -2494,8 +2611,31 @@ class SlagRelayServer:
             if (not isinstance(vault_id, str) or not vault_id or not isinstance(request_id, str)
                     or not request_id or not isinstance(answer, str) or not answer.strip()):
                 raise ApiError(400, "invalid_answer")
+            # Optional and opaque: the device decides what may be applied, the relay only carries
+            # it to the chat and back to whichever device is online when the button is tapped.
+            action = body.get("action")
+            if action is not None:
+                action = self._validate_assistant_action(action)
             self._authorize_vault(auth, vault_id, write=True)
-            result = await self._answer_assistant(vault_id, request_id, answer)
+            result = await self._answer_assistant(vault_id, request_id, answer,
+                                                  base_url=self._public_base(headers), action=action)
+            return result, 200
+
+        # The device that ran the action closes the loop: the bubble under the answer says what
+        # happened and the button goes away, so a second tap cannot ask for the same thing twice.
+        if method == "POST" and path == "/api/assistant/applied":
+            auth = self._auth(headers)
+            self._require_notify_plan(auth)
+            vault_id = body.get("vaultId", "")
+            request_id = body.get("requestId", "")
+            ok = body.get("ok")
+            text = body.get("text", "")
+            if (not isinstance(vault_id, str) or not vault_id or not isinstance(request_id, str)
+                    or not request_id or not isinstance(ok, bool) or not isinstance(text, str)):
+                raise ApiError(400, "invalid_applied")
+            self._authorize_vault(auth, vault_id, write=True)
+            result = await self._apply_assistant_action(vault_id, request_id, ok, text,
+                                                        base_url=self._public_base(headers))
             return result, 200
 
         if method == "GET" and path == "/api/vaults":
@@ -3084,6 +3224,7 @@ class SlagRelayServer:
             logger.info("Telegram bot ready: @%s", self.bot.username)
             await self.bot.call("setMyCommands", {"commands": [
                 {"command": "start", "description": "привязать уведомления"},
+                {"command": "clear", "description": "забыть разговор"},
                 {"command": "stop", "description": "отключить уведомления"}]}, timeout=15)
         else:
             logger.warning("Telegram getMe failed: %s", body.get("description"))
@@ -3091,7 +3232,10 @@ class SlagRelayServer:
         while True:
             try:
                 ok, body = await self.bot.call("getUpdates", {
-                    "offset": self.bot_offset, "timeout": 25, "allowed_updates": ["message"]}, timeout=40)
+                    "offset": self.bot_offset, "timeout": 25,
+                    # A tap on an action button is an update of its own kind: without it here the
+                    # button looks alive and does nothing, which is worse than no button.
+                    "allowed_updates": ["message", "callback_query"]}, timeout=40)
                 if not ok:
                     failures += 1
                     logger.warning("Telegram getUpdates failed (%s): %s", body.get("error_code"), body.get("description"))
@@ -3108,16 +3252,25 @@ class SlagRelayServer:
                 logger.error("Telegram poll error: %s", exc)
                 await asyncio.sleep(10)
 
-    async def _send_telegram(self, chat_id: str, html: str, plain: str, timeout: float = 20) -> Tuple[bool, dict]:
-        """HTML first. Telegram refusing our markup is our bug, not a reason to lose the message."""
-        ok, body = await self.bot.call("sendMessage", {"chat_id": chat_id, "text": html,
-                                                       "parse_mode": "HTML",
-                                                       "disable_web_page_preview": True}, timeout=timeout)
+    async def _send_telegram(self, chat_id: str, html: str, plain: str, timeout: float = 20,
+                             reply_markup: Optional[dict] = None) -> Tuple[bool, dict]:
+        """HTML first. Telegram refusing our markup is our bug, not a reason to lose the message.
+
+        `reply_markup` rides along on both attempts: a refused entity must not also cost the
+        person the button that the message was about.
+        """
+        payload = {"chat_id": chat_id, "text": html, "parse_mode": "HTML",
+                   "disable_web_page_preview": True}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        ok, body = await self.bot.call("sendMessage", payload, timeout=timeout)
         if ok or body.get("error_code") != 400:
             return ok, body
         logger.warning("Telegram refused the markup (%s), sending plain text", body.get("description"))
-        return await self.bot.call("sendMessage", {"chat_id": chat_id, "text": plain,
-                                                   "disable_web_page_preview": True}, timeout=timeout)
+        fallback = {"chat_id": chat_id, "text": plain, "disable_web_page_preview": True}
+        if reply_markup is not None:
+            fallback["reply_markup"] = reply_markup
+        return await self.bot.call("sendMessage", fallback, timeout=timeout)
 
     async def _bot_reply(self, chat_id: str, text: str, html: Optional[str] = None) -> bool:
         """Bot copy is plain by contract; `html` is its formatted twin when the caller builds one."""
@@ -3130,6 +3283,10 @@ class SlagRelayServer:
         return ok
 
     async def _handle_bot_update(self, update: dict) -> None:
+        callback = update.get("callback_query")
+        if isinstance(callback, dict):
+            await self._handle_action_callback(callback)
+            return
         message = update.get("message")
         if not isinstance(message, dict):
             return
@@ -3162,14 +3319,19 @@ class SlagRelayServer:
         if command in ("/ask", "/a"):
             await self._bot_question(chat_id, argument.strip())
             return
+        if command == "/clear":
+            await self._bot_clear(chat_id)
+            return
         if command == "/help":
             await self._bot_reply(
                 chat_id,
                 "напоминания приходят сами — привязка один раз, по ссылке из приложения.\n"
                 "обычное сообщение уходит на устройство с открытым хранилищем, ответ придёт сюда же.\n"
+                "/clear — забыть, о чём говорили.\n"
                 "/stop — отписаться.",
                 html="<b>напоминания</b> приходят сами — привязка один раз, по ссылке из приложения.\n"
                      "обычное сообщение уходит на устройство с открытым хранилищем, ответ придёт сюда же.\n"
+                     "<code>/clear</code> — забыть, о чём говорили.\n"
                      "<code>/stop</code> — отписаться.")
 
     async def _bot_start(self, chat_id: str, sender: str, code: str, message: dict) -> None:
@@ -3203,17 +3365,44 @@ class SlagRelayServer:
                               html=f"<b>готово</b>. напоминания из {tg_escape(source)} будут приходить сюда.")
 
     async def _edit_telegram(self, chat_id: str, message_id: int, html: str, plain: str,
-                             timeout: float = 20) -> Tuple[bool, dict]:
+                             timeout: float = 20,
+                             reply_markup: Optional[dict] = None) -> Tuple[bool, dict]:
         """Rewrites a message the bot already sent. Same markup fallback as a fresh send."""
-        ok, body = await self.bot.call("editMessageText", {
-            "chat_id": chat_id, "message_id": message_id, "text": html,
-            "parse_mode": "HTML", "disable_web_page_preview": True}, timeout=timeout)
+        payload = {"chat_id": chat_id, "message_id": message_id, "text": html,
+                   "parse_mode": "HTML", "disable_web_page_preview": True}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        ok, body = await self.bot.call("editMessageText", payload, timeout=timeout)
         if ok or body.get("error_code") != 400:
             return ok, body
         logger.warning("Telegram refused the markup on edit (%s), rewriting plain", body.get("description"))
-        return await self.bot.call("editMessageText", {
-            "chat_id": chat_id, "message_id": message_id, "text": plain,
-            "disable_web_page_preview": True}, timeout=timeout)
+        fallback = {"chat_id": chat_id, "message_id": message_id, "text": plain,
+                    "disable_web_page_preview": True}
+        if reply_markup is not None:
+            fallback["reply_markup"] = reply_markup
+        return await self.bot.call("editMessageText", fallback, timeout=timeout)
+
+    async def _edit_telegram_markup(self, chat_id: str, message_id: int, reply_markup: dict,
+                                    timeout: float = 15) -> Tuple[bool, dict]:
+        """The half an edit that Telegram always allows: swapping the keyboard, not the text.
+
+        Used when the bubble cannot be rewritten — a deleted message, or an answer that predates
+        the stored text. Removing the button is still worth doing: it is what stops a stale tap.
+        """
+        ok, body = await self.bot.call("editMessageReplyMarkup", {
+            "chat_id": chat_id, "message_id": message_id, "reply_markup": reply_markup}, timeout=timeout)
+        if not ok:
+            logger.warning("Telegram editMessageReplyMarkup failed: %s", body.get("description"))
+        return ok, body
+
+    async def _answer_callback(self, callback_id: str, text: str) -> None:
+        """A callback left unanswered spins forever on the person's screen, so this always fires."""
+        if not self.bot:
+            return
+        ok, body = await self.bot.call("answerCallbackQuery", {
+            "callback_query_id": callback_id, "text": tg_truncate(text, 200)}, timeout=10)
+        if not ok:
+            logger.warning("Telegram answerCallbackQuery failed: %s", body.get("description"))
 
     async def _typing_until(self, request_id: str, chat_id: str, deadline: float) -> None:
         """Holds the typing indicator for as long as the question is alive and unanswered.
@@ -3293,6 +3482,68 @@ class SlagRelayServer:
         tail = f" (и ещё {total - 1})" if total > 1 else ""
         return f"устройство не в сети. ближайшее: «{next_row['title']}»{when}{tail}"
 
+    async def _linked_target(self, chat_id: str) -> Optional[dict]:
+        """The one vault this chat may talk to: route token, vault, mode and tag.
+
+        Answers the person itself and returns None when there is nothing single to answer from:
+        a chat with no assistant wired to it, or one wired to more vaults than a reply could name.
+        """
+        linked = [row for row in self.notify.routes_for_chat(chat_id) if self.db.assistant_link(row["route_token"])]
+        if not linked:
+            await self._bot_reply(chat_id, "ассистента отсюда нужно включить: настройки → уведомления → "
+                                           "ассистент в telegram.",
+                                  html="ассистента отсюда нужно включить: "
+                                       "<code>настройки → уведомления → ассистент в telegram</code>.")
+            return None
+        if len(linked) > 1:
+            await self._bot_reply(chat_id, "к чату привязано несколько хранилищ — спроси из приложения, "
+                                           "чтобы не гадать, откуда ответ.")
+            return None
+        link = self.db.assistant_link(linked[0]["route_token"])
+        route_row = self.notify.get(linked[0]["route_token"])
+        return {"token": linked[0]["route_token"], "vault_id": link["vault_id"],
+                "mode": link["mode"] or "minimal", "tag": route_row["vault_tag"] if route_row else ""}
+
+    async def _bot_clear(self, chat_id: str) -> None:
+        """Forgets the thread on the devices that still hold one.
+
+        The history never reaches the relay — it is written where the answer was written — so a
+        clear can only be forwarded, and a sleeping device keeps what it had. Says which happened
+        instead of assuming the pleasant one.
+        """
+        target = await self._linked_target(chat_id)
+        if target is None:
+            return
+        candidates = self._live_sockets_for_vault(target["vault_id"])
+        frame = json.dumps({"type": "assistant_clear"})
+        cleared = 0
+        for client in candidates:
+            try:
+                await client.send_text(frame)
+                cleared += 1
+            except (ConnectionResetError, BrokenPipeError):
+                client.closed = True
+        self.db.log_delivery_event("assistant.clear", "dispatched" if cleared else "no_device",
+                                   route_tag=target["tag"], device_count=len(candidates))
+        if cleared:
+            await self._bot_reply(chat_id, "ок, забыл, о чём говорили — дальше с чистого листа.")
+        else:
+            await self._bot_reply(chat_id, "ни одно устройство не в сети: разговор хранится на нём, "
+                                           "стереть отсюда не могу. открой приложение и повтори /clear.")
+
+    def _public_base(self, headers: dict) -> str:
+        """The address the device itself reached us on, so a link opens the same relay.
+
+        A telegram answer's note link has to be absolute — Telegram links nothing else — and the
+        relay has no configured public name to build one from. The `Host` of the very request
+        that delivered the answer is the honest source: it is, by definition, reachable.
+        """
+        host = (headers.get("host") or "").strip()
+        if not host:
+            return ""
+        proto = (headers.get("x-forwarded-proto") or "").strip().lower()
+        return f"{'https' if proto == 'https' else 'http'}://{host}"
+
     async def _bot_question(self, chat_id: str, question: str,
                             question_message_id: Optional[int] = None) -> None:
         """Hands the text to a live device. The relay has no model and never answers itself."""
@@ -3304,25 +3555,15 @@ class SlagRelayServer:
         if not self._allow_request(f"tg-ask:{chat_id}", RATE_LIMIT_TG_ASK):
             await self._bot_reply(chat_id, "слишком часто, подожди минуту.")
             return
-        linked = [row for row in self.notify.routes_for_chat(chat_id) if self.db.assistant_link(row["route_token"])]
-        if not linked:
-            await self._bot_reply(chat_id, "задавать вопросы отсюда нужно включить: настройки → уведомления → "
-                                           "ассистент в telegram.",
-                                  html="задавать вопросы отсюда нужно включить: "
-                                       "<code>настройки → уведомления → ассистент в telegram</code>.")
+        target = await self._linked_target(chat_id)
+        if target is None:
             return
-        if len(linked) > 1:
-            await self._bot_reply(chat_id, "к чату привязано несколько хранилищ — спроси из приложения, "
-                                           "чтобы не гадать, откуда ответ.")
-            return
-        link = self.db.assistant_link(linked[0]["route_token"])
-        vault_id = link["vault_id"]
-        mode = link["mode"] or "minimal"
-        route_row = self.notify.get(linked[0]["route_token"])
-        route_tag = route_row["vault_tag"] if route_row else ""
+        vault_id = target["vault_id"]
+        mode = target["mode"]
+        route_tag = target["tag"]
         # The bubble exists before anything is chosen: it is the only message this question will
         # ever own, and every stage below rewrites its text instead of sending a new one.
-        request_id = self.db.create_assistant_request(vault_id, linked[0]["route_token"], question,
+        request_id = self.db.create_assistant_request(vault_id, target["token"], question,
                                                       mode=mode,
                                                       question_message_id=question_message_id)
         reply_params = {"allow_sending_without_reply": True}
@@ -3347,7 +3588,9 @@ class SlagRelayServer:
             # Only after the bubble is rewritten: a finished request is not editable any more.
             self.db.finish_assistant_request(request_id)
             return
-        await self._edit_assistant_progress(
+        # The status line is cosmetic and the socket write is not: the question goes out first,
+        # the bubble catches up on its own.
+        self._spawn_stage_edit(
             request_id, f"{ASSISTANT_STAGE_HANDED} {self._device_label(chosen.device_id)}")
         message = json.dumps({"type": "assistant_question", "id": request_id, "question": question,
                               "mode": mode})
@@ -3368,16 +3611,56 @@ class SlagRelayServer:
         name = (row["name"] or "").strip() if row else ""
         return f"«{name}»" if name else ASSISTANT_DEVICE_FALLBACK
 
+    def _bubble_lock(self, request_id: str) -> asyncio.Lock:
+        """The single writer of one bubble. Created lazily: a request that gets no stage edit
+        never pays for it."""
+        lock = self.bubble_locks.get(request_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self.bubble_locks[request_id] = lock
+        return lock
+
+    def _forget_bubble(self, request_id: str) -> None:
+        self.bubble_locks.pop(request_id, None)
+
+    def _spawn_stage_edit(self, request_id: str, text: str) -> None:
+        """Rewrites the status bubble without holding up the question or the answer.
+
+        A Telegram edit can take longer than the model does, and it used to be awaited between
+        `create_assistant_request` and `send_text`: the device got its question ten seconds late,
+        the person saw "⌛ handed over" as the last word, and the late edit overwrote the answer.
+        """
+        task = asyncio.create_task(self._edit_assistant_progress(request_id, text))
+        self.stage_tasks.add(task)
+
+        def done(finished: "asyncio.Task[None]") -> None:
+            self.stage_tasks.discard(finished)
+            if not finished.cancelled() and finished.exception() is not None:
+                logger.warning("Stage edit for %s died: %s", request_id, finished.exception())
+
+        task.add_done_callback(done)
+
     async def _edit_assistant_progress(self, request_id: str, text: str) -> None:
-        """Rewrites the one bubble this question owns, and only while it is still unanswered."""
-        request = self.db.get_assistant_request(request_id)
-        if not request or request["answered_at"] is not None:
-            return
-        message_id = request["placeholder_message_id"]
-        route = self.notify.get(request["route_token"])
-        if not message_id or not route:
-            return
-        await self._edit_telegram(route["chat_id"], int(message_id), tg_escape(text), text, timeout=10)
+        """Rewrites the one bubble this question owns, and only while it is still unanswered.
+
+        The "still unanswered" check happens under the per-request lock, together with the edit
+        itself: checking before the await let a slow stage edit land after the answer and win.
+        """
+        async with self._bubble_lock(request_id):
+            request = self.db.get_assistant_request(request_id)
+            if not request or request["answered_at"] is not None:
+                return
+            message_id = request["placeholder_message_id"]
+            route = self.notify.get(request["route_token"])
+            if not message_id or not route:
+                return
+            ok, body = await self._edit_telegram(route["chat_id"], int(message_id),
+                                                 tg_escape(text), text, timeout=4)
+            self.db.log_delivery_event("assistant.stage", "edited" if ok else "edit_failed",
+                                       request_id=request_id,
+                                       error_code="" if ok else str(body.get("error_code") or ""))
+            if not ok:
+                logger.warning("Stage edit for %s failed (%s)", request_id, body.get("description"))
 
     async def _handle_assistant_stage(self, conn: WebSocketConnection, msg: dict) -> None:
         """A device started working on a question: the person sees it on the same bubble."""
@@ -3387,9 +3670,10 @@ class SlagRelayServer:
         request = self.db.get_assistant_request(request_id)
         if not request or request["vault_id"] != conn.vault_id or request["answered_at"] is not None:
             return
-        await self._edit_assistant_progress(request_id, ASSISTANT_STAGE_THINKING)
+        self._spawn_stage_edit(request_id, ASSISTANT_STAGE_THINKING)
 
-    async def _answer_assistant(self, vault_id: str, request_id: str, answer: str) -> dict:
+    async def _answer_assistant(self, vault_id: str, request_id: str, answer: str,
+                                base_url: str = "", action: Optional[dict] = None) -> dict:
         request = self.db.get_assistant_request(request_id)
         if not request or request["vault_id"] != vault_id:
             raise ApiError(404, "request_not_found")
@@ -3404,26 +3688,144 @@ class SlagRelayServer:
         started = float(request["created_at"])
         self.db.finish_assistant_request(request_id)
         text = tg_truncate(answer.strip(), ASSISTANT_MAX_ANSWER)
+        # The text and the action are stored before delivery: `/applied` appends to this very
+        # message, and the chat is the only other place the answer ever exists.
+        self.db.set_assistant_answer(request_id, text, action)
+        # Notebook links are the one markup an answer may carry: the model writes [[Title]] and
+        # this turns it into a real entity. Everything else stays escaped plain text.
+        html = render_answer_links(text, base_url)
+        markup = assistant_action_markup(action, request_id)
         chat_id = route["chat_id"]
         ok = False
         message_id = request["placeholder_message_id"]
-        if message_id:
-            # The answer was typed into a model on a device: it is plain text, never markup.
-            ok, body = await self._edit_telegram(chat_id, int(message_id), tg_escape(text), text, timeout=20)
+        # Same lock the stage edits take: the answer is the last word on this bubble, and a stage
+        # edit that started earlier must finish (or be skipped) before the answer is written.
+        async with self._bubble_lock(request_id):
+            if message_id:
+                ok, body = await self._edit_telegram(chat_id, int(message_id), html, text, timeout=20,
+                                                     reply_markup=markup)
+                if not ok:
+                    logger.warning("Editing the placeholder failed (%s), sending a new message",
+                                   body.get("description"))
             if not ok:
-                logger.warning("Editing the placeholder failed (%s), sending a new message",
-                               body.get("description"))
-        if not ok:
-            ok, body = await self._send_telegram(chat_id, tg_escape(text), text, timeout=20)
-            if not ok:
-                logger.warning("Telegram answer delivery failed: %s", body.get("description"))
+                ok, body = await self._send_telegram(chat_id, html, text, timeout=20, reply_markup=markup)
+                if not ok:
+                    logger.warning("Telegram answer delivery failed: %s", body.get("description"))
+        self._forget_bubble(request_id)
         route_row = self.notify.get(request["route_token"])
         self.db.log_delivery_event(
             "assistant.answer", "answered" if ok else "send_failed",
             route_tag=route_row["vault_tag"] if route_row else "", request_id=request_id,
             latency_ms=int((time.time() - started) * 1000),
             error_code="" if ok else str(body.get("error_code") or ""))
+        if markup is not None and ok:
+            # The button is on screen: from here on, a tap is a possible event and the row has
+            # to be explainable from the database alone.
+            self.db.log_delivery_event("assistant.action", "requested",
+                                       route_tag=route_row["vault_tag"] if route_row else "",
+                                       request_id=request_id)
         return {"delivered": ok}
+
+    async def _handle_action_callback(self, callback: dict) -> None:
+        """A tap on the button under an answer: hand the stored action to the live devices.
+
+        Every branch answers the callback before it returns. Telegram keeps the button spinning
+        until `answerCallbackQuery` arrives, so a refusal the person can read always beats a
+        spinner they cannot stop — including for a tap that names nothing this relay knows.
+        """
+        callback_id = callback.get("id")
+        if not isinstance(callback_id, str) or not callback_id:
+            return
+        data = callback.get("data")
+        message = callback.get("message")
+        chat = message.get("chat") if isinstance(message, dict) else None
+        chat_id = str((chat or {}).get("id") or "")
+        if not isinstance(data, str) or not data.startswith(ASSISTANT_ACTION_PREFIX):
+            await self._answer_callback(callback_id, ASSISTANT_ACTION_STALE)
+            return
+        request_id = data[len(ASSISTANT_ACTION_PREFIX):]
+        request = self.db.get_assistant_request(request_id) if request_id else None
+        route = self.notify.get(request["route_token"]) if request else None
+        # The chat is the only proof a tap belongs to the person the request was written for:
+        # callback data is a plain string, and whoever sees it can send it back from anywhere.
+        if request is None or route is None or not chat_id or str(route["chat_id"]) != chat_id:
+            self.db.log_delivery_event(
+                "assistant.action", "stale", request_id=request_id,
+                error_code="unknown_request" if request is None else "foreign_chat")
+            await self._answer_callback(callback_id, ASSISTANT_ACTION_STALE)
+            return
+        route_tag = route["vault_tag"]
+        if request["applied_at"] is not None:
+            self.db.log_delivery_event("assistant.action", "applied", route_tag=route_tag,
+                                       request_id=request_id, error_code="repeat_tap")
+            await self._answer_callback(callback_id, ASSISTANT_ACTION_ALREADY)
+            return
+        action = parse_assistant_action(request["action_json"])
+        if action is None:
+            self.db.log_delivery_event("assistant.action", "stale", route_tag=route_tag,
+                                       request_id=request_id, error_code="no_action")
+            await self._answer_callback(callback_id, ASSISTANT_ACTION_STALE)
+            return
+        if float(request["expires_at"]) <= time.time():
+            # The button outlives its question only briefly: an old one is a tap at something the
+            # person no longer has in front of them, and applying it blind is worse than saying no.
+            self.db.log_delivery_event("assistant.action", "stale", route_tag=route_tag,
+                                       request_id=request_id, error_code="expired")
+            await self._answer_callback(callback_id, ASSISTANT_ACTION_STALE)
+            return
+        candidates = self._live_sockets_for_vault(request["vault_id"])
+        frame = json.dumps({"type": "assistant_action", "id": request_id, "action": action})
+        dispatched = 0
+        for client in candidates:
+            try:
+                await client.send_text(frame)
+                dispatched += 1
+            except (ConnectionResetError, BrokenPipeError):
+                client.closed = True
+        # Every live socket gets it, not the one that answered: an action may be about a note
+        # another device has open, and a device that is not the author still applies it itself.
+        self.db.log_delivery_event("assistant.action", "dispatched" if dispatched else "no_device",
+                                   route_tag=route_tag, request_id=request_id,
+                                   device_count=len(candidates))
+        await self._answer_callback(
+            callback_id, ASSISTANT_ACTION_DONE if dispatched else ASSISTANT_ACTION_NO_DEVICE)
+
+    async def _apply_assistant_action(self, vault_id: str, request_id: str, ok: bool, text: str,
+                                      base_url: str = "") -> dict:
+        """Closes the loop under the answer: the bubble says what happened, the button goes away.
+
+        The first call owns the edit. A repeat is a normal "already" rather than an error, because
+        the relay cannot tell a response lost on the way back from a double submit — and appending
+        the outcome twice would be a lie the person can see.
+        """
+        request = self.db.get_assistant_request(request_id)
+        if not request or request["vault_id"] != vault_id:
+            raise ApiError(404, "request_not_found")
+        if not self.db.mark_assistant_applied(request_id):
+            return {"applied": False, "reason": "already"}
+        route = self.notify.get(request["route_token"])
+        note = tg_truncate(text.strip(), ASSISTANT_MAX_APPLY_TEXT)
+        suffix = ("✓ применено" if ok else "не вышло") + (f": {note}" if note else "")
+        edited = False
+        message_id = request["placeholder_message_id"]
+        if route and message_id:
+            chat_id = route["chat_id"]
+            base = request["answer_text"] or ""
+            if base:
+                full = tg_truncate(f"{base}\n\n{suffix}", ASSISTANT_MAX_ANSWER)
+                edited, _ = await self._edit_telegram(
+                    chat_id, int(message_id), render_answer_links(full, base_url), full,
+                    timeout=15, reply_markup={"inline_keyboard": []})
+            if not edited:
+                # The bubble itself may be gone (deleted, too old, or answered before the relay
+                # stored the text). Dropping the button is still the honest half of the job.
+                edited, _ = await self._edit_telegram_markup(chat_id, int(message_id),
+                                                              {"inline_keyboard": []})
+        self.db.log_delivery_event(
+            "assistant.action", "applied" if ok else "apply_failed",
+            route_tag=route["vault_tag"] if route else "", request_id=request_id,
+            error_code="" if edited else "edit_failed")
+        return {"applied": True, "edited": edited}
 
     async def _expire_assistant_requests(self) -> None:
         """Own loop on purpose: a telegram retry_after used to stall every expiry behind it."""

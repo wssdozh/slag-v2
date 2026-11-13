@@ -6,7 +6,9 @@ the assistant can all use it without dragging the server in. Three Bot API calls
 
 import asyncio
 import json
+import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Optional, Tuple
 
@@ -18,11 +20,70 @@ TG_TEXT_BUDGET = 3800  # our own ceiling: room for tags, and `&` grows fivefold 
 TG_EXPANDABLE_AFTER = 120  # a longer quote is collapsed behind "show more"
 TG_STAMP_MAX = 40
 TG_KINDS = ("task", "overdue")
+# `[[Название заметки]]` is how the app writes an internal link and how the model writes one.
+# Telegram refuses to link a scheme it does not know, so the entity is built here, not in the text.
+TG_WIKI_LINK = re.compile(r"\[\[([^\[\]\n]{1,120})\]\]")
 
 
 def tg_escape(text: str) -> str:
     """Ampersand first: escaping `&` after `<` would edit the entities we just produced."""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def render_answer_links(text: str, base_url: str = "") -> str:
+    """An assistant answer as HTML, with its note links actually tappable.
+
+    Telegram keeps a link entity only for http(s): a `slag://` href comes back from the API as
+    no entity at all, silently. So the entity points at this relay's own one-tap page, and that
+    page is what hands the scheme to the device. Without a base URL there is nowhere to point,
+    so the brackets are simply dropped: the title reads as a title, not as broken markup.
+    """
+    pieces: list[str] = []
+    position = 0
+    for match in TG_WIKI_LINK.finditer(text):
+        title = match.group(1).strip()
+        if not title:
+            continue
+        pieces.append(tg_escape(text[position:match.start()]))
+        if base_url:
+            quoted = urllib.parse.quote(title, safe="")
+            pieces.append(f'<a href="{base_url}/n?title={quoted}">{tg_escape(title)}</a>')
+        else:
+            pieces.append(tg_escape(title))
+        position = match.end()
+    pieces.append(tg_escape(text[position:]))
+    return "".join(pieces)
+
+
+def render_note_page(title: str) -> str:
+    """The one page between Telegram and the app: it exists because Telegram drops our scheme.
+
+    Deliberately dumb — no script, no data: a title the person already saw in the chat and a
+    button that opens the app. Nothing about the vault travels through here.
+    """
+    quoted = urllib.parse.quote(title, safe="")
+    heading = tg_escape(title) if title else "SLAG"
+    return f"""<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>открыть в SLAG</title>
+<style>
+body {{ margin: 0; min-height: 100vh; display: grid; place-items: center;
+  background: #161616; color: #f4f4f5;
+  font: 16px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }}
+main {{ padding: 24px; max-width: 360px; }}
+p {{ margin: 0 0 6px; color: #71717a; font-size: 13px; }}
+h1 {{ margin: 0 0 22px; font-size: 19px; font-weight: 600; line-height: 1.35; }}
+a {{ display: block; padding: 14px 18px; border-radius: 10px; text-align: center;
+  background: #f4f4f5; color: #161616; text-decoration: none; font-weight: 600; }}
+small {{ display: block; margin-top: 18px; color: #52525b; font-size: 12px; }}
+</style></head><body><main>
+<p>заметка</p>
+<h1>{heading}</h1>
+<a href="slag://note?title={quoted}">открыть в SLAG</a>
+<small>если ничего не открылось — приложения нет на этом устройстве.</small>
+</main></body></html>
+"""
 
 
 def tg_truncate(text: str, limit: int) -> str:
