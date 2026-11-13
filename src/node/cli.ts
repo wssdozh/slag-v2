@@ -1,5 +1,6 @@
 // The commands the node answers to. Loaded only after the environment and the secret store are
 // ready, because importing the sync engine builds it and reads its config at module load.
+import os from 'node:os';
 import path from 'node:path';
 import { NodeVault } from './vaultPort';
 import { setVaultPort } from '../lib/storage/port';
@@ -11,6 +12,12 @@ import { SYNC_INTERVALS } from '../config';
 
 const cliLog = logger.scope('NODE');
 
+const DEFAULT_SERVER = process.env.SLAG_RELAY_URL || 'http://152.53.199.71:8320';
+/** How the user calls us back; the wrapper exports its own path so messages stay copyable. */
+const SELF = process.env.SLAG_SELF || 'slag-node';
+/** How long `login` waits for the two taps in the app before giving up. */
+const APPROVAL_WAIT_MS = 5 * 60 * 1000;
+
 interface Flags {
   [key: string]: string | boolean | undefined;
 }
@@ -19,7 +26,7 @@ export interface CliOptions {
   vaultDir: string;
 }
 
-const DEFAULT_SERVER = process.env.SLAG_RELAY_URL || 'http://152.53.199.71:8320';
+type Engine = Awaited<ReturnType<typeof engine>>;
 
 export function parseFlags(args: string[]): { command: string; positional: string[]; flags: Flags } {
   const positional: string[] = [];
@@ -65,70 +72,144 @@ async function engine() {
   return syncEngine;
 }
 
-async function login(options: CliOptions, flags: Flags): Promise<void> {
-  const seed = stringFlag(flags, 'seed')?.trim();
-  if (!seed || !validateMnemonic(seed)) {
-    throw new Error('Нужна валидная seed-фраза: slag-node login --seed "<12 слов>"');
+async function readSeed(): Promise<string> {
+  const { createInterface } = await import('node:readline/promises');
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await rl.question('seed-фраза: ')).trim();
+  } finally {
+    rl.close();
   }
-  const serverUrl = stringFlag(flags, 'server') ?? DEFAULT_SERVER;
-  const name = stringFlag(flags, 'name') ?? 'pet';
-  const vault = await loadVault(options);
+}
 
+/**
+ * Installs the vault the account is willing to give this device: an invitation carries the key,
+ * an already-accepted grant only carries the id. Returns the vault name, or null when there is
+ * nothing to take yet.
+ */
+async function takeVault(sync: Engine, vault: NodeVault, wantedId?: string): Promise<string | null> {
+  await accountClient.refresh();
+  const state = accountClient.getState();
+  const deviceId = sync.getConfig().deviceId;
+
+  const invitation = state.invitations.find((entry) => !wantedId || entry.vaultId === wantedId);
+  if (invitation) {
+    const seedPhrase = await decryptVaultKeyForDevice(deviceId, invitation.encryptedKey);
+    if (!validateMnemonic(seedPhrase)) throw new Error('Не удалось расшифровать ключ хранилища');
+    await sync.setVaultSeedPhrase('default_vault', seedPhrase);
+    vault.adoptSyncId(invitation.vaultId);
+    await accountClient.acceptVault(invitation.vaultId);
+    return invitation.vaultName || invitation.vaultId;
+  }
+
+  const granted = state.vaults.find(
+    (entry) =>
+      (!wantedId || entry.id === wantedId) &&
+      entry.grants.some((grant) => grant.deviceId === deviceId && grant.status === 'accepted')
+  );
+  if (!granted) return null;
+  if (!sync.getConfig().seedPhrase) {
+    // A grant without an invitation means the key never travelled: it only ever rides an
+    // invitation, so the owner has to revoke this device and share the vault again.
+    throw new Error('Доступ выдан, но ключа нет. Отзови устройство в приложении и выдай хранилище заново');
+  }
+  vault.adoptSyncId(granted.id);
+  return granted.name || granted.id;
+}
+
+async function login(options: CliOptions, flags: Flags): Promise<void> {
+  const vault = await loadVault(options);
   const sync = await engine();
+  const serverUrl = stringFlag(flags, 'server') ?? DEFAULT_SERVER;
+  const name = stringFlag(flags, 'name') ?? os.hostname();
+
+  const flagSeed = stringFlag(flags, 'seed');
+  const seed = flagSeed === '-' || flagSeed === undefined ? await readSeed() : flagSeed.trim();
+  if (!validateMnemonic(seed)) throw new Error('Это не seed-фраза');
+
   sync.saveConfig({ enabled: true, serverUrl, deviceName: name });
   sync.saveConfig({ seedPhrase: seed });
 
   const device = await getOrCreateDeviceIdentity(sync.getConfig().deviceId, name, 'desktop');
-  const result = await accountClient.login(seed, serverUrl, device);
-
-  if (result === 'authenticated') {
-    cliLog.info('Вход выполнен сразу: этот аккаунт ещё не знал других устройств');
-  } else {
-    process.stdout.write(
-      '\nУстройство просит доступ.\n' +
-        'Откройте приложение SLAG на телефоне или компьютере:\n' +
-        '  настройки → аккаунт → устройства → «' + name + '» → разрешить вход\n\n' +
-        'Ждём подтверждения, ничего не закрывайте...\n'
-    );
+  let pendingApproval = false;
+  try {
+    pendingApproval = (await accountClient.login(seed, serverUrl, device)) === 'pending_device';
+  } catch (error) {
+    // Same trap as the poll below: a failed state refresh after a saved session is not a failure.
+    if (!accountClient.isAuthenticated()) throw error;
+    cliLog.warn('вход прошёл, обновление состояния сорвалось', error);
+  }
+  if (pendingApproval) {
+    process.stdout.write(`\nустройство «${name}» ждёт подтверждения.\nприложение → настройки → устройства → «${name}» → разрешить.\n\n`);
+    const deadline = Date.now() + APPROVAL_WAIT_MS;
     for (;;) {
+      if (accountClient.isAuthenticated()) break;
       await new Promise((resolve) => setTimeout(resolve, 3000));
-      const status = await accountClient.completePendingLogin();
-      if (status === 'authenticated') {
-        process.stdout.write('Подтверждено, сессия сохранена.\n');
-        break;
+      let status: Awaited<ReturnType<typeof accountClient.completePendingLogin>>;
+      try {
+        status = await accountClient.completePendingLogin();
+      } catch (error) {
+        // A tunnel hiccup or a 15s abort is not a verdict: keep waiting until the deadline.
+        cliLog.warn('опрос подтверждения сорвался, повторяю', error);
+        status = 'pending';
       }
-      if (status === 'expired' || status === 'rejected') {
-        throw new Error(status === 'rejected' ? 'Вход отклонён на основном устройстве' : 'Время ожидания истекло');
-      }
+      // The session is written before the account state refresh, so a failed refresh after a
+      // successful approval must not be read as "not approved yet" — the token is already ours.
+      if (accountClient.isAuthenticated()) break;
+      if (status === 'expired' || status === 'rejected') throw new Error('Подтверждение не пришло');
+      if (Date.now() > deadline) throw new Error(`Подтверждение не пришло за 5 минут. Запусти ${SELF} login ещё раз`);
     }
   }
 
   const pendingVault = stringFlag(flags, 'vault');
   if (pendingVault) vault.adoptSyncId(pendingVault);
 
-  await accountClient.refresh();
-  const state = accountClient.getState();
-  const deviceId = sync.getConfig().deviceId;
-  const vaults = state.vaults.map((entry) => {
-    const grant = entry.grants.find((item) => item.deviceId === deviceId);
-    return `${entry.id}  ${entry.name}  ${grant ? `${grant.mode}/${grant.status}` : 'без доступа'}`;
-  });
-  const invitations = state.invitations.map((entry) => `${entry.vaultId}  ${entry.vaultName}  приглашение`);
-  process.stdout.write(
-    `\nУстройство ${deviceId} подключено к аккаунту.\n` +
-      [...vaults, ...invitations].map((line) => `  ${line}`).join('\n') +
-      '\n\nДальше: slag-node accept <vaultId>, потом slag-node run\n'
-  );
+  const deadline = Date.now() + APPROVAL_WAIT_MS;
+  let lastError: unknown = null;
+  const tryTake = async (): Promise<string | null> => {
+    try {
+      return await takeVault(sync, vault, pendingVault);
+    } catch (error) {
+      // The tunnel drops requests now and then; a refused vault stays refused, so remember it.
+      lastError = error;
+      cliLog.warn('не удалось забрать хранилище, повторяю', error);
+      return null;
+    }
+  };
+
+  let taken = await tryTake();
+  if (!taken) {
+    process.stdout.write('теперь выдай этому устройству хранилище (права — «только чтение»).\n\n');
+    while (!taken) {
+      if (Date.now() > deadline) {
+        throw lastError ?? new Error(`Хранилище так и не выдали. Запусти ${SELF} login ещё раз`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      taken = await tryTake();
+    }
+  }
+
+  process.stdout.write(`\nготово: хранилище «${taken}», устройство ${sync.getConfig().deviceId}\nзапускай: systemctl --user start slag-node\n`);
+}
+
+async function accept(options: CliOptions, positional: string[]): Promise<void> {
+  const vaultId = positional[0];
+  if (!vaultId) throw new Error(`Укажи vaultId: ${SELF} accept <vaultId>`);
+  const vault = await loadVault(options);
+  const sync = await engine();
+  if (!accountClient.isAuthenticated()) throw new Error(`Сначала ${SELF} login`);
+  const taken = await takeVault(sync, vault, vaultId);
+  if (!taken) throw new Error(`Аккаунт не знает хранилище ${vaultId} или не выдал к нему доступ`);
+  process.stdout.write(`хранилище «${taken}» принято\n`);
 }
 
 async function listVaults(options: CliOptions): Promise<void> {
   await loadVault(options);
   const sync = await engine();
+  if (!accountClient.isAuthenticated()) throw new Error(`Сначала ${SELF} login`);
   await accountClient.refresh();
   const state = accountClient.getState();
   const deviceId = sync.getConfig().deviceId;
-  if (!accountClient.isAuthenticated()) throw new Error('Сначала slag-node login');
-
   const rows = [
     ...state.vaults.map((entry) => {
       const grant = entry.grants.find((item) => item.deviceId === deviceId);
@@ -139,49 +220,13 @@ async function listVaults(options: CliOptions): Promise<void> {
   process.stdout.write(`vaultId\tname\tgrant\n${rows.join('\n')}\n`);
 }
 
-async function accept(options: CliOptions, positional: string[]): Promise<void> {
-  const vaultId = positional[0];
-  if (!vaultId) throw new Error('Укажите vaultId из slag-node vaults');
-  const vault = await loadVault(options);
-  const sync = await engine();
-  if (!accountClient.isAuthenticated()) throw new Error('Сначала slag-node login');
-
-  await accountClient.refresh();
-  const state = accountClient.getState();
-  const invitation = state.invitations.find((entry) => entry.vaultId === vaultId);
-  const serverVault = state.vaults.find((entry) => entry.id === vaultId);
-  if (!invitation && !serverVault) throw new Error(`Аккаунт не знает хранилище ${vaultId}`);
-
-  if (invitation) {
-    const deviceId = sync.getConfig().deviceId;
-    const seedPhrase = await decryptVaultKeyForDevice(deviceId, invitation.encryptedKey);
-    if (!validateMnemonic(seedPhrase)) throw new Error('Не удалось расшифровать ключ хранилища');
-    await sync.setVaultSeedPhrase('default_vault', seedPhrase);
-    vault.adoptSyncId(vaultId);
-    await accountClient.acceptVault(vaultId);
-    process.stdout.write(`Хранилище ${invitation.vaultName} принято, ключ сохранён.\n`);
-    return;
-  }
-
-  const grant = serverVault?.grants.find((entry) => entry.deviceId === sync.getConfig().deviceId);
-  if (!grant || grant.status !== 'accepted') {
-    throw new Error('Доступа к этому хранилищу нет: попросите владельца выдать его устройству');
-  }
-  vault.adoptSyncId(vaultId);
-  process.stdout.write(`Хранилище ${serverVault?.name ?? vaultId} уже доступно (${grant.mode}).\n`);
-}
-
 async function run(options: CliOptions): Promise<void> {
   const vault = await loadVault(options);
   const sync = await engine();
   const config = sync.getConfig();
 
-  if (!accountClient.isAuthenticated()) {
-    throw new Error('Нет входа в аккаунт: выполните slag-node login на этом устройстве');
-  }
-  if (!config.seedPhrase) {
-    throw new Error('Нет ключа хранилища: выполните slag-node accept <vaultId>');
-  }
+  if (!accountClient.isAuthenticated()) throw new Error(`Не подключено: запусти ${SELF} login`);
+  if (!config.seedPhrase) throw new Error(`Нет ключа хранилища: запусти ${SELF} login`);
 
   let last = '';
   sync.subscribe((status) => {
@@ -191,7 +236,7 @@ async function run(options: CliOptions): Promise<void> {
     cliLog.info(`sync: ${line}`);
   });
 
-  cliLog.info(`Старт: хранилище ${options.vaultDir}, заметок ${vault.noteCount}, режим ${config.localSyncMode ?? 'read-write'}`);
+  cliLog.info(`старт: ${options.vaultDir}, заметок ${vault.noteCount}, режим ${config.localSyncMode ?? 'read-write'}`);
   await sync.init();
   accountClient.startPolling(config.serverUrl);
 
@@ -203,13 +248,14 @@ async function run(options: CliOptions): Promise<void> {
 
 export async function runCli(argv: string[], defaults: CliOptions): Promise<void> {
   const { command, positional, flags } = parseFlags(argv);
-  const options: CliOptions = {
-    vaultDir: stringFlag(flags, 'vault-dir') ?? defaults.vaultDir,
-  };
+  const options: CliOptions = { vaultDir: stringFlag(flags, 'vault-dir') ?? defaults.vaultDir };
 
   switch (command) {
     case 'login':
       await login(options, flags);
+      return;
+    case 'run':
+      await run(options);
       return;
     case 'vaults':
       await listVaults(options);
@@ -217,20 +263,17 @@ export async function runCli(argv: string[], defaults: CliOptions): Promise<void
     case 'accept':
       await accept(options, positional);
       return;
-    case 'run':
-      await run(options);
-      return;
     default:
       process.stdout.write(
         [
-          'slag-node — headless хранилище и синхронизация',
+          'slag — хранилище и синхронизация без интерфейса',
           '',
-          '  login --seed "<12 слов>" [--server URL] [--name pet] [--vault <syncId>]',
-          '  vaults                      что доступно аккаунту и с какими правами',
-          '  accept <vaultId>            принять хранилище, ключ приедет зашифрованным',
-          '  run                         работать до остановки (systemd)',
+          '  login   ввести seed-фразу, дождаться подтверждения и забрать хранилище',
+          '  run     работать до остановки (этим занимается systemd)',
+          '  vaults  что доступно и с какими правами',
+          '  accept <vaultId>   принять конкретное хранилище',
           '',
-          `каталог хранилища: ${path.resolve(options.vaultDir)}`,
+          `каталог: ${path.resolve(options.vaultDir)}`,
         ].join('\n') + '\n'
       );
   }
