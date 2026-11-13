@@ -17,6 +17,8 @@ const DEFAULT_SERVER = process.env.SLAG_RELAY_URL || 'http://152.53.199.71:8320'
 const SELF = process.env.SLAG_SELF || 'slag-node';
 /** How long `login` waits for the two taps in the app before giving up. */
 const APPROVAL_WAIT_MS = 5 * 60 * 1000;
+/** After a failed init, wait this long before trying the relay again. */
+const RETRY_INTERVAL_MS = 30_000;
 
 interface Flags {
   [key: string]: string | boolean | undefined;
@@ -220,25 +222,44 @@ async function listVaults(options: CliOptions): Promise<void> {
   process.stdout.write(`vaultId\tname\tgrant\n${rows.join('\n')}\n`);
 }
 
-async function run(options: CliOptions): Promise<void> {
+async function run(options: CliOptions, flags: Flags): Promise<void> {
   const vault = await loadVault(options);
   const sync = await engine();
   const config = sync.getConfig();
+  // A backup node holds a copy and never pushes; --read-write is the deliberate opt-out.
+  sync.forceReceiveOnly = flags['read-write'] !== true;
+  // The first pull over a tunnel is a big, slow body; the app's 30s is for a LAN.
+  sync.pullTimeoutMs = 180_000;
+  // Small pages: one attachment-carrying bundle is up to 8 MB and a tunnel drops long bodies.
+  sync.pullPageSize = 1;
 
   if (!accountClient.isAuthenticated()) throw new Error(`Не подключено: запусти ${SELF} login`);
   if (!config.seedPhrase) throw new Error(`Нет ключа хранилища: запусти ${SELF} login`);
 
   let last = '';
   sync.subscribe((status) => {
-    const line = `${status.state}${status.error ? ` (${status.error})` : ''} pending=${status.pendingCount} devices=${status.connectedDevicesCount}`;
+    const line = `${status.state}${status.error ? ` (${status.error})` : ''} room=${status.currentRoomId ?? '-'} pending=${status.pendingCount} devices=${status.connectedDevicesCount}`;
     if (line === last) return;
     last = line;
     cliLog.info(`sync: ${line}`);
   });
 
-  cliLog.info(`старт: ${options.vaultDir}, заметок ${vault.noteCount}, режим ${config.localSyncMode ?? 'read-write'}`);
+  cliLog.info(
+    `старт: ${options.vaultDir}, заметок ${vault.noteCount}, режим ${sync.forceReceiveOnly ? 'только приём' : 'чтение и запись'}`
+  );
   await sync.init();
   accountClient.startPolling(config.serverUrl);
+
+  // init() parks a failure in status instead of throwing, and a headless node has nobody to press
+  // "retry". Reconnecting after a dropped pull is the whole job here.
+  let lastRetry = Date.now();
+  setInterval(() => {
+    if (sync.getStatus().state !== 'error') return;
+    if (Date.now() - lastRetry < RETRY_INTERVAL_MS) return;
+    lastRetry = Date.now();
+    cliLog.info('синхронизация сорвалась, повторяю');
+    void sync.init();
+  }, SYNC_INTERVALS.POLL_INTERVAL_MS);
 
   // Keep the process alive; systemd restarts it if it ever returns.
   await new Promise<void>(() => {
@@ -255,7 +276,7 @@ export async function runCli(argv: string[], defaults: CliOptions): Promise<void
       await login(options, flags);
       return;
     case 'run':
-      await run(options);
+      await run(options, flags);
       return;
     case 'vaults':
       await listVaults(options);
@@ -269,7 +290,7 @@ export async function runCli(argv: string[], defaults: CliOptions): Promise<void
           'slag — хранилище и синхронизация без интерфейса',
           '',
           '  login   ввести seed-фразу, дождаться подтверждения и забрать хранилище',
-          '  run     работать до остановки (этим занимается systemd)',
+          '  run     работать до остановки (этим занимается systemd); --read-write разрешает пушить',
           '  vaults  что доступно и с какими правами',
           '  accept <vaultId>   принять конкретное хранилище',
           '',

@@ -5,5 +5,7 @@ dir=$(dirname "$self")
 if [ -f "$dir/relay-url" ]; then
   SLAG_RELAY_URL=$(cat "$dir/relay-url")
   export SLAG_RELAY_URL
+  # The relay is reachable only through a plain-TCP tunnel from here, so TLS is not on the table.
+  case "$SLAG_RELAY_URL" in http://*) SLAG_ALLOW_INSECURE_RELAY=1; export SLAG_ALLOW_INSECURE_RELAY ;; esac
 fi
 SLAG_SELF="slag" exec "$dir/node" "$dir/index.js" "$@"
