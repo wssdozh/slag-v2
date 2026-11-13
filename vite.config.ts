@@ -18,18 +18,32 @@ function devFolderOpenerPlugin() {
           const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1:5173'}`);
           const target = url.searchParams.get('target') || 'logs';
 
+          // Dev-only endpoint used to be a free path traversal: `target=../../..` created
+          // directories anywhere the dev user could write. Only vault-relative paths now.
+          const safeTarget = (raw: string): string => {
+            const value = raw.trim();
+            if (value === 'notes') return path.join('vaults', 'main', 'notes');
+            if (value === 'logs') return 'logs';
+            if (value === 'backups') return 'backups';
+            if (!value) throw new Error('empty target');
+            const normalized = value.replace(/\\/g, '/');
+            if (normalized.startsWith('/') || normalized.startsWith('~') || /^[a-zA-Z]:/.test(normalized)) {
+              throw new Error('absolute target');
+            }
+            const parts = normalized.split('/');
+            if (parts.some((part) => !part || part === '.' || part === '..' || part.includes(':') || part.includes('\0'))) {
+              throw new Error('unsafe target');
+            }
+            return parts.join('/');
+          };
+
           let targetDir: string;
           const appData =
             process.env.APPDATA ||
             (process.platform === 'darwin'
               ? `${process.env.HOME}/Library/Application Support`
               : `${process.env.HOME}/.config`);
-          const subPath =
-            target === 'notes'
-              ? path.join('vaults', 'main', 'notes')
-              : target === 'logs'
-              ? 'logs'
-              : target.replace(/^[/\\]+/, '');
+          const subPath = safeTarget(target);
           const tauriAppData = path.join(appData, 'com.slag.notes', subPath);
 
           if (fs.existsSync(path.join(appData, 'com.slag.notes'))) {
@@ -80,7 +94,9 @@ export default defineConfig({
   // own cache when asked.
   cacheDir: process.env.SLAG_VITE_CACHE_DIR || 'node_modules/.vite',
   server: {
-    host: true,
+    // The dev server has a filesystem-writing endpoint above; keep it off the LAN unless
+    // phone testing explicitly asks for it with SLAG_DEV_HOST=0.0.0.0.
+    host: process.env.SLAG_DEV_HOST || '127.0.0.1',
     port: 5173,
     strictPort: true,
     proxy: {
