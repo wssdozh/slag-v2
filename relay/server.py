@@ -31,6 +31,20 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
+# The Bot API client, the escaping and the message renderer live on their own: a leaf module the
+# queue, the bot loop and the assistant all share without importing each other.
+from tg import (  # noqa: E402  (import order is deliberate: constants below depend on nothing)
+    TG_EXPANDABLE_AFTER,
+    TG_KINDS,
+    TG_STAMP_MAX,
+    TG_TEXT_BUDGET,
+    TG_TEXT_LIMIT,
+    TelegramBot,
+    render_notification,
+    tg_escape,
+    tg_truncate,
+)
+
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 DEFAULT_PORT = 8320
 DEFAULT_TTL_SECONDS = 7 * 24 * 3600
@@ -57,21 +71,21 @@ NOTIFY_LEEWAY_SECONDS = 300
 RATE_LIMIT_NOTIFY_ARM = 60
 RATE_LIMIT_NOTIFY_INVITE = 10
 # Asking the assistant from Telegram: the question travels to a device, never to the relay's
-# language model — the relay has none.
-ASSISTANT_REQUEST_TTL_SECONDS = 120
+# language model — the relay has none. The wait is short on purpose: a person staring at "передал"
+# reads anything past half a minute as a dead bot, and the placeholder is already on screen.
+ASSISTANT_REQUEST_TTL_SECONDS = 25
+# Telegram drops a typing indicator after ~5s, so it is re-armed inside that window.
+ASSISTANT_TYPING_INTERVAL_SECONDS = 4
+# How long the relay waits for devices to answer "I am here and I can run a model". A healthy
+# socket answers in single-digit milliseconds; a suspended app never answers at all.
+ASSISTANT_PROBE_TIMEOUT_SECONDS = 0.25
 ASSISTANT_MAX_QUESTION = 1000
 ASSISTANT_MAX_ANSWER = 4000
 RATE_LIMIT_TG_ASK = 10
+# Delivery telemetry: outcomes and latencies, never the text of a question or an answer.
+DELIVERY_EVENT_KEEP_SECONDS = 7 * 86400
 NOTIFY_BATCH_SIZE = 50
 NOTIFY_CLAIM_LEASE_SECONDS = 120
-TG_API_BASE = "https://api.telegram.org"
-# Outgoing text is HTML, not MarkdownV2: three characters to escape instead of eighteen, and a
-# missed escape costs a 400 on a message a human was waiting for.
-TG_TEXT_LIMIT = 4096  # Bot API counts characters after the entities are parsed
-TG_TEXT_BUDGET = 3800  # our own ceiling: room for tags, and `&` grows fivefold when escaped
-TG_EXPANDABLE_AFTER = 120  # a longer quote is collapsed behind "show more"
-TG_STAMP_MAX = 40
-TG_KINDS = ("task", "overdue")
 # Telegram allows A-Z a-z 0-9 _ - in a start parameter, 1 to 64 characters.
 BOT_CODE_RE = re.compile(r"^[A-Za-z0-9_-]{8,32}$")
 # Anonymous write endpoints get a small per-IP budget: enough for a real pair flow,
@@ -429,9 +443,17 @@ class RelayDatabase:
             self.conn.execute("""CREATE TABLE IF NOT EXISTS assistant_links (
                 route_token TEXT PRIMARY KEY,
                 vault_id TEXT NOT NULL,
-                enabled_at REAL NOT NULL
+                enabled_at REAL NOT NULL,
+                mode TEXT NOT NULL DEFAULT 'minimal'
             )""")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_assistant_links_vault ON assistant_links(vault_id)")
+            # `mode` is what the person chose: `minimal` answers only about tasks, `risky` lets the
+            # device's assistant read the vault. The relay passes it through and never decides.
+            self._ensure_column("assistant_links", "mode", "TEXT NOT NULL DEFAULT 'minimal'")
+            # The placeholder is the whole user-visible state of a question: it is sent once and
+            # rewritten in place, so `placeholder_message_id` has to survive a restart. `chat_id`
+            # is deliberately NOT here: it lives only in `notify_routes.db`, and putting it next
+            # to `vault_id` would rebuild the one link this design exists to avoid.
             self.conn.execute("""CREATE TABLE IF NOT EXISTS assistant_requests (
                 id TEXT PRIMARY KEY,
                 vault_id TEXT NOT NULL,
@@ -439,9 +461,31 @@ class RelayDatabase:
                 question TEXT NOT NULL,
                 created_at REAL NOT NULL,
                 expires_at REAL NOT NULL,
-                answered_at REAL
+                answered_at REAL,
+                question_message_id INTEGER,
+                placeholder_message_id INTEGER,
+                mode TEXT NOT NULL DEFAULT 'minimal',
+                attempts INTEGER NOT NULL DEFAULT 1
             )""")
+            self._ensure_column("assistant_requests", "question_message_id", "INTEGER")
+            self._ensure_column("assistant_requests", "placeholder_message_id", "INTEGER")
+            self._ensure_column("assistant_requests", "mode", "TEXT NOT NULL DEFAULT 'minimal'")
+            self._ensure_column("assistant_requests", "attempts", "INTEGER NOT NULL DEFAULT 1")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_assistant_pending ON assistant_requests(expires_at) WHERE answered_at IS NULL")
+            # Delivery telemetry without content: an outcome, a duration and a salted route tag are
+            # enough to answer "why was it slow" — the question itself never lands here.
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS delivery_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                at REAL NOT NULL,
+                kind TEXT NOT NULL,
+                route_tag TEXT,
+                request_id TEXT,
+                outcome TEXT,
+                device_count INTEGER NOT NULL DEFAULT 0,
+                latency_ms INTEGER,
+                error_code TEXT
+            )""")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_delivery_events_at ON delivery_events(at)")
 
     def record_telemetry(self, event_type: str, platform: str = "unknown", metadata: Optional[dict] = None) -> str:
         event_id = f"evt_{secrets.token_hex(8)}"
@@ -458,6 +502,11 @@ class RelayDatabase:
             res = self.conn.execute("DELETE FROM bundles WHERE room_id = ?", (room_id,))
             count = res.rowcount
         return count
+
+    def room_vault(self, room_id: str) -> Optional[str]:
+        """Which vault a room speaks for. The row outlives the socket, so it is not presence."""
+        row = self.conn.execute("SELECT vault_id FROM rooms WHERE room_id = ?", (room_id,)).fetchone()
+        return row["vault_id"] if row else None
 
     def touch_room(self, room_id: str, vault_id: Optional[str] = None) -> None:
         now = time.time()
@@ -1034,41 +1083,76 @@ class RelayDatabase:
                 armed += res.rowcount
         return armed, []
 
-    def set_assistant_link(self, route_token: str, vault_id: str, enabled: bool) -> None:
+    def set_assistant_link(self, route_token: str, vault_id: str, enabled: bool,
+                           mode: str = "minimal") -> None:
         with self.conn:
             if enabled:
                 self.conn.execute(
-                    "INSERT INTO assistant_links (route_token, vault_id, enabled_at) VALUES (?, ?, ?) "
-                    "ON CONFLICT(route_token) DO UPDATE SET vault_id = excluded.vault_id",
-                    (route_token, vault_id, time.time()))
+                    "INSERT INTO assistant_links (route_token, vault_id, enabled_at, mode)"
+                    " VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(route_token) DO UPDATE SET vault_id = excluded.vault_id,"
+                    " mode = excluded.mode",
+                    (route_token, vault_id, time.time(), mode))
             else:
                 self.conn.execute("DELETE FROM assistant_links WHERE route_token = ?", (route_token,))
 
     def assistant_link(self, route_token: str) -> Optional[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM assistant_links WHERE route_token = ?", (route_token,)).fetchone()
 
-    def create_assistant_request(self, vault_id: str, route_token: str, question: str) -> str:
+    def create_assistant_request(self, vault_id: str, route_token: str, question: str,
+                                 mode: str = "minimal",
+                                 question_message_id: Optional[int] = None) -> str:
         request_id = f"ask_{secrets.token_hex(8)}"
         now = time.time()
         with self.conn:
             self.conn.execute(
-                "INSERT INTO assistant_requests (id, vault_id, route_token, question, created_at, expires_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (request_id, vault_id, route_token, question, now, now + ASSISTANT_REQUEST_TTL_SECONDS))
+                "INSERT INTO assistant_requests (id, vault_id, route_token, question, created_at,"
+                " expires_at, mode, question_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (request_id, vault_id, route_token, question, now,
+                 now + ASSISTANT_REQUEST_TTL_SECONDS, mode, question_message_id))
         return request_id
+
+    def set_assistant_placeholder(self, request_id: str, message_id: Optional[int]) -> None:
+        """The bubble the answer will overwrite. Without it the answer falls back to a new message."""
+        with self.conn:
+            self.conn.execute("UPDATE assistant_requests SET placeholder_message_id = ? WHERE id = ?",
+                              (int(message_id) if message_id is not None else None, request_id))
 
     def get_assistant_request(self, request_id: str) -> Optional[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM assistant_requests WHERE id = ?", (request_id,)).fetchone()
 
     def finish_assistant_request(self, request_id: str) -> None:
+        # The text is answered or dead by now: keeping it would turn a delivery queue into an
+        # archive of somebody's questions.
         with self.conn:
-            self.conn.execute("UPDATE assistant_requests SET answered_at = ? WHERE id = ? AND answered_at IS NULL",
+            self.conn.execute("UPDATE assistant_requests SET answered_at = ?, question = ''"
+                              " WHERE id = ? AND answered_at IS NULL",
                               (time.time(), request_id))
 
     def expired_assistant_requests(self, now: float, limit: int = 20) -> list[sqlite3.Row]:
         return self.conn.execute(
             "SELECT * FROM assistant_requests WHERE answered_at IS NULL AND expires_at <= ? LIMIT ?",
             (now, limit)).fetchall()
+
+    def pending_assistant_requests(self, vault_id: str, now: float) -> list[sqlite3.Row]:
+        """What a reconnecting device missed: the socket broadcast does not survive a reconnect."""
+        return self.conn.execute(
+            "SELECT * FROM assistant_requests WHERE vault_id = ? AND answered_at IS NULL AND expires_at > ?"
+            " ORDER BY created_at LIMIT 20", (vault_id, now)).fetchall()
+
+    def log_delivery_event(self, kind: str, outcome: str, route_tag: str = "", request_id: str = "",
+                           device_count: int = 0, latency_ms: Optional[int] = None,
+                           error_code: str = "") -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO delivery_events (at, kind, route_tag, request_id, outcome, device_count,"
+                " latency_ms, error_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (time.time(), kind, route_tag, request_id, outcome, device_count, latency_ms, error_code))
+
+    def purge_delivery_events(self, older_than: float) -> int:
+        with self.conn:
+            res = self.conn.execute("DELETE FROM delivery_events WHERE at < ?", (older_than,))
+        return res.rowcount
 
     def due_notify_jobs(self, now: float, limit: int) -> list[sqlite3.Row]:
         return self.conn.execute(
@@ -1163,110 +1247,9 @@ class NotifyStore:
             self.conn.execute("UPDATE notify_routes SET blocked_at = ? WHERE route_token = ?",
                               (time.time(), route_token))
 
-    def close(self) -> None:
-        self.conn.close()
 
-
-def tg_escape(text: str) -> str:
-    """Ampersand first: escaping `&` after `<` would edit the entities we just produced."""
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def tg_truncate(text: str, limit: int) -> str:
-    """Cut raw text, never markup: escaping runs after, so no entity can be split in half."""
-    if limit <= 0:
-        return ""
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
-
-
-def _notification_html(title: str, body: str, kind: str, stamp: str, spoiler: bool) -> str:
-    header = "⚠️ " if kind == "overdue" else ""
-    parts = [f"{header}<b>{tg_escape(title)}</b>"]
-    if body:
-        quoted = tg_escape(body)
-        if spoiler:
-            quoted = f'<span class="tg-spoiler">{quoted}</span>'
-        tag = "<blockquote expandable>" if len(body) > TG_EXPANDABLE_AFTER else "<blockquote>"
-        parts.append(f"{tag}{quoted}</blockquote>")
-    if stamp:
-        parts.append(f'{"срок был" if kind == "overdue" else "срок"} <code>{tg_escape(stamp)}</code>')
-    return "\n".join(parts)
-
-
-def _notification_plain(title: str, body: str, kind: str, stamp: str) -> str:
-    header = "⚠️ " if kind == "overdue" else ""
-    parts = [f"{header}{title}"]
-    if body:
-        parts.append(body)
-    if stamp:
-        parts.append(f'{"срок был" if kind == "overdue" else "срок"} {stamp}')
-    return "\n".join(parts)
-
-
-def render_notification(title: str, body: str, kind: str, stamp: str, spoiler: bool) -> Tuple[str, str]:
-    """(html, plain). The plain twin is what goes out when Telegram refuses the markup.
-
-    The body is the only unbounded part, and escaping turns one `&` into five characters: the
-    binary search finds the longest raw body whose escaped form still fits the budget.
-    """
-    title = title.strip() or "напоминание"
-    body = body.strip()
-    stamp = stamp.strip()
-    low, high = 0, len(body)
-    while low < high:
-        middle = (low + high + 1) // 2
-        candidate = tg_truncate(body, middle)
-        if len(_notification_html(title, candidate, kind, stamp, spoiler)) <= TG_TEXT_BUDGET:
-            low = middle
-        else:
-            high = middle - 1
-    body = tg_truncate(body, low) if len(body) > low else body
-    return (_notification_html(title, body, kind, stamp, spoiler),
-            tg_truncate(_notification_plain(title, body, kind, stamp), TG_TEXT_LIMIT))
-
-
-class TelegramBot:
-    """Three Bot API calls, no framework.
-
-    aiogram/python-telegram-bot own their own event loop and updater; this relay already runs
-    one, and SLAG needs /start, /stop and sendMessage — no FSM, no middlewares, no keyboards.
-    """
-
-    def __init__(self, token: str):
-        self.token = token
-        self.username: Optional[str] = None
-        self._api = f"{TG_API_BASE}/bot{token}"
-
-    def _request(self, method: str, payload: dict, timeout: float) -> Tuple[bool, dict]:
-        data = json.dumps(payload).encode("utf-8") if payload else None
-        headers = {"Content-Type": "application/json"} if data else {}
-        request = urllib.request.Request(f"{self._api}/{method}", data=data, headers=headers)
-        try:
-            with urllib.request.urlopen(request, timeout=timeout) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
-                return bool(body.get("ok")), body
-        except urllib.error.HTTPError as exc:
-            try:
-                body = json.loads(exc.read().decode("utf-8"))
-            except (ValueError, OSError):
-                body = {"ok": False, "error_code": exc.code}
-            return False, body
-        except (urllib.error.URLError, OSError, ValueError) as exc:
-            # The bot token sits in the request URL: never let an exception echo it into a log.
-            return False, {"ok": False, "error_code": 0, "description": self.redact(str(exc))}
-
-    async def call(self, method: str, payload: dict, timeout: float = 20) -> Tuple[bool, dict]:
-        return await asyncio.to_thread(self._request, method, payload, timeout)
-
-    def redact(self, text: str) -> str:
-        return text.replace(self.token, "<bot-token>") if self.token else text
-
-    @staticmethod
-    def retry_after(body: dict) -> Optional[float]:
-        parameters = body.get("parameters")
-        if isinstance(parameters, dict) and isinstance(parameters.get("retry_after"), (int, float)):
-            return float(parameters["retry_after"])
-        return None
+# The Bot API surface lives in `tg.py`: a leaf module shared by the queue, the bot loop and
+# the assistant. It is re-exported through the imports above so callers keep one entry point.
 
 
 class SlagRelayServer:
@@ -1277,6 +1260,10 @@ class SlagRelayServer:
         self.port = port
         self.start_time = time.time()
         self.rooms: Dict[str, Set[WebSocketConnection]] = {}
+        # Typing loops keyed by request: cancelled the moment the question stops being asked.
+        self.typing_tasks: Dict[str, "asyncio.Task[None]"] = {}
+        # Open device probes: the relay asks who is willing to answer before it asks a question.
+        self.assistant_probes: Dict[str, dict] = {}
         self.failed_claim_attempts: Dict[str, list[float]] = {}
         self.rate_limits: Dict[str, list[float]] = {}
         if require_account_auth is None:
@@ -2432,11 +2419,14 @@ class SlagRelayServer:
             return {"code": code, "routeToken": route_token, "link": link,
                     "expiresAt": iso_time(expires_at), "expiresIn": NOTIFY_INVITE_TTL_SECONDS}, 200
 
-        if method == "GET" and path == "/api/notify/status":
+        # A capability token belongs in a body, not a query string: proxies and access logs keep
+        # URLs long after the request is gone. GET stays for older clients.
+        if path == "/api/notify/status" and method in ("GET", "POST"):
             auth = self._auth(headers)
             self._require_notify_plan(auth)
-            vault_id = query.get("vaultId", "")
-            route_token = query.get("routeToken", "")
+            source = body if method == "POST" else query
+            vault_id = source.get("vaultId", "")
+            route_token = source.get("routeToken", "")
             if not vault_id or not route_token:
                 raise ApiError(400, "invalid_notification")
             self._authorize_vault(auth, vault_id)
@@ -2462,14 +2452,32 @@ class SlagRelayServer:
             vault_id = body.get("vaultId", "")
             route_token = body.get("routeToken", "")
             enabled = body.get("enabled") is not False
+            mode = body.get("mode") if isinstance(body.get("mode"), str) else "minimal"
+            if mode not in ("minimal", "risky"):
+                raise ApiError(400, "invalid_assistant_mode")
             if not isinstance(vault_id, str) or not vault_id or not isinstance(route_token, str) or not route_token:
                 raise ApiError(400, "invalid_assistant_link")
             self._authorize_vault(auth, vault_id, write=True)
             route = self.notify.get(route_token)
             if not route or not hmac.compare_digest(route["vault_tag"], self._notify_tag(vault_id)):
                 raise ApiError(404, "route_not_found")
-            self.db.set_assistant_link(route_token, vault_id, enabled)
-            return {"enabled": enabled}, 200
+            self.db.set_assistant_link(route_token, vault_id, enabled, mode)
+            return {"enabled": enabled, "mode": mode}, 200
+
+        # A device that reconnects after the broadcast still owes the chat an answer. The socket
+        # message is fire-and-forget, this is the catch-up.
+        if method == "GET" and path == "/api/assistant/pending":
+            auth = self._auth(headers)
+            self._require_notify_plan(auth)
+            vault_id = query.get("vaultId", "")
+            if not vault_id:
+                raise ApiError(400, "invalid_notification")
+            self._authorize_vault(auth, vault_id)
+            now = time.time()
+            pending = [{"requestId": row["id"], "question": row["question"], "mode": row["mode"],
+                        "expiresAt": row["expires_at"]}
+                       for row in self.db.pending_assistant_requests(vault_id, now)]
+            return {"requests": pending}, 200
 
         if method == "POST" and path == "/api/assistant/answer":
             auth = self._auth(headers)
@@ -2481,8 +2489,8 @@ class SlagRelayServer:
                     or not request_id or not isinstance(answer, str) or not answer.strip()):
                 raise ApiError(400, "invalid_answer")
             self._authorize_vault(auth, vault_id, write=True)
-            delivered = await self._answer_assistant(vault_id, request_id, answer)
-            return {"delivered": delivered}, 200
+            result = await self._answer_assistant(vault_id, request_id, answer)
+            return result, 200
 
         if method == "GET" and path == "/api/vaults":
             auth = self._auth(headers)
@@ -2631,8 +2639,8 @@ class SlagRelayServer:
                 return {"error": "not_found", "path": path}, 404
             auth = owner_account_id = vault_id = None
             max_cache = self.db.DEFAULT_MAX_CACHE_BYTES
-            room = self.db.conn.execute("SELECT vault_id FROM rooms WHERE room_id = ?", (room_id,)).fetchone()
-            if self.require_account_auth or self._bearer(headers) or (room and room["vault_id"]):
+            room_vault = self.db.room_vault(room_id)
+            if self.require_account_auth or self._bearer(headers) or room_vault:
                 auth = self._auth(headers)
                 vault_id = query.get("vault", "")
                 owner_account_id = self._authorize_room(auth, room_id, vault_id)
@@ -2900,8 +2908,8 @@ class SlagRelayServer:
             auth = None
             if not room_id:
                 raise ApiError(404, "room_not_found")
-            room = self.db.conn.execute("SELECT vault_id FROM rooms WHERE room_id = ?", (room_id,)).fetchone()
-            if self.require_account_auth or query.get("token") or self._bearer(headers) or (room and room["vault_id"]):
+            room_vault = self.db.room_vault(room_id)
+            if self.require_account_auth or query.get("token") or self._bearer(headers) or room_vault:
                 token = query.get("token", "") or self._bearer(headers)
                 auth = self.db.authenticate(token)
                 if not auth:
@@ -2967,8 +2975,7 @@ class SlagRelayServer:
             self._authorize_vault(auth, conn.vault_id, write=write)
             conn.max_cache_bytes = PLANS[auth["plan"]]["cache_mb"] * 1024 * 1024
         else:
-            room = self.db.conn.execute("SELECT vault_id FROM rooms WHERE room_id = ?", (conn.room_id,)).fetchone()
-            if self.require_account_auth or (room and room["vault_id"]):
+            if self.require_account_auth or self.db.room_vault(conn.room_id):
                 raise ApiError(401, "unauthorized")
 
     async def _handle_ws_message(self, conn: WebSocketConnection, text: str) -> None:
@@ -2987,6 +2994,21 @@ class SlagRelayServer:
         msg_type = msg.get("type")
         if msg_type == "ping":
             await conn.send_text(json.dumps({"type": "pong", "ts": int(time.time())}))
+            return
+        if msg_type == "assistant_probe_ack":
+            # The chosen-one election: latency, plus whether this device could even run a model.
+            probe_id = msg.get("id")
+            probe = self.assistant_probes.get(probe_id) if isinstance(probe_id, str) else None
+            if not probe:
+                return
+            sent_at = probe["sent"].get(conn.device_id)
+            if sent_at is None:
+                return
+            probe["results"][conn.device_id] = (
+                int((time.monotonic() - sent_at) * 1000), msg.get("aiReady") is True)
+            # Everyone spoke, or the quiet ones will be timed out by the caller.
+            if len(probe["results"]) >= len(probe["sent"]):
+                probe["event"].set()
             return
         if msg_type == "ack":
             bundle_ids = msg.get("bundleIds") or ([msg.get("bundleId")] if msg.get("bundleId") else [])
@@ -3020,8 +3042,7 @@ class SlagRelayServer:
         seq = int(bundle.get("sequence", 0))
         timestamp = bundle.get("timestamp", str(time.time()))
         payload_str = json.dumps(bundle)
-        room = self.db.conn.execute("SELECT vault_id FROM rooms WHERE room_id = ?", (conn.room_id,)).fetchone()
-        vault_id = room["vault_id"] if room else None
+        vault_id = self.db.room_vault(conn.room_id)
         saved = self.db.save_bundle(conn.room_id, bundle_id, from_device, seq, timestamp, payload_str,
                                     max_cache_bytes=conn.max_cache_bytes, account_id=conn.account_id, vault_id=vault_id)
         if not saved:
@@ -3116,7 +3137,8 @@ class SlagRelayServer:
             return
         if not text.startswith("/"):
             # Anything that is not a command is a question for the vault's assistant.
-            await self._bot_question(chat_id, text)
+            message_id = message.get("message_id")
+            await self._bot_question(chat_id, text, message_id if isinstance(message_id, int) else None)
             return
         command, _, argument = text.partition(" ")
         command = command.split("@", 1)[0].lower()
@@ -3171,7 +3193,99 @@ class SlagRelayServer:
         await self._bot_reply(chat_id, f"готово. напоминания из {source} будут приходить сюда.",
                               html=f"<b>готово</b>. напоминания из {tg_escape(source)} будут приходить сюда.")
 
-    async def _bot_question(self, chat_id: str, question: str) -> None:
+    async def _edit_telegram(self, chat_id: str, message_id: int, html: str, plain: str,
+                             timeout: float = 20) -> Tuple[bool, dict]:
+        """Rewrites a message the bot already sent. Same markup fallback as a fresh send."""
+        ok, body = await self.bot.call("editMessageText", {
+            "chat_id": chat_id, "message_id": message_id, "text": html,
+            "parse_mode": "HTML", "disable_web_page_preview": True}, timeout=timeout)
+        if ok or body.get("error_code") != 400:
+            return ok, body
+        logger.warning("Telegram refused the markup on edit (%s), rewriting plain", body.get("description"))
+        return await self.bot.call("editMessageText", {
+            "chat_id": chat_id, "message_id": message_id, "text": plain,
+            "disable_web_page_preview": True}, timeout=timeout)
+
+    async def _typing_until(self, request_id: str, chat_id: str, deadline: float) -> None:
+        """Holds the typing indicator for as long as the question is alive and unanswered.
+
+        Telegram clears it after ~5s and has no "stop typing", so this stops on its own at the
+        deadline: a late call past the answer would leave a ghost indicator behind it.
+        """
+        while time.time() < deadline:
+            request = self.db.get_assistant_request(request_id)
+            if not request or request["answered_at"] is not None:
+                return
+            await self.bot.call("sendChatAction", {"chat_id": chat_id, "action": "typing"}, timeout=10)
+            await asyncio.sleep(ASSISTANT_TYPING_INTERVAL_SECONDS)
+
+    def _live_sockets_for_vault(self, vault_id: str) -> list[WebSocketConnection]:
+        """Sockets that are open right now. Note: open is not the same as awake, see `_pick_device`."""
+        return [client for sockets in list(self.rooms.values()) for client in list(sockets)
+                if not client.closed and client.vault_id == vault_id]
+
+    async def _pick_device(self, candidates: list[WebSocketConnection]) -> Optional[WebSocketConnection]:
+        """Who answers this question: the fastest device that can actually run a model.
+
+        A socket says nothing about the phone behind it — a suspended app holds TCP open and
+        replies to nothing. So the probe doubles as the presence check and the ping, and its ack
+        carries `aiReady`: a device without a model never takes a question from one that has it.
+        """
+        if not candidates:
+            return None
+        # One device is not a choice: no probe, no added latency, no question about it.
+        if len(candidates) == 1:
+            return candidates[0]
+        probe_id = f"probe_{secrets.token_hex(6)}"
+        probe = {"event": asyncio.Event(), "sent": {}, "results": {}}
+        self.assistant_probes[probe_id] = probe
+        frame = json.dumps({"type": "assistant_probe", "id": probe_id})
+
+        async def ask(client: WebSocketConnection) -> None:
+            probe["sent"][client.device_id] = time.monotonic()
+            try:
+                await client.send_text(frame)
+            except (ConnectionResetError, BrokenPipeError):
+                client.closed = True
+
+        try:
+            await asyncio.gather(*(ask(client) for client in candidates))
+            try:
+                await asyncio.wait_for(probe["event"].wait(),
+                                       timeout=ASSISTANT_PROBE_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                pass
+        finally:
+            self.assistant_probes.pop(probe_id, None)
+
+        best: Optional[tuple[tuple[int, int], WebSocketConnection]] = None
+        for client in candidates:
+            result = probe["results"].get(client.device_id)
+            if result is None:
+                continue  # asleep, or already gone: it must not get the question
+            rtt_ms, ready = result
+            rank = (0 if ready else 1, rtt_ms)
+            if best is None or rank < best[0]:
+                best = (rank, client)
+        return best[1] if best else None
+
+    def _armed_digest(self, vault_id: str) -> str:
+        """The honest answer when no device can: what the relay already holds, nothing inferred."""
+        rows = self.db.conn.execute(
+            "SELECT title, stamp FROM notify_jobs WHERE vault_id = ? AND sent_at IS NULL"
+            " ORDER BY fire_at LIMIT 2", (vault_id,)).fetchall()
+        total = self.db.conn.execute(
+            "SELECT COUNT(*) AS n FROM notify_jobs WHERE vault_id = ? AND sent_at IS NULL",
+            (vault_id,)).fetchone()["n"]
+        if not rows:
+            return "ни одно устройство не в сети, а в очереди пусто — спроси из приложения."
+        next_row = rows[0]
+        when = f" — {next_row['stamp']}" if next_row["stamp"] else ""
+        tail = f" (и ещё {total - 1})" if total > 1 else ""
+        return f"устройство не в сети. ближайшее: «{next_row['title']}»{when}{tail}"
+
+    async def _bot_question(self, chat_id: str, question: str,
+                            question_message_id: Optional[int] = None) -> None:
         """Hands the text to a live device. The relay has no model and never answers itself."""
         question = question.strip()[:ASSISTANT_MAX_QUESTION]
         if not question:
@@ -3193,32 +3307,112 @@ class SlagRelayServer:
                                            "чтобы не гадать, откуда ответ.")
             return
         link = self.db.assistant_link(linked[0]["route_token"])
-        request_id = self.db.create_assistant_request(link["vault_id"], linked[0]["route_token"], question)
-        rooms = self.db.conn.execute("SELECT room_id FROM rooms WHERE vault_id = ? AND retired = 0",
-                                     (link["vault_id"],)).fetchall()
-        if not rooms:
-            self.db.finish_assistant_request(request_id)
-            await self._bot_reply(chat_id, "ни одно устройство с этим хранилищем ещё не подключалось.")
+        vault_id = link["vault_id"]
+        mode = link["mode"] or "minimal"
+        route_row = self.notify.get(linked[0]["route_token"])
+        route_tag = route_row["vault_tag"] if route_row else ""
+        # One device answers, chosen before the question is asked: a fan-out spends a model call
+        # per device and hands the chat whichever answer happened to be faster to produce.
+        candidates = self._live_sockets_for_vault(vault_id)
+        chosen = await self._pick_device(candidates)
+        if chosen is None:
+            # Waiting the full TTL for a device that is not there is the worst thing this bot did.
+            self.db.log_delivery_event("assistant.question", "no_device", route_tag=route_tag,
+                                       device_count=len(candidates))
+            if mode == "minimal":
+                await self._bot_reply(chat_id, self._armed_digest(vault_id))
+            else:
+                await self._bot_reply(chat_id, "ни одно устройство не в сети — прочитать хранилище некому. "
+                                               "открой приложение и спроси ещё раз.")
             return
-        message = json.dumps({"type": "assistant_question", "id": request_id, "question": question})
-        for room in rooms:
-            await self._broadcast_to_room(room["room_id"], message)
-        await self._bot_reply(chat_id, "передал устройству, жду ответ…")
+        request_id = self.db.create_assistant_request(vault_id, linked[0]["route_token"], question,
+                                                      mode=mode,
+                                                      question_message_id=question_message_id)
+        # The bubble exists before the question leaves: the answer may land while this coroutine
+        # is still awaiting the fan-out, and it can only edit a message it already knows.
+        reply_params = {"allow_sending_without_reply": True}
+        if question_message_id:
+            reply_params["message_id"] = question_message_id
+        ok, body = await self.bot.call("sendMessage", {
+            "chat_id": chat_id, "text": tg_escape("⌛ передал на устройство"),
+            "parse_mode": "HTML", "reply_parameters": reply_params}, timeout=10)
+        if ok:
+            self.db.set_assistant_placeholder(request_id, (body.get("result") or {}).get("message_id"))
+        message = json.dumps({"type": "assistant_question", "id": request_id, "question": question,
+                              "mode": mode})
+        await chosen.send_text(message)
+        self.db.log_delivery_event("assistant.question", "dispatched", route_tag=route_tag,
+                                   request_id=request_id, device_count=len(candidates))
+        self.typing_tasks[request_id] = asyncio.create_task(self._typing_until(
+            request_id, chat_id, time.time() + ASSISTANT_REQUEST_TTL_SECONDS))
 
-    async def _answer_assistant(self, vault_id: str, request_id: str, answer: str) -> bool:
+    def _stop_typing(self, request_id: str) -> None:
+        task = self.typing_tasks.pop(request_id, None)
+        if task is not None:
+            task.cancel()
+
+    async def _answer_assistant(self, vault_id: str, request_id: str, answer: str) -> dict:
         request = self.db.get_assistant_request(request_id)
-        if not request or request["vault_id"] != vault_id or request["answered_at"] is not None:
+        if not request or request["vault_id"] != vault_id:
             raise ApiError(404, "request_not_found")
         route = self.notify.get(request["route_token"])
         if not route or not self.bot:
             raise ApiError(409, "route_gone")
+        if request["answered_at"] is not None:
+            # The same question answered twice (a retry, or two sockets of one device): the second
+            # answer is dropped, and that is a normal outcome rather than an error.
+            return {"delivered": False, "reason": "already"}
+        self._stop_typing(request_id)
+        started = float(request["created_at"])
         self.db.finish_assistant_request(request_id)
         text = tg_truncate(answer.strip(), ASSISTANT_MAX_ANSWER)
-        # The answer was typed into a model on a device: it is plain text, never markup.
-        ok, body = await self._send_telegram(route["chat_id"], tg_escape(text), text, timeout=20)
+        chat_id = route["chat_id"]
+        ok = False
+        message_id = request["placeholder_message_id"]
+        if message_id:
+            # The answer was typed into a model on a device: it is plain text, never markup.
+            ok, body = await self._edit_telegram(chat_id, int(message_id), tg_escape(text), text, timeout=20)
+            if not ok:
+                logger.warning("Editing the placeholder failed (%s), sending a new message",
+                               body.get("description"))
         if not ok:
-            logger.warning("Telegram answer delivery failed: %s", body.get("description"))
-        return ok
+            ok, body = await self._send_telegram(chat_id, tg_escape(text), text, timeout=20)
+            if not ok:
+                logger.warning("Telegram answer delivery failed: %s", body.get("description"))
+        route_row = self.notify.get(request["route_token"])
+        self.db.log_delivery_event(
+            "assistant.answer", "answered" if ok else "send_failed",
+            route_tag=route_row["vault_tag"] if route_row else "", request_id=request_id,
+            latency_ms=int((time.time() - started) * 1000),
+            error_code="" if ok else str(body.get("error_code") or ""))
+        return {"delivered": ok}
+
+    async def _expire_assistant_requests(self) -> None:
+        """Own loop on purpose: a telegram retry_after used to stall every expiry behind it."""
+        for request in self.db.expired_assistant_requests(time.time()):
+            self.db.finish_assistant_request(request["id"])
+            self._stop_typing(request["id"])
+            route = self.notify.get(request["route_token"])
+            if not route:
+                continue
+            self.db.log_delivery_event("assistant.expired", "expired",
+                                       route_tag=route["vault_tag"], request_id=request["id"])
+            chat_id = route["chat_id"]
+            text = "устройство не ответило. напиши ещё раз — передам заново."
+            message_id = request["placeholder_message_id"]
+            if message_id:
+                ok, _ = await self._edit_telegram(chat_id, int(message_id), tg_escape(text), text, timeout=15)
+                if ok:
+                    continue
+            await self._bot_reply(chat_id, text)
+
+    async def assistant_expiry_loop(self) -> None:
+        while True:
+            await asyncio.sleep(5)
+            try:
+                await self._expire_assistant_requests()
+            except Exception as exc:
+                logger.error("Assistant expiry error: %s", exc)
 
     async def notify_delivery_loop(self) -> None:
         while True:
@@ -3232,11 +3426,6 @@ class SlagRelayServer:
         if not self.bot:
             return
         now = time.time()
-        for request in self.db.expired_assistant_requests(now):
-            self.db.finish_assistant_request(request["id"])
-            route = self.notify.get(request["route_token"])
-            if route:
-                await self._bot_reply(route["chat_id"], "устройство не ответило — видимо, ни одно не в сети.")
 
         for job in self.db.due_notify_jobs(now, NOTIFY_BATCH_SIZE):
             route_token, event_key = job["route_token"], job["event_key"]
@@ -3286,6 +3475,7 @@ class SlagRelayServer:
             await asyncio.sleep(60)
             try:
                 self.db.cleanup_expired()
+                self.db.purge_delivery_events(time.time() - DELIVERY_EVENT_KEEP_SECONDS)
                 self._prune_rate_limits()
             except Exception as exc:
                 logger.error("Cleanup error: %s", exc)
@@ -3303,6 +3493,7 @@ class SlagRelayServer:
         asyncio.create_task(self.background_cleanup_loop())
         asyncio.create_task(self.notify_delivery_loop())
         if self.bot:
+            asyncio.create_task(self.assistant_expiry_loop())
             asyncio.create_task(self.bot_loop())
         else:
             logger.info("Telegram bot is off (SLAG_TG_BOT_TOKEN is empty): notifications stay queued")

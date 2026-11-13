@@ -169,6 +169,14 @@ curl --fail http://127.0.0.1:8320/health
 
 ## telegram notifications — 2026-11-13
 
+the relay is one process with four jobs: sync encrypted bundles between devices, poll the Bot
+API, deliver the notification queue, and ferry assistant questions. all of it is relay code:
+`relay/server.py` is the current home of the sync server, the bot poller, the queue and the
+assistant flow, and the target layout splits it into `relay/tg.py`, `relay/bot.py` and
+`relay/assistant.py`. deploy every `relay/*.py` with its `requirements.txt` — whichever side of
+that split a file is on, it is still one process. this document describes the behaviour, not the
+file count, so it holds before and after the split lands.
+
 reminders leave the vault through the relay: the client arms a job, the relay calls the Bot
 API at `fire_at`. two rules shape the whole thing.
 
@@ -260,24 +268,40 @@ neither does anyone else.
 
 ### asking the assistant from telegram
 
-the relay has no model. a plain message to the bot is forwarded to whatever device has the
-vault open, and the answer comes back the same way:
+the relay has no model. a plain message to the bot becomes an `assistant_requests` row and is
+handed to exactly one device; the answer comes back the same way, and the `⌛ передал на
+устройство` bubble is edited in place instead of a second message. a device that reconnects after
+the question left catches up through `GET /api/assistant/pending`.
 
 ```
-POST /api/assistant/enable  {vaultId, routeToken, enabled}   # opt-in per channel
-bot: "что по задачам?"        → assistant_requests row → broadcast {type:"assistant_question"}
-device: POST /api/assistant/answer {vaultId, requestId, answer} → relay → sendMessage
+POST /api/assistant/enable  {vaultId, routeToken, enabled, mode}   # opt-in per channel
+bot: "что по задачам?"  → assistant_requests row → probe {type:"assistant_probe"}
+relay: first ack {type:"assistant_probe_ack", aiReady} wins → {type:"assistant_question"} to that socket only
+device: POST /api/assistant/answer {vaultId, requestId, answer} → relay → editMessageText
 ```
 
-both endpoints need a paid plan and a read-write grant; `enable` also requires the route token
-to belong to that vault (same `vault_tag` check as `arm`). a question lives 120 seconds: if no
-device answers by then, the bot says so instead of inventing an answer. `assistant_links` is
-the only table that ties a route back to a vault, and only for people who switched the feature
-on — everything else stays one-way.
+one device answers, and the relay picks it before asking: it sends `assistant_probe` to every open
+socket of the vault and waits 250 ms for `assistant_probe_ack`. the frame carries `aiReady`, so the
+order is "can it run a model at all, then lowest round trip". an open socket is not the same as an
+awake device — a suspended app holds TCP and answers nothing — which is why the probe doubles as
+the presence check. with a single open socket the probe is skipped entirely; if nobody answers,
+nobody gets the question and the bot says so instead of waiting out the TTL.
 
-this is the seam, not the feature: today the device answers from its own state (counts and the
-next reminder), and the full assistant plugs into `buildAssistantAnswer` in `src/lib/notify.ts`.
-nothing else has to move when it does — the relay only carries the text both ways.
+two modes, picked by a human in the app and never inferred:
+
+- **`minimal`** — the default for an enabled channel. the bot only answers about tasks and
+  reminders: with a live device the question goes to its task-scoped assistant, and with no device
+  online the relay replies from what it already stores — the nearest armed reminder (`title` and
+  deadline) plus how many more are queued. nothing is read from the vault.
+- **`risky`** — the full assistant: the device's orchestrator may read the vault. the relay still
+  never sees an encrypted bundle, so a question with no device online has nothing to answer from,
+  and the bot says that instead of inventing one.
+
+either way the answer belongs to the device, not the relay: it is assembled on the device from its
+own state and its own model, and the relay only carries the text. `enable` needs a paid plan, a
+read-write grant and the same `vault_tag` check as `arm`; a question lives 25 seconds, its text is
+wiped as soon as it is answered or expires, and `assistant_links` is the only table that ties a
+route back to a vault — and only for people who switched the feature on.
 
 acceptance probe, in this order:
 

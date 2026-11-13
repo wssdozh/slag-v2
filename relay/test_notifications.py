@@ -7,6 +7,8 @@ delivered, one blocked recipient never blocks another, and a chat id never reach
 relay database.
 """
 
+import asyncio
+import json
 import os
 import shutil
 import sqlite3
@@ -27,11 +29,13 @@ from server import (
 
 
 class FakeBot:
-    """Stands in for the Bot API: records sends, can fail on demand."""
+    """Stands in for the Bot API: records sends and edits, can fail on demand."""
 
     def __init__(self):
         self.username = "test_bot"
         self.sent: list[tuple[str, str]] = []
+        self.edits: list[tuple[str, int, str]] = []
+        self.actions: list[str] = []
         self.calls: list[dict] = []
         self.failure: dict | None = None
         # Telegram refuses markup it cannot parse; the relay must then retry without it.
@@ -47,9 +51,51 @@ class FakeBot:
                                "description": "Bad Request: can't parse entities"}
             self.sent.append((str(payload["chat_id"]), str(payload["text"])))
             return True, {"ok": True, "result": {"message_id": len(self.sent)}}
+        if method == "editMessageText":
+            self.calls.append(dict(payload))
+            if self.failure:
+                return False, dict(self.failure)
+            if self.reject_markup and payload.get("parse_mode"):
+                return False, {"ok": False, "error_code": 400,
+                               "description": "Bad Request: can't parse entities"}
+            self.edits.append((str(payload["chat_id"]), int(payload["message_id"]), str(payload["text"])))
+            return True, {"ok": True, "result": {"message_id": payload["message_id"]}}
+        if method == "sendChatAction":
+            self.actions.append(str(payload.get("action")))
+            return True, {"ok": True, "result": True}
         if method == "getMe":
             return True, {"ok": True, "result": {"username": self.username}}
         return True, {"ok": True, "result": []}
+
+
+class FakeDevice:
+    """A live socket: answers the relay's probe after `delay` and records every frame it gets."""
+
+    def __init__(self, device_id: str, vault_id: str, server=None,
+                 delay: float = 0.0, ai_ready: bool = True, answers: bool = True):
+        self.device_id = device_id
+        self.vault_id = vault_id
+        self.room_id = f"room-{device_id}"
+        self.closed = False
+        self.token_hash = None
+        self.delay = delay
+        self.ai_ready = ai_ready
+        self.answers = answers
+        self.frames: list[str] = []
+        self.server = server
+
+    def questions(self) -> list[str]:
+        return [frame for frame in self.frames if '"assistant_question"' in frame]
+
+    async def send_text(self, text: str) -> None:
+        self.frames.append(text)
+        payload = json.loads(text)
+        if payload.get("type") != "assistant_probe" or self.server is None or not self.answers:
+            return
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        await self.server._handle_ws_message(self, json.dumps({
+            "type": "assistant_probe_ack", "id": payload["id"], "aiReady": self.ai_ready}))
 
 
 class RenderTestCase(unittest.TestCase):
@@ -260,6 +306,22 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("987654321000", dump)
         self.assertIn("987654321000", "\n".join(self.notify.conn.iterdump()))
 
+    async def test_assistant_request_does_not_store_the_chat_id(self):
+        """The whole point of the two databases: a question must not rebuild the vault↔chat link."""
+        self.notify.link("tok-a", "987654321000", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        self.server.rooms["room-1"] = {FakeDevice("dev-1", "vault-1", server=self.server)}
+        await self.server._bot_question("987654321000", "секрет")
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+        conn = sqlite3.connect(self.db_path)
+        try:
+            dump = "\n".join(conn.iterdump())
+        finally:
+            conn.close()
+        self.assertNotIn("987654321000", dump)
+        self.assertEqual(request["route_token"], "tok-a")
+
     async def test_forbidden_bot_marks_route_and_stops(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
         await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "T", "body": ""}])
@@ -319,18 +381,135 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertIn("включить", self.bot.sent[-1][1])
         self.db.set_assistant_link("tok-a", "vault-1", True)
         await self.server._bot_question("chat-a", "что по задачам?")
-        # The relay has no model: without a live device it says so instead of making something up.
-        self.assertIn("не подключалось", self.bot.sent[-1][1])
-        self.assertEqual(self.db.expired_assistant_requests(time.time() + 10_000), [])
+        # No device is on the line: the relay answers from the reminders it already holds and
+        # does not leave a request waiting for nobody.
+        self.assertIn("не в сети", self.bot.sent[-1][1])
+        self.assertEqual(self.db.pending_assistant_requests("vault-1", time.time()), [])
 
     async def test_answer_reaches_the_chat_exactly_once(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
         self.db.set_assistant_link("tok-a", "vault-1", True)
         request_id = self.db.create_assistant_request("vault-1", "tok-a", "вопрос")
-        self.assertTrue(await self.server._answer_assistant("vault-1", request_id, "ответ"))
+        self.assertTrue((await self.server._answer_assistant("vault-1", request_id, "ответ"))["delivered"])
         self.assertEqual(self.bot.sent[-1], ("chat-a", "ответ"))
-        with self.assertRaises(ApiError):
-            await self.server._answer_assistant("vault-1", request_id, "ещё раз")
+        # A second device losing the race is the normal outcome, not a 404 in the device log.
+        again = await self.server._answer_assistant("vault-1", request_id, "ещё раз")
+        self.assertEqual(again, {"delivered": False, "reason": "already"})
+        self.assertEqual(self.bot.sent[-1], ("chat-a", "ответ"))
+
+    async def test_question_text_never_survives_the_answer(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "секретный вопрос")
+        await self.server._answer_assistant("vault-1", request_id, "ответ")
+        self.assertEqual(self.db.get_assistant_request(request_id)["question"], "")
+
+    async def test_placeholder_is_edited_in_place_instead_of_a_second_message(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True, "minimal")
+        device = FakeDevice("dev-1", "vault-1", server=self.server)
+        self.server.rooms["room-1"] = {device}
+        await self.server._bot_question("chat-a", "что по задачам?", 501)
+        self.assertIn("передал", self.bot.sent[-1][1])
+        self.assertEqual(len(device.questions()), 1)
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.assertEqual(request["mode"], "minimal")
+        self.assertEqual(request["question_message_id"], 501)
+        self.assertIsNotNone(request["placeholder_message_id"])
+        sends_before = len(self.bot.sent)
+        await self.server._answer_assistant("vault-1", request["id"], "на связи")
+        self.assertEqual(self.bot.edits[-1][1], request["placeholder_message_id"])
+        self.assertEqual(len(self.bot.sent), sends_before)
+
+    async def test_probe_gives_the_question_to_the_fastest_device(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        slow = FakeDevice("dev-slow", "vault-1", server=self.server, delay=0.05)
+        fast = FakeDevice("dev-fast", "vault-1", server=self.server)
+        self.server.rooms["room-1"] = {slow, fast}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        self.assertEqual(len(fast.questions()), 1)
+        self.assertEqual(slow.questions(), [])
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+
+    async def test_probe_skips_a_socket_that_never_answers(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        asleep = FakeDevice("dev-asleep", "vault-1", server=self.server, answers=False)
+        awake = FakeDevice("dev-awake", "vault-1", server=self.server, delay=0.02)
+        self.server.rooms["room-1"] = {asleep, awake}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        self.assertEqual(len(awake.questions()), 1)
+        self.assertEqual(asleep.questions(), [])
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+
+    async def test_a_device_without_a_model_does_not_steal_the_turn(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        # Faster, but it has no key and no lease: its answer would be the bare task summary.
+        blind = FakeDevice("dev-blind", "vault-1", server=self.server, ai_ready=False)
+        able = FakeDevice("dev-able", "vault-1", server=self.server, delay=0.02, ai_ready=True)
+        self.server.rooms["room-1"] = {blind, able}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        self.assertEqual(len(able.questions()), 1)
+        self.assertEqual(blind.questions(), [])
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+
+    async def test_one_device_is_not_an_election(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        only = FakeDevice("dev-1", "vault-1", server=self.server)
+        self.server.rooms["room-1"] = {only}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        self.assertFalse(any('"assistant_probe"' in frame for frame in only.frames))
+        self.assertEqual(len(only.questions()), 1)
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+
+    async def test_no_device_awake_means_no_question_at_all(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True, "risky")
+        asleep_a = FakeDevice("dev-a", "vault-1", server=self.server, answers=False)
+        asleep_b = FakeDevice("dev-b", "vault-1", server=self.server, answers=False)
+        self.server.rooms["room-1"] = {asleep_a, asleep_b}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        self.assertEqual(self.db.pending_assistant_requests("vault-1", time.time()), [])
+        self.assertIn("не в сети", self.bot.sent[-1][1])
+
+    async def test_question_falls_back_to_a_fresh_message_when_the_placeholder_dies(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "вопрос")
+        self.db.set_assistant_placeholder(request_id, 77)
+        self.bot.failure = {"ok": False, "error_code": 400, "description": "message to edit not found"}
+        result = await self.server._answer_assistant("vault-1", request_id, "ответ")
+        self.assertFalse(result["delivered"])
+
+    async def test_pending_lists_what_a_reconnecting_device_missed(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True, "risky")
+        live = self.db.create_assistant_request("vault-1", "tok-a", "первый", mode="risky")
+        self.db.create_assistant_request("vault-1", "tok-a", "второй")
+        await self.server._answer_assistant("vault-1", live, "ответ")
+        pending = self.db.pending_assistant_requests("vault-1", time.time())
+        self.assertEqual([row["question"] for row in pending], ["второй"])
+        self.assertEqual(pending[0]["mode"], "minimal")
+
+    async def test_expiry_rewrites_the_placeholder_and_names_the_retry(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "вопрос")
+        self.db.set_assistant_placeholder(request_id, 88)
+        with self.db.conn:
+            self.db.conn.execute("UPDATE assistant_requests SET expires_at = ? WHERE id = ?",
+                                 (time.time() - 1, request_id))
+        await self.server._expire_assistant_requests()
+        self.assertEqual(self.bot.edits[-1][:2], ("chat-a", 88))
+        self.assertIn("не ответило", self.bot.edits[-1][2])
+        self.assertIn("ещё раз", self.bot.edits[-1][2])
 
     async def test_answer_from_another_vault_is_refused(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
@@ -347,7 +526,7 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         with self.db.conn:
             self.db.conn.execute("UPDATE assistant_requests SET expires_at = ? WHERE id = ?",
                                  (time.time() - 1, request_id))
-        await self.server._deliver_notifications()
+        await self.server._expire_assistant_requests()
         self.assertIn("не ответило", self.bot.sent[-1][1])
         self.assertIsNotNone(self.db.get_assistant_request(request_id)["answered_at"])
 
