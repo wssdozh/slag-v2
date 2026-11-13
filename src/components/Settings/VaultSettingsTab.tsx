@@ -11,6 +11,7 @@ import {
   SettingsRow,
   SettingsSwitch,
 } from './SettingsUI';
+import { StorageUsageSection } from './StorageUsageSection';
 
 export const VaultSettingsTab: React.FC = () => {
   const {
@@ -125,6 +126,8 @@ export const VaultSettingsTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-3">
+      <StorageUsageSection />
+
       <SettingsGroup title="Резервное копирование">
         <SettingsRow
           label="Автобэкап раз в сутки"
