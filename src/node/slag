@@ -1,0 +1,9 @@
+#!/bin/sh
+# The whole node behind one word. Resolves its own real path so /usr/local/bin/slag works too.
+self=$(readlink -f "$0")
+dir=$(dirname "$self")
+if [ -f "$dir/relay-url" ]; then
+  SLAG_RELAY_URL=$(cat "$dir/relay-url")
+  export SLAG_RELAY_URL
+fi
+SLAG_SELF="slag" exec "$dir/node" "$dir/index.js" "$@"

@@ -7,17 +7,18 @@ Wants=network-online.target
 [Service]
 Type=simple
 # %h because the node runs as a user unit: no root, no system-wide paths.
-ExecStart=%h/.local/bin/node %h/slag-node/index.js run
+ExecStart=%h/slag-node/slag run
 WorkingDirectory=%h/slag-node
 Environment=SLAG_VAULT_DIR=%h/vaults/slag
 Environment=NODE_OPTIONS=--max-old-space-size=384
 Restart=always
-RestartSec=5
+RestartSec=15
 # The ledgers are debounced; SIGTERM flushes them.
 KillSignal=SIGTERM
 TimeoutStopSec=15
-StandardOutput=journal
-StandardError=journal
+# journald on a pi without persistent storage keeps nothing; a file is what stays readable.
+StandardOutput=append:%h/slag-node/node.log
+StandardError=inherit
 
 [Install]
 WantedBy=default.target
