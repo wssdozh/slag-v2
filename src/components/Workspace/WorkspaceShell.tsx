@@ -20,7 +20,7 @@ import { LogViewer } from '../Logs/LogViewer';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { WindowControls } from '../UI/WindowControls';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { isDesktopApp } from '../../lib/platform/windowControls';
+import { isDesktopApp, startDraggingWindow } from '../../lib/platform/windowControls';
 import { useDockPanels } from './useDockPanels';
 import { syncAllGroupConstraints } from './dockPanelUtils';
 import { useCrossWindowDnd } from './useCrossWindowDnd';
@@ -198,9 +198,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         target?.closest('.dv-void-container') &&
         !target?.closest('.dv-tab, .dv-tabs-container, button, input, .dv-right-actions-container, .dv-default-tab-action')
       ) {
-        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-          getCurrentWindow().startDragging();
-        }).catch(() => {});
+        void startDraggingWindow();
       }
     };
 
