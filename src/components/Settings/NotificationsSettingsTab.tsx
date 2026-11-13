@@ -16,9 +16,9 @@ import type { NotifyPrefs, NotifyRoute } from '../../types';
 import { SettingsDivider, SettingsGroup, SettingsInput, SettingsRow, SettingsSwitch } from './SettingsUI';
 
 const ROUTE_STATE_LABEL: Record<NotifyRoute['state'], string> = {
-  pending: 'ждёт подтверждения в боте',
-  active: 'канал активен',
-  blocked: 'человек отключил бота',
+  pending: 'ждёт подтверждения',
+  active: 'активен',
+  blocked: 'заблокирован',
 };
 
 function currentVaultId(): string {
@@ -97,7 +97,6 @@ export const NotificationsSettingsTab: React.FC = () => {
       >
         <SettingsRow
           label="Добавить получателя"
-          description="Человек сам подтверждает канал в боте: пока код не отправлен боту, напоминания никуда не уходят."
           right={
             <button
               type="button"
@@ -114,7 +113,7 @@ export const NotificationsSettingsTab: React.FC = () => {
             <SettingsDivider />
             <SettingsRow
               label={<span className="font-mono text-xs text-fg-primary select-all break-all">{invite.code}</span>}
-              description="Код одноразовый и живёт 10 минут. Отправь его боту командой /start или открой ссылку."
+              description="Одноразовый, 10 минут"
               right={
                 invite.link ? (
                   <a href={invite.link} target="_blank" rel="noreferrer" className="text-2xs text-accent hover:underline">
@@ -149,19 +148,18 @@ export const NotificationsSettingsTab: React.FC = () => {
       <SettingsGroup title="Что приходит">
         <SettingsRow
           label="Напоминания задач"
-          description="Точно ко времени из задачи. Если оно попадает в тихие часы — придёт к их концу."
           right={<SettingsSwitch label="Напоминания задач" checked={prefs.tasks} onChange={(value) => patchPrefs({ tasks: value })} />}
         />
         <SettingsDivider />
         <SettingsRow
           label="Просроченные задачи"
-          description="Одно сообщение в 10:00 по каждой задаче с прошедшим сроком, пока её не закроют."
+          description="Раз в день в 10:00, пока не закрыта"
           right={<SettingsSwitch label="Просроченные задачи" checked={prefs.overdue} onChange={(value) => patchPrefs({ overdue: value })} />}
         />
         <SettingsDivider />
         <SettingsRow
-          label="Что уходит в сообщении"
-          description="Заголовок и первые ~200 символов. Текст видит релей в момент отправки — шифровать его там некому; полный текст остаётся в хранилище."
+          label="В сообщении"
+          description="Заголовок и первые ~200 символов: релей видит их при отправке"
         />
       </SettingsGroup>
 
@@ -179,19 +177,15 @@ export const NotificationsSettingsTab: React.FC = () => {
           value={prefs.quietTo}
           onChange={(value) => patchPrefs({ quietTo: value })}
           placeholder="08:00"
+          description="Если попадёт в окно — уедет на его конец"
           mono
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="Окно переносится, а не теряется"
-          description="Напоминание из тихих часов уедет на их конец, а не пропадёт. Одинаковое время в обоих полях выключает окно."
         />
       </SettingsGroup>
 
       <SettingsGroup title="Ассистент в telegram" action={<span className="text-2xs font-mono text-fg-dim">опытное</span>}>
         <SettingsRow
           label="Отвечать на вопросы из бота"
-          description="Пишешь боту обычным сообщением — вопрос уходит на устройство, где открыто приложение, и ответ возвращается в чат. Релей сам не отвечает: модели у него нет."
+          description="Вопрос уходит на устройство с открытым приложением"
           right={
             <SettingsSwitch
               label="Отвечать на вопросы из бота"
@@ -200,14 +194,6 @@ export const NotificationsSettingsTab: React.FC = () => {
               onChange={(value) => void handleAssistant(value)}
             />
           }
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="Нужно живое устройство"
-          description={activeRoutes.length
-            ? 'Если ни одного устройства нет в сети, бот честно скажет об этом через две минуты.'
-            : 'Сначала подключи канал: без подтверждённого чата спрашивать некого.'}
-          value={activeRoutes.length ? undefined : 'нет канала'}
         />
       </SettingsGroup>
     </div>
