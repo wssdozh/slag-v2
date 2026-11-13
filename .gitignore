@@ -65,6 +65,7 @@ design-assets/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 relay/data/
 
 # Tooling & temporary

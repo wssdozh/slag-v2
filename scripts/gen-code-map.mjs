@@ -8,14 +8,14 @@ import { join, relative, dirname, resolve, sep } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const OUT = join(ROOT, 'docs', 'CODE_MAP.md');
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', 'target', 'test-results']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', 'target', 'test-results', '__pycache__']);
 
 function walk(dir, acc = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) walk(full, acc);
-    else if (/\.(ts|tsx)$/.test(entry.name)) acc.push(full);
+    else if (/\.(ts|tsx|py)$/.test(entry.name)) acc.push(full);
   }
   return acc;
 }
@@ -49,7 +49,8 @@ const NAME_RE =
 const LIST_RE = /export\s*(?:type\s*)?\{([^}]*)\}/g;
 const STAR_RE = /export\s*\*\s*from\s*['"]([^'"]+)['"]/g;
 
-function exportsOf(source) {
+function exportsOf(source, file) {
+  if (isPython(file)) return pythonExportsOf(source);
   const names = new Set();
   for (const m of source.matchAll(NAME_RE)) names.add(m[1]);
   for (const m of source.matchAll(LIST_RE)) {
@@ -60,6 +61,50 @@ function exportsOf(source) {
   }
   for (const m of source.matchAll(STAR_RE)) names.add(`* from ${m[1]}`);
   return [...names];
+}
+
+// --- python ----------------------------------------------------------------
+// `relay/` is a flat set of scripts, not a package: the only intra-repo import form is
+// `from server import X`, and only the probes use it. Tests and smokes are real files
+// and get their row, but counting them as importers would make `server.py` look like a
+// library with consumers instead of the process entry point it is — hence the exclusion
+// in the consumer loop below.
+
+const isPython = (file) => file.endsWith('.py');
+const isPythonFixture = (file) => /(?:^|[\\/])(?:test_.*|[^\\/]*_smoke)\.py$/.test(file);
+
+const PY_EXPORT_RE = /^(?:def|class)\s+([A-Za-z_]\w*)/gm;
+const PY_CONST_RE = /^([A-Z][A-Z0-9_]{2,})\s*=/gm;
+
+function pythonExportsOf(source) {
+  const names = [];
+  for (const m of source.matchAll(PY_EXPORT_RE)) names.push(m[1]);
+  // Constants go after the callables so the visible five are functions; the +N counter
+  // swallows the tuning knobs (`NOTIFY_*`, `RATE_LIMIT_*`), which is what a reader wants.
+  for (const m of source.matchAll(PY_CONST_RE)) names.push(m[1]);
+  return names;
+}
+
+// `import x`, `from x import y`, `from x import (y,\n z)`. Relative dots are dropped and a
+// dotted path keeps its last segment (`from .tg import send` → `tg`). Relative imports are
+// unusual here (flat scripts), they are handled so the count does not just read zero.
+const PY_IMPORT_RE =
+  /^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]+(\([^)]*\)|[^\n#]+)|^[ \t]*import[ \t]+([^\n#]+)/gm;
+
+function pythonImportsOf(source) {
+  const out = [];
+  for (const m of source.matchAll(PY_IMPORT_RE)) {
+    if (m[1]) {
+      const clean = m[1].replace(/^\.+/, '');
+      if (clean) out.push(clean.split('.').pop());
+      continue;
+    }
+    for (const part of m[3].split(',')) {
+      const name = part.trim().split(/\s+as\s+/)[0].trim();
+      if (/^[A-Za-z_]\w*$/.test(name)) out.push(name);
+    }
+  }
+  return out;
 }
 
 const clip = (text) => (text.length > 78 ? `${text.slice(0, 77)}…` : text);
@@ -81,7 +126,8 @@ function docLine(block) {
 
 // Two places carry a module's one-liner: a header comment above the imports, and the doc
 // comment sitting right on top of the first export. Most files here use the second.
-function purposeOf(source) {
+function purposeOf(source, file) {
+  if (isPython(file)) return pythonPurposeOf(source);
   const lines = source.split(/\r?\n/);
   for (const line of lines.slice(0, 40)) {
     const trimmed = line.trim();
@@ -99,21 +145,47 @@ function purposeOf(source) {
   return '';
 }
 
+// Python puts the same one-liner in the module docstring, often after a shebang. Only the
+// first sentence-ish line is used; the rest of the block is prose, not a map cell.
+function pythonPurposeOf(source) {
+  const head = source.split(/\r?\n/).slice(0, 20);
+  const at = head.findIndex((line) => /^\s*(?:"""|''')/.test(line));
+  if (at === -1) return '';
+  const block = source.slice(source.indexOf(head[at]));
+  const match = block.match(/^(?:"""|''')([\s\S]*?)(?:"""|''')/);
+  if (!match) return '';
+  const line = match[1]
+    .split(/\r?\n/)
+    .map((part) => part.trim())
+    .find(Boolean);
+  return line ? clip(line) : '';
+}
+
 // --- collect ---------------------------------------------------------------
 
-const files = [...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'e2e'))].sort();
+const files = [
+  ...walk(join(ROOT, 'src')),
+  ...walk(join(ROOT, 'e2e')),
+  ...walk(join(ROOT, 'relay')),
+].sort();
 
 // --- where <symbol> ---------------------------------------------------------
-// Same walk, no index file: 331 files parse in well under a second, and a cache
+// Same walk, no index file: every file parses in well under a second, and a cache
 // would only go stale.
 
 const DEFINITION = /^\s*export\s+(?:default\s+)?(?:async\s+)?(?:function|const|let|var|class|interface|type|enum)\s+/;
+const PY_DEFINITION = /^(?:def|class)\s+[A-Za-z_]\w*/;
 
 // A named import list can span lines (`import {\n  a,\n  b,\n} from './x'`). Matching the
 // symbol against one line reported zero importers for exactly the long lists that matter.
 const IMPORT_BLOCK_RE = /(?:^|\n)[ \t]*(?:import|export)[ \t]+(?:type[ \t]+)?\{([^}]*)\}[ \t]*from[ \t]*['"]([^'"]+)['"]/g;
 
-function importSites(source, name) {
+// `from server import (\n  A,\n  B,\n)` — the same idea for python, one regex for both the
+// parenthesized and the single-line form.
+const PY_IMPORT_SYMBOLS_RE = /^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]+(\([^)]*\)|[^\n#]+)/gm;
+
+function importSites(source, name, file) {
+  if (isPython(file)) return pythonImportSites(source, name);
   const sites = [];
   for (const match of source.matchAll(IMPORT_BLOCK_RE)) {
     const listStart = match.index + match[0].indexOf('{') + 1;
@@ -127,6 +199,19 @@ function importSites(source, name) {
   return sites;
 }
 
+function pythonImportSites(source, name) {
+  const sites = [];
+  for (const match of source.matchAll(PY_IMPORT_SYMBOLS_RE)) {
+    for (const piece of match[2].replace(/[()]/g, ' ').split(',')) {
+      const [original, local] = piece.split(/\s+as\s+/).map((part) => part.trim());
+      if (!original || (original !== name && local !== name)) continue;
+      const at = match.index + match[0].indexOf(piece.trim());
+      sites.push(source.slice(0, at).split('\n').length);
+    }
+  }
+  return sites;
+}
+
 if (process.argv[2] === 'where') {
   const name = process.argv[3];
   if (!name) {
@@ -134,7 +219,9 @@ if (process.argv[2] === 'where') {
     process.exit(1);
   }
 
-  const word = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const word = new RegExp(`\\b${escaped}\\b`);
+  const pyConstDef = new RegExp(`^${escaped}\\s*=`);
   const defs = [];
   const uses = [];
 
@@ -142,15 +229,18 @@ if (process.argv[2] === 'where') {
     const source = readFileSync(file, 'utf8');
     source.split(/\r?\n/).forEach((line, index) => {
       if (!line.includes(name) || !word.test(line)) return;
-      if (DEFINITION.test(line)) defs.push(`${rel(file)}:${index + 1}`);
+      const isDef = isPython(file)
+        ? PY_DEFINITION.test(line) || pyConstDef.test(line)
+        : DEFINITION.test(line);
+      if (isDef) defs.push(`${rel(file)}:${index + 1}`);
     });
-    for (const line of importSites(source, name)) uses.push(`${rel(file)}:${line}`);
+    for (const line of importSites(source, name, file)) uses.push(`${rel(file)}:${line}`);
   }
 
   if (!defs.length && !uses.length) {
     const near = new Set();
     for (const file of files) {
-      for (const exported of exportsOf(readFileSync(file, 'utf8'))) {
+      for (const exported of exportsOf(readFileSync(file, 'utf8'), file)) {
         if (exported.toLowerCase().includes(name.toLowerCase())) near.add(exported);
       }
     }
@@ -172,14 +262,27 @@ for (const file of files) {
   modules.set(file, {
     path: rel(file),
     lines: source.split(/\r?\n/).length,
-    exports: exportsOf(source),
-    purpose: purposeOf(source),
+    exports: exportsOf(source, file),
+    purpose: purposeOf(source, file),
     consumers: 0,
   });
 }
 
 for (const file of files) {
   const source = readFileSync(file, 'utf8');
+  if (isPython(file)) {
+    // Probes import `server` too; excluding them here is the whole point — otherwise the
+    // entry point looks like a library with four consumers (see the comment up top). One
+    // file importing the same module twice counts once: the column is "who imports it".
+    if (isPythonFixture(file)) continue;
+    for (const mod of new Set(pythonImportsOf(source))) {
+      const target = [join(dirname(file), `${mod}.py`), join(ROOT, 'relay', `${mod}.py`)].find(
+        (candidate) => modules.has(candidate) && candidate !== file,
+      );
+      if (target) modules.get(target).consumers += 1;
+    }
+    continue;
+  }
   for (const spec of importsOf(source)) {
     const target = resolveSpec(spec, file);
     if (target && modules.has(target) && target !== file) modules.get(target).consumers += 1;

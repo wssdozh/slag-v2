@@ -19,6 +19,7 @@
 - Трогал `src/components/**` или `src/*.css`: `npx playwright test`, скриншот в `test-results/screenshots/`, показать в ответе `![Результат](<test-results/screenshots/…>)`.
 - Синк- и аудио-спеки (`sync_*.spec.ts`, `*audio*.spec.ts`) чувствительны к нагрузке: в первых 120-мс буфер импорта и замеры «сколько пушей успело», во вторых — реальное воспроизведение и позиция плейхеда. На шести воркерах флакуют, на одном зелёные. Гоняй их `PLAYWRIGHT_WORKERS=1`; остальную пачку можно параллельно.
 - Трогал `src-tauri/`: `npm run build:android`. Есть устройство в `adb devices` — поставить, запустить, снять `adb exec-out screencap -p`, проверить `read_image`.
+- Трогал `relay/**`: `python -m pytest relay/`.
 - Коммит — Conventional Commits на английском, по одной задаче.
 
 ## 3. По зонам
@@ -49,13 +50,14 @@ src/
                 platform/ (tauri, окна, проводник), text/ (markdown, дифф, размеры),
                 tasks/ (чекбоксы, завершение), storage/ (диск, реестр, папки, корзина),
                 sync/ (relay: движок, конфиг, сокет), vault/ (модель), time/ (даты),
-                media/ (вложения и аудио), остальное плоско
+                media/ (вложения и аудио), notify/ (prefs — настройки канала, quiet — тихие
+                часы, plan — напоминания, assistant — ответ из telegram), остальное плоско
   types/        доменные типы
   mcp/          MCP-сервер, собирается отдельным конфигом
   styles/       theme.css — токены
 src-tauri/      Rust: десктоп и Android
 e2e/            Playwright: slag/ по зонам + support/
-relay/          сервер синхронизации
+relay/          синхронизация и telegram-бот в одном процессе: сервер, очередь уведомлений, запросы ассистента
 scripts/        инструменты репозитория: gen-code-map.mjs (карта и `where`), иконки Android
 docs/project-map/  база знаний проекта, 15 документов
 ```
@@ -67,6 +69,9 @@ docs/project-map/  база знаний проекта, 15 документов
 | синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `syncSocket.ts`, `applyBundle.ts`, `pushBundle.ts` |
 | конфиг синка, авторизация, сид-фраза | `src/lib/sync/syncConfig.ts` |
 | экран синка, аккаунт, устройства | `src/components/Settings/`, `src/lib/sync/account.ts` |
+| уведомления и напоминания | `src/lib/notify/`, `src/context/hooks/useNotifyArm.ts` |
+| telegram-бот: канал, приглашение, доставка | `relay/server.py`, `relay/DEPLOYMENT.md`, `src/lib/notify/prefs.ts` |
+| вопрос из бота: режимы и ответ | `src/lib/notify/assistant.ts`, `src/lib/ai/orchestrator.ts`, `relay/server.py` |
 | лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx` |
 | композер, создание и сохранение записи | `src/components/Feed/Composer.tsx`, `src/lib/vault/markdownSerializer.ts` |
 | запись: создать, изменить, удалить, восстановить, переместить | `src/context/hooks/useItemWrites.ts` |

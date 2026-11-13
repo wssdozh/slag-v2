@@ -26,6 +26,7 @@ src/
     Feed/composer/    стрип вложений, тип, ИИ, запись, отправка, резолвер полей
     Editor/fullscreen/ вложения, инлайн-ИИ, строка свойств таски
     Settings/devices/  список, карточка, права, действия, pairing
+    Settings/notifications/ канал, контент, тихие часы, ассистент в telegram
     Mobile/calendar/   строка задачи, шапка, стрип недели, группы дней, трёхдневка, лист месяца
     Audio/panel/       обложка, скраббер, транспорт, плейлист, playback
     UI/menu/           наборы пунктов контекстного меню и подменю
@@ -47,6 +48,7 @@ src/
     vault/          модель записи: schema, updates, markdown serializer, filename, vaultDisplay, demo
     time/           даты, recurrence, Todoist-парсер, раскладка календаря
     media/          attachments enrichment, audio, bytecode, file drop, blobToDataUrl
+    notify/         prefs, quiet, plan, assistant: канал и настройки, тихие часы, напоминания, ответ из бота
   mcp/              MCP-сервер, отдельная сборка
   styles/           theme.css — токены
   types/            доменные типы
@@ -66,6 +68,7 @@ scripts/            инструменты репозитория: gen-code-map.
 | транспорт, бандлы, устройства, ключи | `lib/sync/` |
 | сериализация записи, frontmatter, имя файла | `lib/vault/` |
 | даты, повторения, разбор срока, сетка календаря | `lib/time/` |
+| уведомления, напоминания, тихие часы, ответ из telegram | `lib/notify/` |
 | вложения, аудио, file drop | `lib/media/` |
 | логи и редактирование секретов | `lib/logger/` |
 | окна, Tauri, проводник, платформа | `lib/platform/` |
