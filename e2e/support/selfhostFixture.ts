@@ -5,7 +5,14 @@ const serverUrl = 'http://127.0.0.1:18321';
 export const test = base.extend({
   page: async ({ page }, provide) => {
     await page.addInitScript((url) => {
-      const config = { enabled: false, serverUrl: url, autoSync: false };
+      const config = {
+        enabled: false,
+        serverUrl: url,
+        autoSync: false,
+        // Stable per-test vault key: the app migrates it into the encrypted secret store on
+        // boot, and sync specs that build a second engine need the same seed afterward.
+        seedPhrase: 'abandon ability able about above absent absorb abstract absurd abuse access accident',
+      };
       localStorage.setItem('slag_sync_config_v2', JSON.stringify(config));
       localStorage.setItem('slag_sync_config_v2_default_vault', JSON.stringify(config));
     }, serverUrl);

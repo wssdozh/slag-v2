@@ -9,6 +9,7 @@ import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markd
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/tasks/taskUtils';
 
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
+import { isSafeVaultRelativePath, safeVaultRelativePath } from '../lib/vault/safePath';
 import { DEFAULT_INBOX_FOLDER } from '../config';
 export { getSafeNoteFilename } from '../lib/vault/noteFilename';
 
@@ -78,7 +79,9 @@ export class McpVault {
 
   public async getFolders(): Promise<FolderMeta[]> {
     const state = await this.readState();
-    const stateFolders = Array.isArray(state.folders) ? state.folders : [];
+    const stateFolders = (Array.isArray(state.folders) ? state.folders : [])
+      .filter((folder): folder is FolderMeta =>
+        Boolean(folder) && typeof folder.path === 'string' && isSafeVaultRelativePath(folder.path));
     const knownPaths = new Set(stateFolders.map(f => f.path.replace(/\\/g, '/')));
 
     // Discover any disk folders missing from state.json
@@ -128,7 +131,7 @@ export class McpVault {
   }
 
   public async createFolder(folderPath: string, description?: string, icon?: string): Promise<FolderMeta> {
-    const norm = folderPath.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    const norm = safeVaultRelativePath(folderPath);
     const absPath = path.join(this.config.notesDir, norm);
     await fs.mkdir(absPath, { recursive: true });
 
@@ -248,7 +251,7 @@ export class McpVault {
     reminder?: string;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
-    const targetFolder = (params.folder || DEFAULT_INBOX_FOLDER).trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    const targetFolder = safeVaultRelativePath(params.folder || DEFAULT_INBOX_FOLDER);
     let existingMatch: NoteMatch | null = null;
 
     if (params.id) {

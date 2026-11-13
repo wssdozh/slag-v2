@@ -12,6 +12,7 @@ import {
 } from '@tauri-apps/plugin-fs';
 import { idbSaveAttachment, idbGetAttachment } from './indexedDb';
 import { blobToDataUrl } from '../media/blobToDataUrl';
+import { isSafeVaultRelativePath } from '../vault/safePath';
 
 /**
  * The bytes of attachments, and only them.
@@ -48,7 +49,8 @@ export class AttachmentStore {
 
   private basename(att: SlagAttachment): string {
     const parts = att.relativePath.split(/[\\/]/);
-    return parts[parts.length - 1] || att.id;
+    const candidate = parts[parts.length - 1] || '';
+    return isSafeVaultRelativePath(candidate) ? candidate : (isSafeVaultRelativePath(att.id) ? att.id : 'attachment');
   }
 
   /**
@@ -58,7 +60,9 @@ export class AttachmentStore {
    * write `relativePath` from the id at persist time and never regenerate an id after that.
    */
   private async pathFor(id: string, relativePath: string): Promise<string | undefined> {
-    const basename = relativePath.split(/[\\/]/).pop() || id;
+    const parts = relativePath.split(/[\\/]/);
+    const raw = parts[parts.length - 1] || '';
+    const basename = isSafeVaultRelativePath(raw) ? raw : (isSafeVaultRelativePath(id) ? id : 'attachment');
     const dir = this.attachmentsDir();
     if (await exists(`${dir}/${basename}`, { baseDir: BaseDirectory.AppData })) return `${dir}/${basename}`;
 

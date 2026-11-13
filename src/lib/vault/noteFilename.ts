@@ -1,12 +1,27 @@
 // ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; срез до 60 символов
-export function getSafeNoteFilename(title?: string, fallbackId: string = 'untitled'): string {
-  const clean = (title || '')
-    .trim()
-    .replace(/[\\/:*?"<>|\r\n\t]/g, ' ')
+const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+
+/** Empty when nothing safe is left, so the caller can fall back to the id. */
+function cleanStem(value: string): string {
+  const withoutControls = Array.from(value, (char) => {
+    const code = char.codePointAt(0) ?? 0;
+    return code < 32 || code === 127 ? ' ' : char;
+  }).join('');
+  const clean = withoutControls
+    .replace(/[\\/:*?"<>|]/g, ' ')
     .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '')
+    .slice(0, 60)
     .trim();
-  const safe = clean.slice(0, 60).trim();
-  return `${safe || fallbackId}.md`;
+  if (!clean || clean === '.' || clean === '..') return '';
+  // CON.md is still the console device on Windows, so the stem itself has to move.
+  return WINDOWS_RESERVED.test(clean) ? `_${clean}` : clean;
+}
+
+export function getSafeNoteFilename(title?: string, fallbackId: string = 'untitled'): string {
+  const safe = cleanStem(title || '') || cleanStem(fallbackId) || 'untitled';
+  return `${safe}.md`;
 }
 
 /**

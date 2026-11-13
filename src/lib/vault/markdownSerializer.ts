@@ -2,6 +2,7 @@ import YAML from 'yaml';
 import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
 import { parseSubtasksFromContent } from '../tasks/taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { isSafeVaultRelativePath, safeVaultRelativePath } from './safePath';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
@@ -95,11 +96,13 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
     }
   }
 
-  const id = frontmatter.id || fallbackId;
+  const id = typeof frontmatter.id === 'string' && isSafeVaultRelativePath(frontmatter.id)
+    ? frontmatter.id
+    : fallbackId;
   const type: SlagItemType = (['note', 'article', 'task'].includes(frontmatter.type) ? frontmatter.type : 'note') as SlagItemType;
   
   // Title fallback: from frontmatter -> from first # Heading -> first line -> Untitled
-  let title = frontmatter.title;
+  let title = typeof frontmatter.title === 'string' ? frontmatter.title.trim() : '';
   if (!title) {
     const headingMatch = body.match(/^#\s+(.+)$/m);
     if (headingMatch) {
@@ -127,13 +130,17 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
     type,
     title,
     content: body.trim(),
-    folder: frontmatter.folder || fallbackFolder,
+    folder: typeof frontmatter.folder === 'string' && isSafeVaultRelativePath(frontmatter.folder)
+      ? frontmatter.folder
+      : (isSafeVaultRelativePath(fallbackFolder) ? safeVaultRelativePath(fallbackFolder) : DEFAULT_INBOX_FOLDER),
     tags: allTags,
     attachments: Array.isArray(frontmatter.attachments)
       // Anything written by an older build that did persist a running job: nobody is running
       // it, so the spinner would spin forever. Only `ready` and `error` survive a reload.
-      ? frontmatter.attachments.map((att: SlagAttachment) =>
-        att.enrichmentStatus === 'processing' ? { ...att, enrichmentStatus: 'idle' as const } : att)
+      ? frontmatter.attachments
+        .filter((att: unknown): att is SlagAttachment => typeof att === 'object' && att !== null)
+        .map((att: SlagAttachment) =>
+          att.enrichmentStatus === 'processing' ? { ...att, enrichmentStatus: 'idle' as const } : att)
       : [],
     createdAt: Number(frontmatter.created) || Date.now(),
     updatedAt: Number(frontmatter.updated) || Date.now(),

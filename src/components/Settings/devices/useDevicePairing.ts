@@ -256,7 +256,7 @@ export function useDevicePairing({ config, hosted, locked, accountDevices }: Use
       } else {
         const receivedSeed = parsed.seedPhrase || rawPayload;
         if (!validateMnemonic(receivedSeed)) throw new Error('Получен некорректный ключ хранилища');
-        syncEngine.setVaultSeedPhrase(parsed.vaultId, receivedSeed);
+        await syncEngine.setVaultSeedPhrase(parsed.vaultId, receivedSeed);
         const existing = storage.getVaults().find((vault) => vault.id === parsed.vaultId);
         if (existing) switchVault(existing.id);
         else {

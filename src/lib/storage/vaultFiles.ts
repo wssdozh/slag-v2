@@ -14,6 +14,7 @@ import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownS
 import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
 import { idbSaveAttachment } from './indexedDb';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
+import { isSafeVaultRelativePath, safeVaultRelativePath } from '../vault/safePath';
 import type { AttachmentStore } from './attachments';
 
 const fsLog = logger.scope('FS');
@@ -350,19 +351,22 @@ export class VaultFiles {
     if (!isTauri()) return;
     try {
       const notesBase = this.getVaultNotesPath(vault);
-      const folder = item.folder || DEFAULT_INBOX_FOLDER;
+      const folder = safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER);
       const targetDir = `${notesBase}/${folder}`;
       await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
 
-      const newFilename = this.claimNoteFilename(item, folder);
+      const newFilename = safeVaultRelativePath(this.claimNoteFilename(item, folder));
+      if (newFilename.includes('/')) throw new Error('Invalid note filename');
       item.filename = newFilename;
       const newPath = `${targetDir}/${newFilename}`;
 
-      const prevFolder = oldFolder || folder;
-      const prevFilename = oldFilename || newFilename;
+      const prevFolder = oldFolder ? safeVaultRelativePath(oldFolder) : folder;
+      const prevFilename = oldFilename ? safeVaultRelativePath(oldFilename) : newFilename;
+      if (prevFilename.includes('/')) throw new Error('Invalid previous note filename');
+      const safeId = isSafeVaultRelativePath(item.id) ? item.id : null;
       const oldPath = `${notesBase}/${prevFolder}/${prevFilename}`;
-      const legacyOldPath = `${notesBase}/${prevFolder}/${item.id}.md`;
-      const legacyTargetPath = `${targetDir}/${item.id}.md`;
+      const legacyOldPath = safeId ? `${notesBase}/${prevFolder}/${safeId}.md` : '';
+      const legacyTargetPath = safeId ? `${targetDir}/${safeId}.md` : '';
 
       // Write the replacement before removing the previous filename.
       const content = serializeItemToMarkdown(item);
@@ -374,10 +378,10 @@ export class VaultFiles {
       if (oldPath !== newPath && !protectedPaths.has(oldPath) && await this.fileBelongsTo(oldPath, item.id)) {
         await remove(oldPath, { baseDir: BaseDirectory.AppData });
       }
-      if (legacyOldPath !== newPath && !protectedPaths.has(legacyOldPath) && await exists(legacyOldPath, { baseDir: BaseDirectory.AppData })) {
+      if (legacyOldPath && legacyOldPath !== newPath && !protectedPaths.has(legacyOldPath) && await exists(legacyOldPath, { baseDir: BaseDirectory.AppData })) {
         await remove(legacyOldPath, { baseDir: BaseDirectory.AppData });
       }
-      if (legacyTargetPath !== newPath && !protectedPaths.has(legacyTargetPath) && await exists(legacyTargetPath, { baseDir: BaseDirectory.AppData })) {
+      if (legacyTargetPath && legacyTargetPath !== newPath && !protectedPaths.has(legacyTargetPath) && await exists(legacyTargetPath, { baseDir: BaseDirectory.AppData })) {
         await remove(legacyTargetPath, { baseDir: BaseDirectory.AppData });
       }
 
@@ -392,14 +396,17 @@ export class VaultFiles {
     try {
       const notesBase = this.getVaultNotesPath(vault);
       const trashBase = this.getVaultTrashPath(vault);
-      const targetFolder = item.folder || DEFAULT_INBOX_FOLDER;
-      const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+      const targetFolder = safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER);
+      const filename = safeVaultRelativePath(item.filename || getSafeNoteFilename(item.title, item.id));
+      if (filename.includes('/')) throw new Error('Invalid note filename');
       const notePath = `${notesBase}/${targetFolder}/${filename}`;
-      const legacyPath = `${notesBase}/${targetFolder}/${item.id}.md`;
+      const legacyPath = isSafeVaultRelativePath(item.id)
+        ? `${notesBase}/${targetFolder}/${item.id}.md`
+        : '';
 
       const pathToRemove = (await exists(notePath, { baseDir: BaseDirectory.AppData }))
         ? notePath
-        : ((await exists(legacyPath, { baseDir: BaseDirectory.AppData })) ? legacyPath : null);
+        : ((legacyPath && await exists(legacyPath, { baseDir: BaseDirectory.AppData })) ? legacyPath : null);
 
       if (pathToRemove) {
         await mkdir(trashBase, { baseDir: BaseDirectory.AppData, recursive: true });
@@ -417,9 +424,11 @@ export class VaultFiles {
     if (!isTauri()) return;
     try {
       const trashBase = this.getVaultTrashPath();
-      const filename = item.filename || getSafeNoteFilename(item.title, item.id);
+      const filename = safeVaultRelativePath(item.filename || getSafeNoteFilename(item.title, item.id));
+      if (filename.includes('/')) throw new Error('Invalid note filename');
+      const safeId = isSafeVaultRelativePath(item.id) ? item.id : null;
       // A copy may sit under the plain name, under the id-suffixed one, or under the old id name.
-      for (const candidate of [filename, withIdSuffix(filename, item.id), `${item.id}.md`]) {
+      for (const candidate of [filename, withIdSuffix(filename, item.id), ...(safeId ? [`${safeId}.md`] : [])]) {
         if (await exists(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData })) {
           await remove(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData });
           break;
@@ -483,8 +492,9 @@ export class VaultFiles {
   public async removeFolderFromDisk(folderPath: string): Promise<void> {
     if (!isTauri() || !folderPath || folderPath === DEFAULT_INBOX_FOLDER) return;
     try {
+      const safeFolder = safeVaultRelativePath(folderPath);
       const notesBase = this.getVaultNotesPath();
-      const targetDir = `${notesBase}/${folderPath}`;
+      const targetDir = `${notesBase}/${safeFolder}`;
       if (await exists(targetDir, { baseDir: BaseDirectory.AppData })) {
         await remove(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
         fsLog.info(`Removed folder directory from disk: ${targetDir}`);

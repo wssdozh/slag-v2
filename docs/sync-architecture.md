@@ -11,6 +11,21 @@
 - **Outbox**: каждое локальное изменение — операция `upsert/delete` с `synced` флагом в durable очереди, а не diff по wall-clock.
 - **Delta**: по сети едут только изменённые объекты, не полный снапшот.
 
+## Секреты at rest
+
+`seedPhrase`, токен аккаунта и private key устройства не сериализуются в `localStorage`.
+Их хранит `src/lib/platform/secretStore.ts`:
+
+| платформа | backend | где лежит |
+|---|---|---|
+| desktop tauri | `keyring` (`src-tauri/src/secure_store.rs`) | Windows Credential Manager / macOS Keychain / Linux Secret Service |
+| web, android | AES-GCM-256 (`encryptedLocalStore.ts`) | шифртекст в `slag_secure_v1:*`; ключ non-extractable в IndexedDB |
+
+`initSecretStore()` выполняется до импорта `App`, переносит старые значения и удаляет
+plaintext только после успешной записи. Конфиг синка (`slag_sync_config_v2*`) больше не
+содержит `seedPhrase`; если существующее хранилище осталось без ключа, sync явно
+блокируется, а не генерирует новый seed. Android Keystore — отдельный follow-up.
+
 ## Entity registry — что синхронизируется
 
 | Entity | Синхр. | `id` | Описание |

@@ -20,6 +20,27 @@ function transformWikiLinks(raw: string): string {
   });
 }
 
+/**
+ * Only the schemes the app actually opens. React-markdown's default transform is close,
+ * but the wiki links need `wiki:` and the identity transform that used to be here let
+ * `javascript:`/`data:` through into an `<a href>` — a one-click XSS from any note.
+ * Control characters are stripped before the scheme check because `java\nscript:` is
+ * normalized by the browser into `javascript:`.
+ */
+function safeMarkdownUrl(url: string): string {
+  const value = (url || '').trim();
+  if (!value) return '';
+  let probe = '';
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code > 32 && code !== 127) probe += char;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(probe)) {
+    return /^(?:https?:|mailto:|wiki:)/i.test(probe) ? value : '';
+  }
+  return value;
+}
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   onWikiLinkClick,
@@ -163,7 +184,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={components}
-          urlTransform={(url) => url}
+          urlTransform={safeMarkdownUrl}
         >
           {transformed}
         </ReactMarkdown>
@@ -176,7 +197,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={components}
-        urlTransform={(url) => url}
+        urlTransform={safeMarkdownUrl}
       >
         {transformed}
       </ReactMarkdown>
