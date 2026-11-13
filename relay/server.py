@@ -57,6 +57,12 @@ NOTIFY_MAX_LEAD_SECONDS = 400 * 86400
 NOTIFY_LEEWAY_SECONDS = 300
 RATE_LIMIT_NOTIFY_ARM = 60
 RATE_LIMIT_NOTIFY_INVITE = 10
+# Asking the assistant from Telegram: the question travels to a device, never to the relay's
+# language model — the relay has none.
+ASSISTANT_REQUEST_TTL_SECONDS = 120
+ASSISTANT_MAX_QUESTION = 1000
+ASSISTANT_MAX_ANSWER = 4000
+RATE_LIMIT_TG_ASK = 10
 NOTIFY_BATCH_SIZE = 50
 NOTIFY_CLAIM_LEASE_SECONDS = 120
 TG_API_BASE = "https://api.telegram.org"
@@ -405,6 +411,25 @@ class RelayDatabase:
                 redeemed_at REAL
             )""")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_notify_invites_vault ON notify_invites(vault_id)")
+            # The assistant channel: an opted-in route can carry a question to a device and an
+            # answer back. This is the only table that ties a route to a vault, and only for
+            # people who switched the feature on.
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS assistant_links (
+                route_token TEXT PRIMARY KEY,
+                vault_id TEXT NOT NULL,
+                enabled_at REAL NOT NULL
+            )""")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_assistant_links_vault ON assistant_links(vault_id)")
+            self.conn.execute("""CREATE TABLE IF NOT EXISTS assistant_requests (
+                id TEXT PRIMARY KEY,
+                vault_id TEXT NOT NULL,
+                route_token TEXT NOT NULL,
+                question TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                answered_at REAL
+            )""")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_assistant_pending ON assistant_requests(expires_at) WHERE answered_at IS NULL")
 
     def record_telemetry(self, event_type: str, platform: str = "unknown", metadata: Optional[dict] = None) -> str:
         event_id = f"evt_{secrets.token_hex(8)}"
@@ -976,6 +1001,42 @@ class RelayDatabase:
                 armed += res.rowcount
         return armed, []
 
+    def set_assistant_link(self, route_token: str, vault_id: str, enabled: bool) -> None:
+        with self.conn:
+            if enabled:
+                self.conn.execute(
+                    "INSERT INTO assistant_links (route_token, vault_id, enabled_at) VALUES (?, ?, ?) "
+                    "ON CONFLICT(route_token) DO UPDATE SET vault_id = excluded.vault_id",
+                    (route_token, vault_id, time.time()))
+            else:
+                self.conn.execute("DELETE FROM assistant_links WHERE route_token = ?", (route_token,))
+
+    def assistant_link(self, route_token: str) -> Optional[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM assistant_links WHERE route_token = ?", (route_token,)).fetchone()
+
+    def create_assistant_request(self, vault_id: str, route_token: str, question: str) -> str:
+        request_id = f"ask_{secrets.token_hex(8)}"
+        now = time.time()
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO assistant_requests (id, vault_id, route_token, question, created_at, expires_at)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (request_id, vault_id, route_token, question, now, now + ASSISTANT_REQUEST_TTL_SECONDS))
+        return request_id
+
+    def get_assistant_request(self, request_id: str) -> Optional[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM assistant_requests WHERE id = ?", (request_id,)).fetchone()
+
+    def finish_assistant_request(self, request_id: str) -> None:
+        with self.conn:
+            self.conn.execute("UPDATE assistant_requests SET answered_at = ? WHERE id = ? AND answered_at IS NULL",
+                              (time.time(), request_id))
+
+    def expired_assistant_requests(self, now: float, limit: int = 20) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM assistant_requests WHERE answered_at IS NULL AND expires_at <= ? LIMIT ?",
+            (now, limit)).fetchall()
+
     def due_notify_jobs(self, now: float, limit: int) -> list[sqlite3.Row]:
         return self.conn.execute(
             "SELECT * FROM notify_jobs WHERE sent_at IS NULL AND fire_at <= ? ORDER BY fire_at LIMIT ?",
@@ -1053,6 +1114,10 @@ class NotifyStore:
 
     def get(self, route_token: str) -> Optional[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM notify_routes WHERE route_token = ?", (route_token,)).fetchone()
+
+    def routes_for_chat(self, chat_id: str) -> list[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM notify_routes WHERE chat_id = ? AND blocked_at IS NULL",
+                                 (chat_id,)).fetchall()
 
     def block_chat(self, chat_id: str) -> int:
         with self.conn:
@@ -2269,6 +2334,34 @@ class SlagRelayServer:
             armed, dropped = self._arm_notifications(body, vault_id)
             return {"armed": armed, "dropped": dropped}, 200
 
+        if method == "POST" and path == "/api/assistant/enable":
+            auth = self._auth(headers)
+            self._require_notify_plan(auth)
+            vault_id = body.get("vaultId", "")
+            route_token = body.get("routeToken", "")
+            enabled = body.get("enabled") is not False
+            if not isinstance(vault_id, str) or not vault_id or not isinstance(route_token, str) or not route_token:
+                raise ApiError(400, "invalid_assistant_link")
+            self._authorize_vault(auth, vault_id, write=True)
+            route = self.notify.get(route_token)
+            if not route or not hmac.compare_digest(route["vault_tag"], self._notify_tag(vault_id)):
+                raise ApiError(404, "route_not_found")
+            self.db.set_assistant_link(route_token, vault_id, enabled)
+            return {"enabled": enabled}, 200
+
+        if method == "POST" and path == "/api/assistant/answer":
+            auth = self._auth(headers)
+            self._require_notify_plan(auth)
+            vault_id = body.get("vaultId", "")
+            request_id = body.get("requestId", "")
+            answer = body.get("answer", "")
+            if (not isinstance(vault_id, str) or not vault_id or not isinstance(request_id, str)
+                    or not request_id or not isinstance(answer, str) or not answer.strip()):
+                raise ApiError(400, "invalid_answer")
+            self._authorize_vault(auth, vault_id, write=True)
+            delivered = await self._answer_assistant(vault_id, request_id, answer)
+            return {"delivered": delivered}, 200
+
         if method == "GET" and path == "/api/vaults":
             auth = self._auth(headers)
             return self.db.list_vaults(auth["account_id"], auth["device_id"]), 200
@@ -2884,7 +2977,11 @@ class SlagRelayServer:
             return
         sender = str((message.get("from") or {}).get("id") or chat_id)
         text = (message.get("text") or "").strip()
+        if not text:
+            return
         if not text.startswith("/"):
+            # Anything that is not a command is a question for the vault's assistant.
+            await self._bot_question(chat_id, text)
             return
         command, _, argument = text.partition(" ")
         command = command.split("@", 1)[0].lower()
@@ -2895,6 +2992,13 @@ class SlagRelayServer:
             return
         if command == "/start":
             await self._bot_start(chat_id, sender, argument.strip(), message)
+            return
+        if command in ("/ask", "/a"):
+            await self._bot_question(chat_id, argument.strip())
+            return
+        if command == "/help":
+            await self._bot_reply(chat_id, "напоминания приходят сами. спросить ассистента можно обычным "
+                                           "сообщением, если устройство с хранилищем в сети. /stop — отписаться.")
 
     async def _bot_start(self, chat_id: str, sender: str, code: str, message: dict) -> None:
         if not code:
@@ -2923,6 +3027,52 @@ class SlagRelayServer:
         source = f"«{vault['name']}»" if vault else "хранилища"
         await self._bot_reply(chat_id, f"готово. напоминания из {source} будут приходить сюда.")
 
+    async def _bot_question(self, chat_id: str, question: str) -> None:
+        """Hands the text to a live device. The relay has no model and never answers itself."""
+        question = question.strip()[:ASSISTANT_MAX_QUESTION]
+        if not question:
+            await self._bot_reply(chat_id, "напиши вопрос текстом или /ask <вопрос>.")
+            return
+        if not self._allow_request(f"tg-ask:{chat_id}", RATE_LIMIT_TG_ASK):
+            await self._bot_reply(chat_id, "слишком часто, подожди минуту.")
+            return
+        linked = [row for row in self.notify.routes_for_chat(chat_id) if self.db.assistant_link(row["route_token"])]
+        if not linked:
+            await self._bot_reply(chat_id, "задавать вопросы отсюда нужно включить: настройки → уведомления → "
+                                           "ассистент в telegram.")
+            return
+        if len(linked) > 1:
+            await self._bot_reply(chat_id, "к чату привязано несколько хранилищ — спроси из приложения, "
+                                           "чтобы не гадать, откуда ответ.")
+            return
+        link = self.db.assistant_link(linked[0]["route_token"])
+        request_id = self.db.create_assistant_request(link["vault_id"], linked[0]["route_token"], question)
+        rooms = self.db.conn.execute("SELECT room_id FROM rooms WHERE vault_id = ? AND retired = 0",
+                                     (link["vault_id"],)).fetchall()
+        if not rooms:
+            self.db.finish_assistant_request(request_id)
+            await self._bot_reply(chat_id, "ни одно устройство с этим хранилищем ещё не подключалось.")
+            return
+        message = json.dumps({"type": "assistant_question", "id": request_id, "question": question})
+        for room in rooms:
+            await self._broadcast_to_room(room["room_id"], message)
+        await self._bot_reply(chat_id, "передал устройству, жду ответ…")
+
+    async def _answer_assistant(self, vault_id: str, request_id: str, answer: str) -> bool:
+        request = self.db.get_assistant_request(request_id)
+        if not request or request["vault_id"] != vault_id or request["answered_at"] is not None:
+            raise ApiError(404, "request_not_found")
+        route = self.notify.get(request["route_token"])
+        if not route or not self.bot:
+            raise ApiError(409, "route_gone")
+        self.db.finish_assistant_request(request_id)
+        ok, body = await self.bot.call("sendMessage", {"chat_id": route["chat_id"],
+                                                       "text": answer.strip()[:ASSISTANT_MAX_ANSWER],
+                                                       "disable_web_page_preview": True}, timeout=20)
+        if not ok:
+            logger.warning("Telegram answer delivery failed: %s", body.get("description"))
+        return ok
+
     async def notify_delivery_loop(self) -> None:
         while True:
             await asyncio.sleep(5)
@@ -2935,6 +3085,12 @@ class SlagRelayServer:
         if not self.bot:
             return
         now = time.time()
+        for request in self.db.expired_assistant_requests(now):
+            self.db.finish_assistant_request(request["id"])
+            route = self.notify.get(request["route_token"])
+            if route:
+                await self._bot_reply(route["chat_id"], "устройство не ответило — видимо, ни одно не в сети.")
+
         for job in self.db.due_notify_jobs(now, NOTIFY_BATCH_SIZE):
             route_token, event_key = job["route_token"], job["event_key"]
             # Late is not the same as wanted: a device that wakes up after a week must not

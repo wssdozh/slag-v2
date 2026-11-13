@@ -218,6 +218,27 @@ week must not dump a backlog), `429` is obeyed via `retry_after`, `403` blocks t
 good, one route gets at most 30 messages per hour regardless of who armed them, and a failed
 send gets exactly one retry.
 
+### asking the assistant from telegram
+
+the relay has no model. a plain message to the bot is forwarded to whatever device has the
+vault open, and the answer comes back the same way:
+
+```
+POST /api/assistant/enable  {vaultId, routeToken, enabled}   # opt-in per channel
+bot: "что по задачам?"        → assistant_requests row → broadcast {type:"assistant_question"}
+device: POST /api/assistant/answer {vaultId, requestId, answer} → relay → sendMessage
+```
+
+both endpoints need a paid plan and a read-write grant; `enable` also requires the route token
+to belong to that vault (same `vault_tag` check as `arm`). a question lives 120 seconds: if no
+device answers by then, the bot says so instead of inventing an answer. `assistant_links` is
+the only table that ties a route back to a vault, and only for people who switched the feature
+on — everything else stays one-way.
+
+this is the seam, not the feature: today the device answers from its own state (counts and the
+next reminder), and the full assistant plugs into `buildAssistantAnswer` in `src/lib/notify.ts`.
+nothing else has to move when it does — the relay only carries the text both ways.
+
 acceptance probe, in this order:
 
 ```sh

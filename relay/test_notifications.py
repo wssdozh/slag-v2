@@ -227,5 +227,44 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.bot.sent, [])
 
 
+    async def test_question_from_bot_needs_an_enabled_route(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        await self.server._bot_question("chat-a", "что по задачам?")
+        self.assertIn("включить", self.bot.sent[-1][1])
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        await self.server._bot_question("chat-a", "что по задачам?")
+        # The relay has no model: without a live device it says so instead of making something up.
+        self.assertIn("не подключалось", self.bot.sent[-1][1])
+        self.assertEqual(self.db.expired_assistant_requests(time.time() + 10_000), [])
+
+    async def test_answer_reaches_the_chat_exactly_once(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "вопрос")
+        self.assertTrue(await self.server._answer_assistant("vault-1", request_id, "ответ"))
+        self.assertEqual(self.bot.sent[-1], ("chat-a", "ответ"))
+        with self.assertRaises(ApiError):
+            await self.server._answer_assistant("vault-1", request_id, "ещё раз")
+
+    async def test_answer_from_another_vault_is_refused(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "вопрос")
+        with self.assertRaises(ApiError):
+            await self.server._answer_assistant("vault-2", request_id, "чужой ответ")
+        self.assertEqual(self.bot.sent, [])
+
+    async def test_unanswered_question_expires_with_an_honest_reply(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "вопрос")
+        with self.db.conn:
+            self.db.conn.execute("UPDATE assistant_requests SET expires_at = ? WHERE id = ?",
+                                 (time.time() - 1, request_id))
+        await self.server._deliver_notifications()
+        self.assertIn("не ответило", self.bot.sent[-1][1])
+        self.assertIsNotNone(self.db.get_assistant_request(request_id)["answered_at"])
+
+
 if __name__ == "__main__":
     unittest.main()
