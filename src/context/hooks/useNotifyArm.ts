@@ -4,7 +4,7 @@ import type { AssistantMode, SlagItem, VaultMeta } from '../../types';
 import { logger } from '../../lib/logger/logger';
 import { isChatConfigured } from '../../lib/ai/connections/resolve';
 import { loadAiSettings } from '../../lib/ai/connections/settings';
-import { answerAssistantQuestion } from '../../lib/notify/assistant';
+import { answerAssistantQuestion, clearAssistantHistory } from '../../lib/notify/assistant';
 import { reconcileNotifications, runLocalReminders } from '../../lib/notify/plan';
 import { describeError, getNotifyPrefs, getNotifyRoutes } from '../../lib/notify/prefs';
 import { accountClient } from '../../lib/sync/account';
@@ -14,6 +14,8 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 const ARM_DEBOUNCE_MS = 2000;
 /** Due times are minute-precision, so a half-minute tick is enough to be punctual. */
 const LOCAL_TICK_MS = 30_000;
+/** Safety net for a question that arrived while the socket was down and no edge follows. */
+const PENDING_PULL_MS = 30_000;
 
 const notifyLog = logger.scope('NOTIFY');
 
@@ -59,11 +61,16 @@ export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
       void answerAssistantQuestion(id, requestId, question, mode, reportStage);
     };
     syncEngine.setAssistantHandler(answer);
+    // `/clear` in the bot: the thread is stored here, so this device is the only one that can
+    // drop it. The relay just forwards the command.
+    syncEngine.setAssistantClearHandler(() => {
+      const id = syncVaultId();
+      if (id) clearAssistantHistory(id);
+    });
     // The relay elects one device per question; this is the half of the answer only the app knows.
     syncEngine.setAssistantReadyProvider(() => isChatConfigured(loadAiSettings()));
 
-    const pull = (status: { state: string }): void => {
-      if (status.state !== 'connected') return;
+    const pull = (): void => {
       const id = syncVaultId();
       if (!id || !accountClient.isAuthenticated()) return;
       void accountClient
@@ -77,11 +84,24 @@ export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
           notifyLog.warn('Could not fetch pending telegram questions', { error: describeError(error) });
         });
     };
-    const unsubscribe = syncEngine.subscribe(pull);
-    pull(syncEngine.getStatus());
+    // Only on the edge into "connected", not on every status notify: the engine notifies on pings,
+    // acks and device counts, and pulling then raced the socket dispatch — this device took the
+    // question over HTTP while the relay was still deciding to send it, so answers kept arriving
+    // "before" their own dispatch. The timer covers the reconnect that would otherwise be missed.
+    let wasConnected = false;
+    const onStatus = (status: { state: string }): void => {
+      const connected = status.state === 'connected';
+      if (connected && !wasConnected) pull();
+      wasConnected = connected;
+    };
+    const unsubscribe = syncEngine.subscribe(onStatus);
+    onStatus(syncEngine.getStatus());
+    const retry = setInterval(pull, PENDING_PULL_MS);
     return () => {
       unsubscribe();
+      clearInterval(retry);
       syncEngine.setAssistantHandler(null);
+      syncEngine.setAssistantClearHandler(null);
       syncEngine.setAssistantReadyProvider(null);
     };
   }, []);

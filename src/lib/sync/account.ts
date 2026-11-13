@@ -11,6 +11,8 @@ import type {
   AccountVault,
   AssistantAnswerPayload,
   AssistantAnswerResult,
+  AssistantAppliedPayload,
+  AssistantAppliedResult,
   AssistantLinkPayload,
   AssistantPendingRequest,
   NotifyArmPayload,
@@ -613,6 +615,17 @@ class AccountClient {
     });
   }
 
+  /**
+   * Reports what a tapped button did. The relay edits its own message with this line, so a
+   * failure has to travel too: silence would leave a button that can be tapped forever.
+   */
+  appliedAssistant(payload: AssistantAppliedPayload): Promise<AssistantAppliedResult> {
+    return this.request<AssistantAppliedResult>('/api/assistant/applied', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   /** Questions the relay is still holding: what a device missed while its socket was down. */
   pendingAssistant(vaultId: string): Promise<{ requests: AssistantPendingRequest[] }> {
     const query = new URLSearchParams({ vaultId });
@@ -640,6 +653,9 @@ export type {
   NotifyChannelState,
   AssistantAnswerPayload,
   AssistantAnswerResult,
+  AssistantActionPayload,
+  AssistantAppliedPayload,
+  AssistantAppliedResult,
   AssistantLinkPayload,
   AssistantPendingRequest,
 } from './accountTypes';

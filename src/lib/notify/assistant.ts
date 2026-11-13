@@ -1,5 +1,6 @@
 // The assistant path of the bot: what a question forwarded from telegram is answered with.
 import type { AssistantMode, NotifyRoute, SlagItem } from '../../types';
+import type { AssistantActionPayload } from '../sync/accountTypes';
 import { DEFAULT_INBOX_FOLDER } from '../../config/storage';
 import { logger } from '../logger/logger';
 import { storage } from '../storage';
@@ -7,6 +8,7 @@ import { accountClient } from '../sync/account';
 import { assistantOrchestrator } from '../ai/orchestrator';
 import { loadAiSettings } from '../ai/connections/settings';
 import { isChatConfigured } from '../ai/connections/resolve';
+import { toAssistantAction } from './assistantAction';
 import { localDateKey, resolveReminder } from './plan';
 import { describeError } from './prefs';
 
@@ -106,6 +108,20 @@ function saveHistory(vaultId: string, entries: HistoryEntry[]): void {
 }
 
 /**
+ * Forgets the thread on this device after `/clear` in the bot.
+ *
+ * The relay holds no history, so it can only forward the command to the sockets that might;
+ * whoever is not in the room keeps a thread that a restart of the conversation no longer needs.
+ */
+export function clearAssistantHistory(vaultId: string): void {
+  try {
+    localStorage.removeItem(historyKey(vaultId));
+  } catch {
+    // A locked storage keeps the old thread; there is nothing to report to the person either.
+  }
+}
+
+/**
  * Answers a question the relay forwarded from the bot.
  *
  * The model runs here, on the device, whichever lane pays for it: `resolveChatTarget` already
@@ -124,12 +140,18 @@ export async function answerAssistantQuestion(
   const history = loadHistory(vaultId);
   const asked: HistoryEntry = { role: 'user', content: (question.trim() || 'что по задачам?').slice(0, HISTORY_ENTRY_CHARS) };
   let answer = '';
+  let offered: AssistantActionPayload | null = null;
+  // The stages are logged one by one because "бот задумался" is answered by exactly one of
+  // them being last: a received question with no `model started` never reached the model.
+  notifyLog.info('Telegram question received', { requestId, mode });
   try {
     const settings = loadAiSettings();
     if (isChatConfigured(settings)) {
       // The relay keeps one bubble for the whole exchange: this is the moment it stops saying
       // "handed to a device" and starts saying "writing".
       reportStage('thinking');
+      const startedAt = Date.now();
+      notifyLog.info('Telegram answer model started', { requestId });
       const result = await assistantOrchestrator.runChat({
         // The thread from this chat, so "а конкретной записи нет?" means what it meant a minute
         // ago. Only the device that answers holds it; the relay stays oblivious.
@@ -146,6 +168,14 @@ export async function answerAssistantQuestion(
         channel: 'telegram',
       });
       answer = (result.content ?? '').trim();
+      // The first proposal is the one that becomes the button: a telegram message has room for
+      // one tap, and the rest of the answer already says what else could be done.
+      offered = toAssistantAction(requestId, result.suggestedActions?.[0] ?? result.suggestedAction);
+      notifyLog.info(
+        'Telegram answer model done',
+        { requestId, hasAction: offered !== null, chars: answer.length },
+        Date.now() - startedAt
+      );
     }
   } catch (error) {
     notifyLog.warn('The assistant could not answer a telegram question', { error: describeError(error) });
@@ -154,7 +184,10 @@ export async function answerAssistantQuestion(
   // The thread grows only with what the person saw: a failed delivery would otherwise leave a
   // question in the history that was never answered.
   try {
-    await accountClient.answerAssistant({ vaultId, requestId, answer });
+    await accountClient.answerAssistant(
+      offered ? { vaultId, requestId, answer, action: offered } : { vaultId, requestId, answer }
+    );
+    notifyLog.info('Telegram answer sent', { requestId, withAction: offered !== null });
     saveHistory(vaultId, [...history, asked, { role: 'assistant', content: answer.slice(0, HISTORY_ENTRY_CHARS) }]);
   } catch (error) {
     notifyLog.warn('Answering a telegram question failed', { error: describeError(error) });

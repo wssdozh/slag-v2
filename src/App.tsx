@@ -4,6 +4,8 @@ import { AppProvider, useApp } from './context/AppContext';
 import { navigatePage } from './lib/navigation';
 import { MobileShell } from './components/Mobile/MobileShell';
 import { useVisualViewportHeight } from './hooks/layout/useVisualViewportHeight';
+import { useDeepLink } from './hooks/ui/useDeepLink';
+import { useAssistantActions } from './hooks/ui/useAssistantActions';
 import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { ConfirmDialog } from './components/Modals/ConfirmDialog';
 import { ToastContainer } from './components/UI/Toast';
@@ -113,7 +115,17 @@ const AppContent: React.FC = () => {
     isTriageModalOpen,
     isLogViewerOpen,
     isSearchOpen,
+    scrollToItem,
+    executeSuggestedAction,
   } = useApp();
+
+  // A `slag://note/…` link from telegram (or anywhere else) lands on the same jump a wiki link
+  // inside the app makes: switch folder, highlight, scroll.
+  useDeepLink(scrollToItem);
+
+  // A button under a telegram answer runs the same executor the confirmation card runs: the tap
+  // happens where the model is, not where the card is, so the wiring lives at the shell.
+  useAssistantActions(executeSuggestedAction);
 
   // A lazy component starts importing the moment React renders it, so the editor's CodeMirror
   // chunk (641 kB, the second biggest in the build) used to land on the first paint even though

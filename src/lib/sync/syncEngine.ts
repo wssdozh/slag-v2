@@ -135,9 +135,29 @@ export class SyncEngine {
     this.assistantHandler = handler;
   }
 
+  /** Clears the thread on `/clear`; also registered by the app, since the thread is local. */
+  private assistantClearHandler: (() => void) | null = null;
+
   /** Tells the relay whether this device could answer with a model at all. */
   public setAssistantReadyProvider(provider: (() => boolean) | null): void {
     this.transport.assistantReadyProvider = provider ?? (() => false);
+  }
+
+  /** `/clear` from the bot: drop the thread this device has been keeping. */
+  public setAssistantClearHandler(handler: (() => void) | null): void {
+    this.assistantClearHandler = handler;
+  }
+
+  /**
+   * Runs the action behind a tapped telegram button. Registered only by the app: the node
+   * build has no executor, and an unknown frame shape stays `unknown` until it says otherwise.
+   */
+  private assistantActionHandler: ((requestId: string, action: unknown) => Promise<void> | void) | null = null;
+
+  public setAssistantActionHandler(
+    handler: ((requestId: string, action: unknown) => Promise<void> | void) | null
+  ): void {
+    this.assistantActionHandler = handler;
   }
 
   private pushDebounceDeadline = 0;
@@ -205,6 +225,12 @@ export class SyncEngine {
       // Wired from the app, not imported here: the headless node build has no notifier.
       onAssistantQuestion: (requestId, question, mode, reportStage) => {
         this.assistantHandler?.(requestId, question, mode, reportStage);
+      },
+      onAssistantClear: () => {
+        this.assistantClearHandler?.();
+      },
+      onAssistantAction: (requestId, action) => {
+        return this.assistantActionHandler?.(requestId, action);
       },
       onCatchUpPull: () => {
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));

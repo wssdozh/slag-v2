@@ -1,5 +1,5 @@
 // Shapes of the relay account API: plans, devices, vault grants and invitations.
-import type { AssistantMode } from '../../types';
+import type { AssistantMode, SuggestedAction } from '../../types';
 import type { DeviceSyncMode } from './types';
 
 export interface AccountInfo {
@@ -120,10 +120,39 @@ export interface AssistantLinkPayload {
   mode?: AssistantMode;
 }
 
+/**
+ * The action a model offered, packed so the relay can put it on a button.
+ * `payload` is opaque to the relay: it is echoed back untouched when the person taps.
+ */
+export interface AssistantActionPayload {
+  id: string;
+  /** Button caption. */
+  label: string;
+  /** One line for a human: what exactly the button will touch. */
+  summary: string;
+  payload: SuggestedAction;
+}
+
 export interface AssistantAnswerPayload {
   vaultId: string;
   requestId: string;
   answer: string;
+  /** Absent when the model proposed nothing: then the answer carries no button. */
+  action?: AssistantActionPayload;
+}
+
+/** What the tapped button ended up doing. Sent even on failure, or the button outlives the tap. */
+export interface AssistantAppliedPayload {
+  vaultId: string;
+  requestId: string;
+  ok: boolean;
+  /** One short line for a human: what was created or changed, or why it did not happen. */
+  text: string;
+}
+
+export interface AssistantAppliedResult {
+  /** `already` when another device answered the same tap first; `gone` when the request expired. */
+  reason?: 'already' | 'gone';
 }
 
 /** What the relay holds while a question waits: the text a reconnecting device needs. */

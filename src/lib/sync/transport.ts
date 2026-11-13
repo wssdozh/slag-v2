@@ -22,6 +22,10 @@ export interface TransportCallbacks {
     mode: AssistantMode,
     reportStage: (stage: 'thinking') => void
   ) => Promise<void> | void;
+  /** `/clear` from the bot. The thread lives here, so the relay can only pass the command on. */
+  onAssistantClear?: () => void;
+  /** A button under an answer was tapped: apply this action, or the tap dies with the frame. */
+  onAssistantAction?: (requestId: string, action: unknown) => Promise<void> | void;
   onCatchUpPull?: () => void;
   onAuthRejected?: () => void;
 }
@@ -208,6 +212,14 @@ export class SyncTransport {
           // One bubble for the whole exchange: the relay only changes its text.
           (stage) => this.send(JSON.stringify({ type: 'assistant_stage', id: msg.id, stage })),
         );
+      } else if (msg.type === 'assistant_clear') {
+        // Not a question: the relay has nothing to answer, it just tells every live device
+        // of this vault to drop the thread it has been building.
+        this.callbacks.onAssistantClear?.();
+      } else if (msg.type === 'assistant_action' && typeof msg.id === 'string') {
+        // The tap happened in telegram: the relay echoes the action this vault sent, and the
+        // only thing left is to run it and report back what it did.
+        await this.callbacks.onAssistantAction?.(msg.id, msg.action);
       } else if (msg.type === 'error') {
         syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
       }
