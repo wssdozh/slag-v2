@@ -10,6 +10,10 @@ export function getCurrentWindow(): never {
   throw new Error('The headless node has no window');
 }
 
+export function getCurrentWebviewWindow(): never {
+  throw new Error('The headless node has no webview');
+}
+
 export async function listen(): Promise<UnlistenFn> {
   return () => undefined;
 }
