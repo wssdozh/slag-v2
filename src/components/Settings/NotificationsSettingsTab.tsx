@@ -10,11 +10,13 @@ import {
   notifyErrorText,
   saveNotifyPrefs,
   saveNotifyRoutes,
-  setAssistantForRoutes,
-} from '../../lib/notify';
-import type { NotifyPrefs, NotifyRoute } from '../../types';
-import { NotifyInviteModal } from './NotifyInviteModal';
-import { SettingsDivider, SettingsGroup, SettingsInput, SettingsRow, SettingsSwitch } from './SettingsUI';
+} from '../../lib/notify/prefs';
+import { setAssistantForRoutes } from '../../lib/notify/assistant';
+import type { AssistantSetting, NotifyPrefs, NotifyRoute } from '../../types';
+import { AssistantGroup } from './notifications/AssistantGroup';
+import { ChannelGroup } from './notifications/ChannelGroup';
+import { ContentGroup } from './notifications/ContentGroup';
+import { QuietHoursGroup } from './notifications/QuietHoursGroup';
 
 function currentVaultId(): string {
   try {
@@ -26,7 +28,7 @@ function currentVaultId(): string {
 
 /** Everything the bot is allowed to say, in one place. */
 export const NotificationsSettingsTab: React.FC = () => {
-  const { addToast } = useApp();
+  const { addToast, confirmAction } = useApp();
   const [routes, setRoutes] = useState<NotifyRoute[]>(() => getNotifyRoutes());
   const [prefs, setPrefs] = useState<NotifyPrefs>(() => getNotifyPrefs());
   const [invite, setInvite] = useState<NotifyInvite | null>(null);
@@ -36,10 +38,11 @@ export const NotificationsSettingsTab: React.FC = () => {
 
   const vaultId = currentVaultId();
   const locked = !vaultId || !accountClient.isAuthenticated();
-  const activeRoutes = routes.filter((route) => route.state === 'active');
-  const blockedRoutes = routes.filter((route) => route.state === 'blocked');
-  const pendingRoutes = routes.filter((route) => route.state === 'pending');
-  const channel = activeRoutes[0] ?? pendingRoutes[0] ?? blockedRoutes[0] ?? null;
+  const channel =
+    routes.find((route) => route.state === 'active') ??
+    routes.find((route) => route.state === 'pending') ??
+    routes.find((route) => route.state === 'blocked') ??
+    null;
 
   const patchPrefs = (next: Partial<NotifyPrefs>) => {
     const merged = { ...prefs, ...next };
@@ -67,6 +70,11 @@ export const NotificationsSettingsTab: React.FC = () => {
     }
   };
 
+  const handleRequestOrShow = () => {
+    if (invite) setIsModalOpen(true);
+    else void handleRequestInvite();
+  };
+
   const handleLinked = (routeToken: string) => {
     const updated = routes.map((route) =>
       route.token === routeToken ? { ...route, state: 'active' as const } : route
@@ -85,11 +93,24 @@ export const NotificationsSettingsTab: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleAssistant = async (enabled: boolean) => {
+  // Choosing "risky" hands the bot the whole vault, so it is the one mode that asks first.
+  // Anything but a yes leaves the stored mode alone, and the controlled select snaps back.
+  const handleModeChange = async (mode: AssistantSetting) => {
+    if (mode === 'risky') {
+      const confirmed = await confirmAction({
+        title: 'Разрешить боту читать хранилище?',
+        description:
+          'бот сможет прочитать любую заметку, до которой доберётся ассистент. доступ защищён только твоим телеграм-аккаунтом: кто войдёт в него, тот прочитает хранилище перепиской.',
+        confirmLabel: 'Разрешить',
+        cancelLabel: 'Не надо',
+        isDestructive: true,
+      });
+      if (!confirmed) return;
+    }
     setIsSavingAssistant(true);
     try {
-      await setAssistantForRoutes(vaultId, routes, enabled);
-      patchPrefs({ assistant: enabled });
+      await setAssistantForRoutes(vaultId, routes, mode !== 'off', mode === 'risky' ? 'risky' : 'minimal');
+      patchPrefs({ assistantMode: mode });
     } catch (error) {
       addToast(notifyErrorText(error), 'error');
     } finally {
@@ -97,147 +118,42 @@ export const NotificationsSettingsTab: React.FC = () => {
     }
   };
 
-  const channelAction = () => {
-    if (channel?.state === 'active' || channel?.state === 'blocked') {
-      return (
-        <button
-          type="button"
-          onClick={handleDisconnect}
-          className="px-2 py-1.5 text-2xs text-fg-muted rounded-md hover:bg-surface-hover hover:text-danger cursor-pointer"
-        >
-          отключить
-        </button>
-      );
-    }
-    if (channel?.state === 'pending') {
-      return (
-        <button
-          type="button"
-          disabled={isRequesting || locked}
-          onClick={() => (invite ? setIsModalOpen(true) : void handleRequestInvite())}
-          className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
-        >
-          {invite ? 'показать код' : 'новый код'}
-        </button>
-      );
-    }
-    return (
-      <button
-        type="button"
-        disabled={isRequesting || locked}
-        onClick={() => void handleRequestInvite()}
-        className="px-2 py-1.5 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
-      >
-        {isRequesting ? 'Код…' : 'Получить код'}
-      </button>
-    );
-  };
-
   return (
     <div className="flex flex-col gap-3">
-      <SettingsGroup
-        title="Канал в telegram"
-        action={
-          <span className="text-2xs font-mono text-fg-dim">
-            {activeRoutes.length ? 'подключён' : channel?.state === 'pending' ? 'ждёт подтверждения' : 'не подключён'}
-          </span>
-        }
-      >
-        <SettingsRow
-          label={
-            channel?.state === 'active'
-              ? 'Канал подключён'
-              : channel?.state === 'blocked'
-                ? 'Канал заблокирован'
-                : channel?.state === 'pending'
-                  ? 'Ждём подтверждения'
-                  : 'Добавить получателя'
-          }
-          description={
-            channel?.state === 'active'
-              ? 'напоминания приходят в telegram'
-              : channel?.state === 'blocked'
-                ? 'человек отключил бота'
-                : channel?.state === 'pending'
-                  ? 'код живёт 10 минут'
-                  : undefined
-          }
-          right={channelAction()}
-        />
-      </SettingsGroup>
+      <ChannelGroup
+        channel={channel}
+        hasInvite={invite !== null}
+        openInvite={invite && isModalOpen ? invite : null}
+        vaultId={vaultId}
+        isRequesting={isRequesting}
+        isLocked={locked}
+        onRequestOrShow={handleRequestOrShow}
+        onDisconnect={handleDisconnect}
+        onCloseModal={() => setIsModalOpen(false)}
+        onLinked={handleLinked}
+      />
 
-      {invite && isModalOpen && (
-        <NotifyInviteModal
-          invite={invite}
-          vaultId={vaultId}
-          onClose={() => setIsModalOpen(false)}
-          onLinked={handleLinked}
-        />
-      )}
+      <ContentGroup
+        tasks={prefs.tasks}
+        overdue={prefs.overdue}
+        spoiler={prefs.spoiler}
+        onTasksChange={(value) => patchPrefs({ tasks: value })}
+        onOverdueChange={(value) => patchPrefs({ overdue: value })}
+        onSpoilerChange={(value) => patchPrefs({ spoiler: value })}
+      />
 
-      <SettingsGroup title="Что приходит">
-        <SettingsRow
-          label="Напоминания задач"
-          right={<SettingsSwitch label="Напоминания задач" checked={prefs.tasks} onChange={(value) => patchPrefs({ tasks: value })} />}
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="Просроченные задачи"
-          description="Раз в день в 10:00, пока не закрыта"
-          right={<SettingsSwitch label="Просроченные задачи" checked={prefs.overdue} onChange={(value) => patchPrefs({ overdue: value })} />}
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="Скрывать текст под спойлером"
-          description="Видно после нажатия"
-          right={
-            <SettingsSwitch
-              label="Скрывать текст под спойлером"
-              checked={prefs.spoiler}
-              onChange={(value) => patchPrefs({ spoiler: value })}
-            />
-          }
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="В сообщении"
-          description="Заголовок и первые ~200 символов: релей видит их при отправке"
-        />
-      </SettingsGroup>
+      <QuietHoursGroup
+        quietFrom={prefs.quietFrom}
+        quietTo={prefs.quietTo}
+        onQuietFromChange={(value) => patchPrefs({ quietFrom: value })}
+        onQuietToChange={(value) => patchPrefs({ quietTo: value })}
+      />
 
-      <SettingsGroup title="Тихие часы">
-        <SettingsInput
-          label="Не беспокоить с"
-          value={prefs.quietFrom}
-          onChange={(value) => patchPrefs({ quietFrom: value })}
-          placeholder="23:00"
-          mono
-        />
-        <SettingsDivider />
-        <SettingsInput
-          label="Не беспокоить до"
-          value={prefs.quietTo}
-          onChange={(value) => patchPrefs({ quietTo: value })}
-          placeholder="08:00"
-          description="Если попадёт в окно — уедет на его конец"
-          mono
-        />
-      </SettingsGroup>
-
-      <SettingsGroup title="Ассистент в telegram" action={<span className="text-2xs font-mono text-fg-dim">опытное</span>}>
-        <SettingsRow
-          label="Отвечать на вопросы из бота"
-          description="Вопрос уходит на устройство с открытым приложением"
-          right={
-            <SettingsSwitch
-              label="Отвечать на вопросы из бота"
-              checked={prefs.assistant}
-              disabled={locked || isSavingAssistant || !activeRoutes.length}
-              onChange={(value) => void handleAssistant(value)}
-            />
-          }
-        />
-      </SettingsGroup>
+      <AssistantGroup
+        mode={prefs.assistantMode}
+        disabled={locked || isSavingAssistant || channel?.state !== 'active'}
+        onModeChange={(mode) => void handleModeChange(mode)}
+      />
     </div>
   );
 };
