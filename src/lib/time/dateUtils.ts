@@ -100,6 +100,55 @@ export function formatDueDateLabel(dateIso: string, rawMatchedText?: string): st
   }
 }
 
+const SHORT_MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'] as const;
+
+const BARE_CLOCK = /^([01]?\d|2[0-3]):([0-5]\d)/;
+
+/**
+ * Часы и минуты из срока. `reminder` приходит в двух видах: ISO-момент из парсера
+ * и голое `17:42` из ручного выбора в календаре. Оба означают одно и то же время.
+ */
+export function timeFromReminder(reminder?: string): { hours: number; minutes: number } | null {
+  const raw = reminder?.trim();
+  if (!raw) return null;
+  const bare = BARE_CLOCK.exec(raw);
+  if (bare) return { hours: Number(bare[1]), minutes: Number(bare[2]) };
+  const at = new Date(raw);
+  return Number.isNaN(at.getTime()) ? null : { hours: at.getHours(), minutes: at.getMinutes() };
+}
+
+/**
+ * Срок так, как его читают в ленте: `13 ноя · 17:42`.
+ *
+ * Время показываем только когда `reminder` действительно про этот день: у задачи
+ * с датой и отдельно поставленным напоминанием «на послезавтра» подпись не должна
+ * обещать чужой день. Голое `HH:MM` считается временем самого `dueDate`.
+ */
+export function formatDueStamp(dueDate?: string, reminder?: string): string {
+  if (!dueDate) return '';
+  const parts = dueDate.split('-');
+  const year = Number(parts[0]);
+  const monthIdx = Number(parts[1]) - 1;
+  const day = Number(parts[2]);
+  if (parts.length !== 3 || ![year, monthIdx, day].every(Number.isFinite) || monthIdx < 0 || monthIdx > 11) {
+    return dueDate;
+  }
+
+  const shortDay = year === new Date().getFullYear()
+    ? `${day} ${SHORT_MONTHS[monthIdx]}`
+    : `${day} ${SHORT_MONTHS[monthIdx]} ${year}`;
+
+  const clock = timeFromReminder(reminder);
+  if (!clock) return shortDay;
+  const raw = reminder?.trim() ?? '';
+  const isBareClock = BARE_CLOCK.test(raw);
+  const belongsToDay = isBareClock || getISODateString(new Date(raw)) === dueDate;
+  if (!belongsToDay) return shortDay;
+
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${shortDay} · ${pad(clock.hours)}:${pad(clock.minutes)}`;
+}
+
 /**
  * Русское склонение по числу: pluralRu(2, ['таска', 'таски', 'тасок']) → «таски».
  * Одна функция вместо тернарников в каждом счётчике.

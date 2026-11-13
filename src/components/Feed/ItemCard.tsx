@@ -14,6 +14,7 @@ import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment } from '../../lib/media/enrichment/dispatch';
 import { extractFocalContext } from '../../lib/media/enrichment/text';
 import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
+import { formatDueStamp } from '../../lib/time/dateUtils';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
@@ -58,25 +59,6 @@ export interface ItemCardProps {
    */
   gap?: number;
 }
-
-const formatDueDate = (rawDate?: string): string => {
-  if (!rawDate) return '';
-  const parts = rawDate.split('-');
-  if (parts.length === 3) {
-    const year = parseInt(parts[0], 10);
-    const monthIdx = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    if (!isNaN(year) && !isNaN(monthIdx) && !isNaN(day) && monthIdx >= 0 && monthIdx < 12) {
-      const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-      const currentYear = new Date().getFullYear();
-      if (year === currentYear) {
-        return `${day} ${months[monthIdx]}`;
-      }
-      return `${day} ${months[monthIdx]} ${year}`;
-    }
-  }
-  return rawDate;
-};
 
 const isGenericTitle = (title?: string): boolean => {
   if (!title) return true;
@@ -398,14 +380,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   }
 
   if (isTask && item.dueDate) {
+    const dueLabel = formatDueStamp(item.dueDate, item.reminder);
     metaElements.push(
       <span
         key="due"
         className="flex items-center gap-1 text-2xs text-zinc-500 font-mono shrink-0"
-        title={`Срок: ${item.dueDate}`}
+        title={`Срок: ${dueLabel}`}
       >
         <Calendar className="w-3 h-3 text-zinc-600" />
-        <span>{formatDueDate(item.dueDate)}</span>
+        <span>{dueLabel}</span>
       </span>
     );
   }
