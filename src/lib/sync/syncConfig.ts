@@ -2,6 +2,7 @@
 import { vault } from '../storage/port';
 import { logger } from '../logger/logger';
 import { accountClient } from './account';
+import { apiBase } from './apiBase';
 import {
   computeSubscription as computeSubscriptionFromAccount,
   parseStoredConfig,
@@ -116,7 +117,7 @@ export function authHeaders(store: SyncConfigHost, includeJson = false): Record<
 
 export async function refreshServerAuth(store: SyncConfigHost): Promise<boolean> {
   try {
-    const cleanUrl = store.config.serverUrl.replace(/\/+$/, '');
+    const cleanUrl = apiBase(store.config.serverUrl);
     const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(SYNC_INTERVALS.HEALTH_TIMEOUT_MS) });
     if (!response.ok) throw new Error(`Health check failed: HTTP ${response.status}`);
     const health = await response.json();

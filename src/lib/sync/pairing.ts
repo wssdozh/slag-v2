@@ -1,5 +1,6 @@
 import type { DeviceSyncMode, PairingSessionData, PairingClaimResult, PairingPollResult } from './types';
 import { accountClient } from './account';
+import { apiBase } from './apiBase';
 import { bytesToBase64, base64ToBytes } from '../media/byteCodec';
 import { SYNC_INTERVALS } from '../../config';
 
@@ -16,7 +17,7 @@ export async function createPairingSession(
   serverUrl: string,
   deviceId: string
 ): Promise<PairingSessionData> {
-  const cleanUrl = serverUrl.replace(/\/+$/, '');
+  const cleanUrl = apiBase(serverUrl);
   const res = await fetch(`${cleanUrl}/api/pair/create`, {
     method: 'POST',
     headers: pairingHeaders(serverUrl),
@@ -52,7 +53,7 @@ export async function claimPairingSession(
   guestEphemeralPk: string,
   deviceId?: string
 ): Promise<PairingClaimResult> {
-  const cleanUrl = serverUrl.replace(/\/+$/, '');
+  const cleanUrl = apiBase(serverUrl);
   const res = await fetch(`${cleanUrl}/api/pair/claim`, {
     method: 'POST',
     headers: pairingHeaders(serverUrl),
@@ -84,7 +85,7 @@ async function postPairing(
   action: 'approve' | 'reject',
   payload: Record<string, unknown>
 ): Promise<boolean> {
-  const cleanUrl = serverUrl.replace(/\/+$/, '');
+  const cleanUrl = apiBase(serverUrl);
   const res = await fetch(`${cleanUrl}/api/pair/${action}`, {
     method: 'POST',
     headers: pairingHeaders(serverUrl),
@@ -127,7 +128,7 @@ export async function pollPairingSession(
   serverUrl: string,
   sessionId: string
 ): Promise<PairingPollResult> {
-  const cleanUrl = serverUrl.replace(/\/+$/, '');
+  const cleanUrl = apiBase(serverUrl);
   const res = await fetch(`${cleanUrl}/api/pair/poll?session=${encodeURIComponent(sessionId)}`, {
     headers: pairingHeaders(serverUrl, false),
   });

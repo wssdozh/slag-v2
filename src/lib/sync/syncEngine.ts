@@ -3,6 +3,7 @@ import { vault } from '../storage/port';
 import { persistIncomingBundle } from './applyBundle';
 import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
+import { apiBase } from './apiBase';
 import {
   loadSentHashes,
   loadCursor,
@@ -728,7 +729,7 @@ export class SyncEngine {
     }
     try {
       if (!this.activeRoomId) throw new Error('Sync room is not ready');
-      const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
+      const cleanUrl = apiBase(this.config.serverUrl);
       const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
         method: 'POST',
         headers: authHeaders(this, true),
@@ -809,7 +810,7 @@ export class SyncEngine {
 
   private async pullPendingBundles(generation: number): Promise<void> {
     try {
-      const cleanUrl = this.config.serverUrl.replace(/\/+$/, '');
+      const cleanUrl = apiBase(this.config.serverUrl);
       const params = new URLSearchParams({
         device: this.config.deviceId,
         vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
@@ -903,7 +904,7 @@ export class SyncEngine {
 
   public async rotateVaultKey(): Promise<string> {
     if (this.usesAccountSync()) {
-      const response = await fetch(`${this.config.serverUrl.replace(/\/+$/, '')}/api/vaults/${encodeURIComponent(this.getSyncVaultId())}/rotate`, {
+      const response = await fetch(`${apiBase(this.config.serverUrl)}/api/vaults/${encodeURIComponent(this.getSyncVaultId())}/rotate`, {
         method: 'POST', headers: authHeaders(this, true), body: '{}',
       });
       if (!response.ok) throw new Error('Сервер не подтвердил отзыв старых ключей');
