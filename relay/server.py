@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import base64
 import hashlib
+import hmac
 import ipaddress
 import json
 import logging
@@ -48,6 +49,14 @@ NOTIFY_INVITE_KEEP_SECONDS = 3600
 NOTIFY_STALE_SECONDS = 3600
 NOTIFY_MAX_PENDING_INVITES = 5
 NOTIFY_MAX_JOBS_PER_VAULT = 500
+# A route token is a capability, so it is scoped: one token belongs to exactly one vault and
+# cannot be armed from another. The cap on the receiving side is the anti-spam backstop.
+NOTIFY_MAX_JOBS_PER_ACCOUNT = 1000
+NOTIFY_MAX_PER_HOUR_PER_ROUTE = 30
+NOTIFY_MAX_LEAD_SECONDS = 400 * 86400
+NOTIFY_LEEWAY_SECONDS = 300
+RATE_LIMIT_NOTIFY_ARM = 60
+RATE_LIMIT_NOTIFY_INVITE = 10
 NOTIFY_BATCH_SIZE = 50
 NOTIFY_CLAIM_LEASE_SECONDS = 120
 TG_API_BASE = "https://api.telegram.org"
@@ -922,6 +931,19 @@ class RelayDatabase:
                                 (vault_id,)).fetchone()
         return row["n"] if row else 0
 
+    def count_notify_jobs_for_account(self, account_id: str) -> int:
+        row = self.conn.execute("""
+            SELECT COUNT(*) AS n FROM notify_jobs j JOIN vaults v ON v.id = j.vault_id
+            WHERE v.owner_account_id = ? AND j.sent_at IS NULL
+        """, (account_id,)).fetchone()
+        return row["n"] if row else 0
+
+    def notify_sent_last_hour(self, route_token: str) -> int:
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS n FROM notify_jobs WHERE route_token = ? AND sent_at > ?",
+            (route_token, time.time() - 3600)).fetchone()
+        return row["n"] if row else 0
+
     def arm_notify_jobs(self, vault_id: str, item_key: str, event_key: Optional[str], fire_at: float,
                         routes: list[dict]) -> tuple[int, list[dict]]:
         """Idempotent: the (route, event) primary key is the whole dedup story.
@@ -1004,20 +1026,30 @@ class NotifyStore:
                     route_token TEXT PRIMARY KEY,
                     chat_id TEXT NOT NULL,
                     label TEXT NOT NULL DEFAULT '',
+                    vault_tag TEXT NOT NULL DEFAULT '',
                     created_at REAL NOT NULL,
                     blocked_at REAL
                 )""")
+            columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(notify_routes)")}
+            if "vault_tag" not in columns:
+                self.conn.execute("ALTER TABLE notify_routes ADD COLUMN vault_tag TEXT NOT NULL DEFAULT ''")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_routes_chat ON notify_routes(chat_id)")
+        # Whoever can read this file owns every Telegram channel in it: keep it to the owner.
+        if db_path != ":memory:" and os.name == "posix":
+            try:
+                os.chmod(db_path, 0o600)
+            except OSError as exc:
+                logger.warning("Cannot tighten notify db permissions: %s", exc)
 
-    def link(self, route_token: str, chat_id: str, label: str = "") -> None:
+    def link(self, route_token: str, chat_id: str, label: str, vault_tag: str = "") -> None:
         now = time.time()
         with self.conn:
             self.conn.execute("""
-                INSERT INTO notify_routes (route_token, chat_id, label, created_at, blocked_at)
-                VALUES (?, ?, ?, ?, NULL)
+                INSERT INTO notify_routes (route_token, chat_id, label, vault_tag, created_at, blocked_at)
+                VALUES (?, ?, ?, ?, ?, NULL)
                 ON CONFLICT(route_token) DO UPDATE SET chat_id = excluded.chat_id,
-                    label = excluded.label, blocked_at = NULL
-            """, (route_token, chat_id, label, now))
+                    label = excluded.label, vault_tag = excluded.vault_tag, blocked_at = NULL
+            """, (route_token, chat_id, label, vault_tag, now))
 
     def get(self, route_token: str) -> Optional[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM notify_routes WHERE route_token = ?", (route_token,)).fetchone()
@@ -1064,10 +1096,14 @@ class TelegramBot:
                 body = {"ok": False, "error_code": exc.code}
             return False, body
         except (urllib.error.URLError, OSError, ValueError) as exc:
-            return False, {"ok": False, "error_code": 0, "description": str(exc)}
+            # The bot token sits in the request URL: never let an exception echo it into a log.
+            return False, {"ok": False, "error_code": 0, "description": self.redact(str(exc))}
 
     async def call(self, method: str, payload: dict, timeout: float = 20) -> Tuple[bool, dict]:
         return await asyncio.to_thread(self._request, method, payload, timeout)
+
+    def redact(self, text: str) -> str:
+        return text.replace(self.token, "<bot-token>") if self.token else text
 
     @staticmethod
     def retry_after(body: dict) -> Optional[float]:
@@ -1080,7 +1116,7 @@ class TelegramBot:
 class SlagRelayServer:
     def __init__(self, host: str, port: int, db_path: str, require_account_auth: Optional[bool] = None,
                  admin_token: Optional[str] = None, trusted_proxies: Optional[object] = None,
-                 bot_token: Optional[str] = None):
+                 bot_token: Optional[str] = None, notify_pepper: Optional[str] = None):
         self.host = host
         self.port = port
         self.start_time = time.time()
@@ -1104,6 +1140,12 @@ class SlagRelayServer:
             bot_token = os.environ.get("SLAG_TG_BOT_TOKEN", "")
         token = bot_token.strip() if isinstance(bot_token, str) else ""
         self.bot = TelegramBot(token) if token else None
+        if notify_pepper is None:
+            notify_pepper = os.environ.get("SLAG_NOTIFY_PEPPER", "")
+        pepper = notify_pepper.strip() if isinstance(notify_pepper, str) else ""
+        # Scopes a route token to its vault: without it any paid account holding a token could
+        # post into someone else's Telegram. No pepper, no invites.
+        self.notify_pepper = pepper.encode("utf-8") if pepper else b""
         # Second file on purpose: identity lives where the vault id never does. An in-memory
         # relay (tests) keeps both stores in memory instead of dropping a file in the cwd.
         notify_db = ":memory:" if db_path in (":memory:", "") else os.path.join(
@@ -1453,10 +1495,16 @@ class SlagRelayServer:
         if auth.get("plan") not in ("smile", "angry"):
             raise ApiError(402, "notifications_plan_required")
 
+    def _notify_tag(self, vault_id: str) -> str:
+        """Vault fingerprint stored next to the chat id, never the vault id itself."""
+        if not self.notify_pepper:
+            return ""
+        return hmac.new(self.notify_pepper, vault_id.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+
     def _arm_notifications(self, body: dict, vault_id: str) -> tuple[int, list[dict]]:
         """Validate an arm payload and queue it. Caller has already authorized the vault."""
         item_key = body.get("itemKey", "")
-        if not isinstance(item_key, str) or not item_key:
+        if not isinstance(item_key, str) or not item_key or len(item_key) > 200:
             raise ApiError(400, "invalid_notification")
         event_key = body.get("eventKey")
         if event_key is not None and (not isinstance(event_key, str) or not event_key or len(event_key) > 128):
@@ -1467,10 +1515,15 @@ class SlagRelayServer:
         raw_routes = body.get("routes")
         if not isinstance(fire_at, (int, float)) or isinstance(fire_at, bool):
             raise ApiError(400, "invalid_notification")
+        # A job that fires in 3000 is a queue squat, one that fired last week is noise.
+        now = time.time()
+        if not (now - NOTIFY_LEEWAY_SECONDS <= fire_at <= now + NOTIFY_MAX_LEAD_SECONDS):
+            raise ApiError(400, "invalid_notification")
         if not isinstance(raw_routes, list) or not raw_routes or len(raw_routes) > 20:
             raise ApiError(400, "invalid_notification")
         if self.db.count_notify_jobs(vault_id) > NOTIFY_MAX_JOBS_PER_VAULT:
             raise ApiError(429, "notify_queue_full")
+        vault_tag = self._notify_tag(vault_id)
         routes: list[dict] = []
         dropped: list[dict] = []
         for entry in raw_routes:
@@ -1479,11 +1532,13 @@ class SlagRelayServer:
             token = entry.get("token")
             title = entry.get("title", "")
             bodytext = entry.get("body", "")
-            if (not isinstance(token, str) or not token or not isinstance(title, str)
+            if (not isinstance(token, str) or not token or len(token) > 128 or not isinstance(title, str)
                     or not isinstance(bodytext, str) or len(title) > 200 or len(bodytext) > 1500):
                 raise ApiError(400, "invalid_notification")
             route = self.notify.get(token)
-            if not route:
+            # One uniform answer for "unknown" and "someone else's": a token must not be
+            # usable as an oracle for which channels exist.
+            if not route or not vault_tag or not hmac.compare_digest(route["vault_tag"], vault_tag):
                 dropped.append({"token": token, "reason": "not_linked"})
             elif route["blocked_at"] is not None:
                 dropped.append({"token": token, "reason": "blocked"})
@@ -2175,17 +2230,27 @@ class SlagRelayServer:
         if method == "POST" and path == "/api/notify/invite":
             auth = self._auth(headers)
             self._require_notify_plan(auth)
-            if not self.bot:
+            if not self.bot or not self.notify_pepper:
                 raise ApiError(503, "notify_bot_not_configured")
+            if not self._allow_request(f"notify-invite:{auth['account_id']}", RATE_LIMIT_NOTIFY_INVITE):
+                return {"error": "too_many_requests"}, 429
             vault_id = body.get("vaultId", "")
             if not isinstance(vault_id, str) or not vault_id:
                 raise ApiError(400, "invalid_vault")
+            # A receive-only device has no business queueing messages for the vault.
             self._authorize_vault(auth, vault_id, write=True)
             if self.db.pending_notify_invites(vault_id) >= NOTIFY_MAX_PENDING_INVITES:
                 raise ApiError(429, "too_many_invites")
-            code = secrets.token_hex(6)
-            route_token = secrets.token_hex(16)
-            expires_at = self.db.create_notify_invite(vault_id, code, route_token)
+            for _ in range(3):
+                code = secrets.token_hex(6)
+                route_token = secrets.token_hex(16)
+                try:
+                    expires_at = self.db.create_notify_invite(vault_id, code, route_token)
+                    break
+                except sqlite3.IntegrityError:
+                    continue
+            else:
+                raise ApiError(409, "invite_conflict")
             link = f"https://t.me/{self.bot.username}?start={code}" if self.bot.username else None
             return {"code": code, "routeToken": route_token, "link": link,
                     "expiresAt": iso_time(expires_at), "expiresIn": NOTIFY_INVITE_TTL_SECONDS}, 200
@@ -2193,10 +2258,14 @@ class SlagRelayServer:
         if method == "POST" and path == "/api/notify/arm":
             auth = self._auth(headers)
             self._require_notify_plan(auth)
+            if not self._allow_request(f"notify-arm:{auth['account_id']}", RATE_LIMIT_NOTIFY_ARM):
+                return {"error": "too_many_requests"}, 429
             vault_id = body.get("vaultId", "")
             if not isinstance(vault_id, str) or not vault_id:
                 raise ApiError(400, "invalid_notification")
-            self._authorize_vault(auth, vault_id)
+            self._authorize_vault(auth, vault_id, write=True)
+            if self.db.count_notify_jobs_for_account(auth["account_id"]) > NOTIFY_MAX_JOBS_PER_ACCOUNT:
+                raise ApiError(429, "notify_queue_full")
             armed, dropped = self._arm_notifications(body, vault_id)
             return {"armed": armed, "dropped": dropped}, 200
 
@@ -2848,7 +2917,7 @@ class SlagRelayServer:
         from_user = message.get("from") or {}
         label = " ".join(part for part in (from_user.get("first_name"), from_user.get("last_name")) if part).strip()
         label = label or str(from_user.get("username") or "")
-        self.notify.link(invite["route_token"], chat_id, label[:64])
+        self.notify.link(invite["route_token"], chat_id, label[:64], self._notify_tag(invite["vault_id"]))
         self.db.redeem_notify_invite(code)
         vault = self.db.conn.execute("SELECT name FROM vaults WHERE id = ?", (invite["vault_id"],)).fetchone()
         source = f"«{vault['name']}»" if vault else "хранилища"
@@ -2876,6 +2945,12 @@ class SlagRelayServer:
             route = self.notify.get(route_token)
             if not route or route["blocked_at"] is not None:
                 self.db.finish_notify_job(route_token, event_key)
+                continue
+            # Recipients are people, not a channel: a compromised or hostile vault cannot
+            # turn one chat into a firehose.
+            if self.db.notify_sent_last_hour(route_token) >= NOTIFY_MAX_PER_HOUR_PER_ROUTE:
+                self.db.finish_notify_job(route_token, event_key)
+                logger.warning("Telegram rate cap reached for a route, dropping the message")
                 continue
             if not self.db.claim_notify_job(route_token, event_key, now):
                 continue
@@ -2942,9 +3017,12 @@ def main() -> None:
                         help="comma-separated IPs/CIDRs allowed to set X-Forwarded-For")
     parser.add_argument("--bot-token", default=os.environ.get("SLAG_TG_BOT_TOKEN", ""),
                         help="Telegram bot token; enables reminder delivery")
+    parser.add_argument("--notify-pepper", default=os.environ.get("SLAG_NOTIFY_PEPPER", ""),
+                        help="secret that scopes a telegram route to one vault; required for invites")
     args = parser.parse_args()
     relay = SlagRelayServer(args.host, args.port, args.db, admin_token=args.admin_token,
-                            trusted_proxies=args.trusted_proxies, bot_token=args.bot_token)
+                            trusted_proxies=args.trusted_proxies, bot_token=args.bot_token,
+                            notify_pepper=args.notify_pepper)
     try:
         asyncio.run(relay.run())
     except KeyboardInterrupt:

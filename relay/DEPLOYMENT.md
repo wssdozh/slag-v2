@@ -195,16 +195,28 @@ env (systemd drop-in, `chmod 600`):
 | variable | default | meaning |
 | --- | --- | --- |
 | `SLAG_TG_BOT_TOKEN` | — | absent → no polling, no delivery, `/api/notify/invite` answers `503 notify_bot_not_configured` |
+| `SLAG_NOTIFY_PEPPER` | — | secret that scopes a route token to one vault. absent → `/api/notify/invite` answers `503`. `openssl rand -hex 32` |
+
+a route token is a capability, so it is scoped: redemption stores `HMAC(pepper, vault_id)` next to
+the chat id, and `arm` only accepts a token whose fingerprint matches the calling vault. without
+the pepper any paying account holding a token could post into that person's Telegram, and the
+`vault_tag` column would be empty forever. rotating the pepper unlinks every route (they fall back
+to `not_linked` and people re-bind with a fresh code) — that is the intended kill switch.
 
 gate behaviour: `POST /api/notify/invite` and `POST /api/notify/arm` need a paid plan
-(`smile`/`angry`) or they answer `402 notifications_plan_required`; a token that was never
-linked through `/start` comes back in `dropped` with `not_linked`, a blocked one with
-`blocked`; more than 5 unredeemed invites per vault → `429 too_many_invites`; more than 500
-queued jobs per vault → `429 notify_queue_full`.
+(`smile`/`angry`) or they answer `402 notifications_plan_required`, and a read-write grant, so a
+receive-only device cannot queue messages for the vault; a token that was never linked through
+`/start` **or belongs to another vault** comes back in `dropped` with `not_linked` — the same
+answer on purpose, so the endpoint cannot be used to probe which channels exist. a blocked one
+comes back with `blocked`. more than 5 unredeemed invites per vault → `429 too_many_invites`,
+more than 500 queued jobs per vault or 1000 per account → `429 notify_queue_full`, more than 60
+arm calls per minute per account or 10 invites → `429 too_many_requests`. `fireAt` must land in
+`[now - 5 min, now + 400 days]`, otherwise `400`: a job that fires in 2100 is a queue squat.
 
 delivery behaviour: a job older than an hour is closed unsent (a laptop waking up after a
 week must not dump a backlog), `429` is obeyed via `retry_after`, `403` blocks the route for
-good, and one failed send gets exactly one retry.
+good, one route gets at most 30 messages per hour regardless of who armed them, and a failed
+send gets exactly one retry.
 
 acceptance probe, in this order:
 

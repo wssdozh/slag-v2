@@ -14,7 +14,7 @@ import tempfile
 import time
 import unittest
 
-from server import NOTIFY_STALE_SECONDS, SlagRelayServer
+from server import ApiError, NOTIFY_MAX_PER_HOUR_PER_ROUTE, NOTIFY_STALE_SECONDS, SlagRelayServer
 
 
 class FakeBot:
@@ -40,11 +40,13 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.tmpdir = tempfile.mkdtemp(prefix="slag_notify_")
         self.db_path = os.path.join(self.tmpdir, "relay.db")
-        self.server = SlagRelayServer("127.0.0.1", 0, self.db_path, require_account_auth=False, bot_token="")
+        self.server = SlagRelayServer("127.0.0.1", 0, self.db_path, require_account_auth=False,
+                                      bot_token="", notify_pepper="test-pepper")
         self.server.bot = FakeBot()
         self.bot: FakeBot = self.server.bot
         self.db = self.server.db
         self.notify = self.server.notify
+        self.tag = self.server._notify_tag("vault-1")
 
     async def asyncTearDown(self):
         self.db.conn.close()
@@ -71,8 +73,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.db.pending_notify_invites("vault-1"), 0)
 
     async def test_same_event_is_delivered_once_per_route(self):
-        self.notify.link("tok-a", "chat-a", "A")
-        self.notify.link("tok-b", "chat-b", "B")
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.notify.link("tok-b", "chat-b", "B", self.tag)
         routes = [{"token": "tok-a", "title": "Отчёт", "body": ""},
                   {"token": "tok-b", "title": "Отчёт", "body": ""}]
 
@@ -90,8 +92,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.bot.sent), 2)
 
     async def test_one_blocked_recipient_does_not_block_the_rest(self):
-        self.notify.link("tok-a", "chat-a", "A")
-        self.notify.link("tok-b", "chat-b", "B")
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.notify.link("tok-b", "chat-b", "B", self.tag)
         self.notify.block_route("tok-b")
         armed, dropped = await self.arm("item-1", "ev-1", [
             {"token": "tok-a", "title": "T", "body": ""},
@@ -103,8 +105,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([chat for chat, _ in self.bot.sent], ["chat-a"])
 
     async def test_removing_a_recipient_drops_the_queued_job(self):
-        self.notify.link("tok-a", "chat-a", "A")
-        self.notify.link("tok-b", "chat-b", "B")
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.notify.link("tok-b", "chat-b", "B", self.tag)
         routes = [{"token": "tok-a", "title": "T", "body": ""},
                   {"token": "tok-b", "title": "T", "body": ""}]
         self.assertEqual((await self.arm("item-1", "ev-1", routes))[0], 2)
@@ -120,9 +122,14 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.db.count_notify_jobs("vault-1"), 0)
 
     async def test_stale_reminder_is_dropped_instead_of_delivered(self):
-        self.notify.link("tok-a", "chat-a", "A")
-        await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "T", "body": ""}],
-                       fire_at=time.time() - NOTIFY_STALE_SECONDS - 60)
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        # Queued an hour ago while the relay was down: the moment is gone, not postponed.
+        old = time.time() - NOTIFY_STALE_SECONDS - 60
+        with self.db.conn:
+            self.db.conn.execute(
+                "INSERT INTO notify_jobs (route_token, event_key, item_key, vault_id, fire_at,"
+                " title, body, created_at) VALUES ('tok-a', 'ev-1', 'item-1', 'vault-1', ?, 'T', '', ?)",
+                (old, old))
         await self.server._deliver_notifications()
         self.assertEqual(self.bot.sent, [])
         # Closed, not retried on the next tick.
@@ -157,7 +164,7 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertIn("недействителен", self.bot.sent[-1][1])
 
     async def test_chat_id_never_reaches_the_relay_database(self):
-        self.notify.link("tok-a", "987654321000")
+        self.notify.link("tok-a", "987654321000", "A", self.tag)
         self.db.create_notify_invite("vault-1", "abc123def456", "tok-b")
         conn = sqlite3.connect(self.db_path)
         try:
@@ -168,12 +175,54 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertIn("987654321000", "\n".join(self.notify.conn.iterdump()))
 
     async def test_forbidden_bot_marks_route_and_stops(self):
-        self.notify.link("tok-a", "chat-a", "A")
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
         await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "T", "body": ""}])
         self.bot.failure = {"ok": False, "error_code": 403, "description": "Forbidden: bot was blocked by the user"}
         await self.server._deliver_notifications()
         self.assertIsNotNone(self.notify.get("tok-a")["blocked_at"])
         self.bot.failure = None
+        await self.server._deliver_notifications()
+        self.assertEqual(self.bot.sent, [])
+
+
+    async def test_foreign_vault_cannot_arm_someone_elses_channel(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        payload = {"itemKey": "item-1", "eventKey": "ev-1", "fireAt": time.time() + 60,
+                   "routes": [{"token": "tok-a", "title": "спам", "body": "от чужого имени"}]}
+        armed, dropped = self.server._arm_notifications(payload, "vault-2")
+        self.assertEqual((armed, dropped), (0, [{"token": "tok-a", "reason": "not_linked"}]))
+        self.assertEqual(self.db.count_notify_jobs("vault-2"), 0)
+        await self.server._deliver_notifications()
+        self.assertEqual(self.bot.sent, [])
+
+    async def test_unknown_and_foreign_tokens_answer_identically(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        payload = {"itemKey": "item-1", "eventKey": "ev-1", "fireAt": time.time() + 60}
+        _, unknown = self.server._arm_notifications(
+            {**payload, "routes": [{"token": "nope", "title": "T", "body": ""}]}, "vault-1")
+        _, foreign = self.server._arm_notifications(
+            {**payload, "routes": [{"token": "tok-a", "title": "T", "body": ""}]}, "vault-2")
+        self.assertEqual(unknown[0]["reason"], foreign[0]["reason"])
+        self.assertEqual(unknown[0]["reason"], "not_linked")
+
+    async def test_fire_at_outside_the_window_is_rejected(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        for fire_at in (time.time() + 10 * 365 * 86400, time.time() - 3600):
+            with self.assertRaises(ApiError):
+                await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "T", "body": ""}],
+                               fire_at=fire_at)
+
+    async def test_one_route_cannot_be_flooded(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        now = time.time()
+        with self.db.conn:
+            for index in range(NOTIFY_MAX_PER_HOUR_PER_ROUTE):
+                self.db.conn.execute(
+                    "INSERT INTO notify_jobs (route_token, event_key, item_key, vault_id, fire_at,"
+                    " title, body, created_at, sent_at)"
+                    " VALUES ('tok-a', ?, ?, 'vault-1', ?, 'старое', '', ?, ?)",
+                    (f"sent-{index}", f"item-{index}", now - 60, now - 60, now - 30))
+        await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "T", "body": ""}])
         await self.server._deliver_notifications()
         self.assertEqual(self.bot.sent, [])
 
