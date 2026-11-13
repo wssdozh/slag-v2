@@ -72,6 +72,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | уведомления и напоминания | `src/lib/notify/`, `src/context/hooks/useNotifyArm.ts` |
 | telegram-бот: канал, приглашение, доставка | `relay/server.py`, `relay/DEPLOYMENT.md`, `src/lib/notify/prefs.ts` |
 | вопрос из бота: режимы и ответ | `src/lib/notify/assistant.ts`, `src/lib/ai/orchestrator.ts`, `relay/server.py` |
+| ссылки `slag://`: страница-переходник на релее, схема в ОС | `relay/tg.py` (`render_answer_links`), `src/lib/platform/deepLink.ts`, `src-tauri/src/deeplink.rs` |
 | лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx` |
 | композер, создание и сохранение записи | `src/components/Feed/Composer.tsx`, `src/lib/vault/markdownSerializer.ts` |
 | запись: создать, изменить, удалить, восстановить, переместить | `src/context/hooks/useItemWrites.ts` |
