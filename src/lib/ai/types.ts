@@ -66,6 +66,11 @@ export interface SendAssistantChatParams {
    * the same trust boundary as one typed in the app. Undefined means every tool is allowed.
    */
   toolAllowlist?: string[];
+  /**
+   * Where the answer will be read. Telegram gets its own format block: the relay escapes the
+   * text and sends it as plain, so markdown there is noise, and a phone screen is not a chat pane.
+   */
+  channel?: 'app' | 'telegram';
 }
 
 export interface SendAssistantChatResult {

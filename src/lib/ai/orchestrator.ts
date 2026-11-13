@@ -30,7 +30,7 @@ export type { SendAssistantChatParams, SendAssistantChatResult } from './types';
  */
 export class AssistantOrchestrator {
   async runChat(params: SendAssistantChatParams): Promise<SendAssistantChatResult> {
-    const { messages, currentFolder, settings, folders, allItems, toolAllowlist } = params;
+    const { messages, currentFolder, settings, folders, allItems, toolAllowlist, channel } = params;
     const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
     const folderMeta = folders.find((f) => f.path === currentFolder);
 
@@ -96,6 +96,7 @@ export class AssistantOrchestrator {
       folderMeta,
       memory,
       memoryTags,
+      channel,
     });
     // Protocol Adapter & Endpoint Resolution
     const target = resolveAiTarget(settings);

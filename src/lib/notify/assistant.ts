@@ -40,20 +40,29 @@ export async function setAssistantForRoutes(
 export function buildAssistantAnswer(items: SlagItem[], now = Date.now()): string {
   const todayKey = localDateKey(now);
   const open = items.filter((item) => item.type === 'task' && item.status !== 'done');
-  const dueToday = open.filter((item) => item.dueDate === todayKey).length;
-  const overdue = open.filter((item) => !!item.dueDate && item.dueDate < todayKey).length;
+  const dueToday = open.filter((item) => item.dueDate === todayKey);
+  const overdue = open.filter((item) => !!item.dueDate && item.dueDate < todayKey);
   const upcoming = open
     .map((item) => ({ item, at: resolveReminder(item) }))
     .filter((entry): entry is { item: SlagItem; at: number } => entry.at !== null && entry.at > now)
     .sort((left, right) => left.at - right.at)[0];
-  const parts = [`на связи · задач на сегодня: ${dueToday}`];
-  if (overdue) parts.push(`просрочено: ${overdue}`);
+
+  // Plain text, one fact per line: the relay escapes the answer and sends it as is, so this is
+  // the shape a phone shows — a headline that answers the question, then the items behind it.
+  const lines: string[] = [];
+  if (dueToday.length === 0) {
+    lines.push(overdue.length > 0 ? 'На сегодня задач нет.' : 'На сегодня задач нет, просроченного тоже.');
+  } else {
+    lines.push(`На сегодня ${dueToday.length} ${dueToday.length === 1 ? 'задача' : 'задачи'}:`);
+    for (const task of dueToday.slice(0, 5)) lines.push(`• ${task.title}`);
+    if (dueToday.length > 5) lines.push(`• и ещё ${dueToday.length - 5}`);
+  }
+  if (overdue.length > 0) lines.push('', `Просрочено: ${overdue.length}.`);
   if (upcoming) {
     const time = new Date(upcoming.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    parts.push(`ближайшее: «${upcoming.item.title}» в ${time}`);
+    lines.push('', `Ближайшее: «${upcoming.item.title}» в ${time}.`);
   }
-  parts.push('подробнее — в приложении');
-  return parts.join(' · ');
+  return lines.join('\n');
 }
 
 /**
@@ -84,6 +93,9 @@ export async function answerAssistantQuestion(
         allItems: items,
         // Undefined means "everything" to the orchestrator; null here means the same thing.
         toolAllowlist: ASSISTANT_TOOL_ALLOWLIST[mode] ?? undefined,
+        // The answer is delivered as escaped plain text by the relay, so the model is told how
+        // telegram reads it instead of producing markdown nobody will render.
+        channel: 'telegram',
       });
       answer = (result.content ?? '').trim();
     }
