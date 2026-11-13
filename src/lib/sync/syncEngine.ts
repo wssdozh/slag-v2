@@ -361,6 +361,12 @@ export class SyncEngine {
       const outcome = await this.packAttachmentBytes(att, changes, sentHashes, packedHashes, true);
       if (outcome === 'packed') {
         this.forcedAttachmentIds.delete(att.id);
+        // One file per bundle, so the rest of the answers need their own push; without this the
+        // device that was asked for three files sends one and goes quiet.
+        if (this.forcedAttachmentIds.size > 0) {
+          this.attachmentPass = true;
+          this.scheduleDebouncedPush(0);
+        }
         return true;
       }
     }
