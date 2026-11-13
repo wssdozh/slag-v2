@@ -158,6 +158,18 @@ export const NotificationsSettingsTab: React.FC = () => {
         />
         <SettingsDivider />
         <SettingsRow
+          label="Скрывать текст под спойлером"
+          description="Видно после нажатия"
+          right={
+            <SettingsSwitch
+              label="Скрывать текст под спойлером"
+              checked={prefs.spoiler}
+              onChange={(value) => patchPrefs({ spoiler: value })}
+            />
+          }
+        />
+        <SettingsDivider />
+        <SettingsRow
           label="В сообщении"
           description="Заголовок и первые ~200 символов: релей видит их при отправке"
         />

@@ -404,6 +404,8 @@ export interface NotifyPrefs {
   quietTo: string;
   /** Let this vault's telegram channel ask a question of the devices. */
   assistant: boolean;
+  /** Hide the body behind a telegram spoiler: the chat shows a tap-to-reveal line. */
+  spoiler: boolean;
 }
 
 /** Who this vault belongs to. Synced inside the encrypted bundle, so the relay never sees it. */

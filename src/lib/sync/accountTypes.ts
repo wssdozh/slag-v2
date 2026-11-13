@@ -76,6 +76,14 @@ export interface NotifyArmPayload {
   eventKey: string | null;
   /** UNIX seconds; null on a cancel. */
   fireAt: number | null;
+  /** Which template the relay renders: a timed reminder or the daily overdue ping. */
+  kind: 'task' | 'overdue';
+  /** The deadline in the sender's own words, e.g. `13 нояб., 14:30`. Empty when there is none. */
+  stamp: string;
+  /** Wrap the body in a tap-to-reveal spoiler. */
+  spoiler: boolean;
+  /** Minutes east of UTC on the arming device: the relay refuses to move a job across zones. */
+  tz: number;
   routes: NotifyArmRoute[];
 }
 

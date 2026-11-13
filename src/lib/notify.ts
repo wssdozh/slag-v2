@@ -5,6 +5,7 @@ import { isTauriEnvironment } from './platform/platform';
 import { storage } from './storage';
 import { accountClient } from './sync/account';
 import { computeHash } from './sync/crypto';
+import { formatDueDateLabel } from './time/dateUtils';
 
 const notifyLog = logger.scope('NOTIFY');
 
@@ -16,6 +17,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Reminder text that carries only a time of day, e.g. "10:00" or "10:00:00". */
 const BARE_TIME = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 const CLOCK = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+/** A reminder that names its own offset is the one case where the instant, not the clock, is fixed. */
+const ABSOLUTE_REMINDER = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
 export const DEFAULT_NOTIFY_PREFS: NotifyPrefs = {
   tasks: true,
@@ -23,6 +26,7 @@ export const DEFAULT_NOTIFY_PREFS: NotifyPrefs = {
   quietFrom: '23:00',
   quietTo: '08:00',
   assistant: false,
+  spoiler: false,
 };
 
 /** What this session already pushed, so a re-render is not another arm call. */
@@ -47,6 +51,40 @@ function clockMinutes(value: string): number | null {
 function localDateKey(timestamp: number): string {
   const at = new Date(timestamp);
   return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+}
+
+function clockOf(timestamp: number): string {
+  const at = new Date(timestamp);
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * A wall clock with no zone: two devices in different zones have to agree that this is one
+ * reminder, so the dedup key cannot be built from the UTC instant.
+ */
+function localMinute(timestamp: number): string {
+  return `${localDateKey(timestamp)}T${clockOf(timestamp)}`;
+}
+
+/** The deadline as a human reads it: `сегодня, 14:30`. Built here, never on the relay. */
+function formatNotifyStamp(moment: number): string {
+  return `${formatDueDateLabel(localDateKey(moment)).toLowerCase()}, ${clockOf(moment)}`;
+}
+
+/**
+ * The deadline line the relay prints, or '' when the item has none.
+ *
+ * `fireAt` cannot stand in for it: quiet hours move that moment, and the relay never learns
+ * the recipient's clock, so the string is built on the device that owns the deadline.
+ */
+function dueStamp(item: SlagItem): string {
+  if (!item.dueDate) return '';
+  const bare = BARE_TIME.exec(item.reminder?.trim() ?? '');
+  if (!bare) return formatDueDateLabel(item.dueDate).toLowerCase();
+  const [year, month, day] = item.dueDate.split('-').map(Number);
+  if (![year, month, day].every(Number.isFinite)) return item.dueDate;
+  const at = new Date(year, month - 1, day, Number(bare[1]), Number(bare[2]), Number(bare[3] ?? 0));
+  return Number.isFinite(at.getTime()) ? formatNotifyStamp(at.getTime()) : item.dueDate;
 }
 
 /** Absolute epoch ms of `item.reminder`, or null when it cannot be resolved to a moment. */
@@ -142,9 +180,14 @@ async function planFor(item: SlagItem, prefs: NotifyPrefs, now: number): Promise
     const reminder = resolveReminder(item);
     if (reminder !== null && reminder > now) {
       const fireAt = shiftOutOfQuiet(reminder, prefs);
+      // A reminder that names its own offset is an instant; the rest are a local wall clock,
+      // and that is what two devices in different zones can agree on.
+      const moment = ABSOLUTE_REMINDER.test(item.reminder?.trim() ?? '')
+        ? new Date(reminder).toISOString()
+        : localMinute(reminder);
       return {
         itemKey: item.id,
-        eventKey: await computeHash(`${item.id}|task|${new Date(reminder).toISOString()}`),
+        eventKey: await computeHash(`${item.id}|task|${moment}`),
         fireAt,
         kind: 'task',
       };
@@ -200,12 +243,22 @@ export async function reconcileNotifications(
   // the arm call. The next pass retries until it is: the relay ignores the repeat.
   const hasPending = recipients.some((route) => route.state === 'pending');
   const recipientTokens = recipients.map((route) => route.token).sort().join(',');
+  // Minutes east of UTC. The relay keeps a queued job in the zone that armed it first, so a
+  // laptop in another country cannot pull the moment back and forth every half minute.
+  const tz = -new Date().getTimezoneOffset();
 
   for (const item of items) {
     if (!recipients.length) continue;
     const planned = await planFor(item, prefs, now);
     if (!planned) continue;
-    const signature = `${planned.eventKey}|${recipientTokens}`;
+    const title = item.title;
+    // Only markdown noise goes: `*`, `_`, `~` are literal text in telegram's html mode, and a
+    // note is allowed to say them out loud.
+    const body = item.content.replace(/[#`>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const stamp = dueStamp(item);
+    // The signature carries the message itself: an edit or a toggled spoiler must reach the
+    // job that is already standing, not only the next one.
+    const signature = `${planned.eventKey}|${recipientTokens}|${stamp}|${prefs.spoiler ? 1 : 0}|${title}|${body}`;
     if (!hasPending && armedKeys.get(planned.itemKey) === signature) {
       armedNow.add(planned.itemKey);
       continue;
@@ -217,11 +270,11 @@ export async function reconcileNotifications(
         eventKey: planned.eventKey,
         // UNIX seconds, same unit the relay stores `fire_at` in.
         fireAt: Math.floor(planned.fireAt / 1000),
-        routes: recipients.map((route) => ({
-          token: route.token,
-          title: planned.kind === 'overdue' ? `просрочено: ${item.title}` : item.title,
-          body: item.content.replace(/[#*_`>[\]~]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200),
-        })),
+        kind: planned.kind,
+        stamp,
+        spoiler: prefs.spoiler,
+        tz,
+        routes: recipients.map((route) => ({ token: route.token, title, body })),
       });
       const failed = new Set(result.dropped.map((drop) => drop.token));
       for (const drop of result.dropped) {
@@ -245,7 +298,17 @@ export async function reconcileNotifications(
   for (const itemKey of [...armedKeys.keys()]) {
     if (armedNow.has(itemKey)) continue;
     try {
-      await accountClient.armNotifications({ vaultId, itemKey, eventKey: null, fireAt: null, routes: [] });
+      await accountClient.armNotifications({
+        vaultId,
+        itemKey,
+        eventKey: null,
+        fireAt: null,
+        kind: 'task',
+        stamp: '',
+        spoiler: false,
+        tz: 0,
+        routes: [],
+      });
       armedKeys.delete(itemKey);
     } catch (error) {
       notifyLog.warn('Cancelling a reminder failed', { itemId: itemKey, error: describeError(error) });
