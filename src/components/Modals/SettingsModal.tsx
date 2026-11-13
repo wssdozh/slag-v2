@@ -111,19 +111,12 @@ export const SettingsModal: React.FC = () => {
           )}
         </div>
 
-        {/* Bottom Form Actions */}
-        <div
-          className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle bg-panel shrink-0"
-          style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
-        >
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(false)}
-            className="px-3 py-1.5 rounded-lg text-xs text-fg-muted hover:text-fg-primary transition-colors cursor-pointer"
+        {/* Only the AI tab has something to commit; every other tab closes from the header. */}
+        {activeTab === 'ai' && (
+          <div
+            className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle bg-panel shrink-0"
+            style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
           >
-            Закрыть
-          </button>
-          {activeTab === 'ai' && (
             <button
               type="submit"
               form="ai-settings-form"
@@ -131,8 +124,8 @@ export const SettingsModal: React.FC = () => {
             >
               Сохранить
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
