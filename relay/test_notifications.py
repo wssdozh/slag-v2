@@ -14,7 +14,16 @@ import tempfile
 import time
 import unittest
 
-from server import ApiError, NOTIFY_MAX_PER_HOUR_PER_ROUTE, NOTIFY_STALE_SECONDS, SlagRelayServer
+from server import (
+    ApiError,
+    NOTIFY_MAX_PER_HOUR_PER_ROUTE,
+    NOTIFY_STALE_SECONDS,
+    SlagRelayServer,
+    TG_EXPANDABLE_AFTER,
+    TG_TEXT_BUDGET,
+    TG_TEXT_LIMIT,
+    render_notification,
+)
 
 
 class FakeBot:
@@ -23,17 +32,68 @@ class FakeBot:
     def __init__(self):
         self.username = "test_bot"
         self.sent: list[tuple[str, str]] = []
+        self.calls: list[dict] = []
         self.failure: dict | None = None
+        # Telegram refuses markup it cannot parse; the relay must then retry without it.
+        self.reject_markup = False
 
     async def call(self, method: str, payload: dict, timeout: float = 20):
         if method == "sendMessage":
+            self.calls.append(dict(payload))
             if self.failure:
                 return False, dict(self.failure)
+            if self.reject_markup and payload.get("parse_mode"):
+                return False, {"ok": False, "error_code": 400,
+                               "description": "Bad Request: can't parse entities"}
             self.sent.append((str(payload["chat_id"]), str(payload["text"])))
             return True, {"ok": True, "result": {"message_id": len(self.sent)}}
         if method == "getMe":
             return True, {"ok": True, "result": {"username": self.username}}
         return True, {"ok": True, "result": []}
+
+
+class RenderTestCase(unittest.TestCase):
+    """The renderer is pure: escaping, the character budget and the HTML it produces."""
+
+    def test_user_text_is_escaped_not_interpreted(self):
+        html, plain = render_notification("Сдать <b>отчёт</b> & ко", "a < b", "task", "", False)
+        self.assertIn("&lt;b&gt;отчёт&lt;/b&gt;", html)
+        self.assertIn("&amp; ко", html)
+        self.assertIn("a &lt; b", html)
+        self.assertNotIn("<b>отчёт</b>", html)
+        # The fallback twin is the text a human typed, not the escaped one.
+        self.assertIn("<b>отчёт</b>", plain)
+
+    def test_overdue_leads_with_the_marker_and_the_deadline(self):
+        html, _ = render_notification("T", "тело", "overdue", "12 нояб., 18:00", False)
+        self.assertTrue(html.startswith("⚠️ "))
+        self.assertIn("срок был <code>12 нояб., 18:00</code>", html)
+        self.assertIn("<blockquote>", html)
+
+    def test_spoiler_hides_the_body_and_a_long_body_collapses(self):
+        body = "а" * (TG_EXPANDABLE_AFTER + 20)
+        html, _ = render_notification("T", body, "task", "", True)
+        self.assertIn('<span class="tg-spoiler">', html)
+        self.assertIn("<blockquote expandable>", html)
+        # A stray attribute in the closing tag is a 400 on every message.
+        self.assertIn("</blockquote>", html)
+        self.assertNotIn("</blockquote expandable>", html)
+
+    def test_escaping_never_pushes_the_message_over_the_limit(self):
+        body = "&" * 1500  # five characters of markup per character of text
+        html, plain = render_notification("T", body, "task", "13 нояб., 14:30", False)
+        self.assertLessEqual(len(html), TG_TEXT_BUDGET)
+        self.assertLessEqual(len(plain), TG_TEXT_LIMIT)
+        self.assertIn("…</blockquote>", html)
+
+    def test_no_stamp_line_without_a_deadline(self):
+        html, _ = render_notification("T", "тело", "task", "", False)
+        self.assertNotIn("<code>", html)
+        self.assertNotIn("срок", html)
+
+    def test_empty_title_still_renders_a_message(self):
+        html, _ = render_notification("   ", "", "task", "", False)
+        self.assertEqual(html, "<b>напоминание</b>")
 
 
 class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
@@ -53,11 +113,14 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.notify.conn.close()
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
-    async def arm(self, item_key: str, event_key: str, routes: list[dict], fire_at: float | None = None):
-        return self.server._arm_notifications({
+    async def arm(self, item_key: str, event_key: str, routes: list[dict], fire_at: float | None = None,
+                  **presentation):
+        payload = {
             "vaultId": "vault-1", "itemKey": item_key, "eventKey": event_key,
             "fireAt": time.time() - 1 if fire_at is None else fire_at, "routes": routes,
-        }, "vault-1")
+        }
+        payload.update(presentation)
+        return self.server._arm_notifications(payload, "vault-1")
 
     async def test_invite_lifecycle(self):
         expires = self.db.create_notify_invite("vault-1", "abc123def456", "route-token-1")
@@ -80,9 +143,10 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
 
         armed, dropped = await self.arm("item-1", "ev-1", routes)
         self.assertEqual((armed, dropped), (2, []))
-        # Two devices arming the same reminder must not produce two messages.
+        # Two devices arming the same reminder must not produce two messages. The repeat now
+        # refreshes the queued job, so it counts as accepted rather than as new.
         armed, _ = await self.arm("item-1", "ev-1", routes)
-        self.assertEqual(armed, 0)
+        self.assertEqual(armed, 2)
         self.assertEqual(self.db.count_notify_jobs("vault-1"), 2)
 
         await self.server._deliver_notifications()
@@ -111,7 +175,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
                   {"token": "tok-b", "title": "T", "body": ""}]
         self.assertEqual((await self.arm("item-1", "ev-1", routes))[0], 2)
         # The same event, one recipient fewer: the removed one must not get the message.
-        self.assertEqual((await self.arm("item-1", "ev-1", routes[:1]))[0], 0)
+        # The remaining route is refreshed, so the call still reports one accepted job.
+        self.assertEqual((await self.arm("item-1", "ev-1", routes[:1]))[0], 1)
         await self.server._deliver_notifications()
         self.assertEqual([chat for chat, _ in self.bot.sent], ["chat-a"])
 
@@ -264,6 +329,60 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         await self.server._deliver_notifications()
         self.assertIn("не ответило", self.bot.sent[-1][1])
         self.assertIsNotNone(self.db.get_assistant_request(request_id)["answered_at"])
+
+
+    async def test_delivered_reminder_carries_the_markup(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "Сдать <b>отчёт</b>", "body": "a < b"}],
+                       kind="overdue", stamp="12 нояб., 18:00")
+        await self.server._deliver_notifications()
+        payload = self.bot.calls[-1]
+        self.assertEqual(payload["parse_mode"], "HTML")
+        self.assertIn("&lt;b&gt;отчёт&lt;/b&gt;", payload["text"])
+        self.assertIn("срок был <code>12 нояб., 18:00</code>", payload["text"])
+        self.assertTrue(payload["text"].startswith("⚠️"))
+
+    async def test_refused_markup_still_delivers_the_text(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "T", "body": "тело"}])
+        self.bot.reject_markup = True
+        await self.server._deliver_notifications()
+        # First try with markup is refused, the second without it goes through.
+        self.assertEqual(len(self.bot.calls), 2)
+        self.assertIsNone(self.bot.calls[-1].get("parse_mode"))
+        self.assertEqual(self.bot.sent, [("chat-a", "T\nтело")])
+        self.assertEqual(self.db.count_notify_jobs("vault-1"), 0)
+
+    async def test_answer_from_a_device_is_escaped(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "вопрос")
+        self.assertTrue(await self.server._answer_assistant("vault-1", request_id, "<b>жирный</b> & <i>x</i>"))
+        self.assertEqual(self.bot.sent[-1][1], "&lt;b&gt;жирный&lt;/b&gt; &amp; &lt;i&gt;x&lt;/i&gt;")
+
+    async def test_arm_rejects_presentation_it_cannot_render(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        routes = [{"token": "tok-a", "title": "T", "body": ""}]
+        for broken in ({"kind": "reminder"}, {"stamp": "я" * 41}, {"tz": 5000}, {"spoiler": "да"}):
+            with self.assertRaises(ApiError):
+                await self.arm("item-1", "ev-1", routes, **broken)
+        self.assertEqual(self.db.count_notify_jobs("vault-1"), 0)
+
+    async def test_rearm_refreshes_an_unsent_job_but_never_across_timezones(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "старое", "body": ""}], tz=180)
+        # Same zone: an edited note reaches the queued job instead of firing stale text.
+        await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "новое", "body": ""}], tz=180)
+        job = self.db.conn.execute("SELECT * FROM notify_jobs").fetchone()
+        self.assertEqual(job["title"], "новое")
+
+        fire_at = time.time() + 600
+        await self.arm("item-1", "ev-1", [{"token": "tok-a", "title": "лиссабон", "body": ""}],
+                       fire_at=fire_at, tz=0)
+        job = self.db.conn.execute("SELECT * FROM notify_jobs").fetchone()
+        # Another timezone neither rewrites the text nor pulls the moment: the first arm owns it.
+        self.assertEqual(job["title"], "новое")
+        self.assertLess(job["fire_at"], fire_at)
 
 
 if __name__ == "__main__":

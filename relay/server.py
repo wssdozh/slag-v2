@@ -66,6 +66,13 @@ RATE_LIMIT_TG_ASK = 10
 NOTIFY_BATCH_SIZE = 50
 NOTIFY_CLAIM_LEASE_SECONDS = 120
 TG_API_BASE = "https://api.telegram.org"
+# Outgoing text is HTML, not MarkdownV2: three characters to escape instead of eighteen, and a
+# missed escape costs a 400 on a message a human was waiting for.
+TG_TEXT_LIMIT = 4096  # Bot API counts characters after the entities are parsed
+TG_TEXT_BUDGET = 3800  # our own ceiling: room for tags, and `&` grows fivefold when escaped
+TG_EXPANDABLE_AFTER = 120  # a longer quote is collapsed behind "show more"
+TG_STAMP_MAX = 40
+TG_KINDS = ("task", "overdue")
 # Telegram allows A-Z a-z 0-9 _ - in a start parameter, 1 to 64 characters.
 BOT_CODE_RE = re.compile(r"^[A-Za-z0-9_-]{8,32}$")
 # Anonymous write endpoints get a small per-IP budget: enough for a real pair flow,
@@ -401,6 +408,12 @@ class RelayDatabase:
             )""")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_notify_due ON notify_jobs(fire_at) WHERE sent_at IS NULL")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_notify_item ON notify_jobs(vault_id, item_key)")
+            # Presentation travels with the job: the relay renders the message, so it needs the
+            # event kind, the deadline in the recipient's own words, and the sender's offset.
+            self._ensure_column("notify_jobs", "kind", "TEXT NOT NULL DEFAULT 'task'")
+            self._ensure_column("notify_jobs", "stamp", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column("notify_jobs", "spoiler", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column("notify_jobs", "tz", "INTEGER NOT NULL DEFAULT 0")
             # The only place a vault id ever meets a chat id. Row dies an hour after it expires.
             self.conn.execute("""CREATE TABLE IF NOT EXISTS notify_invites (
                 code TEXT PRIMARY KEY,
@@ -970,12 +983,16 @@ class RelayDatabase:
         return row["n"] if row else 0
 
     def arm_notify_jobs(self, vault_id: str, item_key: str, event_key: Optional[str], fire_at: float,
-                        routes: list[dict]) -> tuple[int, list[dict]]:
+                        routes: list[dict], presentation: Optional[dict] = None) -> tuple[int, list[dict]]:
         """Idempotent: the (route, event) primary key is the whole dedup story.
 
         `routes` is the full desired recipient set for the item: a recipient dropped from it
         loses the already-queued job, otherwise deleting a route in settings would still
         deliver the message that was armed a minute earlier.
+
+        A repeat arm refreshes an unsent job (edited text, toggled spoiler) but only from the
+        same timezone: two devices in different zones would otherwise pull the moment back and
+        forth every reconcile, so the first arm keeps the clock and the second keeps quiet.
         """
         now = time.time()
         armed = 0
@@ -984,6 +1001,11 @@ class RelayDatabase:
                 self.conn.execute("DELETE FROM notify_jobs WHERE vault_id = ? AND item_key = ? AND sent_at IS NULL",
                                   (vault_id, item_key))
             return 0, []
+        look = presentation or {}
+        kind = look.get("kind", "task")
+        stamp = look.get("stamp", "")
+        spoiler = 1 if look.get("spoiler") else 0
+        tz = int(look.get("tz", 0))
         tokens = [route["token"] for route in routes]
         placeholders = ",".join("?" for _ in tokens)
         with self.conn:
@@ -993,11 +1015,17 @@ class RelayDatabase:
                 (vault_id, item_key, event_key, *tokens))
             for route in routes:
                 res = self.conn.execute("""
-                    INSERT OR IGNORE INTO notify_jobs
-                        (route_token, event_key, item_key, vault_id, fire_at, title, body, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO notify_jobs
+                        (route_token, event_key, item_key, vault_id, fire_at, title, body, created_at,
+                         kind, stamp, spoiler, tz)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(route_token, event_key) DO UPDATE SET
+                        title = excluded.title, body = excluded.body, fire_at = excluded.fire_at,
+                        kind = excluded.kind, stamp = excluded.stamp, spoiler = excluded.spoiler
+                    WHERE notify_jobs.sent_at IS NULL AND notify_jobs.tz = excluded.tz
                 """, (route["token"], event_key, item_key, vault_id, fire_at,
-                      route.get("title", ""), route.get("body", ""), now))
+                      route.get("title", ""), route.get("body", ""), now,
+                      kind, stamp, spoiler, tz))
                 armed += res.rowcount
         return armed, []
 
@@ -1132,6 +1160,64 @@ class NotifyStore:
 
     def close(self) -> None:
         self.conn.close()
+
+
+def tg_escape(text: str) -> str:
+    """Ampersand first: escaping `&` after `<` would edit the entities we just produced."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def tg_truncate(text: str, limit: int) -> str:
+    """Cut raw text, never markup: escaping runs after, so no entity can be split in half."""
+    if limit <= 0:
+        return ""
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def _notification_html(title: str, body: str, kind: str, stamp: str, spoiler: bool) -> str:
+    header = "⚠️ " if kind == "overdue" else ""
+    parts = [f"{header}<b>{tg_escape(title)}</b>"]
+    if body:
+        quoted = tg_escape(body)
+        if spoiler:
+            quoted = f'<span class="tg-spoiler">{quoted}</span>'
+        tag = "<blockquote expandable>" if len(body) > TG_EXPANDABLE_AFTER else "<blockquote>"
+        parts.append(f"{tag}{quoted}</blockquote>")
+    if stamp:
+        parts.append(f'{"срок был" if kind == "overdue" else "срок"} <code>{tg_escape(stamp)}</code>')
+    return "\n".join(parts)
+
+
+def _notification_plain(title: str, body: str, kind: str, stamp: str) -> str:
+    header = "⚠️ " if kind == "overdue" else ""
+    parts = [f"{header}{title}"]
+    if body:
+        parts.append(body)
+    if stamp:
+        parts.append(f'{"срок был" if kind == "overdue" else "срок"} {stamp}')
+    return "\n".join(parts)
+
+
+def render_notification(title: str, body: str, kind: str, stamp: str, spoiler: bool) -> Tuple[str, str]:
+    """(html, plain). The plain twin is what goes out when Telegram refuses the markup.
+
+    The body is the only unbounded part, and escaping turns one `&` into five characters: the
+    binary search finds the longest raw body whose escaped form still fits the budget.
+    """
+    title = title.strip() or "напоминание"
+    body = body.strip()
+    stamp = stamp.strip()
+    low, high = 0, len(body)
+    while low < high:
+        middle = (low + high + 1) // 2
+        candidate = tg_truncate(body, middle)
+        if len(_notification_html(title, candidate, kind, stamp, spoiler)) <= TG_TEXT_BUDGET:
+            low = middle
+        else:
+            high = middle - 1
+    body = tg_truncate(body, low) if len(body) > low else body
+    return (_notification_html(title, body, kind, stamp, spoiler),
+            tg_truncate(_notification_plain(title, body, kind, stamp), TG_TEXT_LIMIT))
 
 
 class TelegramBot:
@@ -1586,6 +1672,15 @@ class SlagRelayServer:
             raise ApiError(400, "invalid_notification")
         if not isinstance(raw_routes, list) or not raw_routes or len(raw_routes) > 20:
             raise ApiError(400, "invalid_notification")
+        # Presentation is rendered by the relay, so it is validated here, not trusted as markup.
+        kind = body.get("kind", "task")
+        stamp = body.get("stamp", "")
+        spoiler = body.get("spoiler", False)
+        tz = body.get("tz", 0)
+        if (kind not in TG_KINDS or not isinstance(stamp, str) or len(stamp) > TG_STAMP_MAX
+                or not isinstance(spoiler, bool) or not isinstance(tz, int) or isinstance(tz, bool)
+                or not -1440 <= tz <= 1440):
+            raise ApiError(400, "invalid_notification")
         if self.db.count_notify_jobs(vault_id) > NOTIFY_MAX_JOBS_PER_VAULT:
             raise ApiError(429, "notify_queue_full")
         vault_tag = self._notify_tag(vault_id)
@@ -1609,7 +1704,9 @@ class SlagRelayServer:
                 dropped.append({"token": token, "reason": "blocked"})
             else:
                 routes.append({"token": token, "title": title, "body": bodytext})
-        armed, _ = self.db.arm_notify_jobs(vault_id, item_key, event_key, float(fire_at), routes)
+        armed, _ = self.db.arm_notify_jobs(vault_id, item_key, event_key, float(fire_at), routes,
+                                           {"kind": kind, "stamp": stamp.strip(),
+                                            "spoiler": spoiler, "tz": tz})
         return armed, dropped
 
     async def handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -2956,13 +3053,26 @@ class SlagRelayServer:
                 logger.error("Telegram poll error: %s", exc)
                 await asyncio.sleep(10)
 
-    async def _bot_reply(self, chat_id: str, text: str) -> None:
+    async def _send_telegram(self, chat_id: str, html: str, plain: str, timeout: float = 20) -> Tuple[bool, dict]:
+        """HTML first. Telegram refusing our markup is our bug, not a reason to lose the message."""
+        ok, body = await self.bot.call("sendMessage", {"chat_id": chat_id, "text": html,
+                                                       "parse_mode": "HTML",
+                                                       "disable_web_page_preview": True}, timeout=timeout)
+        if ok or body.get("error_code") != 400:
+            return ok, body
+        logger.warning("Telegram refused the markup (%s), sending plain text", body.get("description"))
+        return await self.bot.call("sendMessage", {"chat_id": chat_id, "text": plain,
+                                                   "disable_web_page_preview": True}, timeout=timeout)
+
+    async def _bot_reply(self, chat_id: str, text: str, html: Optional[str] = None) -> bool:
+        """Bot copy is plain by contract; `html` is its formatted twin when the caller builds one."""
         if not self.bot:
-            return
-        ok, body = await self.bot.call("sendMessage", {"chat_id": chat_id, "text": text,
-                                                       "disable_web_page_preview": True}, timeout=15)
+            return False
+        plain = tg_truncate(text, TG_TEXT_LIMIT)
+        ok, body = await self._send_telegram(chat_id, html or tg_escape(plain), plain, timeout=15)
         if not ok:
             logger.warning("Telegram sendMessage failed: %s", body.get("description"))
+        return ok
 
     async def _handle_bot_update(self, update: dict) -> None:
         message = update.get("message")
@@ -2997,13 +3107,21 @@ class SlagRelayServer:
             await self._bot_question(chat_id, argument.strip())
             return
         if command == "/help":
-            await self._bot_reply(chat_id, "напоминания приходят сами. спросить ассистента можно обычным "
-                                           "сообщением, если устройство с хранилищем в сети. /stop — отписаться.")
+            await self._bot_reply(
+                chat_id,
+                "напоминания приходят сами — привязка один раз, по ссылке из приложения.\n"
+                "обычное сообщение уходит на устройство с открытым хранилищем, ответ придёт сюда же.\n"
+                "/stop — отписаться.",
+                html="<b>напоминания</b> приходят сами — привязка один раз, по ссылке из приложения.\n"
+                     "обычное сообщение уходит на устройство с открытым хранилищем, ответ придёт сюда же.\n"
+                     "<code>/stop</code> — отписаться.")
 
     async def _bot_start(self, chat_id: str, sender: str, code: str, message: dict) -> None:
         if not code:
             await self._bot_reply(chat_id, "это служебный бот slag. ссылку-приглашение создаёт приложение: "
-                                           "настройки → уведомления в telegram.")
+                                           "настройки → уведомления в telegram.",
+                                  html="это служебный бот slag. ссылку-приглашение создаёт приложение: "
+                                       "<code>настройки → уведомления в telegram</code>.")
             return
         if not BOT_CODE_RE.match(code):
             await self._bot_reply(chat_id, "код не похож на настоящий.")
@@ -3025,13 +3143,15 @@ class SlagRelayServer:
         self.db.redeem_notify_invite(code)
         vault = self.db.conn.execute("SELECT name FROM vaults WHERE id = ?", (invite["vault_id"],)).fetchone()
         source = f"«{vault['name']}»" if vault else "хранилища"
-        await self._bot_reply(chat_id, f"готово. напоминания из {source} будут приходить сюда.")
+        await self._bot_reply(chat_id, f"готово. напоминания из {source} будут приходить сюда.",
+                              html=f"<b>готово</b>. напоминания из {tg_escape(source)} будут приходить сюда.")
 
     async def _bot_question(self, chat_id: str, question: str) -> None:
         """Hands the text to a live device. The relay has no model and never answers itself."""
         question = question.strip()[:ASSISTANT_MAX_QUESTION]
         if not question:
-            await self._bot_reply(chat_id, "напиши вопрос текстом или /ask <вопрос>.")
+            await self._bot_reply(chat_id, "напиши вопрос текстом или /ask <вопрос>.",
+                                  html="напиши вопрос текстом или <code>/ask &lt;вопрос&gt;</code>.")
             return
         if not self._allow_request(f"tg-ask:{chat_id}", RATE_LIMIT_TG_ASK):
             await self._bot_reply(chat_id, "слишком часто, подожди минуту.")
@@ -3039,7 +3159,9 @@ class SlagRelayServer:
         linked = [row for row in self.notify.routes_for_chat(chat_id) if self.db.assistant_link(row["route_token"])]
         if not linked:
             await self._bot_reply(chat_id, "задавать вопросы отсюда нужно включить: настройки → уведомления → "
-                                           "ассистент в telegram.")
+                                           "ассистент в telegram.",
+                                  html="задавать вопросы отсюда нужно включить: "
+                                       "<code>настройки → уведомления → ассистент в telegram</code>.")
             return
         if len(linked) > 1:
             await self._bot_reply(chat_id, "к чату привязано несколько хранилищ — спроси из приложения, "
@@ -3066,9 +3188,9 @@ class SlagRelayServer:
         if not route or not self.bot:
             raise ApiError(409, "route_gone")
         self.db.finish_assistant_request(request_id)
-        ok, body = await self.bot.call("sendMessage", {"chat_id": route["chat_id"],
-                                                       "text": answer.strip()[:ASSISTANT_MAX_ANSWER],
-                                                       "disable_web_page_preview": True}, timeout=20)
+        text = tg_truncate(answer.strip(), ASSISTANT_MAX_ANSWER)
+        # The answer was typed into a model on a device: it is plain text, never markup.
+        ok, body = await self._send_telegram(route["chat_id"], tg_escape(text), text, timeout=20)
         if not ok:
             logger.warning("Telegram answer delivery failed: %s", body.get("description"))
         return ok
@@ -3110,9 +3232,9 @@ class SlagRelayServer:
                 continue
             if not self.db.claim_notify_job(route_token, event_key, now):
                 continue
-            text = job["title"] if not job["body"] else f"{job['title']}\n{job['body']}"
-            ok, body = await self.bot.call("sendMessage", {"chat_id": route["chat_id"], "text": text,
-                                                           "disable_web_page_preview": True}, timeout=20)
+            html, plain = render_notification(job["title"], job["body"], job["kind"], job["stamp"],
+                                              bool(job["spoiler"]))
+            ok, body = await self._send_telegram(route["chat_id"], html, plain, timeout=20)
             if ok:
                 self.db.finish_notify_job(route_token, event_key)
                 continue

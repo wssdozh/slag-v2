@@ -218,6 +218,41 @@ week must not dump a backlog), `429` is obeyed via `retry_after`, `403` blocks t
 good, one route gets at most 30 messages per hour regardless of who armed them, and a failed
 send gets exactly one retry.
 
+### what a reminder looks like
+
+the relay renders the message, so a note title can never smuggle markup into someone's chat:
+
+```html
+<b>сдать отчёт</b>
+<blockquote expandable>дописать раздел про релей</blockquote>
+срок <code>13 нояб., 14:30</code>
+```
+
+```html
+⚠️ <b>сдать отчёт</b>
+<blockquote>дописать раздел про релей</blockquote>
+срок был <code>12 нояб., 18:00</code>
+```
+
+`arm` carries the parts, not the markup: `kind` (`task`/`overdue`, picks the header and the
+label), `stamp` (the deadline in the sender's words, ≤40 chars, empty when the item has no due
+date), `spoiler` (wraps the body in `<span class="tg-spoiler">`), `tz` (minutes east of UTC).
+the text itself is escaped on the way out: `&` first, then `<` and `>`. the body is the only
+unbounded part and escaping can grow it fivefold, so it is cut by a binary search on the raw
+text until the escaped message fits 3800 characters (Bot API allows 4096 after parsing).
+`parse_mode` is `HTML`, never `MarkdownV2`: three characters to escape instead of eighteen, and
+one missed escape would be a `400` on a message a human was waiting for. if Telegram refuses
+the markup anyway, the same text goes out unformatted and the refusal is logged — a reminder is
+more valuable than its formatting.
+
+timezones: every wall-clock decision stays on the device (when to fire, quiet hours, the 10:00
+overdue ping) and the relay stores only epoch seconds. the dedup key is a local wall clock, not
+the UTC instant, so two devices in different zones count one reminder as one job; the moment
+belongs to whichever device armed it first, and an arm from another zone refreshes nothing
+(`ON CONFLICT ... WHERE notify_jobs.tz = excluded.tz`). the deadline in the message is therefore
+the deadline of the device that armed it — the relay never learns the recipient's zone, and
+neither does anyone else.
+
 ### asking the assistant from telegram
 
 the relay has no model. a plain message to the bot is forwarded to whatever device has the
