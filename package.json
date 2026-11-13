@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:desktop": "tauri dev",
-    "build": "tsc -b && vite build && vite build --config vite.mcp.config.ts && vite build --config vite.node.config.ts",
+    "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && vite build && vite build --config vite.mcp.config.ts && vite build --config vite.node.config.ts",
     "build:mcp": "vite build --config vite.mcp.config.ts",
     "build:node": "vite build --config vite.node.config.ts",
     "mcp": "node dist/mcp/index.js",
@@ -20,7 +20,7 @@
     "android:run": "adb shell am start -n com.slag.notes/com.slag.notes.MainActivity",
     "android:log": "adb logcat -s RustStdoutStderr:V SLAG:* chromium:I",
     "lint": "oxlint",
-    "check": "tsc -b && oxlint",
+    "check": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && oxlint",
     "map:code": "node scripts/gen-code-map.mjs",
     "where": "node scripts/gen-code-map.mjs where",
     "test:e2e": "playwright test",
