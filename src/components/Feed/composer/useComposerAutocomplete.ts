@@ -1,8 +1,8 @@
 // The composer's suggestions: which trigger is open, what it matches, and applying a row.
 import { useState, useMemo } from 'react';
-import type { SlagItem, FolderMeta } from '../../types';
-import type { TagMeta } from './TagSuggestionMenu';
-import { SLASH_COMMANDS } from '../../types/slashCommands';
+import type { SlagItem, FolderMeta } from '../../../types';
+import type { TagMeta } from '../TagSuggestionMenu';
+import { SLASH_COMMANDS } from '../../../types/slashCommands';
 
 export interface UseComposerAutocompleteOptions {
   content: string;

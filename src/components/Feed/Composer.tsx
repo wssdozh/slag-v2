@@ -26,8 +26,8 @@ import {
   Lock,
   Paperclip,
 } from 'lucide-react';
-import { useComposerDraft } from './useComposerDraft';
-import { useComposerAutocomplete } from './useComposerAutocomplete';
+import { useComposerDraft } from './composer/useComposerDraft';
+import { useComposerAutocomplete } from './composer/useComposerAutocomplete';
 import { ComposerReplyBanner } from './composer/ComposerReplyBanner';
 import { ComposerAttachmentStrip } from './composer/ComposerAttachmentStrip';
 import { ComposerTypeSelector } from './composer/ComposerTypeSelector';

@@ -7,10 +7,10 @@ import type {
   FolderMeta,
   ComposerDraft,
   ReplyTarget,
-} from '../../types';
-import { storage } from '../../lib/storage';
-import { extractFolderToken } from '../../lib/time/todoistTaskParser';
-import { UI_DELAYS } from '../../config';
+} from '../../../types';
+import { storage } from '../../../lib/storage';
+import { extractFolderToken } from '../../../lib/time/todoistTaskParser';
+import { UI_DELAYS } from '../../../config';
 
 export interface ComposerDraftState {
   content: string;
