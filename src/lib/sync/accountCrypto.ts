@@ -3,10 +3,10 @@ import { p256 } from '@noble/curves/nist.js';
 import { validateMnemonic } from './crypto';
 import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../media/byteCodec';
 import type { LocalDeviceIdentity } from './accountTypes';
-import { SYNC_CRYPTO_CONSTANTS, SYNC_STORAGE_KEYS } from '../../config';
+import { SYNC_CRYPTO_CONSTANTS } from '../../config';
+import { getCachedSecret, getSecret, SECRET_KEYS, setSecret } from '../platform/secretStore';
 
 const ACCOUNT_KEY_DOMAIN = SYNC_CRYPTO_CONSTANTS.ACCOUNT_KEY_DOMAIN;
-const DEVICE_KEY_PREFIX = SYNC_STORAGE_KEYS.DEVICE_KEY_PREFIX;
 const HKDF_SALT = new TextEncoder().encode(SYNC_CRYPTO_CONSTANTS.HKDF_SALT);
 const HKDF_INFO = new TextEncoder().encode(SYNC_CRYPTO_CONSTANTS.HKDF_INFO);
 
@@ -76,7 +76,7 @@ export async function generateAccountIdentity(seed: string): Promise<AccountIden
 }
 
 function readStoredDevice(deviceId: string): StoredDeviceIdentity | null {
-  const raw = localStorage.getItem(`${DEVICE_KEY_PREFIX}${deviceId}`);
+  const raw = getCachedSecret(SECRET_KEYS.deviceKey(deviceId));
   if (!raw) return null;
 
   let parsed: unknown;
@@ -119,7 +119,13 @@ export async function getOrCreateDeviceIdentity(
   platform: LocalDeviceIdentity['platform']
 ): Promise<LocalDeviceIdentity> {
   if (!deviceId.trim()) throw new Error('Device ID is required');
-  const stored = readStoredDevice(deviceId);
+  let stored = readStoredDevice(deviceId);
+  if (!stored) {
+    // The cache is preloaded for known devices, but a device created in another window may
+    // not be there yet. Import it before generating a replacement key.
+    await getSecret(SECRET_KEYS.deviceKey(deviceId));
+    stored = readStoredDevice(deviceId);
+  }
   if (stored) {
     return {
       deviceId,
@@ -139,18 +145,20 @@ export async function getOrCreateDeviceIdentity(
     crypto.subtle.exportKey('jwk', pair.privateKey),
   ]);
   const identity: StoredDeviceIdentity = { deviceId, name, platform, publicKey, privateKey };
-  localStorage.setItem(`${DEVICE_KEY_PREFIX}${deviceId}`, JSON.stringify(identity));
+  await setSecret(SECRET_KEYS.deviceKey(deviceId), JSON.stringify(identity));
   return { deviceId, name, platform, publicKey: JSON.stringify(publicKey) };
 }
 
-export function renameStoredDevice(deviceId: string, name: string): void {
+export async function renameStoredDevice(deviceId: string, name: string): Promise<void> {
+  if (!readStoredDevice(deviceId)) await getSecret(SECRET_KEYS.deviceKey(deviceId));
   const stored = readStoredDevice(deviceId);
   if (!stored) return;
   stored.name = name;
-  localStorage.setItem(`${DEVICE_KEY_PREFIX}${deviceId}`, JSON.stringify(stored));
+  await setSecret(SECRET_KEYS.deviceKey(deviceId), JSON.stringify(stored));
 }
 
 export async function getDevicePrivateKey(deviceId: string): Promise<CryptoKey> {
+  if (!readStoredDevice(deviceId)) await getSecret(SECRET_KEYS.deviceKey(deviceId));
   const stored = readStoredDevice(deviceId);
   if (!stored) throw new Error('Device identity is not stored on this device');
   return crypto.subtle.importKey(

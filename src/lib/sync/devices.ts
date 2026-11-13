@@ -87,7 +87,8 @@ export function parseStoredConfig(
   raw: string,
   defaultServerUrl: string,
   accountTokenPresent: boolean,
-  accountSessionDeviceId?: string
+  accountSessionDeviceId?: string,
+  seedPhrase?: string
 ): SyncConfig {
   const parsed = JSON.parse(raw);
   return {
@@ -97,7 +98,7 @@ export function parseStoredConfig(
       ? (accountSessionDeviceId || parsed.deviceId || generateDeviceId())
       : parsed.deviceId || generateDeviceId(),
     deviceName: parsed.deviceName || 'Это устройство',
-    seedPhrase: parsed.seedPhrase || generateMnemonic(12),
+    seedPhrase: seedPhrase ?? parsed.seedPhrase ?? '',
     autoSync: parsed.autoSync ?? true,
     subscriptionPlan: parsed.subscriptionPlan || 'smile',
     bgSyncIntervalMinutes: parsed.bgSyncIntervalMinutes ?? 0,
@@ -111,7 +112,8 @@ export function createInitialConfig(
   defaultServerUrl: string,
   baseRaw: string | null,
   accountTokenPresent: boolean,
-  accountSessionDeviceId?: string
+  accountSessionDeviceId?: string,
+  seedPhrase?: string
 ): SyncConfig {
   let inheritedDeviceId = generateDeviceId();
   let inheritedDeviceName = createDefaultDeviceName();
@@ -139,7 +141,7 @@ export function createInitialConfig(
       ? (accountSessionDeviceId || inheritedDeviceId)
       : inheritedDeviceId,
     deviceName: inheritedDeviceName,
-    seedPhrase: generateMnemonic(12),
+    seedPhrase: seedPhrase ?? generateMnemonic(12),
     autoSync: true,
     subscriptionPlan: inheritedPlan,
     bgSyncIntervalMinutes: inheritedBgSync,

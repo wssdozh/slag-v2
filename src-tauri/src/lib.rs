@@ -171,6 +171,8 @@ fn configure_window_border(window: &tauri::Window) {
 fn configure_window_border(_window: &tauri::Window) {}
 
 mod platform;
+#[cfg(desktop)]
+mod secure_store;
 #[cfg(target_os = "android")]
 mod media_plugin;
 
@@ -202,28 +204,45 @@ fn remove_system_hotkey() -> Result<platform::PlatformInfo, String> {
 }
 
 #[cfg(desktop)]
+fn resolve_open_target(base: &std::path::Path, target: &str) -> Result<(std::path::PathBuf, bool), String> {
+    use std::path::PathBuf;
+
+    // NUL would truncate the path in the OS call; control characters have no business here.
+    if target.contains('\0') || target.chars().any(|c| c.is_control()) {
+        return Err("invalid target".into());
+    }
+
+    let normalized = target.trim().replace('\\', "/");
+    if normalized.is_empty()
+        || normalized.starts_with('/')
+        || normalized.starts_with('~')
+        || normalized.as_bytes().get(1) == Some(&b':')
+    {
+        return Err("invalid target".into());
+    }
+
+    let mut path: PathBuf = base.to_path_buf();
+    for part in normalized.split('/') {
+        if part.is_empty() || part == "." || part == ".." {
+            return Err("invalid target".into());
+        }
+        if part.contains(':') {
+            return Err("invalid target".into());
+        }
+        path.push(part);
+    }
+
+    Ok((path, normalized.ends_with(".md")))
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, String> {
     let base_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let (target_path, is_file) = match target.as_str() {
         "logs" => (base_dir.join("logs"), false),
         "notes" => (base_dir.join("vaults").join("main").join("notes"), false),
-        other => {
-            let normalized = other.replace('\\', "/");
-            let clean = normalized.trim_start_matches('/');
-            let is_file = clean.ends_with(".md");
-            if clean.is_empty() {
-                (base_dir, false)
-            } else {
-                let mut path = base_dir;
-                for part in clean.split('/') {
-                    if !part.is_empty() {
-                        path.push(part);
-                    }
-                }
-                (path, is_file)
-            }
-        }
+        other => resolve_open_target(&base_dir, other)?,
     };
 
     if is_file {
@@ -232,6 +251,19 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
         }
     } else {
         let _ = std::fs::create_dir_all(&target_path);
+    }
+
+    // `..` is already rejected, but a symlink inside app data must not widen the target
+    // either. Canonicalize the directory that will actually be opened.
+    let canonical_base = std::fs::canonicalize(&base_dir).map_err(|e| e.to_string())?;
+    let check_path = if is_file {
+        target_path.parent().unwrap_or(&base_dir)
+    } else {
+        &target_path
+    };
+    let canonical_target = std::fs::canonicalize(check_path).map_err(|e| e.to_string())?;
+    if !canonical_target.starts_with(&canonical_base) {
+        return Err("invalid target".into());
     }
 
     #[cfg(target_os = "windows")]
@@ -364,7 +396,10 @@ pub fn run() {
             open_in_folder,
             get_platform_info,
             setup_system_hotkey,
-            remove_system_hotkey
+            remove_system_hotkey,
+            secure_store::secret_get,
+            secure_store::secret_set,
+            secure_store::secret_delete
         ]);
     }
 
@@ -608,4 +643,61 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running SLAG application");
+}
+
+#[cfg(all(test, desktop))]
+mod open_target_tests {
+    use super::resolve_open_target;
+    use std::path::{Path, PathBuf};
+
+    fn base() -> PathBuf {
+        PathBuf::from("C:\\Users\\test\\AppData\\Roaming\\com.slag.notes")
+    }
+
+    #[test]
+    fn accepts_vault_relative_targets() {
+        let (path, is_file) = resolve_open_target(&base(), "vaults/main/notes/a.md").unwrap();
+        assert_eq!(path, base().join("vaults").join("main").join("notes").join("a.md"));
+        assert!(is_file);
+    }
+
+    #[test]
+    fn accepts_logs_and_notes_aliases() {
+        // The aliases are resolved before this helper; it only has to accept their shapes.
+        assert!(resolve_open_target(&base(), "logs").is_ok());
+        assert!(resolve_open_target(&base(), "vaults/main/notes").is_ok());
+    }
+
+    #[test]
+    fn rejects_traversal_and_absolute_targets() {
+        for target in [
+            "..",
+            "../Windows",
+            "../../Windows/System32",
+            "vaults/../../Windows",
+            "a/./b",
+            "a//b",
+            "/etc/passwd",
+            "C:\\Windows",
+            "C:/Windows",
+            "~/.ssh",
+            "a\\..\\b",
+        ] {
+            assert!(resolve_open_target(&base(), target).is_err(), "accepted {target}");
+        }
+    }
+
+    #[test]
+    fn rejects_nul_and_control_characters() {
+        assert!(resolve_open_target(&base(), "logs\0evil").is_err());
+        assert!(resolve_open_target(&base(), "logs\n/evil").is_err());
+        assert!(resolve_open_target(&base(), "").is_err());
+    }
+
+    #[test]
+    fn keeps_normal_directories_relative() {
+        let (path, is_file) = resolve_open_target(Path::new("base"), "backups/main").unwrap();
+        assert_eq!(path, PathBuf::from("base").join("backups").join("main"));
+        assert!(!is_file);
+    }
 }

@@ -14,13 +14,12 @@ import type { DeviceSyncMode } from './types';
 import { logger } from '../logger/logger';
 import {
   DEFAULT_SYNC_SERVER_URL,
-  SYNC_STORAGE_KEYS,
   SYNC_INTERVALS,
 } from '../../config';
+import { deleteSecret, getCachedSecret, SECRET_KEYS, setSecret } from '../platform/secretStore';
 
 const accountLog = logger.scope('SYNC');
 
-const SESSION_KEY = SYNC_STORAGE_KEYS.ACCOUNT_SESSION;
 const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
 const POLL_INTERVAL_MS = SYNC_INTERVALS.POLL_INTERVAL_MS;
 
@@ -97,13 +96,13 @@ function responseError(data: unknown, status: number, statusText: string): strin
 }
 
 function loadSession(): AccountSession | null {
-  const raw = localStorage.getItem(SESSION_KEY);
+  const raw = getCachedSecret(SECRET_KEYS.accountSession);
   if (!raw) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    localStorage.removeItem(SESSION_KEY);
+    void deleteSecret(SECRET_KEYS.accountSession).catch(() => undefined);
     throw new Error('Stored account session is not valid JSON', { cause: error });
   }
   if (
@@ -113,7 +112,7 @@ function loadSession(): AccountSession | null {
     typeof parsed.accountId !== 'string' ||
     typeof parsed.deviceId !== 'string'
   ) {
-    localStorage.removeItem(SESSION_KEY);
+    void deleteSecret(SECRET_KEYS.accountSession).catch(() => undefined);
     throw new Error('Stored account session is invalid');
   }
   return parsed as unknown as AccountSession;
@@ -207,13 +206,13 @@ class AccountClient {
     }
   }
 
-  private writeSession(session: AccountSession): void {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  private writeSession(session: AccountSession): Promise<void> {
+    return setSecret(SECRET_KEYS.accountSession, JSON.stringify(session));
   }
 
-  private setSession(session: AccountSession): void {
+  private async setSession(session: AccountSession): Promise<void> {
     this.session = session;
-    this.writeSession(session);
+    await this.writeSession(session);
     this.patch({
       session,
       account: session.account ? session.account : null,
@@ -223,8 +222,8 @@ class AccountClient {
     });
   }
 
-  private clearSession(): void {
-    localStorage.removeItem(SESSION_KEY);
+  private async clearSession(): Promise<void> {
+    await deleteSecret(SECRET_KEYS.accountSession);
     this.session = null;
     this.patch({ session: null, account: null, devices: [], vaults: [], invitations: [] });
   }
@@ -259,7 +258,7 @@ class AccountClient {
       }
     }
     if (response.status === 401 && authenticated && this.getToken() === token) {
-      this.clearSession();
+      await this.clearSession();
     }
     if (!response.ok) throw new Error(responseError(data, response.status, response.statusText));
     return data as T;
@@ -322,7 +321,7 @@ class AccountClient {
       );
       if (!auth || typeof auth.token !== 'string' || !auth.token) {
         if (auth && auth.status === 'pending_device') {
-          this.clearSession();
+          await this.clearSession();
           if (typeof auth.requestId !== 'string' || typeof auth.continuationSecret !== 'string' || typeof auth.expiresAt !== 'string') {
             throw new Error('Сервер не поддерживает автоматическое подтверждение входа. Обновите сервер.');
           }
@@ -334,8 +333,8 @@ class AccountClient {
         throw new Error('Server response does not contain an authentication token');
       }
 
-      renameStoredDevice(device.deviceId, device.name);
-      this.setSession({
+      await renameStoredDevice(device.deviceId, device.name);
+      await this.setSession({
         token: auth.token,
         accountId: identity.accountId,
         deviceId: device.deviceId,
@@ -378,8 +377,8 @@ class AccountClient {
     if (typeof auth.token !== 'string' || !auth.token) throw new Error('Сервер не вернул сессию после подтверждения');
     this.cancelPendingLogin();
     accountLog.info('Device approval completed', { deviceId: pending.deviceId });
-    if (auth.device) renameStoredDevice(pending.deviceId, auth.device.name);
-    this.setSession({ token: auth.token, accountId: pending.accountId, deviceId: pending.deviceId,
+    if (auth.device) await renameStoredDevice(pending.deviceId, auth.device.name);
+    await this.setSession({ token: auth.token, accountId: pending.accountId, deviceId: pending.deviceId,
       account: auth.account, device: auth.device, serverUrl: pending.serverUrl });
     await this.fetchRemoteState();
     return 'authenticated';
@@ -406,7 +405,7 @@ class AccountClient {
     try {
       await this.run(() => this.request<void>('/api/auth/logout', { method: 'POST' }));
     } finally {
-      this.clearSession();
+      await this.clearSession();
     }
   }
 
@@ -440,7 +439,7 @@ class AccountClient {
       serverUrl: this.serverUrl,
     };
     this.session = nextSession;
-    this.writeSession(nextSession);
+    await this.writeSession(nextSession);
     this.patch({
       session: nextSession,
       account: accountResponse.account,
@@ -508,7 +507,7 @@ class AccountClient {
       method: 'PATCH', body: JSON.stringify({ name: clean }),
     });
     accountLog.info('Device renamed', { deviceId });
-    if (this.session && this.session.deviceId === deviceId) renameStoredDevice(deviceId, clean);
+    if (this.session && this.session.deviceId === deviceId) await renameStoredDevice(deviceId, clean);
   }
 
   revokeDevice(deviceId: string): Promise<void> {

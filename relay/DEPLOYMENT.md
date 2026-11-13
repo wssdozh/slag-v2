@@ -75,6 +75,30 @@ before release:
 5. verify `/health` reports `authRequired=true`; anonymous pair creation and room access must return 401, while account login, approved-device access and authenticated websocket sync pass.
 6. invalidate disposable http-era sessions and rotate test credentials; never reuse tokens exposed during http testing.
 
+## trusted reverse proxy — 2026-11-13
+
+rate limits are keyed by the direct peer by default. behind nginx every client shares one peer and
+one budget, so tell the relay which proxies may set `X-Forwarded-For`:
+
+```ini
+# systemd drop-in
+Environment=SLAG_TRUSTED_PROXIES=127.0.0.1/32
+```
+
+or `--trusted-proxies 127.0.0.1/32` on the command line. the value is a comma-separated list of
+IPs/CIDRs; an invalid value stops the relay at startup. nginx must **append** the real address,
+never pass a client-supplied header through untouched:
+
+```nginx
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Real-IP $remote_addr;
+```
+
+with that pair the relay walks the header right-to-left, skips trusted proxies and uses the first
+untrusted hop for `auth/challenge`, `pair/create`, `telemetry` and failed `pair/claim` attempts.
+requests from peers outside the list ignore `X-Forwarded-For` completely, so a direct client cannot
+rotate its own bucket.
+
 ## session lifetime — 2026-11-10
 
 `SESSION_TTL_SECONDS` is 3 days, and `RelayDatabase.authenticate_hash` slides `expires_at` a full

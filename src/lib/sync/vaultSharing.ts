@@ -70,7 +70,7 @@ export async function installSharedVault(
 
   const existing = storage.getVaults().find((vault) => (vault.syncId || vault.id) === shared.vaultId);
   const localId = existing ? existing.id : shared.vaultId;
-  syncEngine.setVaultSeedPhrase(localId, seedPhrase);
+  await syncEngine.setVaultSeedPhrase(localId, seedPhrase);
 
   if (existing) {
     if (connect) actions.switchVault(existing.id);

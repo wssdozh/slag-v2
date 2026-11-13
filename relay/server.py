@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import base64
 import hashlib
+import ipaddress
 import json
 import logging
 import mimetypes
@@ -36,6 +37,12 @@ PAIRING_TTL_SECONDS = 300
 CHALLENGE_TTL_SECONDS = 300
 DEVICE_REQUEST_TTL_SECONDS = 600
 SESSION_TTL_SECONDS = 3 * 24 * 3600
+# Anonymous write endpoints get a small per-IP budget: enough for a real pair flow,
+# not enough to fill sqlite from one host. The pairing claim has its own stricter limit.
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_AUTH_CHALLENGE = 60
+RATE_LIMIT_PAIR_CREATE = 30
+RATE_LIMIT_TELEMETRY = 120
 PLANS = {
     "free": {"label": "Free", "devices": 2, "cache_mb": 1024},
     "smile": {"label": "Smile", "devices": 5, "cache_mb": 10 * 1024},
@@ -844,12 +851,13 @@ class RelayDatabase:
 
 class SlagRelayServer:
     def __init__(self, host: str, port: int, db_path: str, require_account_auth: Optional[bool] = None,
-                 admin_token: Optional[str] = None):
+                 admin_token: Optional[str] = None, trusted_proxies: Optional[object] = None):
         self.host = host
         self.port = port
         self.start_time = time.time()
         self.rooms: Dict[str, Set[WebSocketConnection]] = {}
         self.failed_claim_attempts: Dict[str, list[float]] = {}
+        self.rate_limits: Dict[str, list[float]] = {}
         if require_account_auth is None:
             value = os.environ.get("SLAG_REQUIRE_ACCOUNT_AUTH", "false").strip().lower()
             if value not in ("1", "true", "yes", "on", "0", "false", "no", "off"):
@@ -859,7 +867,35 @@ class SlagRelayServer:
         if admin_token is None:
             admin_token = os.environ.get("SLAG_ADMIN_TOKEN")
         self.admin_token = admin_token.strip() if admin_token and admin_token.strip() else None
+        if trusted_proxies is None:
+            trusted_proxies = os.environ.get("SLAG_TRUSTED_PROXIES", "")
+        self.trusted_proxies = self._parse_trusted_proxies(trusted_proxies)
         self.db = RelayDatabase(db_path)
+
+    @staticmethod
+    def _parse_trusted_proxies(raw: object) -> list[object]:
+        """IPs/CIDRs whose X-Forwarded-For header we are allowed to believe."""
+        values = raw if isinstance(raw, (list, tuple)) else str(raw or "").split(",")
+        networks = []
+        for item in values:
+            text = str(item).strip()
+            if not text:
+                continue
+            try:
+                networks.append(ipaddress.ip_network(text, strict=False))
+            except ValueError as exc:
+                raise ValueError(f"invalid trusted proxy: {text!r}") from exc
+        return networks
+
+    def _is_trusted_proxy(self, value: str) -> bool:
+        try:
+            address = ipaddress.ip_address(value)
+        except ValueError:
+            return False
+        return any(
+            address.version == network.version and address in network
+            for network in self.trusted_proxies
+        )
 
     def _cors_headers(self) -> str:
         return ("Access-Control-Allow-Origin: *\r\n"
@@ -868,7 +904,9 @@ class SlagRelayServer:
 
     def _http_response(self, status_code: int, status_text: str, content_type: str, body: bytes) -> bytes:
         headers = [f"HTTP/1.1 {status_code} {status_text}", f"Content-Type: {content_type}",
-                   f"Content-Length: {len(body)}", "Connection: close", self._cors_headers().strip(), "", ""]
+                   f"Content-Length: {len(body)}", "Connection: close",
+                   "X-Content-Type-Options: nosniff", "Referrer-Policy: no-referrer",
+                   self._cors_headers().strip(), "", ""]
         return "\r\n".join(headers).encode("utf-8") + body
 
     def _json_response(self, data: dict, status: int = 200) -> bytes:
@@ -886,6 +924,47 @@ class SlagRelayServer:
             await writer.wait_closed()
         except Exception:
             pass
+
+    def _client_ip(self, writer: asyncio.StreamWriter, headers: Dict[str, str]) -> str:
+        peername = writer.get_extra_info("peername")
+        peer = peername[0] if peername else "unknown"
+        if not self._is_trusted_proxy(peer):
+            return peer
+        forwarded = headers.get("x-forwarded-for", "")
+        for hop in reversed([part.strip() for part in forwarded.split(",") if part.strip()]):
+            try:
+                address = ipaddress.ip_address(hop)
+            except ValueError:
+                continue
+            if not self._is_trusted_proxy(str(address)):
+                return str(address)
+        return peer
+
+    def _allow_request(self, key: str, limit: int, window: float = RATE_LIMIT_WINDOW_SECONDS) -> bool:
+        """Sliding-window token budget per key. False means 429, no state is written."""
+        now = time.time()
+        bucket = [stamp for stamp in self.rate_limits.get(key, []) if now - stamp < window]
+        if len(bucket) >= limit:
+            self.rate_limits[key] = bucket
+            return False
+        bucket.append(now)
+        self.rate_limits[key] = bucket
+        return True
+
+    def _prune_rate_limits(self) -> None:
+        now = time.time()
+        for key in list(self.rate_limits):
+            bucket = [stamp for stamp in self.rate_limits[key] if now - stamp < RATE_LIMIT_WINDOW_SECONDS]
+            if bucket:
+                self.rate_limits[key] = bucket
+            else:
+                self.rate_limits.pop(key, None)
+        for ip in list(self.failed_claim_attempts):
+            attempts = [stamp for stamp in self.failed_claim_attempts[ip] if now - stamp < 300]
+            if attempts:
+                self.failed_claim_attempts[ip] = attempts
+            else:
+                self.failed_claim_attempts.pop(ip, None)
 
     @staticmethod
     def _bearer(headers: dict, allow_raw: bool = False) -> str:
@@ -1183,7 +1262,7 @@ class SlagRelayServer:
                 await self._send_response(writer, self._json_response(data, status))
         except ApiError as exc:
             await self._send_response(writer, self._json_response({"error": exc.error}, exc.status))
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, AttributeError) as exc:
             logger.debug("Bad request: %s", type(exc).__name__)
             await self._send_response(writer, self._json_response({"error": "bad_request"}, 400))
 
@@ -1689,6 +1768,8 @@ class SlagRelayServer:
             }, 200
 
         if method == "POST" and path == "/api/telemetry/event":
+            if not self._allow_request(f"telemetry:{self._client_ip(writer, headers)}", RATE_LIMIT_TELEMETRY):
+                return {"error": "too_many_requests"}, 429
             event_type = body.get("eventType", "").strip()
             if not event_type:
                 raise ApiError(400, "missing_event_type")
@@ -1698,6 +1779,8 @@ class SlagRelayServer:
             return {"status": "ok", "id": event_id}, 200
 
         if method == "POST" and path == "/api/auth/challenge":
+            if not self._allow_request(f"challenge:{self._client_ip(writer, headers)}", RATE_LIMIT_AUTH_CHALLENGE):
+                return {"error": "too_many_requests"}, 429
             account_id = body.get("accountId", "")
             self._validate_account_id(account_id)
             return {"challenge": self.db.create_challenge(account_id), "expiresIn": CHALLENGE_TTL_SECONDS}, 200
@@ -1845,20 +1928,34 @@ class SlagRelayServer:
                 return {"status": "ok"}, 200
 
         if method == "POST" and path == "/api/pair/create":
+            if not self._allow_request(f"pair-create:{self._client_ip(writer, headers)}", RATE_LIMIT_PAIR_CREATE):
+                return {"error": "too_many_requests"}, 429
             auth = self._auth(headers) if self.require_account_auth or self._bearer(headers) else None
             host_device = auth["device_id"] if auth else body.get("deviceId", "anonymous")
+            if not isinstance(host_device, str) or not host_device:
+                raise ApiError(400, "invalid_device_id")
             if auth and body.get("deviceId") not in (None, host_device):
                 raise ApiError(403, "device_mismatch")
-            return self.db.create_pairing_session(host_device, body.get("publicKey", ""),
-                                                  body.get("clientNonce", secrets.token_hex(16)),
+            public_key = body.get("publicKey", "")
+            client_nonce = body.get("clientNonce", secrets.token_hex(16))
+            if not isinstance(public_key, str) or not isinstance(client_nonce, str):
+                raise ApiError(400, "invalid_pairing_key")
+            return self.db.create_pairing_session(host_device, public_key,
+                                                  client_nonce,
                                                   auth["account_id"] if auth else None,
                                                   auth["token_hash"] if auth else None), 200
 
         if method == "POST" and path == "/api/pair/claim":
-            peername = writer.get_extra_info("peername")
-            client_ip = peername[0] if peername else "unknown"
+            pin = body.get("pin", "")
+            if not isinstance(pin, str):
+                raise ApiError(400, "invalid_pin")
+            client_ip = self._client_ip(writer, headers)
             now = time.time()
             attempts = [t for t in self.failed_claim_attempts.get(client_ip, []) if now - t < 300]
+            if attempts:
+                self.failed_claim_attempts[client_ip] = attempts
+            else:
+                self.failed_claim_attempts.pop(client_ip, None)
             if len(attempts) >= 5:
                 return {"error": "too_many_attempts_retry_later"}, 429
             auth = self._auth(headers) if self.require_account_auth or self._bearer(headers) else None
@@ -1877,6 +1974,8 @@ class SlagRelayServer:
 
         if method == "POST" and path == "/api/pair/approve":
             session_id = body.get("sessionId", "")
+            if not isinstance(session_id, str) or not session_id:
+                raise ApiError(400, "invalid_session")
             pair_row = self.db.get_pairing_session(session_id)
             if self.require_account_auth or (pair_row and pair_row["host_account_id"]):
                 auth = self._auth(headers)
@@ -1902,6 +2001,8 @@ class SlagRelayServer:
 
         if method == "POST" and path == "/api/pair/reject":
             session_id = body.get("sessionId", "")
+            if not isinstance(session_id, str) or not session_id:
+                raise ApiError(400, "invalid_session")
             pair_row = self.db.get_pairing_session(session_id)
             if self.require_account_auth or (pair_row and pair_row["host_account_id"]):
                 self._pair_participant(session_id, self._auth(headers))
@@ -1910,6 +2011,8 @@ class SlagRelayServer:
 
         if method == "POST" and path == "/api/pair/exchange":
             session_id = body.get("sessionId", "")
+            if not isinstance(session_id, str) or not session_id:
+                raise ApiError(400, "invalid_session")
             pair_row = self.db.get_pairing_session(session_id)
             if self.require_account_auth or (pair_row and pair_row["host_account_id"]):
                 raise ApiError(403, "use_pair_approve")
@@ -2170,8 +2273,11 @@ class SlagRelayServer:
             static_dir = os.environ.get("SLAG_STATIC_DIR") or str(Path(__file__).resolve().parent / "dist")
             if os.path.isdir(static_dir):
                 clean_path = path.lstrip("/")
-                target = (Path(static_dir) / clean_path).resolve()
-                if not str(target).startswith(str(Path(static_dir).resolve())):
+                static_root = Path(static_dir).resolve()
+                target = (static_root / clean_path).resolve()
+                try:
+                    target.relative_to(static_root)
+                except ValueError:
                     raise ApiError(403, "access_denied")
                 if clean_path and target.is_file():
                     mime, _ = mimetypes.guess_type(str(target))
@@ -2348,6 +2454,7 @@ class SlagRelayServer:
             await asyncio.sleep(60)
             try:
                 self.db.cleanup_expired()
+                self._prune_rate_limits()
             except Exception as exc:
                 logger.error("Cleanup error: %s", exc)
 
@@ -2366,8 +2473,11 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--db", default="data/relay.db")
     parser.add_argument("--admin-token", default=os.environ.get("SLAG_ADMIN_TOKEN"))
+    parser.add_argument("--trusted-proxies", default=os.environ.get("SLAG_TRUSTED_PROXIES", ""),
+                        help="comma-separated IPs/CIDRs allowed to set X-Forwarded-For")
     args = parser.parse_args()
-    relay = SlagRelayServer(args.host, args.port, args.db, admin_token=args.admin_token)
+    relay = SlagRelayServer(args.host, args.port, args.db, admin_token=args.admin_token,
+                            trusted_proxies=args.trusted_proxies)
     try:
         asyncio.run(relay.run())
     except KeyboardInterrupt:

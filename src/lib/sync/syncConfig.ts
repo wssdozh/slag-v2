@@ -1,5 +1,5 @@
 // Where the sync config lives per vault, how requests are authorized, how a seed phrase is stored.
-import { storage } from '../storage';
+import { vault } from '../storage/port';
 import { logger } from '../logger/logger';
 import { accountClient } from './account';
 import {
@@ -7,6 +7,7 @@ import {
   parseStoredConfig,
   createInitialConfig,
 } from './devices';
+import { generateMnemonic } from './crypto';
 import type { SyncConfig, SyncStatus } from './types';
 import {
   DEFAULT_SYNC_SERVER_URL,
@@ -14,6 +15,7 @@ import {
   SYNC_STORAGE_KEYS,
   SYNC_INTERVALS,
 } from '../../config';
+import { getCachedSecret, SECRET_KEYS, setSecret } from '../platform/secretStore';
 
 const SYNC_CONFIG_KEY = SYNC_STORAGE_KEYS.SYNC_CONFIG;
 const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
@@ -38,9 +40,10 @@ export function computeSubscription(store: SyncConfigHost): SyncStatus['subscrip
 }
 
 export function loadConfig(store: SyncConfigHost, targetVaultId?: string): SyncConfig {
-  const vid = targetVaultId || (typeof storage !== 'undefined' && storage.getCurrentVault ? storage.getCurrentVault()?.id : 'default_vault') || 'default_vault';
+  const vid = targetVaultId || vault().getCurrentVault()?.id || 'default_vault';
   store.currentVaultId = vid;
   const key = `${SYNC_CONFIG_KEY}_${vid}`;
+  const secret = getCachedSecret(SECRET_KEYS.vaultSeed(vid));
   try {
     let raw = localStorage.getItem(key);
     if (!raw && vid === 'default_vault') {
@@ -51,31 +54,48 @@ export function loadConfig(store: SyncConfigHost, targetVaultId?: string): SyncC
         raw,
         DEFAULT_SERVER_URL,
         accountClient.getToken(DEFAULT_SERVER_URL) !== null,
-        accountClient.getSession()?.deviceId
+        accountClient.getSession()?.deviceId,
+        secret ?? undefined
       );
     }
   } catch {
     // fallback
   }
 
+  const seed = secret ?? generateMnemonic(12);
   const baseRaw = localStorage.getItem(SYNC_CONFIG_KEY) || localStorage.getItem(`${SYNC_CONFIG_KEY}_default_vault`);
   const initial = createInitialConfig(
     DEFAULT_SERVER_URL,
     baseRaw,
     accountClient.getToken(DEFAULT_SERVER_URL) !== null,
-    accountClient.getSession()?.deviceId
+    accountClient.getSession()?.deviceId,
+    seed
   );
   saveConfig(store, initial);
+  if (!secret) {
+    void setSecret(SECRET_KEYS.vaultSeed(vid), seed).catch((error: unknown) => {
+      syncLog.error('Failed to persist a new vault seed', error);
+    });
+  }
   return initial;
 }
 
 export function saveConfig(store: SyncConfigHost, newConfig: Partial<SyncConfig>): void {
-  store.config = { ...store.config, ...newConfig };
+  const { seedPhrase, ...rest } = newConfig;
+  store.config = { ...store.config, ...rest };
+  if (typeof seedPhrase === 'string') {
+    store.config.seedPhrase = seedPhrase;
+    void setSecret(SECRET_KEYS.vaultSeed(store.currentVaultId), seedPhrase).catch((error: unknown) => {
+      syncLog.error('Failed to persist the vault seed', error);
+    });
+  }
   try {
     const key = `${SYNC_CONFIG_KEY}_${store.currentVaultId}`;
-    localStorage.setItem(key, JSON.stringify(store.config));
+    const persisted: Partial<SyncConfig> = { ...store.config };
+    delete persisted.seedPhrase;
+    localStorage.setItem(key, JSON.stringify(persisted));
     if (store.currentVaultId === 'default_vault') {
-      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(store.config));
+      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(persisted));
     }
   } catch (e) {
     syncLog.error('Failed to save sync config:', e);
@@ -111,29 +131,36 @@ export async function refreshServerAuth(store: SyncConfigHost): Promise<boolean>
 }
 
 export function getVaultSeedPhrase(store: SyncConfigHost, vaultId: string): string | null {
-  if (vaultId === store.currentVaultId) return store.config.seedPhrase;
+  if (vaultId === store.currentVaultId) return store.config.seedPhrase || null;
+  const cached = getCachedSecret(SECRET_KEYS.vaultSeed(vaultId));
+  if (cached) return cached;
   try {
     const raw = localStorage.getItem(`${SYNC_CONFIG_KEY}_${vaultId}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return typeof parsed.seedPhrase === 'string' ? parsed.seedPhrase : null;
+    return typeof parsed.seedPhrase === 'string' && parsed.seedPhrase ? parsed.seedPhrase : null;
   } catch {
     return null;
   }
 }
 
-export function setVaultSeedPhrase(store: SyncConfigHost, vaultId: string, seedPhrase: string): void {
+export async function setVaultSeedPhrase(store: SyncConfigHost, vaultId: string, seedPhrase: string): Promise<void> {
+  await setSecret(SECRET_KEYS.vaultSeed(vaultId), seedPhrase);
   if (vaultId === store.currentVaultId) {
-    saveConfig(store, { seedPhrase });
+    store.config = { ...store.config, seedPhrase };
+    saveConfig(store, {});
     return;
   }
+
+  // Keep device/server metadata in that vault's config, but never write the seed back there.
   const raw = localStorage.getItem(`${SYNC_CONFIG_KEY}_${vaultId}`);
   const base = raw ? JSON.parse(raw) : store.config;
-  localStorage.setItem(`${SYNC_CONFIG_KEY}_${vaultId}`, JSON.stringify({
+  const persisted: Partial<SyncConfig> = {
     ...base,
     deviceId: store.config.deviceId,
     deviceName: store.config.deviceName,
     serverUrl: store.config.serverUrl,
-    seedPhrase,
-  }));
+  };
+  delete persisted.seedPhrase;
+  localStorage.setItem(`${SYNC_CONFIG_KEY}_${vaultId}`, JSON.stringify(persisted));
 }
