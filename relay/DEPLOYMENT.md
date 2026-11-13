@@ -166,3 +166,55 @@ check live state without printing environment secrets:
 systemctl show slag-relay -p ActiveState -p SubState -p ExecMainStatus -p NRestarts
 curl --fail http://127.0.0.1:8320/health
 ```
+
+## telegram notifications — 2026-11-13
+
+reminders leave the vault through the relay: the client arms a job, the relay calls the Bot
+API at `fire_at`. two rules shape the whole thing.
+
+**one poller per token.** `getUpdates` and a webhook are mutually exclusive and a second
+poller gets `409 Conflict`; a stuck webhook keeps returning 409 even after it is deleted.
+so: one token lives on one process. a dev relay runs **without** `SLAG_TG_BOT_TOKEN`
+(jobs queue up, nothing is sent) and delivery is verified on the server only. check the
+token is not shadowed by a webhook before starting:
+`curl -s "https://api.telegram.org/bot$TOKEN/getWebhookInfo"` must show an empty `url`.
+
+**a chat id never reaches `relay.db`.** routes live in a second file next to it:
+
+| file | holds | must never hold |
+| --- | --- | --- |
+| `relay.db` | vaults, accounts, `notify_jobs`, `notify_invites` | any `chat_id` |
+| `notify_routes.db` | `route_token → chat_id` | vault, account, device ids |
+
+`notify_invites` is the only row that touches both sides, it expires in 10 minutes and is
+deleted an hour after that. comment out nothing, join nothing: both files are opened by the
+same process, so a future change that "just adds a column" is what breaks the property.
+
+env (systemd drop-in, `chmod 600`):
+
+| variable | default | meaning |
+| --- | --- | --- |
+| `SLAG_TG_BOT_TOKEN` | — | absent → no polling, no delivery, `/api/notify/invite` answers `503 notify_bot_not_configured` |
+
+gate behaviour: `POST /api/notify/invite` and `POST /api/notify/arm` need a paid plan
+(`smile`/`angry`) or they answer `402 notifications_plan_required`; a token that was never
+linked through `/start` comes back in `dropped` with `not_linked`, a blocked one with
+`blocked`; more than 5 unredeemed invites per vault → `429 too_many_invites`; more than 500
+queued jobs per vault → `429 notify_queue_full`.
+
+delivery behaviour: a job older than an hour is closed unsent (a laptop waking up after a
+week must not dump a backlog), `429` is obeyed via `retry_after`, `403` blocks the route for
+good, and one failed send gets exactly one retry.
+
+acceptance probe, in this order:
+
+```sh
+curl -s "https://api.telegram.org/bot$SLAG_TG_BOT_TOKEN/getMe"        # must answer ok:true
+systemctl restart slag-relay && journalctl -u slag-relay -n 40 --no-pager
+# then, from a telegram account: send /start <code from Settings → notifications>
+sqlite3 /opt/slag-relay/data/notify_routes.db "select chat_id, blocked_at from notify_routes"
+sqlite3 /opt/slag-relay/data/relay.db "select count(*) from notify_jobs where sent_at is null"
+```
+
+the last line is the privacy check nobody should skip: the relay database knows how many
+reminders are queued, not who they are for.
