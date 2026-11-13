@@ -78,18 +78,26 @@ export function resolveComposerFields({
   dismissals,
 }: ComposerFieldSources): ComposerFields {
   // `@Папка` and `#тег` are composer syntax: both are stripped before saving.
+  const parsed = parseTodoistInput(content);
   const { cleanContent: withoutFolder, folder } = extractFolderToken(content, folders);
   const { cleanContent, tags: extractedTags } = extractAndStripTags(withoutFolder);
-  const finalContent = (cleanContent || withoutFolder || content).trim();
+  const baseContent = (cleanContent || withoutFolder || content).trim();
 
-  const parsed = parseTodoistInput(content);
+  const isTask = itemType === 'task';
+  // A task's first line is its title, and the parser already removed the date, time,
+  // priority and repeat from it. Keeping them in the body printed the same fact twice:
+  // `сегодня в 17:42` in the text and `13 ноя · 17:42` in the meta under it.
+  const taskFirstLine = extractFolderToken(parsed.cleanText, folders).cleanContent;
+  const finalContent = isTask
+    ? [taskFirstLine, ...baseContent.split('\n').slice(1)].join('\n').trim()
+    : baseContent;
+
   const finalTags = Array.from(new Set([
     ...tags,
     ...parsed.tags.filter((tag) => !dismissals.dismissedTags.has(tag)),
     ...extractedTags.filter((tag) => !dismissals.dismissedTags.has(tag)),
   ]));
 
-  const isTask = itemType === 'task';
   const nextPriority = isTask
     ? (!dismissals.isPriorityDismissed && parsed.priority ? parsed.priority : priority)
     : undefined;

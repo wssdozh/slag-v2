@@ -4,6 +4,8 @@ import * as chronoEn from 'chrono-node/en';
 import type { RecurrenceRule } from '../../types';
 
 export interface ParsedTodoistTask {
+  /** The first line with the date, time, priority, repeat, duration and tags cut out. */
+  cleanText: string;
   cleanTitle: string;
   dueDate?: string; // YYYY-MM-DD
   reminder?: string; // ISO 8601 string
@@ -198,7 +200,8 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
   }
 
   // f) Clean Title
-  let cleanTitle = workingText.replace(/\s+/g, ' ').trim();
+  const cleanText = workingText.replace(/\s+/g, ' ').trim();
+  let cleanTitle = cleanText;
   if (cleanTitle) {
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
   } else {
@@ -206,6 +209,7 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
   }
 
   return {
+    cleanText,
     cleanTitle,
     dueDate,
     reminder,
