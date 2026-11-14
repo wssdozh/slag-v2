@@ -15,7 +15,6 @@ from tg import TG_KINDS, TG_STAMP_MAX, TelegramBot, render_notification, tg_esca
 from typing import Optional
 
 from settings import *
-from tg import render_notification, tg_escape
 
 
 class DeliveryDomain:

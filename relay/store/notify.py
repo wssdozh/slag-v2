@@ -4,6 +4,8 @@
 знает исключительно `notify_routes.db`.
 """
 
+from __future__ import annotations
+
 import sqlite3
 import hashlib
 import hmac

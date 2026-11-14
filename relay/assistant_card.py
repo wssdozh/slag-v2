@@ -3,6 +3,8 @@
 Чистые функции без I/O — их гоняют тесты и зовёт бот и http-слой.
 """
 
+from __future__ import annotations
+
 import json
 import re
 from typing import Optional, Tuple

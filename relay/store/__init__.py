@@ -3,6 +3,8 @@
 Тесты и `server.py` видят один класс с прежним именем — разложено только по файлам.
 """
 
+from __future__ import annotations
+
 from store.base import StoreBase
 from store.bundles import BundlesMixin
 from store.accounts import AccountsMixin

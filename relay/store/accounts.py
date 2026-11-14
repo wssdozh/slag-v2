@@ -4,6 +4,8 @@
 не покидает устройство, и серверу нечего терять.
 """
 
+from __future__ import annotations
+
 import sqlite3
 import hashlib
 import secrets

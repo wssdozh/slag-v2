@@ -1,5 +1,7 @@
 """RFC 6455 на минималках и бинарный кадр бандла: один сокет, без фреймворка."""
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import hashlib
@@ -53,6 +55,9 @@ class WebSocketConnection:
         self.closed = False
         self.token_hash = None
         self.vault_id = None
+        # Last time this socket said anything at all. The handshake counts: a device that just
+        # connected is alive even before its first ping.
+        self.last_frame_at = time.monotonic()
 
     async def send_text(self, text: str) -> None:
         if self.closed:

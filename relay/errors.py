@@ -3,6 +3,8 @@
 `handle_http_request` ловит его и превращает в json; всё остальное в релее — 500.
 """
 
+from __future__ import annotations
+
 
 class ApiError(Exception):
     def __init__(self, status: int, error: str):

@@ -35,56 +35,72 @@
 
 целевые модули и уровни (импорт разрешён только «вниз»):
 
-| уровень | модуль | из чего | ~строк |
+| уровень | модуль | что | строк |
 |---|---|---|---|
-| 0 | `errors.py` | `ApiError` | 10 |
-| 0 | `settings.py` | env/флаги/PLANS/прокси/TTL-константы | 130 |
-| 0 | `ratelimit.py` | `RATE_LIMIT_*` + `RateLimiter` | 80 |
-| 0 | `wire.py` | `WebSocketConnection`, `decode_bundle_frame`, `WS_GUID` | 130 |
-| 0 | `assistant_card.py` | `iso_time`, `hash_token`, `assistant_action_*`, `assistant_card_block`, `assistant_message_html`, `parse_assistant_action` | 160 |
-| 0 | `notify_routes.py` | `NotifyStore` | 100 |
-| 1 | `store/schema.py` | DDL + `_ensure_column` (249 строк сейчас) | 300 |
-| 1 | `store/base.py` | conn, cache bytes, rooms, telemetry, cleanup, max-cache const | 180 |
-| 1 | `store/bundles.py` | save/pending/watermarks/acks | 110 |
-| 1 | `store/accounts.py` | регистрация, сессии, челленджи, девайсы, audit, ai usage | 200 |
-| 1 | `store/pairing.py` | pairing-сессии | 90 |
-| 1 | `store/vaults.py` | vaults + grants | 110 |
-| 1 | `store/notify.py` | инвайты, джобы, лимиты, delivery-события, assistant_links | 250 |
-| 1 | `store/assistant.py` | `assistant_requests` жизненный цикл | 110 |
-| 2 | `ai_proxy.py` | kie/groq, `_normalize_ai_model`, дневной лимит | 260 |
-| 2 | `delivery.py` | `_arm_notifications`, `_armed_digest`, `_notify_channel_state`, `notify_delivery_loop`, `_deliver_notifications` | 230 |
-| 2 | `assistant.py` | `_bot_question`, typing/bubble/stage, `_answer_assistant`, action/drop callbacks, expiry loop, `_pick_device` | 520 |
-| 2 | `bot.py` | `bot_loop`, `_handle_bot_update`, `/start`, команды, telegram-обёртки, `_public_base` | 480 |
-| 2 | `http_plumbing.py` | `handle_connection/_route_http` вход, ответы, CORS, client ip, bearer | 200 |
-| 2 | `routes_admin.py` | `/api/admin/*` | 560 |
-| 2 | `routes_auth.py` | `/api/telemetry/event`, `/api/auth/*`, `/api/account*` | 200 |
-| 2 | `routes_notify.py` | `/api/notify/*`, `/api/assistant/*`, `/api/vaults*`, `/api/pair/*` | 330 |
-| 2 | `routes_sync.py` | `/api/sync/*`, `/n`, статика | 170 |
-| 2 | `routes_ai.py` | `/api/ai/chat`, `/api/ai/vision`, `/api/ai/audio` | 220 |
-| 3 | `router.py` | упорядоченная таблица маршрутов + диспетчер | 140 |
-| 3 | `realtime.py` | ws upgrade, сообщения, ingest bundle, broadcast | 230 |
-| 4 | `server.py` | `__init__`, auth-хелперы, валидаторы, подписи, `run`, `main`, ре-экспорты | ~450 |
+| 0 | `settings.py` | TTL, лимиты, тексты бота, `PLANS` | 115 |
+| 0 | `errors.py` | `ApiError` | 13 |
+| 0 | `fmt.py` | `iso_time`, `hash_token` | 15 |
+| 0 | `assistant_card.py` | action-разметка, HTML карточки, разбор action | 125 |
+| 0 | `wire.py` | `WebSocketConnection`, бинарный кадр бандла | 120 |
+| 0 | `notify_routes.py` | `NotifyStore` (второй файл: route → chat) | 83 |
+| 0 | `tg.py` | Bot API, экранирование, рендер — вынесен раньше, не трогали | 237 |
+| 1 | `store/schema.py` | DDL + `apply_schema`/`ensure_column` | 266 |
+| 1 | `store/base.py` | соединение, комнаты, кэш, cleanup | 95 |
+| 1 | `store/bundles.py` | бандлы, водарки, ack | 90 |
+| 1 | `store/accounts.py` | аккаунты, устройства, сессии, аудит | 204 |
+| 1 | `store/pairing.py` | pairing-сессии | 94 |
+| 1 | `store/vaults.py` | хранилища и гранты | 114 |
+| 1 | `store/notify.py` | очередь, инвайты, delivery-события | 149 |
+| 1 | `store/assistant.py` | `assistant_requests` | 111 |
+| 2 | `ai_proxy.py` | kie/groq, дневной лимит | 148 |
+| 2 | `delivery.py` | доставка уведомлений | 170 |
+| 2 | `bot.py` | long polling, команды, привязка чата | 275 |
+| 2 | `assistant.py` | вопрос → устройство → ответ, стадии | 319 |
+| 2 | `assistant_actions.py` | action/drop кнопки и применение | 183 |
+| 2 | `http_plumbing.py` | чтение запроса, ответы, CORS, лимитер | 148 |
+| 2 | `realtime.py` | ws upgrade, кадры, broadcast | 192 |
+| 2 | `routes_health.py` | `/health`, `/n` | 32 |
+| 2 | `routes_admin.py` | аккаунты, биллинг, аудит | 176 |
+| 2 | `routes_admin_ops.py` | AI-статы, комнаты, обслуживание, графики | 378 |
+| 2 | `routes_auth.py` | телеметрия, вход, устройства | 151 |
+| 2 | `routes_notify.py` | приглашения, ассистент-http | 154 |
+| 2 | `routes_vaults.py` | хранилища, гранты, pairing, комнаты | 233 |
+| 2 | `routes_ai.py` | чат, vision, whisper | 206 |
+| 2 | `routes_static.py` | раздача собранного веба | 51 |
+| 3 | `router.py` | диспетчер и `_NEXT` | 26 |
+| 4 | `server.py` | сборка, auth-хелперы, `run`, `main`, фасад | 319 |
 
 ## фазы (каждая заканчивается зелёным и коммитом)
 
-**A. листья, нулевой риск** — `errors`, `settings`, `ratelimit`, `wire`, `assistant_card`, `notify_routes`, `store/*`. `server.py` 4136 → ~2100. правка тестов: 6 строк `patch("server.RATE_LIMIT_*")` → `patch("ratelimit.RATE_LIMIT_*")`.
+## фазы (каждая заканчивается зелёным и коммитом)
 
-**B. телеграм-домен** — `ai_proxy`, `delivery`, `assistant`, `bot`. `server.py` ~2100 → ~950.
+**A. листья, нулевой риск** — `settings`, `fmt`, `errors`, `assistant_card`, `wire`, `notify_routes`, `store/*`. `server.py` 4136 → 2742.
 
-**C. транспорт** — `http_plumbing`, `routes_*`, `router`, `realtime`. `server.py` ~950 → ~450. эндпоинты переносятся блоками в исходном порядке: порядок цепочки `if` — часть контракта (prefix-блоки падают сквозь себя).
+**B. телеграм-домен** — `ai_proxy`, `delivery`, `assistant`, `bot`. `server.py` 2742 → 1771.
+
+**C. транспорт** — `http_plumbing`, `router`, `realtime`, `routes_*`. `server.py` 1771 → 319. эндпоинты переносятся блоками в исходном порядке: порядок цепочки `if` — часть контракта (prefix-блоки падают сквозь себя), поэтому у каждого домена в конце `return _NEXT`, а не `return None`.
+
+## как вышло (что оказалось не так, как думали)
+
+- **модулей вышло 29, а не 20.** два разреза пришлось повторить уже после переноса: `routes_admin` (525 строк) разделён на аккаунты/биллинг и эксплуатацию, `assistant` (462) — на передачу вопроса и action-кнопки. иначе гейт на 400 строк пришлось бы поднимать, а это то же враньё, с которого начали.
+- **`_route_admin` после разреза потерял `return _NEXT`** и стал возвращать `None` — а `None` в контракте значит «ответ уже отправлен». сервер молчал, клиент ждал таймаут, прогон тестов повис. теперь это ловит `test_route_handlers_always_hand_the_request_on`, а не внимательность.
+- **`save_bundle` держал `DEFAULT_MAX_CACHE_BYTES` дефолтом аргумента** — имя жило в теле класса, после переноса в миксин перестало. вынесено в `store/base.MAX_CACHE_BYTES`.
+- **`ratelimit.py` не появился**: лимитер — 10 строк и живёт в `http_plumbing`. но константы лимитов читаются через `settings.RATE_LIMIT_*` в точке вызова, поэтому 6 строк в `test_security.py` перевешены на `patch("settings.RATE_LIMIT_*")`: иначе патч попадал бы в привязку на импорте и тест «проходил» бы, ничего не проверяя.
+- **параллельная задача `tg-bot-answer-latency` правила те же файлы прямо во время разреза**: её presence-фильтр уехал вместе с `_pick_device` в `assistant.py`, её `ASSISTANT_PRESENCE_WINDOW_SECONDS` лежит в `settings.py`, её 5 тестов — в `test_notifications.py`. код не перемешался, но в рабочем дереве это один слой.
+- **`store/` — пакет**, а `python relay/server.py` добавляет `relay/` в `sys.path`; проверены оба запуска (pytest и скрипт), потому что `import store` работает только благодаря этому.
 
 ## acceptance criteria (проверяемые)
 
-1. `python -m pytest relay/` — зелёный после каждой фазы, 122 теста (новые не в счёт), время в пределах 2× baseline.
-2. `relay/test_architecture.py` (новый, ~70 строк) и он же — гейт:
+1. `python -m pytest relay/` — зелёный после каждой фазы: 122 теста до, 130 в коммите (122 + 8 новых гейтов); в рабочем дереве 135, потому что параллельная задача добавила ещё 5. время не выросло (21–23 s).
+2. `relay/test_architecture.py` (новый, 8 тестов) и он же — гейт:
    - ни один модуль, кроме `server.py`, не импортирует `server`;
    - импорты идут только на уровень ниже (список разрешённых рёбер зашит в тест);
-   - `server.py` ≤ 500 строк, любой другой `relay/*.py` ≤ 450 (кроме `store/schema.py`, у него лимит 320);
-   - в таблице маршрутов нет дублей `(method, prefix)`, и в ней ≥ 50 записей;
+   - `server.py` ≤ 400 строк, любой другой модуль ≤ 400 (сейчас максимум — `routes_admin_ops.py`, 378);
+   - `router.py` и `routes_*.py` не расходятся в наборе хендлеров, ни один не вызван дважды, и инвентарь из 34 точных путей + prefix-роутов на месте;
    - `from server import RelayDatabase, SlagRelayServer, ApiError, assistant_card_block, render_notification, SESSION_TTL_SECONDS, TG_TEXT_LIMIT` работает (фасад цел).
 3. `python relay/server.py --help` и бут на свободном порту с `:memory:`: `/health` → 200, `ws://…/ws/room?device=x` → handshake 101 и `ping`→`pong`.
 4. `git diff -w` по перенесённым блокам: тела функций совпадают (перенос, не переписывание). ревью — вручную по `git diff -M --stat`/`-w`.
-5. `npm run map:code` — карта обновлена, в `relay/` 0 «самых длинных файлов» в топе.
+5. `npm run map:code` — карта обновлена: `relay/server.py` больше не первый в списке самых длинных файлов репозитория.
 
 ## edge cases
 

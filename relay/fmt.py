@@ -1,5 +1,7 @@
 """Мелочи форматирования, на которых сходятся хранилище и http: ISO-время и хэш токена."""
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Optional
 import hashlib

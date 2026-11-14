@@ -1,5 +1,7 @@
 """Хранилища и гранты на них: владелец, режим доступа, accept/decline."""
 
+from __future__ import annotations
+
 import sqlite3
 import secrets
 from errors import ApiError

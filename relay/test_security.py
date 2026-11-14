@@ -131,13 +131,13 @@ class TestSecurityAnonymous(RelayTestCase):
         self.assertEqual(statuses[5], 429, statuses)
 
     async def test_pair_create_rate_limit_is_enforced(self):
-        with patch("server.RATE_LIMIT_PAIR_CREATE", 3):
+        with patch("settings.RATE_LIMIT_PAIR_CREATE", 3):
             statuses = [(await self.http("POST", "/api/pair/create", {}))[0] for _ in range(4)]
         self.assertEqual(statuses[:3], [200] * 3, statuses)
         self.assertEqual(statuses[3], 429, statuses)
 
     async def test_auth_challenge_rate_limit_is_enforced(self):
-        with patch("server.RATE_LIMIT_AUTH_CHALLENGE", 3):
+        with patch("settings.RATE_LIMIT_AUTH_CHALLENGE", 3):
             statuses = [
                 (await self.http("POST", "/api/auth/challenge", {"accountId": "acc_" + "0" * 24}))[0]
                 for _ in range(4)
@@ -146,7 +146,7 @@ class TestSecurityAnonymous(RelayTestCase):
         self.assertEqual(statuses[3], 429, statuses)
 
     async def test_telemetry_rate_limit_is_enforced(self):
-        with patch("server.RATE_LIMIT_TELEMETRY", 3):
+        with patch("settings.RATE_LIMIT_TELEMETRY", 3):
             statuses = [
                 (await self.http("POST", "/api/telemetry/event", {"eventType": "test"}))[0]
                 for _ in range(4)
@@ -155,7 +155,7 @@ class TestSecurityAnonymous(RelayTestCase):
         self.assertEqual(statuses[3], 429, statuses)
 
     async def test_untrusted_peer_cannot_spoof_x_forwarded_for(self):
-        with patch("server.RATE_LIMIT_AUTH_CHALLENGE", 2):
+        with patch("settings.RATE_LIMIT_AUTH_CHALLENGE", 2):
             statuses = [
                 (await self.raw_request(
                     "POST", "/api/auth/challenge",
@@ -168,7 +168,7 @@ class TestSecurityAnonymous(RelayTestCase):
 
     async def test_trusted_proxy_uses_the_rightmost_forwarded_client(self):
         self.server.trusted_proxies = self.server._parse_trusted_proxies("127.0.0.1/32")
-        with patch("server.RATE_LIMIT_AUTH_CHALLENGE", 2):
+        with patch("settings.RATE_LIMIT_AUTH_CHALLENGE", 2):
             body = json.dumps({"accountId": "acc_" + "0" * 24}).encode()
             # The trusted proxy appends the real client on the right. The client-supplied
             # left value must not become the rate-limit key.
@@ -192,7 +192,7 @@ class TestSecurityAnonymous(RelayTestCase):
 
     async def test_garbage_forwarded_header_falls_back_to_the_peer(self):
         self.server.trusted_proxies = self.server._parse_trusted_proxies("127.0.0.1/32")
-        with patch("server.RATE_LIMIT_TELEMETRY", 2):
+        with patch("settings.RATE_LIMIT_TELEMETRY", 2):
             statuses = [
                 (await self.raw_request(
                     "POST", "/api/telemetry/event", b'{"eventType":"test"}',

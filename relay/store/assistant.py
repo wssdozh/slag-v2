@@ -4,6 +4,8 @@
 он нужен только чтобы спросить устройство, и ни для чего больше.
 """
 
+from __future__ import annotations
+
 import sqlite3
 import secrets
 from assistant_card import assistant_action_label

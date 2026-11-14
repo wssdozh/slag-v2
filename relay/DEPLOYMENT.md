@@ -4,7 +4,7 @@
 
 - ssh target: `netcup-server` (`152.53.199.71`).
 - service: `slag-relay.service`; unit: `/etc/systemd/system/slag-relay.service`.
-- code: `/opt/slag-relay/server.py`; dependencies: `/opt/slag-relay/requirements.txt`.
+- code: `/opt/slag-relay/` — `server.py` plus the modules it imports (`relay/*.py` and `relay/store/`); dependencies: `/opt/slag-relay/requirements.txt`.
 - runtime: `/opt/slag-relay/.venv/bin/python` (python 3.13.5, cryptography 50.0.2).
 - database: `/opt/slag-relay/data/relay.db`.
 - listener: `0.0.0.0:8320`; health: `http://152.53.199.71:8320/health`.
@@ -170,12 +170,17 @@ curl --fail http://127.0.0.1:8320/health
 ## telegram notifications — 2026-11-13
 
 the relay is one process with four jobs: sync encrypted bundles between devices, poll the Bot
-API, deliver the notification queue, and ferry assistant questions. all of it is relay code:
-`relay/server.py` is the current home of the sync server, the bot poller, the queue and the
-assistant flow, and the target layout splits it into `relay/tg.py`, `relay/bot.py` and
-`relay/assistant.py`. deploy every `relay/*.py` with its `requirements.txt` — whichever side of
-that split a file is on, it is still one process. this document describes the behaviour, not the
-file count, so it holds before and after the split lands.
+API, deliver the notification queue, and ferry assistant questions. all of it is relay code, laid
+out by domain in `relay/`: `server.py` (composition root, auth, `run`), `routes_*.py` (one http
+domain per file, dispatched in order by `router.py`), `realtime.py` (websocket), `bot.py`,
+`assistant.py` + `assistant_actions.py`, `delivery.py`, `ai_proxy.py`, and `store/` (sqlite).
+`tg.py` stays the leaf it always was. this document describes the behaviour, not the file count,
+so it holds across the split.
+
+**deploy the whole directory, not one file.** `cp server.py` is not enough any more: the process
+imports its siblings, so a half copied tree starts with `ModuleNotFoundError` on the first request
+that touches the missing module. ship `relay/*.py` plus `relay/store/` (and `requirements.txt`),
+then `systemctl restart slag-relay` and check `/health`.
 
 reminders leave the vault through the relay: the client arms a job, the relay calls the Bot
 API at `fire_at`. two rules shape the whole thing.

@@ -4,6 +4,8 @@
 при старте, здесь — значения по умолчанию.
 """
 
+from __future__ import annotations
+
 import logging
 import re
 
@@ -45,6 +47,11 @@ ASSISTANT_TYPING_INTERVAL_SECONDS = 4
 # a phone tether or a tunnel sits somewhere in between, so the window has to cover a slow ack —
 # giving up at 250ms is what turned a live raspberry pi into "ни одно устройство не в сети".
 ASSISTANT_PROBE_TIMEOUT_SECONDS = 1.5
+# How recently a socket must have said something to be a candidate for a question. Devices ping
+# every 25 seconds, so a socket quiet for longer than this is a suspended app holding TCP open:
+# it answers nothing, and probing it costs the whole timeout above. When nothing is fresh the
+# probe still runs — it is the presence test, just not the first one.
+ASSISTANT_PRESENCE_WINDOW_SECONDS = 40
 ASSISTANT_MAX_QUESTION = 1000
 ASSISTANT_MAX_ANSWER = 4000
 # One bubble per question: these are its texts, in the order the person sees them.

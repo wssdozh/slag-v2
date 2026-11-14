@@ -4,6 +4,8 @@
 reaches relay.db». Модуль — лист, чтобы очередь и бот не тянули друг друга.
 """
 
+from __future__ import annotations
+
 import os
 import sqlite3
 import time

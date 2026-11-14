@@ -1,5 +1,7 @@
 """Pairing-сессии: PIN, SAS, обмен ключами. Короткоживущие и одноразовые."""
 
+from __future__ import annotations
+
 import sqlite3
 import hashlib
 from errors import ApiError

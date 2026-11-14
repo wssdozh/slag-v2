@@ -9,7 +9,6 @@ import asyncio
 import json
 import time
 from typing import Optional, Tuple
-from typing import Optional
 
 from settings import *
 from assistant_card import without_button_styles

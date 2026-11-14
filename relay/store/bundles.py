@@ -1,5 +1,7 @@
 """Бандлы: приём, водарки, выдача недоставленного, подтверждения."""
 
+from __future__ import annotations
+
 import sqlite3
 import json
 from errors import ApiError

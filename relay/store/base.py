@@ -1,5 +1,7 @@
 """Соединение и общая часть хранилища: комнаты, кэш, срок годности строк."""
 
+from __future__ import annotations
+
 import json
 import os
 import secrets
