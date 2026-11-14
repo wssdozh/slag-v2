@@ -206,31 +206,29 @@ class BotDomain:
                 " LEFT JOIN accounts a ON a.account_id = v.owner_account_id WHERE v.id = ?",
                 (link["vault_id"],)).fetchone() if link else None
             if link:
-                # Short, the way the app shows it: a name and the four characters that make two
-                # vaults with the same name distinguishable at a glance.
                 vault_name = (row["name"] if row else "") or "хранилище"
                 display_name = ((row["display_name"] if row else "") or "").strip()
                 mode = link["mode"] or "minimal"
-                account_tail = self._id_head((row["owner_account_id"] if row else "") or "")
+                account_head = self._id_head((row["owner_account_id"] if row else "") or "")
                 vault_head = self._id_head(link["vault_id"])
-                vault_line = f"{vault_name} • {vault_head}"
-                if display_name:
-                    lines_html = [f"<b>{tg_escape(display_name)}</b> • <code>{tg_escape(account_tail)}</code>",
-                                  f"{tg_escape(vault_name)} • <code>{tg_escape(vault_head)}</code>"]
-                    lines_plain = [f"{display_name} • {account_tail}", vault_line]
-                else:
-                    lines_html = [f"<b>{tg_escape(vault_name)}</b> • <code>{tg_escape(vault_head)}</code>"]
-                    lines_plain = [vault_line]
-                    if account_tail:
-                        lines_html.append(f"аккаунт • <code>{tg_escape(account_tail)}</code>")
-                        lines_plain.append(f"аккаунт • {account_tail}")
-                lines_html.append(f"уведомления вкл · ассистент вкл · {tg_escape(mode)}")
-                lines_plain.append(f"уведомления вкл · ассистент вкл · {mode}")
-                html_blocks.append("\n".join(lines_html))
-                plain_blocks.append("\n".join(lines_plain))
+                who = display_name or "аккаунт"
+                # A card, not a debug dump: who, where, and what is switched on, with the ids
+                # dimmed into monospace. Telegram has no colour, so the quote bar and the two
+                # glyphs are the whole visual hierarchy available.
+                head = f"👤 <b>{tg_escape(who)}</b>" + (f" · <code>{tg_escape(account_head)}</code>"
+                                                        if account_head else "")
+                vault = f"🗄 <b>{tg_escape(vault_name)}</b> · <code>{tg_escape(vault_head)}</code>"
+                quote = ("<blockquote>напоминания приходят в этот чат\n"
+                         f"ассистент отвечает по задачам · {tg_escape(mode)}</blockquote>")
+                html_blocks.append("\n".join([head, vault, "", quote]))
+                plain_blocks.append("\n".join([
+                    f"{who}" + (f" · {account_head}" if account_head else ""),
+                    f"{vault_name} · {vault_head}", "",
+                    f"напоминания приходят в этот чат\nассистент отвечает по задачам · {mode}"]))
             else:
-                html_blocks.append("<b>хранилище не привязано</b>\nуведомления вкл · ассистент выкл")
-                plain_blocks.append("хранилище не привязано\nуведомления вкл · ассистент выкл")
+                html_blocks.append("<b>хранилище не привязано</b>\n"
+                                   "<blockquote>напоминания вкл · ассистент выкл</blockquote>")
+                plain_blocks.append("хранилище не привязано\nнапоминания вкл · ассистент выкл")
         return "\n\n".join(html_blocks), "\n\n".join(plain_blocks)
 
     async def _edit_telegram(self, chat_id: str, message_id: int, html: str, plain: str,
