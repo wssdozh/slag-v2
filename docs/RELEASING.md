@@ -71,6 +71,27 @@ npx tauri signer generate -w "$env:USERPROFILE\.tauri\slag-updater.key" --ci
 
 ## 4. Выпуск
 
+### через ci (основной путь)
+
+`.github/workflows/release.yml`, кнопка **Run workflow**. Спрашивает три обязательных поля:
+
+- `version` — x.y.z, **уже стоящая в `src-tauri/tauri.conf.json`** (джоб `verify` падает, если не
+  совпало: манифест не должен обещать версию, которой нет в бинарниках);
+- `channel` — `stable` / `beta` / `alpha` / `dev`;
+- `notes` — что поменялось (уходит в заметки релиза и `latest.json`).
+
+Собирает windows (exe + nsis), linux (deb + AppImage) и android (apk, подпись из секретов) из
+одного коммита, затем публикует тем же `publish-release.ps1`. Секреты:
+`TAURI_SIGNING_PRIVATE_KEY`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+
+**Каналы — это фильтр.** `stable` создаёт обычный релиз и становится github-овским `latest` —
+единственный адрес, который читает установленный клиент. `beta`/`alpha`/`dev` уходят как
+**prerelease**, `latest` не трогают, и обычный клиент их не видит: поставить их можно только
+скачав файл со страницы релиза. Отдельного переключателя каналов в клиенте нет намеренно.
+
+### локально
+
 1. Собери release apk (windows-хост, см. `BUILD.md` §7) и подпиши его `debug.keystore`:
    `zipalign -p -f 4`, `apksigner sign --ks ... --ks-key-alias androiddebugkey`. Версия
    (`versionName`/`versionCode`) берётся из `src-tauri/tauri.conf.json`: бампает её скрипт,
