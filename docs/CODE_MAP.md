@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **520**, строк: **94156**, зон: **48**.
+Модулей: **521**, строк: **93655**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -32,7 +32,7 @@
 
 - `src/node/index.ts` (25 строк)
 
-## e2e (playwright) — 108 файлов, 21059 строк
+## e2e (playwright) — 108 файлов, 21000 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -66,11 +66,11 @@
 |---|---:|---:|---|---|
 | `AccountCabinet.tsx` | 350 | 1 | AccountCabinet | Full-page account cabinet: sign in, seed phrase, devices and vault sharing. |
 
-## src/components/Admin — 9 файлов, 2542 строк
+## src/components/Admin — 9 файлов, 2544 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AdminPanel.tsx` | 412 | 1 | AdminPanel | Admin console shell: server/token login and five tabs over the relay's API. |
+| `AdminPanel.tsx` | 414 | 1 | AdminPanel | Admin console shell: server/token login and five tabs over the relay's API. |
 | `Charts.tsx` | 334 | 4 | DataPoint, SparklineChart, BarChart, FunnelChart, DistributionGauge | Dependency-free SVG charts — sparkline, bars, donut, funnel — for the admin t… |
 | `tabs/AccountsTab.tsx` | 429 | 1 | AccountsTab | Admin accounts tab: search, plan/status filters, per-account actions, devices. |
 | `tabs/AiTab.tsx` | 193 | 1 | AiTab | Admin AI tab: gateway status, request/token totals, model split and the call … |
@@ -182,11 +182,11 @@
 | `folderStatsConfig.ts` | 36 | 2 | FolderStatKey, FolderStatDefinition, FOLDER_STATS, recordCountLabel | The single list of folder counters, labels and the Russian record count. |
 | `useFolderProfileEdit.ts` | 151 | 2 | FolderProfileEditMode, FolderProfileEditOptions, FolderProfileEdit, useFolderProfileEdit | Inline folder editing: one field at a time, committed through the storage act… |
 
-## src/components/Landing — 1 файлов, 503 строк
+## src/components/Landing — 1 файлов, 55 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `LandingPage.tsx` | 503 | 1 | LandingPage | The public page: what SLAG is, what it costs, and the way into the app or the… |
+| `SiteRedirect.tsx` | 55 | 1 | SiteRedirect | `?page=landing` used to be a full marketing page inside the app build. The si… |
 
 ## src/components/Logs — 2 файлов, 465 строк
 
@@ -381,7 +381,7 @@
 | `useDockPanels.ts` | 275 | 1 | UseDockPanelsOptions, useDockPanels | Dockview wiring: default layout, panel creation, tab menus, and saving the la… |
 | `WorkspaceShell.tsx` | 289 | 1 | WorkspaceShellProps, WorkspaceShell | The desktop workspace: the dockview shell holding feed, Kanban, calendar, aud… |
 
-## src/config — 8 файлов, 445 строк
+## src/config — 9 файлов, 449 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -389,6 +389,7 @@
 | `index.ts` | 8 | 92 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
 | `search.ts` | 10 | 1 | SEARCH_LIMITS | Tuning for the Orama index and the palette: result counts, typo tolerance, te… |
 | `settingsTabs.ts` | 48 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel | Names and orders the settings sections once, so desktop and mobile cannot dri… |
+| `site.ts` | 4 | 2 | SITE_URL | Address of the public site, which lives in its own repository: the app build … |
 | `storage.ts` | 99 | 4 | DEFAULT_INBOX_FOLDER, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_VAULT_META, +1 | localStorage keys, the default inbox name and the workspace state a new vault… |
 | `sync.ts` | 47 | 1 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 | Sync defaults: relay URL, storage keys, retry and debounce timings, bundle si… |
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
@@ -480,7 +481,7 @@
 | `commands.ts` | 279 | 3 | CommandCategory, AppCommandContext, AppCommand, isMac, formatShortcut, +3 | ponytail: central command & hotkey engine for SLAG v2 without external depend… |
 | `memory.ts` | 368 | 6 | MEMORY_LIMIT, MEMORY_PROMPT_LIMIT, MEMORY_TAG_PROMPT_LIMIT, MEMORY_KINDS, MEMORY_KIND_LABEL, +14 | The assistant's own memory: what it knows about the person, how it ages, how … |
 | `motion.ts` | 196 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +7 | Reads the CSS motion tokens as numbers, so JS animation timing matches theme.… |
-| `navigation.ts` | 13 | 6 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
+| `navigation.ts` | 13 | 5 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `searchService.ts` | 294 | 4 | preloadSearchEngine, getSearchableAttachmentText, RU_ENDINGS, RU_STOPWORDS, initSearchIndex, +1 | Orama lives in its own lazy chunk (~76 kB, 25 kB gzip). On the 1000-note prob… |
 
 ## src/lib/ai — 28 файлов, 5162 строк
@@ -562,7 +563,7 @@
 | `deepLink.ts` | 60 | 1 | OPEN_LINK_EVENT, parseNoteLink, takePendingNoteLink, onDeepLinkOpened | `slag://` links: the OS hands a URL to the app, this turns it into the note b… |
 | `encryptedLocalStore.ts` | 137 | 1 | ENCRYPTED_SECRET_PREFIX, getLocalSecret, setLocalSecret, deleteLocalSecret | Web/Android secret store: AES-GCM ciphertext in localStorage, non-extractable… |
 | `folderOpener.ts` | 73 | 5 | OpenFolderResult, openAppFolder | Opens logs, notes or backups in the OS file manager, with a toast when no she… |
-| `openExternal.ts` | 19 | 2 | openExternalUrl | Opens a link in the system browser. Telegram deep links are the reason this e… |
+| `openExternal.ts` | 19 | 4 | openExternalUrl | Opens a link in the system browser. Telegram deep links are the reason this e… |
 | `platform.ts` | 83 | 1 | PlatformInfo, getPlatformInfo, setupSystemHotkey, removeSystemHotkey | Reports the desktop OS, session type and hotkey backend so settings can adapt. |
 | `secretStore.ts` | 390 | 5 | SECRET_KEYS, SecretStoreMode, SecretBackend, SecretStoreUnavailableError, SecretMigrationError, +6 | One place for sync secrets at rest. Desktop uses the OS keychain, web/Android… |
 | `windowControls.ts` | 394 | 14 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |

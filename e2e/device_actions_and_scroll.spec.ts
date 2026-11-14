@@ -2,7 +2,7 @@ import { test, expect } from './support/selfhostFixture';
 import * as fs from 'fs';
 import * as path from 'path';
 
-test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
+test.describe('Device Actions with Panic Re-keying', () => {
   test.beforeEach(async () => {
     const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots');
     if (!fs.existsSync(screenshotDir)) {
@@ -10,30 +10,8 @@ test.describe('Landing Scroll & Device Actions with Panic Re-keying', () => {
     }
   });
 
-  test('verifies landing scroll, sync mode toggle, and key rotation', async ({ page }) => {
-    // 1. Verify Landing Page Scroll
-    await page.goto('/?page=landing');
-    await page.waitForLoadState('domcontentloaded');
-
-    // Container should exist and scroll smoothly
-    const scrollContainer = page.locator('.fixed.inset-0.overflow-y-auto');
-    await expect(scrollContainer).toBeVisible();
-
-    // Scroll to footer
-    const footer = page.locator('footer');
-    await footer.scrollIntoViewIfNeeded();
-    await expect(footer).toBeVisible();
-
-    // Verify scrolled position
-    const scrollTop = await scrollContainer.evaluate((el) => el.scrollTop);
-    expect(scrollTop).toBeGreaterThan(400);
-
-    await page.screenshot({
-      path: 'test-results/screenshots/landing_scroll_verified.png',
-      fullPage: false,
-    });
-
-    // 2. Open Main App and go to Settings -> Sync
+  test('verifies sync mode toggle and key rotation', async ({ page }) => {
+    // 1. Open Main App and go to Settings -> Sync
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 

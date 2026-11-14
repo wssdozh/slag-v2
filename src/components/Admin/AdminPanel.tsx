@@ -12,7 +12,9 @@ import {
   Users,
 } from 'lucide-react';
 import { isDesktopApp } from '../../lib/platform/windowControls';
+import { openExternalUrl } from '../../lib/platform/openExternal';
 import { navigatePage } from '../../lib/navigation';
+import { SITE_URL } from '../../config/site';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import { useAdminData } from './useAdminData';
 import { useAdminActions } from './useAdminActions';
@@ -291,7 +293,7 @@ export const AdminPanel: React.FC = () => {
           ) : (
             <button
               type="button"
-              onClick={() => navigatePage('landing')}
+              onClick={() => void openExternalUrl(SITE_URL)}
               className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
             >
               на сайт

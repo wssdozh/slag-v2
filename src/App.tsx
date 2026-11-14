@@ -33,8 +33,8 @@ const TriageModal = lazy(() =>
 const LogModal = lazy(() =>
   import('./components/Logs/LogModal').then((m) => ({ default: m.LogModal }))
 );
-const LandingPage = lazy(() =>
-  import('./components/Landing/LandingPage').then((m) => ({ default: m.LandingPage }))
+const SiteRedirect = lazy(() =>
+  import('./components/Landing/SiteRedirect').then((m) => ({ default: m.SiteRedirect }))
 );
 const AccountCabinet = lazy(() =>
   import('./components/Account/AccountCabinet').then((m) => ({ default: m.AccountCabinet }))
@@ -224,7 +224,7 @@ const AppContent: React.FC = () => {
     return (
       <div className="fixed inset-0 overflow-y-auto overscroll-contain bg-canvas-subtle select-text">
         <Suspense fallback={<div className="min-h-screen bg-canvas-subtle" />}>
-          <LandingPage onNavigateToAccount={() => navigatePage('account')} />
+          <SiteRedirect onNavigateToAccount={() => navigatePage('account')} />
         </Suspense>
       </div>
     );
