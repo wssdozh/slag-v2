@@ -98,6 +98,12 @@ export class SyncTransport {
     if (!response.ok) throw new Error(`Sync ACK failed: HTTP ${response.status}`);
   }
 
+  /** True when the live socket already points at this room, so a re-init need not reopen it. */
+  public isOpenFor(roomId: string): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN
+      && this.currentOptions !== null && this.currentOptions.roomId === roomId;
+  }
+
   public connect(options: TransportOptions): void {
     this.currentOptions = options;
     this.clearReconnectTimeout();

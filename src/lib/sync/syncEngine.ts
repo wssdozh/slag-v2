@@ -755,6 +755,17 @@ export class SyncEngine {
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
 
+      // Presence first. The socket is how every other device and the telegram bot see this one,
+      // and the backlog below is a download that can take minutes or die halfway over a tunnel.
+      // It used to run before the connect, so a slow backlog left the device invisible for its
+      // whole duration and a failed one left it invisible until the next retry. A retry that
+      // finds the socket already up on this room keeps it: closing it is a window every question
+      // can fall into.
+      // Through the public method on purpose: the e2e harness replaces it to keep a synthetic
+      // socket, and init used to call it that way before the socket moved to its own module.
+      if (!this.transport.isOpenFor(roomId)) this.connectWebSocket();
+      this.startIntervals();
+
       seedSyncedIds(this.bookkeeping, vault().getItems().map((it) => it.id));
       this.batchUpdating = initial;
       await this.fetchPendingBundlesHttp();
@@ -777,10 +788,6 @@ export class SyncEngine {
       // whole vault is checked here — after the backlog is on disk, not mid-pull. A device that
       // missed those bundles entirely (an older build ACKed them) still asks on start.
       void this.requestMissingAttachments();
-      // Through the public method on purpose: the e2e harness replaces it to keep a synthetic
-      // socket, and init used to call it that way before the socket moved to its own module.
-      this.connectWebSocket();
-      this.startIntervals();
       await pushLocalChanges(this);
       this.scheduleAttachmentPass();
     } catch (err: unknown) {
