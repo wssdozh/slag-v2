@@ -288,9 +288,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
     await settingsTab.click();
 
-    // Verify Settings view title and profile card
-    await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
-    await expect(page.locator('span', { hasText: 'Obsidian' }).first()).toBeVisible();
+    // Verify the settings root and the vault row
+    await expect(page.getByTestId('mobile-settings-root')).toBeVisible();
+    await expect(page.getByTestId('mobile-vault-row')).toBeVisible();
 
     // Dock lives in the Interface tab now, not on the settings root.
     await page.locator('button', { hasText: 'Интерфейс & Панели' }).click();
@@ -316,7 +316,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Close the settings sheet before the root screenshot.
     await page.locator('[role="dialog"] button[title="Назад"]').first().click();
-    await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
+    await expect(page.getByTestId('mobile-settings-root')).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/25_settings_root.png' });
     await page.screenshot({ path: 'test-results/screenshots/mobile_settings.png' });
   });
@@ -628,7 +628,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // 1. Go to Settings tab
     await dock.locator('button[aria-label="Настройки"]').click();
-    await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
+    await expect(page.getByTestId('mobile-settings-root')).toBeVisible();
 
     // 2. Open Interface tab and locate "Плеер" row in dock customization
     await page.locator('button', { hasText: 'Интерфейс & Панели' }).click();

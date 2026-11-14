@@ -226,7 +226,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     // Header has Back button which returns to folders, dock reappears
     await page.locator('header button[aria-label="Назад"]').click();
     await dock.locator('button[aria-label="Настройки"]').click();
-    await expect(page.locator('h1', { hasText: 'Настройки' })).toBeVisible();
+    await expect(page.getByTestId('mobile-settings-root')).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/25_settings_root.png' });
 
     // Open AI Settings Modal

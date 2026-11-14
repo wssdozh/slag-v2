@@ -5,8 +5,7 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import { accountClient } from '../../lib/sync/account';
 import { navigatePage } from '../../lib/navigation';
 import { acceptSharedVault } from '../../lib/sync/vaultSharing';
-import { Database, Settings as SettingsIcon } from 'lucide-react';
-import { MobileScreenHeader } from './MobileScreenHeader';
+import { Database } from 'lucide-react';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { SettingsGroup, SettingsRow, SettingsDivider } from '../Settings/SettingsUI';
 import { ProfileCard } from '../Settings/ProfileCard';
@@ -71,16 +70,14 @@ export const MobileSettingsView: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
-      {/* Top Header */}
-      <MobileScreenHeader
-        title="Настройки"
-        icon={<SettingsIcon className="w-3.5 h-3.5" />}
-      />
-
-      {/* Main Settings List (Matching iOS/Telegram grouped style) */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">
+      {/* Корень настроек без верхней плашки: контент начинается сразу под статус-баром. */}
+      <div
+        data-testid="mobile-settings-root"
+        className="flex-1 overflow-y-auto px-4 pb-36 flex flex-col gap-4"
+        style={{ paddingTop: 'calc(max(var(--sat), 0px) + 1rem)' }}
+      >
         {/* Аккаунт первым: в настройки заходят проверить его, а не папки. */}
-        <SettingsGroup title="Аккаунт">
+        <SettingsGroup className="pt-5">
           <ProfileCard
             planLabel={isLocked ? 'Войти · синхронизация и облачный ИИ' : `Тариф ${planLabel} · кеш ${usedCacheMb} МБ из ${cacheLabel}`}
           />
@@ -93,13 +90,20 @@ export const MobileSettingsView: React.FC = () => {
           />
         </SettingsGroup>
 
-        <SettingsGroup title="Текущее хранилище">
-          <SettingsRow icon={<Database className="w-4 h-4" />} label={vault.name || 'SLAG Vault'} description={`${folders.length} ${folders.length === 1 ? 'папка' : folders.length < 5 ? 'папки' : 'папок'} · ${items.length} ${items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}`} value="Obsidian" onClick={() => setIsVaultSwitcherOpen(true)} chevron />
+        <SettingsGroup className="pt-5">
+          <SettingsRow
+            icon={<Database className="w-4 h-4" />}
+            label={vault.name || 'SLAG Vault'}
+            value={<span className="font-mono">{folders.length} • {items.length}</span>}
+            testId="mobile-vault-row"
+            onClick={() => setIsVaultSwitcherOpen(true)}
+            chevron
+          />
         </SettingsGroup>
         <VaultSwitcherMenu isOpen={isVaultSwitcherOpen} onClose={() => setIsVaultSwitcherOpen(false)} variant="sheet" />
 
         {accountState.invitations.length > 0 && (
-          <SettingsGroup title="Приглашения в хранилища">
+          <SettingsGroup className="pt-5">
             {accountState.invitations.map((inv, index) => (
               <React.Fragment key={inv.vaultId}>
                 {index > 0 && <SettingsDivider />}
@@ -114,7 +118,7 @@ export const MobileSettingsView: React.FC = () => {
           </SettingsGroup>
         )}
 
-        <SettingsGroup title="Настройки">
+        <SettingsGroup className="pt-5">
           {SETTINGS_TABS.filter((tab) => tab.id !== 'account').map((tab, index) => {
             const TabIcon = tab.icon;
             return (
