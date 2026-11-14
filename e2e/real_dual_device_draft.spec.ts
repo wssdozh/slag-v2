@@ -9,8 +9,8 @@ test('real-life e2e: type on client A, see live update on client B, edit further
   const pageB = await contextB.newPage();
 
   // Load both pages in the real dev web app
-  await pageA.goto('http://localhost:5173/');
-  await pageB.goto('http://localhost:5173/');
+  await pageA.goto('/');
+  await pageB.goto('/');
 
   await expect(pageA.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 15000 });
   await expect(pageB.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 15000 });
@@ -97,7 +97,7 @@ test('real-life e2e: type on client A, see live update on client B, edit further
 });
 
 test('real-life e2e: live AI categorization of draft with latency and tags verification', async ({ page }) => {
-  await page.goto('http://localhost:5173/');
+  await page.goto('/');
   await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 15000 });
 
   // Test AI draft categorization on a real dev note

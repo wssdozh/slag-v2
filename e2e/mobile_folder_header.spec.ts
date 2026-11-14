@@ -10,7 +10,7 @@ test.describe('Mobile Unified Folder Header & Filters in Modal', () => {
 
   test('Unified single-line header with vertical 3-dots, filter modal, active filter badge in header and 1-click dismiss', async ({ page }) => {
     // 1. Open app
-    await page.goto('http://localhost:5173');
+    await page.goto('/');
     await page.waitForSelector('header');
 
     // 2. Open folder "Входящие"
