@@ -88,7 +88,7 @@ class NotifyRoutes:
             route_token = body.get("routeToken", "")
             enabled = body.get("enabled") is not False
             mode = body.get("mode") if isinstance(body.get("mode"), str) else "minimal"
-            if mode not in ("minimal", "risky"):
+            if mode not in ("minimal", "read", "risky"):
                 raise ApiError(400, "invalid_assistant_mode")
             if not isinstance(vault_id, str) or not vault_id or not isinstance(route_token, str) or not route_token:
                 raise ApiError(400, "invalid_assistant_link")

@@ -93,23 +93,26 @@ export const NotificationsSettingsTab: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Choosing "risky" hands the bot the whole vault, so it is the one mode that asks first.
-  // Anything but a yes leaves the stored mode alone, and the controlled select snaps back.
+  // `read` and `risky` both let vault content reach the model, so both ask first; the wording
+  // says which of the two the person is agreeing to.
   const handleModeChange = async (mode: AssistantSetting) => {
-    if (mode === 'risky') {
+    const asksFirst = mode === 'read' || mode === 'risky';
+    if (asksFirst) {
       const confirmed = await confirmAction({
-        title: 'Разрешить боту читать хранилище?',
+        title: mode === 'read' ? 'Разрешить боту читать заметки?' : 'Разрешить боту править хранилище?',
         description:
-          'бот сможет прочитать любую заметку, до которой доберётся ассистент. доступ защищён только твоим телеграм-аккаунтом: кто войдёт в него, тот прочитает хранилище перепиской.',
+          mode === 'read'
+            ? 'бот сможет найти и прочитать любую заметку, до которой доберётся ассистент, и её текст уйдёт в модель. доступ защищён только твоим телеграм-аккаунтом.'
+            : 'бот сможет прочитать любую заметку и предложить её изменить. доступ защищён только твоим телеграм-аккаунтом: кто войдёт в него, тот прочитает хранилище перепиской.',
         confirmLabel: 'Разрешить',
         cancelLabel: 'Не надо',
-        isDestructive: true,
+        isDestructive: mode === 'risky',
       });
       if (!confirmed) return;
     }
     setIsSavingAssistant(true);
     try {
-      await setAssistantForRoutes(vaultId, routes, mode !== 'off', mode === 'risky' ? 'risky' : 'minimal');
+      await setAssistantForRoutes(vaultId, routes, mode !== 'off', mode === 'off' ? 'minimal' : mode);
       patchPrefs({ assistantMode: mode });
     } catch (error) {
       addToast(notifyErrorText(error), 'error');
