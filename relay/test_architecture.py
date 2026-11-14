@@ -19,6 +19,7 @@ RELAY = pathlib.Path(__file__).resolve().parent
 # importable from level N, so a cycle would have to go through `server`, which nobody may import).
 LEVELS = {
     "errors": 0, "settings": 0, "fmt": 0, "assistant_card": 0, "wire": 0, "notify_routes": 0, "tg": 0,
+    "premium": 0,
     "store": 1, "store.base": 1, "store.schema": 1, "store.bundles": 1, "store.accounts": 1,
     "store.pairing": 1, "store.vaults": 1, "store.notify": 1, "store.assistant": 1,
     "router": 2, "http_plumbing": 2, "realtime": 2,
