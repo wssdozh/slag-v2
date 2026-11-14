@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **521**, строк: **93655**, зон: **48**.
+Модулей: **522**, строк: **93683**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -32,7 +32,7 @@
 
 - `src/node/index.ts` (25 строк)
 
-## e2e (playwright) — 108 файлов, 21000 строк
+## e2e (playwright) — 109 файлов, 21034 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -182,11 +182,11 @@
 | `folderStatsConfig.ts` | 36 | 2 | FolderStatKey, FolderStatDefinition, FOLDER_STATS, recordCountLabel | The single list of folder counters, labels and the Russian record count. |
 | `useFolderProfileEdit.ts` | 151 | 2 | FolderProfileEditMode, FolderProfileEditOptions, FolderProfileEdit, useFolderProfileEdit | Inline folder editing: one field at a time, committed through the storage act… |
 
-## src/components/Landing — 1 файлов, 55 строк
+## src/components/Landing — 1 файлов, 49 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `SiteRedirect.tsx` | 55 | 1 | SiteRedirect | `?page=landing` used to be a full marketing page inside the app build. The si… |
+| `SiteRedirect.tsx` | 49 | 1 | SiteRedirect | `?page=landing` used to be a full marketing page inside the app build. The si… |
 
 ## src/components/Logs — 2 файлов, 465 строк
 
