@@ -171,7 +171,9 @@ def assistant_action_markup(action: Optional[dict], request_id: str) -> Optional
     label = assistant_action_label(action)
     if label is None:
         return None
-    return {"inline_keyboard": [[{"text": label,
+    # Telegram gives a button no colour and no icon, so the confirm half borrows the app's tick:
+    # a checkmark in the caption is the only way to tell "this one commits" from "this one undoes".
+    return {"inline_keyboard": [[{"text": f"✓ {label}",
                                   "callback_data": f"{ASSISTANT_ACTION_PREFIX}{request_id}"},
                                  {"text": ASSISTANT_CARD_DROP_LABEL,
                                   "callback_data": f"{ASSISTANT_DROP_PREFIX}{request_id}"}]]}

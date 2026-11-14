@@ -671,7 +671,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         button = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0][0]
         # The button carries the request, never the payload: callback data is a plain string that
         # anyone can replay, so the action stays where a tap cannot rewrite it.
-        self.assertEqual(button["text"], "Применить")
+        # Telegram has no button colour, so the confirm half carries the app's tick instead.
+        self.assertEqual(button["text"], "✓ Применить")
         self.assertEqual(button["callback_data"], f"act:{request_id}")
         self.assertEqual(self.db.get_assistant_request(request_id)["answer_text"],
                          "предлагаю «Купить кота»")
@@ -690,7 +691,7 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(meta, "пн, 16 ноя · 🟡 MEDIUM")
         self.assertLess(html.index("пн, 16 ноя"), html.index("MEDIUM"))
         row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
-        self.assertEqual([button["text"] for button in row], ["Сохранить", "Отклонить"])
+        self.assertEqual([button["text"] for button in row], ["✓ Сохранить", "Отклонить"])
         self.assertEqual(row[0]["callback_data"], f"act:{request_id}")
         self.assertEqual(row[1]["callback_data"], f"drop:{request_id}")
 
@@ -702,7 +703,7 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
                                             action=sample_action(), answered_by="dev-1")
         self.assertNotIn("<blockquote>", str(self.bot.calls[-1]["text"]))
         row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
-        self.assertEqual([button["text"] for button in row], ["Применить", "Отклонить"])
+        self.assertEqual([button["text"] for button in row], ["✓ Применить", "Отклонить"])
 
     async def test_dismiss_kills_the_action_and_a_late_tap_is_stale(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
