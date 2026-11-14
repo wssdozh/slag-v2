@@ -2,8 +2,10 @@
 
 проверка по пяти наборам SecLists: `security-fuzzing`, `security-patterns`,
 `security-passwords`, `security-usernames`, `security-payloads`.
-аудит только локальный: свой клиент, `relay/`, `src/mcp/`, `src-tauri/`, dev-сервер.
+аудит только локальный: свой клиент, relay-репозиторий, `src/mcp/`, `src-tauri/`, dev-сервер.
 продакшн-relay, чужие аккаунты и внешняя сеть не использовались.
+relay вынесен в [wssdozh/slag-relay](https://github.com/wssdozh/slag-relay); пути `relay/...`
+ниже исторические, актуальные файлы — в корне того репозитория.
 
 - commit: `aaa489c` + рабочее дерево
 - окружение: windows, node 24.20, python 3.12.10, rust 1.99.1
@@ -107,10 +109,10 @@ unc, nul/control, `:`/`?`/`*`, reserved-имена windows, хвостовые �
 
 ### 7. relay static: prefix bypass — medium, fixed
 
-`relay/server.py` проверял `str(target).startswith(str(static_dir))`, поэтому
-соседний каталог `dist_evil` с тем же префиксом проходил. заменено на
-`Path.relative_to`.
-тест: `relay/test_security.py::test_static_files_do_not_escape_the_root`.
+[`server.py`](https://github.com/wssdozh/slag-relay/blob/main/server.py) проверял
+`str(target).startswith(str(static_dir))`, поэтому соседний каталог `dist_evil` с тем же
+префиксом проходил. заменено на `Path.relative_to`.
+тест: `test_security.py::test_static_files_do_not_escape_the_root`.
 
 ### 8. relay: анонимные пишущие endpoint'ы без лимитов — medium, fixed
 
@@ -119,7 +121,7 @@ unc, nul/control, `:`/`?`/`*`, reserved-имена windows, хвостовые �
 добавлен bounded sliding-window (`60/мин` challenge, `30/мин` pair create,
 `120/мин` telemetry, `429 too_many_requests`), prune в cleanup-loop, чистка
 пустых ключей pairing claim. `pair/claim` сохранил свой строгий лимит 5/5 мин.
-тесты: 4 теста в `relay/test_security.py`.
+тесты: 4 теста в `test_security.py` (репозиторий `slag-relay`).
 
 ### 9. нет csp в tauri — medium, fixed
 
@@ -141,8 +143,9 @@ unc, nul/control, `:`/`?`/`*`, reserved-имена windows, хвостовые �
 `_client_ip(writer, headers)` идёт по `X-Forwarded-For` справа налево, пропускает
 доверенные хопы и берёт первый недоверенный. от недоверенного peer заголовок
 игнорируется полностью; `pair/claim` ключует неудачи тем же адресом.
-тесты: 5 тестов в `relay/test_security.py` (spoof, rightmost, отдельные buckets,
-garbage header, invalid config). nginx-настройка — в `relay/DEPLOYMENT.md`.
+тесты: 5 тестов в `test_security.py` (spoof, rightmost, отдельные buckets,
+garbage header, invalid config). nginx-настройка — в
+[`DEPLOYMENT.md`](https://github.com/wssdozh/slag-relay/blob/main/DEPLOYMENT.md).
 
 ### 11. прочее — low/info
 
@@ -181,8 +184,8 @@ garbage header, invalid config). nginx-настройка — в `relay/DEPLOYME
 ## тесты и результаты
 
 ```powershell
-# relay: 55 tests, OK (20.7s)
-cd relay; python -m unittest test_relay test_security
+# relay: в отдельном репозитории
+cd slag-relay; python -m pytest
 
 # rust: 7 tests, OK (5 open_in_folder + 2 secure_store)
 cargo test --manifest-path src-tauri/Cargo.toml

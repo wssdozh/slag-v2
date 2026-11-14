@@ -15,7 +15,8 @@ tags:
 
 > Родительский документ: [[00_MOC_Map_of_Content]]  
 > Связанные документы: [[02_Data_Model_Obsidian_Vault]], [[07_Roadmap_Implementation]]
-> Код: `src/lib/sync/` (`syncEngine`, `transport`, `devices`, `outbox`, `crypto`), черновики — `src/lib/storage/draftStore.ts`.
+> Код клиента: `src/lib/sync/` (`syncEngine`, `transport`, `devices`, `outbox`, `crypto`), черновики — `src/lib/storage/draftStore.ts`.
+> Сервер вынесен в [wssdozh/slag-relay](https://github.com/wssdozh/slag-relay); этот документ исторический, актуальный контракт — `docs/sync-architecture.md`.
 
 ---
 

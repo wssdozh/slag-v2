@@ -63,12 +63,11 @@ local.properties
 test-vault/
 design-assets/
 
-# Python & Relay
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
-relay/data/
 
 # Tooling & temporary
 .dsh/

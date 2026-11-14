@@ -64,11 +64,8 @@ function exportsOf(source, file) {
 }
 
 // --- python ----------------------------------------------------------------
-// `relay/` is a flat set of scripts, not a package: the only intra-repo import form is
-// `from server import X`, and only the probes use it. Tests and smokes are real files
-// and get their row, but counting them as importers would make `server.py` look like a
-// library with consumers instead of the process entry point it is — hence the exclusion
-// in the consumer loop below.
+// Python in this repo is a standalone script, not a package: imports are bare module
+// names. Every file gets its row; only real importers count in the consumer loop below.
 
 const isPython = (file) => file.endsWith('.py');
 const isPythonFixture = (file) => /(?:^|[\\/])(?:test_.*|[^\\/]*_smoke)\.py$/.test(file);
@@ -166,7 +163,6 @@ function pythonPurposeOf(source) {
 const files = [
   ...walk(join(ROOT, 'src')),
   ...walk(join(ROOT, 'e2e')),
-  ...walk(join(ROOT, 'relay')),
 ].sort();
 
 // --- where <symbol> ---------------------------------------------------------
@@ -276,10 +272,8 @@ for (const file of files) {
     // file importing the same module twice counts once: the column is "who imports it".
     if (isPythonFixture(file)) continue;
     for (const mod of new Set(pythonImportsOf(source))) {
-      const target = [join(dirname(file), `${mod}.py`), join(ROOT, 'relay', `${mod}.py`)].find(
-        (candidate) => modules.has(candidate) && candidate !== file,
-      );
-      if (target) modules.get(target).consumers += 1;
+      const target = join(dirname(file), `${mod}.py`);
+      if (modules.has(target) && target !== file) modules.get(target).consumers += 1;
     }
     continue;
   }
