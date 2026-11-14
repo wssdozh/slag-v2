@@ -19,6 +19,7 @@ import unittest
 from server import (
     ApiError,
     ASSISTANT_ACTION_STALE,
+    ASSISTANT_CARD_CHIP_MAX,
     NOTIFY_MAX_PER_HOUR_PER_ROUTE,
     NOTIFY_STALE_SECONDS,
     RelayDatabase,
@@ -26,6 +27,7 @@ from server import (
     TG_EXPANDABLE_AFTER,
     TG_TEXT_BUDGET,
     TG_TEXT_LIMIT,
+    assistant_card_block,
     render_notification,
 )
 from tg import render_answer_links, render_note_page
@@ -202,6 +204,17 @@ class RenderTestCase(unittest.TestCase):
     def test_empty_title_still_renders_a_message(self):
         html, _ = render_notification("   ", "", "task", "", False)
         self.assertEqual(html, "<b>напоминание</b>")
+
+    def test_card_head_collapses_instead_of_leaving_empty_chrome(self):
+        # No kind, no folder: an empty chip or a bare "·" would be a card describing nothing.
+        self.assertEqual(assistant_card_block({"card": {"title": "Забрать посылку"}}),
+                         "<blockquote><b>Забрать посылку</b></blockquote>")
+
+    def test_a_folder_too_long_to_be_a_chip_is_cut_not_wrapped(self):
+        block = assistant_card_block({"card": {"title": "т", "folder": "щ" * 90}})
+        head = block.split("\n")[0]
+        self.assertTrue(head.startswith("<code>") and head.endswith("…</code>"))
+        self.assertLessEqual(len(head) - len("<code></code>"), ASSISTANT_CARD_CHIP_MAX + 1)
 
 
 class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
@@ -685,12 +698,14 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         await self.server._answer_assistant("vault-1", request_id, "готово, записал.",
                                             action=sample_card_action(), answered_by="dev-1")
         html = str(self.bot.calls[-1]["text"])
-        # The card is one blockquote: a left bar is the only accent Telegram gives for free.
-        self.assertIn("<blockquote>", html)
-        self.assertIn("<b>Свозить кошку в ветклинику</b>", html)
-        meta = html.split("\n")[-1].replace("</blockquote>", "")
-        self.assertEqual(meta, "пн, 16 ноя · 🟡 MEDIUM")
+        # The bar wraps the title alone: the line that gets saved outranks its own metadata,
+        # and the folder is the one field that can afford a second texture.
+        lines = html.split("\n")
+        self.assertEqual(lines[-3], "Черновик таски · <code>Входящие</code>")
+        self.assertEqual(lines[-2], "<blockquote><b>Свозить кошку в ветклинику</b></blockquote>")
+        self.assertEqual(lines[-1], "пн, 16 ноя · 🟡 MEDIUM")
         self.assertLess(html.index("пн, 16 ноя"), html.index("MEDIUM"))
+        self.assertNotIn("MEDIUM</blockquote>", html)
         row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
         self.assertEqual([button["text"] for button in row], ["Сохранить", "Отклонить"])
         # Green commits, grey refuses: no `style` key at all is what Telegram draws neutral.

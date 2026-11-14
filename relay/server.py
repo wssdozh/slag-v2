@@ -109,6 +109,9 @@ ASSISTANT_CARD_DROP_LABEL = "Отклонить"
 ASSISTANT_CARD_DROPPED = "✕ отклонено"
 # Day first, priority after it: the reading order the confirmation card uses in the app.
 ASSISTANT_CARD_PRIORITY = {"high": "🔴 HIGH", "medium": "🟡 MEDIUM", "low": "🔵 LOW"}
+# The folder is drawn as a `<code>` chip — the only second texture Bot API HTML offers. Past this
+# length a chip stops reading as a chip and eats the line the kind sits on.
+ASSISTANT_CARD_CHIP_MAX = 48
 # Every tap answers the callback — a silent one is a spinner on the person's screen.
 ASSISTANT_ACTION_DONE = "передал устройству"
 ASSISTANT_ACTION_ALREADY = "уже применено"
@@ -203,6 +206,11 @@ def assistant_card_block(action: Optional[dict]) -> str:
     The device words every field — it is the only side that knows the user's names for folders
     and the shape of their dates — so this function escapes and joins, and nothing else. An
     action from a device too old to send a card draws nothing rather than half a card.
+
+    Only the title wears the quote bar. Wrapped around all three lines the bar says nothing: every
+    fact gets the same weight and the one that matters — the thing that will be saved — drowns
+    between its own metadata. So the bar marks the title, the folder takes a `<code>` chip, and
+    kind/date/priority stay plain: three levels of emphasis out of the two levers Telegram has.
     """
     if not isinstance(action, dict):
         return ""
@@ -210,20 +218,22 @@ def assistant_card_block(action: Optional[dict]) -> str:
     if not isinstance(card, dict):
         return ""
 
-    def field(key: str) -> str:
+    def field(key: str, limit: int = ASSISTANT_CARD_FIELD_MAX) -> str:
         value = card.get(key)
         if not isinstance(value, str):
             return ""
-        return tg_escape(tg_truncate(value.strip(), ASSISTANT_CARD_FIELD_MAX))
+        return tg_escape(tg_truncate(value.strip(), limit))
 
     title = field("title")
     if not title:
         return ""
-    head = " · ".join(part for part in (field("kind"), field("folder")) if part)
+    folder = field("folder", ASSISTANT_CARD_CHIP_MAX)
+    head = " · ".join(part for part in (field("kind"), f"<code>{folder}</code>" if folder else "")
+                      if part)
     priority = ASSISTANT_CARD_PRIORITY.get(str(card.get("priority") or ""), "")
     meta = " · ".join(part for part in (field("due"), priority) if part)
-    lines = [head, f"<b>{title}</b>", meta]
-    return "<blockquote>" + "\n".join(line for line in lines if line) + "</blockquote>"
+    lines = [head, f"<blockquote><b>{title}</b></blockquote>", meta]
+    return "\n".join(line for line in lines if line)
 
 
 def assistant_message_html(answer: str, action: Optional[dict], base_url: str = "",
