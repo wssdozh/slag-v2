@@ -15,7 +15,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     const dialog = page.getByRole('dialog', { name: 'Настройки', exact: true });
     // Desktop modal has no accessible name; use the tab container as a stable scope.
     const scope = viewport.width < 768 ? dialog : page.locator('.fixed.z-50').filter({ has: page.locator('[data-tab="ai"]') });
-    for (const tab of ['account', 'ai', 'vault', 'notifications', 'ui', 'shortcuts', 'sync', 'devices', 'logs']) {
+    for (const tab of ['account', 'ai', 'vault', 'notifications', 'ui', 'shortcuts', 'sync', 'devices', 'updates', 'logs']) {
       await scope.locator(`[data-tab="${tab}"]`).click();
       if (tab === 'ai') await expect(scope.getByRole('button', { name: 'Сохранить', exact: true })).toBeVisible();
       else await expect(scope.getByRole('button', { name: 'Сохранить', exact: true })).toHaveCount(0);
@@ -36,6 +36,12 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
         const deviceList = scope.locator('section').filter({ hasText: 'Подключённые устройства' });
         await expect(deviceList.getByText('Локальная синхронизация', { exact: true })).toHaveCount(0);
         await expect(scope.getByTestId('btn-open-pair-modal')).toHaveText('Привязать устройство');
+      }
+      if (tab === 'updates') {
+        // No native backend in a browser: the tab says so instead of offering a dead button.
+        await expect(scope.getByTestId('update-web-hint')).toBeVisible();
+        await expect(scope.getByTestId('update-check-btn')).toHaveCount(0);
+        await expect(scope.getByTestId('update-current-version')).toHaveText('—');
       }
       if (tab === 'sync') {
         await expect(scope.getByRole('status')).toBeVisible();
