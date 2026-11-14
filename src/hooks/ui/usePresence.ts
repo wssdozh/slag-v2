@@ -44,12 +44,12 @@ export function usePresence(open: boolean, { skipEntering = false, manualExit = 
 
   useLayoutEffect(() => {
     const element = ref.current;
-    // Every consumer renders the element while present, so a missing ref means the
-    // surface is already gone and there is nothing left to time.
-    if (!element) return;
     if (state.phase === 'entering') {
       // Commit the initial presentation before changing the transition target.
-      void element.offsetWidth;
+      if (element) void element.offsetWidth;
+      // A controlled surface mounts its node one render later than the phase flip, so the
+      // frame is scheduled even without a ref: otherwise it waits for a node that never
+      // arrives and the surface stays at opacity 0.
       const frame = requestAnimationFrame(() => {
         setState(current => current.phase === 'entering'
           ? { open: true, phase: 'open' }
@@ -57,6 +57,9 @@ export function usePresence(open: boolean, { skipEntering = false, manualExit = 
       });
       return () => cancelAnimationFrame(frame);
     }
+    // Every consumer renders the element while present, so a missing ref means the
+    // surface is already gone and there is nothing left to time.
+    if (!element) return;
     if (state.phase !== 'exiting' || manualExit) return;
 
     const style = getComputedStyle(element);
