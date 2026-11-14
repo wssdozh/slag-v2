@@ -101,8 +101,10 @@ export class OpenAiResponsesAdapter implements LlmProtocolAdapter {
       },
       body: JSON.stringify(payload),
       // The sibling adapter already gave up after 10 s; without this the UI waits forever on a
-      // relay that is down and the caller never reaches its local fallback.
-      signal: AbortSignal.timeout(15000),
+      // relay that is down and the caller never reaches its local fallback. 15 s was too tight
+      // for a reasoning model behind the relay: the answer that arrived at 20 s was thrown away
+      // and the person got the local digest instead of an answer.
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {
