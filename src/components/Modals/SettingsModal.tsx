@@ -8,10 +8,12 @@ import { AccountSettingsTab } from '../Settings/AccountSettingsTab';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
 import { DevicesSettingsTab } from '../Settings/DevicesSettingsTab';
 import { NotificationsSettingsTab } from '../Settings/NotificationsSettingsTab';
+import { IntegrationsSettingsTab } from '../Settings/IntegrationsSettingsTab';
 import { AiSettingsTab } from '../Settings/AiSettingsTab';
 import { VaultSettingsTab } from '../Settings/VaultSettingsTab';
 import { UiSettingsTab } from '../Settings/UiSettingsTab';
 import { ShortcutsSettingsTab } from '../Settings/ShortcutsSettingsTab';
+import { UpdatesSettingsTab } from '../Settings/UpdatesSettingsTab';
 import { LogsSettingsTab } from '../Settings/LogsSettingsTab';
 import { SETTINGS_TABS, settingsTabLabel } from '../../config/settingsTabs';
 
@@ -101,12 +103,20 @@ export const SettingsModal: React.FC = () => {
         <NotificationsSettingsTab />
       )}
 
+      {activeTab === 'integrations' && (
+        <IntegrationsSettingsTab />
+      )}
+
       {activeTab === 'ui' && (
         <UiSettingsTab />
       )}
 
       {activeTab === 'shortcuts' && (
         <ShortcutsSettingsTab />
+      )}
+
+      {activeTab === 'updates' && (
+        <UpdatesSettingsTab />
       )}
 
       {activeTab === 'logs' && (

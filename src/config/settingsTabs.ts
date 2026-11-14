@@ -1,8 +1,19 @@
 // Names and orders the settings sections once, so desktop and mobile cannot drift.
-import { Bell, Database, Keyboard, Laptop, RefreshCw, Sliders, Sparkles, Terminal, UserRound } from 'lucide-react';
+import { ArrowDownToLine, Bell, Database, Keyboard, Laptop, Plug, RefreshCw, Sliders, Sparkles, Terminal, UserRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export type SettingsTabId = 'account' | 'sync' | 'devices' | 'vault' | 'notifications' | 'ai' | 'ui' | 'shortcuts' | 'logs';
+export type SettingsTabId =
+  | 'account'
+  | 'sync'
+  | 'devices'
+  | 'vault'
+  | 'notifications'
+  | 'integrations'
+  | 'ai'
+  | 'ui'
+  | 'shortcuts'
+  | 'updates'
+  | 'logs';
 
 export interface SettingsTabDefinition {
   id: SettingsTabId;
@@ -24,9 +35,11 @@ export const SETTINGS_TABS: readonly SettingsTabDefinition[] = [
   { id: 'devices', label: 'Устройства', icon: Laptop },
   { id: 'vault', label: 'Хранилище & Бэкап', icon: Database },
   { id: 'notifications', label: 'Уведомления', icon: Bell },
+  { id: 'integrations', label: 'Интеграции', icon: Plug },
   { id: 'ai', label: 'ИИ & Провайдеры', icon: Sparkles },
   { id: 'ui', label: 'Интерфейс & Панели', icon: Sliders },
   { id: 'shortcuts', label: 'Горячие клавиши', icon: Keyboard },
+  { id: 'updates', label: 'Обновления', icon: ArrowDownToLine },
   { id: 'logs', label: 'Логи & Диагностика', icon: Terminal },
 ];
 

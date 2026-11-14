@@ -29,6 +29,7 @@ import { useFolderAdmin } from './hooks/useFolderAdmin';
 import { useVaults } from './hooks/useVaults';
 import { useRecurringRollover } from './hooks/useRecurringRollover';
 import { useNotifyArm } from './hooks/useNotifyArm';
+import { useAppUpdates } from './hooks/useAppUpdates';
 import {
   STORAGE_KEYS,
   DEFAULT_INBOX_FOLDER,
@@ -168,6 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useRecurringRollover(refreshData);
   useNotifyArm(items, vault);
+  const appUpdate = useAppUpdates(addToast);
 
   // Application Startup Log (guarded against React StrictMode double invocation)
   const hasLoggedInitRef = useRef(false);
@@ -710,6 +712,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         forceMobileMode,
         uiConfig,
         updateUiConfig,
+        appUpdate,
       }}
     >
       {children}

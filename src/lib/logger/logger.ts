@@ -18,6 +18,7 @@ const SCOPE_STYLES: Record<LogScope, { bg: string; fg: string }> = {
   MEDIA: { bg: '#831843', fg: '#fbcfe8' },
   WORKSPACE: { bg: '#075985', fg: '#bae6fd' },
   NOTIFY: { bg: '#78350f', fg: '#fcd34d' },
+  UPDATE: { bg: '#1e3a8a', fg: '#bfdbfe' },
 };
 
 const LEVEL_COLORS: Record<LogLevel, string> = {

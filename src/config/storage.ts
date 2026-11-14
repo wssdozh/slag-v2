@@ -25,6 +25,7 @@ export const STORAGE_KEYS = {
   BACKUP_SETTINGS: 'slag_backup_settings_v2',
   DETACHED_WINDOWS: 'slag_detached_windows_v2',
   SESSION_BREADCRUMBS: 'slag_session_breadcrumbs',
+  UPDATE_DISMISSED: 'slag_update_dismissed_version',
 } as const;
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {

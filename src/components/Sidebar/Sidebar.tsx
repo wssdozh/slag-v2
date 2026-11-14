@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Terminal,
   RefreshCw,
+  ArrowDownToLine,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -28,6 +29,7 @@ export const Sidebar: React.FC = () => {
     openSettingsModal,
     setIsLogViewerOpen,
     openCreateFolderModal,
+    appUpdate,
   } = useApp();
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => syncEngine.getStatus());
@@ -112,6 +114,20 @@ export const Sidebar: React.FC = () => {
           <FolderTree />
         </div>
       </div>
+
+      {/* A newer build is one click away; the line is quiet until the release is worth it. */}
+      {appUpdate.isNoticeVisible && appUpdate.offer && (
+        <button
+          type="button"
+          onClick={() => openSettingsModal('updates')}
+          data-testid="sidebar-update-notice"
+          title={`Обновление ${appUpdate.offer.version} · открыть раздел обновлений`}
+          className="mx-2 mb-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] text-fg-muted hover:text-fg-primary hover:bg-white/[0.04] transition-colors cursor-pointer"
+        >
+          <ArrowDownToLine className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">обновление {appUpdate.offer.version}</span>
+        </button>
+      )}
 
       {/* Bottom Vault Switcher & Settings */}
       <div

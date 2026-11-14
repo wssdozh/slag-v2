@@ -29,6 +29,7 @@ SortField,
 SortOrder,
 FolderViewSettings,
 ConfirmOptions,
+AppUpdateState,
 } from '../types';
 import type { SettingsTabId } from '../config/settingsTabs';
 export interface ToastMessage {
@@ -225,4 +226,7 @@ export interface AppContextType {
   forceMobileMode: boolean | null;
   uiConfig: AppUiConfig;
   updateUiConfig: (device: 'desktop' | 'mobile', updates: Partial<DeviceUiConfig>) => void;
+
+  // In-app self-update: version, a newer release and the install flow.
+  appUpdate: AppUpdateState;
 }

@@ -19,7 +19,8 @@ export const MobileSettingsView: React.FC = () => {
     openSettingsModal,
     createVault,
     switchVault,
-    addToast
+    addToast,
+    appUpdate,
   } = useApp();
 
   const [acceptingVaultId, setAcceptingVaultId] = useState<string | null>(null);
@@ -121,10 +122,21 @@ export const MobileSettingsView: React.FC = () => {
         <SettingsGroup className="pt-5">
           {SETTINGS_TABS.filter((tab) => tab.id !== 'account').map((tab, index) => {
             const TabIcon = tab.icon;
+            const isUpdates = tab.id === 'updates';
+            const updateValue = isUpdates
+              ? appUpdate.offer?.version ?? appUpdate.platform?.currentVersion
+              : undefined;
             return (
               <React.Fragment key={tab.id}>
                 {index > 0 && <SettingsDivider inset />}
-                <SettingsRow icon={<TabIcon className="w-4 h-4" />} label={tab.label} testId={`mobile-settings-${tab.id}`} onClick={() => openSettingsModal(tab.id)} chevron />
+                <SettingsRow
+                  icon={<TabIcon className="w-4 h-4" />}
+                  label={tab.label}
+                  testId={`mobile-settings-${tab.id}`}
+                  value={updateValue ? <span className="font-mono text-[11px]">{updateValue}</span> : undefined}
+                  onClick={() => openSettingsModal(tab.id)}
+                  chevron
+                />
               </React.Fragment>
             );
           })}
@@ -132,7 +144,7 @@ export const MobileSettingsView: React.FC = () => {
 
         {/* Version info footer */}
         <div className="text-center text-xs text-fg-dim font-mono py-2">
-          SLAG v2.0 • Local-First Minimal Notes
+          SLAG {appUpdate.platform?.currentVersion ? `v${appUpdate.platform.currentVersion}` : ''} • Local-First Minimal Notes
         </div>
       </div>
     </div>
