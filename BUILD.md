@@ -157,3 +157,32 @@ export PATH="$HOME/.cargo/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HO
 `python scripts/build-android-icons.py --scale 0.56` пересобирает `src-tauri/icons/android/**` из `src-tauri/icons/icon.png`. `--scale` — доля adaptive-канвы (108dp) под шар. Лончеры читают канву по-разному: одни показывают все 108dp плиткой, другие режут до центральных 72dp и шар выглядит в 1.5 раза крупнее. Honor UniHome показывает всю канву (проверено по фото собственной иконки), поэтому масштаб равен доле плитки у референса — 0.56. `--preview <path> [--before <старая foreground.png>]` отрисует, как это выглядит под скруглением и кругом.
 
 `src-tauri/gen/**` в gitignore, и tauri кладёт туда mipmap только при инициализации проекта, а не на каждой сборке. Скрипт сам копирует результат в `gen/android/app/src/main/res/`, если проект уже сгенерирован; без этого правка иконок остаётся только в git.
+
+### Android на Windows: сборка без Developer Mode
+
+Тулчейн живёт в `%USERPROFILE%\.dsh-tools`: `jdk-17`, `android-sdk` (cmdline-tools, platform-tools, platforms;android-37.0, build-tools;35.0.0 + 37.0.0, ndk/27.0.12077973). Перед `tauri`/`gradlew` в сессии выставляются `JAVA_HOME`, `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `NDK_HOME`, плюс rustup target `aarch64-linux-android`.
+
+`npx tauri android build --apk --target aarch64` на Windows падает после успешной компиляции: tauri делает симлинк `libslag_lib.so` в `gen/android/app/src/main/jniLibs/<abi>/`, а без включённого Developer Mode Windows это запрещает (`Creation symbolic link is not allowed`). Лечится без админа — собрать lib через tauri (он её компилит до места падения), скопировать руками и звать gradle в обход rust-задач:
+
+```powershell
+npx tauri android build --apk --target aarch64            # падает на симлинке, lib уже собрана
+Copy-Item src-tauri\target\aarch64-linux-android\release\libslag_lib.so `
+  src-tauri\gen\android\app\src\main\jniLibs\arm64-v8a\libslag_lib.so -Force
+Set-Content src-tauri\gen\android\app\tauri.properties "tauri.android.versionCode=1000`ntauri.android.versionName=0.1.0"
+cd src-tauri\gen\android
+.\gradlew.bat :app:assembleUniversalRelease -x rustBuildUniversalRelease `
+  -x rustBuildArm64Release -x rustBuildArmRelease -x rustBuildX86Release -x rustBuildX86_64Release
+# debug: то же с assembleUniversalDebug и -x rustBuild*Debug
+```
+
+Имя задачи: `rustBuildX86_64Release`, не `rustBuildX8664Release`. Выход — `app/build/outputs/apk/universal/<build>/app-universal-<build>.apk`, release там **unsigned**: `zipalign -p -f 4`, затем `apksigner sign --ks %USERPROFILE%\.android\debug.keystore --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey`. Debug-вариант AGP подписывает сам тем же ключом, так что `adb install -r` релиза поверх дебага сохраняет данные.
+
+Если на устройстве уже стоит сборка, подписанная чужим ключом (`apksigner verify --print-certs` не совпадает с локальным `debug.keystore`), обновление невозможно — только снос, а вместе с ним данные (`vaults/`, `shared_prefs`, `app_webview`). Порядок без потерь: `run-as` + tar в `/data/local/tmp` (см. ниже), снос, установка debuggable-сборки, запуск, `am force-stop`, `tar -xf` через `run-as`, установка релиза через `install -r`.
+
+```powershell
+adb shell "run-as com.slag.notes tar -cf - --exclude=cache . > /data/local/tmp/slag-appdata.tar"
+adb pull /data/local/tmp/slag-appdata.tar
+adb shell "run-as com.slag.notes tar -xf /data/local/tmp/slag-appdata.tar"   # на дебажной сборке
+```
+
+tar-архив собирать и распаковывать **на устройстве**: виндовый `tar.exe` ломает кириллические имена при распаковке (часть файлов просто пропускается), поэтому распаковка на хосте не проверка целостности — сверяй `find . -type f | wc -l`.
