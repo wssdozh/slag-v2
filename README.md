@@ -4,6 +4,15 @@
 из одного кода. Данные лежат на диске, синхронизация идёт через свой relay, который не читает
 содержимое заметок.
 
+[Скачать для Windows, Linux и Android](https://github.com/wssdozh/slag-v2/releases)
+
+<p align="center">
+  <img src="docs/screenshots/readme/desktop-feed.png" alt="SLAG на десктопе: папки, лента задач и панель папки" width="100%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/readme/android-tasks.png" alt="SLAG на Android: список задач, статусы и нижний док" width="320">
+</p>
+
 ## Что внутри
 
 - записи хранятся как `.md` с YAML frontmatter; папки и теги лежат рядом, вложения — в
