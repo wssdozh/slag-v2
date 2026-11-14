@@ -13,12 +13,6 @@ interface SiteRedirectProps {
 export const SiteRedirect: React.FC<SiteRedirectProps> = ({ onNavigateToAccount }) => (
   <div className="min-h-screen bg-canvas-subtle text-fg-primary flex items-center justify-center px-6 font-sans antialiased">
     <div className="w-full max-w-sm flex flex-col items-center text-center gap-5">
-      <img
-        src="/mascot-blueberry.svg"
-        alt="SLAG"
-        className="w-12 h-12 rounded-xl bg-surface border border-border-subtle p-1.5"
-      />
-
       <div className="flex flex-col gap-2">
         <h1 className="text-lg font-semibold tracking-tight">SLAG живёт на slag.app</h1>
         <p className="text-xs text-fg-secondary leading-relaxed">
