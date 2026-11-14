@@ -186,3 +186,22 @@ adb shell "run-as com.slag.notes tar -xf /data/local/tmp/slag-appdata.tar"   # �
 ```
 
 tar-архив собирать и распаковывать **на устройстве**: виндовый `tar.exe` ломает кириллические имена при распаковке (часть файлов просто пропускается), поэтому распаковка на хосте не проверка целостности — сверяй `find . -type f | wc -l`.
+
+---
+
+## 8. Обновления клиента (self-update)
+
+Приложение обновляет себя само: манифест и файлы — в публичном
+`https://github.com/wssdozh/slag-releases/releases`, подпись minisign + sha256 проверяются до
+запуска. Точки входа: `src-tauri/src/updater.rs`, вкладка «Обновления» в настройках,
+`src/lib/platform/appUpdate.ts`, `src/context/hooks/useAppUpdates.ts`.
+
+- **windows**: портативная exe подменяет себя (`--apply-update`), установка в папку без прав
+  (`Program Files`) обновляется через nsis-установщик из релиза;
+- **android**: apk → системный установщик (`REQUEST_INSTALL_PACKAGES`, `FileProvider` уже в
+  манифесте);
+- **linux**: бинарь принадлежит пакетному менеджеру — вкладка показывает новую версию и ссылку на
+  релиз, автоподмены нет.
+
+Публикация и проверка — `docs/RELEASING.md`; одной командой:
+`pwsh scripts/publish-release.ps1 -Version 0.2.0 -Notes "…" -ApkPath …`.
