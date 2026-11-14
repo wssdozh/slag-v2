@@ -9,6 +9,7 @@ export const DEFAULT_NOTIFY_PREFS: NotifyPrefs = {
   quietTo: '08:00',
   assistantMode: 'off',
   spoiler: false,
+  integrationsEnabled: true,
 };
 
 /** Older builds stored the assistant switch as a boolean, so state on disk may still carry it. */
@@ -42,6 +43,7 @@ export function getNotifyPrefs(): NotifyPrefs {
     quietTo: stored.quietTo ?? DEFAULT_NOTIFY_PREFS.quietTo,
     assistantMode: assistantModeOf(stored),
     spoiler: stored.spoiler ?? DEFAULT_NOTIFY_PREFS.spoiler,
+    integrationsEnabled: stored.integrationsEnabled ?? DEFAULT_NOTIFY_PREFS.integrationsEnabled,
   };
 }
 

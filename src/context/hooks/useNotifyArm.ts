@@ -36,7 +36,15 @@ function armReminders(items: SlagItem[]): void {
   if (!accountClient.isAuthenticated()) return;
   const vaultId = syncVaultId();
   if (!vaultId) return;
-  void reconcileNotifications(items, vaultId, getNotifyRoutes(), getNotifyPrefs());
+  // The master switch takes every route out of the arm path: the relay disarms what this
+  // session queued there, and nothing new leaves the device.
+  const prefs = getNotifyPrefs();
+  void reconcileNotifications(
+    items,
+    vaultId,
+    prefs.integrationsEnabled ? getNotifyRoutes() : [],
+    prefs
+  );
 }
 
 /**

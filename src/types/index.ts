@@ -416,6 +416,12 @@ export interface NotifyPrefs {
   assistantMode: AssistantSetting;
   /** Hide the body behind a telegram spoiler: the chat shows a tap-to-reveal line. */
   spoiler: boolean;
+  /**
+   * The master switch over every outbound integration. Off means nothing leaves this device:
+   * no reminders are armed on the relay and the bot answers nobody. Local system toasts take
+   * over. Missing on older workspaces and treated as on.
+   */
+  integrationsEnabled: boolean;
 }
 
 /** Who this vault belongs to. Synced inside the encrypted bundle, so the relay never sees it. */
@@ -555,6 +561,15 @@ export interface AppUpdatePlatform {
   currentVersion: string;
   canApply: boolean;
   releasePage: string;
+  /** The manifest URL actually in use; a dev override shows up here. */
+  endpoint: string;
+}
+
+/** A line the native updater emits so the pipeline is visible in Логи & Диагностика. */
+export interface AppUpdateLogLine {
+  level: string;
+  message: string;
+  data: string;
 }
 
 export type AppUpdateStatus =

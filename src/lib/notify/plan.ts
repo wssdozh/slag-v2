@@ -5,7 +5,7 @@ import { logger } from '../logger/logger';
 import { accountClient } from '../sync/account';
 import { computeHash } from '../sync/crypto';
 import { formatDueDateLabel, getISODateString } from '../time/dateUtils';
-import { describeError, getNotifyRoutes, saveNotifyRoutes } from './prefs';
+import { describeError, getNotifyPrefs, getNotifyRoutes, saveNotifyRoutes } from './prefs';
 import { DAY_MS, shiftOutOfQuiet } from './quiet';
 
 const notifyLog = logger.scope('NOTIFY');
@@ -285,21 +285,32 @@ export async function runLocalReminders(items: SlagItem[], prefs: NotifyPrefs): 
   }
 }
 
-/**
- * A desktop toast. Silenced while an active telegram route exists: the relay
- * already sent it, and a second ping for one reminder is noise.
- */
-export async function showLocalReminder(item: SlagItem): Promise<void> {
-  if (!isTauri()) return;
-  if (getNotifyRoutes().some((route) => route.state === 'active')) return;
+export type LocalNotificationResult = 'sent' | 'denied' | 'unsupported';
+
+// одно системное уведомление через плагин: без исключений наружу, только результат.
+export async function sendLocalNotification(title: string, body: string): Promise<LocalNotificationResult> {
+  if (!isTauri()) return 'unsupported';
   try {
     const { isPermissionGranted, requestPermission, sendNotification } = await import(
       '@tauri-apps/plugin-notification'
     );
     const granted = (await isPermissionGranted()) || (await requestPermission()) === 'granted';
-    if (!granted) return;
-    sendNotification({ title: item.title, body: 'напоминание' });
+    if (!granted) return 'denied';
+    sendNotification({ title, body });
+    return 'sent';
   } catch (error) {
-    notifyLog.warn('Local reminder failed', { itemId: item.id, error: describeError(error) });
+    notifyLog.warn('Local reminder failed', { error: describeError(error) });
+    return 'denied';
   }
+}
+
+/**
+ * A desktop toast. Silenced while an active telegram route exists: the relay
+ * already sent it, and a second ping for one reminder is noise. With the integrations
+ * switched off nothing is delivered, so the toast is the only channel left.
+ */
+export async function showLocalReminder(item: SlagItem): Promise<void> {
+  const prefs = getNotifyPrefs();
+  if (prefs.integrationsEnabled && getNotifyRoutes().some((route) => route.state === 'active')) return;
+  await sendLocalNotification(item.title, 'напоминание');
 }
