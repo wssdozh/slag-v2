@@ -671,8 +671,9 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         button = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0][0]
         # The button carries the request, never the payload: callback data is a plain string that
         # anyone can replay, so the action stays where a tap cannot rewrite it.
-        # Telegram has no button colour, so the confirm half carries the app's tick instead.
-        self.assertEqual(button["text"], "✓ Применить")
+        # Bot API 9.4 colours a button; there is no palette, only success/primary/danger.
+        self.assertEqual(button["text"], "Применить")
+        self.assertEqual(button["style"], "success")
         self.assertEqual(button["callback_data"], f"act:{request_id}")
         self.assertEqual(self.db.get_assistant_request(request_id)["answer_text"],
                          "предлагаю «Купить кота»")
@@ -691,7 +692,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(meta, "пн, 16 ноя · 🟡 MEDIUM")
         self.assertLess(html.index("пн, 16 ноя"), html.index("MEDIUM"))
         row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
-        self.assertEqual([button["text"] for button in row], ["✓ Сохранить", "Отклонить"])
+        self.assertEqual([button["text"] for button in row], ["Сохранить", "Отклонить"])
+        self.assertEqual([button["style"] for button in row], ["success", "danger"])
         self.assertEqual(row[0]["callback_data"], f"act:{request_id}")
         self.assertEqual(row[1]["callback_data"], f"drop:{request_id}")
 
@@ -703,7 +705,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
                                             action=sample_action(), answered_by="dev-1")
         self.assertNotIn("<blockquote>", str(self.bot.calls[-1]["text"]))
         row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
-        self.assertEqual([button["text"] for button in row], ["✓ Применить", "Отклонить"])
+        self.assertEqual([button["text"] for button in row], ["Применить", "Отклонить"])
+        self.assertEqual([button["style"] for button in row], ["success", "danger"])
 
     async def test_dismiss_kills_the_action_and_a_late_tap_is_stale(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
@@ -725,6 +728,20 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         await self.tap("chat-a", f"act:{request_id}", callback_id="cb-2")
         self.assertEqual(self.bot.callbacks[-1]["text"], ASSISTANT_ACTION_STALE)
         self.assertEqual([f for f in device.frames if '"assistant_action"' in f], [])
+
+    async def test_a_server_that_refuses_buttons_still_delivers_them_without_a_colour(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "что на 16-е?")
+        # An older Bot API server refuses the whole message over the `style` field it never had.
+        self.bot.reject_markup = True
+        await self.server._answer_assistant("vault-1", request_id, "готово",
+                                            action=sample_card_action(), answered_by="dev-1")
+        fallback = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
+        self.assertEqual([button["text"] for button in fallback], ["Сохранить", "Отклонить"])
+        self.assertNotIn("style", fallback[0])
+        self.assertEqual(fallback[0]["callback_data"], f"act:{request_id}")
+        self.assertTrue(self.bot.sent)
 
     async def test_answer_without_an_action_has_no_keyboard_at_all(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)

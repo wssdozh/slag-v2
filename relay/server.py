@@ -98,6 +98,9 @@ ASSISTANT_DEVICE_FALLBACK = "устройство"
 ASSISTANT_ACTION_PREFIX = "act:"
 # The second button: a card that is not wanted is a card that must be able to disappear.
 ASSISTANT_DROP_PREFIX = "drop:"
+# Bot API 9.4 colours a button with one of three desktop styles; there is no palette and no hex.
+ASSISTANT_CONFIRM_STYLE = "success"
+ASSISTANT_DROP_STYLE = "danger"
 ASSISTANT_ACTION_BUTTON_MAX = 64
 # The card is drawn from fields the device worded; these are the ceilings on what it may print.
 ASSISTANT_CARD_FIELD_MAX = 120
@@ -171,12 +174,27 @@ def assistant_action_markup(action: Optional[dict], request_id: str) -> Optional
     label = assistant_action_label(action)
     if label is None:
         return None
-    # Telegram gives a button no colour and no icon, so the confirm half borrows the app's tick:
-    # a checkmark in the caption is the only way to tell "this one commits" from "this one undoes".
-    return {"inline_keyboard": [[{"text": f"✓ {label}",
-                                  "callback_data": f"{ASSISTANT_ACTION_PREFIX}{request_id}"},
+    return {"inline_keyboard": [[{"text": label,
+                                  "callback_data": f"{ASSISTANT_ACTION_PREFIX}{request_id}",
+                                  "style": ASSISTANT_CONFIRM_STYLE},
                                  {"text": ASSISTANT_CARD_DROP_LABEL,
-                                  "callback_data": f"{ASSISTANT_DROP_PREFIX}{request_id}"}]]}
+                                  "callback_data": f"{ASSISTANT_DROP_PREFIX}{request_id}",
+                                  "style": ASSISTANT_DROP_STYLE}]]}
+
+
+def without_button_styles(markup: Optional[dict]) -> Optional[dict]:
+    """The same keyboard minus its colours.
+
+    `style` arrived in Bot API 9.4. A relay talking to an older server would be refused the whole
+    message over one field it does not know, and losing the button is cheaper than losing the
+    answer — but only after trying the keyboard without the colour first.
+    """
+    if not isinstance(markup, dict) or not isinstance(markup.get("inline_keyboard"), list):
+        return markup
+    rows = [[{key: value for key, value in button.items() if key != "style"}
+             for button in row if isinstance(button, dict)]
+            for row in markup["inline_keyboard"] if isinstance(row, list)]
+    return {**markup, "inline_keyboard": rows}
 
 
 def assistant_card_block(action: Optional[dict]) -> str:
@@ -3352,7 +3370,7 @@ class SlagRelayServer:
         logger.warning("Telegram refused the markup (%s), sending plain text", body.get("description"))
         fallback = {"chat_id": chat_id, "text": plain, "disable_web_page_preview": True}
         if reply_markup is not None:
-            fallback["reply_markup"] = reply_markup
+            fallback["reply_markup"] = without_button_styles(reply_markup)
         return await self.bot.call("sendMessage", fallback, timeout=timeout)
 
     async def _bot_reply(self, chat_id: str, text: str, html: Optional[str] = None) -> bool:
@@ -3466,7 +3484,7 @@ class SlagRelayServer:
         fallback = {"chat_id": chat_id, "message_id": message_id, "text": plain,
                     "disable_web_page_preview": True}
         if reply_markup is not None:
-            fallback["reply_markup"] = reply_markup
+            fallback["reply_markup"] = without_button_styles(reply_markup)
         return await self.bot.call("editMessageText", fallback, timeout=timeout)
 
     async def _edit_telegram_markup(self, chat_id: str, message_id: int, reply_markup: dict,
