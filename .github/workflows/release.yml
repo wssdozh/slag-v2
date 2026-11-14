@@ -97,15 +97,17 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: ndk
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null; yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973"
+        run: |
+          sdk="$ANDROID_HOME"
+          yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973"
+          echo "NDK_HOME=$sdk/ndk/27.0.12077973" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - name: build apk
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
         run: npx tauri android build --apk --target aarch64
       - name: sign apk
         env:
