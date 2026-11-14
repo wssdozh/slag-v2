@@ -693,7 +693,9 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertLess(html.index("пн, 16 ноя"), html.index("MEDIUM"))
         row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
         self.assertEqual([button["text"] for button in row], ["Сохранить", "Отклонить"])
-        self.assertEqual([button["style"] for button in row], ["success", "danger"])
+        # Green commits, grey refuses: no `style` key at all is what Telegram draws neutral.
+        self.assertEqual(row[0]["style"], "success")
+        self.assertNotIn("style", row[1])
         self.assertEqual(row[0]["callback_data"], f"act:{request_id}")
         self.assertEqual(row[1]["callback_data"], f"drop:{request_id}")
 
@@ -706,7 +708,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<blockquote>", str(self.bot.calls[-1]["text"]))
         row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
         self.assertEqual([button["text"] for button in row], ["Применить", "Отклонить"])
-        self.assertEqual([button["style"] for button in row], ["success", "danger"])
+        self.assertEqual(row[0]["style"], "success")
+        self.assertNotIn("style", row[1])
 
     async def test_dismiss_kills_the_action_and_a_late_tap_is_stale(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)

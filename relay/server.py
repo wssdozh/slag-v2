@@ -98,9 +98,10 @@ ASSISTANT_DEVICE_FALLBACK = "устройство"
 ASSISTANT_ACTION_PREFIX = "act:"
 # The second button: a card that is not wanted is a card that must be able to disappear.
 ASSISTANT_DROP_PREFIX = "drop:"
-# Bot API 9.4 colours a button with one of three desktop styles; there is no palette and no hex.
+# Bot API 9.4 colours a button with one of three preset styles; there is no palette and no hex.
+# Only the confirm half gets one: a grey refusal is quieter than a red one, and refusing to save
+# a draft is not a destructive act.
 ASSISTANT_CONFIRM_STYLE = "success"
-ASSISTANT_DROP_STYLE = "danger"
 ASSISTANT_ACTION_BUTTON_MAX = 64
 # The card is drawn from fields the device worded; these are the ceilings on what it may print.
 ASSISTANT_CARD_FIELD_MAX = 120
@@ -178,8 +179,7 @@ def assistant_action_markup(action: Optional[dict], request_id: str) -> Optional
                                   "callback_data": f"{ASSISTANT_ACTION_PREFIX}{request_id}",
                                   "style": ASSISTANT_CONFIRM_STYLE},
                                  {"text": ASSISTANT_CARD_DROP_LABEL,
-                                  "callback_data": f"{ASSISTANT_DROP_PREFIX}{request_id}",
-                                  "style": ASSISTANT_DROP_STYLE}]]}
+                                  "callback_data": f"{ASSISTANT_DROP_PREFIX}{request_id}"}]]}
 
 
 def without_button_styles(markup: Optional[dict]) -> Optional[dict]:
