@@ -1,5 +1,6 @@
 // The dialog frame every modal wears: presence, backdrop, header, footer, Escape.
 import React, { useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { IconButton } from '../UI/IconButton';
 import { usePresence } from '../../hooks/ui/usePresence';
@@ -22,6 +23,13 @@ export interface BaseModalProps {
   showCloseButton?: boolean;
   headerRightSlot?: React.ReactNode;
   closeOnBackdropClick?: boolean;
+  /**
+   * Render into `document.body`. A `fixed` overlay inside an ancestor that moves (a `.motion-screen`
+   * carries `translate`, which makes it a containing block for `fixed`) would be positioned by that
+   * ancestor and clipped by its `overflow` — a dialog was doing exactly that inside the phone's
+   * settings screen.
+   */
+  portal?: boolean;
   role?: 'dialog' | 'alertdialog';
   ariaLabel?: string;
   footer?: React.ReactNode;
@@ -45,6 +53,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   showCloseButton = true,
   headerRightSlot,
   closeOnBackdropClick = true,
+  portal = false,
   role = 'dialog',
   ariaLabel,
   footer,
@@ -74,7 +83,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
   const ariaLabelString = typeof title === 'string' ? title : ariaLabel;
 
-  return (
+  const surface = (
     <div
       ref={overlayRef}
       data-motion-state={phase}
@@ -153,4 +162,6 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       </div>
     </div>
   );
+
+  return portal ? createPortal(surface, document.body) : surface;
 };
