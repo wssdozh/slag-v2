@@ -448,6 +448,26 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ассистент вкл", html)
         self.assertNotIn("приглашение", html)
 
+    async def test_start_shows_the_profile_name_when_the_account_has_one(self):
+        vault_id = "vault_3721cd28-be7a-47f9-aa71-267d341b5121"
+        account_id = "acc_28ec1766232017b19a8a7043"
+        with self.db.conn:
+            self.db.conn.execute(
+                "INSERT OR REPLACE INTO accounts (account_id, public_key, plan, created_at)"
+                " VALUES (?, ?, 'smile', ?)", (account_id, f"pk-{account_id}", time.time()))
+            self.db.conn.execute(
+                "INSERT OR REPLACE INTO vaults (id, name, owner_account_id, created_at, updated_at)"
+                " VALUES (?, 'main', ?, ?, ?)", (vault_id, account_id, time.time(), time.time()))
+        self.db.set_display_name(account_id, "дава")
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", vault_id, True)
+        await self.server._handle_bot_update({"update_id": 13, "message": {
+            "chat": {"id": "chat-a", "type": "private"}, "from": {"id": "chat-a"}, "text": "/start"}})
+        html = self.bot.sent[-1][1]
+        # Name on the first line, the vault on the second: the person, then where they are.
+        self.assertIn("<b>дава</b> • <code>7043</code>", html)
+        self.assertIn("main • <code>5121</code>", html)
+
     async def test_start_without_a_link_still_points_at_the_app(self):
         await self.server._handle_bot_update({"update_id": 12, "message": {
             "chat": {"id": "chat-1", "type": "private"}, "from": {"id": "chat-1"}, "text": "/start"}})

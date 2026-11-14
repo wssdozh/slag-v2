@@ -190,19 +190,28 @@ class BotDomain:
         plain_blocks: list[str] = []
         for route in routes[:3]:
             link = self.db.assistant_link(route["route_token"])
-            row = self.db.conn.execute("SELECT name, owner_account_id FROM vaults WHERE id = ?",
-                                       (link["vault_id"],)).fetchone() if link else None
+            row = self.db.conn.execute(
+                "SELECT v.name, v.owner_account_id, a.display_name FROM vaults v"
+                " LEFT JOIN accounts a ON a.account_id = v.owner_account_id WHERE v.id = ?",
+                (link["vault_id"],)).fetchone() if link else None
             if link:
                 # Short, the way the app shows it: a name and the four characters that make two
                 # vaults with the same name distinguishable at a glance.
-                name = (row["name"] if row else "") or "хранилище"
+                vault_name = (row["name"] if row else "") or "хранилище"
+                display_name = ((row["display_name"] if row else "") or "").strip()
                 mode = link["mode"] or "minimal"
                 account_tail = ((row["owner_account_id"] if row else "") or "")[-4:]
-                lines_html = [f"<b>{tg_escape(name)}</b> • <code>{tg_escape(link['vault_id'][-4:])}</code>"]
-                lines_plain = [f"{name} • {link['vault_id'][-4:]}"]
-                if account_tail:
-                    lines_html.append(f"аккаунт • <code>{tg_escape(account_tail)}</code>")
-                    lines_plain.append(f"аккаунт • {account_tail}")
+                vault_line = f"{vault_name} • {link['vault_id'][-4:]}"
+                if display_name:
+                    lines_html = [f"<b>{tg_escape(display_name)}</b> • <code>{tg_escape(account_tail)}</code>",
+                                  f"{tg_escape(vault_name)} • <code>{tg_escape(link['vault_id'][-4:])}</code>"]
+                    lines_plain = [f"{display_name} • {account_tail}", vault_line]
+                else:
+                    lines_html = [f"<b>{tg_escape(vault_name)}</b> • <code>{tg_escape(link['vault_id'][-4:])}</code>"]
+                    lines_plain = [vault_line]
+                    if account_tail:
+                        lines_html.append(f"аккаунт • <code>{tg_escape(account_tail)}</code>")
+                        lines_plain.append(f"аккаунт • {account_tail}")
                 lines_html.append(f"уведомления вкл · ассистент вкл · {tg_escape(mode)}")
                 lines_plain.append(f"уведомления вкл · ассистент вкл · {mode}")
                 html_blocks.append("\n".join(lines_html))

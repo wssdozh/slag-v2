@@ -537,6 +537,21 @@ class AccountClient {
     });
   }
 
+  /**
+   * The profile name, mirrored to the account.
+   *
+   * It really lives in the vault (the whole point of the profile block), but the telegram bot
+   * greets a person in `/start` and the relay cannot read an encrypted vault. One short string,
+   * set by hand in settings, is the cheapest thing that makes that greeting human.
+   */
+  setProfileName(name: string): Promise<void> {
+    const clean = name.trim().slice(0, 64);
+    return this.mutate('/api/account/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ name: clean }),
+    });
+  }
+
   registerVault(vaultId: string, name: string): Promise<void> {
     return this.mutate(`/api/vaults/${encodeURIComponent(vaultId)}`, {
       method: 'PUT',

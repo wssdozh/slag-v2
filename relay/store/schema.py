@@ -171,6 +171,9 @@ def apply_schema(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_created_at ON telemetry_events(created_at)")
         ensure_column(conn, "accounts", "status", "TEXT NOT NULL DEFAULT 'active'")
         ensure_column(conn, "accounts", "expires_at", "REAL")
+        # The name a person set in the app profile. It used to live only inside the encrypted
+        # vault, which the relay cannot read — and the bot needs it for `/start`.
+        ensure_column(conn, "accounts", "display_name", "TEXT NOT NULL DEFAULT ''")
         # One row per (recipient, event): the pair is the dedup key, so two devices that
         # arm the same reminder cannot produce two messages.
         conn.execute("""CREATE TABLE IF NOT EXISTS notify_jobs (

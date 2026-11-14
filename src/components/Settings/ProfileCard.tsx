@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { Camera, Pencil, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
+import { accountClient } from '../../lib/sync/account';
 import type { ProfileInfo } from '../../types';
 import { IconButton } from '../UI/IconButton';
 import { MenuDropdown } from '../UI/MenuDropdown';
@@ -55,6 +56,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
   const save = (next: ProfileInfo) => {
     setProfile(next);
     storage.saveWorkspaceState({ profile: next });
+    // The name lives in the vault; the copy on the account exists so the telegram bot can greet
+    // a person in `/start`, where it has no way to decrypt anything.
+    if (!accountClient.isAuthenticated()) return;
+    void accountClient.setProfileName(next.name).catch(() => {
+      addToast('Имя сохранено здесь, но не на аккаунте — бот его не увидит', 'error');
+    });
   };
 
   const handleAvatarPick = async (event: React.ChangeEvent<HTMLInputElement>) => {

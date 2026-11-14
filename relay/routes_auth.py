@@ -124,6 +124,14 @@ class AuthRoutes:
             auth = self._auth(headers)
             return {"account": self.db.account_payload(auth["account_id"]), "devices": self.db.list_devices(auth["account_id"])}, 200
 
+        if method == "PATCH" and path == "/api/account/profile":
+            auth = self._auth(headers)
+            name = body.get("name", "")
+            if not isinstance(name, str) or len(name.strip()) > 64:
+                raise ApiError(400, "invalid_profile_name")
+            self.db.set_display_name(auth["account_id"], name.strip())
+            return {"status": "ok", "name": name.strip()}, 200
+
         if path.startswith("/api/account/devices/"):
             path = path.replace("/api/account/devices/", "/api/devices/", 1)
         if path.startswith("/api/devices/"):

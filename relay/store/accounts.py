@@ -66,13 +66,20 @@ class AccountsMixin:
         plan = PLANS.get(account["plan"], PLANS["free"])
         status = account["status"] if "status" in account.keys() else "active"
         expires_at = iso_time(account["expires_at"]) if "expires_at" in account.keys() and account["expires_at"] else None
+        name = account["display_name"] if "display_name" in account.keys() else ""
         return {
-            "id": account_id, "plan": account["plan"], "planLabel": plan["label"], "expiresAt": expires_at,
+            "id": account_id, "name": name or "", "plan": account["plan"], "planLabel": plan["label"],
+            "expiresAt": expires_at,
             "status": status,
             "maxDevices": plan["devices"], "maxCacheMb": plan["cache_mb"],
             "usedCacheMb": round(self.get_account_cache_bytes(account_id) / (1024 * 1024), 3),
             "allowAttachments": True, "hasAiLease": account["plan"] in ("smile", "angry") and status == "active"
         }
+
+    def set_display_name(self, account_id: str, name: str) -> None:
+        """The app profile name, kept as text on purpose: the bot shows it in `/start`."""
+        with self.conn:
+            self.conn.execute("UPDATE accounts SET display_name = ? WHERE account_id = ?", (name, account_id))
 
     def device_payload(self, row: sqlite3.Row) -> dict:
         return {"id": row["id"], "name": row["name"], "platform": row["platform"], "publicKey": row["public_key"],
