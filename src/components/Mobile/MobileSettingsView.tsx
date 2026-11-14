@@ -5,10 +5,11 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import { accountClient } from '../../lib/sync/account';
 import { navigatePage } from '../../lib/navigation';
 import { acceptSharedVault } from '../../lib/sync/vaultSharing';
-import { Database, Shield, Settings as SettingsIcon } from 'lucide-react';
+import { Database, Settings as SettingsIcon } from 'lucide-react';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { SettingsGroup, SettingsRow, SettingsDivider } from '../Settings/SettingsUI';
+import { ProfileCard } from '../Settings/ProfileCard';
 import { SETTINGS_TABS } from '../../config/settingsTabs';
 
 export const MobileSettingsView: React.FC = () => {
@@ -80,10 +81,12 @@ export const MobileSettingsView: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 pb-36">
         {/* Аккаунт первым: в настройки заходят проверить его, а не папки. */}
         <SettingsGroup title="Аккаунт">
+          <ProfileCard
+            planLabel={isLocked ? 'Войти · синхронизация и облачный ИИ' : `Тариф ${planLabel} · кеш ${usedCacheMb} МБ из ${cacheLabel}`}
+          />
+          <SettingsDivider />
           <SettingsRow
-            icon={<Shield className="w-4 h-4" />}
             label={isLocked ? 'SLAG ID' : 'Личный кабинет'}
-            description={isLocked ? 'Войти · синхронизация и облачный ИИ' : `Тариф ${planLabel} · кеш ${usedCacheMb} МБ из ${cacheLabel}`}
             testId={isLocked ? 'mobile-settings-login-btn' : 'mobile-settings-account-btn'}
             onClick={() => navigatePage('account')}
             chevron

@@ -61,6 +61,8 @@ export const SettingsDivider: React.FC<{ inset?: boolean }> = ({ inset = false }
 interface SettingsRowProps {
   /** A glyph, rendered bare. No background plate. */
   icon?: React.ReactNode;
+  /** An avatar or cover that takes the icon slot and keeps its own size. */
+  leading?: React.ReactNode;
   label: React.ReactNode;
   description?: React.ReactNode;
   /** Muted value on the right. Omit when `right` carries a control. */
@@ -80,6 +82,7 @@ interface SettingsRowProps {
 
 export const SettingsRow: React.FC<SettingsRowProps> = ({
   icon,
+  leading,
   label,
   description,
   value,
@@ -105,14 +108,18 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         interactive ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-white/[0.1] active:duration-0' : ''
       } ${disabled ? 'opacity-40' : ''} ${className}`}
     >
-      {icon && (
-        <span
-          className={`w-5 h-5 shrink-0 flex items-center justify-center ${
-            danger ? 'text-danger' : 'text-zinc-400'
-          }`}
-        >
-          {icon}
-        </span>
+      {leading ? (
+        <span className="shrink-0">{leading}</span>
+      ) : (
+        icon && (
+          <span
+            className={`w-5 h-5 shrink-0 flex items-center justify-center ${
+              danger ? 'text-danger' : 'text-zinc-400'
+            }`}
+          >
+            {icon}
+          </span>
+        )
       )}
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
         <span className={`text-sm font-medium ${danger ? 'text-danger' : 'text-zinc-200'}`}>
