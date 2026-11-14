@@ -169,7 +169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useRecurringRollover(refreshData);
   useNotifyArm(items, vault);
-  const appUpdate = useAppUpdates(addToast);
+  const appUpdate = useAppUpdates(addToast, confirmAction);
 
   // Application Startup Log (guarded against React StrictMode double invocation)
   const hasLoggedInitRef = useRef(false);

@@ -1,6 +1,8 @@
 // The "Обновления" tab: what is installed, what is on GitHub, and the one button that applies it.
+// Errors and permission questions are toasts/modals (see useAppUpdates), not rows inside the card:
+// a state that needs a decision belongs in a question, not in a paragraph under a button.
 import React from 'react';
-import { ArrowDownToLine, Check, ExternalLink, RefreshCw, ShieldAlert } from 'lucide-react';
+import { ArrowDownToLine, Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SettingsDivider, SettingsGroup, SettingsRow } from './SettingsUI';
 import { Button } from '../UI/Button';
@@ -12,33 +14,6 @@ const OS_LABEL: Record<string, string> = {
   android: 'android',
   macos: 'macos',
 };
-
-const ERROR_TEXT: Record<string, string> = {
-  network: 'нет связи с github — проверь сеть',
-  network_client: 'не удалось поднять http-клиент',
-  manifest_invalid: 'манифест релиза битый',
-  verify_failed: 'хэш или подпись не сошлись — обновление отменено',
-  signature_invalid: 'подпись не разобралась — обновление отменено',
-  pubkey_invalid: 'вшитый публичный ключ повреждён',
-  asset_url_not_allowed: 'манифест указывает на чужой хост — отказ',
-  size_mismatch: 'скачался не тот объём — попробуй ещё раз',
-  write_failed: 'нет прав писать в папку обновления',
-  read_failed: 'файл обновления не читается',
-  restart_failed: 'не удалось запустить установку',
-  installer_failed: 'установщик не запустился',
-  no_platform_asset: 'в релизе нет файла для этой платформы',
-  up_to_date: 'уже последняя версия',
-  unsupported: 'эта платформа не ставит обновления сама',
-  missing_file: 'файл обновления потерялся — попробуй ещё раз',
-  install_failed: 'системный установщик отказал',
-  settings_failed: 'не открылись настройки установки',
-};
-
-function errorText(code: string | null): string {
-  if (!code) return '';
-  if (code.startsWith('http_')) return `github ответил ${code.slice(5)}`;
-  return ERROR_TEXT[code] ?? code;
-}
 
 function installLabel(kind: string | undefined): string {
   if (kind === 'installer') return 'скачать установщик';
@@ -53,12 +28,10 @@ export const UpdatesSettingsTab: React.FC = () => {
     offer,
     status,
     progress,
-    error,
     canInstall,
     check,
     install,
     openReleasePage,
-    openInstallPermissionSettings,
   } = appUpdate;
 
   const isBusy = status === 'checking' || status === 'downloading';
@@ -97,6 +70,17 @@ export const UpdatesSettingsTab: React.FC = () => {
             </span>
           }
         />
+        <SettingsDivider />
+        <SettingsRow
+          label="канал"
+          testId="update-channel-row"
+          description="адрес манифеста, который опрашивается"
+          value={
+            <span className="text-[11px] font-mono text-fg-dim max-w-[15rem] truncate" data-testid="update-endpoint">
+              {platform?.endpoint ?? '—'}
+            </span>
+          }
+        />
       </SettingsGroup>
 
       <SettingsGroup title="обновление">
@@ -111,8 +95,24 @@ export const UpdatesSettingsTab: React.FC = () => {
           <>
             <SettingsRow
               icon={<ArrowDownToLine className="w-4 h-4" />}
-              label={offer ? `доступна ${offer.version}` : status === 'checking' ? 'проверяю…' : 'версия актуальна'}
-              description={offer ? offerDescription : status === 'up-to-date' ? 'проверено только что' : undefined}
+              label={
+                offer
+                  ? `доступна ${offer.version}`
+                  : status === 'checking'
+                    ? 'проверяю…'
+                    : status === 'error'
+                      ? 'не удалось проверить'
+                      : 'версия актуальна'
+              }
+              description={
+                offer
+                  ? offerDescription
+                  : status === 'up-to-date'
+                    ? 'проверено только что'
+                    : status === 'error'
+                      ? 'причина — в тосте и в логе UPDATE'
+                      : undefined
+              }
               testId="update-offer-row"
               right={
                 <Button
@@ -164,34 +164,6 @@ export const UpdatesSettingsTab: React.FC = () => {
                   {status === 'installing' && (
                     <span className="text-xs text-fg-secondary">
                       установлено — приложение перезапускается…
-                    </span>
-                  )}
-
-                  {status === 'permission-required' && (
-                    <div className="flex flex-col gap-2" data-testid="update-permission">
-                      <span className="text-xs text-fg-secondary">
-                        android не разрешает установку из этого источника. дай разрешение и повтори.
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={openInstallPermissionSettings}
-                          data-testid="update-permission-btn"
-                        >
-                          разрешить установку
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => void install()} data-testid="update-retry-btn">
-                          повторить
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {status === 'error' && (
-                    <span className="text-xs text-rose-400 flex items-center gap-1.5" data-testid="update-error">
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      {errorText(error)}
                     </span>
                   )}
 

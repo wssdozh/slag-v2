@@ -1,6 +1,6 @@
 [package]
 name = "slag-v2"
-version = "0.2.2"
+version = "0.2.3"
 description = "SLAG v2 — Ultra-minimalist notes system"
 authors = ["SLAG"]
 edition = "2021"
