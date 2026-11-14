@@ -1,5 +1,9 @@
 # Дорожная карта SLAG v2 (ROADMAP)
 
+> Сервер синхронизации и telegram-бот вынесены в
+> [wssdozh/slag-relay](https://github.com/wssdozh/slag-relay); упоминания `slag-relay` ниже
+> исторические.
+
 ## Видение продукта
 SLAG v2 — ультраминималистичная, быстрая и полностью локал-фёрст система заметок, объединяющая строгую эстетику **Linear Dark**, эргономику потока **Telegram** и расширяемую структуру **Obsidian** (Markdown + YAML Frontmatter) с нулевым доверием к внешним серверам (Zero-Knowledge E2EE).
 

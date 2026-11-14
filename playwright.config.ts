@@ -6,36 +6,18 @@ import { defineConfig, devices } from '@playwright/test';
 const port = Number(process.env.SLAG_E2E_PORT || 5173);
 const baseURL = `http://127.0.0.1:${port}`;
 
-// The UI playground boots only on its own origin (`src/demo.tsx` refuses every other port), so
-// the runner starts a second server for it. When this tree already runs there, one server is
-// enough: it serves both the app and `/demo.html`.
-const PLAYGROUND_PORT = 5174;
-const playgroundURL = `http://127.0.0.1:${PLAYGROUND_PORT}`;
-
-// Each server this runner starts gets its own pre-bundled deps directory. Worktrees share one
-// node_modules through a junction, and two Vite instances rewriting `.vite/deps` at once end in
-// EPERM on the rename, after which the loser serves 504s and the page never mounts.
+// Each runner gets its own pre-bundled deps directory. Worktrees share one node_modules through
+// a junction, and two Vite instances rewriting `.vite/deps` at once end in EPERM on the rename,
+// after which the loser serves 504s and the page never mounts.
 const cacheFor = (name: string) => ({ SLAG_VITE_CACHE_DIR: `${process.env.TEMP ?? '.'}/slag-vite-${name}` });
 
-const servers: Parameters<typeof defineConfig>[0]['webServer'] = [
-  {
-    command: `npx vite --port ${port} --host 127.0.0.1`,
-    url: baseURL,
-    reuseExistingServer: true,
-    timeout: 30000,
-    env: cacheFor(`app-${port}`),
-  },
-];
-
-if (port !== PLAYGROUND_PORT) {
-  servers.push({
-    command: `npx vite --port ${PLAYGROUND_PORT} --host 127.0.0.1`,
-    url: `${playgroundURL}/demo.html`,
-    reuseExistingServer: true,
-    timeout: 30000,
-    env: cacheFor(`playground-${PLAYGROUND_PORT}`),
-  });
-}
+const webServer = {
+  command: `npx vite --port ${port} --host 127.0.0.1`,
+  url: baseURL,
+  reuseExistingServer: true,
+  timeout: 30000,
+  env: cacheFor(`app-${port}`),
+};
 
 export default defineConfig({
   testDir: './e2e',
@@ -74,5 +56,5 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: servers,
+  webServer,
 });

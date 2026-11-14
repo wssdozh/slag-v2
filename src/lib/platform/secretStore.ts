@@ -357,8 +357,8 @@ function readLegacySecret(key: string): string | null {
 }
 
 export function getCachedSecret(key: string): string | null {
-  // A module can be imported before boot (the demo playground does this). Reads fall back
-  // to the legacy plaintext only until the migration has completed; writes never do.
+  // A module can be imported before boot. Reads fall back to the legacy plaintext only
+  // until the migration has completed; writes never do.
   if (!ready) return readLegacySecret(key);
   return cache.get(key) ?? null;
 }
