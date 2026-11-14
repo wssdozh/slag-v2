@@ -10,9 +10,11 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$Version,
-  [string]$Notes = '',
+  [Parameter(Mandatory = $true)][string]$Notes,
+  [ValidateSet('stable', 'beta', 'alpha', 'dev')][string]$Channel = 'stable',
   [string]$Repo = 'wssdozh/slag-v2',
   [string]$ApkPath = '',
+  [string[]]$ExtraAssets = @(),
   [string]$KeyPath = "$env:USERPROFILE\.tauri\slag-updater.key",
   [switch]$SkipBuild,
   [switch]$SkipAndroid
@@ -24,7 +26,13 @@ Set-Location $root
 
 $semver = '^\d+\.\d+\.\d+$'
 if ($Version -notmatch $semver) { throw "version must be x.y.z, got '$Version'" }
-if (-not (Test-Path $KeyPath)) { throw "no signing key: $KeyPath (npx tauri signer generate -w '$KeyPath' --ci)" }
+# Only a stable release becomes GitHub's "latest", which is exactly the stable client's endpoint:
+# beta/alpha/dev go out as prereleases and a stable client never sees them.
+$isStable = $Channel -eq 'stable'
+$releaseNotes = if ($isStable) { $Notes } else { "[$Channel] $Notes" }
+# The signing key in CI comes from a secret, not from the runner's home directory.
+if ($env:TAURI_SIGNING_PRIVATE_KEY -and -not (Test-Path $KeyPath)) { $KeyPath = '' }
+if ($KeyPath -and -not (Test-Path $KeyPath)) { throw "no signing key: $KeyPath (npx tauri signer generate -w '$KeyPath' --ci)" }
 
 function Write-Step([string]$text) { Write-Host "== $text" -ForegroundColor Cyan }
 function Get-Sha256([string]$path) { (Get-FileHash -Path $path -Algorithm SHA256).Hash.ToLowerInvariant() }
@@ -98,11 +106,18 @@ if ($ApkPath) {
   throw "build the release apk (docs/RELEASING.md) and pass -ApkPath, or run with -SkipAndroid"
 }
 
+# Linux bundles (deb, AppImage) are attached as-is: the client does not apply them (the package
+# manager owns that binary), but the release page should still have them.
+foreach ($path in $ExtraAssets) {
+  if ($path -and (Test-Path $path)) { Copy-Item $path $staging -Force }
+}
+
 # ---- 3. sign + hash -------------------------------------------------------------------------
 $assets = @()
+$signArgs = if ($KeyPath) { @('-f', $KeyPath) } else { @() }
 foreach ($file in Get-ChildItem $staging -File) {
   Write-Step "sign $($file.Name)"
-  Invoke-Native "sign $($file.Name)" { npx tauri signer sign -f $KeyPath $file.FullName }
+  Invoke-Native "sign $($file.Name)" { npx tauri signer sign @signArgs $file.FullName }
   $sigPath = "$($file.FullName).sig"
   if (-not (Test-Path $sigPath)) { throw "no .sig next to $($file.Name)" }
   $assets += [pscustomobject]@{
@@ -153,21 +168,27 @@ Get-Content $manifestPath
 
 # ---- 5. upload ------------------------------------------------------------------------------
 $notesFile = Join-Path $staging 'notes.md'
-Set-Utf8 $notesFile $Notes
+Set-Utf8 $notesFile $releaseNotes
 
-Write-Step "gh release v$Version -> $Repo"
+Write-Step "gh release v$Version ($Channel) -> $Repo"
 $uploads = @(Get-ChildItem $staging -File | ForEach-Object { $_.FullName })
+$prereleaseArgs = if ($isStable) { @() } else { @('--prerelease') }
 $existing = $null
 try { $existing = gh release view "v$Version" --repo $Repo 2>$null } catch { $existing = $null }
 if ($existing) {
   Write-Host '  release exists - uploading assets over it'
   Invoke-Native 'gh release upload' { gh release upload "v$Version" --repo $Repo --clobber @uploads }
-  Invoke-Native 'gh release edit' { gh release edit "v$Version" --repo $Repo --notes-file $notesFile }
+  Invoke-Native 'gh release edit' { gh release edit "v$Version" --repo $Repo --notes-file $notesFile @prereleaseArgs }
 } else {
-  Invoke-Native 'gh release create' { gh release create "v$Version" --repo $Repo --title "SLAG $Version" --notes-file $notesFile @uploads }
+  Invoke-Native 'gh release create' { gh release create "v$Version" --repo $Repo --title "SLAG $Version$(if ($isStable) { '' } else { " $Channel" })" --notes-file $notesFile @prereleaseArgs @uploads }
 }
 
 # ---- 6. verify ------------------------------------------------------------------------------
+if (-not $isStable) {
+  Write-Host "pre-release published: https://github.com/$Repo/releases/tag/v$Version (not 'latest')" -ForegroundColor Yellow
+  return
+}
+
 Write-Step 'verify published latest.json'
 Start-Sleep -Seconds 2
 $latestUrl = "https://github.com/$Repo/releases/latest/download/latest.json"

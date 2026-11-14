@@ -1,0 +1,154 @@
+# Releases are explicit: nothing is built on push. Pick the version, the channel and the notes,
+# and the job builds Windows, Linux and Android from the same commit, then publishes them.
+# Only `stable` becomes GitHub's "latest", which is the stable client's manifest endpoint, so
+# beta/alpha/dev never reach anyone who did not ask for them.
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия x.y.z (уже должна стоять в src-tauri/tauri.conf.json)'
+        required: true
+      channel:
+        description: 'Канал: stable становится latest, остальные уходят как prerelease'
+        type: choice
+        options: [stable, beta, alpha, dev]
+        default: stable
+      notes:
+        description: 'Что поменялось (пойдёт в заметки релиза и latest.json)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: версия совпадает с tauri.conf.json
+        run: |
+          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$conf" != "${{ inputs.version }}" ]; then
+            echo "tauri.conf.json = $conf, а релиз ${{ inputs.version }}. бампни версию локально и запушь." >&2
+            exit 1
+          fi
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: npm run check
+
+  desktop:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: desktop-windows
+          - os: ubuntu-22.04
+            artifact: desktop-linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: linux libs
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: build
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            npx tauri build --bundles nsis
+          else
+            npx tauri build --bundles deb,appimage
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/slag-v2*
+            src-tauri/target/release/bundle/**
+
+  android:
+    needs: verify
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "ndk;27.0.12077973"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: build apk
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+        run: npx tauri android build --apk --target aarch64
+      - name: sign apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          unsigned=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -n1)
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
+          "$bt/zipalign" -p -f 4 "$unsigned" "$RUNNER_TEMP/SLAG-${{ inputs.version }}-universal.apk"
+          "$bt/apksigner" sign --ks "$RUNNER_TEMP/release.keystore" --ks-pass "pass:$KS_PASS" \
+            --key-pass "pass:$KEY_PASS" --ks-key-alias "$KEY_ALIAS" "$RUNNER_TEMP/SLAG-${{ inputs.version }}-universal.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          if-no-files-found: error
+          path: ${{ runner.temp }}/SLAG-*-universal.apk
+
+  publish:
+    needs: [desktop, android]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: .artifacts
+      - name: разложить под скрипт публикации
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'
+          New-Item -ItemType Directory -Force src-tauri/target/release/bundle/nsis | Out-Null
+          Copy-Item .artifacts/desktop-windows/slag-v2.exe src-tauri/target/release/slag-v2.exe -Force
+          Copy-Item .artifacts/desktop-windows/bundle/nsis/*setup.exe src-tauri/target/release/bundle/nsis/ -Force
+          $linux = @(Get-ChildItem .artifacts/desktop-linux/bundle -Recurse -Include *.deb,*.AppImage -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          $apk = (Get-ChildItem .artifacts/android-apk -Filter *.apk | Select-Object -First 1).FullName
+          Write-Host "linux: $($linux -join ', ')"
+          Write-Host "apk: $apk"
+          ./scripts/publish-release.ps1 -Version $version -Channel '${{ inputs.channel }}' `
+            -Notes '${{ inputs.notes }}' -ApkPath $apk -ExtraAssets $linux -SkipBuild
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

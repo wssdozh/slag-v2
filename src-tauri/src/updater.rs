@@ -9,8 +9,8 @@ use tauri::{AppHandle, Emitter};
 
 // The app is open source, so releases ride on the code repository itself: same tags, same
 // release page, no separate artifacts repo to keep in sync.
-const MANIFEST_URL: &str =
-    "https://github.com/wssdozh/slag-v2/releases/latest/download/latest.json";
+const REPO: &str = "https://github.com/wssdozh/slag-v2";
+const MANIFEST_URL: &str = "https://github.com/wssdozh/slag-v2/releases/latest/download/latest.json";
 const ASSET_PREFIX: &str = "https://github.com/wssdozh/slag-v2/releases/download/";
 const PUBKEY: &str = include_str!("../updater.pubkey");
 const PROGRESS_EVENT: &str = "slag://update-progress";

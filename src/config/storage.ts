@@ -26,6 +26,7 @@ export const STORAGE_KEYS = {
   DETACHED_WINDOWS: 'slag_detached_windows_v2',
   SESSION_BREADCRUMBS: 'slag_session_breadcrumbs',
   UPDATE_DISMISSED: 'slag_update_dismissed_version',
+  UPDATE_CHANNEL: 'slag_update_channel',
 } as const;
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {

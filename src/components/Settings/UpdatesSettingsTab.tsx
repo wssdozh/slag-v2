@@ -72,7 +72,7 @@ export const UpdatesSettingsTab: React.FC = () => {
         />
         <SettingsDivider />
         <SettingsRow
-          label="канал"
+          label="манифест"
           testId="update-channel-row"
           description="адрес манифеста, который опрашивается"
           value={

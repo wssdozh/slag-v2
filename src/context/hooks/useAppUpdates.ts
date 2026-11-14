@@ -68,15 +68,16 @@ export function useAppUpdates(
     };
   }, []);
 
-  const runCheck = useCallback(async (silent: boolean): Promise<'found' | 'none' | 'error'> => {
-    if (isBusy.current) return 'error';
-    isBusy.current = true;
-    if (!silent) {
-      setStatus('checking');
-      setError(null);
-    }
-    try {
-      const found = await checkAppUpdate();
+  const runCheck = useCallback(
+    async (silent: boolean): Promise<'found' | 'none' | 'error'> => {
+      if (isBusy.current) return 'error';
+      isBusy.current = true;
+      if (!silent) {
+        setStatus('checking');
+        setError(null);
+      }
+      try {
+        const found = await checkAppUpdate();
       setOffer(found);
       setStatus(found ? 'available' : 'up-to-date');
       updateLog.info('check', { found: found?.version ?? 'none' });
@@ -94,7 +95,9 @@ export function useAppUpdates(
     } finally {
       isBusy.current = false;
     }
-  }, [addToast]);
+    },
+    [addToast]
+  );
 
   // One silent check per launch, after the first paint: a cold start must not race the feed.
   useEffect(() => {
