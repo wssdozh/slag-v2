@@ -16,7 +16,8 @@ from wire import WebSocketConnection
 from assistant_card import *
 import secrets
 from errors import ApiError
-from tg import render_answer_links
+from tg import render_answer_links, strip_premium
+from premium import pe, pp
 
 
 class AssistantDomain:
@@ -140,8 +141,14 @@ class AssistantDomain:
         if question_message_id:
             reply_params["message_id"] = question_message_id
         ok, body = await self.bot.call("sendMessage", {
-            "chat_id": chat_id, "text": tg_escape(ASSISTANT_STAGE_SEARCHING),
+            "chat_id": chat_id, "text": f'{pe("search")} {tg_escape(ASSISTANT_STAGE_SEARCHING)}',
             "parse_mode": "HTML", "reply_parameters": reply_params}, timeout=10)
+        if not ok and body.get("error_code") == 400:
+            # A refused entity must not cost the person the bubble the whole question lives in.
+            logger.warning("Telegram refused the stage markup (%s), sending plain", body.get("description"))
+            ok, body = await self.bot.call("sendMessage", {
+                "chat_id": chat_id, "text": f'{pp("search")} {ASSISTANT_STAGE_SEARCHING}',
+                "reply_parameters": reply_params}, timeout=10)
         if ok:
             self.db.set_assistant_placeholder(request_id, (body.get("result") or {}).get("message_id"))
         # One device answers, chosen before the question is asked: a fan-out spends a model call
@@ -153,8 +160,8 @@ class AssistantDomain:
                                        device_count=len(candidates))
             waiting = "устройство молчит — держу вопрос, передам, как только оно отзовётся."
             queued = self._armed_digest(vault_id) if mode == "minimal" else ""
-            await self._edit_assistant_progress(request_id,
-                                                f"{waiting} {queued}".strip() if queued else waiting)
+            stage = f"{waiting} {queued}".strip() if queued else waiting
+            await self._edit_assistant_progress(request_id, f'{pe("warn")} {tg_escape(stage)}')
             # Not finished on purpose. A socket that looks dead can still be a device: the poll
             # `/api/assistant/pending` is how it picks the question up, and that poll is the only
             # reason a raspberry pi behind a flaky tunnel ever answers at all. The expiry loop
@@ -164,7 +171,8 @@ class AssistantDomain:
         # The status line is cosmetic and the socket write is not: the question goes out first,
         # the bubble catches up on its own.
         self._spawn_stage_edit(
-            request_id, f"{ASSISTANT_STAGE_HANDED} {self._device_label(chosen.device_id)}")
+            request_id,
+            f'{pe("hourglass")} {ASSISTANT_STAGE_HANDED} {tg_escape(self._device_label(chosen.device_id))}')
         message = json.dumps({"type": "assistant_question", "id": request_id, "question": question,
                               "mode": mode})
         await chosen.send_text(message)
@@ -226,11 +234,11 @@ class AssistantDomain:
 
         task.add_done_callback(done)
 
-    async def _edit_assistant_progress(self, request_id: str, text: str) -> None:
+    async def _edit_assistant_progress(self, request_id: str, html: str) -> None:
         """Rewrites the one bubble this question owns, and only while it is still unanswered.
 
-        The "still unanswered" check happens under the per-request lock, together with the edit
-        itself: checking before the await let a slow stage edit land after the answer and win.
+        `html` may carry premium emoji: the plain twin the bot falls back to is the same text
+        without the tags, so a refused entity never costs the person the stage line.
         """
         async with self._bubble_lock(request_id):
             request = self.db.get_assistant_request(request_id)
@@ -241,7 +249,7 @@ class AssistantDomain:
             if not message_id or not route:
                 return
             ok, body = await self._edit_telegram(route["chat_id"], int(message_id),
-                                                 tg_escape(text), text, timeout=4)
+                                                 html, strip_premium(html), timeout=4)
             self.db.log_delivery_event("assistant.stage", "edited" if ok else "edit_failed",
                                        request_id=request_id,
                                        error_code="" if ok else str(body.get("error_code") or ""))
@@ -256,7 +264,7 @@ class AssistantDomain:
         request = self.db.get_assistant_request(request_id)
         if not request or request["vault_id"] != conn.vault_id or request["answered_at"] is not None:
             return
-        self._spawn_stage_edit(request_id, ASSISTANT_STAGE_THINKING)
+        self._spawn_stage_edit(request_id, f'{pe("pencil")} {ASSISTANT_STAGE_THINKING}')
 
     async def _answer_assistant(self, vault_id: str, request_id: str, answer: str,
                                 base_url: str = "", action: Optional[dict] = None,

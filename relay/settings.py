@@ -57,10 +57,11 @@ ASSISTANT_PRESENCE_WINDOW_SECONDS = 40
 ASSISTANT_SYNC_SLACK_SECONDS = 300
 ASSISTANT_MAX_QUESTION = 1000
 ASSISTANT_MAX_ANSWER = 4000
-# One bubble per question: these are its texts, in the order the person sees them.
-ASSISTANT_STAGE_SEARCHING = "🔎 ищу устройство…"
-ASSISTANT_STAGE_HANDED = "⌛ передал на"
-ASSISTANT_STAGE_THINKING = "✍️ печатает ответ…"
+# One bubble per question: these are its texts, in the order the person sees them. The leading
+# glyphs are premium emoji from `premium.pe()`: animated for a Premium owner, plain otherwise.
+ASSISTANT_STAGE_SEARCHING = "ищу устройство…"
+ASSISTANT_STAGE_HANDED = "передал на"
+ASSISTANT_STAGE_THINKING = "печатает ответ…"
 # How a device names itself in that bubble when the relay knows nothing better.
 ASSISTANT_DEVICE_FALLBACK = "устройство"
 # An answer may offer one action. The button carries only `act:<requestId>`: the action itself

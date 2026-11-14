@@ -94,6 +94,15 @@ def tg_truncate(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def strip_premium(text: str) -> str:
+    """The plain twin of a message that may carry `<tg-emoji>`: the character stays, the tag goes.
+
+    Only this one tag is removed on purpose. A blanket tag stripper would also eat `<code>`,
+    and the fallback message would then show markup that was meant to be gone.
+    """
+    return re.sub(r"</?tg-emoji[^>]*>", "", text)
+
+
 def _notification_html(title: str, body: str, kind: str, stamp: str, spoiler: bool) -> str:
     header = "⚠️ " if kind == "overdue" else ""
     parts = [f"{header}<b>{tg_escape(title)}</b>"]

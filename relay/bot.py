@@ -12,6 +12,7 @@ from typing import Optional, Tuple
 
 from settings import *
 from assistant_card import without_button_styles
+from premium import pe, pp
 from tg import TG_TEXT_LIMIT, tg_truncate
 from tg import TelegramBot, render_note_page, tg_escape
 
@@ -215,16 +216,17 @@ class BotDomain:
                 # A card, not a debug dump: who, where, and what is switched on, with the ids
                 # dimmed into monospace. Telegram has no colour, so the quote bar and the two
                 # glyphs are the whole visual hierarchy available.
-                head = f"👤 <b>{tg_escape(who)}</b>" + (f" · <code>{tg_escape(account_head)}</code>"
-                                                        if account_head else "")
-                vault = f"🗄 <b>{tg_escape(vault_name)}</b> · <code>{tg_escape(vault_head)}</code>"
-                quote = ("<blockquote>напоминания приходят в этот чат\n"
-                         f"ассистент отвечает по задачам · {tg_escape(mode)}</blockquote>")
+                head = f'{pe("person")} <b>{tg_escape(who)}</b>' + (
+                    f" · <code>{tg_escape(account_head)}</code>" if account_head else "")
+                vault = f'{pe("house")} <b>{tg_escape(vault_name)}</b> · <code>{tg_escape(vault_head)}</code>'
+                quote = (f'<blockquote>{pe("bell")} напоминания приходят в этот чат\n'
+                         f'{pe("gear")} ассистент отвечает по задачам · {tg_escape(mode)}</blockquote>')
                 html_blocks.append("\n".join([head, vault, "", quote]))
                 plain_blocks.append("\n".join([
-                    f"{who}" + (f" · {account_head}" if account_head else ""),
-                    f"{vault_name} · {vault_head}", "",
-                    f"напоминания приходят в этот чат\nассистент отвечает по задачам · {mode}"]))
+                    f'{pp("person")} {who}' + (f" · {account_head}" if account_head else ""),
+                    f'{pp("house")} {vault_name} · {vault_head}', "",
+                    f'{pp("bell")} напоминания приходят в этот чат\n'
+                    f'{pp("gear")} ассистент отвечает по задачам · {mode}']))
             else:
                 html_blocks.append("<b>хранилище не привязано</b>\n"
                                    "<blockquote>напоминания вкл · ассистент выкл</blockquote>")

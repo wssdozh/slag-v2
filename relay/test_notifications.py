@@ -442,10 +442,11 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
             "text": "/start"}})
         html = self.bot.sent[-1][1]
         # The card: who, where, and what is on. Four characters, the head of the id, because a
-        # person reads `vault_3721cd28…` from the front.
-        self.assertIn("👤 <b>аккаунт</b> · <code>28ec</code>", html)
-        self.assertIn("🗄 <b>main</b> · <code>3721</code>", html)
-        self.assertIn("<blockquote>напоминания приходят в этот чат", html)
+        # person reads `vault_3721cd28…` from the front. Glyphs are premium emoji entities.
+        self.assertIn('<tg-emoji emoji-id=', html)
+        self.assertIn("<b>аккаунт</b> · <code>28ec</code>", html)
+        self.assertIn("<b>main</b> · <code>3721</code>", html)
+        self.assertIn("напоминания приходят в этот чат", html)
         self.assertIn("ассистент отвечает по задачам · minimal", html)
         self.assertNotIn("приглашение", html)
 
@@ -466,8 +467,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
             "chat": {"id": "chat-a", "type": "private"}, "from": {"id": "chat-a"}, "text": "/start"}})
         html = self.bot.sent[-1][1]
         # The profile name takes the first line, the vault stays on its own.
-        self.assertIn("👤 <b>дава</b> · <code>28ec</code>", html)
-        self.assertIn("🗄 <b>main</b> · <code>3721</code>", html)
+        self.assertIn("<b>дава</b> · <code>28ec</code>", html)
+        self.assertIn("<b>main</b> · <code>3721</code>", html)
 
     async def test_start_without_a_link_still_points_at_the_app(self):
         await self.server._handle_bot_update({"update_id": 12, "message": {
