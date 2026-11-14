@@ -176,6 +176,7 @@ mod deeplink;
 mod secure_store;
 #[cfg(target_os = "android")]
 mod media_plugin;
+mod updater;
 
 #[cfg(desktop)]
 #[tauri::command]
@@ -363,6 +364,19 @@ pub fn run() {
     }
 
     let args: Vec<String> = std::env::args().collect();
+
+    // The update helper is this same binary with `--apply-update <target> <pid>`: it swaps the
+    // exe and relaunches it, and it must never build a window or a second instance.
+    if let Some((target, pid)) = updater::is_apply_update_args(&args) {
+        updater::run_apply_update(target, pid);
+        return;
+    }
+
+    if args.iter().any(|a| a == "--update-check") {
+        println!("{}", updater::diagnose());
+        return;
+    }
+
     if args.iter().any(|a| a == "--install-system") {
         #[cfg(target_os = "linux")]
         {
@@ -401,7 +415,10 @@ pub fn run() {
             deeplink::take_deep_link,
             secure_store::secret_get,
             secure_store::secret_set,
-            secure_store::secret_delete
+            secure_store::secret_delete,
+            updater::update_platform,
+            updater::update_check,
+            updater::update_install
         ]);
     }
 
@@ -411,7 +428,11 @@ pub fn run() {
             media_plugin::gallery_access,
             media_plugin::gallery_request_access,
             media_plugin::gallery_list,
-            deeplink::take_deep_link
+            deeplink::take_deep_link,
+            updater::update_platform,
+            updater::update_check,
+            updater::update_install,
+            updater::update_open_install_settings
         ]);
     }
 
@@ -484,7 +505,7 @@ pub fn run() {
     // MediaStore listing only exists on Android; the module is compiled there and nowhere else.
     #[cfg(target_os = "android")]
     {
-        builder = builder.plugin(media_plugin::init()).plugin(deeplink::init());
+        builder = builder.plugin(media_plugin::init()).plugin(deeplink::init()).plugin(updater::init());
     }
 
     #[cfg(desktop)]
@@ -507,6 +528,7 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 platform::auto_adapt_system();
+                updater::cleanup_leftovers();
                 // Owned before anything can deliver into it: the cold start below, or a second
                 // launch once the app is up.
                 app.manage(deeplink::PendingLink::default());

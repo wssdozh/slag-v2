@@ -1,6 +1,6 @@
 [package]
 name = "slag-v2"
-version = "0.1.0"
+version = "0.2.2"
 description = "SLAG v2 — Ultra-minimalist notes system"
 authors = ["SLAG"]
 edition = "2021"
@@ -33,6 +33,16 @@ tauri-plugin-android-fs = { version = "=30.2.0", features = ["protocol-content"]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tauri-plugin-opener = "2.7"
+
+# Self-update: the manifest and the signed asset are fetched by us (the tauri updater plugin is
+# desktop-only and installs an nsis bundle, while this app ships a portable exe and an apk).
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+tokio = { version = "1", features = ["fs", "io-util"] }
+futures-util = "0.3"
+sha2 = "0.10"
+semver = "1"
+base64 = "0.22"
+minisign-verify = "0.3"
 
 # Desktop-only: seed/account secrets live in the OS credential store. Android keeps the
 # encrypted IndexedDB fallback until a Keystore-backed store is wired up.
