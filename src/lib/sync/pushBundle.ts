@@ -126,14 +126,37 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         });
       }
 
-      const workspaceHash = await computeHash(JSON.stringify(workspaceState));
+      // The prompt and the persona travel on their own channel, below: the workspace bundle is
+      // deduped per entity, and these are the one thing a device that joined late can never
+      // recover from a bundle that was already acked.
+      const { aiPrompt: _prompt, aiPersona: _persona, aiPersonaEnabled: _personaOn,
+              aiPromptAt: _promptAt, aiPersonaAt: _personaAt, ...sharedWorkspace } = workspaceState;
+      const workspaceHash = await computeHash(JSON.stringify(sharedWorkspace));
       pack('workspace:workspace_state', workspaceHash, {
         id: 'workspace_state',
         type: 'workspace',
         action: 'upsert',
         version: 1,
         hash: workspaceHash,
-        payload: workspaceState,
+        payload: sharedWorkspace,
+      });
+
+      // Always packed, never deduped: a few hundred bytes are worth a channel that cannot be
+      // missed. The receiver resolves each field by its timestamp, so a stale copy is harmless.
+      const promptPayload = {
+        prompt: workspaceState.aiPrompt ?? '',
+        persona: workspaceState.aiPersona ?? '',
+        personaEnabled: workspaceState.aiPersonaEnabled === true,
+        promptAt: workspaceState.aiPromptAt ?? 0,
+        personaAt: workspaceState.aiPersonaAt ?? 0,
+      };
+      changes.push({
+        id: 'assistant_prompt',
+        type: 'assistant_prompt',
+        action: 'upsert',
+        version: 1,
+        hash: await computeHash(JSON.stringify(promptPayload)),
+        payload: promptPayload,
       });
 
       // The assistant's memory is a short list, so it packs whole and dedupes per fact. It is

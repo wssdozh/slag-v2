@@ -65,9 +65,24 @@ export interface AttachmentRequestPayload {
   relativePath: string;
 }
 
+/**
+ * The owner's words for the assistant: the instructions and the persona.
+ *
+ * It rides every push instead of the workspace bundle, because the workspace is deduped and a
+ * device that joins the room after that bundle was acked would never receive it. Timestamps let
+ * a device that missed the last edit lose the field to the newer copy instead of clobbering it.
+ */
+export interface AssistantPromptPayload {
+  prompt: string;
+  persona: string;
+  personaEnabled: boolean;
+  promptAt: number;
+  personaAt: number;
+}
+
 export interface SyncChangeItem {
   id: string;
-  type: 'item' | 'folder' | 'workspace' | 'attachment' | 'attachment_request' | 'trash' | 'draft' | 'memory';
+  type: 'item' | 'folder' | 'workspace' | 'assistant_prompt' | 'attachment' | 'attachment_request' | 'trash' | 'draft' | 'memory';
   action: 'upsert' | 'delete' | 'rename' | 'restore' | 'purge';
   version: number;
   hash: string;

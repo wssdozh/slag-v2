@@ -448,6 +448,9 @@ export interface WorkspaceState {
   aiPrompt?: string;
   aiPersona?: string;
   aiPersonaEnabled?: boolean;
+  /** When each of those was last written. Synced with the text; the newer copy wins per field. */
+  aiPromptAt?: number;
+  aiPersonaAt?: number;
 }
 
 export interface BackupSnapshotMeta {

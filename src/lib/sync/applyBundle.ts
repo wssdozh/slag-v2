@@ -1,5 +1,5 @@
 import type { SyncEngine } from './syncEngine';
-import type { SyncBundle, EncryptedBundle, AttachmentRequestPayload } from './types';
+import type { SyncBundle, EncryptedBundle, AttachmentRequestPayload, AssistantPromptPayload } from './types';
 import { decryptBundle } from './crypto';
 import { touchDeviceLastSeen } from './devices';
 import { loadSentHashes, loadTombstones, saveSentHashes, tombstonesKey } from './localBookkeeping';
@@ -256,8 +256,17 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             }
           }
         } else if (ch.type === 'workspace' && ch.payload) {
-          workspaceState = ch.payload as WorkspaceState;
+          // The prompt and the persona are not read from here: they arrive on their own channel,
+          // where a stale copy of this bundle cannot overwrite a newer edit.
+          workspaceState = withoutAssistantPrompt(ch.payload as WorkspaceState);
           hasWorkspaceChanged = true;
+        } else if (ch.type === 'assistant_prompt' && ch.payload) {
+          const merged = mergeAssistantPrompt(workspaceState ?? vault().getWorkspaceState(),
+                                               ch.payload as AssistantPromptPayload);
+          if (merged) {
+            workspaceState = merged;
+            hasWorkspaceChanged = true;
+          }
         } else if (ch.type === 'memory') {
           if (ch.action === 'upsert' && ch.payload) {
             const incoming = ch.payload as MemoryItem;
@@ -384,4 +393,35 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       engine.notify();
       throw err;
     }
+}
+
+/** The workspace without the assistant's words: that channel owns them. */
+function withoutAssistantPrompt(state: WorkspaceState): WorkspaceState {
+  const { aiPrompt: _prompt, aiPersona: _persona, aiPersonaEnabled: _enabled,
+          aiPromptAt: _promptAt, aiPersonaAt: _personaAt, ...rest } = state;
+  return rest;
+}
+
+/**
+ * Field-by-field last-writer-wins for the assistant's words.
+ *
+ * Two devices edit the same prompt: the older copy must lose, whichever device it came from.
+ * Returns the merged state, or null when the incoming copy is not newer anywhere.
+ */
+export function mergeAssistantPrompt(base: WorkspaceState, incoming: AssistantPromptPayload): WorkspaceState | null {  const next: WorkspaceState = { ...base };
+  let changed = false;
+  const promptAt = Number(incoming.promptAt) || 0;
+  const personaAt = Number(incoming.personaAt) || 0;
+  if (promptAt > (base.aiPromptAt ?? 0) && typeof incoming.prompt === 'string') {
+    next.aiPrompt = incoming.prompt;
+    next.aiPromptAt = promptAt;
+    changed = true;
+  }
+  if (personaAt > (base.aiPersonaAt ?? 0)) {
+    if (typeof incoming.persona === 'string') next.aiPersona = incoming.persona;
+    next.aiPersonaEnabled = incoming.personaEnabled === true;
+    next.aiPersonaAt = personaAt;
+    changed = true;
+  }
+  return changed ? next : null;
 }
