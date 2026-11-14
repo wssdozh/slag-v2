@@ -17,17 +17,18 @@ const notifyLog = logger.scope('NOTIFY');
 /**
  * Tools a forwarded question may use per mode; `null` means no restriction.
  *
- * A question typed here and a question typed into telegram are not the same trust boundary:
- * `minimal` never gets a tool that returns a note body, so an answer can only ever summarise
- * tasks. `risky` is the person explicitly saying "read whatever you find".
- *
- * `minimal` still gets the two *writing* tools: "сделай таску и разбей на подзадачи" is a
- * task-shaped request, and without `save_item` the bot could only describe the note it was not
- * allowed to make — promising a confirmation card that never came. Reading stays closed; writing
- * arrives as a card the person taps, so nothing is created behind their back.
+ * A question typed here and a question typed into telegram are not the same trust boundary, so
+ * the modes are a ladder:
+ * - `minimal` — tasks only. Counters arrive as text, and the two *writing* tools make "создай
+ *   задачу" real: without `save_item` the bot could only describe a card that never came.
+ * - `read` — the same, plus the tools that return note bodies. This is the tier where vault
+ *   content starts travelling to the model, which is why it is a separate choice.
+ * - `risky` — everything, including note edits.
  */
 export const ASSISTANT_TOOL_ALLOWLIST: Record<AssistantMode, string[] | null> = {
   minimal: ['save_item', 'batch_update_items'],
+  read: ['search_notes', 'read_note', 'get_vault_stats', 'get_calendar_agenda', 'get_app_guide',
+    'memory', 'save_item', 'batch_update_items'],
   risky: null,
 };
 

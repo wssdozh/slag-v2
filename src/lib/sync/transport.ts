@@ -214,7 +214,8 @@ export class SyncTransport {
         await this.callbacks.onAssistantQuestion?.(
           msg.id,
           typeof msg.question === 'string' ? msg.question : '',
-          msg.mode === 'risky' ? 'risky' : 'minimal',
+          // The relay stores the mode a human picked; an unknown string degrades to the narrowest.
+          msg.mode === 'risky' ? 'risky' : msg.mode === 'read' ? 'read' : 'minimal',
           // One bubble for the whole exchange: the relay only changes its text.
           (stage) => this.send(JSON.stringify({ type: 'assistant_stage', id: msg.id, stage })),
         );

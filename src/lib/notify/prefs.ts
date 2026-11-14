@@ -21,7 +21,7 @@ export function describeError(error: unknown): string {
 /** A stored mode wins; legacy `assistant: true` meant the task-scoped set, so it lands on `minimal`. */
 function assistantModeOf(stored: StoredNotifyPrefs): NotifyPrefs['assistantMode'] {
   const mode = stored.assistantMode;
-  if (mode === 'off' || mode === 'minimal' || mode === 'risky') return mode;
+  if (mode === 'off' || mode === 'minimal' || mode === 'read' || mode === 'risky') return mode;
   return stored.assistant === true ? 'minimal' : 'off';
 }
 

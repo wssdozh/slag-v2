@@ -316,7 +316,7 @@ export interface ChatMessage {
 }
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
-export type LogScope = 'AI' | 'FS' | 'NODE' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA' | 'WORKSPACE' | 'NOTIFY';
+export type LogScope = 'AI' | 'FS' | 'NODE' | 'SEARCH' | 'UI' | 'APP' | 'SYNC' | 'MEDIA' | 'WORKSPACE' | 'NOTIFY' | 'UPDATE';
 
 export interface LogEntry {
   id: string;
@@ -386,10 +386,11 @@ export interface FullscreenEditorWorkspaceState {
 }
 
 /**
- * What a question from the bot is allowed to touch. `minimal` answers from a task-scoped tool set,
- * `risky` lets the full assistant read the vault. Chosen by a human, never inferred.
+ * What a question from the bot is allowed to touch. A ladder, not a switch:
+ * `minimal` sees tasks only, `read` may also search and read notes, `risky` is the full
+ * assistant including note edits. Chosen by a human, never inferred.
  */
-export type AssistantMode = 'minimal' | 'risky';
+export type AssistantMode = 'minimal' | 'read' | 'risky';
 
 /** The stored setting: a mode, or off entirely. Off keeps reminders and drops the question path. */
 export type AssistantSetting = 'off' | AssistantMode;
@@ -536,6 +537,62 @@ export interface DevicePick {
   mimeType: string;
   size: number;
 }
+
+/** A newer build the app can fetch itself. `manual` means "show the release page, do not apply". */
+export interface AppUpdateOffer {
+  version: string;
+  notes: string | null;
+  pubDate: string | null;
+  currentVersion: string;
+  kind: 'portable' | 'installer' | 'apk' | 'manual';
+  size: number | null;
+}
+
+/** What this build is and whether it can replace its own binary. */
+export interface AppUpdatePlatform {
+  os: string;
+  arch: string;
+  currentVersion: string;
+  canApply: boolean;
+  releasePage: string;
+}
+
+export type AppUpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'installing'
+  | 'permission-required'
+  | 'up-to-date'
+  | 'error';
+
+export interface AppUpdateProgress {
+  downloaded: number;
+  total: number | null;
+}
+
+export interface AppUpdateInstallOutcome {
+  status: 'restarting' | 'installer_launched' | 'permission_required';
+  version: string;
+}
+
+/** The update state the settings tab and the sidebar notice read from AppContext. */
+export interface AppUpdateState {
+  platform: AppUpdatePlatform | null;
+  offer: AppUpdateOffer | null;
+  status: AppUpdateStatus;
+  progress: AppUpdateProgress | null;
+  error: string | null;
+  isNoticeVisible: boolean;
+  canInstall: boolean;
+  check: () => Promise<void>;
+  install: () => Promise<void>;
+  dismiss: () => void;
+  openReleasePage: () => void;
+  openInstallPermissionSettings: () => void;
+}
+
 
 
 

@@ -9,6 +9,7 @@ import { getOrCreateDeviceIdentity, decryptVaultKeyForDevice } from '../lib/sync
 import { validateMnemonic } from '../lib/sync/crypto';
 import { logger } from '../lib/logger/logger';
 import { SYNC_INTERVALS } from '../config';
+import type { AssistantMode } from '../types';
 
 const cliLog = logger.scope('NODE');
 
@@ -260,7 +261,7 @@ async function run(options: CliOptions, flags: Flags): Promise<void> {
   // One question, one answer: the socket and the poll below race, and both would run the model.
   const handled = new Set<string>();
   const answer = (requestId: string, question: string,
-                  mode: 'minimal' | 'risky', reportStage?: (stage: 'thinking') => void): void => {
+                  mode: AssistantMode, reportStage?: (stage: 'thinking') => void): void => {
     if (handled.has(requestId)) return;
     handled.add(requestId);
     if (handled.size > 200) {
