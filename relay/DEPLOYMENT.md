@@ -320,3 +320,35 @@ sqlite3 /opt/slag-relay/data/relay.db "select count(*) from notify_jobs where se
 
 the last line is the privacy check nobody should skip: the relay database knows how many
 reminders are queued, not who they are for.
+
+## bot answer latency — 2026-11-14
+
+measured on production before the change (`delivery_events`, 32 answers over two days):
+**p50 11.3 s**, average 22 s, **p90 49 s**, max 127 s. three separate costs, none of them
+telegram's:
+
+1. the probe waited its full `ASSISTANT_PROBE_TIMEOUT_SECONDS` (1.5 s) whenever one suspended
+   app held a socket open — with four devices in the room that was every question;
+2. `minimal` questions spent a whole extra model round trip on `get_calendar_agenda`, although
+   the task slice is already in the system prompt;
+3. a question handed to a sleeping socket reached a live device only through
+   `/api/assistant/pending`, which the app polled every 30 seconds — the 20–90 s tail.
+
+deployed 2026-11-14 10:01 UTC (`af7863a`, on top of the relay module split): socket `last_frame_at`
+(`wire.py`) with a 40-second presence window (`settings.py`), fresh sockets only for the probe
+(`assistant.py`); `PENDING_PULL_MS` 5 s in the app (`src/context/hooks/useNotifyArm.ts`); the
+`minimal` channel gets vault totals and the agenda as prompt facts and no tools at all
+(`src/lib/ai/prompt.ts`, `orchestrator.ts`, `notify/assistant.ts`); `tg.py` keeps a pool of HTTPS
+connections instead of a TLS handshake per call.
+
+live smoke after the restart — two `getMe` calls through the deployed client:
+
+```text
+call1 True 58 ms SlagNoteBot      # new socket, handshake included
+call2 True  9 ms                  # same socket reused
+```
+
+acceptance: `systemctl is-active slag-relay` → `active`, `NRestarts=0`, `/health` → `status ok`,
+and `journalctl -u slag-relay` shows `Telegram bot ready` with no tracebacks. the after-measurement
+(p50 ≤ 5 s, p90 ≤ 8 s) is the same `delivery_events` query once a few questions have been asked.
+
