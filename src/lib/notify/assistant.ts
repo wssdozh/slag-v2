@@ -18,15 +18,16 @@ const notifyLog = logger.scope('NOTIFY');
  * Tools a forwarded question may use per mode; `null` means no restriction.
  *
  * A question typed here and a question typed into telegram are not the same trust boundary:
- * in `minimal` the assistant never gets a tool that returns a note body, so an answer can only
- * ever summarise tasks. `risky` is the person explicitly saying "read whatever you find".
+ * `minimal` never gets a tool that returns a note body, so an answer can only ever summarise
+ * tasks. `risky` is the person explicitly saying "read whatever you find".
  *
- * `minimal` is an empty list, not a short one: the two counters it used to call for are computed
- * below and handed over as text. A tool call is a whole extra round trip to the model, and in the
- * bot that round trip was half of the wait.
+ * `minimal` still gets the two *writing* tools: "сделай таску и разбей на подзадачи" is a
+ * task-shaped request, and without `save_item` the bot could only describe the note it was not
+ * allowed to make — promising a confirmation card that never came. Reading stays closed; writing
+ * arrives as a card the person taps, so nothing is created behind their back.
  */
 export const ASSISTANT_TOOL_ALLOWLIST: Record<AssistantMode, string[] | null> = {
-  minimal: [],
+  minimal: ['save_item', 'batch_update_items'],
   risky: null,
 };
 
