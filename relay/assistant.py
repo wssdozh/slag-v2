@@ -26,6 +26,28 @@ class AssistantDomain:
         return [client for sockets in list(self.rooms.values()) for client in list(sockets)
                 if not client.closed and client.vault_id == vault_id]
 
+    def _device_is_current(self, device_id: str, vault_id: str) -> bool:
+        """Whether this device has read the vault up to its newest bundle.
+
+        A device that stopped syncing keeps its socket and keeps answering — from a copy that can
+        be a day old. Its answers then read as "your vault does not contain that", which is a lie
+        about the vault rather than about itself. Pushing the newest bundle counts as having it:
+        the pusher is the one who wrote it.
+        """
+        row = self.db.conn.execute(
+            "SELECT MAX(b.created_at) AS head FROM bundles b JOIN rooms r ON r.room_id = b.room_id"
+            " WHERE r.vault_id = ?", (vault_id,)).fetchone()
+        head = float(row["head"] or 0.0) if row else 0.0
+        if head <= 0:
+            return True  # nothing was ever pushed: every copy is as current as the vault
+        row = self.db.conn.execute(
+            "SELECT MAX(t) AS last FROM ("
+            " SELECT MAX(acked_at) AS t FROM bundle_acks WHERE device_id = ?"
+            " UNION ALL SELECT MAX(created_at) FROM bundles WHERE from_device_id = ?)",
+            (device_id, device_id)).fetchone()
+        last = float(row["last"] or 0.0) if row else 0.0
+        return last >= head - ASSISTANT_SYNC_SLACK_SECONDS
+
     def _fresh_sockets(self, candidates: list[WebSocketConnection]) -> list[WebSocketConnection]:
         """Sockets that said something recently, which is the cheapest presence signal we have.
 
@@ -51,10 +73,13 @@ class AssistantDomain:
         """
         if not candidates:
             return None
+        vault_id = candidates[0].vault_id or ""
         fresh = self._fresh_sockets(candidates)
-        pool = fresh or candidates
-        # One living device is not a choice: no probe, no added latency, no question about it.
-        if len(pool) == 1 and fresh:
+        current = [client for client in fresh if self._device_is_current(client.device_id, vault_id)]
+        # A stale copy answers about a vault that no longer exists; it goes last, never first.
+        pool = current or fresh or candidates
+        # One living, current device is not a choice: no probe, no added latency.
+        if len(pool) == 1 and (current or fresh):
             return pool[0]
         probe_id = f"probe_{secrets.token_hex(6)}"
         probe = {"event": asyncio.Event(), "sent": {}, "results": {}}

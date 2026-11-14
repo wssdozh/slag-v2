@@ -108,6 +108,10 @@ class NotifyRoutes:
             if not vault_id:
                 raise ApiError(400, "invalid_notification")
             self._authorize_vault(auth, vault_id)
+            if not self._device_is_current(auth["device_id"], vault_id):
+                # Its copy predates the newest bundle: an answer from it is about a vault that has
+                # already changed, so the question waits for a device that has actually read it.
+                return {"requests": []}, 200
             now = time.time()
             pending = [{"requestId": row["id"], "question": row["question"], "mode": row["mode"],
                         "expiresAt": row["expires_at"]}

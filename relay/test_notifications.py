@@ -688,6 +688,29 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
         self.server._stop_typing(request["id"])
 
+    async def test_a_device_that_stopped_syncing_does_not_answer(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        now = time.time()
+        with self.db.conn:
+            self.db.conn.execute(
+                "INSERT INTO rooms (room_id, created_at, last_active_at, vault_id) VALUES ('room-1', ?, ?, 'vault-1')",
+                (now, now))
+            # The pusher wrote the newest bundle, so its own copy is current by definition.
+            self.db.conn.execute(
+                "INSERT INTO bundles (bundle_id, room_id, from_device_id, sequence, timestamp, payload,"
+                " created_at, expires_at) VALUES ('b-1', 'room-1', 'dev-current', 1, '', '{}', ?, ?)",
+                (now, now + 3600))
+        current = FakeDevice("dev-current", "vault-1", server=self.server)
+        stale = FakeDevice("dev-stale", "vault-1", server=self.server)
+        self.server.rooms["room-1"] = {current, stale}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        # An answer from a day-old copy is a lie about the vault, not a slow answer.
+        self.assertEqual(stale.questions(), [])
+        self.assertEqual(len(current.questions()), 1)
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+
     async def test_a_room_that_went_quiet_is_still_probed(self):
         """Nothing fresh is not the same as nobody there: the probe is the last presence test."""
         self.notify.link("tok-a", "chat-a", "A", self.tag)

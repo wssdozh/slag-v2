@@ -52,6 +52,9 @@ ASSISTANT_PROBE_TIMEOUT_SECONDS = 1.5
 # it answers nothing, and probing it costs the whole timeout above. When nothing is fresh the
 # probe still runs — it is the presence test, just not the first one.
 ASSISTANT_PRESENCE_WINDOW_SECONDS = 40
+# How far behind the newest bundle a device may be and still answer. A device that pushed the
+# newest bundle itself is current by definition: it is the one that wrote it.
+ASSISTANT_SYNC_SLACK_SECONDS = 300
 ASSISTANT_MAX_QUESTION = 1000
 ASSISTANT_MAX_ANSWER = 4000
 # One bubble per question: these are its texts, in the order the person sees them.
