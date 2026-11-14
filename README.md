@@ -6,11 +6,18 @@
 
 [Скачать для Windows, Linux и Android](https://github.com/wssdozh/slag-v2/releases)
 
+<p align="center"><sub>десктоп</sub></p>
 <p align="center">
-  <img src="docs/screenshots/readme/desktop-feed.png" alt="SLAG на десктопе: папки, лента задач и панель папки" width="100%">
+  <img src="docs/screenshots/readme/desktop-feed.png" alt="SLAG на десктопе: папки, лента задач и панель папки" width="280">
+  <img src="docs/screenshots/readme/desktop-kanban.png" alt="SLAG на десктопе: канбан-доска с задачами" width="280">
+  <img src="docs/screenshots/readme/desktop-search.png" alt="SLAG на десктопе: поиск по заметкам и задачам" width="280">
 </p>
+<p align="center"><sub>Android</sub></p>
 <p align="center">
-  <img src="docs/screenshots/readme/android-tasks.png" alt="SLAG на Android: список задач, статусы и нижний док" width="320">
+  <img src="docs/screenshots/readme/android-tasks.png" alt="SLAG на Android: список задач со статусами" width="190">
+  <img src="docs/screenshots/readme/android-calendar.png" alt="SLAG на Android: календарь задач" width="190">
+  <img src="docs/screenshots/readme/android-search.png" alt="SLAG на Android: поиск по заметкам" width="190">
+  <img src="docs/screenshots/readme/android-folders.png" alt="SLAG на Android: папки и нижний док" width="190">
 </p>
 
 ## Что внутри
