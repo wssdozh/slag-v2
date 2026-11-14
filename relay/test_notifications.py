@@ -441,10 +441,11 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
             "from": {"id": "chat-a", "first_name": "Мория", "username": "morii"},
             "text": "/start"}})
         html = self.bot.sent[-1][1]
-        # Short, like the app: a name and the four characters that tell two vaults apart.
+        # Short, like the app: the first characters of the id, not the tail — a person reads the
+        # beginning of `vault_3721cd28…` and expects to see 3721 next to the name.
         self.assertIn("main", html)
-        self.assertIn("• <code>5121</code>", html)
-        self.assertIn("аккаунт • <code>7043</code>", html)
+        self.assertIn("• <code>3721</code>", html)
+        self.assertIn("аккаунт • <code>28ec</code>", html)
         self.assertIn("ассистент вкл", html)
         self.assertNotIn("приглашение", html)
 
@@ -465,8 +466,8 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
             "chat": {"id": "chat-a", "type": "private"}, "from": {"id": "chat-a"}, "text": "/start"}})
         html = self.bot.sent[-1][1]
         # Name on the first line, the vault on the second: the person, then where they are.
-        self.assertIn("<b>дава</b> • <code>7043</code>", html)
-        self.assertIn("main • <code>5121</code>", html)
+        self.assertIn("<b>дава</b> • <code>28ec</code>", html)
+        self.assertIn("main • <code>3721</code>", html)
 
     async def test_start_without_a_link_still_points_at_the_app(self):
         await self.server._handle_bot_update({"update_id": 12, "message": {

@@ -175,6 +175,17 @@ class BotDomain:
         await self._bot_reply(chat_id, f"готово. напоминания из {source} будут приходить сюда.",
                               html=f"<b>готово</b>. напоминания из {tg_escape(source)} будут приходить сюда.")
 
+    @staticmethod
+    def _id_head(value: str) -> str:
+        """The four characters that name an id: what follows the `vault_`/`acc_` prefix.
+
+        The prefix is the same for every row, and the tail is what a person does not recognize —
+        they read `<vault name> • 3721` and check the beginning of the id against it.
+        """
+        if not value:
+            return ""
+        return (value.split("_", 1)[-1] if "_" in value else value)[:4]
+
     def _chat_status(self, chat_id: str) -> Optional[Tuple[str, str]]:
         """(html, plain) for the vault this chat already talks to, or None when it talks to none.
 
@@ -200,14 +211,15 @@ class BotDomain:
                 vault_name = (row["name"] if row else "") or "хранилище"
                 display_name = ((row["display_name"] if row else "") or "").strip()
                 mode = link["mode"] or "minimal"
-                account_tail = ((row["owner_account_id"] if row else "") or "")[-4:]
-                vault_line = f"{vault_name} • {link['vault_id'][-4:]}"
+                account_tail = self._id_head((row["owner_account_id"] if row else "") or "")
+                vault_head = self._id_head(link["vault_id"])
+                vault_line = f"{vault_name} • {vault_head}"
                 if display_name:
                     lines_html = [f"<b>{tg_escape(display_name)}</b> • <code>{tg_escape(account_tail)}</code>",
-                                  f"{tg_escape(vault_name)} • <code>{tg_escape(link['vault_id'][-4:])}</code>"]
+                                  f"{tg_escape(vault_name)} • <code>{tg_escape(vault_head)}</code>"]
                     lines_plain = [f"{display_name} • {account_tail}", vault_line]
                 else:
-                    lines_html = [f"<b>{tg_escape(vault_name)}</b> • <code>{tg_escape(link['vault_id'][-4:])}</code>"]
+                    lines_html = [f"<b>{tg_escape(vault_name)}</b> • <code>{tg_escape(vault_head)}</code>"]
                     lines_plain = [vault_line]
                     if account_tail:
                         lines_html.append(f"аккаунт • <code>{tg_escape(account_tail)}</code>")
