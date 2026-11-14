@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **562**, строк: **102555**, зон: **50**.
+Модулей: **520**, строк: **94156**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,19 +12,19 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1588 | 0 |
-| `relay/test_notifications.py` | 1161 | 0 |
 | `src/lib/sync/syncEngine.ts` | 1110 | 19 |
 | `e2e/slag/views.spec.ts` | 1100 | 0 |
-| `relay/test_relay.py` | 985 | 0 |
 | `e2e/mobile.spec.ts` | 886 | 0 |
 | `e2e/slag/workspace.spec.ts` | 885 | 0 |
 | `e2e/slag/feed.spec.ts` | 799 | 0 |
 | `src/components/Feed/ItemCard.tsx` | 793 | 1 |
 | `src/lib/storage/index.ts` | 731 | 40 |
-| `src/context/AppContext.tsx` | 730 | 68 |
+| `src/context/AppContext.tsx` | 730 | 67 |
 | `src/components/Feed/Composer.tsx` | 709 | 4 |
 | `src/lib/sync/account.ts` | 677 | 29 |
 | `src/components/Editor/FullscreenEditor.tsx` | 640 | 1 |
+| `src/types/index.ts` | 616 | 197 |
+| `src/components/Workspace/useCrossWindowDnd.ts` | 614 | 1 |
 
 ## Кандидаты в мёртвый код
 
@@ -32,7 +32,7 @@
 
 - `src/node/index.ts` (25 строк)
 
-## e2e (playwright) — 109 файлов, 21096 строк
+## e2e (playwright) — 108 файлов, 21059 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -47,62 +47,11 @@
 - `e2e/motion.spec.ts` — 451
 - `e2e/adversarial_memory_contradictions.spec.ts` — 429
 
-## relay — 31 файлов, 7136 строк
-
-| файл | строк | импортят | экспортирует | что это |
-|---|---:|---:|---|---|
-| `ai_proxy.py` | 149 | 4 | AiProxy | Внешние модели: kie.ai для текста, groq для vision и whisper. |
-| `ai_smoke.py` | 274 | 0 | Probe, main, TRIAGE_PROMPT, CHAT_PAYLOAD | Live acceptance probe for the SLAG relay AI gateway. |
-| `assistant_actions.py` | 184 | 1 | AssistantActions | Action-кнопки ответа: «создать заметку» и «отклонить», плюс применение на уст… |
-| `assistant_card.py` | 126 | 11 | assistant_action_label, assistant_action_markup, without_button_styles, assistant_card_block, assistant_message_html, +2 | Карточка ассистента в Telegram: подпись кнопки, HTML сообщения, разбор action. |
-| `assistant.py` | 353 | 1 | AssistantDomain | Ассистент из Telegram: выбор устройства, стадии «печатает», ответ, action-кно… |
-| `bot.py` | 337 | 1 | BotDomain | Telegram-бот: long polling, команды, привязка чата к хранилищу. |
-| `delivery.py` | 170 | 1 | DeliveryDomain | Доставка уведомлений: очередь → Bot API, с лимитами, ретраем и тихими отказам… |
-| `errors.py` | 14 | 17 | ApiError | `ApiError` — единственный способ ответить 4xx/5xx из глубины хендлера. |
-| `fmt.py` | 16 | 9 | iso_time, hash_token | Мелочи форматирования, на которых сходятся хранилище и http: ISO-время и хэш … |
-| `http_plumbing.py` | 148 | 1 | HttpPlumbing | HTTP-сантехника: чтение запроса, ответы, CORS, IP за прокси, лимит частоты. |
-| `notify_routes.py` | 84 | 1 | NotifyStore | `NotifyStore` — второй файл рядом с relay.db: `route_token → chat_id`. |
-| `notify_smoke.py` | 121 | 0 | invite, arm, run, main | Live acceptance probe for Telegram reminders. |
-| `premium.py` | 45 | 2 | pe, pp, PREMIUM_EMOJI | Премиум-эмодзи: те самые анимированные, что живут в наборах телеграма. |
-| `realtime.py` | 193 | 1 | Realtime | WebSocket: рукопожатие, кадры, приём бандла и рассылка по комнате. |
-| `router.py` | 36 | 9 | HttpRouter | Диспетчер http: один список доменов вместо 1157-строчной цепочки `if`. |
-| `routes_admin_ops.py` | 379 | 1 | AdminOpsRoutes | Админка эксплуатации: AI-статистика и логи, аудит, комнаты, обслуживание, гра… |
-| `routes_admin.py` | 177 | 1 | AdminRoutes | Админка: статистика, аккаунты, биллинг, AI, аудит, комнаты, графики. |
-| `routes_ai.py` | 207 | 1 | AiRoutes | Прокси к моделям: чат, vision, whisper. Ничего не хранит, только считает. |
-| `routes_auth.py` | 160 | 1 | AuthRoutes | Телеметрия, вход по подписи, устройства и сессии. |
-| `routes_health.py` | 33 | 1 | HealthRoutes | Две служебные точки: `/health` для мониторинга и `/n` — переходник на `slag:/… |
-| `routes_notify.py` | 159 | 1 | NotifyRoutes | Приглашения в Telegram, включение ассистента, ожидающие вопросы. |
-| `routes_static.py` | 52 | 1 | StaticRoutes | Одна страница-переходник `/n` и раздача собранного веба. |
-| `routes_vaults.py` | 234 | 1 | VaultRoutes | Хранилища, гранты, pairing по PIN и обмен бандлами в комнате. |
-| `server.py` | 326 | 1 | SlagRelayServer, main | SLAG zero-knowledge asyncio relay with optional account authentication. |
-| `settings.py` | 120 | 26 | WS_GUID, DEFAULT_PORT, DEFAULT_TTL_SECONDS, BUNDLE_FRAME_BUNDLE, BUNDLE_FRAME_VERSION, +51 | Константы релея: TTL, лимиты, тексты бота, тарифы. |
-| `test_architecture.py` | 171 | 0 | relay_modules, imported_modules, line_count, ArchitectureTest, RELAY, +4 | Architecture gate: the relay is a graph, not one file. |
-| `test_notifications.py` | 1161 | 0 | sample_action, sample_card_action, FakeBot, FakeDevice, _FakeResponse, +6 | Notification queue, delivery and Telegram binding. |
-| `test_relay.py` | 985 | 0 | FakeKieUpstream, make_client_ws_frame, RelayTestCase, TestLegacyRelay, TestAccountRelay, +1 | Integration and migration tests for the stdlib + cryptography SLAG relay. |
-| `test_security.py` | 354 | 0 | TestSecurityAnonymous, TestSecurityAccounts, SQLI_PAYLOADS, SPECIAL_CHARS, COMMAND_PAYLOADS, +1 | Security fuzz/regression tests for the stdlib SLAG relay. |
-| `tg.py` | 247 | 7 | tg_escape, render_answer_links, render_note_page, tg_truncate, strip_premium, +12 | Telegram Bot API in one place: the client, the escaping and the message rende… |
-| `wire.py` | 121 | 4 | decode_bundle_frame, WebSocketConnection | RFC 6455 на минималках и бинарный кадр бандла: один сокет, без фреймворка. |
-
-## relay/store — 9 файлов, 1161 строк
-
-| файл | строк | импортят | экспортирует | что это |
-|---|---:|---:|---|---|
-| `__init__.py` | 20 | 0 | RelayDatabase | Хранилище релея: `RelayDatabase` собирается из миксинов, по одному на таблицу. |
-| `accounts.py` | 212 | 1 | AccountsMixin | Аккаунты, устройства, сессии и аудит. |
-| `assistant.py` | 112 | 1 | AssistantMixin | `assistant_requests`: вопрос из бота, ответ устройства и применённый action. |
-| `base.py` | 96 | 2 | StoreBase, MAX_CACHE_BYTES | Соединение и общая часть хранилища: комнаты, кэш, срок годности строк. |
-| `bundles.py` | 91 | 1 | BundlesMixin | Бандлы: приём, водарки, выдача недоставленного, подтверждения. |
-| `notify.py` | 150 | 1 | NotifyMixin | Очередь уведомлений: инвайты, задания, лимиты и телеметрия доставки. |
-| `pairing.py` | 95 | 1 | PairingMixin | Pairing-сессии: PIN, SAS, обмен ключами. Короткоживущие и одноразовые. |
-| `schema.py` | 270 | 1 | ensure_column, apply_schema | DDL и аддитивные миграции: одна схема, один файл. |
-| `vaults.py` | 115 | 1 | VaultsMixin | Хранилища и гранты на них: владелец, режим доступа, accept/decline. |
-
-## src — 3 файлов, 593 строк
+## src — 2 файлов, 524 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `App.tsx` | 462 | 1 | App | The app shell: routes, lazy-loaded screens, viewport height and global overla… |
-| `demo.tsx` | 69 | 0 | Playground | A separate playground entry for eyeballing modals and settings on an isolated… |
 | `main.tsx` | 62 | 0 |  | Boots the React root into #root, in StrictMode, after the secret store and gl… |
 
 ## src/components — 1 файлов, 56 строк
@@ -243,7 +192,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `LogModal.tsx` | 24 | 2 | LogModal | Modal shell for the log viewer: opens from the global hotkey and closes above… |
+| `LogModal.tsx` | 24 | 1 | LogModal | Modal shell for the log viewer: opens from the global hotkey and closes above… |
 | `LogViewer.tsx` | 441 | 3 | LogViewer | The log panel: filters by scope and level, copy and clear, docked and modal v… |
 
 ## src/components/Media — 9 файлов, 1410 строк
@@ -288,16 +237,16 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `BaseModal.tsx` | 168 | 11 | BaseModalProps, BaseModal | The dialog frame every modal wears: presence, backdrop, header, footer, Escap… |
-| `ComposerModal.tsx` | 60 | 2 | ComposerModal | The composer in a dialog: keeps its last options and folder through the exit. |
+| `BaseModal.tsx` | 168 | 10 | BaseModalProps, BaseModal | The dialog frame every modal wears: presence, backdrop, header, footer, Escap… |
+| `ComposerModal.tsx` | 60 | 1 | ComposerModal | The composer in a dialog: keeps its last options and folder through the exit. |
 | `ConfirmDialog.tsx` | 56 | 1 | ConfirmDialog | The app's own yes/no for destructive actions, instead of the platform's confi… |
 | `DiffModal.tsx` | 533 | 1 | DiffModalItemEntry, DiffModalProps, DiffModal | What an AI edit would change, before it is applied: the line diff and the acc… |
-| `FolderInfoModal.tsx` | 95 | 2 | FolderInfoModal | The folder dialog: its profile, plus triage, a new note, and its tags as filt… |
-| `FolderModal.tsx` | 167 | 2 | FolderModal | Creating a folder: name, parent and icon; editing that lives in the folder pr… |
-| `FolderViewModal.tsx` | 319 | 2 | FolderViewModal | The per-folder view settings sheet: layout, sort, filters, and resetting them. |
-| `SettingsModal.tsx` | 223 | 2 | SettingsModal | The settings shell: a rail of tabs, the mobile and desktop frames, and the pi… |
+| `FolderInfoModal.tsx` | 95 | 1 | FolderInfoModal | The folder dialog: its profile, plus triage, a new note, and its tags as filt… |
+| `FolderModal.tsx` | 167 | 1 | FolderModal | Creating a folder: name, parent and icon; editing that lives in the folder pr… |
+| `FolderViewModal.tsx` | 319 | 1 | FolderViewModal | The per-folder view settings sheet: layout, sort, filters, and resetting them. |
+| `SettingsModal.tsx` | 223 | 1 | SettingsModal | The settings shell: a rail of tabs, the mobile and desktop frames, and the pi… |
 | `TriageModal.tsx` | 485 | 1 | TriageModal | AI triage of the inbox: one batch of notes, folders and tags confirmed in a s… |
-| `VaultModal.tsx` | 284 | 2 | VaultModal | The vault switcher: choose a store, create one on a backend, or delete one. |
+| `VaultModal.tsx` | 284 | 1 | VaultModal | The vault switcher: choose a store, create one on a backend, or delete one. |
 
 ## src/components/RightPanel — 3 файлов, 449 строк
 
@@ -311,7 +260,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `SearchModal.tsx` | 460 | 3 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
+| `SearchModal.tsx` | 460 | 2 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
 
 ## src/components/Settings — 35 файлов, 4517 строк
 
@@ -392,7 +341,7 @@
 | `SheetPanel.tsx` | 440 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel | The bottom-sheet shell: detents, drag-to-fold, velocity-aware release, scroll… |
 | `TagChip.tsx` | 82 | 5 | TagChipProps, TagChip | A tag as a chip: clickable to filter, removable while editing, flat or pill. |
 | `TaskStatusMark.tsx` | 50 | 4 | TaskStatusMarkProps, TaskStatusMark | Round task status glyph whose check stroke draws itself when the task is comp… |
-| `Toast.tsx` | 173 | 2 | ToastContainer | The toast stack: pauses on hover, flicks away, carries one action or an undo. |
+| `Toast.tsx` | 173 | 1 | ToastContainer | The toast stack: pauses on hover, flicks away, carries one action or an undo. |
 | `ToolbarButton.tsx` | 59 | 3 | ToolbarButtonProps, ToolbarButton | Square toolbar button with an active glow, for editor, calendar and view chro… |
 | `VideoCirclePlayer.tsx` | 143 | 3 | VideoCirclePlayer | Round Telegram-style video bubble: tap to play, mute toggle, progress ring. |
 | `VideoRecorder.tsx` | 213 | 1 | VideoRecorder | Records a video memo with a live preview, then hands the clip to the composer. |
@@ -432,7 +381,7 @@
 | `useDockPanels.ts` | 275 | 1 | UseDockPanelsOptions, useDockPanels | Dockview wiring: default layout, panel creation, tab menus, and saving the la… |
 | `WorkspaceShell.tsx` | 289 | 1 | WorkspaceShellProps, WorkspaceShell | The desktop workspace: the dockview shell holding feed, Kanban, calendar, aud… |
 
-## src/config — 8 файлов, 444 строк
+## src/config — 8 файлов, 445 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -440,7 +389,7 @@
 | `index.ts` | 8 | 92 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
 | `search.ts` | 10 | 1 | SEARCH_LIMITS | Tuning for the Orama index and the palette: result counts, typo tolerance, te… |
 | `settingsTabs.ts` | 48 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel | Names and orders the settings sections once, so desktop and mobile cannot dri… |
-| `storage.ts` | 98 | 4 | DEFAULT_INBOX_FOLDER, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_VAULT_META, +1 | localStorage keys, the default inbox name and the workspace state a new vault… |
+| `storage.ts` | 99 | 4 | DEFAULT_INBOX_FOLDER, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_VAULT_META, +1 | localStorage keys, the default inbox name and the workspace state a new vault… |
 | `sync.ts` | 47 | 1 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 | Sync defaults: relay URL, storage keys, retry and debounce timings, bundle si… |
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
 | `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
@@ -449,7 +398,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 730 | 68 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
+| `AppContext.tsx` | 730 | 67 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
 | `appContext.types.ts` | 233 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The context's public contract and the shapes passed around it, kept out of st… |
 
 ## src/context/feed — 1 файлов, 90 строк
@@ -458,12 +407,12 @@
 |---|---:|---:|---|---|
 | `feedView.ts` | 90 | 1 | FeedViewQuery, selectVisibleItems | Which records the feed shows and in what order — the inbox's three modes as a… |
 
-## src/context/hooks — 12 файлов, 1822 строк
+## src/context/hooks — 12 файлов, 1825 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useAppearance.ts` | 95 | 1 | useAppearance | Density, font and accent: presets to localStorage and then to CSS variables. |
-| `useAppUpdates.ts` | 212 | 1 | useAppUpdates | Owns the app-update state: one silent check after boot, a manual check, the d… |
+| `useAppUpdates.ts` | 215 | 1 | useAppUpdates | Owns the app-update state: one silent check after boot, a manual check, the d… |
 | `useAssistant.ts` | 113 | 1 | useAssistant | The assistant session: transcript, model choice and one send that never write… |
 | `useBackup.ts` | 146 | 1 | useBackup | Backups: scheduled and manual snapshots on disk, restore, and the zip round t… |
 | `useFeedView.ts` | 216 | 1 | useFeedView | The feed's view state: folder, mode, filters, sorting, persisted per folder. |
