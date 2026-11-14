@@ -1,7 +1,9 @@
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { test, expect } from './support/accountHarness';
+import { relayCheckout, RELAY_SKIP_REASON } from './support/relayCheckout';
 
+test.skip(!relayCheckout(), RELAY_SKIP_REASON);
 test.use({ fullAccountApp: true });
 
 async function seedIsolatedBrowser(context: BrowserContext, relayUrl: string, vaultId: string, deviceId: string, deviceName: string) {

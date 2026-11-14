@@ -1,10 +1,22 @@
 """Test-only relay: loopback port zero, caller-owned temporary database."""
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "relay"))
+root = Path(__file__).resolve().parents[2]
+candidates = [
+    os.environ.get("SLAG_RELAY_DIR"),
+    root / "relay",
+    root.parent / "slag-relay",
+]
+relay_dir = next((Path(value).resolve() for value in candidates if value and (Path(value) / "server.py").is_file()), None)
+if relay_dir is None:
+    print(json.dumps({"error": "relay checkout not found; set SLAG_RELAY_DIR"}), flush=True)
+    raise SystemExit(1)
+
+sys.path.insert(0, str(relay_dir))
 from server import SlagRelayServer
 
 

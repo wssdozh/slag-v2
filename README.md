@@ -37,6 +37,9 @@ pnpm check          # tsc + oxlint
 npx playwright test
 ```
 
+account-спеки требуют клон `wssdozh/slag-relay` рядом с репозиторием или путь в
+`SLAG_RELAY_DIR`; без него они пропускаются.
+
 ## Где что лежит
 
 | путь | что там |

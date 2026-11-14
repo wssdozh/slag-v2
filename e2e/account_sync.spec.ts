@@ -1,5 +1,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/accountHarness';
+import { relayCheckout, RELAY_SKIP_REASON } from './support/relayCheckout';
+
+test.skip(!relayCheckout(), RELAY_SKIP_REASON);
 
 type AccountModules = typeof import('../src/lib/sync/account') & typeof import('../src/lib/sync/accountCrypto') & typeof import('../src/lib/sync/crypto');
 declare global { interface Window { accountTest: AccountModules } }
