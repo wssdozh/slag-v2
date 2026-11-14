@@ -71,6 +71,11 @@ export interface SendAssistantChatParams {
    * text and sends it as plain, so markdown there is noise, and a phone screen is not a chat pane.
    */
   channel?: 'app' | 'telegram';
+  /**
+   * Counters the caller has already computed, one line each. Passed instead of handing the model
+   * a tool: a chat question is answered in one round trip, not two.
+   */
+  facts?: string[];
 }
 
 export interface SendAssistantChatResult {

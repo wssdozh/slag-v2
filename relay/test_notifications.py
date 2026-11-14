@@ -8,6 +8,7 @@ relay database.
 """
 
 import asyncio
+import http.client
 import json
 import os
 import shutil
@@ -15,6 +16,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
+import unittest.mock
 
 from server import (
     ApiError,
@@ -31,6 +33,7 @@ from server import (
     render_notification,
 )
 from tg import render_answer_links, render_note_page
+import tg
 
 
 def sample_action() -> dict:
@@ -131,6 +134,75 @@ class FakeDevice:
             await asyncio.sleep(self.delay)
         await self.server._handle_ws_message(self, json.dumps({
             "type": "assistant_probe_ack", "id": payload["id"], "aiReady": self.ai_ready}))
+
+
+class _FakeResponse:
+    def __init__(self, body: bytes, status: int = 200):
+        self._body = body
+        self.status = status
+        self.will_close = False
+
+    def read(self) -> bytes:
+        return self._body
+
+
+class _FlakyConnection:
+    """An idle keep-alive socket the server already dropped: the first request raises."""
+
+    made = 0
+    fail_first = False
+
+    def __init__(self, host=None, timeout=None, context=None):
+        _FlakyConnection.made += 1
+        self.timeout = timeout
+
+    def request(self, method, path, body=None, headers=None):
+        if _FlakyConnection.fail_first:
+            _FlakyConnection.fail_first = False
+            raise http.client.RemoteDisconnected("the server closed the keep-alive")
+
+    def getresponse(self):
+        return _FakeResponse(b'{"ok": true, "result": {"message_id": 7}}')
+
+    def close(self):
+        pass
+
+
+class _UnreachableConnection(_FlakyConnection):
+    def request(self, method, path, body=None, headers=None):
+        # The token sits in the path, exactly like it does in the real request URL.
+        raise OSError(f"cannot connect to {path}")
+
+
+class TelegramClientTestCase(unittest.TestCase):
+    """Reused sockets are the point; a stale one must cost a retry, never a message."""
+
+    def setUp(self):
+        _FlakyConnection.made = 0
+        _FlakyConnection.fail_first = False
+
+    def test_a_stale_keep_alive_costs_one_retry_not_the_message(self):
+        _FlakyConnection.fail_first = True
+        with unittest.mock.patch("http.client.HTTPSConnection", _FlakyConnection):
+            ok, body = tg.TelegramBot("42:secret")._request("sendMessage", {"chat_id": "1"}, 5)
+        self.assertTrue(ok)
+        self.assertEqual(body["result"]["message_id"], 7)
+        self.assertEqual(_FlakyConnection.made, 2)
+
+    def test_the_next_call_reuses_the_idle_socket(self):
+        with unittest.mock.patch("http.client.HTTPSConnection", _FlakyConnection):
+            bot = tg.TelegramBot("42:secret")
+            bot._request("sendMessage", {"chat_id": "1"}, 5)
+            bot._request("sendMessage", {"chat_id": "1"}, 5)
+        self.assertEqual(_FlakyConnection.made, 1)
+
+    def test_an_unreachable_api_is_an_error_and_the_token_stays_out_of_it(self):
+        with unittest.mock.patch("http.client.HTTPSConnection", _UnreachableConnection):
+            ok, body = tg.TelegramBot("42:secret")._request("sendMessage", {"chat_id": "1"}, 5)
+        self.assertFalse(ok)
+        self.assertEqual(body["error_code"], 0)
+        self.assertIn("<bot-token>", body["description"])
+        self.assertNotIn("42:secret", body["description"])
 
 
 class RenderTestCase(unittest.TestCase):
@@ -572,6 +644,36 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         await self.server._bot_question("chat-a", "что по задачам?")
         self.assertFalse(any('"assistant_probe"' in frame for frame in only.frames))
         self.assertEqual(len(only.questions()), 1)
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+
+    async def test_a_silent_socket_is_not_probed(self):
+        """A suspended app holds its socket open and answers nothing, so it is skipped, not waited on."""
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        awake = FakeDevice("dev-awake", "vault-1", server=self.server)
+        asleep = FakeDevice("dev-asleep", "vault-1", server=self.server)
+        # Silent for far longer than the presence window: its pings stopped, the app is gone.
+        asleep.last_frame_at = time.monotonic() - 5 * 60
+        self.server.rooms["room-1"] = {awake, asleep}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        # No probe at all: with one living device the question goes out immediately.
+        self.assertFalse(any('"assistant_probe"' in frame for frame in awake.frames))
+        self.assertEqual(len(awake.questions()), 1)
+        self.assertEqual(asleep.questions(), [])
+        request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
+        self.server._stop_typing(request["id"])
+
+    async def test_a_room_that_went_quiet_is_still_probed(self):
+        """Nothing fresh is not the same as nobody there: the probe is the last presence test."""
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        quiet = FakeDevice("dev-quiet", "vault-1", server=self.server)
+        quiet.last_frame_at = time.monotonic() - 5 * 60
+        self.server.rooms["room-1"] = {quiet}
+        await self.server._bot_question("chat-a", "что по задачам?")
+        self.assertTrue(any('"assistant_probe"' in frame for frame in quiet.frames))
+        self.assertEqual(len(quiet.questions()), 1)
         request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
         self.server._stop_typing(request["id"])
 

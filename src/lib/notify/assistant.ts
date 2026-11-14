@@ -20,11 +20,42 @@ const notifyLog = logger.scope('NOTIFY');
  * A question typed here and a question typed into telegram are not the same trust boundary:
  * in `minimal` the assistant never gets a tool that returns a note body, so an answer can only
  * ever summarise tasks. `risky` is the person explicitly saying "read whatever you find".
+ *
+ * `minimal` is an empty list, not a short one: the two counters it used to call for are computed
+ * below and handed over as text. A tool call is a whole extra round trip to the model, and in the
+ * bot that round trip was half of the wait.
  */
 export const ASSISTANT_TOOL_ALLOWLIST: Record<AssistantMode, string[] | null> = {
-  minimal: ['get_calendar_agenda', 'get_vault_stats'],
+  minimal: [],
   risky: null,
 };
+
+/**
+ * What the bot may know without reading a single note: totals and the folders they live in.
+ *
+ * The lines are prompt text, not data for display — short, one fact each, so the model repeats
+ * them instead of inventing a number.
+ */
+export function buildVaultFacts(items: SlagItem[], now = Date.now()): string[] {
+  const stats = storage.getVaultStats();
+  const open = items.filter((item) => item.type === 'task' && item.status !== 'done').length;
+  const done = stats.tasksCount - open;
+  const todayKey = localDateKey(now);
+  const overdue = items.filter(
+    (item) => item.type === 'task' && item.status !== 'done' && !!item.dueDate && item.dueDate < todayKey
+  ).length;
+  const folders = Object.entries(stats.folders)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 5)
+    .map(([name, count]) => `«${name}» ${count}`)
+    .join(', ');
+  const lines = [
+    `заметок ${stats.notesCount}, задач ${stats.tasksCount} (открытых ${open}, выполнено ${done}), статей ${stats.articlesCount}`,
+    `просрочено ${overdue}`,
+  ];
+  if (folders) lines.push(`папки: ${folders}`);
+  return lines;
+}
 
 /** Points the bot at every live channel, or takes all of them out of the assistant path. */
 export async function setAssistantForRoutes(
@@ -163,6 +194,9 @@ export async function answerAssistantQuestion(
         allItems: items,
         // Undefined means "everything" to the orchestrator; null here means the same thing.
         toolAllowlist: ASSISTANT_TOOL_ALLOWLIST[mode] ?? undefined,
+        // In `minimal` the allowlist is empty, so the counters have to travel as text — otherwise
+        // "сколько заметок" is an answer the model has no way to produce.
+        facts: mode === 'minimal' ? buildVaultFacts(items) : undefined,
         // The answer is delivered as escaped plain text by the relay, so the model is told how
         // telegram reads it instead of producing markdown nobody will render.
         channel: 'telegram',

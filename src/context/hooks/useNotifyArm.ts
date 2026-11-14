@@ -14,8 +14,13 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 const ARM_DEBOUNCE_MS = 2000;
 /** Due times are minute-precision, so a half-minute tick is enough to be punctual. */
 const LOCAL_TICK_MS = 30_000;
-/** Safety net for a question that arrived while the socket was down and no edge follows. */
-const PENDING_PULL_MS = 30_000;
+/**
+ * Safety net for a question that arrived while the socket was down and no edge follows.
+ *
+ * Five seconds, not thirty: this is the only path that picks up a question the relay could not
+ * hand to a live socket, and at thirty a person watched the placeholder for half a minute.
+ */
+const PENDING_PULL_MS = 5_000;
 
 const notifyLog = logger.scope('NOTIFY');
 

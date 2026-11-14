@@ -5,11 +5,12 @@ the assistant can all use it without dragging the server in. Three Bot API calls
 """
 
 import asyncio
+import http.client
 import json
+import queue
 import re
-import urllib.error
+import ssl
 import urllib.parse
-import urllib.request
 from typing import Optional, Tuple
 
 TG_API_BASE = "https://api.telegram.org"
@@ -139,6 +140,44 @@ def render_notification(title: str, body: str, kind: str, stamp: str, spoiler: b
             tg_truncate(_notification_plain(title, body, kind, stamp), TG_TEXT_LIMIT))
 
 
+class _ConnectionPool:
+    """Idle HTTPS connections to the Bot API, a handful at most.
+
+    urllib opens a fresh TLS handshake for every request, and one question costs two or three
+    requests in a row (placeholder, stage, answer): the handshake is a visible slice of a wait
+    somebody is staring at. A pool, not one shared connection, because the long poll holds its
+    connection for the whole 25 seconds and would block every send behind a lock.
+    """
+
+    def __init__(self, host: str, limit: int = 4):
+        self._host = host
+        self._limit = limit
+        self._idle: "queue.LifoQueue[http.client.HTTPSConnection]" = queue.LifoQueue()
+
+    def take(self, timeout: float) -> http.client.HTTPSConnection:
+        try:
+            conn = self._idle.get_nowait()
+        except queue.Empty:
+            return http.client.HTTPSConnection(self._host, timeout=timeout,
+                                               context=ssl.create_default_context())
+        conn.timeout = timeout
+        return conn
+
+    def give(self, conn: http.client.HTTPSConnection) -> None:
+        # More idle sockets than this is a leak, not a pool: the long poll never comes back here
+        # anyway, so the ceiling only bounds a burst.
+        if self._idle.qsize() < self._limit:
+            self._idle.put_nowait(conn)
+            return
+        conn.close()
+
+    def drop(self, conn: http.client.HTTPSConnection) -> None:
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+
 class TelegramBot:
     """Three Bot API calls, no framework.
 
@@ -149,7 +188,9 @@ class TelegramBot:
     def __init__(self, token: str):
         self.token = token
         self.username: Optional[str] = None
-        self._api = f"{TG_API_BASE}/bot{token}"
+        host = urllib.parse.urlsplit(TG_API_BASE).netloc or "api.telegram.org"
+        self._pool = _ConnectionPool(host)
+        self._path_prefix = f"{urllib.parse.urlsplit(TG_API_BASE).path.rstrip('/')}/bot{token}"
 
     def redact(self, text: str) -> str:
         return text.replace(self.token, "<bot-token>") if self.token else text
@@ -162,22 +203,35 @@ class TelegramBot:
         return None
 
     def _request(self, method: str, payload: dict, timeout: float) -> Tuple[bool, dict]:
+        """One call over a reused connection. A pooled socket the server already closed fails on
+        `request()` — that is the retry, not an error: a stale keep-alive must never cost a
+        message a person was waiting for.
+        """
         data = json.dumps(payload).encode("utf-8") if payload else None
         headers = {"Content-Type": "application/json"} if data else {}
-        request = urllib.request.Request(f"{self._api}/{method}", data=data, headers=headers)
-        try:
-            with urllib.request.urlopen(request, timeout=timeout) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
-                return bool(body.get("ok")), body
-        except urllib.error.HTTPError as exc:
+        path = f"{self._path_prefix}/{method}"
+        for attempt in (0, 1):
+            conn = self._pool.take(timeout)
             try:
-                body = json.loads(exc.read().decode("utf-8"))
-            except (ValueError, OSError):
-                body = {"ok": False, "error_code": exc.code}
-            return False, body
-        except (urllib.error.URLError, OSError, ValueError) as exc:
-            # The bot token sits in the request URL: never let an exception echo it into a log.
-            return False, {"ok": False, "error_code": 0, "description": self.redact(str(exc))}
+                conn.request("POST", path, body=data, headers=headers)
+                response = conn.getresponse()
+                raw = response.read()
+            except (http.client.HTTPException, OSError, ValueError) as exc:
+                # The bot token sits in the request path: never let an exception echo it to a log.
+                self._pool.drop(conn)
+                if attempt == 0:
+                    continue
+                return False, {"ok": False, "error_code": 0, "description": self.redact(str(exc))}
+            if response.will_close:
+                self._pool.drop(conn)
+            else:
+                self._pool.give(conn)
+            try:
+                body = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                return False, {"ok": False, "error_code": int(getattr(response, "status", 0) or 0)}
+            return bool(body.get("ok")), body
+        return False, {"ok": False, "error_code": 0, "description": "telegram_unreachable"}
 
     async def call(self, method: str, payload: dict, timeout: float = 20) -> Tuple[bool, dict]:
         return await asyncio.to_thread(self._request, method, payload, timeout)

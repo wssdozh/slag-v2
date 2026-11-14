@@ -30,7 +30,7 @@ export type { SendAssistantChatParams, SendAssistantChatResult } from './types';
  */
 export class AssistantOrchestrator {
   async runChat(params: SendAssistantChatParams): Promise<SendAssistantChatResult> {
-    const { messages, currentFolder, settings, folders, allItems, toolAllowlist, channel } = params;
+    const { messages, currentFolder, settings, folders, allItems, toolAllowlist, channel, facts } = params;
     const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
     const folderMeta = folders.find((f) => f.path === currentFolder);
 
@@ -106,6 +106,11 @@ export class AssistantOrchestrator {
       // A telegram question in "minimal" mode has no search tool at all: the model is told to
       // say that instead of dressing a vault-stats count up as an answer.
       notesRestricted: Boolean(toolAllowlist) && !toolAllowlist?.includes('search_notes'),
+      // Everything the model may know about the vault, counted here. A tool-less turn is a single
+      // model call; the alternative — call, tool, call — doubled the wait in the bot.
+      facts,
+      // No tools in the payload means no instructions about calling them either.
+      toolsEnabled: canonicalTools.length > 0,
     });
     // Protocol Adapter & Endpoint Resolution
     const target = resolveAiTarget(settings);
