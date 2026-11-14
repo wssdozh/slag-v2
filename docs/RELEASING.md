@@ -83,7 +83,8 @@ npx tauri signer generate -w "$env:USERPROFILE\.tauri\slag-updater.key" --ci
 Собирает windows (exe + nsis), linux (deb + AppImage) и android (apk, подпись из секретов) из
 одного коммита, затем публикует тем же `publish-release.ps1`. Секреты:
 `TAURI_SIGNING_PRIVATE_KEY`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
-`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Пароль к ключу обновлений не используется:
+ключ создан без пароля, отдельного секрета для него нет.
 
 **Каналы — это фильтр.** `stable` создаёт обычный релиз и становится github-овским `latest` —
 единственный адрес, который читает установленный клиент. `beta`/`alpha`/`dev` уходят как
