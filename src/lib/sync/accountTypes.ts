@@ -121,6 +121,22 @@ export interface AssistantLinkPayload {
 }
 
 /**
+ * The card an action wears, worded on the device that answered: the relay only escapes and
+ * joins these lines, and the app renders the same descriptor as the confirmation card.
+ */
+export interface AssistantActionCard {
+  /** `Черновик таски`, an owner-written label, or `Обновление записи`. */
+  kind: string;
+  folder: string;
+  title: string;
+  /** `пн, 16 ноя`; empty when the action carries no deadline. */
+  due: string;
+  priority: 'none' | 'low' | 'medium' | 'high';
+  /** The button's caption: `Сохранить`, `Запланировать`, `Применить (3)`. */
+  actionLabel: string;
+}
+
+/**
  * The action a model offered, packed so the relay can put it on a button.
  * `payload` is opaque to the relay: it is echoed back untouched when the person taps.
  */
@@ -130,6 +146,8 @@ export interface AssistantActionPayload {
   label: string;
   /** One line for a human: what exactly the button will touch. */
   summary: string;
+  /** Absent on an answer from a device too old to word a card: then no card is drawn. */
+  card?: AssistantActionCard;
   payload: SuggestedAction;
 }
 

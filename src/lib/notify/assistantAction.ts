@@ -1,5 +1,5 @@
 // The action offered under a telegram answer: how it is packed for the relay and read back.
-import type { AssistantActionPayload } from '../sync/accountTypes';
+import type { AssistantActionCard, AssistantActionPayload } from '../sync/accountTypes';
 import type {
   BatchUpdateItem,
   ItemUpdates,
@@ -8,7 +8,7 @@ import type {
   SuggestedAction,
   SuggestedActionType,
 } from '../../types';
-import { formatDueStamp } from '../time/dateUtils';
+import { formatDayStamp, formatDueStamp } from '../time/dateUtils';
 
 const ACTION_TYPES: readonly SuggestedActionType[] = ['create_note', 'schedule_task', 'update_item', 'batch_update'];
 const ITEM_TYPES: readonly SlagItemType[] = ['note', 'article', 'task'];
@@ -44,6 +44,50 @@ export function describeActionTarget(target: ActionTarget): string {
 }
 
 /**
+ * The card an action wears, in the order a person reads it: what kind of change it is, where
+ * it lands, what exactly, and when — day first, priority after it.
+ *
+ * Both channels render this same descriptor: the app as JSX, telegram as one `<blockquote>`.
+ * Keeping the wording here is what stops "Применить" in the chat and "Сохранить" in the app
+ * from being the same button with two names.
+ */
+export interface ActionCardDescriptor extends AssistantActionCard {
+  /** The same fields, named for the app's card; see `AssistantActionCard` for the wire. */
+}
+
+export function describeActionCard(
+  action: SuggestedAction,
+  selectedBatchCount?: number
+): ActionCardDescriptor {
+  const priority = action.updates?.priority || action.priority || 'none';
+  const count = selectedBatchCount ?? action.batchUpdateItems?.length ?? 0;
+  const actionLabel = count > 0
+    ? `Применить (${count})`
+    : action.type === 'create_note'
+      ? 'Сохранить'
+      : action.type === 'schedule_task'
+        ? 'Запланировать'
+        : (action.updates?.appendContent || action.appendContent)
+          ? 'Дописать'
+          : 'Применить';
+  return {
+    kind: action.actionLabel?.trim()
+      || (action.type === 'schedule_task' ? 'Планирование в календарь'
+        : action.type === 'batch_update' ? (action.title || 'Перенос задач')
+          : action.type === 'create_note'
+            ? (action.itemType === 'task' ? 'Черновик таски'
+              : action.itemType === 'article' ? 'Черновик статьи' : 'Черновик заметки')
+            : 'Обновление записи'),
+    folder: (action.updates?.folder || action.folder || '').trim(),
+    title: action.title.trim(),
+    due: formatDayStamp(action.updates?.dueDate || action.dueDate,
+                        action.updates?.reminder || action.reminder),
+    priority,
+    actionLabel,
+  };
+}
+
+/**
  * The action an answer offers, shaped for the relay.
  *
  * The whole object goes inside `payload`: the relay never reads it, it only echoes it back on a
@@ -52,11 +96,14 @@ export function describeActionTarget(target: ActionTarget): string {
  */
 export function toAssistantAction(requestId: string, action?: SuggestedAction): AssistantActionPayload | null {
   if (!action) return null;
+  const card = describeActionCard(action);
   return {
     // Tied to the request: a repeated answer must not grow a second button with another id.
     id: `act_${requestId}`,
-    label: (action.actionLabel?.trim() || 'Применить').slice(0, 40),
+    label: card.actionLabel.slice(0, 40),
     summary: describeActionTarget(action),
+    // What the telegram card draws, already worded here: the relay only escapes and joins.
+    card,
     payload: { ...action, actionState: 'suggested' },
   };
 }

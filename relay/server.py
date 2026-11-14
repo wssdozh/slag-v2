@@ -96,11 +96,20 @@ ASSISTANT_DEVICE_FALLBACK = "устройство"
 # stays in the database, so the callback data never has to fit Telegram's 64-byte cap and a
 # replay of the tap cannot smuggle in a different payload.
 ASSISTANT_ACTION_PREFIX = "act:"
+# The second button: a card that is not wanted is a card that must be able to disappear.
+ASSISTANT_DROP_PREFIX = "drop:"
 ASSISTANT_ACTION_BUTTON_MAX = 64
+# The card is drawn from fields the device worded; these are the ceilings on what it may print.
+ASSISTANT_CARD_FIELD_MAX = 120
+ASSISTANT_CARD_DROP_LABEL = "Отклонить"
+ASSISTANT_CARD_DROPPED = "✕ отклонено"
+# Day first, priority after it: the reading order the confirmation card uses in the app.
+ASSISTANT_CARD_PRIORITY = {"high": "🔴 HIGH", "medium": "🟡 MEDIUM", "low": "🔵 LOW"}
 # Every tap answers the callback — a silent one is a spinner on the person's screen.
 ASSISTANT_ACTION_DONE = "передал устройству"
 ASSISTANT_ACTION_ALREADY = "уже применено"
 ASSISTANT_ACTION_STALE = "устарело — спроси ещё раз"
+ASSISTANT_ACTION_DISMISSED = "ок, не сохраняю"
 ASSISTANT_ACTION_NO_DEVICE = "устройство не в сети — открой приложение"
 # The device words the outcome itself; this is only the ceiling on how much of it fits back
 # into the bubble that already holds the answer.
@@ -163,7 +172,58 @@ def assistant_action_markup(action: Optional[dict], request_id: str) -> Optional
     if label is None:
         return None
     return {"inline_keyboard": [[{"text": label,
-                                  "callback_data": f"{ASSISTANT_ACTION_PREFIX}{request_id}"}]]}
+                                  "callback_data": f"{ASSISTANT_ACTION_PREFIX}{request_id}"},
+                                 {"text": ASSISTANT_CARD_DROP_LABEL,
+                                  "callback_data": f"{ASSISTANT_DROP_PREFIX}{request_id}"}]]}
+
+
+def assistant_card_block(action: Optional[dict]) -> str:
+    """The card under an answer: what the action touches, in the app's reading order.
+
+    The device words every field — it is the only side that knows the user's names for folders
+    and the shape of their dates — so this function escapes and joins, and nothing else. An
+    action from a device too old to send a card draws nothing rather than half a card.
+    """
+    if not isinstance(action, dict):
+        return ""
+    card = action.get("card")
+    if not isinstance(card, dict):
+        return ""
+
+    def field(key: str) -> str:
+        value = card.get(key)
+        if not isinstance(value, str):
+            return ""
+        return tg_escape(tg_truncate(value.strip(), ASSISTANT_CARD_FIELD_MAX))
+
+    title = field("title")
+    if not title:
+        return ""
+    head = " · ".join(part for part in (field("kind"), field("folder")) if part)
+    priority = ASSISTANT_CARD_PRIORITY.get(str(card.get("priority") or ""), "")
+    meta = " · ".join(part for part in (field("due"), priority) if part)
+    lines = [head, f"<b>{title}</b>", meta]
+    return "<blockquote>" + "\n".join(line for line in lines if line) + "</blockquote>"
+
+
+def assistant_message_html(answer: str, action: Optional[dict], base_url: str = "",
+                           suffix: str = "") -> Tuple[str, str]:
+    """The bubble: the answer, the card under it, and an optional outcome line.
+
+    The card is paid for out of the answer's budget, not the other way round: truncating the
+    tail would cut the card in half and leave a `blockquote` Telegram rejects as unbalanced.
+    """
+    card = assistant_card_block(action)
+    tail = f"\n\n{suffix}" if suffix else ""
+    budget = max(200, ASSISTANT_MAX_ANSWER - len(card) - len(tail))
+    plain_answer = tg_truncate(answer.strip(), budget)
+    html = render_answer_links(plain_answer, base_url)
+    body = f"{html}\n\n{card}{tail}" if card else f"{html}{tail}"
+    plain = f"{plain_answer}\n\n{APPROX_STRIP_TAGS.sub('', card)}{suffix}"
+    return body, plain.strip()
+
+
+APPROX_STRIP_TAGS = re.compile(r"<[^>]+>")
 
 
 def parse_assistant_action(encoded: Optional[str]) -> Optional[dict]:
@@ -1225,6 +1285,18 @@ class RelayDatabase:
             res = self.conn.execute(
                 "UPDATE assistant_requests SET applied_at = ? WHERE id = ? AND applied_at IS NULL",
                 (time.time(), request_id))
+        return res.rowcount == 1
+
+    def dismiss_assistant_action(self, request_id: str) -> bool:
+        """True for the tap that dismissed a card; a second tap, or one after applying, is not.
+
+        Clearing `action_json` is the whole point: it is what makes a leftover `act:` button on
+        the same message answer "stale" instead of creating the note the person just refused.
+        """
+        with self.conn:
+            res = self.conn.execute(
+                "UPDATE assistant_requests SET action_json = NULL, action_label = NULL"
+                " WHERE id = ? AND action_json IS NOT NULL AND applied_at IS NULL", (request_id,))
         return res.rowcount == 1
 
     def expired_assistant_requests(self, now: float, limit: int = 20) -> list[sqlite3.Row]:
@@ -3294,7 +3366,11 @@ class SlagRelayServer:
     async def _handle_bot_update(self, update: dict) -> None:
         callback = update.get("callback_query")
         if isinstance(callback, dict):
-            await self._handle_action_callback(callback)
+            data = callback.get("data")
+            if isinstance(data, str) and data.startswith(ASSISTANT_DROP_PREFIX):
+                await self._handle_drop_callback(callback)
+            else:
+                await self._handle_action_callback(callback)
             return
         message = update.get("message")
         if not isinstance(message, dict):
@@ -3710,7 +3786,7 @@ class SlagRelayServer:
         self.db.set_assistant_answer(request_id, text, action, answered_by)
         # Notebook links are the one markup an answer may carry: the model writes [[Title]] and
         # this turns it into a real entity. Everything else stays escaped plain text.
-        html = render_answer_links(text, base_url)
+        html, plain = assistant_message_html(text, action, base_url)
         markup = assistant_action_markup(action, request_id)
         chat_id = route["chat_id"]
         ok = False
@@ -3719,13 +3795,13 @@ class SlagRelayServer:
         # edit that started earlier must finish (or be skipped) before the answer is written.
         async with self._bubble_lock(request_id):
             if message_id:
-                ok, body = await self._edit_telegram(chat_id, int(message_id), html, text, timeout=20,
+                ok, body = await self._edit_telegram(chat_id, int(message_id), html, plain, timeout=20,
                                                      reply_markup=markup)
                 if not ok:
                     logger.warning("Editing the placeholder failed (%s), sending a new message",
                                    body.get("description"))
             if not ok:
-                ok, body = await self._send_telegram(chat_id, html, text, timeout=20, reply_markup=markup)
+                ok, body = await self._send_telegram(chat_id, html, plain, timeout=20, reply_markup=markup)
                 if not ok:
                     logger.warning("Telegram answer delivery failed: %s", body.get("description"))
         self._forget_bubble(request_id)
@@ -3742,6 +3818,46 @@ class SlagRelayServer:
                                        route_tag=route_row["vault_tag"] if route_row else "",
                                        request_id=request_id)
         return {"delivered": ok}
+
+    async def _handle_drop_callback(self, callback: dict) -> None:
+        """A tap on `Отклонить`: the card goes, the action stops being applicable.
+
+        The answer text stays — the person asked a question and got an answer; what they refused
+        is the proposed note, not the reply. Every branch answers the callback, or the button
+        spins under their finger forever.
+        """
+        callback_id = callback.get("id")
+        if not isinstance(callback_id, str) or not callback_id:
+            return
+        data = callback.get("data") if isinstance(callback.get("data"), str) else ""
+        request_id = data[len(ASSISTANT_DROP_PREFIX):]
+        request = self.db.get_assistant_request(request_id) if request_id else None
+        if not request or not self.db.dismiss_assistant_action(request_id):
+            await self._answer_callback(callback_id, ASSISTANT_ACTION_ALREADY)
+            return
+        route = self.notify.get(request["route_token"])
+        message = callback.get("message") if isinstance(callback.get("message"), dict) else {}
+        # The tap itself names the message it sits on; the stored placeholder is only a fallback
+        # for a bubble the relay sent before it could remember its id.
+        message_id = message.get("message_id") or request["placeholder_message_id"]
+        chat = message.get("chat") if isinstance(message.get("chat"), dict) else {}
+        chat_id = str(chat.get("id") or (route["chat_id"] if route else ""))
+        edited = False
+        if chat_id and message_id:
+            base = request["answer_text"] or ""
+            if base:
+                full, plain = assistant_message_html(base, None, "", ASSISTANT_CARD_DROPPED)
+                edited, _ = await self._edit_telegram(chat_id, int(message_id), full, plain,
+                                                      timeout=15,
+                                                      reply_markup={"inline_keyboard": []})
+            if not edited:
+                # The text may be gone; a keyboard that still offers a refused action is worse.
+                edited, _ = await self._edit_telegram_markup(chat_id, int(message_id),
+                                                              {"inline_keyboard": []})
+        self.db.log_delivery_event("assistant.action", "dismissed",
+                                   route_tag=route["vault_tag"] if route else "",
+                                   request_id=request_id, error_code="" if edited else "edit_failed")
+        await self._answer_callback(callback_id, ASSISTANT_ACTION_DISMISSED)
 
     async def _handle_action_callback(self, callback: dict) -> None:
         """A tap on the button under an answer: hand the stored action to the live devices.
@@ -3834,9 +3950,10 @@ class SlagRelayServer:
             chat_id = route["chat_id"]
             base = request["answer_text"] or ""
             if base:
-                full = tg_truncate(f"{base}\n\n{suffix}", ASSISTANT_MAX_ANSWER)
+                card_action = parse_assistant_action(request["action_json"])
+                full, plain = assistant_message_html(base, card_action, base_url, suffix)
                 edited, _ = await self._edit_telegram(
-                    chat_id, int(message_id), render_answer_links(full, base_url), full,
+                    chat_id, int(message_id), full, plain,
                     timeout=15, reply_markup={"inline_keyboard": []})
             if not edited:
                 # The bubble itself may be gone (deleted, too old, or answered before the relay

@@ -18,6 +18,7 @@ import unittest
 
 from server import (
     ApiError,
+    ASSISTANT_ACTION_STALE,
     NOTIFY_MAX_PER_HOUR_PER_ROUTE,
     NOTIFY_STALE_SECONDS,
     RelayDatabase,
@@ -35,6 +36,16 @@ def sample_action() -> dict:
     return {"id": "create-note", "label": "Применить",
             "summary": "«Купить кота», 14 ноя, Личное",
             "payload": {"itemKey": "item-1", "folder": "Личное"}}
+
+
+def sample_card_action() -> dict:
+    """The same action from a device new enough to word the whole card."""
+    action = sample_action()
+    action["label"] = "Сохранить"
+    action["card"] = {"kind": "Черновик таски", "folder": "Входящие",
+                      "title": "Свозить кошку в ветклинику", "due": "пн, 16 ноя",
+                      "priority": "medium", "actionLabel": "Сохранить"}
+    return action
 
 
 class FakeBot:
@@ -649,7 +660,7 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
     async def tap(self, chat_id: str, data: str, callback_id: str = "cb-1") -> None:
         await self.server._handle_bot_update({"update_id": 21, "callback_query": {
             "id": callback_id, "data": data,
-            "message": {"chat": {"id": chat_id, "type": "private"}}}})
+            "message": {"chat": {"id": chat_id, "type": "private"}, "message_id": 77}}})
 
     async def test_answer_with_an_action_carries_one_button_for_that_request(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
@@ -664,6 +675,55 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(button["callback_data"], f"act:{request_id}")
         self.assertEqual(self.db.get_assistant_request(request_id)["answer_text"],
                          "предлагаю «Купить кота»")
+
+    async def test_answer_card_reads_like_the_app_and_offers_both_answers(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "что на 16-е?")
+        await self.server._answer_assistant("vault-1", request_id, "готово, записал.",
+                                            action=sample_card_action(), answered_by="dev-1")
+        html = str(self.bot.calls[-1]["text"])
+        # The card is one blockquote: a left bar is the only accent Telegram gives for free.
+        self.assertIn("<blockquote>", html)
+        self.assertIn("<b>Свозить кошку в ветклинику</b>", html)
+        meta = html.split("\n")[-1].replace("</blockquote>", "")
+        self.assertEqual(meta, "пн, 16 ноя · 🟡 MEDIUM")
+        self.assertLess(html.index("пн, 16 ноя"), html.index("MEDIUM"))
+        row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
+        self.assertEqual([button["text"] for button in row], ["Сохранить", "Отклонить"])
+        self.assertEqual(row[0]["callback_data"], f"act:{request_id}")
+        self.assertEqual(row[1]["callback_data"], f"drop:{request_id}")
+
+    async def test_a_card_from_an_old_device_draws_no_blockquote(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "что на 16-е?")
+        await self.server._answer_assistant("vault-1", request_id, "готово",
+                                            action=sample_action(), answered_by="dev-1")
+        self.assertNotIn("<blockquote>", str(self.bot.calls[-1]["text"]))
+        row = self.bot.calls[-1]["reply_markup"]["inline_keyboard"][0]
+        self.assertEqual([button["text"] for button in row], ["Применить", "Отклонить"])
+
+    async def test_dismiss_kills_the_action_and_a_late_tap_is_stale(self):
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        request_id = self.db.create_assistant_request("vault-1", "tok-a", "что на 16-е?")
+        await self.server._answer_assistant("vault-1", request_id, "готово, записал.",
+                                            action=sample_card_action(), answered_by="dev-1")
+        device = FakeDevice("dev-1", "vault-1", server=self.server)
+        self.server.rooms["room-1"] = {device}
+        await self.tap("chat-a", f"drop:{request_id}")
+        self.assertIn("не сохраняю", self.bot.callbacks[-1]["text"])
+        self.assertEqual(self.bot.calls[-1]["reply_markup"], {"inline_keyboard": []})
+        # The answer stays, the card goes: refusing a note is not refusing the answer.
+        self.assertIn("готово, записал.", str(self.bot.calls[-1]["text"]))
+        self.assertIn("отклонено", str(self.bot.calls[-1]["text"]))
+        self.assertNotIn("<blockquote>", str(self.bot.calls[-1]["text"]))
+        self.assertIsNone(self.db.get_assistant_request(request_id)["action_json"])
+        # A button left on screen now names an action that no longer exists.
+        await self.tap("chat-a", f"act:{request_id}", callback_id="cb-2")
+        self.assertEqual(self.bot.callbacks[-1]["text"], ASSISTANT_ACTION_STALE)
+        self.assertEqual([f for f in device.frames if '"assistant_action"' in f], [])
 
     async def test_answer_without_an_action_has_no_keyboard_at_all(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)

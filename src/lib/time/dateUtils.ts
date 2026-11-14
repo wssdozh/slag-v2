@@ -118,6 +118,20 @@ export function timeFromReminder(reminder?: string): { hours: number; minutes: n
 }
 
 /**
+ * День со днём недели: `пн, 16 ноя`. Для карточки действия — там дата стоит первой,
+ * потому что человек ищет в ней «когда», а не «что».
+ */
+export function formatDayStamp(dueDate?: string, reminder?: string): string {
+  const stamp = formatDueStamp(dueDate, reminder);
+  if (!stamp || !dueDate) return stamp;
+  const [year, month, day] = dueDate.split('-').map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return stamp;
+  // Monday-first, like the calendar above the feed.
+  const weekday = RUSSIAN_WEEKDAYS[(new Date(year, month - 1, day).getDay() + 6) % 7];
+  return `${weekday.toLowerCase()}, ${stamp}`;
+}
+
+/**
  * Срок так, как его читают в ленте: `13 ноя · 17:42`.
  *
  * Время показываем только когда `reminder` действительно про этот день: у задачи

@@ -17,6 +17,7 @@ import {
 import { LinearSignalBars } from '../../UI/PriorityBadge';
 import { PRIORITY_TONE_CHIP, priorityTone } from '../../UI/priorityTone';
 import { TagChip } from '../../UI/TagChip';
+import { describeActionCard } from '../../../lib/notify/assistantAction';
 import type { SuggestedAction } from '../../../types';
 
 const formatReminderTime = (rem?: string) => {
@@ -69,6 +70,8 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
   const isApplied = actionState === 'applied';
   const isExecuting = actionState === 'executing';
   const actionPriority = action.updates?.priority || action.priority;
+  // The same wording the telegram card gets: one descriptor, two renderings.
+  const card = describeActionCard(action);
 
   return (
     <div
@@ -91,16 +94,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
           )}
           {(!action.type || action.type === 'create_note') && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
           <span className={isRejected ? 'text-zinc-500' : isApplied ? 'text-zinc-300 font-medium' : 'text-zinc-200 font-medium'}>
-            {action.actionLabel ? action.actionLabel :
-             action.type === 'schedule_task' ? 'Планирование в календарь' :
-             action.type === 'batch_update' ? (action.title || 'Перенос задач') :
-             action.type === 'create_note' ? (
-               action.itemType === 'task' ? 'Черновик таски' :
-               action.itemType === 'article' ? 'Черновик статьи' :
-               'Черновик заметки'
-             ) :
-             'Обновление записи'
-            }
+            {card.kind}
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -355,15 +349,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                 };
               }
 
-              const buttonLabel = count > 0
-                ? `Применить (${count})`
-                : action.type === 'create_note'
-                ? 'Сохранить'
-                : action.type === 'schedule_task'
-                ? 'Запланировать'
-                : (action.updates?.appendContent || action.appendContent)
-                ? 'Дописать'
-                : 'Применить';
+              const buttonLabel = describeActionCard(finalAction, count).actionLabel;
 
               return (
                 <button
