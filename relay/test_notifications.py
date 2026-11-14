@@ -432,10 +432,10 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertIn("включить", self.bot.sent[-1][1])
         self.db.set_assistant_link("tok-a", "vault-1", True)
         await self.server._bot_question("chat-a", "что по задачам?")
-        # No device is on the line: the bubble that asked for one is rewritten with that answer,
-        # and no request is left waiting for nobody.
-        self.assertIn("не в сети", self.bot.edits[-1][2])
-        self.assertEqual(self.db.pending_assistant_requests("vault-1", time.time()), [])
+        # No device answered the probe: the bubble says so, and the question is held for the
+        # pending poll instead of being dropped — a silent socket is not a silent device.
+        self.assertIn("молчит", self.bot.edits[-1][2])
+        self.assertEqual(len(self.db.pending_assistant_requests("vault-1", time.time())), 1)
 
     async def test_answer_reaches_the_chat_exactly_once(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
@@ -551,15 +551,19 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         request = self.db.conn.execute("SELECT * FROM assistant_requests").fetchone()
         self.server._stop_typing(request["id"])
 
-    async def test_no_device_awake_means_no_question_at_all(self):
+    async def test_no_device_awake_keeps_the_question_for_the_poll(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)
         self.db.set_assistant_link("tok-a", "vault-1", True, "risky")
         asleep_a = FakeDevice("dev-a", "vault-1", server=self.server, answers=False)
         asleep_b = FakeDevice("dev-b", "vault-1", server=self.server, answers=False)
         self.server.rooms["room-1"] = {asleep_a, asleep_b}
         await self.server._bot_question("chat-a", "что по задачам?")
-        self.assertEqual(self.db.pending_assistant_requests("vault-1", time.time()), [])
-        self.assertIn("не в сети", self.bot.edits[-1][2])
+        # A socket that does not answer the probe is not proof that nobody can answer: the device
+        # may still poll `/api/assistant/pending`, so the question is held, not thrown away.
+        pending = self.db.pending_assistant_requests("vault-1", time.time())
+        self.assertEqual([row["question"] for row in pending], ["что по задачам?"])
+        self.assertIn("молчит", self.bot.edits[-1][2])
+        self.assertEqual(asleep_a.questions(), [])
 
     async def test_clear_command_reaches_every_live_device_of_the_vault(self):
         self.notify.link("tok-a", "chat-a", "A", self.tag)

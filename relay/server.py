@@ -80,8 +80,10 @@ ASSISTANT_REQUEST_TTL_SECONDS = 90
 # Telegram drops a typing indicator after ~5s, so it is re-armed inside that window.
 ASSISTANT_TYPING_INTERVAL_SECONDS = 4
 # How long the relay waits for devices to answer "I am here and I can run a model". A healthy
-# socket answers in single-digit milliseconds; a suspended app never answers at all.
-ASSISTANT_PROBE_TIMEOUT_SECONDS = 0.25
+# socket answers in single-digit milliseconds; a suspended app never answers at all. A device on
+# a phone tether or a tunnel sits somewhere in between, so the window has to cover a slow ack —
+# giving up at 250ms is what turned a live raspberry pi into "ни одно устройство не в сети".
+ASSISTANT_PROBE_TIMEOUT_SECONDS = 1.5
 ASSISTANT_MAX_QUESTION = 1000
 ASSISTANT_MAX_ANSWER = 4000
 # One bubble per question: these are its texts, in the order the person sees them.
@@ -3475,19 +3477,23 @@ class SlagRelayServer:
         return best[1] if best else None
 
     def _armed_digest(self, vault_id: str) -> str:
-        """The honest answer when no device can: what the relay already holds, nothing inferred."""
+        """What the relay holds that a device will run: the only fact it can add on its own.
+
+        Returns an empty string when the queue is empty — the caller already said the one thing
+        worth saying, and "в очереди пусто" is noise on top of "устройство молчит".
+        """
         rows = self.db.conn.execute(
             "SELECT title, stamp FROM notify_jobs WHERE vault_id = ? AND sent_at IS NULL"
             " ORDER BY fire_at LIMIT 2", (vault_id,)).fetchall()
+        if not rows:
+            return ""
         total = self.db.conn.execute(
             "SELECT COUNT(*) AS n FROM notify_jobs WHERE vault_id = ? AND sent_at IS NULL",
             (vault_id,)).fetchone()["n"]
-        if not rows:
-            return "ни одно устройство не в сети, а в очереди пусто — спроси из приложения."
         next_row = rows[0]
         when = f" — {next_row['stamp']}" if next_row["stamp"] else ""
         tail = f" (и ещё {total - 1})" if total > 1 else ""
-        return f"устройство не в сети. ближайшее: «{next_row['title']}»{when}{tail}"
+        return f"в очереди ближайшее: «{next_row['title']}»{when}{tail}"
 
     async def _linked_target(self, chat_id: str) -> Optional[dict]:
         """The one vault this chat may talk to: route token, vault, mode and tag.
@@ -3588,12 +3594,15 @@ class SlagRelayServer:
         if chosen is None:
             self.db.log_delivery_event("assistant.question", "no_device", route_tag=route_tag,
                                        device_count=len(candidates))
-            await self._edit_assistant_progress(
-                request_id,
-                self._armed_digest(vault_id) if mode == "minimal"
-                else "ни одно устройство не в сети — прочитать хранилище некому. открой приложение и спроси ещё раз.")
-            # Only after the bubble is rewritten: a finished request is not editable any more.
-            self.db.finish_assistant_request(request_id)
+            waiting = "устройство молчит — держу вопрос, передам, как только оно отзовётся."
+            queued = self._armed_digest(vault_id) if mode == "minimal" else ""
+            await self._edit_assistant_progress(request_id,
+                                                f"{waiting} {queued}".strip() if queued else waiting)
+            # Not finished on purpose. A socket that looks dead can still be a device: the poll
+            # `/api/assistant/pending` is how it picks the question up, and that poll is the only
+            # reason a raspberry pi behind a flaky tunnel ever answers at all. The expiry loop
+            # still ends the request if nobody does.
+            self._stop_typing(request_id)
             return
         # The status line is cosmetic and the socket write is not: the question goes out first,
         # the bubble catches up on its own.
