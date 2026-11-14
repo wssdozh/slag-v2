@@ -143,7 +143,7 @@ class BotDomain:
 
     async def _bot_start(self, chat_id: str, sender: str, code: str, message: dict) -> None:
         if not code:
-            status = self._chat_status(chat_id, message)
+            status = self._chat_status(chat_id)
             if status is not None:
                 await self._bot_reply(chat_id, status[1], html=status[0])
                 return
@@ -175,7 +175,7 @@ class BotDomain:
         await self._bot_reply(chat_id, f"готово. напоминания из {source} будут приходить сюда.",
                               html=f"<b>готово</b>. напоминания из {tg_escape(source)} будут приходить сюда.")
 
-    def _chat_status(self, chat_id: str, message: dict) -> Optional[Tuple[str, str]]:
+    def _chat_status(self, chat_id: str) -> Optional[Tuple[str, str]]:
         """(html, plain) for the vault this chat already talks to, or None when it talks to none.
 
         `/start` is the only place a person can see *which* vault answers them, and two vaults
@@ -186,30 +186,30 @@ class BotDomain:
         routes = self.notify.routes_for_chat(chat_id)
         if not routes:
             return None
-        from_user = message.get("from") or {}
-        who = " ".join(part for part in (from_user.get("first_name"), from_user.get("last_name"))
-                       if part).strip()
-        handle = str(from_user.get("username") or "").strip()
-        if handle:
-            who = f"{who} (@{handle})" if who else f"@{handle}"
         html_blocks: list[str] = []
         plain_blocks: list[str] = []
         for route in routes[:3]:
             link = self.db.assistant_link(route["route_token"])
-            row = self.db.conn.execute("SELECT name FROM vaults WHERE id = ?",
+            row = self.db.conn.execute("SELECT name, owner_account_id FROM vaults WHERE id = ?",
                                        (link["vault_id"],)).fetchone() if link else None
             if link:
+                # Short, the way the app shows it: a name and the four characters that make two
+                # vaults with the same name distinguishable at a glance.
                 name = (row["name"] if row else "") or "хранилище"
                 mode = link["mode"] or "minimal"
-                html_blocks.append(f"<b>{tg_escape(name)}</b>\n<code>{tg_escape(link['vault_id'])}</code>\n"
-                                   f"уведомления вкл · ассистент вкл · {tg_escape(mode)}")
-                plain_blocks.append(f"{name}\n{link['vault_id']}\nуведомления вкл · ассистент вкл · {mode}")
+                account_tail = ((row["owner_account_id"] if row else "") or "")[-4:]
+                lines_html = [f"<b>{tg_escape(name)}</b> • <code>{tg_escape(link['vault_id'][-4:])}</code>"]
+                lines_plain = [f"{name} • {link['vault_id'][-4:]}"]
+                if account_tail:
+                    lines_html.append(f"аккаунт • <code>{tg_escape(account_tail)}</code>")
+                    lines_plain.append(f"аккаунт • {account_tail}")
+                lines_html.append(f"уведомления вкл · ассистент вкл · {tg_escape(mode)}")
+                lines_plain.append(f"уведомления вкл · ассистент вкл · {mode}")
+                html_blocks.append("\n".join(lines_html))
+                plain_blocks.append("\n".join(lines_plain))
             else:
                 html_blocks.append("<b>хранилище не привязано</b>\nуведомления вкл · ассистент выкл")
                 plain_blocks.append("хранилище не привязано\nуведомления вкл · ассистент выкл")
-        if who:
-            html_blocks.insert(0, tg_escape(who))
-            plain_blocks.insert(0, who)
         return "\n\n".join(html_blocks), "\n\n".join(plain_blocks)
 
     async def _edit_telegram(self, chat_id: str, message_id: int, html: str, plain: str,

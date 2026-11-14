@@ -432,18 +432,19 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         with self.db.conn:
             self.db.conn.execute(
                 "INSERT OR REPLACE INTO vaults (id, name, owner_account_id, created_at, updated_at)"
-                " VALUES ('vault-1', 'main', 'acc-1', ?, ?)", (time.time(), time.time()))
+                " VALUES ('vault_3721cd28-be7a-47f9-aa71-267d341b5121', 'main',"
+                " 'acc_28ec1766232017b19a8a7043', ?, ?)", (time.time(), time.time()))
         self.notify.link("tok-a", "chat-a", "A", self.tag)
-        self.db.set_assistant_link("tok-a", "vault-1", True)
+        self.db.set_assistant_link("tok-a", "vault_3721cd28-be7a-47f9-aa71-267d341b5121", True)
         await self.server._handle_bot_update({"update_id": 11, "message": {
             "chat": {"id": "chat-a", "type": "private"},
             "from": {"id": "chat-a", "first_name": "Мория", "username": "morii"},
             "text": "/start"}})
         html = self.bot.sent[-1][1]
-        # Two vaults can share a name; the id is the only thing that tells them apart.
+        # Short, like the app: a name and the four characters that tell two vaults apart.
         self.assertIn("main", html)
-        self.assertIn("vault-1", html)
-        self.assertIn("Мория (@morii)", html)
+        self.assertIn("• <code>5121</code>", html)
+        self.assertIn("аккаунт • <code>7043</code>", html)
         self.assertIn("ассистент вкл", html)
         self.assertNotIn("приглашение", html)
 
