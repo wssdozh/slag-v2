@@ -428,6 +428,30 @@ class NotificationTestCase(unittest.IsolatedAsyncioTestCase):
         await self.server._handle_bot_update(update)
         self.assertIn("уже использован", self.bot.sent[-1][1])
 
+    async def test_start_in_a_linked_chat_shows_the_vault_and_the_person(self):
+        with self.db.conn:
+            self.db.conn.execute(
+                "INSERT OR REPLACE INTO vaults (id, name, owner_account_id, created_at, updated_at)"
+                " VALUES ('vault-1', 'main', 'acc-1', ?, ?)", (time.time(), time.time()))
+        self.notify.link("tok-a", "chat-a", "A", self.tag)
+        self.db.set_assistant_link("tok-a", "vault-1", True)
+        await self.server._handle_bot_update({"update_id": 11, "message": {
+            "chat": {"id": "chat-a", "type": "private"},
+            "from": {"id": "chat-a", "first_name": "Мория", "username": "morii"},
+            "text": "/start"}})
+        html = self.bot.sent[-1][1]
+        # Two vaults can share a name; the id is the only thing that tells them apart.
+        self.assertIn("main", html)
+        self.assertIn("vault-1", html)
+        self.assertIn("Мория (@morii)", html)
+        self.assertIn("ассистент вкл", html)
+        self.assertNotIn("приглашение", html)
+
+    async def test_start_without_a_link_still_points_at_the_app(self):
+        await self.server._handle_bot_update({"update_id": 12, "message": {
+            "chat": {"id": "chat-1", "type": "private"}, "from": {"id": "chat-1"}, "text": "/start"}})
+        self.assertIn("приглашение", self.bot.sent[-1][1])
+
     async def test_bot_start_ignores_groups_and_bad_codes(self):
         self.db.create_notify_invite("vault-1", "abc123def456", "route-token-1")
         await self.server._handle_bot_update({"update_id": 2, "message": {
