@@ -18,6 +18,11 @@ export async function listen(): Promise<UnlistenFn> {
   return () => undefined;
 }
 
+/** Plugin events (notification permission, deep links) belong to a window this process has not. */
+export async function addPluginListener(): Promise<{ unregister: () => void }> {
+  return { unregister: () => undefined };
+}
+
 export async function invoke<T>(): Promise<T> {
   throw new Error('The headless node has no tauri commands');
 }

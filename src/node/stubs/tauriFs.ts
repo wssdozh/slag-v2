@@ -17,3 +17,21 @@ export async function readDir(): Promise<never[]> {
 export async function remove(): Promise<void> {
   // Nothing was written.
 }
+
+// Attachments and settings never travel through plugin-fs on the node: the vault port owns every
+// file it touches. These exist so the assistant can share one code path with the app.
+export async function exists(): Promise<boolean> {
+  return false;
+}
+
+export async function readTextFile(): Promise<string> {
+  return '';
+}
+
+export async function writeFile(): Promise<void> {
+  // Nothing was written.
+}
+
+export async function readFile(): Promise<Uint8Array> {
+  return new Uint8Array();
+}

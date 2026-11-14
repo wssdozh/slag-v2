@@ -17,8 +17,11 @@ const DEFAULT_SERVER = process.env.SLAG_RELAY_URL || 'http://152.53.199.71:8320'
 const SELF = process.env.SLAG_SELF || 'slag-node';
 /** How long `login` waits for the two taps in the app before giving up. */
 const APPROVAL_WAIT_MS = 5 * 60 * 1000;
-/** After a failed init, wait this long before trying the relay again. */
+/** After a failed init, wait this long before trying the relay again; doubles up to the cap. */
 const RETRY_INTERVAL_MS = 30_000;
+const RETRY_MAX_INTERVAL_MS = 5 * 60_000;
+/** How often the node asks the relay for questions its socket never delivered. */
+const PENDING_QUESTION_POLL_MS = 30_000;
 
 interface Flags {
   [key: string]: string | boolean | undefined;
@@ -247,17 +250,68 @@ async function run(options: CliOptions, flags: Flags): Promise<void> {
   cliLog.info(
     `старт: ${options.vaultDir}, заметок ${vault.noteCount}, режим ${sync.forceReceiveOnly ? 'только приём' : 'чтение и запись'}`
   );
+  // The bot asks a device, and this node is the one that never sleeps. Without these three the
+  // socket answers every election with "no model" and does nothing with the question itself —
+  // which is what "ни одно устройство не в сети" looked like while the pi sat there, connected.
+  const { answerAssistantQuestion, clearAssistantHistory } = await import('../lib/notify/assistant');
+  const { isChatConfigured } = await import('../lib/ai/connections/resolve');
+  const { loadAiSettings } = await import('../lib/ai/connections/settings');
+  const assistantVaultId = sync.getSyncVaultId();
+  // One question, one answer: the socket and the poll below race, and both would run the model.
+  const handled = new Set<string>();
+  const answer = (requestId: string, question: string,
+                  mode: 'minimal' | 'risky', reportStage?: (stage: 'thinking') => void): void => {
+    if (handled.has(requestId)) return;
+    handled.add(requestId);
+    if (handled.size > 200) {
+      // The node runs for months; only the last handful can still be asked about.
+      const [oldest] = handled;
+      handled.delete(oldest);
+    }
+    void answerAssistantQuestion(assistantVaultId, requestId, question, mode, reportStage);
+  };
+  sync.setAssistantHandler(answer);
+  sync.setAssistantClearHandler(() => clearAssistantHistory(assistantVaultId));
+  sync.setAssistantReadyProvider(() => isChatConfigured(loadAiSettings()));
+
+  // A socket on a tunnel can look open and be dead: the relay probes it, gets no ack and decides
+  // nobody is online. The app covers that with the same poll; without it the one device that
+  // never sleeps is the one that never answers.
+  const pullPendingQuestions = (): void => {
+    if (!accountClient.isAuthenticated()) return;
+    void accountClient.pendingAssistant(assistantVaultId)
+      .then((pending) => {
+        for (const request of pending.requests) {
+          answer(request.requestId, request.question, request.mode);
+        }
+      })
+      .catch((error: unknown) => {
+        cliLog.warn(`не смог спросить релей о ждущих вопросах: ${String(error)}`);
+      });
+  };
+
   await sync.init();
   accountClient.startPolling(config.serverUrl);
+  pullPendingQuestions();
+  // Every half a minute, so a question waits at most that long for a device whose socket the
+  // relay has given up on. The relay keeps one alive for 90s, so this can still catch it.
+  setInterval(pullPendingQuestions, PENDING_QUESTION_POLL_MS);
 
   // init() parks a failure in status instead of throwing, and a headless node has nobody to press
-  // "retry". Reconnecting after a dropped pull is the whole job here.
+  // "retry". Reconnecting after a dropped pull is the whole job here — but a backlog that cannot
+  // be pulled at all must not be retried on a tight loop, or the node spends its day downloading
+  // the same dead bundle. The socket stays open across the wait; only the pull is backed off.
   let lastRetry = Date.now();
+  let retryDelay = RETRY_INTERVAL_MS;
   setInterval(() => {
-    if (sync.getStatus().state !== 'error') return;
-    if (Date.now() - lastRetry < RETRY_INTERVAL_MS) return;
+    if (sync.getStatus().state !== 'error') {
+      retryDelay = RETRY_INTERVAL_MS;
+      return;
+    }
+    if (Date.now() - lastRetry < retryDelay) return;
     lastRetry = Date.now();
-    cliLog.info('синхронизация сорвалась, повторяю');
+    cliLog.info(`синхронизация сорвалась, повторяю (пауза ${Math.round(retryDelay / 1000)} с)`);
+    retryDelay = Math.min(retryDelay * 2, RETRY_MAX_INTERVAL_MS);
     void sync.init();
   }, SYNC_INTERVALS.POLL_INTERVAL_MS);
 
