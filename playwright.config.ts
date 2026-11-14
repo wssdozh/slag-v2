@@ -12,7 +12,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 const cacheFor = (name: string) => ({ SLAG_VITE_CACHE_DIR: `${process.env.TEMP ?? '.'}/slag-vite-${name}` });
 
 const webServer = {
-  command: `npx vite --port ${port} --host 127.0.0.1`,
+  command: `npx vite --config config/vite.config.ts --port ${port} --host 127.0.0.1`,
   url: baseURL,
   reuseExistingServer: true,
   timeout: 30000,

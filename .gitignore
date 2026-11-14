@@ -77,8 +77,8 @@ __pycache__/
 .tmp/
 
 # Search benchmark artifacts (corpora are huge, they are generated)
-bench/.data/
-bench/out/
+scripts/bench/.data/
+scripts/bench/out/
 
 # Test screenshots written by the specs at the repo root.
 # Anchored on purpose: docs/screenshots is tracked documentation.

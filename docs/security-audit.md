@@ -101,7 +101,7 @@ unc, nul/control, `:`/`?`/`*`, reserved-имена windows, хвостовые �
 
 ### 6. dev-сервер: open-folder traversal + `host: true` — medium, fixed
 
-`vite.config.ts` принимал `target=../../..`, создавал каталог и открывал explorer;
+`config/vite.config.ts` принимал `target=../../..`, создавал каталог и открывал explorer;
 сервер слушал все интерфейсы. теперь target — только `notes`/`logs`/`backups` или
 безопасный vault-relative путь, а `host` по умолчанию `127.0.0.1`
 (`SLAG_DEV_HOST=0.0.0.0` — только осознанно, для телефона).

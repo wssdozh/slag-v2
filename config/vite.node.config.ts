@@ -1,10 +1,10 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
-const tauriStub = fileURLToPath(new URL('./src/node/stubs/tauri.ts', import.meta.url));
-const tauriFsStub = fileURLToPath(new URL('./src/node/stubs/tauriFs.ts', import.meta.url));
-const storageStub = fileURLToPath(new URL('./src/node/stubs/storageSingleton.ts', import.meta.url));
-const browserPortStub = fileURLToPath(new URL('./src/node/stubs/browserPort.ts', import.meta.url));
+const tauriStub = fileURLToPath(new URL('../src/node/stubs/tauri.ts', import.meta.url));
+const tauriFsStub = fileURLToPath(new URL('../src/node/stubs/tauriFs.ts', import.meta.url));
+const storageStub = fileURLToPath(new URL('../src/node/stubs/storageSingleton.ts', import.meta.url));
+const browserPortStub = fileURLToPath(new URL('../src/node/stubs/browserPort.ts', import.meta.url));
 
 /**
  * The headless build. Two modules are replaced before anything is bundled:

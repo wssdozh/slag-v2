@@ -47,9 +47,9 @@ account-спеки требуют клон `wssdozh/slag-relay` рядом с р
 | `src/` | React UI, контекст, хуки, `lib/` |
 | `src-tauri/` | Rust-оболочка, десктоп и Android |
 | `e2e/` | Playwright |
+| `config/` | Vite, tsconfig, oxlint |
 | `docs/` | архитектура, карта кода, гайды |
-| `scripts/` | карта кода, релиз, иконки |
-| `bench/` | замеры поиска |
+| `scripts/` | карта кода, релиз, иконки, замеры поиска |
 
 Сервер синхронизации и telegram-бот живут отдельно:
 [wssdozh/slag-relay](https://github.com/wssdozh/slag-relay).

@@ -21,7 +21,7 @@ import {
 } from './localBookkeeping';
 import { logger } from '../logger/logger';
 // Re-exported for the sync e2e specs, which drive sync through the real store. The headless
-// build swaps this module out (vite.node.config.ts), so nothing here reaches the node.
+// build swaps this module out (config/vite.node.config.ts), so nothing here reaches the node.
 export { storage } from '../storage';
 import { accountClient } from './account';
 export { accountClient };

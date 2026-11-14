@@ -56,7 +56,8 @@ src/
   styles/       theme.css — токены
 src-tauri/      Rust: десктоп и Android
 e2e/            Playwright: slag/ по зонам + support/
-scripts/        инструменты репозитория: gen-code-map.mjs (карта и `where`), иконки Android
+config/         Vite, tsconfig и oxlint
+scripts/        инструменты репозитория: gen-code-map.mjs (карта и `where`), иконки Android, bench/
 docs/project-map/  база знаний проекта, 15 документов
 ```
 
@@ -90,7 +91,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | состояние приложения | `src/context/AppContext.tsx` + `src/context/hooks/` |
 | вложения, аудио, вставка файлов | `src/lib/media/`, `src/lib/storage/index.ts` |
 | настройки, тема, типографика | `src/components/Modals/SettingsModal.tsx`, `src/components/Settings/`, `src/styles/theme.css` |
-| MCP-сервер | `src/mcp/`, `vite.mcp.config.ts` |
+| MCP-сервер | `src/mcp/`, `config/vite.mcp.config.ts` |
 | e2e | `e2e/slag/` |
 
 Детали не пересказываю, читаю по вопросу:
