@@ -1,6 +1,6 @@
-// Integrations: a list of outbound connections, one open at a time, and the master switch over all of them.
+// Integrations: the master switch, the list of channels, and one detail screen behind a gear.
 import React, { useState } from 'react';
-import { ArrowLeft, Cog, Send } from 'lucide-react';
+import { ArrowLeft, Cog } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
 import type { NotifyInvite } from '../../lib/sync/account';
@@ -8,6 +8,7 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import {
   getNotifyPrefs,
   getNotifyRoutes,
+  integrationsLive,
   notifyErrorText,
   saveNotifyPrefs,
   saveNotifyRoutes,
@@ -36,15 +37,16 @@ function channelOf(routes: NotifyRoute[]): NotifyRoute | null {
   );
 }
 
-function channelText(channel: NotifyRoute | null): string {
-  if (channel?.state === 'active') return 'подключён';
-  if (channel?.state === 'pending') return 'ждёт подтверждения';
-  return 'не подключён';
-}
+/** The real Telegram mark, not a paper plane that means "send" in every other app. */
+const TelegramIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+  </svg>
+);
 
 /**
- * A list, not a settings dump: the master switch, the integrations it governs, and one detail
- * screen behind a gear. Another integration is one entry plus its own block, nothing else.
+ * A list, not a settings dump: the master switch first, then one line per channel, then the
+ * channel's own screen behind a gear. Another integration is one row plus its own block.
  */
 export const IntegrationsSettingsTab: React.FC = () => {
   const { addToast, confirmAction } = useApp();
@@ -54,18 +56,31 @@ export const IntegrationsSettingsTab: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
   const [isSavingAssistant, setIsSavingAssistant] = useState(false);
-  const [isSavingMaster, setIsSavingMaster] = useState(false);
   const [isTelegramOpen, setIsTelegramOpen] = useState(false);
 
   const vaultId = currentVaultId();
   const locked = !vaultId || !accountClient.isAuthenticated();
   const channel = channelOf(routes);
-  const enabled = prefs.integrationsEnabled;
+  const live = integrationsLive(prefs);
 
-  const patchPrefs = (next: Partial<NotifyPrefs>) => {
+  /** Saves the switch and hands the relay the new verdict on the whole delivery path. */
+  const applyPrefs = (next: Partial<NotifyPrefs>): NotifyPrefs => {
     const merged = { ...prefs, ...next };
     setPrefs(merged);
     saveNotifyPrefs(merged);
+    return merged;
+  };
+
+  // The switch is a promise that nothing leaves the device: it stops new arms here and tells
+  // the relay to stop routing questions. Whatever an earlier session queued still fires.
+  const syncRelay = async (next: NotifyPrefs) => {
+    if (!vaultId || !accountClient.isAuthenticated() || routes.length === 0) return;
+    const mode = next.assistantMode;
+    try {
+      await setAssistantForRoutes(vaultId, routes, integrationsLive(next) && mode !== 'off', mode === 'off' ? 'minimal' : mode);
+    } catch (error) {
+      addToast(notifyErrorText(error), 'error');
+    }
   };
 
   const handleRequestInvite = async () => {
@@ -131,28 +146,11 @@ export const IntegrationsSettingsTab: React.FC = () => {
     setIsSavingAssistant(true);
     try {
       await setAssistantForRoutes(vaultId, routes, mode !== 'off', mode === 'off' ? 'minimal' : mode);
-      patchPrefs({ assistantMode: mode });
+      applyPrefs({ assistantMode: mode });
     } catch (error) {
       addToast(notifyErrorText(error), 'error');
     } finally {
       setIsSavingAssistant(false);
-    }
-  };
-
-  // The switch is the promise that nothing leaves the device: it stops new arms here and tells
-  // the relay to stop routing questions. Whatever an earlier session queued still fires.
-  const handleMasterChange = async (next: boolean) => {
-    patchPrefs({ integrationsEnabled: next });
-    if (!vaultId || !accountClient.isAuthenticated() || routes.length === 0) return;
-    setIsSavingMaster(true);
-    try {
-      const mode = prefs.assistantMode;
-      await setAssistantForRoutes(vaultId, routes, next && mode !== 'off', mode === 'off' ? 'minimal' : mode);
-      addToast(next ? 'интеграции включены' : 'интеграции выключены: бот молчит', 'info');
-    } catch (error) {
-      addToast(notifyErrorText(error), 'error');
-    } finally {
-      setIsSavingMaster(false);
     }
   };
 
@@ -176,9 +174,11 @@ export const IntegrationsSettingsTab: React.FC = () => {
           </p>
         </div>
 
-        {!enabled && (
+        {!live && (
           <p className="px-1 text-2xs text-fg-muted">
-            все интеграции выключены — включи их в списке, настройки подождут
+            {prefs.integrationsEnabled
+              ? 'канал выключен — включи telegram в списке'
+              : 'все интеграции выключены — включи их в списке'}
           </p>
         )}
 
@@ -188,7 +188,7 @@ export const IntegrationsSettingsTab: React.FC = () => {
           openInvite={invite && isModalOpen ? invite : null}
           vaultId={vaultId}
           isRequesting={isRequesting}
-          isLocked={locked || !enabled}
+          isLocked={locked || !live}
           onRequestOrShow={handleRequestOrShow}
           onDisconnect={handleDisconnect}
           onCloseModal={() => setIsModalOpen(false)}
@@ -203,8 +203,8 @@ export const IntegrationsSettingsTab: React.FC = () => {
               <SettingsSwitch
                 label="Скрывать текст под спойлером"
                 checked={prefs.spoiler}
-                disabled={!enabled}
-                onChange={(value) => patchPrefs({ spoiler: value })}
+                disabled={!live}
+                onChange={(value) => applyPrefs({ spoiler: value })}
               />
             }
           />
@@ -217,7 +217,7 @@ export const IntegrationsSettingsTab: React.FC = () => {
 
         <AssistantGroup
           mode={prefs.assistantMode}
-          disabled={locked || isSavingAssistant || channel?.state !== 'active' || !enabled}
+          disabled={locked || isSavingAssistant || channel?.state !== 'active' || !live}
           onModeChange={(mode) => void handleModeChange(mode)}
         />
       </div>
@@ -227,37 +227,43 @@ export const IntegrationsSettingsTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-3">
       <SettingsGroup
-        title="Интеграции"
         action={<span className="text-2xs font-mono text-fg-dim">каналы наружу</span>}
       >
         <SettingsRow
           label="Включить интеграции"
-          description="разом: напоминания в каналы и ответы бота. выключено — остаются системные уведомления"
           right={
             <SettingsSwitch
               label="Включить интеграции"
-              checked={enabled}
-              disabled={isSavingMaster}
-              onChange={(value) => void handleMasterChange(value)}
+              checked={prefs.integrationsEnabled}
+              onChange={(value) => void syncRelay(applyPrefs({ integrationsEnabled: value }))}
             />
           }
         />
-        <SettingsDivider />
+      </SettingsGroup>
+
+      <SettingsGroup title="Интеграции">
         <SettingsRow
-          icon={<Send className="w-4 h-4" />}
+          icon={<TelegramIcon className="w-4 h-4" />}
           label="telegram"
-          description={
-            enabled
-              ? `${channelText(channel)} · напоминания и вопросы боту`
-              : 'выключено вместе с остальными'
-          }
           right={
-            <span className="text-fg-dim">
-              <Cog className="w-4 h-4" />
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="настройки telegram"
+                data-testid="integration-telegram-settings"
+                onClick={() => setIsTelegramOpen(true)}
+                className="p-1.5 rounded-md text-fg-muted hover:text-fg-primary hover:bg-surface-hover cursor-pointer motion-press"
+              >
+                <Cog className="w-4 h-4" />
+              </button>
+              <SettingsSwitch
+                label="канал telegram"
+                checked={live}
+                disabled={!prefs.integrationsEnabled}
+                onChange={(value) => void syncRelay(applyPrefs({ telegramEnabled: value }))}
+              />
             </span>
           }
-          onClick={() => setIsTelegramOpen(true)}
-          testId="integration-telegram"
         />
       </SettingsGroup>
     </div>

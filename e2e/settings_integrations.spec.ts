@@ -19,25 +19,32 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     }
 
     await scope.locator('[data-tab="integrations"]').click();
-    // The tab is a list: one switch over all outbound channels, then the channels themselves.
+    // Two blocks: one switch over everything, then one line per channel — name, gear, switch.
     const master = scope.getByRole('switch', { name: 'Включить интеграции' });
+    const channelToggle = scope.getByRole('switch', { name: 'канал telegram' });
     await expect(master).toHaveAttribute('aria-checked', 'true');
-    await expect(scope.getByTestId('integration-telegram')).toBeVisible();
-    await expect(scope.getByText('не подключён · напоминания и вопросы боту')).toBeVisible();
+    await expect(channelToggle).toHaveAttribute('aria-checked', 'true');
+    await expect(scope.getByTestId('integration-telegram-settings')).toBeVisible();
+    // No descriptions in the list: the row is a name and two controls.
+    await expect(scope.getByText('не подключён · напоминания и вопросы боту')).toHaveCount(0);
     await expect(scope.locator('button button')).toHaveCount(0);
     expect(await scope.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     await settle(page);
     await page.screenshot({ path: `test-results/screenshots/settings-integrations-${viewport.width}.png` });
 
-    // Off is a promise the row keeps: the integration says it went down with the rest.
+    // The master takes the channel down with it, and the channel cannot outvote it.
     await master.click();
-    await expect(master).toHaveAttribute('aria-checked', 'false');
-    await expect(scope.getByText('выключено вместе с остальными')).toBeVisible();
+    await expect(channelToggle).toHaveAttribute('aria-checked', 'false');
+    await expect(channelToggle).toBeDisabled();
     await master.click();
-    await expect(master).toHaveAttribute('aria-checked', 'true');
+    await expect(channelToggle).toHaveAttribute('aria-checked', 'true');
+    await channelToggle.click();
+    await expect(channelToggle).toHaveAttribute('aria-checked', 'false');
+    await channelToggle.click();
+    await expect(channelToggle).toHaveAttribute('aria-checked', 'true');
 
     // The gear opens the one integration: its description first, its settings below.
-    await scope.getByTestId('integration-telegram').click();
+    await scope.getByTestId('integration-telegram-settings').click();
     await expect(scope.getByText('Канал в telegram', { exact: true })).toBeVisible();
     await expect(scope.getByText('Скрывать текст под спойлером')).toBeVisible();
     await expect(scope.getByText('Ассистент в telegram', { exact: true })).toBeVisible();
@@ -47,7 +54,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     await page.screenshot({ path: `test-results/screenshots/settings-integrations-telegram-${viewport.width}.png` });
 
     await scope.getByRole('button', { name: 'все интеграции' }).click();
-    await expect(scope.getByTestId('integration-telegram')).toBeVisible();
+    await expect(scope.getByTestId('integration-telegram-settings')).toBeVisible();
 
     await scope.locator('[data-tab="notifications"]').click();
     // Notifications answer "what and when", not "where": no telegram wording may leak back in.

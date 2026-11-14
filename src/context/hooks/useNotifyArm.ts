@@ -6,7 +6,7 @@ import { isChatConfigured } from '../../lib/ai/connections/resolve';
 import { loadAiSettings } from '../../lib/ai/connections/settings';
 import { answerAssistantQuestion, clearAssistantHistory } from '../../lib/notify/assistant';
 import { reconcileNotifications, runLocalReminders } from '../../lib/notify/plan';
-import { describeError, getNotifyPrefs, getNotifyRoutes } from '../../lib/notify/prefs';
+import { describeError, getNotifyPrefs, getNotifyRoutes, integrationsLive } from '../../lib/notify/prefs';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
 
@@ -42,7 +42,7 @@ function armReminders(items: SlagItem[]): void {
   void reconcileNotifications(
     items,
     vaultId,
-    prefs.integrationsEnabled ? getNotifyRoutes() : [],
+    integrationsLive(prefs) ? getNotifyRoutes() : [],
     prefs
   );
 }

@@ -5,7 +5,7 @@ import { logger } from '../logger/logger';
 import { accountClient } from '../sync/account';
 import { computeHash } from '../sync/crypto';
 import { formatDueDateLabel, getISODateString } from '../time/dateUtils';
-import { describeError, getNotifyPrefs, getNotifyRoutes, saveNotifyRoutes } from './prefs';
+import { describeError, getNotifyPrefs, getNotifyRoutes, integrationsLive, saveNotifyRoutes } from './prefs';
 import { DAY_MS, shiftOutOfQuiet } from './quiet';
 
 const notifyLog = logger.scope('NOTIFY');
@@ -311,6 +311,6 @@ export async function sendLocalNotification(title: string, body: string): Promis
  */
 export async function showLocalReminder(item: SlagItem): Promise<void> {
   const prefs = getNotifyPrefs();
-  if (prefs.integrationsEnabled && getNotifyRoutes().some((route) => route.state === 'active')) return;
+  if (integrationsLive(prefs) && getNotifyRoutes().some((route) => route.state === 'active')) return;
   await sendLocalNotification(item.title, 'напоминание');
 }

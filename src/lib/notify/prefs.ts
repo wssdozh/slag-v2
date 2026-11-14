@@ -10,7 +10,16 @@ export const DEFAULT_NOTIFY_PREFS: NotifyPrefs = {
   assistantMode: 'off',
   spoiler: false,
   integrationsEnabled: true,
+  telegramEnabled: true,
 };
+
+/**
+ * Whether any outbound channel may deliver right now: the master switch plus the channel's own.
+ * A second integration adds its term here, not a second check at every call site.
+ */
+export function integrationsLive(prefs: NotifyPrefs): boolean {
+  return prefs.integrationsEnabled && prefs.telegramEnabled;
+}
 
 /** Older builds stored the assistant switch as a boolean, so state on disk may still carry it. */
 type StoredNotifyPrefs = Partial<NotifyPrefs> & { assistant?: boolean };
@@ -44,6 +53,7 @@ export function getNotifyPrefs(): NotifyPrefs {
     assistantMode: assistantModeOf(stored),
     spoiler: stored.spoiler ?? DEFAULT_NOTIFY_PREFS.spoiler,
     integrationsEnabled: stored.integrationsEnabled ?? DEFAULT_NOTIFY_PREFS.integrationsEnabled,
+    telegramEnabled: stored.telegramEnabled ?? DEFAULT_NOTIFY_PREFS.telegramEnabled,
   };
 }
 

@@ -422,6 +422,8 @@ export interface NotifyPrefs {
    * over. Missing on older workspaces and treated as on.
    */
   integrationsEnabled: boolean;
+  /** The telegram channel's own switch, one row in the integrations list. */
+  telegramEnabled: boolean;
 }
 
 /** Who this vault belongs to. Synced inside the encrypted bundle, so the relay never sees it. */
@@ -578,7 +580,6 @@ export type AppUpdateStatus =
   | 'available'
   | 'downloading'
   | 'installing'
-  | 'permission-required'
   | 'up-to-date'
   | 'error';
 
