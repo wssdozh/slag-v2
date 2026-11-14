@@ -11,7 +11,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$Version,
   [string]$Notes = '',
-  [string]$Repo = 'wssdozh/slag-releases',
+  [string]$Repo = 'wssdozh/slag-v2',
   [string]$ApkPath = '',
   [string]$KeyPath = "$env:USERPROFILE\.tauri\slag-updater.key",
   [switch]$SkipBuild,

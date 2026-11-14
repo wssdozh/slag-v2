@@ -7,14 +7,16 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
+// The app is open source, so releases ride on the code repository itself: same tags, same
+// release page, no separate artifacts repo to keep in sync.
 const MANIFEST_URL: &str =
-    "https://github.com/wssdozh/slag-releases/releases/latest/download/latest.json";
-const ASSET_PREFIX: &str = "https://github.com/wssdozh/slag-releases/releases/download/";
+    "https://github.com/wssdozh/slag-v2/releases/latest/download/latest.json";
+const ASSET_PREFIX: &str = "https://github.com/wssdozh/slag-v2/releases/download/";
 const PUBKEY: &str = include_str!("../updater.pubkey");
 const PROGRESS_EVENT: &str = "slag://update-progress";
 const LOG_EVENT: &str = "slag://update-log";
 const APPLY_FLAG: &str = "--apply-update";
-const RELEASE_PAGE: &str = "https://github.com/wssdozh/slag-releases/releases";
+const RELEASE_PAGE: &str = "https://github.com/wssdozh/slag-v2/releases";
 
 #[derive(Deserialize, Clone)]
 pub struct Asset {

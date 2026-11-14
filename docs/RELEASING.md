@@ -9,7 +9,7 @@
 портативная exe и apk. Вместо этого:
 
 - манифест `latest.json` лежит ассетом в публичном релизе
-  `https://github.com/wssdozh/slag-releases/releases/latest/download/latest.json`;
+  `https://github.com/wssdozh/slag-v2/releases/latest/download/latest.json`;
 - клиент сверяет `version` (semver) со своей, качает файл своей платформы, проверяет **sha256**
   и **minisign-подпись** вшитым публичным ключом (`src-tauri/updater.pubkey`);
 - только после обеих проверок файл применяется:
@@ -24,7 +24,7 @@
     «Обновления» показывает новую версию и ссылку на страницу релиза.
 
 Подпись манифеста не проверяется: url ограничен префиксом
-`https://github.com/wssdozh/slag-releases/releases/download/`, а подменённый файл не пройдёт
+`https://github.com/wssdozh/slag-v2/releases/download/`, а подменённый файл не пройдёт
 проверку подписи. Заметки о релизе — справочные.
 
 Обе подписи (`*.sig` рядом с артефактом и поле `signature` в манифесте) — это **base64** от
@@ -63,15 +63,11 @@ npx tauri signer generate -w "$env:USERPROFILE\.tauri\slag-updater.key" --ci
 
 Потеря ключа = невозможность обновить уже установленные копии, кроме ручной переустановки.
 
-## 3. Публичный репозиторий релизов
+## 3. Репозиторий релизов
 
-Основной репозиторий приватный, поэтому артефакты лежат в отдельном публичном:
-
-```powershell
-gh repo create wssdozh/slag-releases --public --description "SLAG release artifacts"
-```
-
-Репозиторий нужен только под ассеты и `latest.json`; исходников там нет.
+Проект открытый, поэтому релизы живут в нём же: `github.com/wssdozh/slag-v2/releases`. Отдельный
+репозиторий артефактов (`slag-releases`) больше не нужен и удаляется; прежние теги там остаются
+только историей и клиентами не читаются.
 
 ## 4. Выпуск
 

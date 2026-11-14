@@ -192,7 +192,7 @@ tar-архив собирать и распаковывать **на устро�
 ## 8. Обновления клиента (self-update)
 
 Приложение обновляет себя само: манифест и файлы — в публичном
-`https://github.com/wssdozh/slag-releases/releases`, подпись minisign + sha256 проверяются до
+`https://github.com/wssdozh/slag-v2/releases`, подпись minisign + sha256 проверяются до
 запуска. Точки входа: `src-tauri/src/updater.rs`, вкладка «Обновления» в настройках,
 `src/lib/platform/appUpdate.ts`, `src/context/hooks/useAppUpdates.ts`.
 
