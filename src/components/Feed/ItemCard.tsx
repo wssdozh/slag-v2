@@ -10,6 +10,7 @@ import { extractFocalContext } from '../../lib/media/enrichment/text';
 import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 import { formatDueStamp } from '../../lib/time/dateUtils';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
+import { findAttachmentEmbeds } from '../../lib/text/attachmentEmbed';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
@@ -282,8 +283,20 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const isTask = item.type === 'task';
   const isArticle = item.type === 'article';
 
+  // A file the text already shows as `![[name]]` must not also appear in the gallery below:
+  // the embed is the file's place on the card, and a second copy reads as two attachments.
+  const embeddedAttachmentNames = useMemo(
+    () => new Set(findAttachmentEmbeds(item.content ?? '').map((embed) => embed.name.toLowerCase())),
+    [item.content]
+  );
+  const galleryAttachments = useMemo(
+    () => (item.attachments ?? []).filter(
+      (attachment) => !embeddedAttachmentNames.has(attachment.name.toLowerCase())
+    ),
+    [item.attachments, embeddedAttachmentNames]
+  );
   // One bucket per kind, so each slot of the card gets its own list and the shape counts once.
-  const attachmentGroups = useMemo(() => groupItemAttachments(item.attachments), [item.attachments]);
+  const attachmentGroups = useMemo(() => groupItemAttachments(galleryAttachments), [galleryAttachments]);
   // Bytes are not in the note any more: they are resolved from IndexedDB or `.attachments/`.
   // `missing` tells pictures apart from bytes still on their way.
   const { srcs: attachmentSrcs, missing: missingAttachmentSrcs } = useAttachmentSrcs(item.attachments);
