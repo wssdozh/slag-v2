@@ -17,8 +17,9 @@ import path from 'node:path';
 const base = process.env.BASE_URL || 'http://127.0.0.1:4199/';
 const out = path.resolve(process.env.OUT || 'shots-out');
 
-// Panels that turn the hero frame into a dashboard rather than one screen with one note.
-const HIDDEN_PANELS = ['panel_sidebar', 'panel_info'];
+// Panels that turn the hero frame into a dashboard rather than one screen with one note. The folder
+// rail on the left stays: it is what makes the feed read as a place with structure.
+const HIDDEN_PANELS = ['panel_assistant', 'panel_info'];
 
 const boot = async (page) => {
   await page.goto(base, { waitUntil: 'load' });
