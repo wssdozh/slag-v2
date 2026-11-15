@@ -42,10 +42,12 @@ const closeTab = async (page, panelId) => {
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
-  viewport: { width: 1440, height: 900 },
+  // Recorded at the size the hero shows, so nothing has to be rescaled afterwards: this machine has
+  // no ffmpeg with a scale filter, and a 1:1 capture is sharper anyway.
+  viewport: { width: 1200, height: 750 },
   locale: 'ru-RU',
   colorScheme: 'dark',
-  recordVideo: { dir: out, size: { width: 1440, height: 900 } },
+  recordVideo: { dir: out, size: { width: 1200, height: 750 } },
 });
 const page = await ctx.newPage();
 const startedAt = Date.now();
@@ -122,13 +124,25 @@ const tabBox = await boardTab.boundingBox();
 const groupBox = await feedGroup.boundingBox();
 if (!tabBox || !groupBox) throw new Error('не нашёл вкладку доски или группу ленты');
 const from = { x: tabBox.x + tabBox.width / 2, y: tabBox.y + tabBox.height / 2 };
-const to = { x: groupBox.x + groupBox.width * 0.84, y: groupBox.y + groupBox.height * 0.5 };
+// Dockview paints the zone the pointer is over, so the path has to end where the panel should land:
+// pull straight down out of the tab strip, then across to the right edge, then hold. The old diagonal
+// shortcut showed a "top" indicator and dropped the panel on the right, which no viewer can unsee.
+const to = { x: groupBox.x + groupBox.width - 24, y: groupBox.y + groupBox.height * 0.5 };
 await page.mouse.move(from.x, from.y);
 await page.mouse.down();
-for (let step = 1; step <= 16; step += 1) {
-  await page.mouse.move(from.x + ((to.x - from.x) * step) / 16, from.y + ((to.y - from.y) * step) / 16);
-  await page.waitForTimeout(45);
+for (let step = 1; step <= 8; step += 1) {
+  await page.mouse.move(from.x, from.y + (72 * step) / 8);
+  await page.waitForTimeout(40);
 }
+const startX = from.x;
+const startY = from.y + 72;
+for (let step = 1; step <= 16; step += 1) {
+  await page.mouse.move(startX + ((to.x - startX) * step) / 16, startY + ((to.y - startY) * step) / 16);
+  await page.waitForTimeout(35);
+}
+await page.mouse.move(to.x - 1, to.y);
+await page.waitForTimeout(420);
+await page.screenshot({ path: path.join(out, 'beat-3b-hover-zone.png') });
 await page.mouse.up();
 const groups = await page.evaluate(() => document.querySelectorAll('.dv-groupview').length);
 if (groups < 3) throw new Error(`перетаскивание не разделило окно: групп ${groups}`);
