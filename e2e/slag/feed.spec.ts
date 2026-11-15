@@ -655,8 +655,8 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
 
     const materialsSearch = page.locator('input[placeholder*="Поиск по материалам"]');
     await expect(materialsSearch).toBeVisible();
-    await materialsSearch.fill('манифест');
-    await expect(page.locator('text=Манифест ультра-минимализма').first()).toBeVisible();
+    await materialsSearch.fill('заметочников');
+    await expect(page.locator('text=Вернулся к обычному .txt').first()).toBeVisible();
     await materialsSearch.fill('');
 
     // 3. Verify 4 columns exist (Бэклог, К выполнению, В работе, Выполнено)
