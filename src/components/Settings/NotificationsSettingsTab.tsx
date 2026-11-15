@@ -5,6 +5,7 @@ import { getNotifyPrefs, saveNotifyPrefs } from '../../lib/notify/prefs';
 import { sendLocalNotification } from '../../lib/notify/plan';
 import type { NotifyPrefs } from '../../types';
 import { ContentGroup } from './notifications/ContentGroup';
+import { PermissionsGroup } from './notifications/PermissionsGroup';
 import { QuietHoursGroup } from './notifications/QuietHoursGroup';
 import { SystemGroup } from './notifications/SystemGroup';
 
@@ -28,6 +29,9 @@ export const NotificationsSettingsTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Android draws its own settings screen for these; the group renders nothing elsewhere. */}
+      <PermissionsGroup />
+
       <ContentGroup
         tasks={prefs.tasks}
         overdue={prefs.overdue}

@@ -7,6 +7,15 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Reminders and alarms have to surface while another app is in front; the grant itself is
+         a system switch (`Settings.canDrawOverlays`), never a runtime dialog. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Android 14 limited full-screen intents to apps the person allowed; the manifest entry is
+         only the declaration, `NotificationManager.canUseFullScreenIntent()` is the real state. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Runtime permission on 33+; the notification plugin asks for it, this line keeps the
+         manifest honest for the permission screen the app opens. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- The attach sheet draws its own gallery: it reads names, dates, sizes and thumbnails,
          and touches a file only when that file is attached to a note. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />

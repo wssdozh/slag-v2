@@ -17,7 +17,9 @@ const OS_LABEL: Record<string, string> = {
 
 function installLabel(kind: string | undefined): string {
   if (kind === 'installer') return 'скачать установщик';
-  if (kind === 'apk') return 'скачать apk';
+  // Android: the apk is downloaded, verified and handed to the system installer — the phone
+  // owner reads that as "update", not as "download apk" next to an older version on screen.
+  if (kind === 'apk') return 'обновить';
   return 'скачать и установить';
 }
 
@@ -32,6 +34,7 @@ export const UpdatesSettingsTab: React.FC = () => {
     check,
     install,
     openReleasePage,
+    openInstallPermissionSettings,
   } = appUpdate;
 
   const isBusy = status === 'checking' || status === 'downloading';
@@ -169,6 +172,19 @@ export const UpdatesSettingsTab: React.FC = () => {
 
                   {status !== 'downloading' && status !== 'installing' && (
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* Android blocks the installer before the download even starts; the switch
+                          lives in system settings, so the way out is one tap away. */}
+                      {offer.kind === 'apk' && platform?.canInstallPackages === false && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Icon name="system.security" size="sm" tone="inherit" />}
+                          onClick={openInstallPermissionSettings}
+                          data-testid="update-install-permission-btn"
+                        >
+                          разрешить установку
+                        </Button>
+                      )}
                       {canInstall ? (
                         <Button
                           variant="primary"
