@@ -17,7 +17,9 @@ const OS_LABEL: Record<string, string> = {
 
 function installLabel(kind: string | undefined): string {
   if (kind === 'installer') return 'скачать установщик';
-  if (kind === 'apk') return 'скачать apk';
+  // Android: the apk is downloaded, verified and handed to the system installer — the phone
+  // owner reads that as "update", not as "download apk" next to an older version on screen.
+  if (kind === 'apk') return 'обновить';
   return 'скачать и установить';
 }
 
@@ -32,9 +34,13 @@ export const UpdatesSettingsTab: React.FC = () => {
     check,
     install,
     openReleasePage,
+    openInstallPermissionSettings,
   } = appUpdate;
 
   const isBusy = status === 'checking' || status === 'downloading';
+  // Android refuses the installer before the download starts when the source is not allowed;
+  // offering "обновить" first would spend the user's traffic only to hit that wall.
+  const isInstallBlocked = offer?.kind === 'apk' && platform?.canInstallPackages === false;
   const percent =
     progress && progress.total && progress.total > 0
       ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
@@ -169,7 +175,17 @@ export const UpdatesSettingsTab: React.FC = () => {
 
                   {status !== 'downloading' && status !== 'installing' && (
                     <div className="flex flex-wrap items-center gap-2">
-                      {canInstall ? (
+                      {isInstallBlocked ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<Icon name="system.security" size="sm" tone="inherit" />}
+                          onClick={openInstallPermissionSettings}
+                          data-testid="update-install-permission-btn"
+                        >
+                          разрешить установку
+                        </Button>
+                      ) : canInstall ? (
                         <Button
                           variant="primary"
                           size="sm"
@@ -194,6 +210,13 @@ export const UpdatesSettingsTab: React.FC = () => {
                         что нового
                       </Button>
                     </div>
+                  )}
+
+                  {isInstallBlocked && (
+                    <span className="text-2xs text-fg-dim">
+                      android не разрешает установку из этого источника — включи переключатель и вернись:
+                      кнопка станет «обновить».
+                    </span>
                   )}
 
                   {offer.kind === 'installer' && (

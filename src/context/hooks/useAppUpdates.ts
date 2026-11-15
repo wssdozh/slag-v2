@@ -13,6 +13,7 @@ import {
   watchUpdateProgress,
 } from '../../lib/platform/appUpdate';
 import { openExternalUrl } from '../../lib/platform/openExternal';
+import { shouldResumeInstall } from '../../lib/platform/installResume';
 import { logger } from '../../lib/logger/logger';
 import type {
   AppUpdateOffer,
@@ -45,6 +46,10 @@ export function useAppUpdates(
   const [error, setError] = useState<string | null>(null);
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(readDismissedVersion);
   const isBusy = useRef(false);
+  /** The offer android refused to install, kept until the system permission changes. */
+  const pendingInstall = useRef<string | null>(null);
+  /** The version whose automatic resume already ran; one resume per offer, never a loop. */
+  const resumedInstall = useRef<string | null>(null);
 
   useEffect(() => {
     void getAppUpdatePlatform().then(setPlatform);
@@ -125,7 +130,9 @@ export function useAppUpdates(
       updateLog.info('installed', { version: outcome.version, status: outcome.status });
       if (outcome.status === 'permission_required') {
         // Android cannot install silently: the switch lives in system settings, so this is a
-        // question with a consequence, not a line of text under the button.
+        // question with a consequence, not a line of text under the button. The version is
+        // remembered so the return from that screen can pick the offer up again.
+        pendingInstall.current = offer.version;
         setStatus('available');
         const proceed = await confirmAction({
           title: 'Разрешить установку?',
@@ -141,6 +148,7 @@ export function useAppUpdates(
         }
         return;
       }
+      pendingInstall.current = null;
       setStatus('installing');
     } catch (cause) {
       const code = updateErrorCode(cause);
@@ -153,6 +161,48 @@ export function useAppUpdates(
       isBusy.current = false;
     }
   }, [offer, confirmAction, addToast]);
+
+  /**
+   * Android: the install permission and the install itself both happen outside the app, and the
+   * return is the only moment either can have changed. The platform probe is re-read then — never
+   * on a timer — and one blocked offer gets exactly one automatic resume.
+   */
+  useEffect(() => {
+    const onReturn = () => {
+      if (document.visibilityState !== 'visible') return;
+      const pending = pendingInstall.current;
+      // Neither a blocked install nor an open permission row on screen: nothing to look at.
+      if (!pending && platform?.canInstallPackages !== false) return;
+      void (async () => {
+        const next = await getAppUpdatePlatform();
+        if (next) setPlatform(next);
+        const canInstallPackages = next?.canInstallPackages ?? null;
+        updateLog.info('install permission check', {
+          pending: pending ?? 'none',
+          canInstall: canInstallPackages === null ? 'unknown' : String(canInstallPackages),
+        });
+        if (
+          !shouldResumeInstall({
+            pendingVersion: pending,
+            offerVersion: offer?.version ?? null,
+            resumedVersion: resumedInstall.current,
+            canInstallPackages,
+          })
+        ) {
+          return;
+        }
+        resumedInstall.current = pending;
+        updateLog.info('install resume', { version: pending });
+        await install();
+      })();
+    };
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
+    };
+  }, [platform, offer, install]);
 
   const dismiss = useCallback(() => {
     const version = offer?.version;

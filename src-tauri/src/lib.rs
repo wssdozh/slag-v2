@@ -176,6 +176,7 @@ mod deeplink;
 mod secure_store;
 #[cfg(target_os = "android")]
 mod media_plugin;
+mod device_access;
 mod updater;
 
 #[cfg(desktop)]
@@ -418,7 +419,11 @@ pub fn run() {
             secure_store::secret_delete,
             updater::update_platform,
             updater::update_check,
-            updater::update_install
+            updater::update_install,
+            // Desktop has none of these grants; the commands answer "unknown" so the webview
+            // still gets an answer instead of a missing-command error.
+            device_access::device_access_status,
+            device_access::device_access_open
         ]);
     }
 
@@ -432,7 +437,9 @@ pub fn run() {
             updater::update_platform,
             updater::update_check,
             updater::update_install,
-            updater::update_open_install_settings
+            updater::update_open_install_settings,
+            device_access::device_access_status,
+            device_access::device_access_open
         ]);
     }
 
@@ -505,7 +512,11 @@ pub fn run() {
     // MediaStore listing only exists on Android; the module is compiled there and nowhere else.
     #[cfg(target_os = "android")]
     {
-        builder = builder.plugin(media_plugin::init()).plugin(deeplink::init()).plugin(updater::init());
+        builder = builder
+            .plugin(media_plugin::init())
+            .plugin(deeplink::init())
+            .plugin(updater::init())
+            .plugin(device_access::init());
     }
 
     #[cfg(desktop)]
