@@ -1,13 +1,31 @@
-// Renders markdown with GFM and turns Obsidian [[wiki links]] into in-app jumps.
+// Renders markdown with GFM, Obsidian [[wiki links]] as in-app jumps and ![[files]] as embeds.
 import React, { useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Icon } from './icons/Icon';
+import type { SlagAttachment } from '../../types';
+import { formatBytes } from '../../lib/text/formatBytes';
+import {
+  attachmentEmbedSrc,
+  attachmentNameFromHref,
+  markdownWithAttachmentEmbeds,
+  resolveAttachmentByName,
+} from '../../lib/text/attachmentEmbed';
+
+/** Attachment ids to the object URLs `useAttachmentSrcs` has resolved so far. */
+export type MarkdownAttachmentSrcs = Readonly<Record<string, string>>;
+
 interface MarkdownRendererProps {
   content: string;
   onWikiLinkClick?: (target: string) => void;
   className?: string;
   inline?: boolean;
+  /** Files of the note being rendered; `![[name]]` resolves against them. */
+  attachments?: SlagAttachment[];
+  /** Resolved bytes per attachment id; the embed falls back to the attachment's own dataUrl. */
+  attachmentSrcs?: MarkdownAttachmentSrcs;
+  /** A click on an image embed or a non-downloadable file chip. */
+  onAttachmentClick?: (attachment: SlagAttachment) => void;
 }
 
 // Convert Obsidian-style [[Target|Label]] and [[Target]] into markdown links [Label](wiki:Target)
@@ -35,18 +53,136 @@ function safeMarkdownUrl(url: string): string {
     if (code > 32 && code !== 127) probe += char;
   }
   if (/^[a-z][a-z0-9+.-]*:/i.test(probe)) {
-    return /^(?:https?:|mailto:|wiki:)/i.test(probe) ? value : '';
+    return /^(?:https?:|mailto:|wiki:|attachment:)/i.test(probe) ? value : '';
   }
   return value;
 }
+
+const EMBED_CHIP_CLASS =
+  'inline-flex items-center gap-1.5 align-middle max-w-full px-2 py-0.5 rounded-md bg-tint-6 border border-tint-8 font-mono text-2xs text-fg-tertiary';
+
+interface AttachmentEmbedViewProps {
+  name: string;
+  attachment?: SlagAttachment;
+  srcs?: MarkdownAttachmentSrcs;
+  onAttachmentClick?: (attachment: SlagAttachment) => void;
+}
+
+/**
+ * One `![[file]]` in the feed. A known picture becomes the picture itself, a known file becomes
+ * a chip that downloads when its bytes are there, and an unknown name stays a neutral chip with
+ * the name on it — never an `<img>` pointed at a scheme nothing can fetch.
+ */
+const AttachmentEmbedView: React.FC<AttachmentEmbedViewProps> = ({
+  name,
+  attachment,
+  srcs,
+  onAttachmentClick,
+}) => {
+  const src = attachmentEmbedSrc(attachment, srcs);
+  const label = attachment?.name ?? name;
+  const size = attachment ? formatBytes(attachment.size) : '';
+
+  if (attachment?.type === 'image' && src) {
+    return (
+      <button
+        type="button"
+        data-testid="attachment-embed"
+        data-attachment-kind="image"
+        title={label}
+        draggable={false}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onAttachmentClick?.(attachment);
+        }}
+        className="inline-flex max-w-full my-1 align-middle outline-none ring-0 cursor-zoom-in overflow-hidden rounded-lg border border-tint-10 bg-scrim-40"
+      >
+        <img
+          src={src}
+          alt={label}
+          loading="lazy"
+          draggable={false}
+          className="block max-h-64 max-w-full object-contain"
+        />
+      </button>
+    );
+  }
+
+  const chip = (
+    <>
+      <Icon name="action.attach" size="xs" tone="muted" className="shrink-0" />
+      <span className="truncate max-w-[16rem]">{label}</span>
+      {size && <span className="shrink-0 text-fg-muted normal-case">{size}</span>}
+    </>
+  );
+
+  // A file with bytes downloads straight from the card; audio and video open the note's rail,
+  // where they have a player. An unresolved name is a label, not an action.
+  if (attachment?.type === 'file' && src) {
+    return (
+      <a
+        href={src}
+        download={attachment.name}
+        data-testid="attachment-embed"
+        data-attachment-kind="file"
+        title={`Скачать ${attachment.name}`}
+        onClick={(e) => e.stopPropagation()}
+        className={`${EMBED_CHIP_CLASS} no-underline hover:bg-tint-8 hover:text-fg-soft transition-colors`}
+      >
+        {chip}
+      </a>
+    );
+  }
+
+  if (attachment && onAttachmentClick) {
+    return (
+      <button
+        type="button"
+        data-testid="attachment-embed"
+        data-attachment-kind={attachment.type}
+        title={`Открыть ${attachment.name}`}
+        draggable={false}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onAttachmentClick(attachment);
+        }}
+        className={`${EMBED_CHIP_CLASS} cursor-pointer hover:bg-tint-8 hover:text-fg-soft transition-colors`}
+      >
+        {chip}
+      </button>
+    );
+  }
+
+  return (
+    <span
+      data-testid="attachment-embed"
+      data-attachment-kind={attachment?.type ?? 'unknown'}
+      title={attachment ? label : `Вложение «${name}» не найдено`}
+      className={EMBED_CHIP_CLASS}
+    >
+      {chip}
+    </span>
+  );
+};
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   onWikiLinkClick,
   className = '',
   inline = false,
+  attachments,
+  attachmentSrcs,
+  onAttachmentClick,
 }) => {
-  const transformed = useMemo(() => transformWikiLinks(content), [content]);
+  // Embeds are pulled out first: the wiki transform would otherwise eat the inner `[[name]]`.
+  const transformed = useMemo(
+    () => transformWikiLinks(markdownWithAttachmentEmbeds(content)),
+    [content],
+  );
 
   const components: Components = useMemo(
     () => ({
@@ -76,6 +212,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             >
               {children}
             </span>
+          );
+        }
+        const embedName = href ? attachmentNameFromHref(href) : null;
+        if (embedName !== null) {
+          // The name is resolved against the note's own files; the scheme itself is never fetched.
+          return (
+            <AttachmentEmbedView
+              name={embedName}
+              attachment={resolveAttachmentByName(attachments, embedName)}
+              srcs={attachmentSrcs}
+              onAttachmentClick={onAttachmentClick}
+            />
           );
         }
         return (
@@ -174,7 +322,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       ),
       hr: () => <hr className="my-2 border-tint-8" />,
     }),
-    [onWikiLinkClick, inline]
+    [onWikiLinkClick, inline, attachments, attachmentSrcs, onAttachmentClick]
   );
 
   if (inline) {
