@@ -307,6 +307,23 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     openLightbox(itemImages, clickedIdx >= 0 ? clickedIdx : 0);
   }, [onImageClick, item, attachmentSrcs, openLightbox]);
 
+  // A `![[file]]` chip in the text opens pictures in the lightbox; anything else opens the
+  // note's rail, where a player or a download row already exists.
+  const handleAttachmentClick = useCallback((attachment: SlagAttachment) => {
+    if (attachment.type === 'image') {
+      handleImageClick(attachment);
+      return;
+    }
+    setSelectedItem(item);
+    setIsFullscreenEditorOpen(true);
+  }, [handleImageClick, item, setSelectedItem, setIsFullscreenEditorOpen]);
+
+  const attachmentMarkdownProps = {
+    attachments: item.attachments,
+    attachmentSrcs,
+    onAttachmentClick: handleAttachmentClick,
+  };
+
   const folderDisplayName =
     item.folder !== DEFAULT_INBOX_FOLDER
       ? item.folder.split('/').filter(Boolean).pop() || item.folder
@@ -565,12 +582,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   inline
                   onWikiLinkClick={scrollToItem}
                   className={item.status === 'done' ? 'line-through text-fg-muted' : 'text-fg-primary'}
+                  {...attachmentMarkdownProps}
                 />
               </h3>
 
               {taskBodyContent && (
                 <div className="mt-1 text-sm text-fg-tertiary leading-relaxed font-normal">
-                  <CardMarkdown content={taskBodyContent} onWikiLinkClick={scrollToItem} />
+                  <CardMarkdown content={taskBodyContent} onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
                 </div>
               )}
             </div>
@@ -615,7 +633,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           return (
             <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
               <div className="text-sm text-fg-soft leading-relaxed font-normal">
-                <CardMarkdown content={textToRender} onWikiLinkClick={scrollToItem} />
+                <CardMarkdown content={textToRender} onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
               </div>
             </div>
           );

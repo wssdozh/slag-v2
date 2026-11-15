@@ -41,7 +41,11 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
   if (attachments.length === 0) return null;
 
   return (
-    <div className="flex flex-col rounded-xl bg-tint-2 border border-tint-6 overflow-hidden">
+    <div
+      data-testid="attachment-strip"
+      data-collapsed={isCollapsed ? 'true' : 'false'}
+      className="flex flex-col rounded-xl bg-tint-2 border border-tint-6 overflow-hidden"
+    >
       <div
         onClick={onToggleCollapse}
         className="flex items-center justify-between px-3 py-2 text-xs text-fg-secondary hover:bg-tint-3 cursor-pointer transition-colors select-none"

@@ -5,6 +5,7 @@ import type { SlagItem, SlagItemStatus } from '../../types';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
+import type { Extension } from '@codemirror/state';
 import { undo, redo } from '@codemirror/commands';
 import { Icon } from '../UI/icons/Icon';
 import { SheetPanel } from '../UI/SheetPanel';
@@ -12,6 +13,7 @@ import { TagChip } from '../UI/TagChip';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
+import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
@@ -19,6 +21,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { EditorTaskFields } from './fullscreen/EditorTaskFields';
 import { useEditorAttachments } from './fullscreen/useEditorAttachments';
 import { useEditorAiActions } from './fullscreen/useEditorAiActions';
+import { attachmentEmbeds, syncAttachmentEmbedDeps, type AttachmentEmbedDeps } from './fullscreen/attachmentEmbeds';
 
 let activeEditorView: EditorView | null = null;
 
@@ -175,7 +178,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
   // Zen mode & layout controls (persisting user's width preference)
   const [isZenMode, setIsZenMode] = useState(false);
-  const [isAttachmentsCollapsed, setIsAttachmentsCollapsed] = useState(false);
+  // The rail starts folded: it belongs under the text, not between the tags and the note.
+  const [isAttachmentsCollapsed, setIsAttachmentsCollapsed] = useState(true);
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
 
   const selectedAttachment = attachments.find(a => a.id === selectedAttachmentId);
@@ -185,6 +189,21 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   const editorHandleRef = useRef<AtomicCodeMirrorEditorHandle | null>(null);
 
   const getEditorView = useCallback((): EditorView | null => activeEditorView, []);
+
+  // `![[file]]` paints as a widget in the note body. CM6 captures extensions at mount, so the
+  // plugin reads a deps object that outlives renders and is repainted when `version` moves.
+  const { srcs: attachmentSrcs } = useAttachmentSrcs(attachments);
+  const [embedDeps] = useState<AttachmentEmbedDeps>(() => ({ attachments, srcs: {}, version: 0 }));
+  const [extensionsForEditor] = useState<readonly Extension[]>(() => [
+    ...editorExtensions,
+    attachmentEmbeds(embedDeps),
+  ]);
+
+  useEffect(() => {
+    syncAttachmentEmbedDeps(embedDeps, attachments, attachmentSrcs);
+    // An empty transaction is enough: the plugin rebuilds on its own version check.
+    getEditorView()?.dispatch({});
+  }, [attachments, attachmentSrcs, embedDeps, getEditorView]);
 
   useEffect(() => {
     (window as any).__slagGetEditorMarkdown = () => editorHandleRef.current?.getMarkdown() ?? '';
@@ -528,21 +547,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
               <div className="h-px bg-tint-6 w-full mt-1" />
             </div>
 
-            {/* Media Attachments Section in Fullscreen Editor - Collapsible */}
-            <AttachmentStrip
-              itemId={item.id}
-              attachments={attachments}
-              isCollapsed={isAttachmentsCollapsed}
-              onToggleCollapse={() => setIsAttachmentsCollapsed(prev => !prev)}
-              selectedAttachmentId={selectedAttachmentId}
-              onSelectAttachment={setSelectedAttachmentId}
-              onInsertMarkdown={insertAttachmentMarkdown}
-              onMoveAttachment={moveAttachment}
-              onRemoveAttachment={removeAttachment}
-              onAddClick={handleAttachClick}
-              onOpenLightbox={openLightbox}
-            />
-
             {/* Main Markdown Editor with Obsidian-style Live Preview */}
             <div
               id="fullscreen-editor-root"
@@ -570,9 +574,25 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                 markdownSource={content}
                 onMarkdownChange={setContent}
                 editorHandleRef={editorHandleRef}
-                extensions={editorExtensions}
+                extensions={extensionsForEditor}
               />
             </div>
+
+            {/* The rail lives under the note: attachments are a footnote to the text, not a
+                block glued over it. Folded until a file arrives or the reader opens it. */}
+            <AttachmentStrip
+              itemId={item.id}
+              attachments={attachments}
+              isCollapsed={isAttachmentsCollapsed}
+              onToggleCollapse={() => setIsAttachmentsCollapsed(prev => !prev)}
+              selectedAttachmentId={selectedAttachmentId}
+              onSelectAttachment={setSelectedAttachmentId}
+              onInsertMarkdown={insertAttachmentMarkdown}
+              onMoveAttachment={moveAttachment}
+              onRemoveAttachment={removeAttachment}
+              onAddClick={handleAttachClick}
+              onOpenLightbox={openLightbox}
+            />
 
             {/* Bottom spacer on mobile so last lines clear the floating bottom bar */}
             <div className="h-16 md:hidden shrink-0" aria-hidden="true" />
