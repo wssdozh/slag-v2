@@ -72,6 +72,9 @@ pub struct PlatformInfo {
     pub release_page: String,
     /// The manifest actually used, so a dev override (`SLAG_UPDATE_ENDPOINT`) is visible in the UI.
     pub endpoint: String,
+    /// Android: `PackageManager.canRequestPackageInstalls()`, i.e. whether the system installer
+    /// will accept the apk this app hands it. `None` everywhere else — no such switch exists.
+    pub can_install_packages: Option<bool>,
 }
 
 #[derive(Serialize, Clone)]
@@ -282,15 +285,36 @@ fn offer_from(app: &AppHandle, manifest: Manifest) -> Option<UpdateOffer> {
 }
 
 #[tauri::command]
-pub fn update_platform(app: AppHandle) -> PlatformInfo {
-    PlatformInfo {
+pub async fn update_platform(app: AppHandle) -> Result<PlatformInfo, String> {
+    // Android answers this through the Kotlin bridge: `canRequestPackageInstalls` is a
+    // PackageManager call, and the whole update path already goes through that plugin. A failed
+    // probe is "unknown", not "forbidden": the UI must not offer a settings link on a guess.
+    #[cfg(target_os = "android")]
+    let can_install_packages = crate::device_access::can_install_packages(&app).await;
+    #[cfg(not(target_os = "android"))]
+    let can_install_packages: Option<bool> = None;
+    #[cfg(target_os = "android")]
+    if let Some(allowed) = can_install_packages {
+        log_line(
+            Some(&app),
+            "info",
+            "install permission",
+            if allowed {
+                "allowed"
+            } else {
+                "forbidden: android blocks installs from this source"
+            },
+        );
+    }
+    Ok(PlatformInfo {
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
         current_version: current_version(&app),
         can_apply: cfg!(any(target_os = "windows", target_os = "android")),
         release_page: RELEASE_PAGE.to_string(),
         endpoint: endpoint(),
-    }
+        can_install_packages,
+    })
 }
 
 #[tauri::command]

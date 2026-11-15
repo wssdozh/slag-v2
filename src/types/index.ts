@@ -565,7 +565,21 @@ export interface AppUpdatePlatform {
   releasePage: string;
   /** The manifest URL actually in use; a dev override shows up here. */
   endpoint: string;
+  /** Android only: `PackageManager.canRequestPackageInstalls()`, null elsewhere or unknown. */
+  canInstallPackages: boolean | null;
 }
+
+/** The Android grants a reminder needs; each one is a switch in system settings, not a dialog. */
+export interface DeviceAccessStatus {
+  /** draw over other apps: the reminder panel appears while another app is in front. */
+  overlay: boolean;
+  /** the OS will post this app's notifications at all. */
+  notifications: boolean;
+  /** Android 14+: an alarm may take the whole screen; true on older releases by default. */
+  fullScreenIntent: boolean;
+}
+
+export type DeviceAccessTarget = 'overlay' | 'notifications' | 'fullScreen';
 
 /** A line the native updater emits so the pipeline is visible in Логи & Диагностика. */
 export interface AppUpdateLogLine {
