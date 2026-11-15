@@ -38,6 +38,9 @@ export const UpdatesSettingsTab: React.FC = () => {
   } = appUpdate;
 
   const isBusy = status === 'checking' || status === 'downloading';
+  // Android refuses the installer before the download starts when the source is not allowed;
+  // offering "обновить" first would spend the user's traffic only to hit that wall.
+  const isInstallBlocked = offer?.kind === 'apk' && platform?.canInstallPackages === false;
   const percent =
     progress && progress.total && progress.total > 0
       ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
@@ -172,11 +175,9 @@ export const UpdatesSettingsTab: React.FC = () => {
 
                   {status !== 'downloading' && status !== 'installing' && (
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* Android blocks the installer before the download even starts; the switch
-                          lives in system settings, so the way out is one tap away. */}
-                      {offer.kind === 'apk' && platform?.canInstallPackages === false && (
+                      {isInstallBlocked ? (
                         <Button
-                          variant="secondary"
+                          variant="primary"
                           size="sm"
                           icon={<Icon name="system.security" size="sm" tone="inherit" />}
                           onClick={openInstallPermissionSettings}
@@ -184,8 +185,7 @@ export const UpdatesSettingsTab: React.FC = () => {
                         >
                           разрешить установку
                         </Button>
-                      )}
-                      {canInstall ? (
+                      ) : canInstall ? (
                         <Button
                           variant="primary"
                           size="sm"
@@ -210,6 +210,13 @@ export const UpdatesSettingsTab: React.FC = () => {
                         что нового
                       </Button>
                     </div>
+                  )}
+
+                  {isInstallBlocked && (
+                    <span className="text-2xs text-fg-dim">
+                      android не разрешает установку из этого источника — включи переключатель и вернись:
+                      кнопка станет «обновить».
+                    </span>
                   )}
 
                   {offer.kind === 'installer' && (
